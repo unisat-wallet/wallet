@@ -1,6 +1,6 @@
 {
   "name": "@unisat/keyring-service",
-  "version": "0.1.22",
+  "version": "0.1.23",
   "description": "Keyring service for managing Bitcoin wallets - supports HD, simple, and hardware wallets",
   "main": "lib/index.js",
   "module": "lib/index.mjs",

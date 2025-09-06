@@ -1,4 +1,4 @@
-import KeystoneSDK, { KeystoneBitcoinSDK, UR } from '@keystonehq/keystone-sdk'
+import { KeystoneSDK, KeystoneBitcoinSDK, UR } from '@keystonehq/keystone-sdk'
 import { uuid } from '@keystonehq/keystone-sdk/dist/utils/stringHelper.js'
 import { Psbt } from 'bitcoinjs-lib'
 //@ts-ignore
