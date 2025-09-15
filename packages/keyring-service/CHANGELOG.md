@@ -1,5 +1,11 @@
 # @unisat/keyring-service
 
+## 0.2.2
+
+### Patch Changes
+
+- fix
+
 ## 0.2.1
 
 ### Patch Changes
