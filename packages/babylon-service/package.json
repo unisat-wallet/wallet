@@ -1,6 +1,6 @@
 {
   "name": "@unisat/babylon-service",
-  "version": "0.1.5",
+  "version": "0.1.6",
   "description": "Babylon Bitcoin staking service for UniSat Wallet - handles delegation management and API interactions",
   "main": "lib/index.js",
   "module": "lib/index.mjs",
@@ -17,14 +17,24 @@
       "import": "./lib/index.mjs"
     },
     "./types": {
-      "types": "./lib/types/index.d.ts",
-      "require": "./lib/types/index.js",
-      "import": "./lib/types/index.mjs"
+      "types": "./lib/types.d.ts",
+      "require": "./lib/types.js",
+      "import": "./lib/types.mjs"
     },
     "./cosmos": {
-      "types": "./lib/cosmos/index.d.ts",
-      "require": "./lib/cosmos/index.js",
-      "import": "./lib/cosmos/index.mjs"
+      "types": "./lib/cosmos.d.ts",
+      "require": "./lib/cosmos.js",
+      "import": "./lib/cosmos.mjs"
+    },
+    "./api": {
+      "types": "./lib/api.d.ts",
+      "require": "./lib/api.js",
+      "import": "./lib/api.mjs"
+    },
+    "./utils": {
+      "types": "./lib/utils.d.ts",
+      "require": "./lib/utils.js",
+      "import": "./lib/utils.mjs"
     }
   },
   "scripts": {

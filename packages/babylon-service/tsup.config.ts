@@ -1,10 +1,13 @@
 import { defineConfig } from 'tsup';
 
 export default defineConfig({
-  entry: [
-    'src/index.ts',
-    'src/types/index.ts'
-  ],
+  entry: {
+    'index': 'src/index.ts',
+    'types': 'src/types-only.ts',
+    'cosmos': 'src/cosmos/index.ts',
+    'api': 'src/api/index.ts',
+    'utils': 'src/utils/index.ts'
+  },
   format: ['cjs', 'esm'],
   dts: true,
   splitting: false,
@@ -17,7 +20,7 @@ export default defineConfig({
     'fs/promises',
     'path'
   ],
-  esbuildOptions(options, context) {
+  esbuildOptions(options) {
     delete options.packages;
   },
 });
