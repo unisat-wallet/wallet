@@ -1,4 +1,4 @@
-import { KeyringType, ToSignInput, Keyring } from '@unisat/wallet-types'
+import { KeyringType, ToSignInput, Keyring } from '../types'
 
 export class ReadonlyKeyring implements Keyring {
   type = KeyringType.ReadonlyKeyring

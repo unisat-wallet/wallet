@@ -1,4 +1,6 @@
-import { AddressType, NetworkType, ToSignInput } from '@unisat/wallet-types'
+import { AddressType, NetworkType } from '@unisat/wallet-types'
+import { ToSignInput } from '@unisat/keyring-service/types'
+
 import { AddressUserToSignInput, PublicKeyUserToSignInput, SignPsbtOptions } from '../types'
 import { AbstractWallet } from './abstract-wallet'
 import { HdKeyring, SimpleKeyring } from '@unisat/keyring-service'

@@ -1,4 +1,6 @@
-import { NetworkType, ToSignInput } from '@unisat/wallet-types'
+import { NetworkType } from '@unisat/wallet-types'
+import { ToSignInput } from '@unisat/keyring-service/types'
+
 import { ErrorCodes, WalletUtilsError } from './error'
 import { InscriptionUnit, InscriptionUnspendOutput, Transaction, utxoHelper } from './transaction'
 import { UnspentOutput } from './types'

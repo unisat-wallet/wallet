@@ -11,10 +11,6 @@ import { eccManager } from '@unisat/wallet-bitcoin'
 describe('KeyringServiceWrapper', () => {
   let keyringService: KeyringServiceWrapper
 
-  beforeAll(async () => {
-    await eccManager.waitForReady()
-  })
-
   beforeEach(async () => {
     // Mock console to reduce test output noise
     vi.spyOn(console, 'log').mockImplementation(() => {})
@@ -204,7 +200,7 @@ describe('KeyringServiceWrapper', () => {
       )
 
       await expect(
-        keyringService.createKeyringWithMnemonic(
+        (keyringService as any).createKeyringWithMnemonic(
           'abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about',
           "m/44'/0'/0'",
           '',

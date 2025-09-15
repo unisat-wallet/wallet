@@ -1,6 +1,8 @@
 import { EstimateWallet } from '../wallet'
 import { utxoHelper } from './utxo'
-import { AddressType, NetworkType, ToSignInput } from '@unisat/wallet-types'
+import { AddressType, NetworkType } from '@unisat/wallet-types'
+import { ToSignInput } from '@unisat/keyring-service/types'
+
 import {
   addressToScriptPk,
   bitcoin,

@@ -1,4 +1,4 @@
-import { KeyringType as KeyringType, ToSignInput, Keyring } from '@unisat/wallet-types'
+import { KeyringType, ToSignInput, Keyring } from '../types'
 // Empty keyring implementation for placeholder
 export class EmptyKeyring implements Keyring {
   type = KeyringType.Empty

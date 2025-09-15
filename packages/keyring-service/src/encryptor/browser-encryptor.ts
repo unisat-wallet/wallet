@@ -1,4 +1,4 @@
-import { Encryptor } from '@unisat/wallet-types'
+import { Encryptor } from '../types'
 
 // @ts-ignore
 import * as browserPassworder from 'browser-passworder'

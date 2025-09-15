@@ -7,7 +7,8 @@ import { Transaction } from './transaction/transaction'
 import { utxoHelper } from './transaction/utxo'
 import { UnspentOutput } from './types'
 import { bitcoin } from '@unisat/wallet-bitcoin'
-import { NetworkType, ToSignInput } from '@unisat/wallet-types'
+import { NetworkType } from '@unisat/wallet-types'
+import { ToSignInput } from '@unisat/keyring-service/types'
 
 // only one arc20 can be send
 export async function sendRunes({

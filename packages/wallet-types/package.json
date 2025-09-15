@@ -1,6 +1,6 @@
 {
   "name": "@unisat/wallet-types",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "Shared type definitions for UniSat wallet ecosystem",
   "main": "lib/index.js",
   "module": "lib/index.mjs",

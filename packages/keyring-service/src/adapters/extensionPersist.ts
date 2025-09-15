@@ -1,4 +1,4 @@
-import { StorageAdapter } from '@unisat/wallet-types'
+import { StorageAdapter } from '../types'
 
 /**
  * Extension persist store adapter for Chrome extension storage

@@ -1,9 +1,4 @@
-import { AddressType } from '../base'
-
-// Re-export types from separate modules
-export * from './keyring' // Keyring interface, ToSignInput
-export * from './cosmos' // CosmosSignRequest, CosmosSignDataType
-export * from './keystone' // Keystone UR types
+import { AddressType } from '@unisat/wallet-types'
 
 // Core service interfaces
 export interface DisplayedKeyring {

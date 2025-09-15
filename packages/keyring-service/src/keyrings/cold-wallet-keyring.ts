@@ -1,9 +1,4 @@
-import {
-  KeyringType as KeyringType,
-  ToSignInput,
-  CosmosSignDataType,
-  Keyring,
-} from '@unisat/wallet-types'
+import { KeyringType, ToSignInput, CosmosSignDataType, Keyring } from '../types'
 import { bitcoin } from '@unisat/wallet-bitcoin'
 
 export interface ColdWalletKeyringOptions {

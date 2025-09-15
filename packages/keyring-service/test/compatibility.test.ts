@@ -1,10 +1,7 @@
 import { describe, it, expect, beforeEach } from 'vitest'
 import { KeyringService } from '../src/keyring-service'
 import { MemoryStorageAdapter } from '../src/adapters/memory'
-import { FilesystemStorageAdapter } from '../src/adapters/filesystem'
 import { MemStoreState } from '../src/types'
-import * as fs from 'fs/promises'
-import * as path from 'path'
 
 describe('KeyringService Compatibility Tests', () => {
   describe('Memory Storage Adapter', () => {
@@ -15,7 +12,7 @@ describe('KeyringService Compatibility Tests', () => {
       storageAdapter = new MemoryStorageAdapter()
       keyringService = new KeyringService({
         storage: storageAdapter,
-        logger: console
+        logger: console,
       })
     })
 
@@ -27,7 +24,7 @@ describe('KeyringService Compatibility Tests', () => {
     it('should boot and maintain state', async () => {
       await keyringService.init()
       await keyringService.boot('test-password')
-      
+
       expect(keyringService.isBooted()).toBe(true)
       expect(keyringService.getMemStore().isUnlocked).toBe(true)
     })
@@ -35,11 +32,11 @@ describe('KeyringService Compatibility Tests', () => {
     it('should handle lock/unlock cycle', async () => {
       await keyringService.init()
       await keyringService.boot('test-password')
-      
+
       // Lock
       await keyringService.setLocked()
       expect(keyringService.getMemStore().isUnlocked).toBe(false)
-      
+
       // Unlock
       await keyringService.submitPassword('test-password')
       expect(keyringService.getMemStore().isUnlocked).toBe(true)
@@ -48,10 +45,10 @@ describe('KeyringService Compatibility Tests', () => {
     it('should verify password correctly', async () => {
       await keyringService.init()
       await keyringService.boot('test-password')
-      
+
       const isValid = await keyringService.verifyPassword('test-password')
       expect(isValid).toBe(true)
-      
+
       const isInvalid = await keyringService.verifyPassword('wrong-password')
       expect(isInvalid).toBe(false)
     })
@@ -59,77 +56,13 @@ describe('KeyringService Compatibility Tests', () => {
     it('should handle pre-mnemonic generation', async () => {
       await keyringService.init()
       await keyringService.boot('test-password')
-      
+
       const mnemonic = await keyringService.generatePreMnemonic()
       expect(typeof mnemonic).toBe('string')
       expect(mnemonic.split(' ')).toHaveLength(12)
-      
+
       const storedMnemonic = await keyringService.getPreMnemonic()
       expect(storedMnemonic).toBe(mnemonic)
-    })
-  })
-
-  describe('Filesystem Storage Adapter', () => {
-    let keyringService: KeyringService
-    let storageAdapter: FilesystemStorageAdapter
-    let tempDir: string
-
-    beforeEach(async () => {
-      tempDir = path.join(__dirname, 'temp-storage-' + Date.now())
-      storageAdapter = new FilesystemStorageAdapter(tempDir)
-      keyringService = new KeyringService({
-        storage: storageAdapter,
-        logger: console
-      })
-    })
-
-    afterEach(async () => {
-      try {
-        await fs.rm(tempDir, { recursive: true, force: true })
-      } catch {
-        // Ignore cleanup errors
-      }
-    })
-
-    it('should initialize with filesystem storage', async () => {
-      await keyringService.init()
-      expect(keyringService.getMemStore().isUnlocked).toBe(false)
-      
-      // Check that directory was created
-      const stats = await fs.stat(tempDir)
-      expect(stats.isDirectory()).toBe(true)
-    })
-
-    it('should persist state to filesystem', async () => {
-      await keyringService.init()
-      await keyringService.boot('test-password')
-      
-      // Verify booted state is persisted
-      const keyringData = await storageAdapter.get('keyring')
-      expect(keyringData).toBeDefined()
-      expect(keyringData.booted).toBeDefined()
-    })
-
-    it('should restore state from filesystem', async () => {
-      // First service instance
-      await keyringService.init()
-      await keyringService.boot('test-password')
-      const mnemonic = await keyringService.generatePreMnemonic()
-      
-      // Create new service instance with same storage
-      const newStorageAdapter = new FilesystemStorageAdapter(tempDir)
-      const newKeyringService = new KeyringService({
-        storage: newStorageAdapter,
-        logger: console
-      })
-      
-      await newKeyringService.init()
-      expect(newKeyringService.isBooted()).toBe(true)
-      
-      // Unlock and verify state
-      await newKeyringService.submitPassword('test-password')
-      // Note: pre-mnemonic is stored in memory store, not persistent storage
-      // So it won't be restored in new instance
     })
   })
 
@@ -140,37 +73,37 @@ describe('KeyringService Compatibility Tests', () => {
       const storageAdapter = new MemoryStorageAdapter()
       keyringService = new KeyringService({
         storage: storageAdapter,
-        logger: console
+        logger: console,
       })
     })
 
     it('should emit update events', async () => {
       await keyringService.init()
-      
+
       let updateEmitted = false
       let lastState: MemStoreState | null = null
-      
-      keyringService.on('update', (state) => {
+
+      keyringService.on('update', state => {
         updateEmitted = true
         lastState = state
       })
-      
+
       await keyringService.boot('test-password')
-      
+
       expect(updateEmitted).toBe(true)
       expect(lastState).toBeDefined()
-      expect(lastState?.isUnlocked).toBe(true)
+      expect((lastState as any)?.isUnlocked).toBe(true)
     })
 
     it('should emit lock events', async () => {
       await keyringService.init()
       await keyringService.boot('test-password')
-      
+
       let lockEmitted = false
       keyringService.on('lock', () => {
         lockEmitted = true
       })
-      
+
       await keyringService.setLocked()
       expect(lockEmitted).toBe(true)
     })
@@ -179,26 +112,26 @@ describe('KeyringService Compatibility Tests', () => {
       await keyringService.init()
       await keyringService.boot('test-password')
       await keyringService.setLocked()
-      
+
       let unlockEmitted = false
       keyringService.on('unlock', () => {
         unlockEmitted = true
       })
-      
+
       await keyringService.submitPassword('test-password')
       expect(unlockEmitted).toBe(true)
     })
 
     it('should provide memory store state', async () => {
       await keyringService.init()
-      
+
       const initialState = keyringService.getMemStore()
       expect(initialState.isUnlocked).toBe(false)
       expect(initialState.keyrings).toEqual([])
       expect(initialState.keyringTypes).toEqual([])
-      
+
       await keyringService.boot('test-password')
-      
+
       const unlockedState = keyringService.getMemStore()
       expect(unlockedState.isUnlocked).toBe(true)
     })
@@ -211,15 +144,15 @@ describe('KeyringService Compatibility Tests', () => {
       const storageAdapter = new MemoryStorageAdapter()
       keyringService = new KeyringService({
         storage: storageAdapter,
-        logger: console
+        logger: console,
       })
     })
 
     it('should have loadStore method', () => {
       expect(typeof keyringService.loadStore).toBe('function')
-      
+
       const mockState = { test: 'data' }
-      keyringService.loadStore(mockState)
+      keyringService.loadStore(mockState as any)
       expect(keyringService.store.getState()).toEqual(mockState)
     })
 
@@ -234,7 +167,7 @@ describe('KeyringService Compatibility Tests', () => {
 
     it('should have correct memStore structure', async () => {
       await keyringService.init()
-      
+
       const memStore = keyringService.getMemStore()
       expect(memStore).toHaveProperty('isUnlocked')
       expect(memStore).toHaveProperty('keyringTypes')

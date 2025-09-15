@@ -11,7 +11,8 @@ import {
   toPsbtNetwork,
   toXOnly,
 } from '@unisat/wallet-bitcoin'
-import { AddressType, NetworkType, ToSignInput } from '@unisat/wallet-types'
+import { AddressType, NetworkType } from '@unisat/wallet-types'
+import { ToSignInput } from '@unisat/keyring-service/types'
 
 /**
  * EstimateWallet is a wallet that can be used to estimate the size of a transaction.

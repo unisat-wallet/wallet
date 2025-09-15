@@ -1,10 +1,10 @@
-import { NetworkType, ToSignInput } from '@unisat/wallet-types'
+import { NetworkType } from '@unisat/wallet-types'
 import { ErrorCodes, WalletUtilsError } from './error'
 import { Transaction } from './transaction/transaction'
 import { utxoHelper } from './transaction/utxo'
 import { UnspentOutput } from './types'
 import { bitcoin, UTXO_DUST } from '@unisat/wallet-bitcoin'
-
+import { ToSignInput } from '@unisat/keyring-service/types'
 export async function sendBTC({
   btcUtxos,
   tos,

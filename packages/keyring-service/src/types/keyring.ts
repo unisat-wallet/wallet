@@ -1,4 +1,4 @@
-import { AddressType } from '../base'
+import { AddressType } from '@unisat/wallet-types'
 import { CosmosSignDataType } from './cosmos'
 
 // ToSignInput interface defined here to avoid circular imports

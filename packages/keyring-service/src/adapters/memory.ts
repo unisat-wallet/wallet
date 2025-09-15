@@ -1,4 +1,4 @@
-import { StorageAdapter } from '@unisat/wallet-types'
+import { StorageAdapter } from '../types'
 
 /**
  * Memory storage adapter for testing and development

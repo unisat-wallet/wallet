@@ -12,7 +12,7 @@ import {
   Encryptor,
   Keyring,
   ADDRESS_TYPES,
-} from '@unisat/wallet-types'
+} from './types'
 import { AddressType } from '@unisat/wallet-types'
 import { BrowserPassworderEncryptor } from './encryptor/browser-encryptor'
 import { ColdWalletKeyring, HdKeyring, KeystoneKeyring, SimpleKeyring } from './keyrings'

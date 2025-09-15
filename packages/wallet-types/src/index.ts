@@ -1,3 +1,28 @@
-export * from './base'
-export * from './keyring-service'
-export * from './tx-helpers'
+// Network and Chain types
+export enum NetworkType {
+  MAINNET,
+  TESTNET,
+  REGTEST,
+}
+
+export enum ChainType {
+  BITCOIN_MAINNET = 'BITCOIN_MAINNET',
+  BITCOIN_TESTNET = 'BITCOIN_TESTNET',
+  BITCOIN_TESTNET4 = 'BITCOIN_TESTNET4',
+  BITCOIN_SIGNET = 'BITCOIN_SIGNET',
+  FRACTAL_BITCOIN_MAINNET = 'FRACTAL_BITCOIN_MAINNET',
+  FRACTAL_BITCOIN_TESTNET = 'FRACTAL_BITCOIN_TESTNET',
+}
+
+// Address types
+export enum AddressType {
+  P2PKH,
+  P2WPKH,
+  P2TR,
+  P2SH_P2WPKH,
+  M44_P2WPKH, // deprecated
+  M44_P2TR, // deprecated
+  P2WSH,
+  P2SH,
+  UNKNOWN,
+}
