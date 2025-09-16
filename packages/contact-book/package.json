@@ -1,6 +1,6 @@
 {
   "name": "@unisat/contact-book",
-  "version": "0.1.8",
+  "version": "1.0.0",
   "description": "Universal contact book management with multi-chain support",
   "main": "dist/index.js",
   "module": "dist/index.mjs",

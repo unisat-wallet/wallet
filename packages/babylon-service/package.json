@@ -1,6 +1,6 @@
 {
   "name": "@unisat/babylon-service",
-  "version": "0.1.7",
+  "version": "1.0.0",
   "description": "Babylon Bitcoin staking service for UniSat Wallet - handles delegation management and API interactions",
   "main": "lib/index.js",
   "module": "lib/index.mjs",

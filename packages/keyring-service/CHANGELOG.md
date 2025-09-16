@@ -1,5 +1,17 @@
 # @unisat/keyring-service
 
+## 1.0.0
+
+### Major Changes
+
+- release first major version
+
+### Patch Changes
+
+- Updated dependencies
+  - @unisat/wallet-bitcoin@1.0.0
+  - @unisat/wallet-types@1.0.0
+
 ## 0.2.2
 
 ### Patch Changes

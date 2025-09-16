@@ -1,6 +1,6 @@
 {
   "name": "@unisat/permission-service",
-  "version": "0.1.10",
+  "version": "1.0.0",
   "description": "Cross-platform permission management service for web3 applications",
   "main": "dist/index.js",
   "module": "dist/index.mjs",
