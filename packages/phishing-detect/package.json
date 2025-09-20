@@ -1,0 +1,42 @@
+{
+  "name": "@unisat/phishing-detect",
+  "version": "1.0.0",
+  "description": "Cross-platform phishing detection library for UniSat wallet",
+  "main": "dist/index.js",
+  "module": "dist/index.mjs", 
+  "types": "lib/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/index.mjs",
+      "require": "./dist/index.js",
+      "types": "./lib/index.d.ts"
+    }
+  },
+  "files": [
+    "dist",
+    "lib",
+    "src"
+  ],
+  "scripts": {
+    "build": "tsup && pnpm run build:typed",
+    "build:cjs": "tsup --format cjs",
+    "build:esm": "tsup --format esm",
+    "build:typed": "tsc --declaration --declarationMap --emitDeclarationOnly --outDir lib",
+    "test": "vitest",
+    "lint": "eslint src"
+  },
+  "dependencies": {
+    "eventemitter3": "^5.0.1"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "@types/chrome": "^0.0.246",
+    "eslint": "^8.0.0",
+    "tsup": "^7.0.0",
+    "typescript": "^5.0.0",
+    "vitest": "^0.34.0"
+  },
+  "publishConfig": {
+    "access": "public"
+  }
+}
