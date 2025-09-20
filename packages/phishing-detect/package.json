@@ -1,6 +1,6 @@
 {
   "name": "@unisat/phishing-detect",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "Cross-platform phishing detection library for UniSat wallet",
   "main": "dist/index.js",
   "module": "dist/index.mjs",

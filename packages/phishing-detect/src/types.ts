@@ -20,19 +20,25 @@ export interface PhishingCheckResult {
 
 export interface PhishingAdapter {
   /**
-   * 获取存储的数据
+   * Get stored data
    */
   get(key: string): Promise<any>;
   
   /**
-   * 存储数据
+   * Store data
    */
   set(key: string, value: any): Promise<void>;
   
   /**
-   * HTTP 请求
+   * HTTP request
    */
   fetch(url: string, options?: RequestInit): Promise<Response>;
+}
+
+export interface PhishingServiceConfig {
+  adapter: PhishingAdapter;
+  logger?: any;
+  t?: any;
 }
 
 export interface PhishingServiceEvents {

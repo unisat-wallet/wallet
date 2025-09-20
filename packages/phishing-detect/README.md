@@ -27,8 +27,15 @@ import { PhishingService, LocalStorageAdapter } from '@unisat/phishing-detect';
 // Create adapter
 const adapter = new LocalStorageAdapter();
 
-// Create service instance
-const phishingService = new PhishingService(adapter);
+// Create service instance with config (recommended)
+const phishingService = new PhishingService({
+  adapter,
+  logger: console, // Optional: custom logger
+  t: (key) => key   // Optional: translation function
+});
+
+// Or use legacy format (backward compatible)
+// const phishingService = new PhishingService(adapter);
 
 // Initialize
 await phishingService.initialize();
