@@ -1,4 +1,4 @@
-import { defineConfig } from 'tsup';
+import { defineConfig } from 'tsup'
 
 export default defineConfig({
   entry: ['src/index.ts'],
@@ -9,10 +9,6 @@ export default defineConfig({
   splitting: false,
   minify: false,
   treeshake: true,
-  external: [
-    'react',
-    'react-redux',
-    '@reduxjs/toolkit',
-    '@unisat/wallet-types'
-  ]
-});
+  outDir: 'lib',
+  external: ['react', 'react-redux', '@reduxjs/toolkit', '@unisat/wallet-types'],
+})

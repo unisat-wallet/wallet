@@ -4,90 +4,17 @@
 
 import { EventEmitter } from 'eventemitter3'
 import { AddressType, ChainType, NetworkType } from '@unisat/wallet-types'
-
-// Re-export common types (these should come from @unisat/wallet-types)
-export interface Account {
-  address: string
-  pubkey: string
-  type: string
-  brandName: string
-  alianName?: string
-  displayBrandName?: string
-  index?: number
-  balance?: number
-}
-
-export interface BitcoinBalance {
-  confirm_amount: string
-  pending_amount: string
-  amount: string
-  confirm_btc_amount: string
-  pending_btc_amount: string
-  btc_amount: string
-  confirm_inscription_amount: string
-  pending_inscription_amount: string
-  inscription_amount: string
-  usd_value: string
-}
-
-export interface TxHistoryItem {
-  txid: string
-  time: number
-  date: string
-  amount: string
-  symbol: string
-  address: string
-}
-
-export interface Inscription {
-  inscriptionId: string
-  inscriptionNumber: number
-  address: string
-  outputValue: number
-  content: string
-  contentType: string
-  preview: string
-  title: string
-  desc: string
-}
-
-export interface TokenBalance {
-  ticker: string
-  overallBalance: string
-  availableBalance: string
-  transferableBalance: string
-  availableBalanceSafe: string
-  availableBalanceUnSafe: string
-}
-
-export interface TokenTransfer {
-  ticker: string
-  amount: string
-  inscriptionId: string
-  inscriptionNumber: number
-}
-
-export interface AddressTokenSummary {
-  tokenBalance: TokenBalance
-  tokenInfo: any
-  historyList: any[]
-  transferableList: TokenTransfer[]
-}
-
-export interface AppSummary {
-  apps: any[]
-}
-
-export interface AddressSummary {
-  totalSatoshis: number
-  btcSatoshis: number
-  assetSatoshis: number
-}
-
-export enum AddressFlagType {
-  Is_Enable_Atomicals = 1,
-  CONFIRMED_UTXO_MODE = 2,
-}
+import {
+  Account,
+  AddressSummary,
+  AddressTokenSummary,
+  AppSummary,
+  BitcoinBalance,
+  Inscription,
+  TokenBalance,
+  TokenTransfer,
+  TxHistoryItem,
+} from '@unisat/wallet-shared'
 
 // Base preference store structure
 export interface BasePreferenceStore {
@@ -200,7 +127,6 @@ export interface StorageAdapter {
   set(key: string, value: any): Promise<void>
   createPersistentProxy<T extends object>(name: string, template: T): Promise<T>
 }
-
 
 // Service configuration
 export interface PreferenceServiceConfig {

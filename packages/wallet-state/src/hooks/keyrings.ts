@@ -1,7 +1,16 @@
-import { useWalletSelector } from './index';
+import { AppState } from '..'
+import { useAppSelector } from './base'
 
-export const useKeyringsState = () => {
-  return useWalletSelector((state) => state.keyrings);
-};
+export function useKeyringsState(): AppState['keyrings'] {
+  return useAppSelector(state => state.keyrings)
+}
 
-// Additional keyrings hooks will be migrated here
+export function useKeyrings() {
+  const keyringsState = useKeyringsState()
+  return keyringsState.keyrings
+}
+
+export function useCurrentKeyring() {
+  const keyringsState = useKeyringsState()
+  return keyringsState.current
+}

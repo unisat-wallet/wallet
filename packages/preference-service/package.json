@@ -1,6 +1,6 @@
 {
   "name": "@unisat/preference-service",
-  "version": "0.1.3",
+  "version": "0.1.5",
   "description": "Cross-platform preference management service for UniSat wallet",
   "main": "lib/index.js",
   "module": "lib/index.mjs",
@@ -33,6 +33,7 @@
   "dependencies": {
     "@unisat/i18n": "workspace:*",
     "@unisat/wallet-types": "workspace:*",
+    "@unisat/wallet-shared": "workspace:*",
     "debounce": "^1.2.1",
     "eventemitter3": "^5.0.1",
     "lodash": "^4.17.21"

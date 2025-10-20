@@ -248,16 +248,16 @@ export type TypeChain = {
 export const CHAINS_MAP: { [key: string]: TypeChain } = {
   [ChainType.BITCOIN_MAINNET]: {
     enum: ChainType.BITCOIN_MAINNET,
-    label: 'Bitcoin T0',
-    iconLabel: 'BTC t0',
+    label: 'Bitcoin',
+    iconLabel: 'Bitcoin',
     icon: './images/artifacts/bitcoin-mainnet.svg',
-    unit: 'tBTC',
+    unit: 'BTC',
     networkType: NetworkType.MAINNET,
-    endpoints: ['https://t0.degen.earth/wallet-api'],
-    mempoolSpaceUrl: 'https://mempool-t0.degen.earth',
-    unisatUrl: 'https://t0.degen.earth',
-    ordinalsUrl: 'https://ordinals-t0.degen.earth',
-    unisatExplorerUrl: 'https://uniscan-t0.degen.earth',
+    endpoints: ['https://wallet-api.unisat.io'],
+    mempoolSpaceUrl: 'https://mempool.space',
+    unisatUrl: 'https://unisat.io',
+    ordinalsUrl: 'https://ordinals.com',
+    unisatExplorerUrl: 'https://uniscan.cc',
     okxExplorerUrl: '',
     showPrice: true,
     defaultExplorer: 'unisat-explorer',
@@ -314,16 +314,16 @@ export const CHAINS_MAP: { [key: string]: TypeChain } = {
   },
   [ChainType.FRACTAL_BITCOIN_MAINNET]: {
     enum: ChainType.FRACTAL_BITCOIN_MAINNET,
-    label: 'Fractl Bitcoin T0',
-    iconLabel: 'FB t0',
+    label: 'Fractal Bitcoin',
+    iconLabel: 'Fractal',
     icon: './images/artifacts/fractal-mainnet.svg',
-    unit: 'tFB',
+    unit: 'FB',
     networkType: NetworkType.MAINNET,
-    endpoints: ['https://fbt0.degen.earth/wallet-api'],
-    mempoolSpaceUrl: 'https://mempool-fbt0.degen.earth',
-    unisatUrl: 'https://fbt0.degen.earth',
-    ordinalsUrl: 'https://ordinals-fbt0.degen.earth',
-    unisatExplorerUrl: 'https://uniscan-fbt0.degen.earth',
+    endpoints: ['https://wallet-api-fractal.unisat.io'],
+    mempoolSpaceUrl: 'https://mempool.fractalbitcoin.io',
+    unisatUrl: 'https://fractal.unisat.io',
+    ordinalsUrl: 'https://ordinals.fractalbitcoin.io',
+    unisatExplorerUrl: 'https://uniscan.cc/fractal',
     okxExplorerUrl: '',
     isViewTxHistoryInternally: false,
     disable: false,
@@ -352,7 +352,6 @@ export const CHAINS_MAP: { [key: string]: TypeChain } = {
     enableBrc20SingleStep: true,
   },
 }
-
 export const CHAINS = Object.values(CHAINS_MAP)
 
 export type TypeChainGroup = {
@@ -368,25 +367,25 @@ export const CHAIN_GROUPS: TypeChainGroup[] = [
     type: 'single',
     chain: CHAINS_MAP[ChainType.BITCOIN_MAINNET],
   },
-  // {
-  //   type: 'list',
-  //   label: 'Bitcoin Testnet',
-  //   icon: './images/artifacts/bitcoin-testnet-all.svg',
-  //   items: [
-  //     CHAINS_MAP[ChainType.BITCOIN_TESTNET],
-  //     CHAINS_MAP[ChainType.BITCOIN_TESTNET4],
-  //     CHAINS_MAP[ChainType.BITCOIN_SIGNET]
-  //   ]
-  // },
+  {
+    type: 'list',
+    label: 'Bitcoin Testnet',
+    icon: './images/artifacts/bitcoin-testnet-all.svg',
+    items: [
+      CHAINS_MAP[ChainType.BITCOIN_TESTNET],
+      CHAINS_MAP[ChainType.BITCOIN_TESTNET4],
+      CHAINS_MAP[ChainType.BITCOIN_SIGNET],
+    ],
+  },
   {
     type: 'single',
     chain: CHAINS_MAP[ChainType.FRACTAL_BITCOIN_MAINNET],
   },
-  // {
-  //   type: 'single',
-  //   chain: CHAINS_MAP[ChainType.FRACTAL_BITCOIN_TESTNET]
-  // }
-]
+  {
+    type: 'single',
+    chain: CHAINS_MAP[ChainType.FRACTAL_BITCOIN_TESTNET],
+  },
+] as any
 
 export const MINIMUM_GAS_LIMIT = 21000
 
@@ -449,9 +448,9 @@ export const REVIEW_URL =
 export const TERMS_OF_SERVICE_URL = 'https://unisat.io/terms-of-service.html'
 export const PRIVACY_POLICY_URL = 'https://unisat.io/privacy-policy.html'
 
-export const CHANNEL = process.env.channel!
-export const VERSION = process.env.release!
-export const MANIFEST_VERSION = process.env.manifest!
+export const CHANNEL = 'extension'
+export const VERSION = '0.1.0'
+export const MANIFEST_VERSION = 'mv3' as any
 
 export enum AddressFlagType {
   Is_Enable_Atomicals = 0b1, // deprecated

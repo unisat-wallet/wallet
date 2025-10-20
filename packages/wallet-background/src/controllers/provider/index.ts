@@ -1,29 +1,30 @@
-import { ethErrors } from 'eth-rpc-errors'
-
-import { sessionService, keyringService } from '@/background/service'
-import { tab } from '@/background/webapi'
-
+// Provider controller for handling RPC requests
+import { WalletError, ErrorCodes } from '../../utils/error'
 import internalMethod from './internalMethod'
 import rpcFlow from './rpcFlow'
 
-tab.on('tabRemove', id => {
-  sessionService.deleteSession(id)
-})
+class ProviderController {
+  private services: any = {}
 
-export default async req => {
-  const {
-    data: { method },
-  } = req
-
-  if (internalMethod[method]) {
-    return internalMethod[method](req)
+  setServices(services: any) {
+    this.services = services
   }
 
-  const hasVault = keyringService.hasVault()
-  if (!hasVault) {
-    throw ethErrors.provider.userRejectedRequest({
-      message: 'wallet must has at least one account',
-    })
+  async handleRequest(req: any) {
+    const {
+      data: { method },
+    } = req
+
+    if (internalMethod[method]) {
+      return internalMethod[method](req)
+    }
+
+    const hasVault = this.services.keyring?.hasVault()
+    if (!hasVault) {
+      throw new WalletError(ErrorCodes.UserCancel, 'wallet must has at least one account')
+    }
+    return rpcFlow(req)
   }
-  return rpcFlow(req)
 }
+
+export default new ProviderController()

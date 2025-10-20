@@ -20,17 +20,6 @@ export class KeyringServiceWrapper extends KeyringService {
 
     super(config)
   }
-
-  // Override init to ensure storage adapter is properly initialized
-  async init(): Promise<void> {
-    console.log('[KeyringService] Starting initialization...')
-
-    // Call parent init
-    console.log('[KeyringService] Calling parent init...')
-    await super.init()
-
-    console.log('[KeyringService] Initialization complete')
-  }
 }
 
 export const keyringService = new KeyringServiceWrapper()

@@ -1,22 +1,33 @@
-import { getCurrentLocale } from '@/ui/hooks/useI18n'
 import { changeLanguage, initI18n, t } from '@unisat/i18n'
 
-initI18n('en')
+// Default locale helper
+const getCurrentLocale = () => {
+  // This would be stored in preferences in a real implementation
+  return 'en'
+}
 
-if (chrome && chrome.runtime && chrome.runtime.onMessage) {
-  chrome.runtime.onMessage.addListener(message => {
-    if (message && message.type === 'CHANGE_LANGUAGE' && message.locale) {
-      changeLanguage(message.locale)
+class I18nService {
+  private initialized = false
+
+  async init() {
+    if (!this.initialized) {
+      await initI18n('en')
+      this.initialized = true
+      console.log('[I18nService] Initialized')
     }
-  })
+  }
+
+  changeLanguage = changeLanguage
+  t = t
+  getCurrentLocale = getCurrentLocale
+
+  async cleanup() {
+    this.initialized = false
+  }
 }
 
-const i18nCompatObject = {
-  changeLanguage,
-  t,
-  getCurrentLocale,
-}
+export const i18n = new I18nService()
 
 export { getCurrentLocale, t }
 
-export default i18nCompatObject
+export default i18n

@@ -1,6 +1,5 @@
-import Events from 'events'
-
-import { winMgr } from '../webapi'
+import { EventEmitter } from 'eventemitter3'
+import type { NotificationAdapter } from '../adapters'
 import { IS_CHROME, IS_LINUX } from '../shared/constants'
 import { ErrorCodes, WalletError } from '../utils/error'
 
@@ -19,30 +18,23 @@ interface Approval {
 
 // something need user approval in window
 // should only open one window, unfocus will close the current notification
-class NotificationService extends Events {
+class NotificationService extends EventEmitter {
   approval: Approval | null = null
   notifiWindowId = 0
   isLocked = false
+  private adapter?: NotificationAdapter
 
   constructor() {
     super()
+  }
 
-    winMgr.event.on('windowRemoved', (winId: number) => {
-      if (winId === this.notifiWindowId) {
-        this.notifiWindowId = 0
-        this.rejectApproval()
-      }
-    })
+  setAdapter(adapter: NotificationAdapter) {
+    this.adapter = adapter
+  }
 
-    winMgr.event.on('windowFocusChange', (winId: number) => {
-      if (this.notifiWindowId && winId !== this.notifiWindowId) {
-        if (IS_CHROME && winId === (chrome as any).windows.WINDOW_ID_NONE && IS_LINUX) {
-          // Wired issue: When notification popuped, will focus to -1 first then focus on notification
-          return
-        }
-        // this.rejectApproval();
-      }
-    })
+  init() {
+    // Initialize window event listeners if available
+    // This will be implemented by the platform-specific adapter
   }
 
   getApproval = () => this.approval?.data
@@ -91,7 +83,7 @@ class NotificationService extends Events {
   clear = async (stay = false) => {
     this.approval = null
     if (this.notifiWindowId && !stay) {
-      await winMgr.remove(this.notifiWindowId)
+      // Platform-specific window management will be handled by adapters
       this.notifiWindowId = 0
     }
   }
@@ -104,16 +96,33 @@ class NotificationService extends Events {
     this.isLocked = true
   }
 
-  openNotification = winProps => {
-    // if (this.isLocked) return;
-    // this.lock();
+  openNotification = async (winProps?: any) => {
     if (this.notifiWindowId) {
-      winMgr.remove(this.notifiWindowId)
+      // Close existing notification
       this.notifiWindowId = 0
     }
-    winMgr.openNotification(winProps).then(winId => {
-      this.notifiWindowId = winId!
-    })
+    
+    // Platform-specific implementation will be handled by adapters
+    if (this.adapter) {
+      await this.adapter.create('approval-notification', {
+        title: 'UniSat Wallet',
+        message: 'Approval required',
+        type: 'basic'
+      })
+    }
+  }
+
+  // Create a platform notification
+  async createNotification(id: string, title: string, message: string) {
+    if (this.adapter) {
+      await this.adapter.create(id, { title, message })
+    }
+  }
+
+  async clearNotification(id: string) {
+    if (this.adapter) {
+      await this.adapter.clear(id)
+    }
   }
 }
 

@@ -16,6 +16,7 @@ export class WalletApiService {
   private clientAddress = ''
   private addressFlag = 0
   private currentEndpoint = ''
+  private networkAdapter?: any
 
   constructor() {
     // Initialize with default configuration
@@ -25,6 +26,10 @@ export class WalletApiService {
       retries: 3,
     })
     this.currentEndpoint = 'https://api.unisat.io'
+  }
+
+  setNetworkAdapter(adapter: any) {
+    this.networkAdapter = adapter
   }
 
   setEndpoints = async (endpoints: string[]) => {

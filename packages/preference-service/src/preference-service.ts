@@ -3,20 +3,17 @@
  */
 
 import { EventEmitter } from 'eventemitter3'
-import cloneDeep from 'lodash/cloneDeep'
+import cloneDeep from 'lodash/cloneDeep.js'
 import {
   BasePreferenceStore,
   PreferenceServiceConfig,
   PreferenceServiceEvents,
   StorageAdapter,
-  Account,
-  BitcoinBalance,
-  TxHistoryItem,
-  AddressFlagType,
 } from './types'
 import { changeLanguage } from '@unisat/i18n'
 import { MigrationManager, commonMigrations } from './utils/migration'
 import { ChainType } from '@unisat/wallet-types'
+import { Account, AddressFlagType, BitcoinBalance, TxHistoryItem } from '@unisat/wallet-shared'
 
 const SUPPORTED_LOCALES = ['en', 'zh_TW', 'fr', 'es', 'ru', 'ja']
 

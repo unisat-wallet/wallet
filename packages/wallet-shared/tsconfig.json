@@ -1,0 +1,18 @@
+{
+  "extends": "../../tsconfig.json",
+  "compilerOptions": {
+    "outDir": "./lib",
+    "rootDir": "./src",
+    "declaration": true,
+    "declarationMap": true,
+    "moduleResolution": "bundler"
+  },
+  "include": [
+    "src/**/*"
+  ],
+  "exclude": [
+    "lib/**/*",
+    "node_modules/**/*",
+    "test/**/*"
+  ]
+}

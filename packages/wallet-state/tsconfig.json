@@ -1,19 +1,23 @@
 {
   "extends": "../../tsconfig.json",
   "compilerOptions": {
+    "baseUrl": ".",
     "outDir": "./lib",
     "rootDir": "./src",
-    "composite": true,
     "declaration": true,
     "declarationMap": true,
-    "jsx": "react-jsx"
+    "sourceMap": true,
+    "strict": false,
+    "exactOptionalPropertyTypes": false,
+    "moduleResolution": "bundler",
+     "jsx": "react-jsx"
   },
   "include": [
     "src/**/*"
   ],
   "exclude": [
-    "lib",
     "node_modules",
-    "**/*.test.ts"
+    "lib",
+    "test"
   ]
 }

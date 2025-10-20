@@ -1,5 +1,5 @@
 import { createPersistStore } from '../utils'
-import { INTERNAL_REQUEST_ORIGIN } from '@/shared/constant'
+import { INTERNAL_REQUEST_ORIGIN } from '../shared/constants'
 import { ExtensionPersistStoreAdapter, PermissionService } from '@unisat/permission-service'
 import { ChainType } from '@unisat/wallet-types'
 
@@ -35,9 +35,6 @@ class PermissionServiceWrapper extends PermissionService {
       internalRequestOrigin: INTERNAL_REQUEST_ORIGIN,
     })
   }
-
-  // Legacy method names for compatibility
-  touchConnectedSite = (origin: string) => super.touchConnectedSite(origin)
 }
 
 const permissionService = new PermissionServiceWrapper()

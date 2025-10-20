@@ -16,7 +16,9 @@
     "moduleResolution": "bundler",
     "resolveJsonModule": true,
     "isolatedModules": true,
-    "noEmit": false
+    "noEmit": false,
+    "lib": ["ES2020", "DOM"],
+    "types": ["chrome", "node"]
   },
   "include": [
     "src/**/*"

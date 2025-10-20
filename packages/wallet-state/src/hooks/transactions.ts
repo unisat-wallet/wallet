@@ -1,17 +1,23 @@
 import { useCallback, useMemo } from 'react'
 
-import { RawTxInfo, ToAddressInfo } from '@/shared/types'
-import { useTools } from '@/ui/components/ActionComponent'
-import { useI18n } from '@/ui/hooks/useI18n'
-import { useBTCUnit } from '@/ui/state/settings/hooks'
-import { satoshisToBTC, sleep, useWallet } from '@/ui/utils'
-import { UnspentOutput } from '@unisat/tx-helpers/types'
+import { RawTxInfo, ToAddressInfo, UnspentOutput } from '@unisat/wallet-shared'
+
+import { useI18n } from './i18n'
+import { useBTCUnit } from '../hooks/settings'
 
 import { AppState } from '..'
-import { useAccountAddress, useCurrentAccount } from '../accounts/hooks'
-import { accountActions } from '../accounts/reducer'
-import { useAppDispatch, useAppSelector } from '../hooks'
-import { transactionsActions } from './reducer'
+import { useAccountAddress, useCurrentAccount } from '../hooks/accounts'
+import { accountActions } from '../reducers/accounts'
+import { useAppDispatch, useAppSelector } from './base'
+import { transactionsActions } from '../reducers/transactions'
+import { numUtils, timeUtils } from '@unisat/base-utils'
+import { useWallet } from '../context/WalletContext'
+
+function useTools() {
+  return {
+    showLoading: (show: boolean) => {},
+  }
+}
 
 export function useTransactionsState(): AppState['transactions'] {
   return useAppSelector(state => state.transactions)
@@ -62,7 +68,7 @@ export function usePrepareSendBTCCallback() {
 
       if (!feeRate) {
         const summary = await wallet.getFeeSummary()
-        feeRate = summary.list[1].feeRate
+        feeRate = summary.list[1]!.feeRate
       }
       let res: {
         psbtHex: string
@@ -84,13 +90,13 @@ export function usePrepareSendBTCCallback() {
           btcUtxos: _utxos,
           enableRBF,
           feeRate,
-          memo,
-          memos,
+          memo: memo!,
+          memos: memos!,
         })
       }
 
       dispatch(
-        transactionsActions.updateBitcoinTx({
+        (transactionsActions as any).updateBitcoinTx({
           rawtx: res.rawtx,
           psbtHex: res.psbtHex,
           fromAddress,
@@ -137,7 +143,7 @@ export function usePrepareSendBypassHeadOffsetsCallback() {
       )
 
       dispatch(
-        transactionsActions.updateBitcoinTx({
+        (transactionsActions as any).updateBitcoinTx({
           rawtx: res.rawtx,
           psbtHex: res.psbtHex,
           fromAddress,
@@ -170,15 +176,15 @@ export function usePushBitcoinTxCallback() {
       try {
         tools.showLoading(true)
         const txid = await wallet.pushTx(rawtx)
-        await sleep(3) // Wait for transaction synchronization
+        await timeUtils.sleep(3) // Wait for transaction synchronization
         tools.showLoading(false)
-        dispatch(transactionsActions.updateBitcoinTx({ txid }))
-        dispatch(accountActions.expireBalance())
+        dispatch((transactionsActions as any).updateBitcoinTx({ txid }))
+        dispatch((accountActions as any).expireBalance())
         setTimeout(() => {
-          dispatch(accountActions.expireBalance())
+          dispatch((accountActions as any).expireBalance())
         }, 2000)
         setTimeout(() => {
-          dispatch(accountActions.expireBalance())
+          dispatch((accountActions as any).expireBalance())
         }, 5000)
 
         ret.success = true
@@ -222,7 +228,7 @@ export function usePrepareSendOrdinalsInscriptionCallback() {
     }) => {
       if (!feeRate) {
         const summary = await wallet.getFeeSummary()
-        feeRate = summary.list[1].feeRate
+        feeRate = summary.list[1]!.feeRate
       }
 
       let btcUtxos = utxos
@@ -234,12 +240,12 @@ export function usePrepareSendOrdinalsInscriptionCallback() {
         to: toAddressInfo.address,
         inscriptionId,
         feeRate,
-        outputValue,
+        outputValue: outputValue!,
         enableRBF,
         btcUtxos,
       })
       dispatch(
-        transactionsActions.updateOrdinalsTx({
+        (transactionsActions as any).updateOrdinalsTx({
           rawtx: res.rawtx,
           psbtHex: res.psbtHex,
           fromAddress,
@@ -281,7 +287,7 @@ export function usePrepareSendOrdinalsInscriptionsCallback() {
     }) => {
       if (!feeRate) {
         const summary = await wallet.getFeeSummary()
-        feeRate = summary.list[1].feeRate
+        feeRate = summary.list[1]!.feeRate
       }
 
       let btcUtxos = utxos
@@ -296,7 +302,7 @@ export function usePrepareSendOrdinalsInscriptionsCallback() {
         btcUtxos,
       })
       dispatch(
-        transactionsActions.updateOrdinalsTx({
+        (transactionsActions as any).updateOrdinalsTx({
           rawtx: res.rawtx,
           psbtHex: res.psbtHex,
           fromAddress,
@@ -347,7 +353,7 @@ export function useCreateSplitTxCallback() {
         btcUtxos,
       })
       dispatch(
-        transactionsActions.updateOrdinalsTx({
+        (transactionsActions as any).updateOrdinalsTx({
           rawtx: res.rawtx,
           psbtHex: res.psbtHex,
           fromAddress,
@@ -384,16 +390,16 @@ export function usePushOrdinalsTxCallback() {
       try {
         tools.showLoading(true)
         const txid = await wallet.pushTx(rawtx)
-        await sleep(3) // Wait for transaction synchronization
+        await timeUtils.sleep(3) // Wait for transaction synchronization
         tools.showLoading(false)
-        dispatch(transactionsActions.updateOrdinalsTx({ txid }))
+        dispatch((transactionsActions as any).updateOrdinalsTx({ txid }))
 
-        dispatch(accountActions.expireBalance())
+        dispatch((accountActions as any).expireBalance())
         setTimeout(() => {
-          dispatch(accountActions.expireBalance())
+          dispatch((accountActions as any).expireBalance())
         }, 2000)
         setTimeout(() => {
-          dispatch(accountActions.expireBalance())
+          dispatch((accountActions as any).expireBalance())
         }, 5000)
 
         ret.success = true
@@ -421,7 +427,7 @@ export function useFetchUtxosCallback() {
   const account = useCurrentAccount()
   return useCallback(async () => {
     const data = await wallet.getBTCUtxos()
-    dispatch(transactionsActions.setUtxos(data))
+    dispatch((transactionsActions as any).setUtxos(data))
     return data
   }, [wallet, account])
 }
@@ -435,7 +441,7 @@ export function useSetSpendUnavailableUtxosCallback() {
   const dispatch = useAppDispatch()
   return useCallback(
     (utxos: UnspentOutput[]) => {
-      dispatch(transactionsActions.setSpendUnavailableUtxos(utxos))
+      dispatch((transactionsActions as any).setSpendUnavailableUtxos(utxos))
     },
     [dispatch]
   )
@@ -447,7 +453,7 @@ export function useSafeBalance() {
     const satoshis = utxos
       .filter(v => v.inscriptions.length === 0)
       .reduce((pre, cur) => pre + cur.satoshis, 0)
-    return satoshisToBTC(satoshis)
+    return numUtils.satoshisToAmount(satoshis)
   }, [utxos])
 }
 
@@ -463,7 +469,7 @@ export function useFetchAssetUtxosRunesCallback() {
   return useCallback(
     async (rune: string) => {
       const data = await wallet.getAssetUtxosRunes(rune)
-      dispatch(transactionsActions.setAssetUtxosRunes(data))
+      dispatch((transactionsActions as any).setAssetUtxosRunes(data))
       return data
     },
     [wallet, account]
@@ -497,7 +503,7 @@ export function usePrepareSendRunesCallback() {
     }) => {
       if (!feeRate) {
         const summary = await wallet.getFeeSummary()
-        feeRate = summary.list[1].feeRate
+        feeRate = summary.list[1]!.feeRate
       }
 
       let btcUtxos = utxos
@@ -514,7 +520,7 @@ export function usePrepareSendRunesCallback() {
         to: toAddressInfo.address,
         runeid,
         runeAmount,
-        outputValue,
+        outputValue: outputValue!,
         feeRate,
         enableRBF,
         btcUtxos,
@@ -522,7 +528,7 @@ export function usePrepareSendRunesCallback() {
       })
 
       dispatch(
-        transactionsActions.updateRunesTx({
+        (transactionsActions as any).updateRunesTx({
           rawtx: res.rawtx,
           psbtHex: res.psbtHex,
           fromAddress,

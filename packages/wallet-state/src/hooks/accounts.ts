@@ -1,15 +1,17 @@
 import { useCallback } from 'react'
 
-import { Account, AddressType } from '@/shared/types'
-import { useWallet } from '@/ui/utils'
+import { Account } from '@unisat/wallet-shared'
+
+import { AddressType } from '@unisat/wallet-types'
 import { KeyringType } from '@unisat/keyring-service/types'
 
 import { AppState } from '..'
-import { useAppDispatch, useAppSelector } from '../hooks'
-import { useCurrentKeyring } from '../keyrings/hooks'
-import { keyringsActions } from '../keyrings/reducer'
-import { settingsActions } from '../settings/reducer'
-import { accountActions } from './reducer'
+import { useAppDispatch, useAppSelector } from './base'
+import { useCurrentKeyring } from './keyrings'
+import { keyringsActions } from '../reducers/keyrings'
+import { settingsActions } from '../reducers/settings'
+import { accountActions } from '../reducers/accounts'
+import { useWallet } from '../context/WalletContext'
 
 export function useAccountsState(): AppState['accounts'] {
   return useAppSelector(state => state.accounts)
@@ -78,7 +80,7 @@ export function useReadTab() {
       await wallet.readTab(name)
       if (name == 'app') {
         const appSummary = await wallet.getAppSummary()
-        dispatch(accountActions.setAppSummary(appSummary))
+        dispatch(accountActions['setAppSummary']!(appSummary))
       }
     },
     [dispatch, wallet, appSummary]
@@ -93,7 +95,7 @@ export function useReadApp() {
     async (id: number) => {
       await wallet.readApp(id)
       const appSummary = await wallet.getAppSummary()
-      dispatch(accountActions.setAppSummary(appSummary))
+      dispatch(accountActions['setAppSummary']!(appSummary))
     },
     [dispatch, wallet, appSummary]
   )
@@ -114,7 +116,7 @@ export function useSetCurrentAccountCallback() {
   const dispatch = useAppDispatch()
   return useCallback(
     (account: Account) => {
-      dispatch(accountActions.setCurrent(account))
+      dispatch(accountActions['setCurrent']!(account))
     },
     [dispatch]
   )
@@ -132,7 +134,7 @@ export function useImportAccountCallback() {
         const alianName = await wallet.getNextAlianName(currentKeyring)
         await wallet.createKeyringWithPrivateKey(privateKey, addressType, alianName)
         const currentAccount = await wallet.getCurrentAccount()
-        dispatch(accountActions.setCurrent(currentAccount))
+        dispatch(accountActions['setCurrent']!(currentAccount))
 
         success = true
       } catch (e) {
@@ -154,7 +156,7 @@ export function useChangeAddressFlagCallback() {
       const account = isAdd
         ? await wallet.addAddressFlag(currentAccount, flag)
         : await wallet.removeAddressFlag(currentAccount, flag)
-      dispatch(accountActions.setCurrentAddressFlag(account.flag))
+      dispatch(accountActions['setCurrentAddressFlag']!(account.flag))
     },
     [dispatch, wallet, currentAccount]
   )
@@ -201,11 +203,11 @@ export function useFetchBalanceCallback() {
 
     const summary = await wallet.getAddressSummary(currentAccount.address)
     summary.address = currentAccount.address
-    dispatch(accountActions.setAddressSummary(summary))
+    dispatch(accountActions['setAddressSummary']!(summary))
 
     const balanceV2 = await wallet.getAddressBalanceV2(currentAccount.address)
     dispatch(
-      accountActions.setBalanceV2({
+      accountActions['setBalanceV2']!({
         address: currentAccount.address,
         balance: balanceV2,
       })
@@ -218,22 +220,22 @@ export function useReloadAccounts() {
   const wallet = useWallet()
   return useCallback(async () => {
     const keyrings = await wallet.getKeyrings()
-    dispatch(keyringsActions.setKeyrings(keyrings))
+    dispatch(keyringsActions['setKeyrings']!(keyrings))
 
     const currentKeyring = await wallet.getCurrentKeyring()
-    dispatch(keyringsActions.setCurrent(currentKeyring))
+    dispatch(keyringsActions['setCurrent']!(currentKeyring))
 
     const _accounts = await wallet.getAccounts()
-    dispatch(accountActions.setAccounts(_accounts))
+    dispatch(accountActions['setAccounts']!(_accounts))
 
     const account = await wallet.getCurrentAccount()
-    dispatch(accountActions.setCurrent(account))
+    dispatch(accountActions['setCurrent']!(account))
 
-    dispatch(accountActions.expireBalance())
-    dispatch(accountActions.expireInscriptions())
+    dispatch(accountActions['expireBalance']!(null))
+    dispatch(accountActions['expireInscriptions']!(null))
 
     wallet.getWalletConfig().then(data => {
-      dispatch(settingsActions.updateSettings({ walletConfig: data }))
+      dispatch(settingsActions['updateSettings']!({ walletConfig: data }))
     })
   }, [dispatch, wallet])
 }
