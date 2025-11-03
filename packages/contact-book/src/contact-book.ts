@@ -43,8 +43,8 @@ export class ContactBook {
   /**
    * Initialize the contact book - loads data from storage
    */
-  async init(): Promise<void> {
-    if (this.initialized) {
+  async init(reset?: boolean): Promise<void> {
+    if (this.initialized && !reset) {
       return
     }
 
@@ -379,5 +379,9 @@ export class ContactBook {
   getRawStore(): ContactBookStore {
     this.ensureInitialized()
     return { ...this.store }
+  }
+
+  resetAllData = () => {
+    return this.init(true)
   }
 }
