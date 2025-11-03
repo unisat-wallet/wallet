@@ -47,6 +47,7 @@ import {
   UnspentOutput,
   AddressFlagType,
   ConnectedSite,
+  RateUsStatus,
 } from '@unisat/wallet-shared'
 import { BabylonConfigV2 } from '@unisat/babylon-service/types'
 import { AddressType, ChainType, NetworkType } from '@unisat/wallet-types'
@@ -678,6 +679,18 @@ export interface WalletController {
   ): Promise<{ currentPage: number; pageSize: number; list: AlkanesInfo[]; total: number }>
 
   getBRC20RecentHistory(address: string, ticker: string): Promise<BRC20HistoryItem[]>
+
+  resetAllData(): Promise<void>
+
+  getGuideReaded(): Promise<boolean>
+  setGuideReaded(): Promise<void>
+
+  getRateUsStatus(): Promise<RateUsStatus>
+
+  setHasRated(hasRated: boolean): Promise<void>
+  setRatePromptDismissedAt(timestamp: number | null): Promise<void>
+  setHasShownSecondPrompt(hasShown: boolean): Promise<void>
+  resetRateUsStatus(): Promise<void>
 }
 
 const WalletContext = createContext<{

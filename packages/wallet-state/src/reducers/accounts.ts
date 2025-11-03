@@ -11,6 +11,16 @@ import { createSlice, Slice } from '@reduxjs/toolkit'
 
 import { updateVersion } from '../actions/global'
 
+export interface Molels {
+  states: boolean
+}
+
+export interface MolelsPopover {
+  state: boolean
+  title: string
+  data: any
+}
+
 export interface AccountsState {
   accounts: Account[]
   current: Account
@@ -43,6 +53,8 @@ export interface AccountsState {
   appSummary: AppSummary
   inscriptionSummary: InscriptionSummary
   addressSummary: AddressSummary
+  model: Molels
+  molelsPopover: MolelsPopover
 }
 
 const initialAccount = {
@@ -84,6 +96,9 @@ export const initialState: AccountsState = {
     address: '',
     runesCount: 0,
   },
+
+  model: { states: false },
+  molelsPopover: { state: false, title: '', data: null },
 }
 
 const slice: Slice<AccountsState> = createSlice({

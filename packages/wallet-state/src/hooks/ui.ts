@@ -1,4 +1,4 @@
-import { useMemo } from 'react'
+import { useCallback, useMemo } from 'react'
 
 import { ChainType } from '@unisat/wallet-types'
 import { Inscription } from '@unisat/wallet-shared'
@@ -8,7 +8,7 @@ import { AddressType } from '@unisat/wallet-types'
 import { AppState, AssetTabKey } from '..'
 import { useCurrentAccount, useCurrentAddress } from '../hooks/accounts'
 import { useAppDispatch, useAppSelector } from '../hooks/base'
-import { useChainType, useNetworkType } from '../hooks/settings'
+import { useChain, useChainType, useNetworkType } from '../hooks/settings'
 import { uiActions } from '../reducers/ui'
 import { TypeChain } from '@unisat/wallet-shared'
 import { useLocation } from 'react-router-dom'
@@ -63,6 +63,19 @@ export function useResetUiTxCreateScreen() {
   return () => {
     dispatch((uiActions as any).resetTxCreateScreen())
   }
+}
+
+export const useThrottle = (callback, delay, lastCallRef) => {
+  return useCallback(
+    (...args) => {
+      const now = Date.now()
+      if (now - lastCallRef.current > delay) {
+        lastCallRef.current = now
+        callback(...args)
+      }
+    },
+    [callback, delay, lastCallRef]
+  )
 }
 
 export function useSupportedAssets() {
@@ -124,18 +137,7 @@ export const useIsInExpandView = () => {
   }, [window.innerWidth])
 }
 
-export const useUtxoTools = (chain: TypeChain) => {
-  const openUtxoTools = () => {
-    // @ts-ignore
-    window.open(`${chain.unisatUrl}/utxo?tab=all`)
-  }
-
-  return {
-    openUtxoTools,
-  }
-}
-
-export function useLocationState<T>() {
-  const { state } = useLocation()
-  return state as T
+export function useWalletTopTabScreenState() {
+  const uiState = useUIState()
+  return uiState.walletTopTabScreen
 }

@@ -47,7 +47,7 @@ export const useApproval = () => {
     })
   }
 
-  const rejectApproval = async (err: any, stay = false, isInternal = false) => {
+  const rejectApproval = async (err?: any, stay = false, isInternal = false) => {
     const approval = await getApproval()
     if (approval) {
       await wallet.rejectApproval(err, stay, isInternal)

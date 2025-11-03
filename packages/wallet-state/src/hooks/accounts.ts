@@ -244,3 +244,7 @@ export function useIsKeystoneWallet() {
   const currentKeyring = useCurrentKeyring()
   return currentKeyring.type === KeyringType.KeystoneKeyring
 }
+export function useModelPopover() {
+  const modelState = useAccountsState()
+  return modelState.molelsPopover
+}

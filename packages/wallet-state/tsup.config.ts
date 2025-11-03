@@ -5,11 +5,11 @@ export default defineConfig({
   format: ['cjs', 'esm'],
   dts: true,
   clean: true,
+  outDir: 'lib',
   sourcemap: true,
   splitting: false,
   minify: false,
   treeshake: true,
-  outDir: 'lib',
   external: [
     'react',
     'react-redux',

@@ -11,6 +11,7 @@ import keyrings from './reducers/keyrings'
 import settings from './reducers/settings'
 import transactions from './reducers/transactions'
 import ui from './reducers/ui'
+import browser from './reducers/browser'
 
 const PERSISTED_KEYS: string[] = ['ui', 'discovery']
 const store = configureStore({
@@ -22,11 +23,12 @@ const store = configureStore({
     keyrings,
     ui,
     discovery,
+    browser,
   },
   middleware: getDefaultMiddleware =>
     // @ts-ignore
-    getDefaultMiddleware({ thunk: true }).concat(save({ states: PERSISTED_KEYS, debounce: 1000 })),
-  preloadedState: load({ states: PERSISTED_KEYS, disableWarnings: true }),
+    getDefaultMiddleware({ thunk: true }),
+  // preloadedState: load({ states: PERSISTED_KEYS, disableWarnings: true }),
 })
 
 store.dispatch(updateVersion())
@@ -43,3 +45,4 @@ export * from './hooks'
 export * from './updater'
 export * from './reducers'
 export * from './types'
+export * from './ui-hooks'

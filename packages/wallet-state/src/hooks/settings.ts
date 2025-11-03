@@ -5,7 +5,6 @@ import { CHAINS_MAP, CAT_VERSION, VERSION } from '@unisat/wallet-shared'
 import { AddressType, ChainType, NetworkType } from '@unisat/wallet-types'
 import { useWallet } from '../context/WalletContext'
 import { getAddressType } from '../utils/bitcoin-utils'
-import i18n, { addResourceBundle } from '../utils/i18n'
 import { BABYLON_CONFIG_MAP } from '@unisat/babylon-service/types'
 import { t } from '@unisat/i18n'
 
@@ -13,6 +12,7 @@ import { AppState } from '..'
 import { useCurrentAccount } from '../hooks/accounts'
 import { useAppDispatch, useAppSelector } from './base'
 import { settingsActions } from '../reducers/settings'
+import { useI18n } from 'src/context/I18nContext'
 
 export function useSettingsState(): AppState['settings'] {
   return useAppSelector(state => state.settings)
@@ -26,11 +26,12 @@ export function useLocale() {
 export function useChangeLocaleCallback() {
   const dispatch = useAppDispatch()
   const wallet = useWallet()
+  const i18n = useI18n()
   return useCallback(
     async (locale: string) => {
       await wallet.setLocale(locale)
-      await addResourceBundle(locale)
-      i18n.changeLanguage(locale)
+      await i18n.addResourceBundle(locale)
+      i18n.changeLocale(locale)
       dispatch(
         (settingsActions as any).updateSettings({
           locale,
@@ -208,6 +209,8 @@ export function useVersionInfo() {
     newVersion,
     latestVersion,
     skipped,
+    downloadUrl: '',
+    isNewest: false,
   }
 }
 

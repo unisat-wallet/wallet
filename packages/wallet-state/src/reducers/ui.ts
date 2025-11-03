@@ -10,6 +10,14 @@ import {
   OrdinalsAssetTabKey,
 } from '../types'
 
+export enum WallettopTabScreenTabKey {
+  Ordinals,
+  Atomicals,
+  Runes,
+  CAT20,
+  Alkanes,
+}
+
 export interface UIState {
   assetTabKey: AssetTabKey
   ordinalsAssetTabKey: OrdinalsAssetTabKey
@@ -31,6 +39,10 @@ export interface UIState {
   }
   navigationSource: NavigationSource
   isBalanceHidden: boolean
+
+  walletTopTabScreen: {
+    toptabKey: WallettopTabScreenTabKey
+  }
 }
 
 export const initialState: UIState = {
@@ -53,6 +65,10 @@ export const initialState: UIState = {
   },
   navigationSource: NavigationSource.NORMAL,
   isBalanceHidden: false,
+
+  walletTopTabScreen: {
+    toptabKey: WallettopTabScreenTabKey.Ordinals,
+  },
 }
 
 const slice: Slice<UIState> = createSlice({

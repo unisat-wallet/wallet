@@ -37,7 +37,8 @@
     "@unisat/keyring-service": "workspace:*",
     "@unisat/base-utils": "workspace:*",
     "@unisat/i18n": "workspace:*",
-    "loglevel": "^1.8.0"
+    "loglevel": "^1.8.0",
+    "bignumber.js": "^9.1.2"
   },
   "peerDependencies": {
     "redux-localstorage-simple": "^2.5.1",
@@ -46,8 +47,8 @@
     "i18next": "^21.8.1",
     "react-router-dom": "^6.3.0",
     "@reduxjs/toolkit": "^1.9.2",
-    "react": "^18.0.0",
-    "react-redux": "^8.0.0"
+    "react": "*",
+    "react-redux": "*"
   },
   "devDependencies": {
     "@types/node": "^20.0.0",

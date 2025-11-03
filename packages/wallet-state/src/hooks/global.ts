@@ -2,7 +2,7 @@ import { useCallback } from 'react'
 
 import { AddressType } from '@unisat/wallet-types'
 
-import { AppState } from '..'
+import { AppState, useNavigation } from '..'
 import { useAppDispatch, useAppSelector } from './base'
 import { globalActions } from '../reducers/global'
 import { useWallet } from '../context/WalletContext'
@@ -16,6 +16,25 @@ export function useGlobalState(): AppState['global'] {
 export function useTab() {
   const globalState = useGlobalState()
   return globalState.tab
+}
+
+export function useScreenState() {
+  const globalState = useGlobalState()
+  return globalState.screenState
+}
+
+export function useUpdateScreenStateCallback() {
+  const dispatch = useAppDispatch()
+  return useCallback(
+    (screenState: Partial<AppState['global']['screenState']>) => {
+      dispatch(
+        globalActions['updateScreenState']!({
+          screenState,
+        })
+      )
+    },
+    [dispatch]
+  )
 }
 
 export function useSetTabCallback() {
@@ -45,6 +64,116 @@ export function useIsUnlocked() {
 export function useIsReady() {
   const globalState = useGlobalState()
   return globalState.isReady
+}
+
+export function useIsRefresh() {
+  const globalState = useGlobalState()
+  return globalState.isRefresh
+}
+
+export function useBackRefresh() {
+  const globalState = useGlobalState()
+  return globalState.backRefresh
+}
+
+export function useWallRefresh() {
+  const globalState = useGlobalState()
+  return globalState.wallRefresh
+}
+
+export function useWallTabRefresh() {
+  const globalState = useGlobalState()
+  return globalState.wallTabRefresh
+}
+
+export function useWallTabFocusRefresh() {
+  const globalState = useGlobalState()
+  return globalState.wallTabFocusRefresh
+}
+
+export function useGoBackRefresh() {
+  const globalState = useGlobalState()
+  return globalState.goBackRefresh
+}
+
+export function useLayerState() {
+  const globalState = useGlobalState()
+  return globalState.layerState
+}
+
+export function useUnlockRefresh() {
+  const globalState = useGlobalState()
+  return globalState.unlockRefres
+}
+
+export function useUnlockRead() {
+  const globalState = useGlobalState()
+  return globalState.unlockRead
+}
+export function useIsUnlockTimeRefres() {
+  const globalState = useGlobalState()
+  return globalState.isUnlockTimeRefres
+}
+
+export function useIsScrollViewModel() {
+  const globalState = useGlobalState()
+  return globalState.isScrollViewModel
+}
+
+export function useIsScrollViewTop() {
+  const globalState = useGlobalState()
+  return globalState.isScrollViewTop
+}
+
+export function useIsScrollViewBot() {
+  const globalState = useGlobalState()
+  return globalState.isScrollViewBot
+}
+
+export function useIsBiometrics() {
+  const globalState = useGlobalState()
+  return globalState.isBiometrics
+}
+
+export function useIsBiometricsKey() {
+  const globalState = useGlobalState()
+  return globalState.isBiometricsKey
+}
+
+export function useSwitchChainModalVisible() {
+  const globalState = useGlobalState()
+  return globalState.switchChainModalVisible
+}
+
+export function useLockCallback() {
+  const dispatch = useAppDispatch()
+  const wallet = useWallet()
+  const navigation = useNavigation()
+  return useCallback(async () => {
+    await wallet.lockWallet()
+    const isBooted = await wallet.isBooted()
+    const isUnlocked = await wallet.isUnlocked()
+    if (!isBooted) {
+      navigation.navToWelcome
+      return
+    }
+
+    if (!isUnlocked && !isBooted) {
+      navigation.navToWelcome
+      return
+    }
+
+    if (!isUnlocked && isBooted) {
+      navigation.navToLock({ fromStartup: true })
+      return
+    }
+    const currentAccount = await wallet.getCurrentAccount()
+    if (!currentAccount) {
+      navigation.navToWelcome
+    }
+
+    dispatch(globalActions.update({ isUnlocked: false }))
+  }, [dispatch, wallet])
 }
 
 export function useUnlockCallback() {
