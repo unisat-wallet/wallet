@@ -221,6 +221,8 @@ export function useFeeRateBarLogic({ readonly }: { readonly?: boolean }) {
         updateFeeRateBar({ feeRateInputVal: MAX_FEE_RATE.toString() })
       } else if (val < 1 && supportLowFeeMode == false) {
         updateFeeRateBar({ feeRateInputVal: '1' })
+      } else if (val < 0.1) {
+        updateFeeRateBar({ feeRateInputVal: '0.1' })
       } else {
         updateFeeRateBar({ feeRateInputVal: inputVal })
       }
