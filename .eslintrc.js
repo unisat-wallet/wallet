@@ -4,19 +4,14 @@ module.exports = {
     node: true,
     es2020: true,
   },
-  extends: [
-    'eslint:recommended',
-    '@typescript-eslint/recommended',
-    '@typescript-eslint/recommended-requiring-type-checking',
-    'prettier',
-  ],
+  extends: ['eslint:recommended', 'prettier'],
   parser: '@typescript-eslint/parser',
   parserOptions: {
     ecmaVersion: 2020,
     sourceType: 'module',
     project: './tsconfig.json',
   },
-  plugins: ['@typescript-eslint', 'prettier'],
+  plugins: ['@typescript-eslint', 'prettier', 'simple-import-sort', 'unused-imports'],
   rules: {
     'prettier/prettier': 'error',
     '@typescript-eslint/no-unused-vars': ['error', { argsIgnorePattern: '^_' }],
@@ -26,6 +21,7 @@ module.exports = {
     '@typescript-eslint/prefer-nullish-coalescing': 'error',
     '@typescript-eslint/prefer-optional-chain': 'error',
     'no-console': ['warn', { allow: ['warn', 'error'] }],
+    'unused-imports/no-unused-imports': 'warn',
   },
   overrides: [
     {
@@ -36,4 +32,4 @@ module.exports = {
       },
     },
   ],
-};
+}

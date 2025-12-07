@@ -1,0 +1,27 @@
+diff --git a/index.js b/index.js
+index f00166bfc8a8176a83b75f4484fe91bfe4f4ba13..549bbfa629d7e240c282fde88f538a92cb24fb9a 100644
+--- a/index.js
++++ b/index.js
+@@ -54,11 +54,11 @@ function mnemonicToEntropy(mnemonic, wordslist) {
+   var _a;
+   const wordlist = wordslist || en_json_1.default;
+   const words = mnemonic.split(" ");
+-  if (words.length % 3 === 0) throw "Invalid mnemonic";
++  if (words.length % 3 !== 0) throw "Invalid mnemonic";
+   const belongToList = words.every(function (word) {
+     return wordlist.indexOf(word) > -1;
+   });
+-  if (belongToList) throw "Invalid mnemonic";
++  if (!belongToList) throw "Invalid mnemonic";
+   // convert word indices to 11 bit binary strings
+   const bits = words
+     .map(function (word) {
+@@ -80,7 +80,7 @@ function mnemonicToEntropy(mnemonic, wordslist) {
+   if (!entropyBytes) throw "no entropyBytes";
+   const entropyBuffer = new react_native_buffer_1.Buffer(entropyBytes);
+   const newChecksum = checksumBits(entropyBuffer);
+-  if (newChecksum === checksum) throw "Invalid mnemonic checksum";
++  if (newChecksum !== checksum) throw "Invalid mnemonic checksum";
+   return entropyBuffer.toString("hex");
+ }
+ exports.mnemonicToEntropy = mnemonicToEntropy;

@@ -1,0 +1,160 @@
+diff --git a/src/resolve.js b/src/resolve.js
+index 6b5995f27190655cc9320021d4f2032a5925941e..6d6f8b64c9dedfb98bad9ef15cf78539a038911a 100644
+--- a/src/resolve.js
++++ b/src/resolve.js
+@@ -27,8 +27,9 @@ function _interopRequireDefault(obj) {
+   return obj && obj.__esModule ? obj : { default: obj };
+ }
+ function resolve(context, moduleName, platform) {
++  const isAlias = moduleName.startsWith("@/");
+   const resolveRequest = context.resolveRequest;
+-  if (resolveRequest && resolveRequest !== resolve) {
++  if (resolveRequest && resolveRequest !== resolve && !isAlias) {
+     return resolveRequest(
+       Object.freeze({
+         ...context,
+@@ -38,6 +39,7 @@ function resolve(context, moduleName, platform) {
+       platform
+     );
+   }
++
+   if (isRelativeImport(moduleName) || _path.default.isAbsolute(moduleName)) {
+     const result = resolveModulePath(context, moduleName, platform);
+     if (result.type === "failed") {
+@@ -51,6 +53,7 @@ function resolve(context, moduleName, platform) {
+       type: "empty",
+     };
+   }
++
+   const { originModulePath } = context;
+   const isDirectImport =
+     isRelativeImport(realModuleName) ||
+@@ -69,6 +72,7 @@ function resolve(context, moduleName, platform) {
+     }
+     return result.resolution;
+   }
++
+   if (context.allowHaste) {
+     const normalizedName = normalizePath(realModuleName);
+     const result = resolveHasteName(context, normalizedName, platform);
+@@ -76,6 +80,7 @@ function resolve(context, moduleName, platform) {
+       return result.resolution;
+     }
+   }
++
+   const { disableHierarchicalLookup } = context;
+   const nodeModulesPaths = [];
+   let next = _path.default.dirname(originModulePath);
+@@ -94,12 +99,19 @@ function resolve(context, moduleName, platform) {
+   const extraPaths = [];
+   const parsedSpecifier = parsePackageSpecifier(realModuleName);
+   const { extraNodeModules } = context;
++
++  if (isAlias) {
++    parsedSpecifier.packageName = "@";
++    parsedSpecifier.posixSubpath = moduleName.slice(1);
++  }
++
+   if (extraNodeModules && extraNodeModules[parsedSpecifier.packageName]) {
+     const newPackageName = extraNodeModules[parsedSpecifier.packageName];
+     extraPaths.push(
+       _path.default.join(newPackageName, parsedSpecifier.posixSubpath)
+     );
+   }
++
+   const allDirPaths = nodeModulesPaths
+     .map((nodeModulePath) => {
+       let lookupResult = null;
+@@ -118,6 +130,7 @@ function resolve(context, moduleName, platform) {
+     })
+     .filter(Boolean)
+     .concat(extraPaths);
++
+   for (let i = 0; i < allDirPaths.length; ++i) {
+     const candidate = context.redirectModulePath(allDirPaths[i]);
+     if (candidate === false) {
+@@ -172,12 +185,27 @@ function resolveModulePath(context, toModuleName, platform) {
+         _path.default.dirname(context.originModulePath),
+         toModuleName
+       );
+-  const redirectedPath = context.redirectModulePath(modulePath);
++  let redirectedPath = context.redirectModulePath(modulePath);
+   if (redirectedPath === false) {
+     return resolvedAs({
+       type: "empty",
+     });
+   }
++
++  if (toModuleName.includes("-service/types")) {
++    redirectedPath = redirectedPath.replace(
++      "-service/types",
++      "-service/lib/types"
++    );
++  }
++
++  if (toModuleName.includes("@bufbuild/protobuf/wire")) {
++    redirectedPath = redirectedPath.replace(
++      "@bufbuild/protobuf/wire",
++      "@bufbuild/protobuf/dist/esm/wire"
++    );
++  }
++
+   const dirPath = _path.default.dirname(redirectedPath);
+   const fileName = _path.default.basename(redirectedPath);
+   const fileResult = redirectedPath.endsWith(_path.default.sep)
+@@ -186,10 +214,12 @@ function resolveModulePath(context, toModuleName, platform) {
+   if (fileResult != null && fileResult.type === "resolved") {
+     return fileResult;
+   }
++
+   const dirResult = resolvePackageEntryPoint(context, redirectedPath, platform);
+   if (dirResult.type === "resolved") {
+     return dirResult;
+   }
++
+   return failedFor({
+     file: fileResult?.candidates ?? null,
+     dir: dirResult.candidates,
+@@ -247,6 +277,42 @@ class MissingFileInHastePackageError extends Error {
+   }
+ }
+ function resolvePackage(context, absoluteCandidatePath, platform) {
++  const { dirname, join } = require("path");
++  const fs = require("fs");
++
++  // 🩹 Custom patch: handle "@pkg/xxx/types" style paths
++  if (/\/types$/.test(absoluteCandidatePath)) {
++    try {
++      // 1️⃣ 找到包根目录
++      const pkgRoot = absoluteCandidatePath.replace(/\/types$/, "");
++
++      // 2️⃣ 尝试几种常见路径
++      const tryPaths = [
++        join(pkgRoot, "lib", "types.js"),
++        join(pkgRoot, "lib", "types.mjs"),
++        join(pkgRoot, "src", "types.js"),
++        join(pkgRoot, "src", "types.mjs"),
++        join(pkgRoot, "types", "index.js"),
++        join(pkgRoot, "lib", "types", "index.js"),
++      ];
++
++      for (const p of tryPaths) {
++        if (fs.existsSync(p)) {
++          console.log("[metro patch] resolved custom types file:", p);
++          return { type: "sourceFile", filePath: p };
++        }
++      }
++
++      // 3️⃣ 如果没找到，也打印调试信息
++      console.warn(
++        "[metro patch] types file not found for:",
++        absoluteCandidatePath
++      );
++    } catch (e) {
++      console.warn("[metro patch] error resolving /types path:", e);
++    }
++  }
++
+   if (context.unstable_enablePackageExports) {
+     const pkg = context.getPackageForModule(absoluteCandidatePath);
+     const exportsField = pkg?.packageJson.exports;

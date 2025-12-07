@@ -1,0 +1,12 @@
+diff --git a/index.js b/index.js
+index 9dd500be06db94d0c08c8ba8d77fa3787b81c3c2..49a84baa8f8778fa20bcd1e3a2e33c3e4a7ccc8c 100644
+--- a/index.js
++++ b/index.js
+@@ -35,6 +35,7 @@ const defaultSVGRConfig = {
+               onlyMatchedOnce: false
+             },
+             removeViewBox: false,
++            removeDimensions: true,
+             removeUnknownsAndDefaults: false,
+             convertColors: false
+           }

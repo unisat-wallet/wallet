@@ -1,6 +1,6 @@
 packages:
   - 'packages/*'
-  - 'examples/*'
+  - 'apps/*'
 
 # Enable strict dependency management
 prefer-workspace-packages: true

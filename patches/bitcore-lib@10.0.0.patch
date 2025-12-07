@@ -1,0 +1,368 @@
+diff --git a/lib/crypto/random.js b/lib/crypto/random.js
+index 9938b37874b5f5033c6d1c20eb1542f4bb2aef61..59b970d0c48513264f971ce57d971addd26d9fd5 100644
+--- a/lib/crypto/random.js
++++ b/lib/crypto/random.js
+@@ -1,32 +1,19 @@
+-'use strict';
++"use strict";
+ 
+-function Random() {
+-}
++function Random() {}
+ 
+ /* secure random bytes that sometimes throws an error due to lack of entropy */
+-Random.getRandomBuffer = function(size) {
+-  if (process.browser)
+-    return Random.getRandomBufferBrowser(size);
+-  else
+-    return Random.getRandomBufferNode(size);
++Random.getRandomBuffer = function (size) {
++  if (process.browser) return Random.getRandomBufferBrowser(size);
++  else return Random.getRandomBufferNode(size);
+ };
+ 
+-Random.getRandomBufferNode = function(size) {
+-  var crypto = require('crypto');
++Random.getRandomBufferNode = function (size) {
++  var crypto = require("crypto");
+   return crypto.randomBytes(size);
+ };
+ 
+-Random.getRandomBufferBrowser = function(size) {
+-  if (!window.crypto && !window.msCrypto)
+-    throw new Error('window.crypto not available');
+-
+-  if (window.crypto && window.crypto.getRandomValues)
+-    var crypto = window.crypto;
+-  else if (window.msCrypto && window.msCrypto.getRandomValues) //internet explorer
+-    var crypto = window.msCrypto;
+-  else
+-    throw new Error('window.crypto.getRandomValues not available');
+-
++Random.getRandomBufferBrowser = function (size) {
+   var bbuf = new Uint8Array(size);
+   crypto.getRandomValues(bbuf);
+   var buf = Buffer.from(bbuf);
+@@ -35,7 +22,7 @@ Random.getRandomBufferBrowser = function(size) {
+ };
+ 
+ /* insecure random bytes, but it never fails */
+-Random.getPseudoRandomBuffer = function(size) {
++Random.getPseudoRandomBuffer = function (size) {
+   var b32 = 0x100000000;
+   var b = Buffer.alloc(size);
+   var r;
+diff --git a/lib/crypto/signature.js b/lib/crypto/signature.js
+index 6ba6053177d69afc741880de77209be5043937ae..301d2c7d45821ed3beba0d6b3286583856d32535 100644
+--- a/lib/crypto/signature.js
++++ b/lib/crypto/signature.js
+@@ -1,10 +1,10 @@
+-'use strict';
++"use strict";
+ 
+-var BN = require('./bn');
+-var _ = require('lodash');
+-var $ = require('../util/preconditions');
+-var BufferUtil = require('../util/buffer');
+-var JSUtil = require('../util/js');
++var BN = require("./bn");
++var _ = require("lodash");
++var $ = require("../util/preconditions");
++var BufferUtil = require("../util/buffer");
++var JSUtil = require("../util/js");
+ 
+ var Signature = function Signature(r, s) {
+   if (!(this instanceof Signature)) {
+@@ -13,28 +13,34 @@ var Signature = function Signature(r, s) {
+   if (r instanceof BN) {
+     this.set({
+       r: r,
+-      s: s
++      s: s,
+     });
+   } else if (r) {
+     var obj = r;
+     this.set(obj);
+   }
++
++  this.r = BN.fromString(this.r.toString(16), 16);
++  this.s = BN.fromString(this.s.toString(16), 16);
+ };
+ 
+ /* jshint maxcomplexity: 7 */
+-Signature.prototype.set = function(obj) {
++Signature.prototype.set = function (obj) {
+   this.r = obj.r || this.r || undefined;
+   this.s = obj.s || this.s || undefined;
+ 
+-  this.i = typeof obj.i !== 'undefined' ? obj.i : this.i; //public key recovery parameter in range [0, 3]
+-  this.compressed = typeof obj.compressed !== 'undefined' ?
+-    obj.compressed : this.compressed; //whether the recovered pubkey is compressed
++  this.i = typeof obj.i !== "undefined" ? obj.i : this.i; //public key recovery parameter in range [0, 3]
++  this.compressed =
++    typeof obj.compressed !== "undefined" ? obj.compressed : this.compressed; //whether the recovered pubkey is compressed
+   this.nhashtype = obj.nhashtype || this.nhashtype || undefined;
+   return this;
+ };
+ 
+-Signature.fromCompact = function(buf) {
+-  $.checkArgument(BufferUtil.isBuffer(buf), 'Argument is expected to be a Buffer');
++Signature.fromCompact = function (buf) {
++  $.checkArgument(
++    BufferUtil.isBuffer(buf),
++    "Argument is expected to be a Buffer"
++  );
+ 
+   var sig = new Signature();
+ 
+@@ -48,9 +54,12 @@ Signature.fromCompact = function(buf) {
+   var b2 = buf.slice(1, 33);
+   var b3 = buf.slice(33, 65);
+ 
+-  $.checkArgument(i === 0 || i === 1 || i === 2 || i === 3, new Error('i must be 0, 1, 2, or 3'));
+-  $.checkArgument(b2.length === 32, new Error('r must be 32 bytes'));
+-  $.checkArgument(b3.length === 32, new Error('s must be 32 bytes'));
++  $.checkArgument(
++    i === 0 || i === 1 || i === 2 || i === 3,
++    new Error("i must be 0, 1, 2, or 3")
++  );
++  $.checkArgument(b2.length === 32, new Error("r must be 32 bytes"));
++  $.checkArgument(b3.length === 32, new Error("s must be 32 bytes"));
+ 
+   sig.compressed = compressed;
+   sig.i = i;
+@@ -60,7 +69,7 @@ Signature.fromCompact = function(buf) {
+   return sig;
+ };
+ 
+-Signature.fromDER = Signature.fromBuffer = function(buf, strict) {
++Signature.fromDER = Signature.fromBuffer = function (buf, strict) {
+   var obj = Signature.parseDER(buf, strict);
+   var sig = new Signature();
+ 
+@@ -71,7 +80,7 @@ Signature.fromDER = Signature.fromBuffer = function(buf, strict) {
+ };
+ 
+ // The format used in a tx
+-Signature.fromTxFormat = function(buf) {
++Signature.fromTxFormat = function (buf) {
+   var nhashtype = buf.readUInt8(buf.length - 1);
+   var derbuf = buf.slice(0, buf.length - 1);
+   var sig = new Signature.fromDER(derbuf, false);
+@@ -79,50 +88,64 @@ Signature.fromTxFormat = function(buf) {
+   return sig;
+ };
+ 
+-Signature.fromString = function(str) {
+-  var buf = Buffer.from(str, 'hex');
++Signature.fromString = function (str) {
++  var buf = Buffer.from(str, "hex");
+   return Signature.fromDER(buf);
+ };
+ 
+-
+ /**
+  * In order to mimic the non-strict DER encoding of OpenSSL, set strict = false.
+  */
+-Signature.parseDER = function(buf, strict) {
+-  $.checkArgument(BufferUtil.isBuffer(buf), new Error('DER formatted signature should be a buffer'));
++Signature.parseDER = function (buf, strict) {
++  $.checkArgument(
++    BufferUtil.isBuffer(buf),
++    new Error("DER formatted signature should be a buffer")
++  );
+   if (_.isUndefined(strict)) {
+     strict = true;
+   }
+ 
+   var header = buf[0];
+-  $.checkArgument(header === 0x30, new Error('Header byte should be 0x30'));
++  $.checkArgument(header === 0x30, new Error("Header byte should be 0x30"));
+ 
+   var length = buf[1];
+   var buflength = buf.slice(2).length;
+-  $.checkArgument(!strict || length === buflength, new Error('Length byte should length of what follows'));
++  $.checkArgument(
++    !strict || length === buflength,
++    new Error("Length byte should length of what follows")
++  );
+ 
+   length = length < buflength ? length : buflength;
+ 
+   var rheader = buf[2 + 0];
+-  $.checkArgument(rheader === 0x02, new Error('Integer byte for r should be 0x02'));
++  $.checkArgument(
++    rheader === 0x02,
++    new Error("Integer byte for r should be 0x02")
++  );
+ 
+   var rlength = buf[2 + 1];
+   var rbuf = buf.slice(2 + 2, 2 + 2 + rlength);
+   var r = BN.fromBuffer(rbuf);
+   var rneg = buf[2 + 1 + 1] === 0x00 ? true : false;
+-  $.checkArgument(rlength === rbuf.length, new Error('Length of r incorrect'));
++  $.checkArgument(rlength === rbuf.length, new Error("Length of r incorrect"));
+ 
+   var sheader = buf[2 + 2 + rlength + 0];
+-  $.checkArgument(sheader === 0x02, new Error('Integer byte for s should be 0x02'));
++  $.checkArgument(
++    sheader === 0x02,
++    new Error("Integer byte for s should be 0x02")
++  );
+ 
+   var slength = buf[2 + 2 + rlength + 1];
+   var sbuf = buf.slice(2 + 2 + rlength + 2, 2 + 2 + rlength + 2 + slength);
+   var s = BN.fromBuffer(sbuf);
+   var sneg = buf[2 + 2 + rlength + 2 + 2] === 0x00 ? true : false;
+-  $.checkArgument(slength === sbuf.length, new Error('Length of s incorrect'));
++  $.checkArgument(slength === sbuf.length, new Error("Length of s incorrect"));
+ 
+   var sumlength = 2 + 2 + rlength + 2 + slength;
+-  $.checkArgument(length === sumlength - 2, new Error('Length of signature incorrect'));
++  $.checkArgument(
++    length === sumlength - 2,
++    new Error("Length of signature incorrect")
++  );
+ 
+   var obj = {
+     header: header,
+@@ -136,19 +159,18 @@ Signature.parseDER = function(buf, strict) {
+     slength: slength,
+     sneg: sneg,
+     sbuf: sbuf,
+-    s: s
++    s: s,
+   };
+ 
+   return obj;
+ };
+ 
+-
+-Signature.prototype.toCompact = function(i, compressed) {
+-  i = typeof i === 'number' ? i : this.i;
+-  compressed = typeof compressed === 'boolean' ? compressed : this.compressed;
++Signature.prototype.toCompact = function (i, compressed) {
++  i = typeof i === "number" ? i : this.i;
++  compressed = typeof compressed === "boolean" ? compressed : this.compressed;
+ 
+   if (!(i === 0 || i === 1 || i === 2 || i === 3)) {
+-    throw new Error('i must be equal to 0, 1, 2, or 3');
++    throw new Error("i must be equal to 0, 1, 2, or 3");
+   }
+ 
+   var val = i + 27 + 4;
+@@ -157,15 +179,15 @@ Signature.prototype.toCompact = function(i, compressed) {
+   }
+   var b1 = Buffer.from([val]);
+   var b2 = this.r.toBuffer({
+-    size: 32
++    size: 32,
+   });
+   var b3 = this.s.toBuffer({
+-    size: 32
++    size: 32,
+   });
+   return Buffer.concat([b1, b2, b3]);
+ };
+ 
+-Signature.prototype.toBuffer = Signature.prototype.toDER = function() {
++Signature.prototype.toBuffer = Signature.prototype.toDER = function () {
+   var rnbuf = this.r.toBuffer();
+   var snbuf = this.s.toBuffer();
+ 
+@@ -182,13 +204,18 @@ Signature.prototype.toBuffer = Signature.prototype.toDER = function() {
+   var sheader = 0x02;
+   var header = 0x30;
+ 
+-  var der = Buffer.concat([Buffer.from([header, length, rheader, rlength]), rbuf, Buffer.from([sheader, slength]), sbuf]);
++  var der = Buffer.concat([
++    Buffer.from([header, length, rheader, rlength]),
++    rbuf,
++    Buffer.from([sheader, slength]),
++    sbuf,
++  ]);
+   return der;
+ };
+ 
+-Signature.prototype.toString = function() {
++Signature.prototype.toString = function () {
+   var buf = this.toDER();
+-  return buf.toString('hex');
++  return buf.toString("hex");
+ };
+ 
+ /**
+@@ -203,7 +230,7 @@ Signature.prototype.toString = function() {
+  *
+  * See https://bitcointalk.org/index.php?topic=8392.msg127623#msg127623
+  */
+-Signature.isTxDER = function(buf) {
++Signature.isTxDER = function (buf) {
+   if (buf.length < 9) {
+     //  Non-canonical signature: too short
+     return false;
+@@ -226,7 +253,7 @@ Signature.isTxDER = function(buf) {
+     return false;
+   }
+   var nLenS = buf[5 + nLenR];
+-  if ((nLenR + nLenS + 7) !== buf.length) {
++  if (nLenR + nLenS + 7 !== buf.length) {
+     //  Non-canonical signature: R+S length mismatch
+     return false;
+   }
+@@ -244,7 +271,7 @@ Signature.isTxDER = function(buf) {
+     //  Non-canonical signature: R value negative
+     return false;
+   }
+-  if (nLenR > 1 && (R[0] === 0x00) && !(R[1] & 0x80)) {
++  if (nLenR > 1 && R[0] === 0x00 && !(R[1] & 0x80)) {
+     //  Non-canonical signature: R value excessively padded
+     return false;
+   }
+@@ -262,7 +289,7 @@ Signature.isTxDER = function(buf) {
+     //  Non-canonical signature: S value negative
+     return false;
+   }
+-  if (nLenS > 1 && (S[0] === 0x00) && !(S[1] & 0x80)) {
++  if (nLenS > 1 && S[0] === 0x00 && !(S[1] & 0x80)) {
+     //  Non-canonical signature: S value excessively padded
+     return false;
+   }
+@@ -274,9 +301,16 @@ Signature.isTxDER = function(buf) {
+  * See also ECDSA signature algorithm which enforces this.
+  * See also BIP 62, "low S values in signatures"
+  */
+-Signature.prototype.hasLowS = function() {
+-  if (this.s.lt(new BN(1)) ||
+-    this.s.gt(new BN('7FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF5D576E7357A4501DDFE92F46681B20A0', 'hex'))) {
++Signature.prototype.hasLowS = function () {
++  if (
++    this.s.lt(new BN(1)) ||
++    this.s.gt(
++      new BN(
++        "7FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF5D576E7357A4501DDFE92F46681B20A0",
++        "hex"
++      )
++    )
++  ) {
+     return false;
+   }
+   return true;
+@@ -286,7 +320,7 @@ Signature.prototype.hasLowS = function() {
+  * @returns true if the nhashtype is exactly equal to one of the standard options or combinations thereof.
+  * Translated from bitcoind's IsDefinedHashtypeSignature
+  */
+-Signature.prototype.hasDefinedHashtype = function() {
++Signature.prototype.hasDefinedHashtype = function () {
+   if (!JSUtil.isNaturalNumber(this.nhashtype)) {
+     return false;
+   }
+@@ -298,7 +332,7 @@ Signature.prototype.hasDefinedHashtype = function() {
+   return true;
+ };
+ 
+-Signature.prototype.toTxFormat = function() {
++Signature.prototype.toTxFormat = function () {
+   var derbuf = this.toDER();
+   var buf = Buffer.alloc(1);
+   buf.writeUInt8(this.nhashtype, 0);

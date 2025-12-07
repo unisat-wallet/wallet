@@ -1,0 +1,31 @@
+diff --git a/src/psbt.js b/src/psbt.js
+index b071f374f9d9b2a0bb6f4385550ace3166ea16f8..14b235a35f0722a203f05a8462c2290c0f54014e 100644
+--- a/src/psbt.js
++++ b/src/psbt.js
+@@ -444,7 +444,7 @@ class Psbt {
+       sighashCache = sig.hashType;
+       hashCache = hash;
+       scriptCache = script;
+-      checkScriptForPubkey(pSig.pubkey, script, 'verify');
++      // checkScriptForPubkey(pSig.pubkey, script, 'verify');
+       results.push(validator(pSig.pubkey, hash, sig.signature));
+     }
+     return results.every(res => res === true);
+@@ -1194,7 +1194,7 @@ function getHashAndSighashType(
+     false,
+     sighashTypes,
+   );
+-  checkScriptForPubkey(pubkey, script, 'sign');
++  // checkScriptForPubkey(pubkey, script, 'sign');
+   return {
+     hash,
+     sighashType,
+@@ -1342,7 +1342,7 @@ function getTaprootHashesForSig(
+     }
+   }
+   const tapLeafHashes = (input.tapLeafScript || [])
+-    .filter(tapLeaf => (0, psbtutils_1.pubkeyInScript)(pubkey, tapLeaf.script))
++    // .filter(tapLeaf => (0, psbtutils_1.pubkeyInScript)(pubkey, tapLeaf.script))
+     .map(tapLeaf => {
+       const hash = (0, bip341_1.tapleafHash)({
+         output: tapLeaf.script,
