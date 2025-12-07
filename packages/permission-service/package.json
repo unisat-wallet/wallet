@@ -44,6 +44,7 @@
   "license": "MIT",
   "dependencies": {
     "@unisat/wallet-types": "workspace:*",
+    "@unisat/wallet-storage": "workspace:*",
     "lru-cache": "^6.0.0"
   },
   "devDependencies": {

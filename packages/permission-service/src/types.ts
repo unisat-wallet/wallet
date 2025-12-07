@@ -1,3 +1,4 @@
+import { ProxyStorageAdapter } from '@unisat/wallet-storage'
 import { ChainType } from '@unisat/wallet-types'
 
 // LRU Cache entry interface
@@ -35,8 +36,6 @@ export interface PermissionStore {
 export interface StorageAdapter {
   get(key: string): Promise<any>
   set(key: string, value: any): Promise<void>
-  remove(key: string): Promise<void>
-  clear?(): Promise<void>
 }
 
 /**
@@ -53,7 +52,7 @@ export interface Logger {
  * Permission service configuration
  */
 export interface PermissionServiceConfig {
-  storage: StorageAdapter
+  storage: ProxyStorageAdapter
   storageKey?: string
   logger?: Logger
   autoSync?: boolean

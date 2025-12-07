@@ -11,6 +11,7 @@ import type {
 } from './types'
 import { defaultLogger } from './types'
 import { ChainType } from '@unisat/wallet-types'
+import { ProxyStorageAdapter } from '@unisat/wallet-storage'
 
 /**
  * Cross-platform permission service for managing dApp connections
@@ -20,27 +21,37 @@ export class PermissionService {
     dumpCache: [],
   }
   private lruCache: LRU<string, ConnectedSite> | undefined
-  protected storage: StorageAdapter
-  private storageKey: string
-  private logger: Logger
-  private autoSync: boolean
-  private internalRequestOrigin: string
+  protected storage: ProxyStorageAdapter = undefined as any
+  private storageKey: string = 'permission'
+  private logger: Logger = defaultLogger
+  private autoSync: boolean = false
+  private internalRequestOrigin: string = 'https://unisat.io'
 
-  constructor(config: PermissionServiceConfig) {
-    this.storage = config.storage
-    this.storageKey = config.storageKey || 'permission'
-    this.logger = config.logger || defaultLogger
-    this.autoSync = config.autoSync !== false
-    this.internalRequestOrigin = config.internalRequestOrigin || 'internal'
-  }
+  constructor() {}
 
   /**
    * Initialize the permission service
    */
-  async init(reset?: boolean): Promise<void> {
+  async init(config: PermissionServiceConfig): Promise<void> {
     try {
+      if (config.storage) {
+        this.storage = config.storage
+      }
+
+      if (config.logger) {
+        this.logger = config.logger
+      }
+
+      if (config.storageKey) {
+        this.storageKey = config.storageKey
+      }
+
+      if (!this.storage) {
+        throw new Error('PermissionService: Storage adapter is required')
+      }
+
       const storedData = await this.storage.get(this.storageKey)
-      this.store = storedData || this.store
+      this.store = storedData || { dumpCache: [] }
 
       this.lruCache = new LRU()
       const cache: ReadonlyArray<LRUEntry<string, ConnectedSite>> = (
@@ -52,11 +63,23 @@ export class PermissionService {
       }))
       this.lruCache.load(cache)
 
+      this.sync()
+
       this.logger.debug?.('PermissionService initialized with', cache.length, 'cached sites')
     } catch (error) {
       this.logger.error('Failed to initialize PermissionService:', error)
       throw error
     }
+  }
+
+  resetAllData = () => {
+    this.storage.set(this.storageKey, { dumpCache: [] })
+
+    this.store = {
+      dumpCache: [],
+    }
+
+    this.lruCache.reset()
   }
 
   /**
@@ -71,10 +94,6 @@ export class PermissionService {
     } catch (error) {
       this.logger.error('Failed to sync permission data:', error)
     }
-  }
-
-  resetAllData = () => {
-    return this.init(true)
   }
 
   /**

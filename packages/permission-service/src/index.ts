@@ -7,4 +7,3 @@ export type {
   PermissionServiceConfig,
 } from './types'
 export { defaultLogger } from './types'
-export * from './adapters'
