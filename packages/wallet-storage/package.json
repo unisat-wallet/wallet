@@ -1,0 +1,52 @@
+{
+  "name": "@unisat/wallet-storage",
+  "version": "0.1.6",
+  "description": "Cross-platform wallet storage service for UniSat wallet",
+  "main": "lib/index.js",
+  "module": "lib/index.mjs",
+  "types": "lib/index.d.ts",
+  "files": [
+    "lib/**/*",
+    "src/**/*",
+    "README.md"
+  ],
+  "exports": {
+    ".": {
+      "import": "./lib/index.mjs",
+      "require": "./lib/index.js",
+      "types": "./lib/index.d.ts"
+    },
+    "./types": {
+      "types": "./lib/types/index.d.ts",
+      "require": "./lib/types/index.js",
+      "import": "./lib/types/index.mjs"
+    }
+  },
+  "scripts": {
+    "build": "tsup",
+    "build:cjs": "tsup --format cjs",
+    "build:esm": "tsup --format esm",
+    "build:typed": "tsc --declaration --declarationMap --emitDeclarationOnly --outDir lib",
+    "test": "vitest",
+    "lint": "eslint src"
+  },
+  "dependencies": {
+    "@unisat/wallet-types": "workspace:*",
+    "@unisat/wallet-shared": "workspace:*",
+    "debounce": "^1.2.1",
+    "eventemitter3": "^5.0.1",
+    "lodash": "^4.17.21"
+  },
+  "devDependencies": {
+    "@types/debounce": "^1.2.4",
+    "@types/lodash": "^4.14.195",
+    "@types/node": "^20.0.0",
+    "eslint": "^8.0.0",
+    "tsup": "^7.0.0",
+    "typescript": "^5.0.0",
+    "vitest": "^0.34.0"
+  },
+  "publishConfig": {
+    "access": "public"
+  }
+}
