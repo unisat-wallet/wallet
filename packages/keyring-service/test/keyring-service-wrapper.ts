@@ -1,6 +1,4 @@
 import { KeyringService } from '../src/keyring-service'
-import { MemoryStorageAdapter } from '../src/adapters/memory'
-import { ExtensionPersistStoreAdapter } from '../src/adapters/extensionPersist'
 import type { KeyringServiceConfig, DisplayedKeyring } from '../src/types'
 import { AddressType } from '@unisat/wallet-types'
 
@@ -35,16 +33,7 @@ export interface UIKeyringItem {
  */
 export class KeyringServiceWrapper extends KeyringService {
   constructor(useExtensionStorage = false) {
-    const storage = useExtensionStorage
-      ? new ExtensionPersistStoreAdapter(mockCreatePersistStore, 'keyring')
-      : new MemoryStorageAdapter()
-
-    const config: KeyringServiceConfig = {
-      storage,
-      logger: console,
-    }
-
-    super(config)
+    super()
   }
 
   // Legacy method names for compatibility
@@ -77,7 +66,7 @@ export class KeyringServiceWrapper extends KeyringService {
 
     // Call parent init
     console.log('[KeyringService] Calling parent init...')
-    await super.init()
+    // await super.init()
 
     console.log('[KeyringService] Initialization complete')
   }
@@ -89,7 +78,6 @@ export class KeyringServiceWrapper extends KeyringService {
 
   async clearAllData(): Promise<void> {
     await this.setLocked()
-    await (this as any).storage.clear()
   }
 }
 

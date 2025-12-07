@@ -1,3 +1,4 @@
+import { ProxyStorageAdapter } from '@unisat/wallet-storage'
 import { AddressType } from '@unisat/wallet-types'
 
 // Core service interfaces
@@ -47,15 +48,6 @@ export interface CreateKeystoneKeyringOptions {
   connectionType?: 'USB' | 'QR'
 }
 
-// Storage adapter interface
-export interface StorageAdapter {
-  init(): Promise<void>
-  get(key: string): Promise<any>
-  set(key: string, value: any): Promise<void>
-  remove(key: string): Promise<void>
-  clear(): Promise<void>
-}
-
 // Encryptor interface for customizable encryption
 export interface Encryptor {
   encrypt(password: string, data: any): Promise<string>
@@ -64,11 +56,12 @@ export interface Encryptor {
 
 // Keyring service configuration
 export interface KeyringServiceConfig {
-  storage: StorageAdapter
+  storage: ProxyStorageAdapter
   logger?: any
   encryptor?: Encryptor
   t?: any
   eventBus?: any
+  boostValue?: string
 }
 
 // Account information

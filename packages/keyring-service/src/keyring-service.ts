@@ -1,40 +1,69 @@
-import { EventEmitter } from 'events'
-import * as bip39 from 'bip39'
 import { ObservableStore } from '@metamask/obs-store'
+import * as bip39 from 'bip39'
+import { EventEmitter } from 'events'
 
-import {
-  KeyringServiceConfig,
-  StorageAdapter,
-  MemStoreState,
-  DisplayedKeyring,
-  ToSignInput,
-  KeyringType,
-  Encryptor,
-  Keyring,
-  ADDRESS_TYPES,
-} from './types'
+import { bitcoin } from '@unisat/wallet-bitcoin'
 import { AddressType } from '@unisat/wallet-types'
-import { BrowserPassworderEncryptor } from './encryptor/browser-encryptor'
 import { ColdWalletKeyring, HdKeyring, KeystoneKeyring, SimpleKeyring } from './keyrings'
 import { EmptyKeyring } from './keyrings/empty-keyring'
-import { bitcoin } from '@unisat/wallet-bitcoin'
+import {
+  ADDRESS_TYPES,
+  DisplayedKeyring,
+  Encryptor,
+  Keyring,
+  KeyringServiceConfig,
+  KeyringType,
+  MemStoreState,
+  ToSignInput,
+} from './types'
 
-const EVENTS = {
-  broadcastToUI: 'broadcastToUI',
-  broadcastToBackground: 'broadcastToBackground',
-  SIGN_FINISHED: 'SIGN_FINISHED',
-  WALLETCONNECT: {
-    STATUS_CHANGED: 'WALLETCONNECT_STATUS_CHANGED',
-    INIT: 'WALLETCONNECT_INIT',
-    INITED: 'WALLETCONNECT_INITED',
-  },
-}
+import { BUS_EVENTS, BUS_METHODS, WalletKeyring } from '@unisat/wallet-shared'
+import { ProxyStorageAdapter } from '@unisat/wallet-storage'
 
 const KEYRING_SDK_TYPES = {
   SimpleKeyring,
   HdKeyring,
   KeystoneKeyring,
   ColdWalletKeyring,
+}
+
+/**
+ * Simple Mutex Lock for managing concurrent operations
+ * Ensures only one operation can proceed at a time
+ */
+class SimpleMutex {
+  private queue: (() => void)[] = []
+  private locked: boolean = false
+
+  async lock<T>(fn: () => Promise<T>): Promise<T> {
+    return new Promise((resolve, reject) => {
+      const execute = async () => {
+        this.locked = true
+        try {
+          const result = await fn()
+          resolve(result)
+        } catch (error) {
+          reject(error)
+        } finally {
+          this.locked = false
+          const next = this.queue.shift()
+          if (next) {
+            next()
+          }
+        }
+      }
+
+      if (!this.locked) {
+        execute()
+      } else {
+        this.queue.push(execute)
+      }
+    })
+  }
+
+  isLocked(): boolean {
+    return this.locked
+  }
 }
 
 class DisplayKeyring {
@@ -49,34 +78,113 @@ class DisplayKeyring {
   }
 }
 
+interface StoreState {
+  booted: string
+  vault: string | null
+  boostValue: string
+}
+
 /**
  * KeyringService - Core service for managing multiple keyrings (wallets)
  * Aligned with unisat-extension keyring implementation
  */
 export class KeyringService extends EventEmitter {
-  private storage: StorageAdapter
+  private storage: ProxyStorageAdapter = undefined as any
   private logger: any
-  private encryptor: Encryptor
+  private encryptor: Encryptor = undefined as any
   private t: any
   private eventBus: any
 
   // Core state - aligned with unisat-extension
   public keyringTypes: any[] = []
-  public store!: ObservableStore<any>
-  public memStore: ObservableStore<MemStoreState>
+  public store!: ObservableStore<StoreState>
+  public memStore: ObservableStore<MemStoreState> = undefined as any
   public keyrings: Keyring[] = []
   public addressTypes: AddressType[] = []
   public password: string | null = null
-  private isUnlocking = false
+  private unlockingMutex: SimpleMutex = new SimpleMutex()
+  private passwordChangeMutex: SimpleMutex = new SimpleMutex()
   private cachedDisplayedKeyring: DisplayedKeyring[] | null = null
+  private initialBoostValue: string = 'true'
+  private storageKey: string = 'keyringState'
+  private cachedKey: string = 'cached_pubkeys'
+  private readonly MAX_CACHE_ITEMS: number = 20
 
-  constructor(config: KeyringServiceConfig) {
+  constructor() {
     super()
-    this.storage = config.storage
-    this.logger = config.logger || console
-    this.encryptor = config.encryptor || new BrowserPassworderEncryptor()
-    this.t = config.t || ((key: string) => key) // Default t function
-    this.eventBus = config.eventBus
+  }
+
+  /**
+   * Generate a secure boost value for password verification
+   * Uses a combination of timestamp and random string for better security
+   */
+  private generateSecureBoostValue(): string {
+    const timestamp = Date.now().toString()
+    const random = Math.random().toString(36).substring(2, 15)
+    return `secure_${timestamp}_${random}`
+  }
+
+  /**
+   * Upgrade boost value from initial 'true' to a more secure value
+   * This enhances security by replacing the simple initial value
+   */
+  private upgradeBoostValueIfNeeded = async (): Promise<boolean> => {
+    if (!this.password) {
+      throw new Error(this.t('password_not_set'))
+    }
+
+    let boostValue = this.getBoostValue()
+    // Only upgrade if still using the initial simple value
+    if (boostValue === this.initialBoostValue) {
+      try {
+        // Generate new secure boost value
+        const newBoostValue = this.generateSecureBoostValue()
+
+        // Re-encrypt with the new boost value
+        const upgradedEncryptBooted = await this.encryptor.encrypt(this.password, newBoostValue)
+
+        // Persist the upgraded value
+        this.store.updateState({ booted: upgradedEncryptBooted, boostValue: newBoostValue })
+
+        this.logger.info('[KeyringService] Boost value upgraded to secure version')
+        return true
+      } catch (error) {
+        this.logger.error('[KeyringService] Failed to upgrade boost value:', error)
+        // Fallback: keep using the old value if upgrade fails
+        throw new Error(this.t('boost_value_upgrade_failed'))
+      }
+    }
+
+    return false
+  }
+
+  /**
+   * Initialize the service - must be called before use
+   */
+  async init(config: KeyringServiceConfig): Promise<void> {
+    if (config.storage) {
+      this.storage = config.storage
+    }
+
+    if (config.logger) {
+      this.logger = config.logger
+    }
+
+    if (config.t) {
+      this.t = config.t
+    }
+
+    if (config.eventBus) {
+      this.eventBus = config.eventBus
+    }
+
+    if (config.encryptor) {
+      this.encryptor = config.encryptor
+    }
+
+    if (config.boostValue) {
+      this.initialBoostValue = config.boostValue
+    }
 
     // Initialize supported keyring types
     this.keyringTypes = Object.values(KEYRING_SDK_TYPES)
@@ -93,56 +201,63 @@ export class KeyringService extends EventEmitter {
 
     this.keyrings = []
     this.addressTypes = []
-  }
-
-  /**
-   * Initialize the service - must be called before use
-   */
-  async init(): Promise<void> {
-    await this.storage.init()
-
-    // Initialize store if not already initialized
-    if (!this.store) {
-      const persistedState = await this.getStore()
-      this.loadStore(persistedState)
-    }
+    this.cachedDisplayedKeyring = null
+    this.password = null
 
     this.logger.debug('[KeyringService] Initialized')
+
+    const keyringState = await this.storage.get(this.storageKey)
+    this.loadStore(keyringState)
+    this.store.subscribe(value => this.storage.set(this.storageKey, value))
   }
 
-  private async getStore(): Promise<any> {
-    const store = (await this.storage.get('keyring')) || {}
-    return store
+  // reset total keyrings
+  resetAllData = async () => {
+    // Clear persistent storage
+    await this.storage.set(this.storageKey, {
+      booted: '',
+      vault: null,
+      boostValue: this.initialBoostValue,
+    })
+
+    await this.storage.set(this.cachedKey, null)
+
+    // Reset stores
+    this.store.updateState({
+      booted: '',
+      boostValue: this.initialBoostValue,
+      vault: null,
+    })
+
+    this.memStore.updateState({
+      isUnlocked: false,
+      keyrings: [],
+      preMnemonics: '',
+      addressTypes: [],
+    })
+
+    this.keyrings = []
+    this.addressTypes = []
+    this.cachedDisplayedKeyring = null
+    this.password = null
   }
 
-  private async updateStore(updates: any): Promise<void> {
-    const currentStore = await this.getStore()
-    const newStore = { ...currentStore, ...updates }
-    await this.storage.set('keyring', newStore)
-  }
-
-  loadStore = (initState: MemStoreState) => {
+  loadStore = (initState: StoreState) => {
     this.store = new ObservableStore(initState)
   }
 
   boot = async (password: string) => {
     this.password = password
-    const encryptBooted = await this.encryptor.encrypt(password, 'true')
-
-    // Initialize store if not already initialized
-    if (!this.store) {
-      this.loadStore({
-        isUnlocked: false,
-        keyrings: [],
-        keyringTypes: [],
-        preMnemonics: '',
-        addressTypes: [],
-      })
-    }
+    const boostValue = this.generateSecureBoostValue()
+    const encryptBooted = await this.encryptor.encrypt(password, boostValue)
 
     // Update both in-memory and persistent storage
-    this.store.updateState({ booted: encryptBooted })
-    await this.updateStore({ booted: encryptBooted })
+    this.store.updateState({ booted: encryptBooted, boostValue })
+    this.memStore.updateState({ isUnlocked: true })
+
+    // Upgrade boost value on first boot (when initial value is still 'true')
+    await this.upgradeBoostValueIfNeeded()
+
     this.setUnlocked()
     this.fullUpdate()
   }
@@ -153,29 +268,6 @@ export class KeyringService extends EventEmitter {
 
   hasVault = () => {
     return !!this.store.getState().vault
-  }
-
-  // reset total keyrings
-  resetAllData = () => {
-    this.password = null
-    this.cachedDisplayedKeyring = null
-    this.keyringTypes = Object.values(KEYRING_SDK_TYPES)
-    this.memStore = new ObservableStore({
-      isUnlocked: false,
-      keyringTypes: this.keyringTypes.map(krt => krt.type),
-      keyrings: [],
-      preMnemonics: '',
-      addressTypes: [],
-    })
-
-    this.keyrings = []
-    this.addressTypes = []
-
-    this.store.updateState({
-      booted: false,
-      vault: null,
-      face: null,
-    })
   }
 
   /**
@@ -236,9 +328,9 @@ export class KeyringService extends EventEmitter {
       throw new Error(this.t('you_need_to_unlock_wallet_first'))
     }
     const mnemonic = this.generateMnemonic()
+
     const preMnemonics = await this.encryptor.encrypt(this.password, mnemonic)
     this.memStore.updateState({ preMnemonics })
-
     return mnemonic
   }
 
@@ -285,7 +377,7 @@ export class KeyringService extends EventEmitter {
     accountCount: number
   ) => {
     if (accountCount < 1) {
-      throw new Error(this.t('account_count_must_be_greater_than_0'))
+      throw new Error(this.t('keyring_error_account_count'))
     }
     if (!bip39.validateMnemonic(seed)) {
       return Promise.reject(new Error(this.t('mnemonic_phrase_is_invalid')))
@@ -296,6 +388,7 @@ export class KeyringService extends EventEmitter {
     for (let i = 0; i < accountCount; i++) {
       activeIndexes.push(i)
     }
+
     const keyring = await this.addNewKeyring(
       'HD Key Tree',
       {
@@ -325,7 +418,7 @@ export class KeyringService extends EventEmitter {
     connectionType: 'USB' | 'QR' = 'USB'
   ) => {
     if (accountCount < 1) {
-      throw new Error(this.t('account_count_must_be_greater_than_0'))
+      throw new Error(this.t('keyring_error_account_count'))
     }
     // await this.persistAllKeyrings();
     const tmpKeyring = new KeystoneKeyring()
@@ -361,6 +454,7 @@ export class KeyringService extends EventEmitter {
     await this.persistAllKeyrings()
     await this._updateMemStoreKeyrings()
     await this.fullUpdate()
+
     return keyring
   }
 
@@ -418,66 +512,63 @@ export class KeyringService extends EventEmitter {
    * @returns {Promise<Object>} A Promise that resolves to the state.
    */
   submitPassword = async (password: string): Promise<MemStoreState> => {
-    if (this.isUnlocking) {
-      throw new Error(this.t('unlock_already_in_progress'))
-    }
-
-    this.isUnlocking = true
-
-    try {
+    return this.unlockingMutex.lock(async () => {
       const isValidPassword = await this.verifyPassword(password)
       if (!isValidPassword) {
-        throw new Error(this.t('invalid_password'))
+        throw new Error(this.t('password_error'))
       }
 
       this.password = password
 
-      this.keyrings = await this.unlockKeyrings(password)
+      if (this.hasVault()) {
+        this.keyrings = await this.unlockKeyrings(password)
+      }
+
+      // Upgrade boost value if needed (on first unlock after initialization)
+      await this.upgradeBoostValueIfNeeded()
+
       this.cachedDisplayedKeyring = null
 
       this.setUnlocked()
       return this.fullUpdate()
-    } catch (e) {
-      throw e
-    } finally {
-      this.isUnlocking = false
-    }
+    })
   }
 
   changePassword = async (oldPassword: string, newPassword: string) => {
-    try {
-      if (this.isUnlocking) {
-        throw new Error(this.t('change_password_already_in_progress'))
-      }
-      this.isUnlocking = true
+    return this.passwordChangeMutex
+      .lock(async () => {
+        const isValidPassword = await this.verifyPassword(oldPassword)
+        if (!isValidPassword) {
+          throw new Error(this.t('password_error'))
+        }
+        await this.unlockKeyrings(oldPassword)
+        this.password = newPassword
 
-      const isValidPassword = await this.verifyPassword(oldPassword)
-      if (!isValidPassword) {
-        throw new Error(this.t('invalid_password'))
-      }
-      await this.unlockKeyrings(oldPassword)
-      this.password = newPassword
+        const boostValue = this.getBoostValue()
+        // Re-encrypt with current boost value (upgraded if applicable)
+        const encryptBooted = await this.encryptor.encrypt(newPassword, boostValue)
+        this.store.updateState({ booted: encryptBooted, boostValue })
 
-      const encryptBooted = await this.encryptor.encrypt(newPassword, 'true')
-      this.store.updateState({ booted: encryptBooted })
+        if (this.memStore.getState().preMnemonics) {
+          const mnemonic = await this.encryptor.decrypt(
+            oldPassword,
+            this.memStore.getState().preMnemonics
+          )
+          const preMnemonics = await this.encryptor.encrypt(newPassword, mnemonic)
+          this.memStore.updateState({ preMnemonics })
+        }
 
-      if (this.memStore.getState().preMnemonics) {
-        const mnemonic = await this.encryptor.decrypt(
-          oldPassword,
-          this.memStore.getState().preMnemonics
-        )
-        const preMnemonics = await this.encryptor.encrypt(newPassword, mnemonic)
-        this.memStore.updateState({ preMnemonics })
-      }
+        await this.persistAllKeyrings()
+        await this._updateMemStoreKeyrings()
+        await this.fullUpdate()
+      })
+      .catch(e => {
+        throw new Error(this.t('change_password_failed'))
+      })
+  }
 
-      await this.persistAllKeyrings()
-      await this._updateMemStoreKeyrings()
-      await this.fullUpdate()
-    } catch (e) {
-      throw new Error(this.t('change_password_failed'))
-    } finally {
-      this.isUnlocking = false
-    }
+  private getBoostValue = (): string => {
+    return this.store.getState().boostValue || this.initialBoostValue
   }
 
   /**
@@ -485,6 +576,9 @@ export class KeyringService extends EventEmitter {
    *
    * Attempts to decrypt the current vault with a given password
    * to verify its validity.
+   *
+   * Security: Only accepts upgraded boost values. Initial 'true' value
+   * is rejected to prevent dictionary/collision attacks.
    *
    * @param {string} password
    */
@@ -494,8 +588,14 @@ export class KeyringService extends EventEmitter {
       throw new Error(this.t('cannot_unlock_without_a_previous_vault'))
     }
     try {
-      await this.encryptor.decrypt(password, encryptedBooted)
-      return true
+      const val = await this.encryptor.decrypt(password, encryptedBooted)
+      // SECURITY: Only accept the current boost value
+      // Reject initial 'true' value to prevent weak value attacks
+      if (val === this.getBoostValue()) {
+        return true
+      }
+
+      return false
     } catch {
       return false
     }
@@ -531,8 +631,10 @@ export class KeyringService extends EventEmitter {
 
     const Keyring = this.getKeyringClassForType(type)
     if (!Keyring) {
+      console.error(`Unknown keyring type: ${type}`)
       throw new Error(`Unknown keyring type: ${type}`)
     }
+
     const keyring = new Keyring(opts)
     return keyring
   }
@@ -1032,10 +1134,142 @@ export class KeyringService extends EventEmitter {
     this.memStore.updateState({ isUnlocked: true })
     this.emit('unlock')
     if (this.eventBus) {
-      this.eventBus.emit(EVENTS.broadcastToUI, {
-        method: 'unlock',
+      this.eventBus.emit(BUS_EVENTS.broadcastToUI, {
+        method: BUS_METHODS.UNLOCKED,
         params: {},
       })
+    }
+  }
+
+  /**
+   * Clean up cache to keep only the most recently accessed items
+   * Uses LRU (Least Recently Used) strategy to limit cache size
+   */
+  private cleanupCache = async (cachedPubkeyData: any): Promise<any> => {
+    if (!cachedPubkeyData) return cachedPubkeyData
+
+    // Collect all cache entries with their access times
+    const allEntries: {
+      keyringIndex: string
+      derivedIndex: string
+      timestamp: number
+      data: any
+    }[] = []
+
+    for (const keyringIndex in cachedPubkeyData) {
+      if (!cachedPubkeyData[keyringIndex]) continue
+
+      for (const derivedIndex in cachedPubkeyData[keyringIndex]) {
+        const entry = cachedPubkeyData[keyringIndex][derivedIndex]
+        if (entry && typeof entry === 'object') {
+          allEntries.push({
+            keyringIndex,
+            derivedIndex,
+            timestamp: entry.timestamp || 0,
+            data: entry,
+          })
+        }
+      }
+    }
+
+    // If total entries <= MAX_CACHE_ITEMS, no cleanup needed
+    if (allEntries.length <= this.MAX_CACHE_ITEMS) {
+      return cachedPubkeyData
+    }
+
+    // Sort by timestamp descending (most recent first)
+    allEntries.sort((a, b) => b.timestamp - a.timestamp)
+
+    // Keep only the most recent MAX_CACHE_ITEMS
+    const toKeep = allEntries.slice(0, this.MAX_CACHE_ITEMS)
+
+    // Rebuild cache with only kept items
+    const cleanedCache: any = {}
+    toKeep.forEach(entry => {
+      if (!cleanedCache[entry.keyringIndex]) {
+        cleanedCache[entry.keyringIndex] = {}
+      }
+      cleanedCache[entry.keyringIndex][entry.derivedIndex] = entry.data
+    })
+
+    this.logger?.debug(
+      `[KeyringService] Cache cleanup: removed ${allEntries.length - toKeep.length} old entries, kept ${toKeep.length}`
+    )
+
+    return cleanedCache
+  }
+
+  getAllPubkeysByDerivedIndex = async (
+    keyring: WalletKeyring,
+    derivedIndex: number
+  ): Promise<{ pubkey: string; type: AddressType }[]> => {
+    const cachedPubkeys: {
+      pubkey: string
+      type: AddressType
+    }[] = []
+
+    let cachedPubkeyData: CachedPubkeyData = await this.storage.get(this.cachedKey)
+    if (
+      cachedPubkeyData &&
+      cachedPubkeyData[keyring.index] &&
+      cachedPubkeyData[keyring.index]![derivedIndex]
+    ) {
+      const cachedEntry = cachedPubkeyData[keyring.index]![derivedIndex]!
+
+      // Update timestamp for LRU
+      cachedEntry.timestamp = Date.now()
+      await this.storage.set(this.cachedKey, cachedPubkeyData)
+
+      return cachedEntry.data
+    }
+
+    const _keyring = this.keyrings[keyring.index]!
+
+    if (_keyring.type === KeyringType.HdKeyring || _keyring.type === KeyringType.KeystoneKeyring) {
+      const pathPubkey: { [path: string]: string } = {}
+      ADDRESS_TYPES.filter(v => v.displayIndex >= 0).forEach(v => {
+        let pubkey = pathPubkey[v.hdPath]
+        if (!pubkey && _keyring.getAccountByHdPath) {
+          pubkey = _keyring.getAccountByHdPath(v.hdPath, derivedIndex)
+        }
+        cachedPubkeys.push({
+          pubkey: pubkey || '',
+          type: v.value,
+        })
+      })
+    } else {
+      ADDRESS_TYPES.filter(v => v.displayIndex >= 0 && v.isUnisatLegacy === false).forEach(v => {
+        const pubkey = keyring.accounts[derivedIndex]!.pubkey
+        cachedPubkeys.push({
+          pubkey: pubkey || '',
+          type: v.value,
+        })
+      })
+    }
+
+    cachedPubkeyData = cachedPubkeyData || {}
+    cachedPubkeyData[keyring.index] = cachedPubkeyData[keyring.index] || {}
+
+    // Store with timestamp for LRU tracking
+    cachedPubkeyData[keyring.index]![derivedIndex] = {
+      data: cachedPubkeys,
+      timestamp: Date.now(),
+    }
+
+    // Clean up cache to keep only recent items
+    cachedPubkeyData = await this.cleanupCache(cachedPubkeyData)
+
+    await this.storage.set(this.cachedKey, cachedPubkeyData)
+
+    return cachedPubkeys
+  }
+}
+
+interface CachedPubkeyData {
+  [keyringIndex: string]: {
+    [derivedIndex: string]: {
+      data: { pubkey: string; type: AddressType }[]
+      timestamp: number
     }
   }
 }

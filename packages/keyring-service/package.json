@@ -46,17 +46,20 @@
   "author": "UniSat",
   "license": "MIT",
   "dependencies": {
-    "@unisat/wallet-bitcoin": "workspace:*",
-    "@unisat/wallet-types": "workspace:*",
+    "@keystonehq/keystone-sdk": "^0.3.0",
     "@metamask/obs-store": "^7.0.0",
+    "@unisat/wallet-bitcoin": "workspace:*",
+    "@unisat/wallet-shared": "workspace:*",
+    "@unisat/wallet-storage": "workspace:*",
+    "@unisat/wallet-types": "workspace:*",
+    "bip39": "^3.1.0",
     "bitcoinjs-lib": "^6.1.5",
     "bitcore-lib": "^10.0.0",
-    "bip39": "^3.1.0",
-    "hdkey": "^2.1.0",
     "browser-passworder": "^2.0.3",
-    "events": "^3.3.0",
     "bs58check": "^3.0.1",
-    "@keystonehq/keystone-sdk": "^0.3.0"
+    "events": "^3.3.0",
+    "hdkey": "^2.1.0",
+    "patch-package": "^8.0.0"
   },
   "devDependencies": {
     "@types/node": "^20.8.0",

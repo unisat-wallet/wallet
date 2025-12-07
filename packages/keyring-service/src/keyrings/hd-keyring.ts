@@ -97,7 +97,12 @@ export class HdKeyring extends SimpleKeyring {
     this.mnemonic = mnemonic
     this._index2wallet = {}
 
-    const seed = bip39.mnemonicToSeedSync(mnemonic, this.passphrase)
+    let seed
+    if (bip39.mnemonicToSeedSync) {
+      seed = bip39.mnemonicToSeedSync(mnemonic, this.passphrase)
+    } else {
+      seed = bip39.mnemonicToSeed(mnemonic, this.passphrase)
+    }
     this.hdWallet = hdkey.fromMasterSeed(seed)
     this.root = this.hdWallet.derive(this.hdPath)
   }
