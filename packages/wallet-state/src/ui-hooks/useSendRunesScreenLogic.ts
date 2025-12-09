@@ -1,5 +1,6 @@
 import { bnUtils } from '@unisat/base-utils'
 import { Inscription, RawTxInfo, RuneBalance, RuneInfo } from '@unisat/wallet-shared'
+import BigNumber from 'bignumber.js'
 import { useEffect, useMemo, useState } from 'react'
 import { useI18n, useNavigation, useTools } from 'src/context'
 import {
