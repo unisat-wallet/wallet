@@ -212,7 +212,7 @@ export function getSupportedAssets(chainType: ChainType, address: string) {
   return {
     assets,
     tabKeys: assetTabKeys,
-    key: assetTabKeys.join(','),
+    key: chainType + address + assetTabKeys.join(','),
   }
 }
 export function useSupportedAssets() {

@@ -1,18 +1,8 @@
-import { useEffect, useState } from 'react'
+import { useRef, useState } from 'react'
 
-import { AlkanesBalance, CAT20Balance, CAT_VERSION, TickPriceItem } from '@unisat/wallet-shared'
+import { CAT20Balance, CAT_VERSION, TickPriceItem } from '@unisat/wallet-shared'
 
-import {
-  useChainType,
-  useCurrentAccount,
-  useI18n,
-  useWallet,
-  useTools,
-  useNavigation,
-  useSupportedAssets,
-  useChain,
-  getSupportedAssets,
-} from '..'
+import { getSupportedAssets, useChainType, useCurrentAccount, useNavigation, useWallet } from '..'
 import { useInfiniteList } from './useInfiniteList'
 
 export function useCAT20ListLogic(version: CAT_VERSION) {
@@ -21,6 +11,17 @@ export function useCAT20ListLogic(version: CAT_VERSION) {
   const currentAccount = useCurrentAccount()
   const chainType = useChainType()
   const [priceMap, setPriceMap] = useState<{ [key: string]: TickPriceItem }>({})
+
+  const priceMapRef = useRef(priceMap)
+  const updatePrices = (res: { [tick: string]: TickPriceItem }) => {
+    const newPriceMap = { ...priceMapRef.current }
+    Object.keys(res).forEach(tick => {
+      newPriceMap[tick] = res[tick]
+    })
+    priceMapRef.current = newPriceMap
+    setPriceMap(newPriceMap)
+  }
+
   const {
     data: tokens,
     total,
@@ -41,7 +42,7 @@ export function useCAT20ListLogic(version: CAT_VERSION) {
         pageSize
       )
       if (list.length > 0) {
-        wallet.getCAT20sPrice(list.map(item => item.tokenId)).then(setPriceMap)
+        wallet.getCAT20sPrice(list.map(item => item.tokenId)).then(updatePrices)
       }
       return { list, total }
     },

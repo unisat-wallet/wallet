@@ -1,16 +1,6 @@
-import { useEffect, useState } from 'react'
 import { TickPriceItem, TokenBalance } from '@unisat/wallet-shared'
-import {
-  useChainType,
-  useCurrentAccount,
-  useI18n,
-  useWallet,
-  useTools,
-  useNavigation,
-  useSupportedAssets,
-  useChain,
-  getSupportedAssets,
-} from '..'
+import { useRef, useState } from 'react'
+import { getSupportedAssets, useChainType, useCurrentAccount, useNavigation, useWallet } from '..'
 import { useInfiniteList } from './useInfiniteList'
 
 export function useBRC20ProgListLogic() {
@@ -19,6 +9,16 @@ export function useBRC20ProgListLogic() {
   const currentAccount = useCurrentAccount()
   const chainType = useChainType()
   const [priceMap, setPriceMap] = useState<{ [key: string]: TickPriceItem }>({})
+
+  const priceMapRef = useRef(priceMap)
+  const updatePrices = (res: { [tick: string]: TickPriceItem }) => {
+    const newPriceMap = { ...priceMapRef.current }
+    Object.keys(res).forEach(tick => {
+      newPriceMap[tick] = res[tick]
+    })
+    priceMapRef.current = newPriceMap
+    setPriceMap(newPriceMap)
+  }
 
   const {
     data: items,
@@ -36,7 +36,7 @@ export function useBRC20ProgListLogic() {
 
       const { list, total } = await wallet.getBRC20ProgList(currentAccount.address, page, pageSize)
       if (list.length > 0) {
-        wallet.getBrc20sPrice(list.map(item => item.ticker)).then(setPriceMap)
+        wallet.getBrc20sPrice(list.map(item => item.ticker)).then(updatePrices)
       }
       return { list, total }
     },
