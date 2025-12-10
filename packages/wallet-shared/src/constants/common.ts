@@ -581,7 +581,7 @@ export const getLockTimeInfo = (id: number, t?: any) => {
   return AUTO_LOCK_TIMES.find(v => v.id === DEFAULT_LOCKTIME_ID)!
 }
 
-export const DEFAULT_LOCKTIME_ID = 2
+export const DEFAULT_LOCKTIME_ID = 3
 
 export const RESTORE_WALLETS: {
   value: RestoreWalletType
