@@ -2750,7 +2750,6 @@ export class WalletController extends BaseController {
       )
 
     const psbt = bitcoin.Psbt.fromBase64(psbtBase64)
-    console.log('gogogo', psbt, toSignInputs)
     return this.getSignedResult(psbt, toSignInputs)
   }
   // createBabylonDeposit = async (amount: string) => {};
