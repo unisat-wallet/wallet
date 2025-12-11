@@ -1,8 +1,8 @@
-import { AddressTokenSummary, CHAINS_MAP, TickPriceItem, TokenBalance } from '@unisat/wallet-shared'
-import { useMemo, useState } from 'react'
-import { useI18n, useWallet } from 'src/context'
-import { useChain, useChainType, useCurrentAccount } from 'src/hooks'
+import { AddressTokenSummary, TickPriceItem, TokenBalance } from '@unisat/wallet-shared'
 import BigNumber from 'bignumber.js'
+import { useMemo, useState } from 'react'
+import { useI18n } from 'src/context'
+import { useBRC20IconInfo, useChain, useCurrentAccount } from 'src/hooks'
 
 export interface BRC20BalanceCardProps {
   tokenBalance: TokenBalance
@@ -27,8 +27,7 @@ export function useBRC20BalanceCardLogic(props: BRC20BalanceCardProps) {
 
   const account = useCurrentAccount()
   const [tokenSummary, setTokenSummary] = useState<AddressTokenSummary>()
-  const [loading, setLoading] = useState(false)
-  const wallet = useWallet()
+
   const { t } = useI18n()
 
   const deploy_count = tokenSummary ? (tokenSummary.tokenInfo.holder == account.address ? 1 : 0) : 0
@@ -73,28 +72,38 @@ export function useBRC20BalanceCardLogic(props: BRC20BalanceCardProps) {
 
   const hasOutWalletBalance = (onSwapBalance || onProgBalance || '0')! !== '0'
 
-  const chainType = useChainType()
-  const brc20Url = CHAINS_MAP[chainType]?.iconBaseUrl
-  const brc20IconUrl = `${brc20Url}/brc20/${ticker}`
+  // icon
+  const iconInfo = useBRC20IconInfo(ticker)
+
+  // price
   const chain = useChain()
   const showPrice = chain.showPrice
 
   return {
-    price,
-    showPrice,
+    // info
     ticker,
     displayName,
+    selfMint,
     tag,
-    onClick,
+
+    // icon
+    iconInfo,
+
+    // balance
     totalBalance,
     hasOutWalletBalance,
-    selfMint,
     onProgBalance,
     inWalletBalance,
     onSwapBalance,
+
+    // price
+    price,
+    showPrice,
+
+    // click
+    onClick,
+
+    // others
     t,
-    brc20IconUrl,
-    overallBalance,
-    transferableBalance,
   }
 }

@@ -162,6 +162,11 @@ export function useUnisatWebsite() {
   return CHAINS_MAP[chainType]!.unisatUrl
 }
 
+export function useIconBaseUrl() {
+  const chainType = useChainType()
+  return CHAINS_MAP[chainType]!.iconBaseUrl
+}
+
 export function useOrdinalsWebsite() {
   const chainType = useChainType()
   return CHAINS_MAP[chainType]!.ordinalsUrl
@@ -267,26 +272,6 @@ export function useCAT721NFTContentBaseUrl(version: CAT_VERSION) {
   } else {
     return ''
   }
-}
-
-export function useBRC20MarketPlaceWebsite(ticker: string) {
-  const chainType = useChainType()
-  if (chainType === ChainType.BITCOIN_MAINNET) {
-    if (ticker.length == 6) {
-      return `${CHAINS_MAP[chainType]!.unisatUrl}/market/brc20_prog?tick=${ticker}`
-    }
-  }
-  return `${CHAINS_MAP[chainType]!.unisatUrl}/market/brc20?tick=${ticker}`
-}
-
-export function useRunesMarketPlaceWebsite(ticker: string) {
-  const chainType = useChainType()
-  return `${CHAINS_MAP[chainType]!.unisatUrl}/runes/market?tick=${ticker}`
-}
-
-export function useCAT20MarketPlaceWebsite(tokenId: string) {
-  const chainType = useChainType()
-  return `${CHAINS_MAP[chainType]!.unisatUrl}/dex/cat20/${tokenId}`
 }
 
 export function useBabylonConfig() {

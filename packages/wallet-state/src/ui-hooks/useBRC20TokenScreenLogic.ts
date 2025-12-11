@@ -2,6 +2,7 @@ import { AddressTokenSummary, BRC20HistoryItem, Inscription } from '@unisat/wall
 import { ChainType } from '@unisat/wallet-types'
 import { useEffect, useMemo, useState } from 'react'
 import {
+  useBRC20IconInfo,
   useChain,
   useChainType,
   useCurrentAccount,
@@ -359,6 +360,8 @@ export function useBRC20TokenScreenLogic() {
     })
   }
 
+  const iconInfo = useBRC20IconInfo(ticker)
+
   return {
     totalBalance,
     onSwapBalance,
@@ -380,6 +383,7 @@ export function useBRC20TokenScreenLogic() {
     chain,
     tools,
     isBrc20Prog,
+    iconInfo,
     onClickWrapBrc20Prog,
     onClickUnwrapBrc20Prog,
     onClickSendBrc20Prog,

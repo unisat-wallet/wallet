@@ -7,7 +7,9 @@ import {
   useCurrentAccount,
   useOrdinalsWebsite,
   useResetTxState,
-  useRunesMarketPlaceWebsite,
+  useRunesIconInfo,
+  useRunesInscribeUrl,
+  useRunesMarketUrl,
   useTxExplorerUrl,
   useUnisatWebsite,
 } from 'src/hooks'
@@ -105,11 +107,13 @@ export function useRunesTokenScreenLogic() {
       return false
     }
   }, [chainType])
-  const marketPlaceUrl = useRunesMarketPlaceWebsite(tokenSummary.runeInfo.spacedRune)
+
+  const iconInfo = useRunesIconInfo(tokenSummary.runeInfo.spacedRune)
+  const inscribeUrl = useRunesInscribeUrl(tokenSummary.runeInfo.rune)
+  const marketPlaceUrl = useRunesMarketUrl(tokenSummary.runeInfo.spacedRune)
 
   const onClickMint = () => {
-    const newUrl = `${unisatWebsite}/runes/inscribe?only=1&tab=mint&rune=${tokenSummary?.runeInfo?.rune}`
-    nav.navToUrl(newUrl)
+    nav.navToUrl(inscribeUrl)
   }
 
   const onClickSend = () => {
@@ -129,6 +133,8 @@ export function useRunesTokenScreenLogic() {
   return {
     runeid,
     tokenSummary,
+    iconInfo,
+
     loading,
     t,
 

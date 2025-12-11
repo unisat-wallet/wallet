@@ -61,7 +61,7 @@ export function useAlkanesCollectionListLogic() {
   }, [walletTabFocusRefresh, isFocus])
 
   const onClickItem = (item: AlkanesCollection) => {
-    nav.navigate('AlkanesCollectionScreen', { alkaneid: item.alkaneid })
+    nav.navigate('AlkanesCollectionScreen', { collectionId: item.alkaneid })
   }
 
   return { items, total, loading, hasMore, onRefresh, onLoadMore, onClickItem }

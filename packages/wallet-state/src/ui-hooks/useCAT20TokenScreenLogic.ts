@@ -4,6 +4,7 @@ import { ChainType } from '@unisat/wallet-types'
 import { useEffect, useMemo, useState } from 'react'
 import { useI18n, useNavigation, useTools, useWallet } from 'src/context'
 import {
+  useCAT20IconInfo,
   useCAT20MarketPlaceWebsite,
   useCAT20TokenInfoExplorerUrl,
   useChainType,
@@ -106,12 +107,15 @@ export function useCAT20TokenScreenLogic() {
     nav.navToUrl(marketPlaceUrl)
   }
 
+  const iconInfo = useCAT20IconInfo(tokenSummary.cat20Info.name, tokenSummary.cat20Info.tokenId)
+
   return {
     tokenSummary,
     loading,
     tokenUrl,
     enableTransfer,
     enableTrade,
+    iconInfo,
     onClickMerge,
     onClickSend,
     onClickTrade,

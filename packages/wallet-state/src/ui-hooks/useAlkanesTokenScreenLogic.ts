@@ -1,7 +1,15 @@
 import { useEffect, useMemo, useState } from 'react'
 
 import { AddressAlkanesTokenSummary } from '@unisat/wallet-shared'
-import { useCurrentAccount, useI18n, useNavigation, useResetTxState, useTools, useWallet } from '..'
+import {
+  useAlkanesIconInfo,
+  useCurrentAccount,
+  useI18n,
+  useNavigation,
+  useResetTxState,
+  useTools,
+  useWallet,
+} from '..'
 
 export function useAlkanesTokenScreenLogic() {
   const nav = useNavigation()
@@ -100,6 +108,12 @@ export function useAlkanesTokenScreenLogic() {
       nav.navToUrl(tokenSummary.tradeUrl)
     }
   }
+
+  const iconInfo = useAlkanesIconInfo(
+    tokenSummary.tokenBalance.name,
+    tokenSummary.tokenBalance.alkaneid
+  )
+
   return {
     tokenSummary,
     loading,
@@ -113,5 +127,6 @@ export function useAlkanesTokenScreenLogic() {
     onClickMint,
     onClickSend,
     onClickTrade,
+    iconInfo,
   }
 }

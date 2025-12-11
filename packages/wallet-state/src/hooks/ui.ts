@@ -7,7 +7,7 @@ import { getAddressType } from '../utils/bitcoin-utils'
 import { AppState, AssetTabKey } from '..'
 import { useCurrentAddress } from '../hooks/accounts'
 import { useAppDispatch, useAppSelector } from '../hooks/base'
-import { useChainType } from '../hooks/settings'
+import { useChainType, useIconBaseUrl, useUnisatWebsite } from '../hooks/settings'
 import { uiActions } from '../reducers/ui'
 export function useUIState(): AppState['ui'] {
   return useAppSelector(state => state.ui)
@@ -241,4 +241,84 @@ export const useIsInExpandView = () => {
 export function useWalletTopTabScreenState() {
   const uiState = useUIState()
   return uiState.walletTopTabScreen
+}
+
+export function useBRC20IconInfo(ticker: string) {
+  const baseUrl = useIconBaseUrl()
+  const iconUrl = `${baseUrl}/brc20/${ticker}`
+  const iconShortName = ticker.substring(0, 2)
+  const chainType = useChainType()
+  if (chainType === ChainType.BITCOIN_MAINNET || chainType === ChainType.FRACTAL_BITCOIN_MAINNET) {
+    return { iconUrl, iconShortName }
+  }
+
+  return { iconUrl: '', iconShortName }
+}
+
+export function useRunesIconInfo(spacedRune: string) {
+  const baseUrl = useIconBaseUrl()
+  const iconUrl = `${baseUrl}/runes/${spacedRune}`
+  const iconShortName = spacedRune.substring(0, 2)
+  const chainType = useChainType()
+  if (chainType === ChainType.BITCOIN_MAINNET || chainType === ChainType.FRACTAL_BITCOIN_MAINNET) {
+    return { iconUrl, iconShortName }
+  }
+
+  return { iconUrl: '', iconShortName }
+}
+
+export function useAlkanesIconInfo(name: string, alkaneid: string) {
+  const baseUrl = useIconBaseUrl()
+  const iconUrl = `${baseUrl}/alkanes/${name}/${alkaneid}`
+  const iconShortName = name.substring(0, 2)
+  const chainType = useChainType()
+  if (chainType === ChainType.BITCOIN_MAINNET || chainType === ChainType.FRACTAL_BITCOIN_MAINNET) {
+    return { iconUrl, iconShortName }
+  }
+
+  return { iconUrl: '', iconShortName }
+}
+
+export function useCAT20IconInfo(name: string, tokenId: string) {
+  const baseUrl = useIconBaseUrl()
+  const iconUrl = `${baseUrl}/cat20/${name}/${tokenId}`
+  const iconShortName = name.substring(0, 2)
+  const chainType = useChainType()
+  if (chainType === ChainType.BITCOIN_MAINNET || chainType === ChainType.FRACTAL_BITCOIN_MAINNET) {
+    return { iconUrl, iconShortName }
+  }
+
+  return { iconUrl: '', iconShortName }
+}
+
+export function useBRC20MarketPlaceWebsite(ticker: string) {
+  const chainType = useChainType()
+  const unisatWebsite = useUnisatWebsite()
+  if (chainType === ChainType.BITCOIN_MAINNET) {
+    if (ticker.length == 6) {
+      return `${unisatWebsite}/market/brc20_prog?tick=${ticker}`
+    }
+  }
+  return `${unisatWebsite}/market/brc20?tick=${ticker}`
+}
+
+export function useRunesMarketUrl(ticker: string) {
+  const unisatWebsite = useUnisatWebsite()
+  return `${unisatWebsite}/runes/market?tick=${ticker}`
+}
+
+export function useAlkanesMarketPlaceWebsite(alkaneid: string) {
+  const unisatWebsite = useUnisatWebsite()
+  return `${unisatWebsite}/alkanes/market?tick=${alkaneid}`
+}
+
+export function useCAT20MarketPlaceWebsite(tokenId: string) {
+  const unisatWebsite = useUnisatWebsite()
+  return `${unisatWebsite}/dex/cat20/${tokenId}`
+}
+
+export function useRunesInscribeUrl(rune: string) {
+  const unisatWebsite = useUnisatWebsite()
+  const newUrl = `${unisatWebsite}/runes/inscribe?only=1&tab=mint&rune=${rune}`
+  return newUrl
 }
