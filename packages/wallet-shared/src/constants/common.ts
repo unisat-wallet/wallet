@@ -420,6 +420,8 @@ export const BUS_METHODS = {
   AUTO_LOCKED: 'walletAutoLocked',
   SIGN_FINISHED: 'signFinished',
   LOCALE_CHANGED: 'localeChanged',
+
+  USER_UI_INTERACT: 'USER_UI_INTERACT', // used to notify background script that user has interacted with the UI
 }
 
 /**
