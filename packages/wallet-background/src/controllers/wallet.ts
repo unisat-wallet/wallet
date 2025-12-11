@@ -525,7 +525,7 @@ export class WalletController extends BaseController {
       displayedKeyring,
       keyringService.keyrings.length - 1
     )
-    this.changeKeyring(keyring)
+    await this.changeKeyring(keyring)
   }
 
   createKeyringWithColdWallet = async (
@@ -563,7 +563,7 @@ export class WalletController extends BaseController {
       this.setKeyringAlianName(keyring, alianName)
     }
 
-    this.changeKeyring(keyring)
+    await this.changeKeyring(keyring)
 
     return keyring
   }
@@ -604,7 +604,7 @@ export class WalletController extends BaseController {
     const keyrings = await this.getKeyrings()
     const nextKeyring = keyrings[keyrings.length - 1]
     if (nextKeyring && nextKeyring.accounts[0]) {
-      this.changeKeyring(nextKeyring)
+      await this.changeKeyring(nextKeyring)
       return nextKeyring
     }
     return
@@ -618,10 +618,14 @@ export class WalletController extends BaseController {
     const _keyring = keyringService.keyrings[keyring.index]!
     await keyringService.addNewAccount(_keyring)
 
-    const currentKeyring = await this.getCurrentKeyring()
-    if (!currentKeyring) throw new Error('no current keyring')
-    keyring = currentKeyring
-    this.changeKeyring(keyring, keyring.accounts.length - 1)
+    const displayedKeyring = await keyringService.displayForKeyring(
+      _keyring,
+      keyring.addressType,
+      keyring.index
+    )
+    const newKeyring = this.displayedKeyringToWalletKeyring(displayedKeyring, keyring.index)
+
+    await this.changeKeyring(newKeyring, newKeyring.accounts.length - 1)
 
     if (alianName) {
       const account = preferenceService.getCurrentAccount() as Account
@@ -648,8 +652,7 @@ export class WalletController extends BaseController {
       })
     }
 
-    const flag = preferenceService.getAddressFlag(keyring.accounts[accountIndex]!.address)
-    walletApiService.setClientAddress(keyring.accounts[accountIndex]!.address)
+    await walletApiService.setClientAddress(keyring.accounts[accountIndex]!.address)
   }
 
   getAllAddresses = async (keyring: WalletKeyring, index: number) => {
@@ -667,7 +670,7 @@ export class WalletController extends BaseController {
     await keyringService.changeAddressType(currentKeyringIndex, addressType)
     const keyring = await this.getCurrentKeyring()
     if (!keyring) throw new Error('no current keyring')
-    this.changeKeyring(keyring, currentAccount?.index)
+    await this.changeKeyring(keyring, currentAccount?.index)
   }
 
   formatOptionsToSignInputs = async (_psbt: string | bitcoin.Psbt, options?: SignPsbtOptions) => {
@@ -1091,7 +1094,7 @@ export class WalletController extends BaseController {
     const currentAccount = await this.getCurrentAccount()
     const keyring = await this.getCurrentKeyring()
     if (!keyring) throw new Error('no current keyring')
-    this.changeKeyring(keyring, currentAccount?.index)
+    await this.changeKeyring(keyring, currentAccount?.index)
 
     const chainInfo = getChainInfo(chainType)
     sessionService.broadcastEvent(SESSION_EVENTS.chainChanged, chainInfo)
@@ -2975,7 +2978,7 @@ export class WalletController extends BaseController {
       displayedKeyring,
       keyringService.keyrings.length - 1
     )
-    this.changeKeyring(keyring)
+    await this.changeKeyring(keyring)
   }
 }
 export default new WalletController()
