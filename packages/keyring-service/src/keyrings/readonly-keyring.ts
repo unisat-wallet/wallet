@@ -1,6 +1,7 @@
-import { KeyringType, ToSignInput, Keyring } from '../types'
+import { Keyring, KeyringType, ToSignInput } from '../types'
 
 export class ReadonlyKeyring implements Keyring {
+  static type = KeyringType.ReadonlyKeyring
   type = KeyringType.ReadonlyKeyring
   pubkeys: string[] = []
   constructor(pubkeys: string[]) {

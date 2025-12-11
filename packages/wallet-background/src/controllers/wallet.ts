@@ -463,7 +463,6 @@ export class WalletController extends BaseController {
   createTmpKeyringWithPrivateKey = async (privateKey: string, addressType: AddressType) => {
     const originKeyring = keyringService.createTmpKeyring(KeyringType.SimpleKeyring, [privateKey])
     const displayedKeyring = await keyringService.displayForKeyring(originKeyring, addressType, -1)
-    preferenceService.setShowSafeNotice(false)
     return this.displayedKeyringToWalletKeyring(displayedKeyring, -1, false)
   }
 
@@ -487,7 +486,6 @@ export class WalletController extends BaseController {
     const opts = await tmpKeyring.serialize()
     const originKeyring = keyringService.createTmpKeyring(KeyringType.KeystoneKeyring, opts)
     const displayedKeyring = await keyringService.displayForKeyring(originKeyring, addressType, -1)
-    preferenceService.setShowSafeNotice(false)
     return this.displayedKeyringToWalletKeyring(displayedKeyring, -1, false)
   }
 
@@ -528,7 +526,6 @@ export class WalletController extends BaseController {
       keyringService.keyrings.length - 1
     )
     this.changeKeyring(keyring)
-    preferenceService.setShowSafeNotice(false)
   }
 
   createKeyringWithColdWallet = async (
@@ -567,7 +564,6 @@ export class WalletController extends BaseController {
     }
 
     this.changeKeyring(keyring)
-    preferenceService.setShowSafeNotice(false)
 
     return keyring
   }
@@ -2948,6 +2944,38 @@ export class WalletController extends BaseController {
 
   setAcceptLowFeeMode = async (accept: boolean) => {
     preferenceService.setAcceptLowFeeMode(accept)
+  }
+
+  createTmpKeyringWithPublicKey = async (publicKey: string, addressType: AddressType) => {
+    const originKeyring = keyringService.createTmpKeyring(KeyringType.ReadonlyKeyring, [publicKey])
+    const displayedKeyring = await keyringService.displayForKeyring(originKeyring, addressType, -1)
+    preferenceService.setShowSafeNotice(true)
+    return this.displayedKeyringToWalletKeyring(displayedKeyring, -1, false)
+  }
+
+  createKeyringWithPublicKey = async (
+    data: string,
+    addressType: AddressType,
+    alianName?: string
+  ) => {
+    let originKeyring: Keyring
+
+    try {
+      originKeyring = await keyringService.importPublicKeyOnly(data, addressType as AddressType)
+    } catch (e) {
+      throw e
+    }
+
+    const displayedKeyring = await keyringService.displayForKeyring(
+      originKeyring,
+      addressType,
+      keyringService.keyrings.length - 1
+    )
+    const keyring = this.displayedKeyringToWalletKeyring(
+      displayedKeyring,
+      keyringService.keyrings.length - 1
+    )
+    this.changeKeyring(keyring)
   }
 }
 export default new WalletController()

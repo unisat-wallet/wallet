@@ -1,4 +1,4 @@
-import React, { useContext, useEffect, useRef } from 'react'
+import React, { useContext } from 'react'
 
 type RouteTypes = any
 
@@ -8,6 +8,7 @@ export interface NavigationContextType {
   poptotop: () => void
   goBack: () => void
   navToTab: () => void
+  navToTest: () => void
   navToLock: (params?: any) => void
   navToWelcome: () => void
 
@@ -29,6 +30,7 @@ const initContext = {
   goBack: () => {},
   replace: (screenName: RouteTypes, params?: any) => {},
   navToTab: () => {},
+  navToTest: () => {},
   navToLock: () => {},
   navToWelcome: () => {},
 

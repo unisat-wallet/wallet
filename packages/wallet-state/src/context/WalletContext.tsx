@@ -720,6 +720,10 @@ export interface WalletController {
 
   getAcceptLowFeeMode(): Promise<boolean>
   setAcceptLowFeeMode(accept: boolean): Promise<void>
+
+  createTmpKeyringWithPublicKey(publicKey: string, addressType: AddressType): Promise<WalletKeyring>
+
+  createKeyringWithPublicKey(data: string, addressType: AddressType): Promise<void>
 }
 
 const WalletContext = createContext<{

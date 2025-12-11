@@ -1,5 +1,5 @@
-import { KeyringType, ToSignInput, CosmosSignDataType, Keyring } from '../types'
 import { bitcoin } from '@unisat/wallet-bitcoin'
+import { CosmosSignDataType, Keyring, KeyringType, ToSignInput } from '../types'
 
 export interface ColdWalletKeyringOptions {
   xpub: string
@@ -11,6 +11,7 @@ export interface ColdWalletKeyringOptions {
 }
 
 export class ColdWalletKeyring implements Keyring {
+  static type = KeyringType.ColdWalletKeyring
   type = KeyringType.ColdWalletKeyring
   xpub: string
   addresses: string[] = []

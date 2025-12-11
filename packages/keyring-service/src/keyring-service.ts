@@ -4,7 +4,13 @@ import { EventEmitter } from 'events'
 
 import { bitcoin } from '@unisat/wallet-bitcoin'
 import { AddressType } from '@unisat/wallet-types'
-import { ColdWalletKeyring, HdKeyring, KeystoneKeyring, SimpleKeyring } from './keyrings'
+import {
+  ColdWalletKeyring,
+  HdKeyring,
+  KeystoneKeyring,
+  ReadonlyKeyring,
+  SimpleKeyring,
+} from './keyrings'
 import { EmptyKeyring } from './keyrings/empty-keyring'
 import {
   ADDRESS_TYPES,
@@ -25,6 +31,7 @@ const KEYRING_SDK_TYPES = {
   HdKeyring,
   KeystoneKeyring,
   ColdWalletKeyring,
+  ReadonlyKeyring,
 }
 
 /**
@@ -625,13 +632,8 @@ export class KeyringService extends EventEmitter {
   }
 
   createTmpKeyring = (type: string, opts: unknown) => {
-    if (type === KeyringType.ColdWalletKeyring) {
-      return new ColdWalletKeyring(opts as any)
-    }
-
     const Keyring = this.getKeyringClassForType(type)
     if (!Keyring) {
-      console.error(`Unknown keyring type: ${type}`)
       throw new Error(`Unknown keyring type: ${type}`)
     }
 
@@ -902,16 +904,6 @@ export class KeyringService extends EventEmitter {
       }
     }
 
-    if (type === KeyringType.ColdWalletKeyring) {
-      const keyring = new ColdWalletKeyring()
-      await keyring.deserialize(data)
-      await keyring.getAccounts()
-      return {
-        keyring,
-        addressType: addressType,
-      }
-    }
-
     const Keyring = this.getKeyringClassForType(type)
     if (!Keyring) {
       throw new Error(`Unknown keyring type: ${type}`)
@@ -939,10 +931,6 @@ export class KeyringService extends EventEmitter {
    * @returns {Keyring|undefined} The class, if it exists.
    */
   getKeyringClassForType = (type: string) => {
-    if (type === KeyringType.ColdWalletKeyring) {
-      return ColdWalletKeyring
-    }
-
     return this.keyringTypes.find(kr => kr.type === type)
   }
 
