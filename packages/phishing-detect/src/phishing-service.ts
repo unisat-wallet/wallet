@@ -3,26 +3,35 @@
  */
 
 import { EventEmitter } from 'eventemitter3'
+import { fetchPhishingList } from 'utils/fetch'
 import type {
-  PhishingConfig,
-  PhishingCheckResult,
   PhishingAdapter,
+  PhishingCheckResult,
+  PhishingConfig,
   PhishingServiceConfig,
   PhishingServiceEvents,
 } from './types'
 
-export class PhishingService extends EventEmitter<PhishingServiceEvents> {
-  private config: PhishingConfig = {
-    version: 2,
-    tolerance: 1,
-    fuzzylist: [],
-    whitelist: [],
-    blacklist: [],
-    lastFetchTime: 0,
-    cacheExpireTime: 24 * 60 * 60 * 1000, // 24 hours
-  }
+const STORE_KEY = 'phishing'
+const CACHE_DURATION = 24 * 60 * 60 * 1000 // 24 hours
+const VERSION = 2
+const RETRY_DELAY = 60 * 60 * 1000 // 1 hour retry delay
+const MAX_RETRIES = 3
 
-  private adapter: PhishingAdapter
+const initConfig: PhishingConfig = {
+  version: VERSION,
+  tolerance: 1,
+  fuzzylist: [],
+  whitelist: [],
+  blacklist: [],
+  lastFetchTime: 0,
+  cacheExpireTime: CACHE_DURATION,
+}
+
+export class PhishingService extends EventEmitter<PhishingServiceEvents> {
+  private config: PhishingConfig = { ...initConfig }
+
+  private adapter: PhishingAdapter = null!
   private logger: any
   private t: any
   private updating = false
@@ -32,24 +41,27 @@ export class PhishingService extends EventEmitter<PhishingServiceEvents> {
   private updateTimer: NodeJS.Timeout | null = null
   private initialized = false
 
-  constructor(configOrAdapter: PhishingServiceConfig) {
+  constructor() {
     super()
+  }
 
+  /**
+   * Initialize the preference service
+   */
+  async init(configOrAdapter: PhishingServiceConfig): Promise<void> {
     // Support both config object and direct adapter for backward compatibility
     this.adapter = configOrAdapter.adapter
     this.logger = configOrAdapter.logger || console
     this.t = configOrAdapter.t || ((key: string) => key)
-  }
 
-  /**
-   * Initialize the service
-   */
-  async initialize(): Promise<void> {
     if (this.initialized) {
       return
     }
 
     await this.loadConfig()
+    if (this.config.blacklist.length === 0) {
+      this.forceUpdate()
+    }
     this.scheduleUpdate()
     this.initialized = true
   }
@@ -98,15 +110,15 @@ export class PhishingService extends EventEmitter<PhishingServiceEvents> {
     }
 
     // Check fuzzy matching
-    const fuzzyMatch = this.checkFuzzyMatch(normalizedHostname)
-    if (fuzzyMatch) {
-      this.emit('phishing:detected', hostname, 'Fuzzy match')
-      return {
-        isPhishing: true,
-        reason: 'Fuzzy match',
-        matchedPattern: fuzzyMatch,
-      }
-    }
+    // const fuzzyMatch = this.checkFuzzyMatch(normalizedHostname)
+    // if (fuzzyMatch) {
+    //   this.emit('phishing:detected', hostname, 'Fuzzy match')
+    //   return {
+    //     isPhishing: true,
+    //     reason: 'Fuzzy match',
+    //     matchedPattern: fuzzyMatch,
+    //   }
+    // }
 
     return { isPhishing: false }
   }
@@ -195,7 +207,8 @@ export class PhishingService extends EventEmitter<PhishingServiceEvents> {
 
   private async loadConfig(): Promise<void> {
     try {
-      const stored = await this.adapter.get('phishing:config')
+      const stored = await this.adapter.get(STORE_KEY)
+
       if (stored && stored.version === this.config.version) {
         this.config = { ...this.config, ...stored }
         this.updateSets()
@@ -212,7 +225,7 @@ export class PhishingService extends EventEmitter<PhishingServiceEvents> {
 
   private async saveConfig(): Promise<void> {
     try {
-      await this.adapter.set('phishing:config', this.config)
+      await this.adapter.set(STORE_KEY, this.config)
     } catch (error) {
       this.logger.error('Failed to save phishing config:', error)
       this.emit('phishing:error', error as Error)
@@ -240,26 +253,54 @@ export class PhishingService extends EventEmitter<PhishingServiceEvents> {
 
   private async updatePhishingList(): Promise<void> {
     try {
-      const response = await this.adapter.fetch('https://api.unisat.io/wallet-v4/phishing/list')
+      const newConfig = await fetchPhishingList()
 
-      if (response.ok) {
-        const data = await response.json()
+      // Ensure domains in default whitelist are not in the blacklist
+      const defaultWhitelist = new Set(initConfig.whitelist)
 
-        this.config = {
-          ...this.config,
-          fuzzylist: data.fuzzylist || [],
-          blacklist: data.blacklist || [],
-          whitelist: data.whitelist || [],
-          lastFetchTime: Date.now(),
-        }
+      // Filter blacklist, remove whitelisted domains and their subdomains
+      let filteredBlacklist: string[] = []
+      if (Array.isArray(newConfig.blacklist)) {
+        filteredBlacklist = newConfig.blacklist.filter(domain => {
+          // Remove domains in whitelist
+          if (defaultWhitelist.has(domain)) {
+            return false
+          }
 
-        this.updateSets()
-        await this.saveConfig()
-        this.emit('phishing:updated', this.config)
+          // Remove subdomains of whitelisted domains
+          const domainParts = domain.split('.')
+          if (domainParts.length > 2) {
+            const mainDomain = domainParts.slice(domainParts.length - 2).join('.')
+            if (defaultWhitelist.has(mainDomain)) {
+              return false
+            }
+          }
 
-        // Reschedule next update
-        this.scheduleUpdate()
+          // Keep other domains
+          return true
+        })
       }
+
+      // Merge remote whitelist and default whitelist
+      const mergedWhitelist = Array.from(
+        new Set([...(newConfig.whitelist || []), ...initConfig.whitelist])
+      )
+
+      this.config = {
+        ...newConfig,
+        blacklist: filteredBlacklist,
+        whitelist: mergedWhitelist,
+        version: VERSION,
+        lastFetchTime: Date.now(),
+        cacheExpireTime: CACHE_DURATION,
+      }
+
+      this.updateSets()
+      await this.saveConfig()
+      this.emit('phishing:updated', this.config)
+
+      // Reschedule next update
+      this.scheduleUpdate()
     } catch (error) {
       this.logger.error('Failed to update phishing list:', error)
       this.emit('phishing:error', error as Error)
