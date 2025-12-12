@@ -79,3 +79,5 @@ export {
   useAlkanesBalanceCardLogic,
   type AlkanesBalanceCardProps,
 } from './useAlkanesBalanceCardLogic'
+
+export { useCAT721NFTScreenLogic } from './useCAT721NFTScreenLogic'
