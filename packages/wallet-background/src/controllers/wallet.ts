@@ -175,7 +175,7 @@ export class WalletController extends BaseController {
 
   lockWallet = async () => {
     await keyringService.setLocked()
-    sessionService.broadcastEvent(SESSION_EVENTS.accountsChanged, [])
+    // sessionService.broadcastEvent(SESSION_EVENTS.accountsChanged, [])
     sessionService.broadcastEvent(SESSION_EVENTS.lock)
     bgEventBus.emit(BUS_EVENTS.broadcastToUI, {
       method: BUS_METHODS.LOCKED,
