@@ -1,149 +1,134 @@
-# UniSat Wallet Toolkit
+# UniSat Wallet
 
-A modular Bitcoin wallet toolkit with pluggable keyring architecture.
+UniSat Wallet is an open-source Bitcoin wallet built for Ordinals, BRC-20, and the Bitcoin native ecosystem.
 
-> ⚠️ **Important Notice**: This toolkit is primarily designed for UniSat products and internal development use. Third-party usage is at your own risk. We recommend thorough evaluation before using in production environments. UniSat does not provide support or warranty for external usage.
+You can find the latest version of UniSat Wallet on our official website.  
+For user guides, FAQs, and general documentation, please visit our documentation site.
 
-## 🚀 Features
+If you encounter any wallet-related issues or need support, please submit a support ticket via our Discord.
 
-- **Modular Design**: Each keyring type is a separate package
-- **Pluggable Architecture**: Register only the keyring types you need  
-- **TypeScript First**: Full type safety and excellent IDE support
-- **Tree Shakable**: Import only what you use
-- **Platform Agnostic**: Works in browsers, Node.js, and mobile apps
+For announcements and the latest updates, follow us on X.
 
-## 📦 Packages
+For developers building on Bitcoin and Ordinals, see our developer documentation.
 
-### Core Services
+---
 
-- `@unisat/keyring-service` - Keyring service for managing Bitcoin wallets
-- `@unisat/wallet-types` - Shared type definitions for the wallet ecosystem
-- `@unisat/wallet-bitcoin` - Bitcoin core utilities and address management
+### Official Links
 
-### API & Transaction Helpers
+- 🌐 Website: https://unisat.io
+- 📖 Documentation: https://docs.unisat.io
+- 💬 Support (Discord): https://discord.com/invite/EMskB2sMz8
+- 🐦 X / Twitter: https://x.com/unisat_wallet
 
-- `@unisat/wallet-api` - UniSat wallet API client with Bitcoin ecosystem support
-- `@unisat/tx-helpers` - Bitcoin transaction helpers for BTC, Inscriptions, Runes
+---
 
-### Additional Services
+## Repository Overview
 
-- `@unisat/permission-service` - Cross-platform permission management for web3 apps
-- `@unisat/contact-book` - Universal contact book with multi-chain support
-- `@unisat/i18n` - Internationalization utilities
-- `@unisat/babylon-service` - Babylon Bitcoin staking service
+This is a **monorepo** managed with **pnpm workspaces**, designed to support multi-platform wallet development with a single source of truth.
 
-## 🔧 Usage
+### Apps
 
-### Basic Setup
+Runnable end-user applications:
 
-```typescript
-import { KeyringService } from '@unisat/keyring-service'
-import { WalletApi } from '@unisat/wallet-api'
-import { sendBtc } from '@unisat/tx-helpers'
-
-// Initialize keyring service
-const keyringService = new KeyringService()
-
-// Create HD wallet
-const wallet = await keyringService.createKeyring('HD', {
-  mnemonic: 'your twelve word mnemonic phrase here...',
-})
-
-// Use API client
-const api = new WalletApi({ endpoint: 'https://api.unisat.io' })
-const balance = await api.bitcoin.getBalance('bc1qaddress...')
+```
+apps/
+├── extension        # UniSat Browser Extension
+└── mobile           # UniSat Mobile Wallet (iOS & Android) (Comming Soon)
 ```
 
-### Browser Extension
+### Packages
 
-```typescript
-import { KeyringService } from '@unisat/keyring-service'
-import { PermissionService } from '@unisat/permission-service'
-import { WalletApi } from '@unisat/wallet-api'
+Shared wallet core, services, and utilities used across all platforms:
 
-// Full featured setup for browser extension
-const keyringService = new KeyringService()
-const permissionService = new PermissionService()
-const api = new WalletApi()
-
-// Handle dApp connections
-await permissionService.requestPermission('https://dapp.com')
+```
+packages/
+├── wallet-bitcoin        # Bitcoin protocol & transaction logic
+├── wallet-background     # Background runtime & message handling
+├── wallet-api            # Public wallet APIs
+├── wallet-state          # Global wallet state management
+├── wallet-storage        # Persistence & storage layer
+├── keyring-service       # Key management & signing
+├── permission-service    # DApp permission system
+├── notification-service # Notification system
+├── phishing-detect       # Phishing & security detection
+├── tx-helpers            # Transaction helpers
+├── wallet-shared         # Shared business logic
+├── wallet-types          # Shared TypeScript types
+└── base-utils             # Common utilities
 ```
 
-### Transaction Building
+> Packages are **not published independently**. Versions are tracked via Git commits and tags at the application level.
 
-```typescript
-import { sendBtc, sendInscription } from '@unisat/tx-helpers'
-import { KeyringService } from '@unisat/keyring-service'
+---
 
-const keyring = new KeyringService()
+## Versioning & Release Strategy
 
-// Send BTC transaction
-const btcTx = await sendBtc({
-  from: 'bc1qfrom...',
-  to: 'bc1qto...',
-  amount: 100000, // sats
-  feeRate: 10
-})
+This repository uses **Git tags** to track releases.
 
-// Send inscription
-const inscriptionTx = await sendInscription({
-  from: 'bc1qfrom...',
-  to: 'bc1qto...',
-  inscriptionId: 'abc123...i0',
-  feeRate: 15
-})
+### Platform-specific tags
+
+```
+extension/v1.7.6
+ios/v0.2.28
+android/v0.2.47
 ```
 
-## 🏗️ Development
+### Pre-release tags
+
+```
+extension-v1.7.6-beta.1
+ios-v0.2.28-rc.1
+android-v0.2.47-beta.2
+```
+
+All tags reference commits in this repository. Shared package changes are reflected across platforms through these tags.
+
+---
+
+## Development Setup
+
+### Requirements
+
+- Node.js >= 18
+- pnpm >= 8
+
+### Install dependencies
 
 ```bash
-# Install dependencies
 pnpm install
-
-# Build all packages
-pnpm build
-
-# Run tests
-pnpm test
-
-# Lint code
-pnpm lint
-
-# Type check
-pnpm typecheck
 ```
 
-## 📄 License
-
-MIT License - see LICENSE file for details.
-
-## 📦 Publishing
+### Run apps
 
 ```bash
-# Create changeset for version bump
-pnpm changeset
+# Browser extension
+cd apps/extension
+pnpm build:chrome:mv3:dev
 
-# Update versions
-pnpm changeset version
-
-# Install dependencies and build
-pnpm install
-pnpm build
-
-# Publish to npm
-pnpm changeset publish
 ```
 
-## ⚠️ Disclaimer
+---
 
-This toolkit is primarily designed for UniSat products. While it's open source, please note:
+## Project Principles
 
-- Third-party usage is at your own risk
-- No official support for external implementations  
-- Thoroughly test before production use
-- UniSat is not liable for issues arising from external usage
+- **Single source of truth** for wallet core logic
+- **Shared packages first**, platform code as thin layers
+- **Strict dependency boundaries** between apps and packages
+- **Security-oriented design**, especially around key management and permissions
 
-## 🤝 Contributing
+---
 
-This project is primarily for UniSat internal development. External contributions should be discussed via issues first.
+## Repository Status
+
+This repository is the **only active development repository** for UniSat Wallet.
+
+Previous standalone repositories have been deprecated:
+
+- `unisat-wallet/extension`
+- `unisat-wallet/wallet-sdk`
+
+---
+
+## License
+
+This project is licensed under the MIT License.
