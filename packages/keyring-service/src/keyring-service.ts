@@ -142,7 +142,7 @@ export class KeyringService extends EventEmitter {
 
     let boostValue = this.getBoostValue()
     // Only upgrade if still using the initial simple value
-    if (boostValue === this.initialBoostValue) {
+    if (boostValue === this.initialBoostValue || boostValue === 'true') {
       try {
         // Generate new secure boost value
         const newBoostValue = this.generateSecureBoostValue()
@@ -598,6 +598,12 @@ export class KeyringService extends EventEmitter {
       const val = await this.encryptor.decrypt(password, encryptedBooted)
       // SECURITY: Only accept the current boost value
       // Reject initial 'true' value to prevent weak value attacks
+
+      if (val === 'true') {
+        // for backward compatibility
+        return true
+      }
+
       if (val === this.getBoostValue()) {
         return true
       }
