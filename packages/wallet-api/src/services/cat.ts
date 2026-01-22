@@ -2,9 +2,9 @@
  * CAT20/CAT721-related API methods - Fully compatible with openapi.ts
  */
 
-import type { BaseHttpClient, HttpClient } from '../client/http-client'
-import type { CAT721CollectionInfo, CAT20Balance } from '../types'
-import { CAT_VERSION } from '@unisat/wallet-shared'
+import { CAT_VERSION, UserToSignInput } from '@unisat/wallet-shared'
+import type { BaseHttpClient } from '../client/http-client'
+import type { CAT20Balance, CAT721CollectionInfo } from '../types'
 export class CATService {
   constructor(private readonly httpClient: BaseHttpClient) {}
 
@@ -40,7 +40,13 @@ export class CATService {
     amount: string,
     feeRate: number
   ) {
-    return this.httpClient.post('/v5/cat20/transfer-token-step1', {
+    return this.httpClient.post<{
+      id: string
+      // base64 psbt
+      commitTx: string
+      toSignInputs: UserToSignInput[]
+      feeRate: number
+    }>('/v5/cat20/transfer-token-step1', {
       version,
       address,
       pubkey,
@@ -52,7 +58,10 @@ export class CATService {
   }
 
   async transferCAT20Step2(version: CAT_VERSION, transferId: string, signedPsbt: string) {
-    return this.httpClient.post('/v5/cat20/transfer-token-step2', {
+    return this.httpClient.post<{
+      revealTx: string
+      toSignInputs: UserToSignInput[]
+    }>('/v5/cat20/transfer-token-step2', {
       id: transferId,
       psbt: signedPsbt,
       version,
@@ -60,7 +69,9 @@ export class CATService {
   }
 
   async transferCAT20Step3(version: CAT_VERSION, transferId: string, signedPsbt: string) {
-    return this.httpClient.post('/v5/cat20/transfer-token-step3', {
+    return this.httpClient.post<{
+      txid: string
+    }>('/v5/cat20/transfer-token-step3', {
       id: transferId,
       psbt: signedPsbt,
       version,
@@ -68,7 +79,13 @@ export class CATService {
   }
 
   async transferCAT20Step1ByMerge(version: CAT_VERSION, mergeId: string) {
-    return this.httpClient.post('/v5/cat20/transfer-token-step1-by-merge', {
+    return this.httpClient.post<{
+      id: string
+      // base64 psbt
+      commitTx: string
+      toSignInputs: UserToSignInput[]
+      feeRate: number
+    }>('/v5/cat20/transfer-token-step1-by-merge', {
       mergeId,
       version,
     })
@@ -82,7 +99,17 @@ export class CATService {
     utxoCount: number,
     feeRate: number
   ) {
-    return this.httpClient.post('/v5/cat20/merge-token-prepare', {
+    return this.httpClient.post<{
+      id: string
+      senderAddress: string
+      senderPubkey: string
+      tokenId: string
+      feeRate: number
+      batchIndex: number
+      batchCount: number
+      ct: number
+      version?: string
+    }>('/v5/cat20/merge-token-prepare', {
       version,
       address,
       pubkey,
@@ -93,7 +120,17 @@ export class CATService {
   }
 
   async getMergeCAT20Status(version: CAT_VERSION, mergeId: string) {
-    return this.httpClient.post('/v5/cat20/merge-token-status', {
+    return this.httpClient.post<{
+      id: string
+      senderAddress: string
+      senderPubkey: string
+      tokenId: string
+      feeRate: number
+      batchIndex: number
+      batchCount: number
+      ct: number
+      version?: string
+    }>('/v5/cat20/merge-token-status', {
       id: mergeId,
       version,
     })
@@ -130,7 +167,13 @@ export class CATService {
     localId: string,
     feeRate: number
   ) {
-    return this.httpClient.post('/v5/cat721/transfer-nft-step1', {
+    return this.httpClient.post<{
+      id: string
+      // base64 psbt
+      commitTx: string
+      toSignInputs: UserToSignInput[]
+      feeRate: number
+    }>('/v5/cat721/transfer-nft-step1', {
       version,
       address,
       pubkey,
@@ -142,7 +185,10 @@ export class CATService {
   }
 
   async transferCAT721Step2(version: CAT_VERSION, transferId: string, signedPsbt: string) {
-    return this.httpClient.post('/v5/cat721/transfer-nft-step2', {
+    return this.httpClient.post<{
+      revealTx: string
+      toSignInputs: UserToSignInput[]
+    }>('/v5/cat721/transfer-nft-step2', {
       id: transferId,
       psbt: signedPsbt,
       version,
@@ -150,7 +196,9 @@ export class CATService {
   }
 
   async transferCAT721Step3(version: CAT_VERSION, transferId: string, signedPsbt: string) {
-    return this.httpClient.post('/v5/cat721/transfer-nft-step3', {
+    return this.httpClient.post<{
+      txid: string
+    }>('/v5/cat721/transfer-nft-step3', {
       id: transferId,
       psbt: signedPsbt,
       version,
