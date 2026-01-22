@@ -21,7 +21,7 @@ const path = require('path')
 // ========================== CONFIG ==========================
 
 // Extension locale dirs
-const EXT_LOCALES_DIR = path.join(__dirname, '../apps/unisat-extension/src/_locales')
+const EXT_LOCALES_DIR = path.join(__dirname, '../apps/extension/src/_locales')
 const EXT_LANGS = ['en', 'zh_TW', 'ja', 'fr', 'es', 'ru']
 const TODO_PREFIX = '[TODO] '
 
