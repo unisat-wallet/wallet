@@ -1,4 +1,6 @@
 import { TxType } from './create-tx'
+import { ToSignMessage } from './sign-message'
+import { ToSignData } from './sign-tx'
 
 export interface RequestMethodSendBitcoinParams {
   sendBitcoinParams: {
@@ -42,6 +44,8 @@ export interface RequestMethodSendRunesParams {
 export interface RequestMethodSignMessageParams {
   text: string
   type: string
+
+  toSignMessages?: ToSignMessage[]
 }
 
 export interface RequestMethodSignMessagesParams {
@@ -49,6 +53,8 @@ export interface RequestMethodSignMessagesParams {
     text: string
     type: string
   }[]
+
+  toSignMessages?: ToSignMessage[]
 }
 
 export interface RequestMethodGetInscriptionsParams {
@@ -60,11 +66,13 @@ export interface RequestMethodSignPsbtParams {
   psbtHex: string
   type: TxType
   options?: any
+  toSignDatas?: ToSignData[]
 }
 
 export interface RequestMethodSignPsbtsParams {
-  psbtHexs: string[]
+  psbtHexs?: string[]
   options?: any
+  toSignDatas?: ToSignData[]
 }
 
 export interface RequestMethodInscribeTransferParams {

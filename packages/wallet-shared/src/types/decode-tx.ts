@@ -33,26 +33,30 @@ export interface Risk {
   desc: string
 }
 
+export interface DecodedPsbtInput {
+  txid: string
+  vout: number
+  address: string
+  value: number
+  inscriptions: Inscription[]
+  sighashType: number
+  runes: RuneBalance[]
+  alkanes: AlkanesBalance[]
+  contract?: ContractResult
+}
+
+export interface DecodedPsbtOutput {
+  address: string
+  value: number
+  inscriptions: Inscription[]
+  runes: RuneBalance[]
+  alkanes: AlkanesBalance[]
+  contract?: ContractResult
+}
+
 export interface DecodedPsbt {
-  inputInfos: {
-    txid: string
-    vout: number
-    address: string
-    value: number
-    inscriptions: Inscription[]
-    sighashType: number
-    runes: RuneBalance[]
-    alkanes: AlkanesBalance[]
-    contract?: ContractResult
-  }[]
-  outputInfos: {
-    address: string
-    value: number
-    inscriptions: Inscription[]
-    runes: RuneBalance[]
-    alkanes: AlkanesBalance[]
-    contract?: ContractResult
-  }[]
+  inputInfos: DecodedPsbtInput[]
+  outputInfos: DecodedPsbtOutput[]
   inscriptions: { [key: string]: Inscription }
   feeRate: number
   fee: number
@@ -63,6 +67,7 @@ export interface DecodedPsbt {
   isScammer: boolean
   recommendedFeeRate: number
   shouldWarnFeeRate: boolean
+  isCompleted: boolean
 }
 
 export interface ContractResult {
