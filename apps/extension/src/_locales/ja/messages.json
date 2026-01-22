@@ -59,6 +59,9 @@
   "agreement_text": {
     "message": "確認する"
   },
+  "alkanes": {
+    "message": "Alkanes"
+  },
   "alkanes_burning_risk_description": {
     "message": "このトランザクションにはAlkanesの燃焼が含まれています。続行する前に、この操作の影響を理解していることを確認してください。"
   },
@@ -199,6 +202,9 @@
   },
   "block_preview": {
     "message": "ブロック:"
+  },
+  "brc20": {
+    "message": "brc-20"
   },
   "brc20_history_from": {
     "message": "送信者"
@@ -391,6 +397,9 @@
   },
   "collection_not_found": {
     "message": "コレクションが見つかりません"
+  },
+  "collections": {
+    "message": "コレクション"
   },
   "coming_soon": {
     "message": "近日公開"
@@ -1367,6 +1376,9 @@
   "multisign_disclaimer": {
     "message": "マルチシグ免責事項"
   },
+  "my_address": {
+    "message": "私のアドレス"
+  },
   "name": {
     "message": "名前"
   },
@@ -1591,6 +1603,9 @@
   },
   "per_mint": {
     "message": "単位鋳造"
+  },
+  "permission_denied": {
+    "message": "権限が拒否されました"
   },
   "phishing_detection": {
     "message": "フィッシング検出"
@@ -1877,6 +1892,9 @@
   "send": {
     "message": "送信"
   },
+  "send_CAT721": {
+    "message": "CAT721を送信"
+  },
   "send_alkanes": {
     "message": "アルカンズ送信"
   },
@@ -1996,6 +2014,12 @@
   },
   "spend_inscription": {
     "message": "インスクリプションを使用"
+  },
+  "spending_amount": {
+    "message": "使用額"
+  },
+  "spending_assets": {
+    "message": "使用中の資産"
   },
   "split": {
     "message": "分割"
@@ -2208,7 +2232,7 @@
     "message": "より大きな金額を送信するには、UTXOをマージして利用可能な残高を増やしてください。"
   },
   "to_send_brc20_you_have_to_inscribe_a_transfer_inscription_first": {
-    "message": "* BRC-20を送信するには、まずTRANSFERインスクリプションをインスクライブする必要があります"
+    "message": "* brc-20を送信するには、まずTRANSFERインスクリプションをインスクライブする必要があります"
   },
   "to_sign": {
     "message": "署名する"
@@ -2218,6 +2242,9 @@
   },
   "token_not_found": {
     "message": "トークンが見つかりません"
+  },
+  "tokens": {
+    "message": "トークン"
   },
   "total": {
     "message": "合計"
@@ -2239,6 +2266,9 @@
   },
   "transaction_id": {
     "message": "トランザクションID"
+  },
+  "transaction_overview": {
+    "message": "トランザクション概要"
   },
   "transaction_preview": {
     "message": "トランザクション:"
@@ -2298,10 +2328,10 @@
     "message": "Tx手数料:"
   },
   "tx_sent_desc": {
-    "message": "トランザクションは正常に送信されました"
+    "message": "トランザクションは正常にブロードキャストされ、確認待ちです。"
   },
   "tx_sent_title": {
-    "message": "支払い送信完了"
+    "message": "トランザクション送信完了"
   },
   "unable_to_find_any_addresses_with_assets": {
     "message": "アセットを持つアドレスが見つかりません"
@@ -2464,11 +2494,5 @@
   },
   "your_balance_have_to_be_merged": {
     "message": "あなたの"
-  },
-  "tokens": {
-    "message": "トークン"
-  },
-  "collections": {
-    "message": "コレクション"
   }
 }

@@ -59,6 +59,9 @@
   "agreement_text": {
     "message": "CONFIRM"
   },
+  "alkanes": {
+    "message": "Alkanes"
+  },
   "alkanes_burning_risk_description": {
     "message": "This transaction involves the burning of Alkanes. Please ensure you understand the implications of this action before proceeding."
   },
@@ -199,6 +202,9 @@
   },
   "block_preview": {
     "message": "Block:"
+  },
+  "brc20": {
+    "message": "brc-20"
   },
   "brc20_history_from": {
     "message": "From"
@@ -391,6 +397,9 @@
   },
   "collection_not_found": {
     "message": "Collection not found"
+  },
+  "collections": {
+    "message": "Collections"
   },
   "coming_soon": {
     "message": "Coming soon"
@@ -1367,6 +1376,9 @@
   "multisign_disclaimer": {
     "message": "MultiSign Disclaimer"
   },
+  "my_address": {
+    "message": "My Address"
+  },
   "name": {
     "message": "name"
   },
@@ -1591,6 +1603,9 @@
   },
   "per_mint": {
     "message": "PerMint"
+  },
+  "permission_denied": {
+    "message": "Permission denied"
   },
   "phishing_detection": {
     "message": "Phishing Detection"
@@ -1877,6 +1892,9 @@
   "send": {
     "message": "Send"
   },
+  "send_CAT721": {
+    "message": "Send CAT721"
+  },
   "send_alkanes": {
     "message": "Send Alkanes"
   },
@@ -1996,6 +2014,12 @@
   },
   "spend_inscription": {
     "message": "Spend Inscription"
+  },
+  "spending_amount": {
+    "message": "Spending Amount"
+  },
+  "spending_assets": {
+    "message": "Spending Assets"
   },
   "split": {
     "message": "Split"
@@ -2208,7 +2232,7 @@
     "message": "To send a larger amount, please merge your UTXOs to increase the available balance."
   },
   "to_send_brc20_you_have_to_inscribe_a_transfer_inscription_first": {
-    "message": "* To send BRC-20, you have to inscribe a TRANSFER inscription first"
+    "message": "* To send brc-20, you have to inscribe a TRANSFER inscription first"
   },
   "to_sign": {
     "message": "to sign"
@@ -2218,6 +2242,9 @@
   },
   "token_not_found": {
     "message": "Token not found"
+  },
+  "tokens": {
+    "message": "Tokens"
   },
   "total": {
     "message": "Total"
@@ -2239,6 +2266,9 @@
   },
   "transaction_id": {
     "message": "Transaction ID"
+  },
+  "transaction_overview": {
+    "message": "Transaction Overview"
   },
   "transaction_preview": {
     "message": "Transaction:"
@@ -2298,10 +2328,10 @@
     "message": "Tx Fee:"
   },
   "tx_sent_desc": {
-    "message": "Your transaction has been successfully sent"
+    "message": "Your transaction has been broadcasted successfully, waitting for confirmation."
   },
   "tx_sent_title": {
-    "message": "Payment Sent"
+    "message": "Transaction Sent"
   },
   "unable_to_find_any_addresses_with_assets": {
     "message": "Unable to find any addresses with assets"
@@ -2464,11 +2494,5 @@
   },
   "your_balance_have_to_be_merged": {
     "message": "Your "
-  },
-  "tokens": {
-    "message": "Tokens"
-  },
-  "collections": {
-    "message": "Collections"
   }
 }

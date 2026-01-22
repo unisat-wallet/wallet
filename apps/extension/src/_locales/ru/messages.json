@@ -59,6 +59,9 @@
   "agreement_text": {
     "message": "ПОДТВЕРДИТЬ"
   },
+  "alkanes": {
+    "message": "Alkanes"
+  },
   "alkanes_burning_risk_description": {
     "message": "Эта транзакция включает сжигание Alkanes. Пожалуйста, убедитесь, что вы понимаете последствия этого действия, прежде чем продолжить."
   },
@@ -199,6 +202,9 @@
   },
   "block_preview": {
     "message": "Блок:"
+  },
+  "brc20": {
+    "message": "brc-20"
   },
   "brc20_history_from": {
     "message": "От"
@@ -391,6 +397,9 @@
   },
   "collection_not_found": {
     "message": "Коллекция не найдена"
+  },
+  "collections": {
+    "message": "Коллекции"
   },
   "coming_soon": {
     "message": "Скоро"
@@ -1367,6 +1376,9 @@
   "multisign_disclaimer": {
     "message": "Отказ от ответственности MultiSign"
   },
+  "my_address": {
+    "message": "Мой адрес"
+  },
   "name": {
     "message": "имя"
   },
@@ -1591,6 +1603,9 @@
   },
   "per_mint": {
     "message": "за монету"
+  },
+  "permission_denied": {
+    "message": "В доступе отказано"
   },
   "phishing_detection": {
     "message": "Обнаружение фишинга"
@@ -1877,6 +1892,9 @@
   "send": {
     "message": "Отправить"
   },
+  "send_CAT721": {
+    "message": "Отправить CAT721"
+  },
   "send_alkanes": {
     "message": "Отправить Алканов"
   },
@@ -1996,6 +2014,12 @@
   },
   "spend_inscription": {
     "message": "Потратить надпись"
+  },
+  "spending_amount": {
+    "message": "Сумма траты"
+  },
+  "spending_assets": {
+    "message": "Тратимые активы"
   },
   "split": {
     "message": "Разделить"
@@ -2208,7 +2232,7 @@
     "message": "Чтобы отправить большую сумму, пожалуйста, объедините ваши UTXO, чтобы увеличить доступный баланс."
   },
   "to_send_brc20_you_have_to_inscribe_a_transfer_inscription_first": {
-    "message": "* Для отправки BRC-20 необходимо сначала создать надпись TRANSFER"
+    "message": "* Для отправки brc-20 необходимо сначала создать надпись TRANSFER"
   },
   "to_sign": {
     "message": "для подписи"
@@ -2218,6 +2242,9 @@
   },
   "token_not_found": {
     "message": "Токен не найден"
+  },
+  "tokens": {
+    "message": "Токены"
   },
   "total": {
     "message": "Итого"
@@ -2239,6 +2266,9 @@
   },
   "transaction_id": {
     "message": "ID транзакции"
+  },
+  "transaction_overview": {
+    "message": "Обзор транзакции"
   },
   "transaction_preview": {
     "message": "Транзакция:"
@@ -2298,10 +2328,10 @@
     "message": "Комиссия Tx:"
   },
   "tx_sent_desc": {
-    "message": "Ваша транзакция была успешно отправлена"
+    "message": "Ваша транзакция была успешно передана в сеть, ожидание подтверждения."
   },
   "tx_sent_title": {
-    "message": "Платёж отправлен"
+    "message": "Транзакция отправлена"
   },
   "unable_to_find_any_addresses_with_assets": {
     "message": "Не удалось найти адреса с активами"
@@ -2464,11 +2494,5 @@
   },
   "your_balance_have_to_be_merged": {
     "message": "Ваш "
-  },
-  "tokens": {
-    "message": "Токены"
-  },
-  "collections": {
-    "message": "Коллекции"
   }
 }

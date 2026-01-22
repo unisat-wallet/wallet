@@ -59,6 +59,9 @@
   "agreement_text": {
     "message": "確認"
   },
+  "alkanes": {
+    "message": "Alkanes"
+  },
   "alkanes_burning_risk_description": {
     "message": "此交易涉及Alkanes銷毀。請確保您了解此操作的影響，然後再繼續。"
   },
@@ -199,6 +202,9 @@
   },
   "block_preview": {
     "message": "區塊："
+  },
+  "brc20": {
+    "message": "brc-20"
   },
   "brc20_history_from": {
     "message": "從"
@@ -391,6 +397,9 @@
   },
   "collection_not_found": {
     "message": "找不到合集"
+  },
+  "collections": {
+    "message": "收藏"
   },
   "coming_soon": {
     "message": "即將推出"
@@ -1370,6 +1379,9 @@
   "multisign_disclaimer": {
     "message": "多重簽署免責聲明"
   },
+  "my_address": {
+    "message": "我的地址"
+  },
   "name": {
     "message": "名稱"
   },
@@ -1594,6 +1606,9 @@
   },
   "per_mint": {
     "message": "單次鑄造量"
+  },
+  "permission_denied": {
+    "message": "權限被拒絕"
   },
   "phishing_detection": {
     "message": "釣魚偵測"
@@ -1880,6 +1895,9 @@
   "send": {
     "message": "發送"
   },
+  "send_CAT721": {
+    "message": "發送 CAT721"
+  },
   "send_alkanes": {
     "message": "發送 Alkanes"
   },
@@ -1999,6 +2017,12 @@
   },
   "spend_inscription": {
     "message": "花費銘文"
+  },
+  "spending_amount": {
+    "message": "花費金額"
+  },
+  "spending_assets": {
+    "message": "花費資產"
   },
   "split": {
     "message": "分割"
@@ -2211,7 +2235,7 @@
     "message": "若要發送更大金額，請合併您的 UTXO 以增加可用餘額。"
   },
   "to_send_brc20_you_have_to_inscribe_a_transfer_inscription_first": {
-    "message": "* 若要發送 BRC-20，您必須先銘刻 TRANSFER 銘文"
+    "message": "* 若要發送 brc-20，您必須先銘刻 TRANSFER 銘文"
   },
   "to_sign": {
     "message": "待簽署"
@@ -2221,6 +2245,9 @@
   },
   "token_not_found": {
     "message": "找不到代幣"
+  },
+  "tokens": {
+    "message": "代幣"
   },
   "total": {
     "message": "總計"
@@ -2242,6 +2269,9 @@
   },
   "transaction_id": {
     "message": "交易 ID"
+  },
+  "transaction_overview": {
+    "message": "交易概覽"
   },
   "transaction_preview": {
     "message": "交易："
@@ -2301,10 +2331,10 @@
     "message": "交易手續費："
   },
   "tx_sent_desc": {
-    "message": "您的交易已成功發送"
+    "message": "您的交易已成功廣播，等待確認中。"
   },
   "tx_sent_title": {
-    "message": "付款已發送"
+    "message": "交易已發送"
   },
   "unable_to_find_any_addresses_with_assets": {
     "message": "找不到任何持有資產的地址"
@@ -2467,11 +2497,5 @@
   },
   "your_balance_have_to_be_merged": {
     "message": "您的 "
-  },
-  "tokens": {
-    "message": "代幣"
-  },
-  "collections": {
-    "message": "收藏"
   }
 }

@@ -59,6 +59,9 @@
   "agreement_text": {
     "message": "CONFIRMER"
   },
+  "alkanes": {
+    "message": "Alkanes"
+  },
   "alkanes_burning_risk_description": {
     "message": "Cette transaction implique la destruction d'Alkanes. Veuillez vous assurer de comprendre les implications de cette action avant de continuer."
   },
@@ -199,6 +202,9 @@
   },
   "block_preview": {
     "message": "Bloc :"
+  },
+  "brc20": {
+    "message": "brc-20"
   },
   "brc20_history_from": {
     "message": "De"
@@ -391,6 +397,9 @@
   },
   "collection_not_found": {
     "message": "Collection non trouvée"
+  },
+  "collections": {
+    "message": "Collections"
   },
   "coming_soon": {
     "message": "Bientôt disponible"
@@ -1367,6 +1376,9 @@
   "multisign_disclaimer": {
     "message": "Avertissement MultiSign"
   },
+  "my_address": {
+    "message": "Mon Adresse"
+  },
   "name": {
     "message": "nom"
   },
@@ -1591,6 +1603,9 @@
   },
   "per_mint": {
     "message": "par menthe"
+  },
+  "permission_denied": {
+    "message": "Permission refusée"
   },
   "phishing_detection": {
     "message": "Détection de Phishing"
@@ -1877,6 +1892,9 @@
   "send": {
     "message": "Envoyer"
   },
+  "send_CAT721": {
+    "message": "Envoyer CAT721"
+  },
   "send_alkanes": {
     "message": "Envoyer Alkanes"
   },
@@ -1996,6 +2014,12 @@
   },
   "spend_inscription": {
     "message": "Dépenser l'Inscription"
+  },
+  "spending_amount": {
+    "message": "Montant Dépensé"
+  },
+  "spending_assets": {
+    "message": "Actifs Dépensés"
   },
   "split": {
     "message": "Fractionner"
@@ -2208,7 +2232,7 @@
     "message": "Pour envoyer un montant plus important, veuillez fusionner vos UTXOs pour augmenter le solde disponible."
   },
   "to_send_brc20_you_have_to_inscribe_a_transfer_inscription_first": {
-    "message": "* Pour envoyer des BRC-20, vous devez d'abord inscrire une inscription TRANSFER"
+    "message": "* Pour envoyer des brc-20, vous devez d'abord inscrire une inscription TRANSFER"
   },
   "to_sign": {
     "message": "à signer"
@@ -2218,6 +2242,9 @@
   },
   "token_not_found": {
     "message": "Jeton non trouvé"
+  },
+  "tokens": {
+    "message": "Jetons"
   },
   "total": {
     "message": "Total"
@@ -2239,6 +2266,9 @@
   },
   "transaction_id": {
     "message": "ID de Transaction"
+  },
+  "transaction_overview": {
+    "message": "Aperçu de la Transaction"
   },
   "transaction_preview": {
     "message": "Transaction :"
@@ -2298,10 +2328,10 @@
     "message": "Frais Tx :"
   },
   "tx_sent_desc": {
-    "message": "Votre transaction a été envoyée avec succès"
+    "message": "Votre transaction a été diffusée avec succès, en attente de confirmation."
   },
   "tx_sent_title": {
-    "message": "Paiement Envoyé"
+    "message": "Transaction Envoyée"
   },
   "unable_to_find_any_addresses_with_assets": {
     "message": "Impossible de trouver des adresses avec des actifs"
@@ -2464,11 +2494,5 @@
   },
   "your_balance_have_to_be_merged": {
     "message": "Votre "
-  },
-  "tokens": {
-    "message": "Jetons"
-  },
-  "collections": {
-    "message": "Collections"
   }
 }
