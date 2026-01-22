@@ -1,13 +1,10 @@
-import { AlkanesInfo } from '@unisat/wallet-shared'
 import { useEffect, useState } from 'react'
 import { useI18n, useNavigation, useWallet } from 'src/context'
 import { useResetTxState } from 'src/hooks'
 
 export function useAlkanesNFTScreenLogic() {
   const nav = useNavigation()
-  const { alkanesInfo } = nav.getRouteState<{
-    alkanesInfo: AlkanesInfo
-  }>()
+  const { alkanesInfo } = nav.getRouteState<'AlkanesNFTScreen'>()
 
   const { t } = useI18n()
 

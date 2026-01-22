@@ -1,11 +1,11 @@
-import { ADDRESS_TYPES, WalletKeyring } from '@unisat/wallet-shared'
+import { ADDRESS_TYPES } from '@unisat/wallet-shared'
 import { useEffect, useState } from 'react'
 import { useI18n, useNavigation, useTools, useWallet } from 'src/context'
 type Status = '' | 'error' | 'warning' | undefined
 
 export function useExportMnemonicsScreenLogic() {
   const nav = useNavigation()
-  const { keyring } = nav.getRouteState<{ keyring: WalletKeyring }>()
+  const { keyring } = nav.getRouteState<'ExportMnemonicsScreen'>()
 
   const { t } = useI18n()
 

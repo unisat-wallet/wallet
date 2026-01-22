@@ -15,10 +15,7 @@ import {
 
 export function useCAT20TokenScreenLogic() {
   const nav = useNavigation()
-  const { tokenId, version } = nav.getRouteState<{
-    tokenId: string
-    version: CAT_VERSION
-  }>()
+  const { tokenId, version } = nav.getRouteState<'CAT20TokenScreen'>()
   const { t } = useI18n()
   const [tokenSummary, setTokenSummary] = useState<AddressCAT20TokenSummary>({
     cat20Balance: {

@@ -143,9 +143,7 @@ export function useBRC20TokenHistoryLogic(props: { ticker: string; displayName?:
 
 export function useBRC20TokenScreenLogic() {
   const nav = useNavigation()
-  const { ticker } = nav.getRouteState<{
-    ticker: string
-  }>()
+  const { ticker } = nav.getRouteState<'BRC20TokenScreen'>()
   const { t } = useI18n()
 
   const [activeTab, setActiveTab] = useState<BRC20TokenScreenTabKey>(BRC20TokenScreenTabKey.HISTORY)

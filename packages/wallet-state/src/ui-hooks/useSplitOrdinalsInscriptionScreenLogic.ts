@@ -1,4 +1,4 @@
-import { Inscription, RawTxInfo } from '@unisat/wallet-shared'
+import { Inscription } from '@unisat/wallet-shared'
 import { useEffect, useState } from 'react'
 import { useI18n, useNavigation, useWallet } from 'src/context'
 import {
@@ -11,9 +11,7 @@ import { getAddressUtxoDust } from 'src/utils/bitcoin-utils'
 
 export function useSplitOrdinalsInscriptionScreenLogic() {
   const nav = useNavigation()
-  const props = nav.getRouteState<{
-    inscription: Inscription
-  }>()
+  const props = nav.getRouteState<'SplitOrdinalsInscriptionScreen'>()
 
   const inscription = props.inscription
 
@@ -31,8 +29,6 @@ export function useSplitOrdinalsInscriptionScreenLogic() {
   const [outputValue, setOutputValue] = useState(defaultOutputValue)
 
   const { feeRate } = useFeeRateBar()
-
-  const [rawTxInfo, setRawTxInfo] = useState<RawTxInfo>()
 
   const [inscriptions, setInscriptions] = useState<Inscription[]>([])
 
@@ -63,22 +59,7 @@ export function useSplitOrdinalsInscriptionScreenLogic() {
       return
     }
 
-    if (feeRate == ordinalsTx.feeRate && outputValue == ordinalsTx.outputValue) {
-      //Prevent repeated triggering caused by setAmount
-      setDisabled(false)
-      return
-    }
-
-    createSplitTx({ inscriptionId: inscription.inscriptionId, feeRate, outputValue })
-      .then(data => {
-        setRawTxInfo(data.rawTxInfo)
-        setSplitedCount(data.splitedCount)
-        setDisabled(false)
-      })
-      .catch(e => {
-        console.log(e)
-        setError(e.message)
-      })
+    setDisabled(false)
   }, [feeRate, outputValue])
 
   const onClickBack = () => {
@@ -90,7 +71,14 @@ export function useSplitOrdinalsInscriptionScreenLogic() {
   }
 
   const onClickNext = () => {
-    nav.navigate('SignOrdinalsTransactionScreen', { rawTxInfo })
+    createSplitTx({ inscriptionId: inscription.inscriptionId, feeRate, outputValue })
+      .then(toSignData => {
+        nav.navigate('TxConfirmScreen', { toSignData })
+      })
+      .catch(e => {
+        console.log(e)
+        setError(e.message)
+      })
   }
 
   return {

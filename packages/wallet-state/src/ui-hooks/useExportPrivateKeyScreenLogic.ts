@@ -1,4 +1,3 @@
-import { Account } from '@unisat/wallet-shared'
 import { useEffect, useState } from 'react'
 import { useI18n, useNavigation, useTools, useWallet } from 'src/context'
 
@@ -7,9 +6,7 @@ export function useExportPrivateKeyScreenLogic() {
   const { t } = useI18n()
 
   const nav = useNavigation()
-  const { account } = nav.getRouteState<{
-    account: Account
-  }>()
+  const { account } = nav.getRouteState<'ExportPrivateKeyScreen'>()
 
   const [password, setPassword] = useState('')
   const [disabled, setDisabled] = useState(true)

@@ -8,14 +8,10 @@ export function useEditContactScreenLogic() {
   const nav = useNavigation()
 
   // Required parameters
-  const { address, chain, selectedNetworkFilter } = nav.getRouteState<{
-    address: string
-    chain: string
-    selectedNetworkFilter: string
-  }>()
+  const { address, chain, selectedNetworkFilter } = nav.getRouteState<'EditContactScreen'>()
   const wallet = useWallet()
   const [name, setName] = useState('')
-  const [contactAddress, setContactAddress] = useState('')
+  const [contactAddress, setContactAddress] = useState(address || '')
   const [originalAddress, setOriginalAddress] = useState('')
   const [originalChain, setOriginalChain] = useState<ChainType | undefined>()
   const [chainType, setChainType] = useState<ChainType>(ChainType.BITCOIN_MAINNET)
@@ -51,7 +47,7 @@ export function useEditContactScreenLogic() {
       } else {
         setError(t('contact_not_found'))
         setTimeout(() => {
-          nav.navigate('ContactsScreen')
+          nav.navigate('ContactsScreen', {})
         }, 1500)
       }
     } catch (err) {

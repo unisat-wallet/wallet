@@ -11,10 +11,7 @@ enum TabKey {
 }
 export function useOrdinalsInscriptionScreenLogic() {
   const nav = useNavigation()
-  const props = nav.getRouteState<{
-    inscriptionId: string
-    inscription: Inscription
-  }>()
+  const props = nav.getRouteState<'OrdinalsInscriptionScreen'>()
   const inscriptionId = props.inscriptionId
 
   const [inscription, setInscription] = useState<Inscription>(props.inscription)

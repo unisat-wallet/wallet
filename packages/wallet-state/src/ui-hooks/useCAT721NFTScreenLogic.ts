@@ -1,14 +1,9 @@
-import { CAT721CollectionInfo, CAT_VERSION } from '@unisat/wallet-shared'
 import { useI18n, useNavigation } from 'src/context'
 import { useResetTxState } from 'src/hooks'
 
 export function useCAT721NFTScreenLogic() {
   const nav = useNavigation()
-  const { collectionInfo, localId, version } = nav.getRouteState<{
-    version: CAT_VERSION
-    collectionInfo: CAT721CollectionInfo
-    localId: string
-  }>()
+  const { collectionInfo, localId, version } = nav.getRouteState<'CAT721NFTScreen'>()
 
   const { t } = useI18n()
 

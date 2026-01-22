@@ -1,6 +1,7 @@
 import { createContext, ReactNode, useContext } from 'react'
 
 import { BabylonConfigV2 } from '@unisat/babylon-service/types'
+
 import {
   Account,
   AddressAlkanesTokenSummary,
@@ -30,20 +31,24 @@ import {
   CosmosBalance,
   CosmosSignDataType,
   DecodedPsbt,
+  DummyTxType,
   FeeSummary,
   InscribeOrder,
   Inscription,
   InscriptionSummary,
   RateUsStatus,
   RuneBalance,
+  SignedData,
+  SignedMessage,
   SignPsbtOptions,
   TickPriceItem,
   TokenBalance,
   TokenTransfer,
+  ToSignData,
   ToSignInput,
+  ToSignMessage,
   TxHistoryItem,
   UnspentOutput,
-  UserToSignInput,
   UTXO,
   UTXO_Detail,
   VersionDetail,
@@ -67,6 +72,8 @@ export interface WalletController {
   openapi: {
     [key: string]: (...params: any) => Promise<any>
   }
+  // for development use only
+  requestMethod: (...params: any) => Promise<any>
 
   setBackgroundInited(value: boolean): Promise<void>
   getBackgroundInited(): Promise<boolean>
@@ -222,65 +229,46 @@ export interface WalletController {
 
   getCurrentKeyringAccounts(): Promise<Account[]>
 
-  signPsbtWithHex(
-    psbtHex: string,
-    toSignInputs: ToSignInput[],
-    autoFinalized: boolean
-  ): Promise<string>
+  signPsbtV2(toSignData: ToSignData): Promise<SignedData>
 
-  sendBTC(data: {
+  signMessage(params: ToSignMessage): Promise<SignedMessage>
+
+  createSendBTCPsbt(data: {
     to: string
     amount: number
     btcUtxos: UnspentOutput[]
     feeRate: number
     memo?: string
     memos?: string[]
-  }): Promise<{
-    psbtHex: string
-    rawtx: string
-    fee: number
-  }>
+  }): Promise<ToSignData>
 
-  sendAllBTC(data: { to: string; btcUtxos: UnspentOutput[]; feeRate: number }): Promise<{
-    psbtHex: string
-    rawtx: string
-    fee: number
-  }>
+  createSendAllBTCPsbt(data: {
+    to: string
+    btcUtxos: UnspentOutput[]
+    feeRate: number
+  }): Promise<ToSignData>
 
-  sendOrdinalsInscription(data: {
+  createSendInscriptionPsbt(data: {
     to: string
     inscriptionId: string
     feeRate: number
     outputValue?: number
     btcUtxos: UnspentOutput[]
-  }): Promise<{
-    psbtHex: string
-    rawtx: string
-    fee: number
-  }>
+  }): Promise<ToSignData>
 
-  sendOrdinalsInscriptions(data: {
+  createSendMultipleInscriptionsPsbt(data: {
     to: string
     inscriptionIds: string[]
     feeRate: number
     btcUtxos: UnspentOutput[]
-  }): Promise<{
-    psbtHex: string
-    rawtx: string
-    fee: number
-  }>
+  }): Promise<ToSignData>
 
-  splitOrdinalsInscription(data: {
+  createSplitInscriptionPsbt(data: {
     inscriptionId: string
     feeRate: number
     outputValue: number
     btcUtxos: UnspentOutput[]
-  }): Promise<{
-    psbtHex: string
-    rawtx: string
-    fee: number
-    splitedCount: number
-  }>
+  }): Promise<ToSignData>
 
   pushTx(rawtx: string): Promise<string>
 
@@ -444,7 +432,7 @@ export interface WalletController {
 
   getAddressRunesTokenSummary(address: string, runeid: string): Promise<AddressRunesTokenSummary>
 
-  sendRunes(data: {
+  createSendRunesPsbt(data: {
     to: string
     runeid: string
     runeAmount: string
@@ -452,11 +440,7 @@ export interface WalletController {
     btcUtxos?: UnspentOutput[]
     assetUtxos?: UnspentOutput[]
     outputValue?: number
-  }): Promise<{
-    psbtHex: string
-    rawtx: string
-    fee: number
-  }>
+  }): Promise<ToSignData>
 
   setAutoLockTimeId(timeId: number): Promise<void>
   getAutoLockTimeId(): Promise<number>
@@ -489,18 +473,16 @@ export interface WalletController {
     tokenId: string,
     tokenAmount: string,
     feeRate: number
-  ): Promise<{ id: string; commitTx: string; toSignInputs: UserToSignInput[]; feeRate: number }>
+  ): Promise<{ id: string; feeRate: number; toSignData: ToSignData }>
   transferCAT20Step2(
     version: 'v1' | 'v2',
     transferId: string,
-    commitTx: string,
-    toSignInputs: UserToSignInput[]
-  ): Promise<{ revealTx: string; toSignInputs: UserToSignInput[] }>
+    psbtHex: string
+  ): Promise<{ toSignData: ToSignData }>
   transferCAT20Step3(
     version: 'v1' | 'v2',
     transferId: string,
-    revealTx: string,
-    toSignInputs: UserToSignInput[]
+    psbtHex: string
   ): Promise<{ txid: string }>
 
   mergeCAT20Prepare(
@@ -512,7 +494,7 @@ export interface WalletController {
   transferCAT20Step1ByMerge(
     version: 'v1' | 'v2',
     mergeId: string
-  ): Promise<{ id: string; commitTx: string; toSignInputs: UserToSignInput[]; feeRate: number }>
+  ): Promise<{ id: string; feeRate: number; toSignData: ToSignData }>
   getMergeCAT20Status(version: 'v1' | 'v2', mergeId: string): Promise<any>
 
   getAppList(): Promise<{ tab: string; items: AppInfo[] }[]>
@@ -538,18 +520,16 @@ export interface WalletController {
     collectionId: string,
     localId: string,
     feeRate: number
-  ): Promise<{ id: string; commitTx: string; toSignInputs: UserToSignInput[]; feeRate: number }>
+  ): Promise<{ id: string; feeRate: number; toSignData: ToSignData }>
   transferCAT721Step2(
     version: 'v1' | 'v2',
     transferId: string,
-    commitTx: string,
-    toSignInputs: UserToSignInput[]
-  ): Promise<{ revealTx: string; toSignInputs: UserToSignInput[] }>
+    psbtHex: string
+  ): Promise<{ toSignData: ToSignData }>
   transferCAT721Step3(
     version: 'v1' | 'v2',
     transferId: string,
-    revealTx: string,
-    toSignInputs: UserToSignInput[]
+    psbtHex: string
   ): Promise<{ txid: string }>
 
   getBuyCoinChannelList(coin: string): Promise<BtcChannelItem[]>
@@ -607,25 +587,16 @@ export interface WalletController {
     feeRate: number
   }): Promise<{
     orderId: string
-    psbtHex: string
-    toSignInputs: UserToSignInput[]
+    toSignData: ToSignData
   }>
 
-  singleStepTransferBRC20Step2(params: {
-    orderId: string
-    commitTx: string
-    toSignInputs: UserToSignInput[]
-    signed?: boolean
-  }): Promise<{
-    psbtHex: string
-    toSignInputs: UserToSignInput[]
+  singleStepTransferBRC20Step2(params: { orderId: string; commitTx: string }): Promise<{
+    toSignData: ToSignData
   }>
 
   singleStepTransferBRC20Step3(params: {
     orderId: string
     revealTx: string
-    toSignInputs: UserToSignInput[]
-    signed?: boolean
   }): Promise<{ txid: string }>
 
   setLastActiveTime(): void
@@ -633,14 +604,10 @@ export interface WalletController {
   getOpenInSidePanel(): Promise<boolean>
   setOpenInSidePanel(openInSidePanel: boolean): Promise<void>
 
-  sendCoinBypassHeadOffsets(
+  createSendBTCOffsetPsbt(
     tos: { address: string; satoshis: number }[],
     feeRate: number
-  ): Promise<{
-    psbtHex: string
-    rawtx: string
-    fee: number
-  }>
+  ): Promise<ToSignData>
 
   getAlkanesList(
     address: string,
@@ -656,29 +623,12 @@ export interface WalletController {
     fetchAvailable: boolean
   ): Promise<AddressAlkanesTokenSummary>
 
-  createAlkanesSendTx(params: {
-    userAddress: string
-    userPubkey: string
-    receiver: string
-    alkaneid: string
-    amount: string
-    feeRate: number
-  }): Promise<{
-    psbtHex: string
-    toSignInputs: UserToSignInput[]
-  }>
-
-  signAlkanesSendTx(params: {
-    commitTx: string
-    toSignInputs: ToSignInput[]
-  }): Promise<{ txid: string }>
-
-  sendAlkanes(params: {
+  createSendAlkanesPsbt(params: {
     to: string
     alkaneid: string
     amount: string
     feeRate: number
-  }): Promise<string>
+  }): Promise<ToSignData>
 
   getAlkanesCollectionList(
     address: string,
@@ -719,6 +669,8 @@ export interface WalletController {
   createTmpKeyringWithPublicKey(publicKey: string, addressType: AddressType): Promise<WalletKeyring>
 
   createKeyringWithPublicKey(data: string, addressType: AddressType): Promise<void>
+
+  createDummyPsbt(params: { txType: DummyTxType }): Promise<ToSignData>
 }
 
 const WalletContext = createContext<{

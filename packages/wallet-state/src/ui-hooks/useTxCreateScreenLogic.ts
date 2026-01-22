@@ -1,10 +1,9 @@
 import { useEffect, useMemo, useState } from 'react'
 
 import { numUtils } from '@unisat/base-utils'
-import { COIN_DUST, RawTxInfo } from '@unisat/wallet-shared'
+import { COIN_DUST } from '@unisat/wallet-shared'
 import {
   useAccountBalance,
-  useBitcoinTx,
   useBTCUnit,
   useChain,
   useFeeRateBar,
@@ -23,7 +22,6 @@ export function useTxCreateScreenLogic() {
   const { t, isSpecialLocale } = useI18n()
   const accountBalance = useAccountBalance()
   const nav = useNavigation()
-  const bitcoinTx = useBitcoinTx()
   const btcUnit = useBTCUnit()
 
   const [disabled, setDisabled] = useState(true)
@@ -58,8 +56,6 @@ export function useTxCreateScreenLogic() {
 
   const dustAmount = useMemo(() => numUtils.satoshisToAmount(COIN_DUST), [COIN_DUST])
 
-  const [rawTxInfo, setRawTxInfo] = useState<RawTxInfo>()
-
   const availableAmount = numUtils.satoshisToAmount(accountBalance.availableBalance)
   const unavailableAmount = numUtils.satoshisToAmount(accountBalance.unavailableBalance)
 
@@ -89,29 +85,7 @@ export function useTxCreateScreenLogic() {
       return
     }
 
-    if (
-      toInfo.address == bitcoinTx.toAddress &&
-      toSatoshis == bitcoinTx.toSatoshis &&
-      feeRate == bitcoinTx.feeRate
-    ) {
-      //Prevent repeated triggering caused by setAmount
-      setDisabled(false)
-      return
-    }
-
-    prepareSendBTC({ toAddressInfo: toInfo, toAmount: toSatoshis, feeRate })
-      .then(data => {
-        // if (data.fee < data.estimateFee) {
-        //   setError(`Network fee must be at leat ${data.estimateFee}`);
-        //   return;
-        // }
-        setRawTxInfo(data)
-        setDisabled(false)
-      })
-      .catch(e => {
-        console.log(e)
-        setError(e.message)
-      })
+    setDisabled(false)
   }, [toInfo, inputAmount, feeRate])
 
   const walletConfig = useWalletConfig()
@@ -145,7 +119,16 @@ export function useTxCreateScreenLogic() {
   }
 
   const onClickNext = () => {
-    nav.navigate('TxConfirmScreen', { rawTxInfo })
+    prepareSendBTC({ toAddressInfo: toInfo, toAmount: toSatoshis, feeRate })
+      .then(toSignData => {
+        nav.navigate('TxConfirmScreen', {
+          toSignData,
+        })
+      })
+      .catch(e => {
+        console.log(e)
+        setError(e.message)
+      })
   }
 
   return {

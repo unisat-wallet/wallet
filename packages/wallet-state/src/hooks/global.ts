@@ -198,7 +198,7 @@ export function useLockCallback() {
     }
 
     if (!isUnlocked && isBooted) {
-      navigation.navToLock({ fromStartup: true })
+      navigation.navToLock({ autoUnlockByFace: false })
       return
     }
     const currentAccount = await wallet.getCurrentAccount()

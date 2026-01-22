@@ -4,11 +4,7 @@ import { getPasswordStrengthWord, MIN_PASSWORD_LENGTH } from 'src/utils/password
 
 export function useCreatePasswordScreenLogic() {
   const nav = useNavigation()
-  const { isNewAccount, isKeystone, fromColdWallet } = nav.getRouteState<{
-    isNewAccount: boolean
-    isKeystone: boolean
-    fromColdWallet: boolean
-  }>()
+  const { isNewAccount, isKeystone, fromColdWallet } = nav.getRouteState<'CreatePasswordScreen'>()
   const [newPassword, setNewPassword] = useState('')
   const { t } = useI18n()
 

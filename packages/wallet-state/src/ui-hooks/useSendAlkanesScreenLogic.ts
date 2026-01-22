@@ -1,14 +1,13 @@
 import { bnUtils } from '@unisat/base-utils'
-import {
-  AlkanesBalance,
-  AlkanesInfo,
-  Inscription,
-  TxType,
-  UserToSignInput,
-} from '@unisat/wallet-shared'
+import { Inscription, SignedData, SignPsbtParams, ToSignData } from '@unisat/wallet-shared'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useI18n, useNavigation, useTools, useWallet } from 'src/context'
-import { useCurrentAccount, useFeeRateBar, usePushBitcoinTxCallback } from 'src/hooks'
+import {
+  useCurrentAccount,
+  useFeeRateBar,
+  usePrepareSendAlkanesCallback,
+  usePushBitcoinTxCallback,
+} from 'src/hooks'
 import { isValidAddress } from 'src/utils/bitcoin-utils'
 
 export enum SendAlkanesScreenStep {
@@ -18,10 +17,7 @@ export enum SendAlkanesScreenStep {
 
 export function useSendAlkanesScreenLogic() {
   const nav = useNavigation()
-  const props = nav.getRouteState<{
-    tokenBalance: AlkanesBalance
-    tokenInfo: AlkanesInfo
-  }>()
+  const props = nav.getRouteState<'SendAlkanesScreen'>()
 
   const { t } = useI18n()
 
@@ -92,7 +88,7 @@ export function useSendAlkanesScreenLogic() {
     }
 
     if (bnUtils.compareAmount(sendingAmount, availableBalance)! > 0) {
-      setError(t('send_amount_exceeds_balance'))
+      setError(t('insufficient_balance'))
       return
     }
 
@@ -101,18 +97,17 @@ export function useSendAlkanesScreenLogic() {
 
   const transferData = useRef<{
     id: string
-    commitTx: string
-    commitToSignInputs: UserToSignInput[]
+    toSignData: ToSignData
   }>({
     id: '',
-    commitTx: '',
-    commitToSignInputs: [],
+    toSignData: null,
   })
 
   const [step, setStep] = useState(SendAlkanesScreenStep.CREATE_TX)
 
   const wallet = useWallet()
 
+  const prepareSendAlkanes = usePrepareSendAlkanesCallback()
   const pushBitcoinTx = usePushBitcoinTxCallback()
 
   const onClickBack = () => {
@@ -122,53 +117,38 @@ export function useSendAlkanesScreenLogic() {
   const onClickNext = async () => {
     tools.showLoading(true)
     try {
-      const step1 = await wallet.createAlkanesSendTx({
-        userAddress: currentAccount.address,
-        userPubkey: currentAccount.pubkey,
-        receiver: toInfo.address,
-        alkaneid: tokenBalance.alkaneid,
-        amount: bnUtils.fromDecimalAmount(inputAmount, tokenBalance.divisibility),
-        feeRate,
-      })
-      if (step1) {
-        transferData.current.commitTx = step1.psbtHex
-        transferData.current.commitToSignInputs = step1.toSignInputs
+      const toSignData = await prepareSendAlkanes(
+        toInfo,
+        tokenBalance.alkaneid,
+        bnUtils.fromDecimalAmount(inputAmount, tokenBalance.divisibility),
+        feeRate
+      )
+      if (toSignData) {
+        transferData.current.toSignData = toSignData
         setStep(1)
       }
     } catch (e) {
-      const msg = (e as any).message
       setError((e as any).message)
     } finally {
       tools.showLoading(false)
     }
   }
 
-  const signPsbtParams = {
+  const signPsbtParams: SignPsbtParams = {
     data: {
-      psbtHex: transferData.current.commitTx,
-      type: TxType.SIGN_TX,
-      options: { autoFinalized: true, toSignInputs: transferData.current.commitToSignInputs },
+      toSignDatas: [transferData.current.toSignData],
     },
   }
 
-  const onSignPsbtHandleConfirm = async res => {
+  const onSignPsbtHandleConfirm = async (signedDatas: SignedData[]) => {
     tools.showLoading(true)
     try {
-      if (res && res.psbtHex) {
-        const { success, txid, error } = await pushBitcoinTx(res.psbtHex)
-        if (success) {
-          nav.navigate('TxSuccessScreen', { txid })
-        } else {
-          throw new Error(error)
-        }
-        return
+      const { success, txid, error } = await pushBitcoinTx(signedDatas[0].psbtHex)
+      if (success) {
+        nav.navigate('TxSuccessScreen', { txid })
+      } else {
+        throw new Error(error)
       }
-
-      const result = await wallet.signAlkanesSendTx({
-        commitTx: transferData.current.commitTx,
-        toSignInputs: transferData.current.commitToSignInputs as any,
-      })
-      nav.navigate('TxSuccessScreen', { txid: result.txid })
     } catch (e) {
       nav.navigate('TxFailScreen', { error: (e as any).message })
     } finally {

@@ -11,14 +11,11 @@ import {
   useRunesInscribeUrl,
   useRunesMarketUrl,
   useTxExplorerUrl,
-  useUnisatWebsite,
 } from 'src/hooks'
 
 export function useRunesTokenScreenLogic() {
   const nav = useNavigation()
-  const { runeid } = nav.getRouteState<{
-    runeid: string
-  }>()
+  const { runeid } = nav.getRouteState<'RunesTokenScreen'>()
   const [tokenSummary, setTokenSummary] = useState<AddressRunesTokenSummary>({
     runeBalance: {
       runeid: '',
@@ -75,8 +72,6 @@ export function useRunesTokenScreenLogic() {
       setLoading(false)
     })
   }, [])
-
-  const unisatWebsite = useUnisatWebsite()
 
   const enableMint = tokenSummary.runeInfo.mintable
 

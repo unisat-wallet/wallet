@@ -1,16 +1,14 @@
 import { useCallback, useMemo } from 'react'
 
-import { RawTxInfo, ToAddressInfo, UnspentOutput } from '@unisat/wallet-shared'
+import { ToAddressInfo, ToSignData, UnspentOutput } from '@unisat/wallet-shared'
 
-import { useBTCUnit } from '../hooks/settings'
-
+import { numUtils, timeUtils } from '@unisat/base-utils'
 import { AppState, useI18n, useTools } from '..'
+import { useWallet } from '../context/WalletContext'
 import { useAccountAddress, useCurrentAccount } from '../hooks/accounts'
 import { accountActions } from '../reducers/accounts'
-import { useAppDispatch, useAppSelector } from './base'
 import { transactionsActions } from '../reducers/transactions'
-import { numUtils, timeUtils } from '@unisat/base-utils'
-import { useWallet } from '../context/WalletContext'
+import { useAppDispatch, useAppSelector } from './base'
 
 export function useTransactionsState(): AppState['transactions'] {
   return useAppSelector(state => state.transactions)
@@ -27,8 +25,7 @@ export function usePrepareSendBTCCallback() {
   const fromAddress = useAccountAddress()
   const utxos = useUtxos()
   const fetchUtxos = useFetchUtxosCallback()
-  const account = useCurrentAccount()
-  const btcUnit = useBTCUnit()
+
   const { t } = useI18n()
   return useCallback(
     async ({
@@ -61,20 +58,16 @@ export function usePrepareSendBTCCallback() {
         const summary = await wallet.getFeeSummary()
         feeRate = summary.list[1]!.feeRate
       }
-      let res: {
-        psbtHex: string
-        rawtx: string
-        fee: number
-      }
+      let res: ToSignData
 
       if (safeBalance === toAmount && !disableAutoAdjust) {
-        res = await wallet.sendAllBTC({
+        res = await wallet.createSendAllBTCPsbt({
           to: toAddressInfo.address,
           btcUtxos: _utxos,
           feeRate,
         })
       } else {
-        res = await wallet.sendBTC({
+        res = await wallet.createSendBTCPsbt({
           to: toAddressInfo.address,
           amount: toAmount,
           btcUtxos: _utxos,
@@ -84,21 +77,7 @@ export function usePrepareSendBTCCallback() {
         })
       }
 
-      dispatch(
-        (transactionsActions as any).updateBitcoinTx({
-          rawtx: res.rawtx,
-          psbtHex: res.psbtHex,
-          fromAddress,
-          feeRate,
-        })
-      )
-      const rawTxInfo: RawTxInfo = {
-        psbtHex: res.psbtHex,
-        rawtx: res.rawtx,
-        toAddressInfo,
-        fee: res.fee,
-      }
-      return rawTxInfo
+      return res
     },
     [dispatch, wallet, fromAddress, utxos, fetchUtxos]
   )
@@ -107,9 +86,6 @@ export function usePrepareSendBTCCallback() {
 export function usePrepareSendBypassHeadOffsetsCallback() {
   const dispatch = useAppDispatch()
   const wallet = useWallet()
-  const fromAddress = useAccountAddress()
-  const account = useCurrentAccount()
-  const btcUnit = useBTCUnit()
   return useCallback(
     async ({
       toAddressInfo,
@@ -120,7 +96,7 @@ export function usePrepareSendBypassHeadOffsetsCallback() {
       toAmount: number
       feeRate: number
     }) => {
-      const res = await wallet.sendCoinBypassHeadOffsets(
+      const res = await wallet.createSendBTCOffsetPsbt(
         [
           {
             address: toAddressInfo.address,
@@ -129,23 +105,9 @@ export function usePrepareSendBypassHeadOffsetsCallback() {
         ],
         feeRate
       )
-      dispatch(
-        (transactionsActions as any).updateBitcoinTx({
-          rawtx: res.rawtx,
-          psbtHex: res.psbtHex,
-          fromAddress,
-          feeRate,
-        })
-      )
-      const rawTxInfo: RawTxInfo = {
-        psbtHex: res.psbtHex,
-        rawtx: res.rawtx,
-        toAddressInfo,
-        fee: res.fee,
-      }
-      return rawTxInfo
+      return res
     },
-    [dispatch, wallet, fromAddress]
+    [dispatch, wallet]
   )
 }
 
@@ -198,7 +160,6 @@ export function usePrepareSendOrdinalsInscriptionCallback() {
   const fromAddress = useAccountAddress()
   const utxos = useUtxos()
   const fetchUtxos = useFetchUtxosCallback()
-  const account = useCurrentAccount()
   return useCallback(
     async ({
       toAddressInfo,
@@ -221,29 +182,15 @@ export function usePrepareSendOrdinalsInscriptionCallback() {
         btcUtxos = await fetchUtxos()
       }
 
-      const res = await wallet.sendOrdinalsInscription({
+      const toSignData = await wallet.createSendInscriptionPsbt({
         to: toAddressInfo.address,
         inscriptionId,
         feeRate,
         outputValue: outputValue!,
         btcUtxos,
       })
-      dispatch(
-        (transactionsActions as any).updateOrdinalsTx({
-          rawtx: res.rawtx,
-          psbtHex: res.psbtHex,
-          fromAddress,
-          // inscription,
-          feeRate,
-          outputValue,
-        })
-      )
-      const rawTxInfo: RawTxInfo = {
-        psbtHex: res.psbtHex,
-        rawtx: res.rawtx,
-        toAddressInfo,
-      }
-      return rawTxInfo
+
+      return toSignData
     },
     [dispatch, wallet, fromAddress, utxos]
   )
@@ -255,7 +202,6 @@ export function usePrepareSendOrdinalsInscriptionsCallback() {
   const fromAddress = useAccountAddress()
   const fetchUtxos = useFetchUtxosCallback()
   const utxos = useUtxos()
-  const account = useCurrentAccount()
   return useCallback(
     async ({
       toAddressInfo,
@@ -275,26 +221,14 @@ export function usePrepareSendOrdinalsInscriptionsCallback() {
       if (btcUtxos.length === 0) {
         btcUtxos = await fetchUtxos()
       }
-      const res = await wallet.sendOrdinalsInscriptions({
+      const res = await wallet.createSendMultipleInscriptionsPsbt({
         to: toAddressInfo.address,
         inscriptionIds,
         feeRate,
         btcUtxos,
       })
-      dispatch(
-        (transactionsActions as any).updateOrdinalsTx({
-          rawtx: res.rawtx,
-          psbtHex: res.psbtHex,
-          fromAddress,
-          feeRate,
-        })
-      )
-      const rawTxInfo: RawTxInfo = {
-        psbtHex: res.psbtHex,
-        rawtx: res.rawtx,
-        toAddressInfo,
-      }
-      return rawTxInfo
+
+      return res
     },
     [dispatch, wallet, fromAddress, utxos]
   )
@@ -322,30 +256,14 @@ export function useCreateSplitTxCallback() {
         btcUtxos = await fetchUtxos()
       }
 
-      const res = await wallet.splitOrdinalsInscription({
+      const res = await wallet.createSplitInscriptionPsbt({
         inscriptionId,
         feeRate,
         outputValue,
         btcUtxos,
       })
-      dispatch(
-        (transactionsActions as any).updateOrdinalsTx({
-          rawtx: res.rawtx,
-          psbtHex: res.psbtHex,
-          fromAddress,
-          // inscription,
-          feeRate,
-          outputValue,
-        })
-      )
-      const rawTxInfo: RawTxInfo = {
-        psbtHex: res.psbtHex,
-        rawtx: res.rawtx,
-        toAddressInfo: {
-          address: fromAddress,
-        },
-      }
-      return { rawTxInfo, splitedCount: res.splitedCount }
+
+      return res
     },
     [dispatch, wallet, fromAddress, utxos]
   )
@@ -489,7 +407,7 @@ export function usePrepareSendRunesCallback() {
         assetUtxos = await fetchAssetUtxosRunes(runeid)
       }
 
-      const res = await wallet.sendRunes({
+      const toSignData = await wallet.createSendRunesPsbt({
         to: toAddressInfo.address,
         runeid,
         runeAmount,
@@ -499,23 +417,7 @@ export function usePrepareSendRunesCallback() {
         assetUtxos,
       })
 
-      dispatch(
-        (transactionsActions as any).updateRunesTx({
-          rawtx: res.rawtx,
-          psbtHex: res.psbtHex,
-          fromAddress,
-          feeRate,
-          runeid,
-          runeAmount,
-          outputValue,
-        })
-      )
-      const rawTxInfo: RawTxInfo = {
-        psbtHex: res.psbtHex,
-        rawtx: res.rawtx,
-        toAddressInfo,
-      }
-      return rawTxInfo
+      return toSignData
     },
     [dispatch, wallet, fromAddress, utxos, assetUtxosRunes, fetchAssetUtxosRunes, account]
   )
@@ -531,7 +433,7 @@ export function usePrepareSendAlkanesCallback() {
   const account = useCurrentAccount()
   const callback = useCallback(
     async (toAddressInfo: ToAddressInfo, alkaneid: string, amount: string, feeRate: number) => {
-      return await wallet.sendAlkanes({
+      return await wallet.createSendAlkanesPsbt({
         to: toAddressInfo.address,
         alkaneid,
         amount,

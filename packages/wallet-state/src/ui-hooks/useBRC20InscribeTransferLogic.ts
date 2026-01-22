@@ -1,5 +1,12 @@
 import { numUtils } from '@unisat/base-utils'
-import { InscribeOrder, RawTxInfo, TokenBalance, TokenInfo, TxType } from '@unisat/wallet-shared'
+import {
+  InscribeOrder,
+  SignedData,
+  SignPsbtParams,
+  TokenBalance,
+  TokenInfo,
+  ToSignData,
+} from '@unisat/wallet-shared'
 import BigNumber from 'bignumber.js'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useApproval, useI18n, useNavigation, useTools, useWallet } from 'src/context'
@@ -27,7 +34,7 @@ interface ContextData {
   session?: any
   tokenBalance?: TokenBalance
   order?: InscribeOrder
-  rawTxInfo?: RawTxInfo
+  toSignData?: ToSignData
   amount?: string
   isApproval: boolean
   tokenInfo?: TokenInfo
@@ -40,7 +47,7 @@ interface UpdateContextDataParams {
   session?: any
   tokenBalance?: TokenBalance
   order?: InscribeOrder
-  rawTxInfo?: RawTxInfo
+  toSignData?: ToSignData
   amount?: string
   tokenInfo?: TokenInfo
   amountEditable?: boolean
@@ -53,7 +60,7 @@ export interface BRC20InscribeTransferParams {
 
 export function useBRC20InscribeTransferLogic() {
   const nav = useNavigation()
-  const { ticker } = nav.getRouteState<{ ticker: string }>()
+  const { ticker } = nav.getRouteState<'BRC20InscribeTransfer'>()
 
   const [contextData, setContextData] = useState<ContextData>({
     step: Step.STEP1,
@@ -197,12 +204,12 @@ export function useBRC20InscribeTransferLogicStep1(params: BRC20InscribeTransfer
         outputValue
       )
 
-      const rawTxInfo = await prepareSendBypassHeadOffsets({
+      const toSignData = await prepareSendBypassHeadOffsets({
         toAddressInfo: { address: order.payAddress, domain: '' },
         toAmount: order.totalFee,
         feeRate: feeRateBarState.feeRate,
       })
-      updateContextData({ order, amount, rawTxInfo, step: Step.STEP2 })
+      updateContextData({ order, amount, toSignData, step: Step.STEP2 })
     } catch (e) {
       tools.toastError((e as Error).message.replace('Error:', ''))
     } finally {
@@ -230,11 +237,11 @@ export function useBRC20InscribeTransferLogicStep1(params: BRC20InscribeTransfer
 
 export function useBRC20InscribeTransferLogicStep2(params: BRC20InscribeTransferParams) {
   const { contextData } = params
-  const { order, tokenBalance, amount, rawTxInfo, session } = contextData
+  const { order, tokenBalance, amount, toSignData, session } = contextData
   const btcUnit = useBTCUnit()
   const { t } = useI18n()
 
-  if (!order || !tokenBalance || !rawTxInfo) {
+  if (!order || !tokenBalance || !toSignData) {
     return {
       isEmpty: true,
       networkFee: '0',
@@ -251,7 +258,7 @@ export function useBRC20InscribeTransferLogicStep2(params: BRC20InscribeTransfer
     }
   }
 
-  const fee = rawTxInfo.fee || 0
+  const fee = toSignData.estimatedFee || 0
   const networkFee = useMemo(() => numUtils.satoshisToAmount(fee), [fee])
   const outputValue = useMemo(
     () => numUtils.satoshisToAmount(order.outputValue),
@@ -278,7 +285,7 @@ export function useBRC20InscribeTransferLogicStep2(params: BRC20InscribeTransfer
     amount,
     tokenBalance,
     order,
-    rawTxInfo,
+    toSignData,
   }
 }
 
@@ -299,28 +306,28 @@ export function useBRC20InscribeTransferLogicStep3(params: BRC20InscribeTransfer
       step: Step.STEP2,
     })
   }
-  const signPsbtParams = {
+  const signPsbtParams: SignPsbtParams = {
     data: {
-      psbtHex: contextData.rawTxInfo!.psbtHex,
-      type: TxType.SEND_BITCOIN,
-      options: {
-        autoFinalized: true,
-      },
+      toSignDatas: [contextData.toSignData!],
     },
   }
-  const onSignPsbtHandleConfirm = res => {
-    pushBitcoinTx((res ?? contextData.rawTxInfo!).rawtx).then(({ success, txid, error }) => {
-      if (success) {
-        updateContextData({
-          step: Step.STEP4,
-        })
-      } else {
-        // @ts-ignore TODO
-        // contextData.isApproval ? tools.toastError(error) : navigation.replace('TxFailScreen', { error });
 
-        nav.navigate('TxFailScreen', { error })
+  const tools = useTools()
+  const onSignPsbtHandleConfirm = async (signedDatas: SignedData[]) => {
+    tools.showLoading(true)
+    try {
+      const { success, txid, error } = await pushBitcoinTx(signedDatas[0].psbtHex)
+      if (success) {
+        nav.navigate('TxSuccessScreen', { txid })
+      } else {
+        throw new Error(error)
       }
-    })
+      return
+    } catch (e) {
+      nav.navigate('TxFailScreen', { error: (e as any).message })
+    } finally {
+      tools.showLoading(false)
+    }
   }
 
   return {

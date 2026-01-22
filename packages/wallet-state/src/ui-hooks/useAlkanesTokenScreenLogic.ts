@@ -13,9 +13,7 @@ import {
 
 export function useAlkanesTokenScreenLogic() {
   const nav = useNavigation()
-  const { alkaneid } = nav.getRouteState<{
-    alkaneid: string
-  }>()
+  const { alkaneid } = nav.getRouteState<'AlkanesTokenScreen'>()
   const [tokenSummary, setTokenSummary] = useState<AddressAlkanesTokenSummary>({
     tokenBalance: {
       alkaneid: '',

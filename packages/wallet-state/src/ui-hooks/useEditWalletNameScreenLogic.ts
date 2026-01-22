@@ -1,12 +1,9 @@
 import { useMemo, useState } from 'react'
 
 import { keyringsActions, useAppDispatch, useI18n, useNavigation, useWallet } from '..'
-import { WalletKeyring } from '@unisat/wallet-shared'
 export function useEditWalletNameScreenLogic() {
   const nav = useNavigation()
-  const { keyring } = nav.getRouteState<{
-    keyring: WalletKeyring
-  }>()
+  const { keyring } = nav.getRouteState<'EditWalletNameScreen'>()
   const { t } = useI18n()
   const wallet = useWallet()
   const [alianName, setAlianName] = useState(keyring.alianName || '')

@@ -1,4 +1,4 @@
-import { Inscription, RawTxInfo } from '@unisat/wallet-shared'
+import { Inscription } from '@unisat/wallet-shared'
 import { useEffect, useMemo, useState } from 'react'
 import {
   useFeeRateBar,
@@ -16,9 +16,7 @@ export function useSendOrdinalsInscriptionScreenLogic() {
   const [disabled, setDisabled] = useState(true)
   const nav = useNavigation()
 
-  const { inscription } = nav.getRouteState<{
-    inscription: Inscription
-  }>()
+  const { inscription } = nav.getRouteState<'SendOrdinalsInscriptionScreen'>()
   const ordinalsTx = useOrdinalsTx()
   const [toInfo, setToInfo] = useState({
     address: ordinalsTx.toAddress,
@@ -49,8 +47,6 @@ export function useSendOrdinalsInscriptionScreenLogic() {
       setInscriptions(v.inscriptions)
     })
   }, [])
-
-  const [rawTxInfo, setRawTxInfo] = useState<RawTxInfo>()
 
   const minOutputValue = useMemo(() => {
     if (toInfo.address) {
@@ -97,30 +93,7 @@ export function useSendOrdinalsInscriptionScreenLogic() {
       return
     }
 
-    if (
-      toInfo.address == ordinalsTx.toAddress &&
-      feeRate == ordinalsTx.feeRate &&
-      outputValue == ordinalsTx.outputValue
-    ) {
-      //Prevent repeated triggering caused by setAmount
-      setDisabled(false)
-      return
-    }
-
-    prepareSendOrdinalsInscription({
-      toAddressInfo: toInfo,
-      inscriptionId: inscription.inscriptionId,
-      feeRate,
-      outputValue,
-    })
-      .then(data => {
-        setRawTxInfo(data)
-        setDisabled(false)
-      })
-      .catch(e => {
-        console.log(e)
-        setError(e.message)
-      })
+    setDisabled(false)
   }, [toInfo, feeRate, outputValue, inscriptions])
 
   const onAddressInputChange = val => {
@@ -132,7 +105,19 @@ export function useSendOrdinalsInscriptionScreenLogic() {
   }
 
   const onClickNext = () => {
-    nav.navigate('SignOrdinalsTransactionScreen', { rawTxInfo })
+    prepareSendOrdinalsInscription({
+      toAddressInfo: toInfo,
+      inscriptionId: inscription.inscriptionId,
+      feeRate,
+      outputValue,
+    })
+      .then(toSignData => {
+        nav.navigate('TxConfirmScreen', { toSignData })
+      })
+      .catch(e => {
+        console.log(e)
+        setError(e.message)
+      })
   }
 
   return {

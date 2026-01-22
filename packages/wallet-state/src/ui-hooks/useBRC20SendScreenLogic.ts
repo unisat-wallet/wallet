@@ -1,7 +1,15 @@
-import { RawTxInfo, TokenBalance, TokenInfo, TokenTransfer, TxType } from '@unisat/wallet-shared'
-import { useCallback, useEffect, useState } from 'react'
-import { useI18n, useNavigation, useTools } from 'src/context'
 import {
+  RawTxInfo,
+  SignPsbtParams,
+  TokenBalance,
+  TokenInfo,
+  TokenTransfer,
+} from '@unisat/wallet-shared'
+import BigNumber from 'bignumber.js'
+import { startTransition, useCallback, useEffect, useMemo, useState } from 'react'
+import { useI18n, useNavigation, useTools, useWallet } from 'src/context'
+import {
+  useCurrentAccount,
   useFeeRateBar,
   useFetchUtxosCallback,
   usePrepareSendOrdinalsInscriptionCallback,
@@ -9,7 +17,6 @@ import {
   usePushOrdinalsTxCallback,
 } from 'src/hooks'
 import { getAddressUtxoDust } from 'src/utils/bitcoin-utils'
-import BigNumber from 'bignumber.js'
 
 export enum BRC20SendTabKey {
   STEP1,
@@ -46,12 +53,7 @@ export interface BRC20SendStepParams {
 export function useBRC20SendScreenLogic() {
   const nav = useNavigation()
 
-  const props = nav.getRouteState<{
-    tokenBalance: TokenBalance
-    tokenInfo: TokenInfo
-    selectedInscriptionIds: string[]
-    selectedAmount: string
-  }>()
+  const props = nav.getRouteState<'BRC20SendScreen'>()
 
   const tokenBalance = props.tokenBalance
   const selectedInscriptionIds = props.selectedInscriptionIds || []
@@ -188,20 +190,20 @@ export function useBRC20SendScreenLogicStep2({
       tools.showLoading(true)
       const inscriptionIds = Array.from(contextData.inscriptionIdSet)
       if (inscriptionIds.length === 1) {
-        const rawTxInfo = await prepareSendOrdinalsInscription({
+        const toSignData = await prepareSendOrdinalsInscription({
           toAddressInfo: { address: contextData.receiver, domain: '' },
           inscriptionId: inscriptionIds[0],
           feeRate: feeRateBar.feeRate,
           outputValue: getAddressUtxoDust(contextData.receiver),
         })
-        nav.navigate('SignOrdinalsTransactionScreen', { rawTxInfo })
+        nav.navigate('TxConfirmScreen', { toSignData })
       } else {
-        const rawTxInfo = await prepareSendOrdinalsInscriptions({
+        const toSignData = await prepareSendOrdinalsInscriptions({
           toAddressInfo: { address: contextData.receiver, domain: '' },
           inscriptionIds,
           feeRate: feeRateBar.feeRate,
         })
-        nav.navigate('SignOrdinalsTransactionScreen', { rawTxInfo })
+        nav.navigate('TxConfirmScreen', { toSignData })
       }
 
       // updateContextData({ tabKey: TabKey.STEP3, rawTxInfo: txInfo });
@@ -260,16 +262,150 @@ export function useBRC20SendScreenLogicStep3({
     }
   }
 
-  const signPsbtParams = {
+  const signPsbtParams: SignPsbtParams = {
     data: {
-      psbtHex: contextData.rawTxInfo.psbtHex,
-      type: TxType.SIGN_TX,
-      options: { autoFinalized: false },
+      toSignDatas: [
+        {
+          psbtHex: contextData.rawTxInfo.psbtHex,
+          toSignInputs: undefined,
+          autoFinalized: true,
+        },
+      ],
     },
   }
 
   return {
     signPsbtParams,
     onSignPsbtConfirm,
+  }
+}
+
+export function useTransferableListLogic({ contextData, updateContextData }: BRC20SendStepParams) {
+  const wallet = useWallet()
+  const currentAccount = useCurrentAccount()
+  const { t } = useI18n()
+
+  const [items, setItems] = useState<TokenTransfer[]>([])
+  const [total, setTotal] = useState(0)
+  const [loading, setLoading] = useState(false)
+  const [loadingLump, setLoadingLump] = useState(false)
+  const [pagination, setPagination] = useState({ currentPage: 1, pageSize: 100 })
+  const [allSelected, setAllSelected] = useState(false)
+
+  const tools = useTools()
+  const fetchData = async () => {
+    try {
+      setLoading(true)
+      const { list, total } = await wallet.getBRC20TransferableList(
+        currentAccount.address,
+        contextData.tokenBalance.ticker,
+        pagination.currentPage,
+        pagination.pageSize
+      )
+      setItems(list)
+      setTotal(total)
+    } catch (e) {
+      tools.toastError((e as Error).message)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    fetchData()
+  }, [pagination])
+  const totalAmount = items
+    .reduce((pre, cur) => new BigNumber(cur.amount).plus(pre), new BigNumber(0))
+    .toString()
+
+  const selectedCount = useMemo(() => contextData.inscriptionIdSet.size, [contextData])
+
+  const onClickItem = (item: TokenTransfer) => {
+    if (contextData.inscriptionIdSet.has(item.inscriptionId)) {
+      const inscriptionIdSet = new Set(contextData.inscriptionIdSet)
+      inscriptionIdSet.delete(item.inscriptionId)
+      const transferAmount = new BigNumber(contextData.transferAmount).minus(
+        new BigNumber(item.amount)
+      )
+      updateContextData({
+        inscriptionIdSet,
+        transferAmount: transferAmount.toString(),
+      })
+      if (allSelected) {
+        setAllSelected(false)
+      }
+    } else {
+      const inscriptionIdSet = new Set(contextData.inscriptionIdSet)
+      inscriptionIdSet.add(item.inscriptionId)
+      const transferAmount = new BigNumber(contextData.transferAmount)
+        .plus(new BigNumber(item.amount))
+        .toString()
+      updateContextData({
+        inscriptionIdSet,
+        transferAmount,
+      })
+      if (allSelected == false && transferAmount === totalAmount) {
+        setAllSelected(true)
+      }
+    }
+  }
+
+  const onCheckBoxChange = e => {
+    const val = e.target.checked
+    setAllSelected(val)
+    if (val) {
+      const inscriptionIdSet = new Set(items.map(v => v.inscriptionId))
+      updateContextData({
+        inscriptionIdSet,
+        transferAmount: totalAmount,
+      })
+    } else {
+      updateContextData({
+        inscriptionIdSet: new Set(),
+        transferAmount: '0',
+      })
+    }
+  }
+
+  const onClickCheckBoxInMobile = () => {
+    setLoadingLump(true)
+    setAllSelected(!allSelected)
+    startTransition(() => {
+      if (!allSelected) {
+        const inscriptionIdSet = new Set(items.map(v => v.inscriptionId))
+        updateContextData({
+          inscriptionIdSet,
+          transferAmount: totalAmount,
+        })
+      } else {
+        updateContextData({
+          inscriptionIdSet: new Set(),
+          transferAmount: '0',
+        })
+      }
+    })
+    setLoadingLump(false)
+  }
+
+  const onClickRefresh = () => {
+    fetchData()
+  }
+
+  return {
+    // data
+    items,
+    selectedCount,
+    allSelected,
+    loading,
+    loadingLump,
+
+    // actions
+    onClickItem,
+    onCheckBoxChange,
+    onClickCheckBoxInMobile,
+    onClickRefresh,
+
+    // tools
+    t,
   }
 }

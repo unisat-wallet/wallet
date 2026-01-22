@@ -1,5 +1,5 @@
 import { bnUtils } from '@unisat/base-utils'
-import { Inscription, RawTxInfo, RuneBalance, RuneInfo } from '@unisat/wallet-shared'
+import { Inscription } from '@unisat/wallet-shared'
 import BigNumber from 'bignumber.js'
 import { useEffect, useMemo, useState } from 'react'
 import { useI18n, useNavigation, useTools } from 'src/context'
@@ -15,10 +15,7 @@ import { getAddressUtxoDust, isValidAddress } from 'src/utils/bitcoin-utils'
 
 export function useSendRunesScreenLogic() {
   const nav = useNavigation()
-  const props = nav.getRouteState<{
-    runeBalance: RuneBalance
-    runeInfo: RuneInfo
-  }>()
+  const props = nav.getRouteState<'SendRunesScreen'>()
   const { t } = useI18n()
 
   const runeBalance = props.runeBalance
@@ -86,7 +83,6 @@ export function useSendRunesScreenLogic() {
 
   const { feeRate } = useFeeRateBar()
 
-  const [rawTxInfo, setRawTxInfo] = useState<RawTxInfo>()
   useEffect(() => {
     setError('')
     setDisabled(true)
@@ -107,6 +103,11 @@ export function useSendRunesScreenLogic() {
       return
     }
 
+    if (bnUtils.compareAmount(runeAmount, availableBalance) > 0) {
+      setError(t('insufficient_balance'))
+      return
+    }
+
     if (outputValue < minOutputValue) {
       setError(`${t('output_value_must_be_at_least')} ${minOutputValue}`)
       return
@@ -116,36 +117,8 @@ export function useSendRunesScreenLogic() {
       return
     }
 
-    if (
-      toInfo.address == runesTx.toAddress &&
-      runeAmount == runesTx.runeAmount &&
-      outputValue == runesTx.outputValue
-    ) {
-      //Prevent repeated triggering caused by setAmount
-      setDisabled(false)
-      return
-    }
-
-    prepareSendRunes({
-      toAddressInfo: toInfo,
-      runeid: runeInfo.runeid,
-      runeAmount: runeAmount,
-      outputValue: outputValue,
-      feeRate,
-    })
-      .then(data => {
-        // if (data.fee < data.estimateFee) {
-        //   setError(`Network fee must be at leat ${data.estimateFee}`);
-        //   return;
-        // }
-        setRawTxInfo(data)
-        setDisabled(false)
-      })
-      .catch(e => {
-        console.log(e)
-        setError(e.message)
-      })
-  }, [toInfo, inputAmount, feeRate, outputValue, minOutputValue])
+    setDisabled(false)
+  }, [toInfo, inputAmount, feeRate, outputValue, minOutputValue, availableBalance])
 
   const totalBalanceStr = useMemo(() => {
     return bnUtils.toDecimalAmount(runeBalance.amount, runeBalance.divisibility)
@@ -158,9 +131,21 @@ export function useSendRunesScreenLogic() {
     nav.goBack()
   }
   const onClickNext = () => {
-    if (rawTxInfo) {
-      nav.navigate('TxConfirmScreen', { rawTxInfo })
-    }
+    const runeAmount = bnUtils.fromDecimalAmount(inputAmount, runeInfo.divisibility)
+    prepareSendRunes({
+      toAddressInfo: toInfo,
+      runeid: runeInfo.runeid,
+      runeAmount: runeAmount,
+      outputValue: outputValue,
+      feeRate,
+    })
+      .then(toSignData => {
+        nav.navigate('TxConfirmScreen', { toSignData })
+      })
+      .catch(e => {
+        console.log(e)
+        setError(e.message)
+      })
   }
 
   return {
