@@ -1,286 +1,80 @@
-import BigNumber from 'bignumber.js';
-import { useEffect, useMemo, useRef, useState } from 'react';
-
-import {
-  AddressCAT20UtxoSummary,
-  CAT20Balance,
-  CAT20TokenInfo,
-  CAT_VERSION,
-  Inscription,
-  TxType,
-  UserToSignInput
-} from '@/shared/types';
 import { Button, Column, Content, Header, Input, Layout, Loading, Row, Text } from '@/ui/components';
 import { BRC20Ticker } from '@/ui/components/BRC20Ticker';
 import { FeeRateBar } from '@/ui/components/FeeRateBar';
 import { MergeBTCPopover } from '@/ui/components/MergeBTCPopover';
 import { TickUsdWithoutPrice, TokenType } from '@/ui/components/TickUsd';
-import { useNavigate } from '@/ui/pages/MainRoute';
 import { colors } from '@/ui/theme/colors';
-import { isValidAddress, showLongNumber } from '@/ui/utils';
-import { getAddressType } from '@/ui/utils/bitcoin-utils';
+import { showLongNumber } from '@/ui/utils';
 import { bnUtils } from '@unisat/base-utils';
-import {
-  useCurrentAccount,
-  useFeeRateBar,
-  useI18n,
-  useNavigation,
-  useNetworkType,
-  useRunesTx,
-  useTools,
-  useWallet
-} from '@unisat/wallet-state';
-import { AddressType } from '@unisat/wallet-types';
+import { SendCAT20ScreenStep, useSendCAT20ScreenLogic } from '@unisat/wallet-state';
 
 import { SignPsbt } from '../Approval/components';
 
-const MAX_TOKEN_INPUT = 4;
-
-interface LocationState {
-  version: CAT_VERSION;
-  cat20Balance: CAT20Balance;
-  cat20Info: CAT20TokenInfo;
-}
-
 export default function SendCAT20Screen() {
-  const nav = useNavigation();
-  const props = nav.getRouteState<LocationState>();
+  const {
+    // info
+    cat20Info,
+    cat20Balance,
+    availableTokenAmount,
+    toInfo,
+    setToInfo,
+    inputAmount,
+    setInputAmount,
+    error,
+    disabled,
+    step,
+    showMergeBTCUTXOPopover,
+    setShowMergeBTCUTXOPopover,
+    shouldShowMerge,
 
-  const cat20Balance = props.cat20Balance;
+    // actions
+    onClickNext,
+    onClickBack,
 
-  const cat20Info = props.cat20Info;
+    // sign commit psbt actions
+    onSignCommitPsbtHandleConfirm,
+    onSignCommitPsbtHandleCancel,
+    onSignCommitPsbtHandleBack,
+    signCommitPsbtParams,
 
-  const wallet = useWallet();
+    // sign reveal psbt actions
+    onSignRevealPsbtHandleConfirm,
+    onSignRevealPsbtHandleCancel,
+    onSignRevealPsbtHandleBack,
+    signRevealPsbtParams,
 
-  const navigate = useNavigate();
-  const { t } = useI18n();
-  const runesTx = useRunesTx();
-  const [inputAmount, setInputAmount] = useState('');
-  const [disabled, setDisabled] = useState(false);
-  const [toInfo, setToInfo] = useState<{
-    address: string;
-    domain: string;
-    inscription?: Inscription;
-  }>({
-    address: runesTx.toAddress,
-    domain: runesTx.toDomain,
-    inscription: undefined
-  });
+    // merge UTXO action
+    onClickMergeUTXO,
 
-  const [tokenUtxoSummary, setTokenUtxoSummary] = useState<AddressCAT20UtxoSummary>({
-    totalUtxoCount: 0,
-    availableUtxoCount: 0,
-    availableTokenAmounts: []
-  });
-  const [error, setError] = useState('');
+    // tools
+    t
+  } = useSendCAT20ScreenLogic();
 
-  const account = useCurrentAccount();
-
-  const networkType = useNetworkType();
-
-  const [showMergeBTCUTXOPopover, setShowMergeBTCUTXOPopover] = useState(false);
-  const tools = useTools();
-
-  useEffect(() => {
-    tools.showLoading(true);
-    wallet
-      .getAddressCAT20UtxoSummary(props.version, account.address, cat20Balance.tokenId)
-      .then((data) => {
-        setTokenUtxoSummary(data);
-      })
-      .finally(() => {
-        tools.showLoading(false);
-      });
-  }, []);
-
-  const availableTokenAmount = useMemo(() => {
-    let amount = new BigNumber(0);
-    for (let i = 0; i < Math.min(tokenUtxoSummary.availableTokenAmounts.length, MAX_TOKEN_INPUT); i++) {
-      amount = amount.plus(BigNumber(tokenUtxoSummary.availableTokenAmounts[i]));
-    }
-    return amount.toString();
-  }, [tokenUtxoSummary]);
-
-  const shouldShowMerge = availableTokenAmount !== cat20Balance.amount;
-
-  const { feeRate } = useFeeRateBar();
-
-  useEffect(() => {
-    setError('');
-    setDisabled(true);
-
-    if (!isValidAddress(toInfo.address)) {
-      return;
-    }
-
-    const addressType = getAddressType(toInfo.address, networkType);
-    if (addressType !== AddressType.P2TR && addressType !== AddressType.P2WPKH) {
-      setError(t('the_recipient_must_be_p2tr_or_p2wpkh_address_type'));
-      return;
-    }
-
-    if (!inputAmount) {
-      return;
-    }
-
-    if (!feeRate) {
-      return;
-    }
-
-    const amt = bnUtils.fromDecimalAmount(inputAmount, cat20Balance.decimals);
-    if (bnUtils.compareAmount(amt, '0') != 1) {
-      return;
-    }
-
-    if (bnUtils.compareAmount(amt, availableTokenAmount) == 1) {
-      // insufficient balance
-      return;
-    }
-
-    setDisabled(false);
-  }, [toInfo, inputAmount, feeRate]);
-
-  const transferData = useRef<{
-    id: string;
-    commitTx: string;
-    commitToSignInputs: UserToSignInput[];
-    revealTx: string;
-    revealToSignInputs: UserToSignInput[];
-  }>({
-    id: '',
-    commitTx: '',
-    commitToSignInputs: [],
-    revealTx: '',
-    revealToSignInputs: []
-  });
-  const [step, setStep] = useState(0);
-  const onConfirm = async () => {
-    tools.showLoading(true);
-    try {
-      const cat20Amount = bnUtils.fromDecimalAmount(inputAmount, cat20Balance.decimals);
-      const step1 = await wallet.transferCAT20Step1(
-        props.version,
-        toInfo.address,
-        cat20Balance.tokenId,
-        cat20Amount,
-        feeRate
-      );
-      if (step1) {
-        transferData.current.id = step1.id;
-        transferData.current.commitTx = step1.commitTx;
-        transferData.current.commitToSignInputs = step1.toSignInputs;
-        setStep(1);
-      }
-    } catch (e) {
-      const msg = (e as any).message;
-      if (msg.includes('-307')) {
-        setShowMergeBTCUTXOPopover(true);
-        return;
-      }
-      setError((e as any).message);
-    } finally {
-      tools.showLoading(false);
-    }
-  };
-
-  if (step == 1) {
+  if (step == SendCAT20ScreenStep.SIGN_COMMIT) {
     return (
       <SignPsbt
-        header={
-          <Header
-            title={t('step_12')}
-            onBack={() => {
-              setStep(0);
-            }}
-          />
-        }
-        params={{
-          data: {
-            psbtHex: transferData.current.commitTx,
-            type: TxType.SIGN_TX,
-            options: { autoFinalized: false, toSignInputs: transferData.current.commitToSignInputs }
-          }
-        }}
-        handleCancel={() => {
-          setStep(0);
-        }}
-        handleConfirm={async () => {
-          try {
-            tools.showLoading(true);
-            const step2 = await wallet.transferCAT20Step2(
-              props.version,
-              transferData.current.id,
-              transferData.current.commitTx,
-              transferData.current.commitToSignInputs
-            );
-
-            transferData.current.revealTx = step2.revealTx;
-            transferData.current.revealToSignInputs = step2.toSignInputs;
-
-            setStep(1.5);
-            setTimeout(() => {
-              setStep(2);
-            }, 100);
-          } catch (e) {
-            console.log(e);
-          } finally {
-            tools.showLoading(false);
-          }
-        }}
+        header={<Header title={t('step_12')} onBack={onSignCommitPsbtHandleBack} />}
+        params={signCommitPsbtParams}
+        handleCancel={onSignCommitPsbtHandleCancel}
+        handleConfirm={onSignCommitPsbtHandleConfirm}
       />
     );
-  } else if (step == 1.5) {
+  } else if (step == SendCAT20ScreenStep.WAITING) {
     return <Loading />;
-  } else if (step == 2) {
+  } else if (step == SendCAT20ScreenStep.SIGN_REVEAL) {
     return (
       <SignPsbt
-        header={
-          <Header
-            title={t('step_22')}
-            onBack={() => {
-              setStep(0);
-            }}
-          />
-        }
-        params={{
-          data: {
-            psbtHex: transferData.current.revealTx,
-            type: TxType.SIGN_TX,
-            options: { autoFinalized: false, toSignInputs: transferData.current.revealToSignInputs }
-          }
-        }}
-        handleCancel={() => {
-          setStep(0);
-        }}
-        handleConfirm={async () => {
-          tools.showLoading(true);
-          try {
-            const step3 = await wallet.transferCAT20Step3(
-              props.version,
-              transferData.current.id,
-              transferData.current.revealTx,
-              transferData.current.revealToSignInputs
-            );
-            navigate('TxSuccessScreen', { txid: step3.txid });
-          } catch (e) {
-            // tools.toastError((e as any).message);
-            navigate('TxFailScreen', { error: (e as any).message });
-          } finally {
-            tools.showLoading(false);
-          }
-        }}
+        header={<Header title={t('step_22')} onBack={onSignRevealPsbtHandleBack} />}
+        params={signRevealPsbtParams}
+        handleCancel={onSignRevealPsbtHandleCancel}
+        handleConfirm={onSignRevealPsbtHandleConfirm}
       />
     );
   }
 
   return (
     <Layout>
-      <Header
-        onBack={() => {
-          window.history.go(-1);
-        }}
-        title={t('send_cat20')}
-      />
+      <Header onBack={onClickBack} title={t('send_cat20')} />
       <Content>
         <Text text={cat20Info.name} preset="title-bold" textCenter size="xxl" color="gold" />
         <Row itemsCenter fullX justifyCenter>
@@ -358,13 +152,7 @@ export default function SendCAT20Screen() {
                   text={t('merge_utxos_to_increase_the_available_balance')}
                   size="xs"
                   color="gold"
-                  onClick={() => {
-                    navigate('MergeCAT20Screen', {
-                      version: props.version,
-                      cat20Balance: cat20Balance,
-                      cat20Info: cat20Info
-                    });
-                  }}
+                  onClick={onClickMergeUTXO}
                 />
               </Column>
             </Column>
@@ -377,13 +165,7 @@ export default function SendCAT20Screen() {
 
         {error && <Text text={error} color="error" />}
 
-        <Button
-          disabled={disabled}
-          preset="primary"
-          text={t('next')}
-          onClick={(e) => {
-            onConfirm();
-          }}></Button>
+        <Button disabled={disabled} preset="primary" text={t('next')} onClick={onClickNext}></Button>
 
         {showMergeBTCUTXOPopover && (
           <MergeBTCPopover

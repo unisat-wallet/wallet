@@ -19,7 +19,9 @@ const $viewPresets = {
 
   medium: {},
 
-  small: {}
+  small: {},
+
+  xs: {}
 };
 
 const $containerPresets: Record<Presets, CSSProperties> = {
@@ -44,6 +46,15 @@ const $containerPresets: Record<Presets, CSSProperties> = {
     backgroundColor: colors.black,
     width: '100%',
     maxWidth: '120px',
+    borderRadius: 8,
+    overflow: 'hidden',
+    display: 'flex',
+    flexDirection: 'column'
+  },
+  xs: {
+    backgroundColor: colors.black,
+    width: '100%',
+    maxWidth: '80px',
     borderRadius: 8,
     overflow: 'hidden',
     display: 'flex',
@@ -80,19 +91,31 @@ const $iframePresets: Record<Presets, CSSProperties> = {
     objectFit: 'cover',
     display: 'block',
     pointerEvents: 'none'
+  },
+  xs: {
+    width: '100%',
+    maxWidth: '80px',
+    aspectRatio: '1/1',
+    borderTopLeftRadius: 8,
+    borderTopRightRadius: 8,
+    objectFit: 'cover',
+    display: 'block',
+    pointerEvents: 'none'
   }
 };
 
 const $timePresets: Record<Presets, string> = {
   large: 'sm',
   medium: 'sm',
-  small: 'xxs'
+  small: 'xxs',
+  xs: 'xxs'
 };
 
 const $numberPresets: Record<Presets, string> = {
   large: 'md',
   medium: 'sm',
-  small: 'xxs'
+  small: 'xxs',
+  xs: 'xxs'
 };
 
 type Presets = keyof typeof $viewPresets;

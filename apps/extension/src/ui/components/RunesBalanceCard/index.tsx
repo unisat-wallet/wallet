@@ -33,14 +33,16 @@ export default function RunesBalanceCard(props: RunesBalanceCardProps) {
             <TokenBalanceIcon iconInfo={iconInfo} />
           </Column>
 
-          <Column justifyCenter style={{ marginRight: 'auto' }}>
+          <Column justifyCenter style={{ marginRight: 'auto' }} fullX gap="zero">
             <RunesTicker tick={tokenBalance.spacedRune} />
+            <Row itemsCenter justifyBetween>
+              <Text text={tokenBalance.runeid} size="xs" color="white_muted" />
+              <Row itemsCenter fullY gap="zero">
+                <Text text={balanceStr} size="xs" />
+                <Text text={tokenBalance.symbol} size="xs" mx="sm" />
+              </Row>
+            </Row>
           </Column>
-
-          <Row itemsCenter fullY gap="zero">
-            <Text text={balanceStr} size="xs" />
-            <Text text={tokenBalance.symbol} size="xs" mx="sm" />
-          </Row>
         </Row>
         <TokenBalancePrice showPrice={showPrice} price={price} balance={balance.toString()} />
       </Column>

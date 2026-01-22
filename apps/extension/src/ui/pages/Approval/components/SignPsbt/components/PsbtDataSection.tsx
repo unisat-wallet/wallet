@@ -1,23 +1,35 @@
-import { Icon, Row, Text } from '@/ui/components';
-import { copyToClipboard, shortAddress } from '@/ui/utils';
+import { Card, Column, Icon, Row, Text } from '@/ui/components';
+import { shortAddress } from '@/ui/utils';
 
-import Section from './Section';
+import { ToSignData } from '@unisat/wallet-shared';
+import { useI18n, useTools } from '@unisat/wallet-state';
+import { SignPsbtSection } from './Section';
 
-const PsbtDataSection = ({ txInfo, t, tools }) => {
+const PsbtDataSection = ({ toSignData }: { toSignData: ToSignData }) => {
+  const tools = useTools();
+  const { t } = useI18n();
   return (
-    <Section title={t('psbt_data')}>
-      <Text text={shortAddress(txInfo.psbtHex, 10)} />
-      <Row
-        itemsCenter
-        onClick={() => {
-          copyToClipboard(txInfo.psbtHex).then(() => {
-            tools.toastSuccess(t('copied'));
-          });
+    <SignPsbtSection title={t('psbt_data')}>
+      <Card
+        style={{
+          backgroundColor: 'rgba(255, 255, 255, 0.06)'
         }}>
-        <Text text={`${txInfo.psbtHex.length / 2} bytes`} color="textDim" />
-        <Icon icon="copy" color="textDim" />
-      </Row>
-    </Section>
+        <Column>
+          <Row
+            itemsCenter
+            onClick={() => {
+              tools.copyToClipboard(toSignData.psbtHex);
+            }}>
+            <Text text={shortAddress(toSignData.psbtHex, 18)} wrap />
+            <Icon icon="copy" color="textDim" />
+          </Row>
+
+          <Row itemsCenter>
+            <Text text={`${toSignData.psbtHex.length / 2} bytes`} color="textDim" />
+          </Row>
+        </Column>
+      </Card>
+    </SignPsbtSection>
   );
 };
 

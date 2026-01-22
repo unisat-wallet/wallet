@@ -1,70 +1,44 @@
-import { Card, Column, Row, ScrollableList, Text } from '@/ui/components';
-import { AddressText } from '@/ui/components/AddressText';
-import { colors } from '@/ui/theme/colors';
-import { satoshisToAmount } from '@/ui/utils';
+import { Card, Column, Text } from '@/ui/components';
+import { DecodedPsbt, TickPriceItem } from '@unisat/wallet-shared';
+import { useI18n } from '@unisat/wallet-state';
+import { InputItem } from './InputItem';
 
-import AssetList from './AssetList';
-import ContractSection from './ContractSection';
-
-const OutputsList = ({ txInfo, t, currentAccount, btcUnit, canChanged, runesPriceMap, setContractPopoverData }) => {
-  const outputInfos = txInfo.decodedPsbt.outputInfos;
-
-  const renderOutputItem = (v, index) => {
-    const isMyAddress = v.address === currentAccount.address;
-    const inscriptions = v.inscriptions;
-    const runes = v.runes || [];
-    const alkanes = v.alkanes || [];
-
-    // only show inscriptions when the condition is met
-    const filteredInscriptions = !canChanged ? inscriptions : [];
-
-    return (
-      <Column style={index === 0 ? {} : { borderColor: colors.border, borderTopWidth: 1, paddingTop: 10 }}>
-        <Column>
-          <Row justifyBetween>
-            <Column>
-              <AddressText address={v.address} color={isMyAddress ? 'white' : 'textDim'} />
-              {v.contract && <ContractSection contract={v.contract} setContractPopoverData={setContractPopoverData} />}
-            </Column>
-
-            <Row>
-              <Text text={`${satoshisToAmount(v.value)}`} color={isMyAddress ? 'white' : 'textDim'} />
-              <Text text={btcUnit} color="textDim" />
-            </Row>
-          </Row>
-        </Column>
-
-        <AssetList
-          inscriptions={filteredInscriptions}
-          runes={runes}
-          txInfo={txInfo}
-          alkanes={alkanes}
-          t={t}
-          isMyAddress={isMyAddress}
-          runesPriceMap={runesPriceMap}
-          isToSign={false}
-        />
-      </Column>
-    );
-  };
+export function OutputsList({
+  decodedPsbt,
+  runesPriceMap,
+  setContractPopoverData
+}: {
+  decodedPsbt: DecodedPsbt;
+  runesPriceMap: { [key: string]: TickPriceItem } | undefined;
+  setContractPopoverData: (data: any) => void;
+}) {
+  const { t } = useI18n();
+  const outputInfos = decodedPsbt.outputInfos;
 
   return (
     <Column>
-      <Text text={`${t('outputs')}: (${outputInfos.length})`} preset="bold" />
-      <Card>
-        <ScrollableList
-          items={outputInfos}
-          renderItem={renderOutputItem}
-          maxVisibleItems={5}
-          showScrollIndicator={true}
-          showJumpButtons={true}
-          emptyText={t('no_outputs')}
-          itemHeight={70}
-          style={{ width: '100%' }}
-        />
+      <Card
+        mt="sm"
+        style={{
+          backgroundColor: 'rgba(255, 255, 255, 0.06)'
+        }}>
+        <Column full justifyCenter>
+          <Text text={`${t('outputs')}: (${outputInfos.length})`} mb="lg" color="textDim" />
+
+          {decodedPsbt.outputInfos.map((v, index) => {
+            return (
+              <InputItem
+                key={index}
+                outputInfo={v}
+                index={index}
+                decodedPsbt={decodedPsbt}
+                runesPriceMap={runesPriceMap}
+                setContractPopoverData={setContractPopoverData}
+              />
+            );
+          })}
+        </Column>
       </Card>
     </Column>
   );
-};
-
-export default OutputsList;
+}

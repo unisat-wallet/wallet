@@ -161,18 +161,11 @@ export default function MergeCAT20Screen() {
     for (i = order.batchIndex; i < order.batchCount; i++) {
       try {
         const step1Data = await wallet.transferCAT20Step1ByMerge(props.version, order.id);
-        const step2Data = await wallet.transferCAT20Step2(
-          props.version,
-          step1Data.id,
-          step1Data.commitTx,
-          step1Data.toSignInputs
-        );
-        const step3Data = await wallet.transferCAT20Step3(
-          props.version,
-          step1Data.id,
-          step2Data.revealTx,
-          step2Data.toSignInputs
-        );
+        const res = await wallet.signPsbtV2(step1Data.toSignData);
+        const step2Data = await wallet.transferCAT20Step2(props.version, step1Data.id, res.psbtHex!);
+
+        const res2 = await wallet.signPsbtV2(step2Data.toSignData);
+        const step3Data = await wallet.transferCAT20Step3(props.version, step1Data.id, res2.psbtHex!);
 
         mergeItems[i].status = ItemStatus.completed;
         mergeItems[i].txid = step3Data.txid;

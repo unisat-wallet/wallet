@@ -44,8 +44,11 @@ export default function BRC20BalanceCard(props: BRC20BalanceCardProps) {
             <TokenBalanceIcon iconInfo={iconInfo} />
           </Column>
 
-          <Column justifyCenter style={{ marginRight: 'auto' }} gap="zero">
-            <BRC20Ticker tick={ticker} displayName={displayName} />
+          <Column justifyCenter style={{ marginRight: 'auto' }} gap="zero" fullX>
+            <Row justifyBetween itemsCenter fullY gap="zero">
+              <BRC20Ticker tick={ticker} displayName={displayName} />
+              <Text text={totalBalance} size="xs" digital />
+            </Row>
             {(tag || selfMint) && (
               <Row>
                 {tag && <Tag type={tag} />}
@@ -53,10 +56,6 @@ export default function BRC20BalanceCard(props: BRC20BalanceCardProps) {
               </Row>
             )}
           </Column>
-
-          <Row itemsCenter fullY gap="zero">
-            <Text text={totalBalance} size="xs" digital />
-          </Row>
         </Row>
 
         <TokenBalancePrice showPrice={showPrice} price={price} balance={totalBalance} />

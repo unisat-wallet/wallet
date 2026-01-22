@@ -4,17 +4,17 @@ import { Row } from '../Row';
 import { Text } from '../Text';
 
 export interface AssetTagProps {
-  type: 'BRC20' | 'ARC20' | 'Inscription' | 'Unconfirmed' | 'RUNES' | 'Alkanes';
+  type: 'brc-20' | 'ARC20' | 'Inscription' | 'Unconfirmed' | 'Runes' | 'Alkanes';
   small?: boolean;
 }
 
 const colors = {
-  BRC20: '#ABAE0B',
+  'brc-20': 'rgba(244, 182, 44, 0.2)',
   ARC20: '#2B4E8B',
   Inscription: '#62A759',
   Unconfirmed: '#BC9238',
-  RUNES: '#A14419',
-  Alkanes: '#A14419'
+  Runes: '#A14419',
+  Alkanes: 'rgba(62, 126, 224, 0.3)'
 };
 
 export default function AssetTag(props: AssetTagProps) {
@@ -22,7 +22,7 @@ export default function AssetTag(props: AssetTagProps) {
   const { t } = useI18n();
 
   const displayText = () => {
-    if (type === 'RUNES') {
+    if (type === 'Runes') {
       return t('runes');
     } else if (type === 'Unconfirmed') {
       return t('unconfirmed');

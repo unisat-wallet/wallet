@@ -1,6 +1,7 @@
-import { Card, Column, Row, Text } from '@/ui/components';
+import { Column, Row, Text } from '@/ui/components';
+import React from 'react';
 
-export default function Section({
+export function SignPsbtSection({
   title,
   children,
   extra
@@ -10,16 +11,12 @@ export default function Section({
   extra?: React.ReactNode;
 }) {
   return (
-    <Column>
+    <Column gap="sm">
       <Row justifyBetween>
-        <Text text={title} preset="bold" />
+        <Text text={title} size="md" my="sm" />
         {extra}
       </Row>
-      <Card>
-        <Row full justifyBetween itemsCenter>
-          {children}
-        </Row>
-      </Card>
+      {children}
     </Column>
   );
 }

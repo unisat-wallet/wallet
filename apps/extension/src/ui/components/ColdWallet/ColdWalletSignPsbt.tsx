@@ -10,7 +10,7 @@ import TransactionQRDisplay from './TransactionQRDisplay';
 
 interface ColdWalletSignPsbtProps {
   psbtHex: string;
-  onSuccess: (signedPsbtHex: string) => void;
+  onSuccess: (signedPsbtHex: any) => void;
   onCancel: () => void;
   header?: React.ReactNode;
 }

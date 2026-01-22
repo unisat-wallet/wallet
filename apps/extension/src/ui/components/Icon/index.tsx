@@ -127,7 +127,11 @@ export const svgRegistry = {
   swap_swap: '/images/icons/swap_swap.svg',
   swap_wrap: '/images/icons/wrap.svg',
   swap_unwrap: '/images/icons/swap_withdraw.svg',
-  swap_send: '/images/icons/swap_send.svg'
+  swap_send: '/images/icons/swap_send.svg',
+
+  psbt_input: '/images/icons/psbt_input.svg',
+  psbt_output: '/images/icons/psbt_output.svg',
+  psbt_opreturn: '/images/icons/psbt_opreturn.svg'
 };
 
 const iconImgList: Array<IconTypes> = [
@@ -180,7 +184,11 @@ const iconImgList: Array<IconTypes> = [
   'history_receive',
   'history_inscribe',
   'history_wrap',
-  'history_unwrap'
+  'history_unwrap',
+
+  'psbt_input',
+  'psbt_output',
+  'psbt_opreturn'
 ];
 
 export type IconTypes = keyof typeof svgRegistry;

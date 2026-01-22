@@ -18,7 +18,7 @@ interface Props {
   isFinalize?: boolean;
   signatureText?: string;
   id?: number;
-  onSuccess?: (data: { psbtHex?: string; rawtx?: string; signature?: string }) => void;
+  onSuccess?: (data: { psbtHex?: string; rawtx?: string; signature: string }) => void;
   onBack: () => void;
 }
 

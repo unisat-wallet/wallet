@@ -1,15 +1,9 @@
 import { Button, Column, Content, Footer, Header, Icon, Layout, Row, Text } from '@/ui/components';
 import { spacing } from '@/ui/theme/spacing';
-import { useI18n, useNavigation } from '@unisat/wallet-state';
-
-interface LocationState {
-  txid: string;
-}
+import { useTxSuccessScreenLogic } from '@unisat/wallet-state';
 
 export default function TxSuccessScreen() {
-  const nav = useNavigation();
-  const { txid } = nav.getRouteState<LocationState>();
-  const { t } = useI18n();
+  const { onClickExploreTx, onClickDone, t } = useTxSuccessScreenLogic();
 
   return (
     <Layout>
@@ -24,24 +18,14 @@ export default function TxSuccessScreen() {
           <Text preset="title" text={t('tx_sent_title')} textCenter />
           <Text preset="sub" text={t('tx_sent_desc')} color="textDim" textCenter />
 
-          <Row
-            justifyCenter
-            onClick={() => {
-              nav.navToExplorerTx(txid);
-            }}>
+          <Row justifyCenter onClick={onClickExploreTx}>
             <Icon icon="eye" color="textDim" />
             <Text preset="regular-bold" text={t('view_on_block_explorer')} color="textDim" />
           </Row>
         </Column>
       </Content>
       <Footer>
-        <Button
-          full
-          text={t('done')}
-          onClick={() => {
-            nav.navigate('MainScreen');
-          }}
-        />
+        <Button full text={t('done')} onClick={onClickDone} />
       </Footer>
     </Layout>
   );

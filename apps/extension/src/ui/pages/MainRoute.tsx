@@ -55,7 +55,6 @@ import WalletTabScreen from './Main/WalletTabScreen';
 import WelcomeScreen from './Main/WelcomeScreen';
 import OrdinalsInscriptionScreen from './Ordinals/OrdinalsInscriptionScreen';
 import SendOrdinalsInscriptionScreen from './Ordinals/SendOrdinalsInscriptionScreen';
-import SignOrdinalsTransactionScreen from './Ordinals/SignOrdinalsTransactionScreen';
 import SplitOrdinalsInscriptionScreen from './Ordinals/SplitOrdinalsInscriptionScreen';
 import PhishingScreen from './Phishing/PhishingScreen';
 import RunesTokenScreen from './Runes/RunesTokenScreen';
@@ -163,11 +162,6 @@ export const routes = {
   SendOrdinalsInscriptionScreen: {
     path: '/wallet/ordinals-tx/create',
     element: <SendOrdinalsInscriptionScreen />
-  },
-
-  SignOrdinalsTransactionScreen: {
-    path: '/wallet/ordinals-tx/confirm',
-    element: <SignOrdinalsTransactionScreen />
   },
 
   NetworkTypeScreen: {

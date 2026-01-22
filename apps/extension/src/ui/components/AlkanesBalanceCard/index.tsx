@@ -27,24 +27,16 @@ export default function AlkanesBalanceCard(props: AlkanesBalanceCardProps) {
             <TokenBalanceIcon iconInfo={iconInfo} />
           </Column>
 
-          <Column justifyCenter style={{ marginRight: 'auto' }}>
-            <Row itemsCenter justifyCenter>
-              <RunesTicker tick={tokenBalance.name} />
-              <Text
-                text={tokenBalance.alkaneid}
-                size="xs"
-                color="white_muted"
-                onClick={() => {
-                  navigator.clipboard.writeText(tokenBalance.alkaneid);
-                }}
-              />
+          <Column justifyCenter style={{ marginRight: 'auto' }} fullX gap="zero">
+            <RunesTicker tick={tokenBalance.name} />
+            <Row itemsCenter justifyBetween>
+              <Text text={tokenBalance.alkaneid} size="xs" color="white_muted" />
+              <Row itemsCenter fullY gap="zero">
+                <Text text={balanceStr} size="xs" />
+                <Text text={tokenBalance.symbol} size="xs" mx="sm" />
+              </Row>
             </Row>
           </Column>
-
-          <Row itemsCenter fullY gap="zero">
-            <Text text={balanceStr} size="xs" />
-            <Text text={tokenBalance.symbol} size="xs" mx="sm" />
-          </Row>
         </Row>
         <TokenBalancePrice showPrice={showPrice} price={price} balance={balance.toString()} />
       </Column>

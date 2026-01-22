@@ -3,7 +3,7 @@
 const palette = {
   white: '#ffffff',
   white_muted: 'rgba(255, 255, 255, 0.5)',
-  white_muted2: 'rgba(255, 255, 255, 0.2)',
+  white_muted2: 'rgba(255, 255, 255, 0.8)',
   white_muted3: 'rgba(255, 255, 255, 0.8)',
   black: '#000000',
   black_muted: 'rgba(0, 0, 0, 0.5)',
