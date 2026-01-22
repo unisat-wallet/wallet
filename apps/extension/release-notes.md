@@ -1,5 +1,21 @@
 # UniSat Wallet Release Notes
 
+## v1.7.8
+
+### New Features
+
+- Added balance refresh button on the home screen
+
+### Improvements
+
+- Optimized transaction signing interface flow for better user experience
+- Improved PSBT signing workflow with clearer steps
+- Address display now shows first 8 and last 8 characters for better readability
+
+### Bug Fixes
+
+- Fixed Keystone wallet signing issues in certain scenarios
+
 ## 1.7.6
 
 New Features
