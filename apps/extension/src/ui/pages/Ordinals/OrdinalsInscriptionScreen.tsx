@@ -188,8 +188,6 @@ function Details({ inscription, isLoading }: { inscription: Inscription; isLoadi
       <Line />
       <Section title={t('inscription_preview')} value={inscription.preview} link={inscription.preview} />
       <Line />
-      <Section title={t('inscription_content')} value={inscription.content} link={inscription.content} />
-      <Line />
       <Section title={t('inscription_content_length')} value={inscription.contentLength} />
       <Line />
       <Section title={t('inscription_content_type')} value={inscription.contentType} />
