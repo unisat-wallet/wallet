@@ -153,9 +153,7 @@ export function useBRC20SingleStepScreenLogic() {
 
       transferData.current.revealToSignData = step2.toSignData
 
-      setTimeout(() => {
-        setStep(BRC20SingleStepKey.STEP3)
-      }, 100)
+      setStep(BRC20SingleStepKey.STEP3)
     } catch (e) {
       console.log(e)
     } finally {
