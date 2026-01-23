@@ -979,12 +979,6 @@ export class WalletController extends BaseController {
     }
   }
 
-  signData = async (data: string, type = 'ecdsa') => {
-    const account = preferenceService.getCurrentAccount()
-    if (!account) throw new Error('no current account')
-    return keyringService.signData(account.pubkey, data, type)
-  }
-
   addContact = (data: ContactBookItem) => {
     contactBookService.addContact(data)
   }

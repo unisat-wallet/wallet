@@ -117,14 +117,6 @@ describe('ReadonlyKeyring', () => {
     })
   })
 
-  describe('#signData', function () {
-    it('throws Method not implemented error', async function () {
-      await expect(async () => {
-        await keyring.signData(testPubkeys[0], 'data', 'ecdsa')
-      }).rejects.toThrow('Method not implemented.')
-    })
-  })
-
   describe('#exportAccount', function () {
     it('throws Method not implemented error', async function () {
       await expect(async () => {
@@ -135,9 +127,7 @@ describe('ReadonlyKeyring', () => {
 
   describe('#removeAccount', function () {
     it('throws Method not implemented error', function () {
-      expect(() => keyring.removeAccount(testPubkeys[0])).throw(
-        'Method not implemented.'
-      )
+      expect(() => keyring.removeAccount(testPubkeys[0])).throw('Method not implemented.')
     })
   })
 })

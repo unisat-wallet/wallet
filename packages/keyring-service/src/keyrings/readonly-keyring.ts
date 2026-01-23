@@ -24,9 +24,7 @@ export class ReadonlyKeyring implements Keyring {
   verifyMessage(address: string, message: string, sig: string): Promise<boolean> {
     throw new Error('Method not implemented.')
   }
-  signData(address: string, data: string, type: string): Promise<string> {
-    throw new Error('Method not implemented.')
-  }
+
   exportAccount(address: string): Promise<string> {
     throw new Error('Method not implemented.')
   }

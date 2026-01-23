@@ -212,9 +212,4 @@ export class LocalWallet implements AbstractWallet {
       return await this.keyring.signMessage(pubkey, text)
     }
   }
-
-  async signData(data: string, type: 'ecdsa' | 'schnorr' = 'ecdsa') {
-    const pubkey = await this.getPublicKey()
-    return await this.keyring.signData(pubkey, data, type)
-  }
 }

@@ -1,4 +1,4 @@
-import { KeyringType, ToSignInput, Keyring } from '../types'
+import { Keyring, KeyringType, ToSignInput } from '../types'
 // Empty keyring implementation for placeholder
 export class EmptyKeyring implements Keyring {
   type = KeyringType.Empty
@@ -24,10 +24,6 @@ export class EmptyKeyring implements Keyring {
   }
 
   verifyMessage(address: string, message: string, sig: string): Promise<boolean> {
-    throw new Error('Method not implemented in empty keyring.')
-  }
-
-  signData(address: string, data: string, type: string): Promise<string> {
     throw new Error('Method not implemented in empty keyring.')
   }
 

@@ -22,7 +22,6 @@ export interface Keyring {
   getAccounts(): Promise<string[]>
   signTransaction(psbt: any, inputs: ToSignInput[]): Promise<any>
   signMessage(address: string, message: string): Promise<string>
-  signData(address: string, data: string, type: string): Promise<string>
   verifyMessage(address: string, message: string, sig: string): Promise<boolean>
   exportAccount(address: string): Promise<string>
   removeAccount(address: string): void

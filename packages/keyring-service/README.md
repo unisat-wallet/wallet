@@ -22,27 +22,23 @@ yarn add @unisat/keyring-service
 ## Basic Usage
 
 ```typescript
-import { 
-  KeyringService, 
-  MemoryStorageAdapter, 
-  AddressType 
-} from '@unisat/keyring-service';
+import { KeyringService, MemoryStorageAdapter, AddressType } from '@unisat/keyring-service'
 
 // Create service with memory storage
 const keyringService = new KeyringService({
   storage: new MemoryStorageAdapter(),
-  logger: console
-});
+  logger: console,
+})
 
 // Initialize the service
-await keyringService.init();
+await keyringService.init()
 
 // Boot with password
-await keyringService.boot('your-secure-password');
+await keyringService.boot('your-secure-password')
 
 // Generate mnemonic
-const mnemonic = keyringService.generateMnemonic();
-console.log('Generated mnemonic:', mnemonic);
+const mnemonic = keyringService.generateMnemonic()
+console.log('Generated mnemonic:', mnemonic)
 
 // Create HD wallet (requires wallet-sdk integration)
 // const keyring = await keyringService.createKeyringWithMnemonic(
@@ -59,21 +55,18 @@ console.log('Generated mnemonic:', mnemonic);
 For Chrome extension integration:
 
 ```typescript
-import { 
-  KeyringService, 
-  ExtensionPersistStoreAdapter 
-} from '@unisat/keyring-service';
+import { KeyringService, ExtensionPersistStoreAdapter } from '@unisat/keyring-service'
 
 // Extension storage adapter
 const storage = new ExtensionPersistStoreAdapter(
   createPersistStore, // Your extension's createPersistStore function
   'keyring'
-);
+)
 
 const keyringService = new KeyringService({
   storage,
-  logger: console
-});
+  logger: console,
+})
 ```
 
 ## Storage Adapters
@@ -83,9 +76,9 @@ const keyringService = new KeyringService({
 For testing and development:
 
 ```typescript
-import { MemoryStorageAdapter } from '@unisat/keyring-service/adapters/memory';
+import { MemoryStorageAdapter } from '@unisat/keyring-service/adapters/memory'
 
-const storage = new MemoryStorageAdapter();
+const storage = new MemoryStorageAdapter()
 ```
 
 ### Extension Storage
@@ -93,9 +86,9 @@ const storage = new MemoryStorageAdapter();
 For Chrome extensions:
 
 ```typescript
-import { ExtensionPersistStoreAdapter } from '@unisat/keyring-service/adapters/extensionPersist';
+import { ExtensionPersistStoreAdapter } from '@unisat/keyring-service/adapters/extensionPersist'
 
-const storage = new ExtensionPersistStoreAdapter(createPersistStore, 'keyring');
+const storage = new ExtensionPersistStoreAdapter(createPersistStore, 'keyring')
 ```
 
 ## API Reference
@@ -139,7 +132,6 @@ Main service class for managing keyrings.
 - `signTransaction(keyring: Keyring, psbt: any, inputs: ToSignInput[]): Promise<any>` - Sign transaction
 - `signMessage(address: string, keyringType: string, message: string): Promise<string>` - Sign message
 - `verifyMessage(address: string, message: string, signature: string): Promise<boolean>` - Verify message
-- `signData(address: string, data: string, type: string): Promise<string>` - Sign arbitrary data
 
 ### Types
 
@@ -151,8 +143,8 @@ import {
   Keyring,
   StorageAdapter,
   KeyringServiceConfig,
-  MemStoreState
-} from '@unisat/keyring-service/types';
+  MemStoreState,
+} from '@unisat/keyring-service/types'
 ```
 
 ## Supported Keyring Types
@@ -166,7 +158,7 @@ import {
 ## Supported Networks
 
 - Bitcoin Mainnet
-- Bitcoin Testnet  
+- Bitcoin Testnet
 - Bitcoin Signet
 - Fractal Bitcoin Mainnet
 - Fractal Bitcoin Testnet
@@ -206,9 +198,9 @@ This package is designed to work with `@unisat/wallet-sdk` for complete keyring 
 
 ```typescript
 // Example with wallet SDK integration
-import { keyring } from '@unisat/wallet-sdk';
+import { keyring } from '@unisat/wallet-sdk'
 
-const { SimpleKeyring, HdKeyring, KeystoneKeyring } = keyring;
+const { SimpleKeyring, HdKeyring, KeystoneKeyring } = keyring
 
 // Register keyring types with the service
 // (Implementation details depend on final SDK integration)

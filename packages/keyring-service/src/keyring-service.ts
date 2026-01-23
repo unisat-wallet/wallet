@@ -788,18 +788,6 @@ export class KeyringService extends EventEmitter {
     return result
   }
 
-  /**
-   * Sign Data
-   *
-   * Sign any content, but note that the content signed by this method is unreadable, so use it with caution.
-   *
-   */
-  signData = async (address: string, data: string, type: string) => {
-    const keyring = await this.getKeyringForAccount(address)
-    const result = await keyring.signData(address, data, type)
-    return result
-  }
-
   //
   // PRIVATE METHODS
   //

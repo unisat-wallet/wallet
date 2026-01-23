@@ -98,10 +98,6 @@ export class ColdWalletKeyring implements Keyring {
     throw new Error('Cold wallet cannot sign messages. Please use mobile device to sign.')
   }
 
-  signData(_address: string, _data: string, _type: string): Promise<string> {
-    throw new Error('Cold wallet cannot sign data. Please use mobile device to sign.')
-  }
-
   verifyMessage(_address: string, _message: string, _sig: string): Promise<boolean> {
     throw new Error('Cold wallet cannot verify messages.')
   }

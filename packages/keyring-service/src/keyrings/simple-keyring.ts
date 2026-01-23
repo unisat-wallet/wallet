@@ -1,14 +1,14 @@
-import { isTaprootInput } from 'bitcoinjs-lib/src/psbt/bip371.js'
-import { decode } from 'bs58check'
-import { EventEmitter } from 'events'
 import {
   ECPairInterface,
   bitcoin,
-  signMessageOfDeterministicECDSA,
-  verifyMessageOfECDSA,
-  tweakSigner,
   eccManager,
+  signMessageOfDeterministicECDSA,
+  tweakSigner,
+  verifyMessageOfECDSA,
 } from '@unisat/wallet-bitcoin'
+import { isTaprootInput } from 'bitcoinjs-lib/src/psbt/bip371.js'
+import { decode } from 'bs58check'
+import { EventEmitter } from 'events'
 import { ToSignInput } from '../types'
 
 const type = 'Simple Key Pair'
@@ -104,18 +104,6 @@ export class SimpleKeyring extends EventEmitter {
 
   async verifyMessage(publicKey: string, text: string, sig: string) {
     return verifyMessageOfECDSA(publicKey, text, sig)
-  }
-
-  // Sign any content, but note that the content signed by this method is unreadable, so use it with caution.
-  async signData(publicKey: string, data: string, type: 'ecdsa' | 'schnorr' = 'ecdsa') {
-    const keyPair = this._getPrivateKeyFor(publicKey)
-    if (type === 'ecdsa') {
-      return keyPair.sign(Buffer.from(data, 'hex')).toString('hex')
-    } else if (type === 'schnorr') {
-      return keyPair.signSchnorr(Buffer.from(data, 'hex')).toString('hex')
-    } else {
-      throw new Error('Not support type')
-    }
   }
 
   private _getPrivateKeyFor(publicKey: string) {
