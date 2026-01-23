@@ -27,7 +27,7 @@
     "build:cjs": "tsup --format cjs",
     "build:esm": "tsup --format esm",
     "build:typed": "tsc --declaration --declarationMap --emitDeclarationOnly --outDir lib",
-    "test": "vitest",
+    "test": "vitest run",
     "lint": "eslint src"
   },
   "dependencies": {
@@ -52,9 +52,11 @@
   },
   "devDependencies": {
     "@reduxjs/toolkit": "^1.9.2",
+    "@testing-library/react": "^13.2.0",
     "@types/node": "^20.0.0",
     "@types/react": "^18.0.0",
     "eslint": "^8.0.0",
+    "jsdom": "^27.4.0",
     "tsup": "^7.0.0",
     "typescript": "^5.0.0",
     "vitest": "^0.34.0"
