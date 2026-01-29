@@ -61,7 +61,8 @@ export function MyItem({ account, autoNav }: MyItemProps, ref) {
         backgroundColor: selected ? 'rgba(244,182,44,0.1)' : colors.black_dark,
         marginLeft: 10,
         marginRight: 10
-      }}>
+      }}
+      data-testid={`account-item-${account.address}`}>
       <Row>
         <Column style={{ width: 20 }} selfItemsCenter>
           {selected ? <Icon icon="circle-check" color="gold" /> : <Icon icon="circle-check" color="white_muted2" />}
@@ -199,7 +200,8 @@ export default function SwitchAccountScreen() {
             <Icon
               onClick={() => {
                 nav.navigate('CreateAccountScreen', {});
-              }}>
+              }}
+              data-testid="add-account-button">
               <PlusCircleOutlined />
             </Icon>
           )

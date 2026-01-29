@@ -192,7 +192,8 @@ export default function WalletTabScreen() {
             style={{ height: 28 }}
             onClick={() => {
               navigate('SwitchKeyringScreen');
-            }}>
+            }}
+            data-testid="wallet-management-entry">
             <Text
               text={
                 currentKeyring.type === KeyringType.ColdWalletKeyring

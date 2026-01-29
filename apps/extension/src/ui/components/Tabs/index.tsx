@@ -43,7 +43,8 @@ export function Tabs({ preset, items, defaultActiveKey, activeKey, onTabClick }:
                 key={item.key}
                 style={{ borderWidth: 1, borderRadius: 20, backgroundColor: '#322D1F' }}
                 color={isActiveItem ? 'gold' : 'white_muted'}
-                onClick={() => onTabClick(item.key)}>
+                onClick={() => onTabClick(item.key)}
+                data-testid={`tab-item-${item.key}`}>
                 <Text text={item.label} size="xs" color={isActiveItem ? 'gold' : 'white_muted'} mx="md" my="sm" />
               </Column>
             );
@@ -57,7 +58,7 @@ export function Tabs({ preset, items, defaultActiveKey, activeKey, onTabClick }:
             {items.map((item) => {
               const isActiveItem = item.key === activeTab;
               return (
-                <Row key={item.key} onClick={() => onTabClick(item.key)} mx="md">
+                <Row key={item.key} onClick={() => onTabClick(item.key)} mx="md" data-testid={`tab-item-${item.key}`}>
                   <Column gap="zero" justifyCenter itemsCenter>
                     <Text text={item.label} color={isActiveItem ? 'gold' : 'textDim'} size="md" />
                     <Row

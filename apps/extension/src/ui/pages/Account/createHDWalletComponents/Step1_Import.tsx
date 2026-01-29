@@ -70,6 +70,7 @@ export function Step1_Import(params: {
                     autoFocus={index == curInputIndex}
                     preset={'password'}
                     placeholder=""
+                    data-testid={`mnemonic-import-word-${index}`}
                   />
                 </Card>
               </Row>
@@ -86,6 +87,7 @@ export function Step1_Import(params: {
           onClick={() => {
             onClickNext();
           }}
+          data-testid="mnemonic-import-continue-button"
         />
       </FooterButtonContainer>
     </Column>

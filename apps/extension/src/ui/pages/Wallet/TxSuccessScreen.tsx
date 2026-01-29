@@ -25,7 +25,7 @@ export default function TxSuccessScreen() {
         </Column>
       </Content>
       <Footer>
-        <Button full text={t('done')} onClick={onClickDone} />
+        <Button full text={t('done')} onClick={onClickDone} data-testid="tx-success-done-button" />
       </Footer>
     </Layout>
   );

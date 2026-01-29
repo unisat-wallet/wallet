@@ -274,7 +274,7 @@ export function Step2({
     <Column>
       {contextData.isRestore && scanned == false ? (
         <Row justifyBetween>
-          <Text text={t('address_type')} preset="bold" />
+          <Text text={t('address_type')} preset="bold" data-testid="address-type-title" />
           <Text
             text={t('scan_in_more_addresses')}
             preset="link"
@@ -284,7 +284,7 @@ export function Step2({
           />
         </Row>
       ) : (
-        <Text text={t('address_type')} preset="bold" />
+        <Text text={t('address_type')} preset="bold" data-testid="address-type-title" />
       )}
 
       {scannedGroups.length > 0 &&
@@ -310,6 +310,7 @@ export function Step2({
                   addressType: options.addressType
                 });
               }}
+              data-testid={`address-type-card-${index}`}
             />
           );
         })}
@@ -345,6 +346,7 @@ export function Step2({
                   addressType: item.addressType
                 });
               }}
+              data-testid={`address-type-card-${index}`}
             />
           );
         })}
@@ -358,6 +360,7 @@ export function Step2({
           onChange={(e) => {
             submitCustomHdPath(e.target.value);
           }}
+          data-testid="custom-hdpath-input"
         />
       </Column>
       {pathError && <Text text={pathError} color="error" />}
@@ -373,10 +376,11 @@ export function Step2({
             passphrase: e.target.value
           });
         }}
+        data-testid="passphrase-input"
       />
 
       <FooterButtonContainer>
-        <Button text={t('continue')} preset="primary" onClick={onNext} disabled={disabled} />
+        <Button text={t('continue')} preset="primary" onClick={onNext} disabled={disabled} data-testid="address-type-continue-button" />
       </FooterButtonContainer>
 
       {loading && (

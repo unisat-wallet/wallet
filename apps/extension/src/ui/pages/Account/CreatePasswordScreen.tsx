@@ -26,10 +26,10 @@ export default function CreatePasswordScreen() {
       <Content preset="middle">
         <Column fullX fullY>
           <Column gap="xl" style={{ marginTop: 200 }}>
-            <Text text={t('create_a_password')} preset="title-bold" textCenter />
+            <Text text={t('create_a_password')} preset="title-bold" textCenter data-testid="create-password-title" />
             <Text text={t('you_will_use_this_to_unlock_your_wallet')} preset="sub" textCenter />
             <Column>
-              <Input preset="password" onChange={onPasswordChange} autoFocus={true} />
+              <Input preset="password" onChange={onPasswordChange} autoFocus={true} data-testid="create-password-input" />
               {strongTextRenderData && (
                 <Column>
                   <Row>
@@ -47,6 +47,7 @@ export default function CreatePasswordScreen() {
                 placeholder={t('confirm_password')}
                 onChange={onConfirmPasswordChange}
                 onKeyUp={(e) => handleOnKeyUp(e as any)}
+                data-testid="create-password-confirm-input"
               />
               {matchTextRenderData && (
                 <Row>
@@ -55,7 +56,7 @@ export default function CreatePasswordScreen() {
               )}
             </Column>
 
-            <Button disabled={disabled} text={t('continue')} preset="primary" onClick={onClickConfirm} />
+            <Button disabled={disabled} text={t('continue')} preset="primary" onClick={onClickConfirm} data-testid="create-password-continue-button" />
           </Column>
         </Column>
       </Content>

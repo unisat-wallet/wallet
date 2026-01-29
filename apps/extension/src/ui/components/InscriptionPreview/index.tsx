@@ -127,9 +127,17 @@ export interface InscriptionProps {
   asLogo?: boolean;
   hideValue?: boolean;
   style?: CSSProperties;
+  'data-testid'?: string;
 }
 
-export default function InscriptionPreview({ data, onClick, preset, asLogo, hideValue }: InscriptionProps) {
+export default function InscriptionPreview({
+  data,
+  onClick,
+  preset,
+  asLogo,
+  hideValue,
+  'data-testid': dataTestId
+}: InscriptionProps) {
   const [isVisible, setIsVisible] = useState(false);
   /** iframe loaded */
   const [isLoaded, setIsLoaded] = useState(false);
@@ -180,7 +188,10 @@ export default function InscriptionPreview({ data, onClick, preset, asLogo, hide
   const valueText = `${data.outputValue} sats`;
 
   return (
-    <div ref={previewRef} style={{ pointerEvents: 'auto', width: '100%', cursor: onClick ? 'pointer' : 'default' }}>
+    <div
+      ref={previewRef}
+      style={{ pointerEvents: 'auto', width: '100%', cursor: onClick ? 'pointer' : 'default' }}
+      data-testid={dataTestId}>
       <Column
         gap="zero"
         onClick={onClick}

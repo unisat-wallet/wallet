@@ -100,6 +100,7 @@ export const WalletActions = ({ chain, address }: WalletActionsProps) => {
             onClick={(e) => {
               nav.navigate('ReceiveScreen');
             }}
+            data-testid="receive-button"
           />
 
           <Button
@@ -110,6 +111,7 @@ export const WalletActions = ({ chain, address }: WalletActionsProps) => {
               resetUiTxCreateScreen();
               nav.navigate('TxCreateScreen');
             }}
+            data-testid="send-button"
           />
           <Button
             text={t('history')}
@@ -122,6 +124,7 @@ export const WalletActions = ({ chain, address }: WalletActionsProps) => {
                 window.open(addressExplorerUrl);
               }
             }}
+            data-testid="history-button"
           />
           <Button
             text={t('buy')}
@@ -131,15 +134,28 @@ export const WalletActions = ({ chain, address }: WalletActionsProps) => {
               setBuyBtcModalVisible(true);
             }}
             disabled={chainType !== ChainType.BITCOIN_MAINNET && chainType !== ChainType.FRACTAL_BITCOIN_MAINNET}
+            data-testid="buy-button"
           />
         </Row>
       ) : (
         <>
           <Row justifyCenter mt="md">
-            <Button text={t('receive')} preset="home" icon="receive" onClick={onReceiveClick} />
+            <Button
+              text={t('receive')}
+              preset="home"
+              icon="receive"
+              onClick={onReceiveClick}
+              data-testid="receive-button"
+            />
 
-            <Button text={t('send')} preset="home" icon="send" onClick={onSendClick} />
-            <Button text={t('history')} preset="home" icon="history" onClick={onHistoryClick} />
+            <Button text={t('send')} preset="home" icon="send" onClick={onSendClick} data-testid="send-button" />
+            <Button
+              text={t('history')}
+              preset="home"
+              icon="history"
+              onClick={onHistoryClick}
+              data-testid="history-button"
+            />
             {/* Custom div used to avoid Button component's style merging issues with toggle states */}
             <div
               style={{
@@ -194,6 +210,7 @@ export const WalletActions = ({ chain, address }: WalletActionsProps) => {
                   icon={isFractal ? 'fb' : 'bitcoin'}
                   onClick={() => setBuyBtcModalVisible(true)}
                   disabled={chainType !== ChainType.BITCOIN_MAINNET && chainType !== ChainType.FRACTAL_BITCOIN_MAINNET}
+                  data-testid="buy-button"
                 />
               </div>
             </Row>

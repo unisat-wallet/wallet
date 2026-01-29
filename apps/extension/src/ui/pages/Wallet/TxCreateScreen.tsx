@@ -56,6 +56,7 @@ export default function TxCreateScreen() {
             onAddressInputChange={onAddressInputChange}
             autoFocus={true}
             networkType={chain.enum}
+            data-testid="recipient-address-input"
           />
         </Column>
 
@@ -71,6 +72,7 @@ export default function TxCreateScreen() {
             onAmountInputChange={onAmountInputChange}
             enableMax={true}
             onMaxClick={onAmountMaxClick}
+            data-testid="transfer-amount-input"
           />
 
           <Card
@@ -162,7 +164,7 @@ export default function TxCreateScreen() {
 
         {error && <Text text={error} color="error" />}
 
-        <Button disabled={disabled} preset="primary" text={t('next')} onClick={onClickNext}></Button>
+        <Button disabled={disabled} preset="primary" text={t('next')} onClick={onClickNext} data-testid="tx-next-button"></Button>
       </Content>
     </Layout>
   );

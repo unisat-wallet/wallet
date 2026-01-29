@@ -21,16 +21,17 @@ interface AddressTypeCardProps {
   checked: boolean;
   assets: AddressAssets;
   onClick?: ReactEventHandler<HTMLDivElement>;
+  'data-testid'?: string;
 }
 export function AddressTypeCard(props: AddressTypeCardProps) {
   const btcUnit = useBTCUnit();
-  const { onClick, label, address, checked, assets } = props;
+  const { onClick, label, address, checked, assets, 'data-testid': dataTestId } = props;
   const hasVault = Boolean(assets.satoshis && assets.satoshis > 0);
   const { t } = useI18n();
 
   const chain = useChain();
   return (
-    <Card px="zero" py="zero" gap="zero" rounded onClick={onClick}>
+    <Card px="zero" py="zero" gap="zero" rounded onClick={onClick} data-testid={dataTestId}>
       <Column full>
         <Row justifyBetween px="md" pt="md">
           <Column justifyCenter>
@@ -68,13 +69,14 @@ interface AddressTypeCardProp2 {
   }[];
   checked: boolean;
   onClick?: ReactEventHandler<HTMLDivElement>;
+  'data-testid'?: string;
 }
 
 export function AddressTypeCard2(props: AddressTypeCardProp2) {
   const btcUnit = useBTCUnit();
-  const { onClick, label, items, checked } = props;
+  const { onClick, label, items, checked, 'data-testid': dataTestId } = props;
   return (
-    <Card px="zero" py="zero" gap={'zero'} rounded onClick={onClick}>
+    <Card px="zero" py="zero" gap={'zero'} rounded onClick={onClick} data-testid={dataTestId}>
       <Column full>
         <Row justifyBetween px="md" pt="md">
           <Column justifyCenter>

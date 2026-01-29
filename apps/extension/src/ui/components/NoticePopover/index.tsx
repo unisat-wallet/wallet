@@ -31,9 +31,9 @@ export const NoticePopover = ({ onClose }: { onClose: () => void }) => {
   }, [coolDown]);
 
   return (
-    <Popover>
+    <Popover data-testid="notice-popover">
       <Column justifyCenter itemsCenter>
-        <Text text={t('compatibility_tips')} preset="title-bold" />
+        <Text text={t('compatibility_tips')} preset="title-bold" data-testid="notice-title" />
         <Icon icon={'info'} color={'icon_yellow'} size={57} />
 
         <Column gap="zero">
@@ -41,6 +41,7 @@ export const NoticePopover = ({ onClose }: { onClose: () => void }) => {
           <div style={{ marginTop: 8 }}>
             <Checkbox
               checked={checked1}
+              data-testid="notice-checkbox-1"
               onChange={(e) => {
                 setChecked1(e.target.checked);
               }}>
@@ -59,6 +60,7 @@ export const NoticePopover = ({ onClose }: { onClose: () => void }) => {
             preset="primary"
             disabled={!checked1}
             full
+            data-testid="notice-ok-button"
             onClick={(e) => {
               if (!enable) return;
               if (onClose) {

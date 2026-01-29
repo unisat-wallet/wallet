@@ -7,7 +7,11 @@ export function ChangePasswordCard() {
   const { t } = useI18n();
 
   return (
-    <Card style={{ borderRadius: 10, cursor: 'pointer' }} onClick={() => nav.navigate('ChangePasswordScreen')}>
+    <Card
+      style={{ borderRadius: 10, cursor: 'pointer' }}
+      onClick={() => nav.navigate('ChangePasswordScreen')}
+      data-testid="change-password-card"
+    >
       <Row full justifyBetween>
         <Text text={t('change_password')} preset="bold" size="sm" />
         <Icon icon="right" size={fontSizes.lg} color="textDim" />

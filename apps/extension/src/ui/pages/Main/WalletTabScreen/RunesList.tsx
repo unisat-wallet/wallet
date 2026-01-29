@@ -10,9 +10,14 @@ export function RunesList() {
       data={items}
       total={total}
       keyExtractor={(item) => item.runeid}
-      renderItem={({ item }) => {
+      renderItem={({ item, index }) => {
         return (
-          <RunesBalanceCard tokenBalance={item} price={priceMap[item.spacedRune]} onClick={() => onClickItem(item)} />
+          <RunesBalanceCard
+            tokenBalance={item}
+            price={priceMap[item.spacedRune]}
+            onClick={() => onClickItem(item)}
+            data-testid={`rune-item-${index}`}
+          />
         );
       }}
       onLoadMore={onLoadMore}

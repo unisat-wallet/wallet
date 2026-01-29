@@ -75,7 +75,8 @@ export function FeeRateBar({ readonly }: { readonly?: boolean }) {
                   cursor: 'pointer'
                 } as CSSProperties,
                 selected ? { backgroundColor: colors.primary } : {}
-              )}>
+              )}
+              data-testid={`fee-rate-option-${index}`}>
               <Text
                 text={v.title}
                 textCenter

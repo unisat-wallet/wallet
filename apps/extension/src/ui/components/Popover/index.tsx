@@ -4,15 +4,13 @@ import { CloseOutlined } from '@ant-design/icons';
 
 import { Row } from '../Row';
 
-export const Popover = ({
-  children,
-  onClose,
-  contentStyle = {}
-}: {
+export const Popover = (props: {
   children: React.ReactNode;
   onClose?: () => void;
   contentStyle?: React.CSSProperties;
+  'data-testid'?: string;
 }) => {
+  const { children, onClose, contentStyle, 'data-testid': dataTestId, ...rest } = props;
   return (
     <div
       className="popover-container"
@@ -27,7 +25,8 @@ export const Popover = ({
           borderRadius: 15,
           position: 'relative',
           ...contentStyle
-        }}>
+        }}
+        data-testid={dataTestId}>
         {onClose && (
           <Row
             style={{ position: 'absolute', top: 20, right: 20 }}

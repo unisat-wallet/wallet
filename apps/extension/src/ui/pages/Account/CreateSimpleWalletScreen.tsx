@@ -70,9 +70,10 @@ function Step1({
         }}
         onChange={onChange}
         autoFocus={true}
+        data-testid="private-key-input"
       />
       <FooterButtonContainer>
-        <Button disabled={disabled} text={t('continue')} preset="primary" onClick={btnClick} />
+        <Button disabled={disabled} text={t('continue')} preset="primary" onClick={btnClick} data-testid="private-key-continue-button" />
       </FooterButtonContainer>
     </Column>
   );
@@ -194,12 +195,13 @@ function Step2({
             onClick={() => {
               updateContextData({ addressType: item.addressType });
             }}
+            data-testid={`address-type-card-${index}`}
           />
         );
       })}
 
       <FooterButtonContainer>
-        <Button text={t('continue')} preset="primary" onClick={onNext} />
+        <Button text={t('continue')} preset="primary" onClick={onNext} data-testid="private-key-address-type-continue-button" />
       </FooterButtonContainer>
     </Column>
   );

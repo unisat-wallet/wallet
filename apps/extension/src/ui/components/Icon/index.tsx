@@ -223,6 +223,7 @@ interface IconProps {
    */
   onClick?: React.MouseEventHandler<HTMLDivElement>;
   children?: React.ReactNode;
+  'data-testid'?: string;
 }
 
 export function Icon(props: IconProps) {
@@ -233,7 +234,8 @@ export function Icon(props: IconProps) {
     style: $imageStyleOverride,
     containerStyle: $containerStyleOverride,
     onClick,
-    children
+    children,
+    'data-testid': dataTestId
   } = props;
   if (!icon) {
     return (
@@ -249,7 +251,8 @@ export function Icon(props: IconProps) {
           $containerStyleOverride,
           $imageStyleOverride || {},
           onClick ? { cursor: 'pointer' } : {}
-        )}>
+        )}
+        data-testid={dataTestId}>
         {children}
       </div>
     );
@@ -291,6 +294,7 @@ export function Icon(props: IconProps) {
             $imageStyleOverride || {},
             onClick ? { cursor: 'pointer' } : {}
           )}
+          data-testid={dataTestId}
         />
       </div>
     );

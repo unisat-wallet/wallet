@@ -19,6 +19,7 @@ export function InscriptionList() {
             data={item}
             preset="medium"
             onClick={() => onClickItem(item)}
+            data-testid={`inscription-item-${index}`}
           />
         );
       }}

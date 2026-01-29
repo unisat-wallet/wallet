@@ -165,6 +165,7 @@ export default function RunesTokenScreen() {
               disabled={!enableTransfer}
               onClick={onClickSend}
               full
+              data-testid="rune-send-button"
             />
 
             {enableTrade ? (

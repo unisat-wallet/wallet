@@ -27,6 +27,7 @@ export function SwitchNetworkBar() {
       }}>
       <Row
         itemsCenter
+        data-testid="switch-network-bar"
         onClick={() => {
           setSwitchChainModalVisible(true);
         }}>

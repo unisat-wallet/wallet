@@ -116,7 +116,7 @@ export default function OrdinalsInscriptionScreen() {
           {withSend && (
             <Row fullX>
               {isNeedToSplit && <Button text={t('split')} icon="split" preset="default" full onClick={onClickSplit} />}
-              {<Button text={t('send')} icon="send" preset="default" full onClick={onClickSend} />}
+              {<Button text={t('send')} icon="send" preset="default" full onClick={onClickSend} data-testid="inscription-send-button" />}
             </Row>
           )}
 

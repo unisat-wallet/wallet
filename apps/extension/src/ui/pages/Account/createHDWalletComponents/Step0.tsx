@@ -11,7 +11,7 @@ export function Step0({
 }) {
   const { t } = useI18n();
   return (
-    <Column gap="lg">
+    <Column gap="lg" data-testid="create-hd-wallet-step-0">
       <Text text={t('choose_a_wallet_you_want_to_restore_from')} preset="title-bold" textCenter mt="xl" />
       {getRestoreWallets().map((item, index) => {
         return (
@@ -20,7 +20,8 @@ export function Step0({
             preset="default"
             onClick={() => {
               updateContextData({ tabType: TabType.IMPORT_WORDS, restoreWalletType: item.value });
-            }}>
+            }}
+            data-testid={`restore-wallet-type-option-${index}`}>
             <Text text={t(item.name)} />
           </Button>
         );

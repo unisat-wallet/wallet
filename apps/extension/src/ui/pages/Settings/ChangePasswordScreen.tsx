@@ -96,6 +96,7 @@ export default function ChangePasswordScreen() {
               setOriginPassword(e.target.value);
             }}
             autoFocus={true}
+            data-testid="current-password-input"
           />
           <Input
             preset="password"
@@ -103,6 +104,7 @@ export default function ChangePasswordScreen() {
             onChange={(e) => {
               setNewPassword(e.target.value);
             }}
+            data-testid="new-password-input"
           />
           {strongText}
           <Input
@@ -111,6 +113,7 @@ export default function ChangePasswordScreen() {
             onChange={(e) => {
               setConfirmPassword(e.target.value);
             }}
+            data-testid="confirm-password-input"
           />
           {matchText}
           <Button
@@ -120,6 +123,7 @@ export default function ChangePasswordScreen() {
             onClick={() => {
               verify();
             }}
+            data-testid="change-password-confirm-button"
           />
         </Column>
       </Content>

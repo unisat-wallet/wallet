@@ -53,6 +53,7 @@ export default function CreateAccountScreen() {
             }}
             onKeyUp={(e) => handleOnKeyUp(e as any)}
             autoFocus={true}
+            data-testid="create-account-name-input"
           />
           <Button
             text={t('create_an_account')}
@@ -60,6 +61,7 @@ export default function CreateAccountScreen() {
             onClick={(e) => {
               handleOnClick();
             }}
+            data-testid="create-account-confirm-button"
           />
         </Column>
       </Content>

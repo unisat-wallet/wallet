@@ -348,7 +348,8 @@ export function Button(props: ButtonProps) {
         style={$viewStyle}
         onMouseEnter={() => setHover(true)}
         onMouseLeave={() => setHover(false)}
-        onClick={disabled ? undefined : onClick}>
+        onClick={disabled ? undefined : onClick}
+        {...rest}>
         <Row>
           {LeftAccessory && <div style={$leftAccessoryStyle}>{LeftAccessory}</div>}
           {icon && <Icon icon={icon} color={'white'} style={{ marginRight: spacing.tiny }} />}
@@ -375,7 +376,8 @@ export function Button(props: ButtonProps) {
         style={$viewStyle}
         onClick={disabled ? undefined : onClick}
         onMouseEnter={() => setHover(true)}
-        onMouseLeave={() => setHover(false)}>
+        onMouseLeave={() => setHover(false)}
+        {...rest}>
         {icon && (
           <Icon
             icon={icon}
@@ -401,7 +403,8 @@ export function Button(props: ButtonProps) {
         style={$viewStyle}
         onClick={disabled ? undefined : onClick}
         onMouseEnter={() => setHover(true)}
-        onMouseLeave={() => setHover(false)}>
+        onMouseLeave={() => setHover(false)}
+        {...rest}>
         {icon && (
           <Icon
             icon={icon}
@@ -423,7 +426,8 @@ export function Button(props: ButtonProps) {
         style={$viewStyle}
         onClick={disabled ? undefined : onClick}
         onMouseEnter={() => setHover(true)}
-        onMouseLeave={() => setHover(false)}>
+        onMouseLeave={() => setHover(false)}
+        {...rest}>
         {text && <Text style={$textStyle} text={text} preset="regular" />}
       </div>
     );
@@ -439,7 +443,8 @@ export function Button(props: ButtonProps) {
         style={$viewStyle}
         onClick={disabled ? undefined : onClick}
         onMouseEnter={() => setHover(true)}
-        onMouseLeave={() => setHover(false)}>
+        onMouseLeave={() => setHover(false)}
+        {...rest}>
         {icon && (
           <Icon
             icon={icon}
@@ -460,7 +465,8 @@ export function Button(props: ButtonProps) {
       style={$viewStyle}
       onClick={disabled ? undefined : onClick}
       onMouseEnter={() => setHover(true)}
-      onMouseLeave={() => setHover(false)}>
+      onMouseLeave={() => setHover(false)}
+      {...rest}>
       {LeftAccessory && <div style={$leftAccessoryStyle}>{LeftAccessory}</div>}
       {icon && <Icon icon={icon} style={{ marginRight: spacing.tiny, backgroundColor: $textStyle.color }} />}
       {text && <Text style={$textStyle} text={text} preset="regular-bold" />}

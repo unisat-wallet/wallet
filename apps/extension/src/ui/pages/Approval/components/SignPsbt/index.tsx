@@ -279,6 +279,7 @@ export default function SignPsbt(props: SignPsbtProps) {
             onClick={onClickSign}
             disabled={!isValid}
             full
+            data-testid="sign-psbt-button"
           />
         </Row>
       </Footer>

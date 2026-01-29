@@ -13,10 +13,11 @@ export interface CheckboxProps {
   disabled?: boolean;
   children?: React.ReactNode;
   className?: string;
+  'data-testid'?: string;
 }
 
 export function Checkbox(props: CheckboxProps) {
-  const { checked = false, onChange, style, disabled = false, children, className } = props;
+  const { checked = false, onChange, style, disabled = false, children, className, 'data-testid': dataTestId } = props;
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (disabled) return;
@@ -31,6 +32,7 @@ export function Checkbox(props: CheckboxProps) {
   return (
     <label
       className={className}
+      data-testid={dataTestId}
       style={{
         display: 'inline-flex',
         alignItems: 'center',
@@ -50,6 +52,7 @@ export function Checkbox(props: CheckboxProps) {
           checked={checked}
           onChange={handleChange}
           disabled={disabled}
+          data-testid={dataTestId ? `${dataTestId}-input` : undefined}
           style={{
             appearance: 'none',
             width: '15px',

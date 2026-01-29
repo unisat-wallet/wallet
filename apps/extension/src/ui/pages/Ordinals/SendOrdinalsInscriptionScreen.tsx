@@ -38,6 +38,7 @@ export default function SendOrdinalsInscriptionScreen() {
             autoFocus={true}
             onAddressInputChange={(val) => onAddressInputChange(val)}
             recipientLabel={<Text text={t('recipient')} color="textDim" />}
+            data-testid="send-inscription-address-input"
           />
 
           {toInfo.address ? (
@@ -59,7 +60,7 @@ export default function SendOrdinalsInscriptionScreen() {
           </Column>
 
           {error && <Text text={error} color="error" />}
-          <Button disabled={disabled} preset="primary" text={t('next')} onClick={onClickNext} />
+          <Button disabled={disabled} preset="primary" text={t('next')} onClick={onClickNext} data-testid="send-inscription-next-button" />
         </Column>
       </Content>
     </Layout>

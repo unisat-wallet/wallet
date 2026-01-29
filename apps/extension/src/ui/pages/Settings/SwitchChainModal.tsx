@@ -20,6 +20,7 @@ function ChainItem(props: { chainType: ChainType; inGroup?: boolean; onClose: ()
   const { t } = useI18n();
   return (
     <Card
+      data-testid={`chain-item-${chain.enum}`}
       style={Object.assign(
         {},
         {

@@ -14,6 +14,7 @@ export interface RunesBalanceCardProps {
   onClick?: () => void;
   showPrice?: boolean;
   price?: TickPriceItem;
+  'data-testid'?: string;
 }
 
 export default function RunesBalanceCard(props: RunesBalanceCardProps) {
@@ -26,7 +27,8 @@ export default function RunesBalanceCard(props: RunesBalanceCardProps) {
         borderRadius: 12
       }}
       fullX
-      onClick={onClick}>
+      onClick={onClick}
+      data-testid={props['data-testid']}>
       <Column full py="zero" gap="zero">
         <Row fullY justifyBetween justifyCenter>
           <Column onClick={onClick}>

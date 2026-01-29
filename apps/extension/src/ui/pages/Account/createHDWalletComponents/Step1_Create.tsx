@@ -44,7 +44,7 @@ export function Step1_Create({
   const words = contextData.mnemonics.split(' ');
   return (
     <Column gap="xl">
-      <Text text={t('secret_recovery_phrase')} preset="title-bold" textCenter />
+      <Text text={t('secret_recovery_phrase')} preset="title-bold" textCenter data-testid="mnemonic-title" />
       <Text text={t('this_phrase_is_the_only_way_to_recover_your_wallet')} color="warning" textCenter />
 
       <Row justifyCenter>
@@ -53,7 +53,7 @@ export function Step1_Create({
             return (
               <Row key={index}>
                 <Text text={`${index + 1}. `} style={{ width: 40 }} />
-                <Card preset="style2" style={{ width: 200 }}>
+                <Card preset="style2" style={{ width: 200 }} data-index={index} data-testid={`mnemonic-word-${index}`}>
                   <Text text={v} selectText disableTranslate />
                 </Card>
               </Row>
@@ -63,13 +63,13 @@ export function Step1_Create({
       </Row>
 
       <Row justifyCenter>
-        <Checkbox onChange={onChange} checked={checked} style={{ fontSize: fontSizes.sm }}>
+        <Checkbox onChange={onChange} checked={checked} style={{ fontSize: fontSizes.sm }} data-testid="mnemonic-saved-checkbox">
           <Text text={t('i_saved_my_secret_recovery_phrase')} />
         </Checkbox>
       </Row>
 
       <FooterButtonContainer>
-        <Button disabled={!checked} text={t('continue')} preset="primary" onClick={btnClick} />
+        <Button disabled={!checked} text={t('continue')} preset="primary" onClick={btnClick} data-testid="mnemonic-continue-button" />
       </FooterButtonContainer>
     </Column>
   );

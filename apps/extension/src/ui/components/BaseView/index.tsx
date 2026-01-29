@@ -37,6 +37,7 @@ export interface BaseViewProps {
   classname?: string;
   overflowX?: boolean;
   overflowY?: boolean;
+  'data-testid'?: string;
 }
 
 export function BaseView(props: BaseViewProps) {
@@ -108,7 +109,7 @@ export function BaseView(props: BaseViewProps) {
   const $classname = [classname].join(' ').trim();
 
   return (
-    <div style={$style} onClick={onClick} className={$classname}>
+    <div style={$style} onClick={onClick} className={$classname} data-testid={props['data-testid']}>
       {children}
     </div>
   );

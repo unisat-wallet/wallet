@@ -57,6 +57,7 @@ export default function SendRunesScreen() {
             }}
             recipientLabel={<Text text={t('recipient')} preset="regular" color="textDim" />}
             autoFocus={true}
+            data-testid="send-runes-address-input"
           />
         </Column>
 
@@ -81,6 +82,7 @@ export default function SendRunesScreen() {
               setInputAmount(amount);
             }}
             runesDecimal={runeInfo.divisibility}
+            data-testid="send-runes-amount-input"
           />
         </Column>
 
@@ -104,7 +106,7 @@ export default function SendRunesScreen() {
 
         {error && <Text text={error} color="error" />}
 
-        <Button disabled={disabled} preset="primary" text={t('next')} onClick={onClickNext}></Button>
+        <Button disabled={disabled} preset="primary" text={t('next')} onClick={onClickNext} data-testid="send-runes-next-button"></Button>
       </Content>
     </Layout>
   );

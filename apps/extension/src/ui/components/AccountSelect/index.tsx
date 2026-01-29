@@ -51,7 +51,8 @@ const AccountSelect = () => {
         itemsCenter
         onClick={(e) => {
           nav.navigate('SwitchAccountScreen');
-        }}>
+        }}
+        data-testid="account-select">
         <Icon size={15} icon="right" style={{ marginRight: 10 }} />
       </Row>
     </Row>

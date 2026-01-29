@@ -9,14 +9,24 @@ import { Icon, IconTypes } from '../Icon';
 export function NavTabBar({ tab }: { tab: TabOption }) {
   return (
     <Grid columns={3} style={{ width: '100%', height: '67.5px', backgroundColor: colors.bg2 }}>
-      <TabButton tabName="home" icon="unisat" isActive={tab === 'home'} />
-      <TabButton tabName="discover" icon="compass" isActive={tab === 'discover'} />
-      <TabButton tabName="settings" icon="settings" isActive={tab === 'settings'} />
+      <TabButton tabName="home" icon="unisat" isActive={tab === 'home'} data-testid="tab-home" />
+      <TabButton tabName="discover" icon="compass" isActive={tab === 'discover'} data-testid="tab-discover" />
+      <TabButton tabName="settings" icon="settings" isActive={tab === 'settings'} data-testid="tab-settings" />
     </Grid>
   );
 }
 
-function TabButton({ tabName, icon, isActive }: { tabName: TabOption; icon: IconTypes; isActive: boolean }) {
+function TabButton({
+  tabName,
+  icon,
+  isActive,
+  'data-testid': dataTestId
+}: {
+  tabName: TabOption;
+  icon: IconTypes;
+  isActive: boolean;
+  'data-testid'?: string;
+}) {
   const nav = useNavigation();
   const hasNewBanner = useHasNewBanner();
 
@@ -32,7 +42,8 @@ function TabButton({ tabName, icon, isActive }: { tabName: TabOption; icon: Icon
         } else if (tabName === 'settings') {
           nav.navigate('SettingsTabScreen');
         }
-      }}>
+      }}
+      data-testid={dataTestId}>
       <Icon size={20} icon={icon} color={isActive ? 'white' : 'white_muted'} />
       <BaseView style={{ position: 'relative' }}>
         {tabName === 'discover' && hasNewBanner && (

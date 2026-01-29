@@ -85,8 +85,9 @@ export default function UnlockScreen() {
               onChange={(e) => setPassword(e.target.value)}
               onKeyUp={(e) => handleOnKeyUp(e as any)}
               autoFocus={true}
+              data-testid="unlock-password-input"
             />
-            <Button disabled={disabled} text={t('unlock')} preset="primary" onClick={btnClick} />
+            <Button disabled={disabled} text={t('unlock')} preset="primary" onClick={btnClick} data-testid="unlock-button" />
           </Column>
         </Column>
       </Content>

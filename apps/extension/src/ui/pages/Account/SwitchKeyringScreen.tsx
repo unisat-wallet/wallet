@@ -72,7 +72,8 @@ export function MyItem({ keyring, autoNav }: MyItemProps, ref) {
         backgroundColor: selected ? 'rgba(244,182,44,0.1)' : colors.black_dark,
         marginLeft: 10,
         marginRight: 10
-      }}>
+      }}
+      data-testid={`wallet-item-${keyring.key}`}>
       <Row
         full
         onClick={async (e) => {
@@ -278,7 +279,8 @@ export default function SwitchKeyringScreen() {
           <Icon
             onClick={() => {
               navigate('AddKeyringScreen');
-            }}>
+            }}
+            data-testid="add-wallet-button">
             <PlusCircleOutlined />
           </Icon>
         }

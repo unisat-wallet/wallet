@@ -104,6 +104,7 @@ export function Text(props: TextProps) {
     style: $styleOverride,
     max1Lines,
     max2Lines,
+    'data-testid': _dataTestId,
     ...rest
   } = props;
   const preset: Presets = props.preset || 'regular';
@@ -132,7 +133,7 @@ export function Text(props: TextProps) {
     textUseClassName = 'span-max-lines-2';
   }
   return (
-    <BaseView style={$style} {...rest}>
+    <BaseView style={$style} {...rest} data-testid={_dataTestId}>
       {disableTranslate ? (
         <span translate="no" className="span-text">
           {textUse}
