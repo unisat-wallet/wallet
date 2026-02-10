@@ -7,7 +7,7 @@ export interface ToSignInput {
   publicKey: string
   useTweakedSigner?: boolean
   disableTweakSigner?: boolean
-  tapLeafHashToSign?: Buffer
+  tapLeafHashToSign?: Buffer | string
   sighashTypes?: number[] | undefined
 }
 

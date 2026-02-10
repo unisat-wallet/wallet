@@ -33,7 +33,7 @@ export interface ToSignInput {
   index: number
   publicKey: string
   sighashTypes?: number[] | undefined
-  tapLeafHashToSign?: Buffer
+  tapLeafHashToSign?: Buffer | string
 
   // special
   useTweakedSigner?: boolean
