@@ -1,5 +1,13 @@
 # UniSat Wallet Release Notes
 
+## v1.7.10
+
+### Bug Fixes
+
+- Resolved issue with incorrect display of BRC-20 program balance.
+- Fixed bug in tapLeafHashToSign parameters in unisat.signPsbt.
+- Corrected signPsbt auto-finalization default (set to true by default).
+
 ## v1.7.9
 
 ### Bug Fixes
