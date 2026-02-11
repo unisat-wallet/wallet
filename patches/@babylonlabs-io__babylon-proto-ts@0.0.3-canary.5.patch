@@ -1,0 +1,312 @@
+diff --git a/dist/generated/babylon/btccheckpoint/v1/btccheckpoint.js b/dist/generated/babylon/btccheckpoint/v1/btccheckpoint.js
+index 5cb1b1a..eae8719 100644
+--- a/dist/generated/babylon/btccheckpoint/v1/btccheckpoint.js
++++ b/dist/generated/babylon/btccheckpoint/v1/btccheckpoint.js
+@@ -9,7 +9,7 @@ exports.BTCCheckpointInfo = exports.CheckpointAddresses = exports.EpochData = ex
+ exports.btcStatusFromJSON = btcStatusFromJSON;
+ exports.btcStatusToJSON = btcStatusToJSON;
+ /* eslint-disable */
+-const wire_1 = require("@bufbuild/protobuf/wire");
++const wire_1 = require("@bufbuild/protobuf/dist/cjs/wire");
+ exports.protobufPackage = "babylon.btccheckpoint.v1";
+ /** BtcStatus is an enum describing the current btc status of the checkpoint */
+ var BtcStatus;
+diff --git a/dist/generated/babylon/btclightclient/v1/btclightclient.js b/dist/generated/babylon/btclightclient/v1/btclightclient.js
+index db109c9..1bd8238 100644
+--- a/dist/generated/babylon/btclightclient/v1/btclightclient.js
++++ b/dist/generated/babylon/btclightclient/v1/btclightclient.js
+@@ -7,7 +7,7 @@
+ Object.defineProperty(exports, "__esModule", { value: true });
+ exports.BTCHeaderInfo = exports.protobufPackage = void 0;
+ /* eslint-disable */
+-const wire_1 = require("@bufbuild/protobuf/wire");
++const wire_1 = require("@bufbuild/protobuf/dist/cjs/wire");
+ exports.protobufPackage = "babylon.btclightclient.v1";
+ function createBaseBTCHeaderInfo() {
+     return { header: new Uint8Array(0), hash: new Uint8Array(0), height: 0, work: new Uint8Array(0) };
+diff --git a/dist/generated/babylon/btclightclient/v1/params.js b/dist/generated/babylon/btclightclient/v1/params.js
+index 20f1a76..5834e2c 100644
+--- a/dist/generated/babylon/btclightclient/v1/params.js
++++ b/dist/generated/babylon/btclightclient/v1/params.js
+@@ -7,7 +7,7 @@
+ Object.defineProperty(exports, "__esModule", { value: true });
+ exports.Params = exports.protobufPackage = void 0;
+ /* eslint-disable */
+-const wire_1 = require("@bufbuild/protobuf/wire");
++const wire_1 = require("@bufbuild/protobuf/dist/cjs/wire");
+ exports.protobufPackage = "babylon.btclightclient.v1";
+ function createBaseParams() {
+     return { insertHeadersAllowList: [] };
+diff --git a/dist/generated/babylon/btclightclient/v1/query.js b/dist/generated/babylon/btclightclient/v1/query.js
+index e4be758..6ec6b35 100644
+--- a/dist/generated/babylon/btclightclient/v1/query.js
++++ b/dist/generated/babylon/btclightclient/v1/query.js
+@@ -7,7 +7,7 @@
+ Object.defineProperty(exports, "__esModule", { value: true });
+ exports.QueryClientImpl = exports.QueryServiceName = exports.BTCHeaderInfoResponse = exports.QueryHeaderDepthResponse = exports.QueryHeaderDepthRequest = exports.QueryBaseHeaderResponse = exports.QueryBaseHeaderRequest = exports.QueryTipResponse = exports.QueryTipRequest = exports.QueryMainChainResponse = exports.QueryMainChainRequest = exports.QueryContainsBytesResponse = exports.QueryContainsBytesRequest = exports.QueryContainsResponse = exports.QueryContainsRequest = exports.QueryHashesResponse = exports.QueryHashesRequest = exports.QueryParamsResponse = exports.QueryParamsRequest = exports.protobufPackage = void 0;
+ /* eslint-disable */
+-const wire_1 = require("@bufbuild/protobuf/wire");
++const wire_1 = require("@bufbuild/protobuf/dist/cjs/wire");
+ const pagination_1 = require("../../../cosmos/base/query/v1beta1/pagination");
+ const params_1 = require("./params");
+ exports.protobufPackage = "babylon.btclightclient.v1";
+diff --git a/dist/generated/babylon/btcstaking/v1/btcstaking.js b/dist/generated/babylon/btcstaking/v1/btcstaking.js
+index 4b977af..748d063 100644
+--- a/dist/generated/babylon/btcstaking/v1/btcstaking.js
++++ b/dist/generated/babylon/btcstaking/v1/btcstaking.js
+@@ -9,7 +9,7 @@ exports.InclusionProof = exports.SelectiveSlashingEvidence = exports.CovenantAda
+ exports.bTCDelegationStatusFromJSON = bTCDelegationStatusFromJSON;
+ exports.bTCDelegationStatusToJSON = bTCDelegationStatusToJSON;
+ /* eslint-disable */
+-const wire_1 = require("@bufbuild/protobuf/wire");
++const wire_1 = require("@bufbuild/protobuf/dist/cjs/wire");
+ const staking_1 = require("../../../cosmos/staking/v1beta1/staking");
+ const btccheckpoint_1 = require("../../btccheckpoint/v1/btccheckpoint");
+ const pop_1 = require("./pop");
+diff --git a/dist/generated/babylon/btcstaking/v1/params.js b/dist/generated/babylon/btcstaking/v1/params.js
+index 0921640..16c7601 100644
+--- a/dist/generated/babylon/btcstaking/v1/params.js
++++ b/dist/generated/babylon/btcstaking/v1/params.js
+@@ -7,7 +7,7 @@
+ Object.defineProperty(exports, "__esModule", { value: true });
+ exports.StoredParams = exports.HeightToVersionMap = exports.HeightVersionPair = exports.Params = exports.protobufPackage = void 0;
+ /* eslint-disable */
+-const wire_1 = require("@bufbuild/protobuf/wire");
++const wire_1 = require("@bufbuild/protobuf/dist/cjs/wire");
+ exports.protobufPackage = "babylon.btcstaking.v1";
+ function createBaseParams() {
+     return {
+diff --git a/dist/generated/babylon/btcstaking/v1/pop.js b/dist/generated/babylon/btcstaking/v1/pop.js
+index de1384f..c89fe39 100644
+--- a/dist/generated/babylon/btcstaking/v1/pop.js
++++ b/dist/generated/babylon/btcstaking/v1/pop.js
+@@ -9,7 +9,7 @@ exports.BIP322Sig = exports.ProofOfPossessionBTC = exports.BTCSigType = exports.
+ exports.bTCSigTypeFromJSON = bTCSigTypeFromJSON;
+ exports.bTCSigTypeToJSON = bTCSigTypeToJSON;
+ /* eslint-disable */
+-const wire_1 = require("@bufbuild/protobuf/wire");
++const wire_1 = require("@bufbuild/protobuf/dist/cjs/wire");
+ exports.protobufPackage = "babylon.btcstaking.v1";
+ /** BTCSigType indicates the type of btc_sig in a pop */
+ var BTCSigType;
+diff --git a/dist/generated/babylon/btcstaking/v1/tx.js b/dist/generated/babylon/btcstaking/v1/tx.js
+index a7aa35a..c27ca7c 100644
+--- a/dist/generated/babylon/btcstaking/v1/tx.js
++++ b/dist/generated/babylon/btcstaking/v1/tx.js
+@@ -7,7 +7,7 @@
+ Object.defineProperty(exports, "__esModule", { value: true });
+ exports.MsgClientImpl = exports.MsgServiceName = exports.MsgUpdateParamsResponse = exports.MsgUpdateParams = exports.MsgSelectiveSlashingEvidenceResponse = exports.MsgSelectiveSlashingEvidence = exports.MsgBTCUndelegateResponse = exports.MsgBTCUndelegate = exports.MsgAddCovenantSigsResponse = exports.MsgAddCovenantSigs = exports.MsgAddBTCDelegationInclusionProofResponse = exports.MsgAddBTCDelegationInclusionProof = exports.MsgCreateBTCDelegationResponse = exports.MsgCreateBTCDelegation = exports.MsgEditFinalityProviderResponse = exports.MsgEditFinalityProvider = exports.MsgCreateFinalityProviderResponse = exports.MsgCreateFinalityProvider = exports.protobufPackage = void 0;
+ /* eslint-disable */
+-const wire_1 = require("@bufbuild/protobuf/wire");
++const wire_1 = require("@bufbuild/protobuf/dist/cjs/wire");
+ const staking_1 = require("../../../cosmos/staking/v1beta1/staking");
+ const btcstaking_1 = require("./btcstaking");
+ const params_1 = require("./params");
+diff --git a/dist/generated/babylon/incentive/params.js b/dist/generated/babylon/incentive/params.js
+index 0cd071d..06b6226 100644
+--- a/dist/generated/babylon/incentive/params.js
++++ b/dist/generated/babylon/incentive/params.js
+@@ -7,7 +7,7 @@
+ Object.defineProperty(exports, "__esModule", { value: true });
+ exports.Params = exports.protobufPackage = void 0;
+ /* eslint-disable */
+-const wire_1 = require("@bufbuild/protobuf/wire");
++const wire_1 = require("@bufbuild/protobuf/dist/cjs/wire");
+ exports.protobufPackage = "babylon.incentive";
+ function createBaseParams() {
+     return { btcStakingPortion: "" };
+diff --git a/dist/generated/babylon/incentive/query.js b/dist/generated/babylon/incentive/query.js
+index 17cd12a..10a9b81 100644
+--- a/dist/generated/babylon/incentive/query.js
++++ b/dist/generated/babylon/incentive/query.js
+@@ -7,7 +7,7 @@
+ Object.defineProperty(exports, "__esModule", { value: true });
+ exports.QueryClientImpl = exports.QueryServiceName = exports.QueryDelegatorWithdrawAddressResponse = exports.QueryDelegatorWithdrawAddressRequest = exports.QueryBTCStakingGaugeResponse = exports.BTCStakingGaugeResponse = exports.QueryBTCStakingGaugeRequest = exports.QueryRewardGaugesResponse_RewardGaugesEntry = exports.QueryRewardGaugesResponse = exports.RewardGaugesResponse = exports.QueryRewardGaugesRequest = exports.QueryParamsResponse = exports.QueryParamsRequest = exports.protobufPackage = void 0;
+ /* eslint-disable */
+-const wire_1 = require("@bufbuild/protobuf/wire");
++const wire_1 = require("@bufbuild/protobuf/dist/cjs/wire");
+ const coin_1 = require("../../cosmos/base/v1beta1/coin");
+ const params_1 = require("./params");
+ exports.protobufPackage = "babylon.incentive";
+diff --git a/dist/generated/babylon/incentive/tx.js b/dist/generated/babylon/incentive/tx.js
+index 65f5cff..8b8dda7 100644
+--- a/dist/generated/babylon/incentive/tx.js
++++ b/dist/generated/babylon/incentive/tx.js
+@@ -7,7 +7,7 @@
+ Object.defineProperty(exports, "__esModule", { value: true });
+ exports.MsgClientImpl = exports.MsgServiceName = exports.MsgSetWithdrawAddressResponse = exports.MsgSetWithdrawAddress = exports.MsgUpdateParamsResponse = exports.MsgUpdateParams = exports.MsgWithdrawRewardResponse = exports.MsgWithdrawReward = exports.protobufPackage = void 0;
+ /* eslint-disable */
+-const wire_1 = require("@bufbuild/protobuf/wire");
++const wire_1 = require("@bufbuild/protobuf/dist/cjs/wire");
+ const coin_1 = require("../../cosmos/base/v1beta1/coin");
+ const params_1 = require("./params");
+ exports.protobufPackage = "babylon.incentive";
+diff --git a/dist/generated/cosmos/base/query/v1beta1/pagination.js b/dist/generated/cosmos/base/query/v1beta1/pagination.js
+index 8ee15a0..4d61096 100644
+--- a/dist/generated/cosmos/base/query/v1beta1/pagination.js
++++ b/dist/generated/cosmos/base/query/v1beta1/pagination.js
+@@ -7,7 +7,7 @@
+ Object.defineProperty(exports, "__esModule", { value: true });
+ exports.PageResponse = exports.PageRequest = exports.protobufPackage = void 0;
+ /* eslint-disable */
+-const wire_1 = require("@bufbuild/protobuf/wire");
++const wire_1 = require("@bufbuild/protobuf/dist/cjs/wire");
+ exports.protobufPackage = "cosmos.base.query.v1beta1";
+ function createBasePageRequest() {
+     return { key: new Uint8Array(0), offset: 0, limit: 0, countTotal: false, reverse: false };
+diff --git a/dist/generated/cosmos/base/v1beta1/coin.js b/dist/generated/cosmos/base/v1beta1/coin.js
+index 1357f3c..db87979 100644
+--- a/dist/generated/cosmos/base/v1beta1/coin.js
++++ b/dist/generated/cosmos/base/v1beta1/coin.js
+@@ -7,7 +7,7 @@
+ Object.defineProperty(exports, "__esModule", { value: true });
+ exports.DecProto = exports.IntProto = exports.DecCoin = exports.Coin = exports.protobufPackage = void 0;
+ /* eslint-disable */
+-const wire_1 = require("@bufbuild/protobuf/wire");
++const wire_1 = require("@bufbuild/protobuf/dist/cjs/wire");
+ exports.protobufPackage = "cosmos.base.v1beta1";
+ function createBaseCoin() {
+     return { denom: "", amount: "" };
+diff --git a/dist/generated/cosmos/staking/v1beta1/staking.js b/dist/generated/cosmos/staking/v1beta1/staking.js
+index 663a86a..e508225 100644
+--- a/dist/generated/cosmos/staking/v1beta1/staking.js
++++ b/dist/generated/cosmos/staking/v1beta1/staking.js
+@@ -11,7 +11,7 @@ exports.bondStatusToJSON = bondStatusToJSON;
+ exports.infractionFromJSON = infractionFromJSON;
+ exports.infractionToJSON = infractionToJSON;
+ /* eslint-disable */
+-const wire_1 = require("@bufbuild/protobuf/wire");
++const wire_1 = require("@bufbuild/protobuf/dist/cjs/wire");
+ const any_1 = require("../../../google/protobuf/any");
+ const duration_1 = require("../../../google/protobuf/duration");
+ const timestamp_1 = require("../../../google/protobuf/timestamp");
+diff --git a/dist/generated/google/protobuf/any.js b/dist/generated/google/protobuf/any.js
+index 5038ef0..43c31ef 100644
+--- a/dist/generated/google/protobuf/any.js
++++ b/dist/generated/google/protobuf/any.js
+@@ -7,7 +7,7 @@
+ Object.defineProperty(exports, "__esModule", { value: true });
+ exports.Any = exports.protobufPackage = void 0;
+ /* eslint-disable */
+-const wire_1 = require("@bufbuild/protobuf/wire");
++const wire_1 = require("@bufbuild/protobuf/dist/cjs/wire");
+ exports.protobufPackage = "google.protobuf";
+ function createBaseAny() {
+     return { typeUrl: "", value: new Uint8Array(0) };
+diff --git a/dist/generated/google/protobuf/duration.js b/dist/generated/google/protobuf/duration.js
+index ae078ed..76bd06d 100644
+--- a/dist/generated/google/protobuf/duration.js
++++ b/dist/generated/google/protobuf/duration.js
+@@ -7,7 +7,7 @@
+ Object.defineProperty(exports, "__esModule", { value: true });
+ exports.Duration = exports.protobufPackage = void 0;
+ /* eslint-disable */
+-const wire_1 = require("@bufbuild/protobuf/wire");
++const wire_1 = require("@bufbuild/protobuf/dist/cjs/wire");
+ exports.protobufPackage = "google.protobuf";
+ function createBaseDuration() {
+     return { seconds: 0, nanos: 0 };
+diff --git a/dist/generated/google/protobuf/timestamp.js b/dist/generated/google/protobuf/timestamp.js
+index 38f7771..b3615cb 100644
+--- a/dist/generated/google/protobuf/timestamp.js
++++ b/dist/generated/google/protobuf/timestamp.js
+@@ -7,7 +7,7 @@
+ Object.defineProperty(exports, "__esModule", { value: true });
+ exports.Timestamp = exports.protobufPackage = void 0;
+ /* eslint-disable */
+-const wire_1 = require("@bufbuild/protobuf/wire");
++const wire_1 = require("@bufbuild/protobuf/dist/cjs/wire");
+ exports.protobufPackage = "google.protobuf";
+ function createBaseTimestamp() {
+     return { seconds: 0, nanos: 0 };
+diff --git a/dist/generated/tendermint/abci/types.js b/dist/generated/tendermint/abci/types.js
+index f2e2174..479354f 100644
+--- a/dist/generated/tendermint/abci/types.js
++++ b/dist/generated/tendermint/abci/types.js
+@@ -20,7 +20,7 @@ exports.responseProcessProposal_ProposalStatusToJSON = responseProcessProposal_P
+ exports.responseVerifyVoteExtension_VerifyStatusFromJSON = responseVerifyVoteExtension_VerifyStatusFromJSON;
+ exports.responseVerifyVoteExtension_VerifyStatusToJSON = responseVerifyVoteExtension_VerifyStatusToJSON;
+ /* eslint-disable */
+-const wire_1 = require("@bufbuild/protobuf/wire");
++const wire_1 = require("@bufbuild/protobuf/dist/cjs/wire");
+ const timestamp_1 = require("../../google/protobuf/timestamp");
+ const keys_1 = require("../crypto/keys");
+ const proof_1 = require("../crypto/proof");
+diff --git a/dist/generated/tendermint/crypto/keys.js b/dist/generated/tendermint/crypto/keys.js
+index d72db6a..8d97faa 100644
+--- a/dist/generated/tendermint/crypto/keys.js
++++ b/dist/generated/tendermint/crypto/keys.js
+@@ -7,7 +7,7 @@
+ Object.defineProperty(exports, "__esModule", { value: true });
+ exports.PublicKey = exports.protobufPackage = void 0;
+ /* eslint-disable */
+-const wire_1 = require("@bufbuild/protobuf/wire");
++const wire_1 = require("@bufbuild/protobuf/dist/cjs/wire");
+ exports.protobufPackage = "tendermint.crypto";
+ function createBasePublicKey() {
+     return { ed25519: undefined, secp256k1: undefined };
+diff --git a/dist/generated/tendermint/crypto/proof.js b/dist/generated/tendermint/crypto/proof.js
+index 200d8e4..7eba37b 100644
+--- a/dist/generated/tendermint/crypto/proof.js
++++ b/dist/generated/tendermint/crypto/proof.js
+@@ -7,7 +7,7 @@
+ Object.defineProperty(exports, "__esModule", { value: true });
+ exports.ProofOps = exports.ProofOp = exports.DominoOp = exports.ValueOp = exports.Proof = exports.protobufPackage = void 0;
+ /* eslint-disable */
+-const wire_1 = require("@bufbuild/protobuf/wire");
++const wire_1 = require("@bufbuild/protobuf/dist/cjs/wire");
+ exports.protobufPackage = "tendermint.crypto";
+ function createBaseProof() {
+     return { total: 0, index: 0, leafHash: new Uint8Array(0), aunts: [] };
+diff --git a/dist/generated/tendermint/types/params.js b/dist/generated/tendermint/types/params.js
+index 694e48f..5993d38 100644
+--- a/dist/generated/tendermint/types/params.js
++++ b/dist/generated/tendermint/types/params.js
+@@ -7,7 +7,7 @@
+ Object.defineProperty(exports, "__esModule", { value: true });
+ exports.ABCIParams = exports.HashedParams = exports.VersionParams = exports.ValidatorParams = exports.EvidenceParams = exports.BlockParams = exports.ConsensusParams = exports.protobufPackage = void 0;
+ /* eslint-disable */
+-const wire_1 = require("@bufbuild/protobuf/wire");
++const wire_1 = require("@bufbuild/protobuf/dist/cjs/wire");
+ const duration_1 = require("../../google/protobuf/duration");
+ exports.protobufPackage = "tendermint.types";
+ function createBaseConsensusParams() {
+diff --git a/dist/generated/tendermint/types/types.js b/dist/generated/tendermint/types/types.js
+index 115fd73..e9c8dad 100644
+--- a/dist/generated/tendermint/types/types.js
++++ b/dist/generated/tendermint/types/types.js
+@@ -9,7 +9,7 @@ exports.TxProof = exports.BlockMeta = exports.LightBlock = exports.SignedHeader
+ exports.signedMsgTypeFromJSON = signedMsgTypeFromJSON;
+ exports.signedMsgTypeToJSON = signedMsgTypeToJSON;
+ /* eslint-disable */
+-const wire_1 = require("@bufbuild/protobuf/wire");
++const wire_1 = require("@bufbuild/protobuf/dist/cjs/wire");
+ const timestamp_1 = require("../../google/protobuf/timestamp");
+ const proof_1 = require("../crypto/proof");
+ const types_1 = require("../version/types");
+diff --git a/dist/generated/tendermint/types/validator.js b/dist/generated/tendermint/types/validator.js
+index 1e18a97..5834b01 100644
+--- a/dist/generated/tendermint/types/validator.js
++++ b/dist/generated/tendermint/types/validator.js
+@@ -9,7 +9,7 @@ exports.SimpleValidator = exports.Validator = exports.ValidatorSet = exports.Blo
+ exports.blockIDFlagFromJSON = blockIDFlagFromJSON;
+ exports.blockIDFlagToJSON = blockIDFlagToJSON;
+ /* eslint-disable */
+-const wire_1 = require("@bufbuild/protobuf/wire");
++const wire_1 = require("@bufbuild/protobuf/dist/cjs/wire");
+ const keys_1 = require("../crypto/keys");
+ exports.protobufPackage = "tendermint.types";
+ /** BlockIdFlag indicates which BlockID the signature is for */
+diff --git a/dist/generated/tendermint/version/types.js b/dist/generated/tendermint/version/types.js
+index 0cb935e..5c65cf1 100644
+--- a/dist/generated/tendermint/version/types.js
++++ b/dist/generated/tendermint/version/types.js
+@@ -7,7 +7,7 @@
+ Object.defineProperty(exports, "__esModule", { value: true });
+ exports.Consensus = exports.App = exports.protobufPackage = void 0;
+ /* eslint-disable */
+-const wire_1 = require("@bufbuild/protobuf/wire");
++const wire_1 = require("@bufbuild/protobuf/dist/cjs/wire");
+ exports.protobufPackage = "tendermint.version";
+ function createBaseApp() {
+     return { protocol: 0, software: "" };

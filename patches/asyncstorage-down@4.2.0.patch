@@ -1,0 +1,11 @@
+diff --git a/default-opts.js b/default-opts.js
+index c076d3d..ccf6f8f 100644
+--- a/default-opts.js
++++ b/default-opts.js
+@@ -1,5 +1,5 @@
+ module.exports = {
+   get AsyncStorage() {
+-    return require('react-native').AsyncStorage
++    return require('@react-native-async-storage/async-storage').AsyncStorage
+   }
+ }

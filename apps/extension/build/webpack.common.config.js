@@ -515,7 +515,7 @@ const config = (env) => {
         stream: require.resolve('stream-browserify')
       },
       plugins: [new TSConfigPathsPlugin()],
-      modules: [path.resolve(__dirname, '../../../node_modules'), 'node_modules'],
+      modules: ['node_modules', path.resolve(__dirname, '../../../node_modules')],
       fallback: {
         stream: require.resolve('stream-browserify'),
         crypto: require.resolve('crypto-browserify'),

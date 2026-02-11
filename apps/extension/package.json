@@ -22,8 +22,7 @@
     "lint": "eslint src --fix --ext .js,.ts,.tsx,.json  && npm run format",
     "lint:fix": "eslint --fix src/**/*.{js,jsx,ts,tsx,json}",
     "_prettier": "prettier --write .",
-    "format": "prettier --write \"src/**/*.{js,jsx,json,md,ts,tsx}\" --plugin-search-dir=./node_modules/ --plugin=./node_modules/@trivago/prettier-plugin-sort-imports/ ",
-    "postinstall": "patch-package"
+    "format": "prettier --write \"src/**/*.{js,jsx,json,md,ts,tsx}\" --plugin-search-dir=./node_modules/ --plugin=./node_modules/@trivago/prettier-plugin-sort-imports/ "
   },
   "dependencies": {
     "@ant-design/icons": "^4.7.0",

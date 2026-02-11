@@ -15,7 +15,8 @@ export default defineConfig({
     '@noble/secp256k1',
     '@unisat/wallet-types',
     'tiny-secp256k1',
-    '@bitcoinerlab/secp256k1'
+    '@bitcoinerlab/secp256k1',
+    'react-native'
   ],
   target: 'es2020',
   tsconfig: './tsconfig.json',

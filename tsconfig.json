@@ -20,6 +20,7 @@
     "rootDir": "src",
     "removeComments": false,
     "skipLibCheck": true,
+    "types": ["node"],
     "forceConsistentCasingInFileNames": true,
     "resolveJsonModule": true,
     "isolatedModules": true,
