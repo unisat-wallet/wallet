@@ -153,7 +153,6 @@ const iconImgList: Array<IconTypes> = [
   'network',
   'changePassword',
   'addressBookEmpty',
-  'website',
   'feedback',
   'apidocs',
   'medium',
