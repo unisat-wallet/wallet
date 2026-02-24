@@ -43,8 +43,7 @@
   "author": "UniSat",
   "license": "MIT",
   "dependencies": {
-    "@unisat/wallet-types": "workspace:*",
-    "@unisat/keyring-service": "workspace:*"
+    "@unisat/wallet-types": "workspace:*"
   },
   "devDependencies": {
     "@types/node": "^20.8.0",
