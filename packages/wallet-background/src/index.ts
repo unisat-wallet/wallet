@@ -26,7 +26,6 @@ export { notification } from './webapi'
 
 // Utils
 export { brc20Utils } from './utils/brc20-utils'
-export { namesUtils } from './utils/names-utils'
 
 export { initPersistStoreStorage } from './utils/persistStore'
 
