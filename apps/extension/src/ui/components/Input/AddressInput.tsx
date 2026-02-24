@@ -1,13 +1,13 @@
 import React, { useEffect, useState } from 'react';
 
-import { getSatsName } from '@/shared/lib/satsname-utils';
 import { Icon, Row, Text } from '@/ui/components';
 import { getAddressType, isValidAddress } from '@/ui/utils/bitcoin-utils';
+import { namesUtils } from '@unisat/base-utils';
 import { Inscription } from '@unisat/wallet-shared';
-import { useChain, useI18n, useWallet } from '@unisat/wallet-state';
-
 import { CHAINS_MAP, SAFE_DOMAIN_CONFIRMATION } from '@unisat/wallet-shared';
+import { useChain, useI18n, useWallet } from '@unisat/wallet-state';
 import { AddressType, ChainType } from '@unisat/wallet-types';
+
 import { $baseContainerStyle, $baseTextareaStyle, InputProps } from '.';
 import { AccordingInscription } from '../AccordingInscription';
 import { Column } from '../Column';
@@ -116,7 +116,7 @@ export const AddressInput = (props: InputProps) => {
     resetState();
 
     const teststr = inputAddress.toLowerCase();
-    const satsname = getSatsName(teststr);
+    const satsname = namesUtils.getSatsName(teststr);
     if (satsname) {
       if (SUPPORTED_DOMAINS.includes(satsname.suffix)) {
         setSearching(true);
