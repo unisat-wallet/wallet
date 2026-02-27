@@ -1,10 +1,18 @@
 import { useMemo } from 'react';
 
-import { Row, Text } from '@/ui/components';
+import { Column, Row, Text } from '@/ui/components';
 import { useBTCUnit, useChainType } from '@unisat/wallet-state';
 import { ChainType } from '@unisat/wallet-types';
 
-export function BtcDisplay({ balance }: { balance: string }) {
+export function BtcDisplay({
+  balance,
+  small,
+  hideBalance
+}: {
+  balance: string;
+  small?: boolean;
+  hideBalance?: boolean;
+}) {
   const chainType = useChainType();
   const btcUnit = useBTCUnit();
   const { intPart, decPart } = useMemo(() => {
@@ -22,6 +30,35 @@ export function BtcDisplay({ balance }: { balance: string }) {
     chainType === ChainType.BITCOIN_TESTNET ||
     chainType === ChainType.BITCOIN_TESTNET4 ||
     chainType === ChainType.BITCOIN_SIGNET;
+
+  if (hideBalance) {
+    return (
+      <Row itemsCenter>
+        <Column justifyCenter>
+          <Text
+            text={hideBalance ? '****' : balance}
+            preset="title-bold"
+            size="xxl"
+            style={{
+              fontSize: small ? 12 : 28,
+              color: small ? 'rgba(0, 0, 0, 0.5)' : '#000'
+            }}
+          />
+        </Column>
+        <Column justifyCenter>
+          <Text
+            text={btcUnit}
+            preset="title-bold"
+            textCenter
+            style={{
+              fontSize: small ? 12 : 28,
+              color: '#000'
+            }}
+          />
+        </Column>
+      </Row>
+    );
+  }
 
   if (chainType === 'FRACTAL_BITCOIN_MAINNET' || chainType === 'FRACTAL_BITCOIN_TESTNET') {
     //   show 3 decimal places for fractal bitcoin
@@ -54,13 +91,29 @@ export function BtcDisplay({ balance }: { balance: string }) {
   }
 
   return (
-    <Text
-      text={balance + ' ' + btcUnit}
-      preset="title-bold"
-      textCenter
-      size="xxxl"
-      my="sm"
-      color={isBTCChain ? 'white' : undefined}
-    />
+    <Row itemsCenter>
+      <Column justifyCenter>
+        <Text
+          text={hideBalance ? '****' : balance}
+          preset="title-bold"
+          style={{
+            fontSize: small ? 12 : 24,
+            color: small ? 'rgba(0, 0, 0, 0.5)' : '#000'
+          }}
+        />
+      </Column>
+      <Column justifyCenter>
+        <Text
+          text={btcUnit}
+          preset="title-bold"
+          textCenter
+          style={{
+            fontSize: small ? 12 : 24,
+            color: '#000'
+          }}
+        />
+      </Column>
+      {/* <Text text={balance + ' ' + btcUnit} preset="title-bold" textCenter size="xxxl" my="sm" /> */}
+    </Row>
   );
 }

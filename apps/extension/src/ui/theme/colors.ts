@@ -8,6 +8,7 @@ const palette = {
   black: '#000000',
   black_muted: 'rgba(0, 0, 0, 0.5)',
   black_muted2: 'rgba(0, 0, 0, 0.)',
+  black_65: 'rgba(0, 0, 0, 0.65)',
 
   dark: '#1E283C',
   grey: '#495361',

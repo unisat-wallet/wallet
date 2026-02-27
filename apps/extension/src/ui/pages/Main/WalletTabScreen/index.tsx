@@ -235,11 +235,7 @@ export default function WalletTabScreen() {
             </Column>
           )}
 
-          <BalanceCard
-            accountBalance={accountBalance}
-            disableUtxoTools={walletConfig.disableUtxoTools}
-            enableRefresh={true}
-          />
+          <BalanceCard />
 
           <WalletActions address={currentAccount?.address} chain={chain} />
 

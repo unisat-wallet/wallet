@@ -98,3 +98,5 @@ export {
   type ActionOverviewSectionProps,
 } from './useActionOverviewSectionLogic'
 export { useSettingsTabScreenLogic, type SettingsItemType } from './useSettingsTabScreenLogic'
+
+export { useBalanceCardLogic } from './useBalanceCardLogic'

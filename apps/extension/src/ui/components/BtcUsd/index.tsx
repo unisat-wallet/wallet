@@ -14,6 +14,7 @@ export function BtcUsd(
     size?: Sizes;
     bracket?: boolean; // ()
     isHidden?: boolean;
+    hideBalance?: boolean;
   } & TextProps
 ) {
   const { sats, color = 'textDim', size = 'sm', bracket = false, isHidden = false } = props;
@@ -64,7 +65,7 @@ export function BtcUsd(
     return result.toFixed(2);
   }, [chainType, coinPrice.btc, coinPrice.fb, sats]);
 
-  if (isHidden) {
+  if (isHidden || props.hideBalance) {
     if (bracket) {
       return <Text color={color} size={size} text={'(****)'} {...props} />;
     }
