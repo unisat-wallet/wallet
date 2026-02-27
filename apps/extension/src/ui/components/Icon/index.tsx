@@ -28,6 +28,7 @@ export const svgRegistry = {
   apidocs: '/images/icons/apidocs.svg',
   medium: '/images/icons/medium.svg',
   email: '/images/icons/email.svg',
+  notification: '/images/icons/notification.svg',
   arrowUp: '/images/icons/arrowup.svg',
   aboutus: '/images/icons/aboutus.svg',
   offcial: '/images/icons/offcial.svg',
@@ -187,7 +188,8 @@ const iconImgList: Array<IconTypes> = [
 
   'psbt_input',
   'psbt_output',
-  'psbt_opreturn'
+  'psbt_opreturn',
+  'notification'
 ];
 
 export type IconTypes = keyof typeof svgRegistry;
@@ -260,6 +262,7 @@ export function Icon(props: IconProps) {
   if (iconImgList.includes(icon)) {
     return (
       <img
+        onClick={onClick}
         src={iconPath}
         alt=""
         style={Object.assign({}, $containerStyleOverride, {

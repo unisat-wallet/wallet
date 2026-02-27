@@ -1,20 +1,28 @@
 import React from 'react';
 
-import { Column, Content, Footer, Header, Icon, Layout, Row, Text } from '@/ui/components';
-import { Button, Card } from '@/ui/components';
+import { Button, Card, Column, Content, Footer, Header, Icon, Layout, Row, Text } from '@/ui/components';
+import { BaseView } from '@/ui/components/BaseView';
 import { NavTabBar } from '@/ui/components/NavTabBar';
 import { SwitchNetworkBar } from '@/ui/components/SwitchNetworkBar';
 import { fontSizes } from '@/ui/theme/font';
 import { spacing } from '@/ui/theme/spacing';
 import { DISCORD_URL, GITHUB_URL, TWITTER_URL } from '@unisat/wallet-shared';
-import { SettingsItemType, useChain, useI18n, useNavigation, useVersionInfo } from '@unisat/wallet-state';
-import { useSettingsTabScreenLogic } from '@unisat/wallet-state';
+import {
+  SettingsItemType,
+  useChain,
+  useI18n,
+  useNavigation,
+  useSettingsTabScreenLogic,
+  useUnreadNotificationsCount,
+  useVersionInfo
+} from '@unisat/wallet-state';
 
 export default function SettingsTabScreen() {
   const versionInfo = useVersionInfo();
   const nav = useNavigation();
   const { t } = useI18n();
   const { unisatUrl } = useChain();
+  const unreadNotificationCount = useUnreadNotificationsCount();
   const {
     settings_connectedSites,
     settings_addressBook,
@@ -119,11 +127,37 @@ export default function SettingsTabScreen() {
         }
         RightComponent={
           <Row itemsCenter gap="md">
-            <div
-              onClick={() => nav.navigate('LanguageScreen')}
-              style={{ cursor: 'pointer', display: 'flex', alignItems: 'center' }}>
-              <Icon icon="language" size={28} color="textDim" />
-            </div>
+            <BaseView style={{ position: 'relative' }}>
+              <Icon
+                icon="notification"
+                size={20}
+                color="textDim"
+                onClick={() => {
+                  nav.navToNotifications();
+                }}
+              />
+              {unreadNotificationCount ? (
+                <BaseView
+                  style={{
+                    position: 'absolute',
+                    top: 2,
+                    right: 2,
+                    width: 7,
+                    height: 7,
+                    backgroundColor: 'red',
+                    borderRadius: '50%'
+                  }}></BaseView>
+              ) : null}
+            </BaseView>
+
+            <Icon
+              icon="language"
+              size={20}
+              color="textDim"
+              onClick={() => {
+                nav.navigate('LanguageScreen');
+              }}
+            />
             <SwitchNetworkBar />
           </Row>
         }

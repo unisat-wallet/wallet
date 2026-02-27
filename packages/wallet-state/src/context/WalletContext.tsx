@@ -41,6 +41,7 @@ import {
   SignedData,
   SignedMessage,
   SignPsbtOptions,
+  StoredNotification,
   TickPriceItem,
   TokenBalance,
   TokenTransfer,
@@ -664,6 +665,12 @@ export interface WalletController {
     hasMore: boolean
     list: Announcement[]
   }>
+
+  getNotifications(): Promise<StoredNotification[]>
+  readNotification(id: string): Promise<void>
+  readAllNotifications(): Promise<void>
+  deleteNotification(id: string): Promise<void>
+  getNotificationUnreadCount(): Promise<number>
 
   getAcceptLowFeeMode(): Promise<boolean>
   setAcceptLowFeeMode(accept: boolean): Promise<void>

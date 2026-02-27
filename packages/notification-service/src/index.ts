@@ -1,2 +1,2 @@
 export { NotificationService } from './notification-service'
-export type { StoredNotification, NotificationStore } from './types'
+export type { NotificationStore } from './types'

@@ -3243,6 +3243,30 @@ export class WalletController extends BaseController {
     return walletApiService.utility.getAnnouncements(cursor, size)
   }
 
+  // get the notifications
+  getNotifications = async () => {
+    return notificationService.getNotifications()
+  }
+
+  // mark the notification as read
+  readNotification = async (id: string) => {
+    return notificationService.markAsRead(id)
+  }
+
+  // mark all notifications as read
+  readAllNotifications = async () => {
+    return notificationService.readAll()
+  }
+
+  // delete the notification
+  deleteNotification = async (id: string) => {
+    return notificationService.deleteNotification(id)
+  }
+
+  getNotificationUnreadCount = (): number => {
+    return notificationService.getUnreadCount()
+  }
+
   getAcceptLowFeeMode = async () => {
     return preferenceService.getAcceptLowFeeMode()
   }

@@ -1,6 +1,6 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { StoredNotification } from '@unisat/wallet-shared'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { NotificationService } from '../src/notification-service'
-import { StoredNotification } from '../src/types'
 
 // ── helpers ───────────────────────────────────────────────────────────────────
 
@@ -108,7 +108,7 @@ describe('NotificationService', () => {
       ]
       await initService(service, { list })
       const results = await service.getNotifications()
-      expect(results.map((r) => r.id)).toEqual(['b', 'c', 'a'])
+      expect(results.map(r => r.id)).toEqual(['b', 'c', 'a'])
     })
 
     it('caps store at 20 items, keeping highest priority', async () => {
@@ -130,14 +130,16 @@ describe('NotificationService', () => {
       }
       await initService(service, { stored, list: [] })
       const results = await service.getNotifications()
-      expect(results.find((r) => r.id === 'old')).toBeUndefined()
-      expect(results.find((r) => r.id === 'fresh')).toBeDefined()
+      expect(results.find(r => r.id === 'old')).toBeUndefined()
+      expect(results.find(r => r.id === 'fresh')).toBeDefined()
     })
 
     it('falls back to local store when API fails', async () => {
       const stored = { n1: makeItem() }
       const storage = makeStorage({ notifications: stored })
-      const api = { notification: { getList: vi.fn().mockRejectedValue(new Error('network')), read: vi.fn() } }
+      const api = {
+        notification: { getList: vi.fn().mockRejectedValue(new Error('network')), read: vi.fn() },
+      }
       await service.init({ storage: storage as any, api: api as any })
       const results = await service.getNotifications()
       expect(results[0].id).toBe('n1')
@@ -203,7 +205,12 @@ describe('NotificationService', () => {
 
     it('still deletes locally even if server read call fails', async () => {
       const storage = makeStorage({ notifications: { n1: makeItem() } })
-      const api = { notification: { getList: vi.fn().mockResolvedValue({ list: [], total: 0 }), read: vi.fn().mockRejectedValue(new Error('network')) } }
+      const api = {
+        notification: {
+          getList: vi.fn().mockResolvedValue({ list: [], total: 0 }),
+          read: vi.fn().mockRejectedValue(new Error('network')),
+        },
+      }
       await service.init({ storage: storage as any, api: api as any })
       await service.deleteNotification('n1')
       expect(storage._db['notifications']['n1']).toBeUndefined()
@@ -278,9 +285,12 @@ describe('NotificationService', () => {
       const stored = { n1: makeItem({ id: 'n1' }) }
       const { storage } = await initService(service, { stored, list: [] })
       await service.readAll()
-      expect(storage.set).toHaveBeenCalledWith('notifications', expect.objectContaining({
-        n1: expect.objectContaining({ readAt: expect.any(Number) }),
-      }))
+      expect(storage.set).toHaveBeenCalledWith(
+        'notifications',
+        expect.objectContaining({
+          n1: expect.objectContaining({ readAt: expect.any(Number) }),
+        })
+      )
     })
 
     it('does nothing when there are no unread notifications', async () => {

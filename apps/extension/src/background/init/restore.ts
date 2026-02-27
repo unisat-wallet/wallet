@@ -1,24 +1,27 @@
+import { EventEmitter } from 'events';
+import logger from 'loglevel';
+
+// init/restore.ts
+import { i18nService } from '@/shared/utils/i18n';
+import { ExtensionAdapter } from '@unisat/phishing-detect';
 import {
   bgEventBus,
   contactBookService,
   keyringService,
+  notificationService,
   permissionService,
   phishingDetectService,
   preferenceService,
   walletApiService,
   walletController
 } from '@unisat/wallet-background';
+import { bgI18n, CHAINS_MAP, t } from '@unisat/wallet-shared';
 import { BaseProxyStorageAdapter } from '@unisat/wallet-storage';
-import logger from 'loglevel';
+
 import { encryptor } from '../utils/encryptor';
 import { HttpClient } from '../utils/http-client/httpClient';
 import storage from '../utils/storage';
 
-// init/restore.ts
-import { i18nService } from '@/shared/utils/i18n';
-import { ExtensionAdapter } from '@unisat/phishing-detect';
-import { bgI18n, CHAINS_MAP, t } from '@unisat/wallet-shared';
-import { EventEmitter } from 'events';
 export const AppInitEvent = new EventEmitter();
 
 class ExtensionStorageAdapter extends BaseProxyStorageAdapter {
@@ -80,6 +83,12 @@ export async function restoreAppState() {
     await contactBookService.init({
       storage: proxyStorage,
       logger: logger
+    });
+
+    await notificationService.init({
+      storage: proxyStorage,
+      logger: logger,
+      api: walletApiService
     });
 
     const adapter = new ExtensionAdapter();

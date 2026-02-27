@@ -1,7 +1,7 @@
 import { WalletApiService } from '@unisat/wallet-api'
-import { Logger } from '@unisat/wallet-shared'
+import { Logger, StoredNotification } from '@unisat/wallet-shared'
 import { ProxyStorageAdapter } from '@unisat/wallet-storage'
-import { NotificationStore, StoredNotification } from './types'
+import { NotificationStore } from './types'
 
 const MAX_NOTIFICATIONS = 20
 // Read notifications are deleted after 7 days

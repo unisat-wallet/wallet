@@ -1,9 +1,7 @@
+import { Card, Column, Row, Text } from '@/ui/components';
 import { CloseOutlined } from '@ant-design/icons';
 import { AnnouncementLinkType } from '@unisat/wallet-shared';
 import { useAnnouncementCardLogic, useI18n } from '@unisat/wallet-state';
-
-import { Column, Row, Text } from '@/ui/components';
-import { Button } from '@/ui/components/Button';
 
 const CARD_HEIGHT = 130;
 
@@ -67,7 +65,7 @@ export function AnnouncementCard() {
           padding: '2px 8px',
           alignSelf: 'flex-start'
         }}>
-        <Text text={`📣 ${t('announcement')}`} size="xs" color="textDim" />
+        <Text text={`📣 ${t('announcement')}`} size="xs" />
       </Row>
 
       {/* Title & description */}
@@ -116,18 +114,16 @@ export function AnnouncementCard() {
         </Row>
 
         {isLinkable(current) && (
-          <Button
-            text={t('view_detail')}
-            onClick={handleViewDetails}
-            style={{
-              background: '#323232',
-              borderRadius: 8,
-              padding: '4px 10px',
-              fontSize: 12,
-              height: 'auto',
-              minHeight: 'unset'
+          <Card
+            preset="style2"
+            style={{ height: 28, backgroundColor: 'rgba(255, 255, 255, 0.1)' }}
+            fullX
+            onClick={() => {
+              handleViewDetails();
             }}
-          />
+            data-testid="wallet-management-entry">
+            <Text text={t('view_detail')} size="xxs" ellipsis />
+          </Card>
         )}
       </Row>
     </Column>

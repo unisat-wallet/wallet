@@ -72,6 +72,7 @@ import ExportMnemonicsScreen from './Settings/ExportMnemonicsScreen';
 import ExportPrivateKeyScreen from './Settings/ExportPrivateKeyScreen';
 import LanguageScreen from './Settings/LanguageScreen';
 import NetworkTypeScreen from './Settings/NetworkTypeScreen';
+import NotificationListScreen from './Settings/NotificationListScreen';
 import UpgradeNoticeScreen from './Settings/UpgradeNoticeScreen';
 import CosmosSignDemo from './Test/CosmosSignDemo';
 import TestScreen from './Test/TestScreen';
@@ -103,6 +104,10 @@ export const routes = {
   AppTabScrren: {
     path: '/app',
     element: <AppTabScrren />
+  },
+  NotificationListScreen: {
+    path: '/notifications',
+    element: <NotificationListScreen />
   },
   SettingsTabScreen: {
     path: '/settings',

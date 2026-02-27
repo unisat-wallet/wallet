@@ -155,6 +155,9 @@ export function NavigationProvider({ children }: { children: React.ReactNode }) 
       navToRootHome: () => {
         navigate('/');
       },
+      navToNotifications: () => {
+        navigate('NotificationListScreen');
+      },
       openExtensionInTab: async () => {
         await openExtensionInTab('index.html', {});
         window.close();

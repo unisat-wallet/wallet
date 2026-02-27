@@ -262,6 +262,7 @@ export interface NavigationContextType {
 
   openExtensionInTab?: () => void // in extension only
   navToRootHome: () => void // in extension only
+  navToNotifications: () => void // in extension only
 }
 
 const initContext = {
@@ -291,6 +292,7 @@ const initContext = {
   // in extension only
   openExtensionInTab: () => {},
   navToRootHome: () => {},
+  navToNotifications: () => {},
 }
 
 export const NavigationContext = React.createContext<NavigationContextType>(initContext)

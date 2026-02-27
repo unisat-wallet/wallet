@@ -19,13 +19,13 @@ export class NotificationService {
     list: NotificationListItem[]
     total: number
   }> {
-    return this.httpClient.post('/v5/notification/list', {})
+    return this.httpClient.get('/v5/notification/list', {})
   }
 
-  async read(id: string): Promise<{
+  async read(notificationId: string): Promise<{
     success: boolean
   }> {
-    return this.httpClient.post('/v5/notification/read', { id })
+    return this.httpClient.post('/v5/notification/read', { notificationId })
   }
 
   async readAll(notificationIds: string[]): Promise<{

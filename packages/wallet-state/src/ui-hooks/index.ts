@@ -22,6 +22,7 @@ export {
 export { useEditWalletNameScreenLogic } from './useEditWalletNameScreenLogic'
 export { useFeeRateBarLogic } from './useFeeRateBarLogic'
 export { useLockTimePageLogic } from './useLockTimePageLogic'
+export { useNotificationsLogic, useUnreadNotificationsCount } from './useNotificationsLogic'
 export { useSendOrdinalsInscriptionScreenLogic } from './useSendOrdinalsInscriptionScreenLogic'
 export { useTxCreateScreenLogic } from './useTxCreateScreenLogic'
 

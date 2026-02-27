@@ -177,7 +177,7 @@ export const WalletActions = ({ chain, address }: WalletActionsProps) => {
               onClick={() => setMoreExpanded(!moreExpanded)}>
               {!moreExpanded && (
                 <>
-                  {!utxoClicked && <NewBadge />}
+                  {/* {!utxoClicked && <NewBadge />} */}
 
                   <div
                     style={{
@@ -202,7 +202,7 @@ export const WalletActions = ({ chain, address }: WalletActionsProps) => {
                 <Button preset="home" style={{ opacity: 0 }}></Button>
                 <div style={{ position: 'relative', marginRight: 7, marginLeft: 8 }}>
                   <Button text="UTXO" preset="homeGold" icon="utxo" onClick={handleUtxoClick} />
-                  {!utxoClicked && <NewBadge top={-5} right={-5} />}
+                  {/* {!utxoClicked && <NewBadge top={-5} right={-5} />} */}
                 </div>
                 <Button
                   text={t('buy')}

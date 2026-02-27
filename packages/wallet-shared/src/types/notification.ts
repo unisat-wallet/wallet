@@ -7,3 +7,7 @@ export type NotificationListItem = {
   priority: number
   publishTime: number
 }
+
+export interface StoredNotification extends NotificationListItem {
+  readAt?: number // timestamp when marked as read; undefined means unread
+}

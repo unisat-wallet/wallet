@@ -1,5 +1,5 @@
 import { colors } from '@/ui/theme/colors';
-import { TabOption, useHasNewBanner, useNavigation } from '@unisat/wallet-state';
+import { TabOption, useHasNewBanner, useNavigation, useUnreadNotificationsCount } from '@unisat/wallet-state';
 
 import { BaseView } from '../BaseView';
 import { Column } from '../Column';
@@ -29,6 +29,7 @@ function TabButton({
 }) {
   const nav = useNavigation();
   const hasNewBanner = useHasNewBanner();
+  const unreadNotificationCount = useUnreadNotificationsCount();
 
   return (
     <Column
@@ -47,6 +48,18 @@ function TabButton({
       <Icon size={20} icon={icon} color={isActive ? 'white' : 'white_muted'} />
       <BaseView style={{ position: 'relative' }}>
         {tabName === 'discover' && hasNewBanner && (
+          <BaseView
+            style={{
+              position: 'absolute',
+              top: -28,
+              right: -10,
+              width: 7,
+              height: 7,
+              backgroundColor: 'red',
+              borderRadius: '50%'
+            }}></BaseView>
+        )}
+        {tabName === 'settings' && unreadNotificationCount > 0 && (
           <BaseView
             style={{
               position: 'absolute',

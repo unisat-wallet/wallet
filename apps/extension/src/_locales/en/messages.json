@@ -1943,6 +1943,27 @@
   "settings": {
     "message": "Settings"
   },
+  "notifications": {
+    "message": "Notifications"
+  },
+  "all_read": {
+    "message": "All Read"
+  },
+  "no_notifications": {
+    "message": "No notifications"
+  },
+  "just_now": {
+    "message": "Just now"
+  },
+  "minutes_ago": {
+    "message": "$1 minutes ago"
+  },
+  "hours_ago": {
+    "message": "$1 hours ago"
+  },
+  "days_ago": {
+    "message": "$1 days ago"
+  },
   "show_private_key": {
     "message": "Show Private Key"
   },
