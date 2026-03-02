@@ -1,4 +1,5 @@
 import { Card, Column, Row, Text } from '@/ui/components';
+import { shortDesc } from '@/ui/utils';
 import { CloseOutlined } from '@ant-design/icons';
 import { AnnouncementLinkType } from '@unisat/wallet-shared';
 import { useAnnouncementCardLogic, useI18n } from '@unisat/wallet-state';
@@ -25,77 +26,76 @@ export function AnnouncementCard() {
   if (loading || validAnnouncements.length === 0) return null;
 
   return (
-    <Column
-      style={{
-        position: 'relative',
-        borderRadius: 12,
-        border: '1px solid #2C2C2C',
-        background: '#1A1A1A',
-        padding: 12,
-        gap: 8,
-        height: CARD_HEIGHT,
-        overflow: 'hidden'
-      }}>
-      {/* Close button */}
-      <div
-        onClick={handleDismissAll}
+    <Column justifyCenter>
+      <Column
         style={{
-          position: 'absolute',
-          top: 8,
-          right: 8,
-          width: 20,
-          height: 20,
-          borderRadius: 10,
-          background: '#828282',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          cursor: 'pointer',
-          zIndex: 10
+          position: 'relative',
+          borderRadius: 12,
+          border: '1px solid #2C2C2C',
+          background: '#1A1A1A',
+          padding: 12,
+          gap: 8,
+          height: CARD_HEIGHT,
+          overflow: 'hidden'
         }}>
-        <CloseOutlined style={{ fontSize: 10, color: '#000' }} />
-      </div>
-
-      {/* Header badge */}
-      <Row
-        style={{
-          display: 'inline-flex',
-          background: 'rgba(255,255,255,0.1)',
-          borderRadius: 20,
-          padding: '2px 8px',
-          alignSelf: 'flex-start'
-        }}>
-        <Text text={`📣 ${t('announcement')}`} size="xs" />
-      </Row>
-
-      {/* Title & description */}
-      <Column style={{ flex: 1, overflow: 'hidden', gap: 4 }}>
-        <Text
-          text={current.title}
-          size="sm"
+        {/* Close button */}
+        <div
+          onClick={handleDismissAll}
           style={{
-            fontWeight: 600,
-            whiteSpace: 'nowrap',
-            overflow: 'hidden',
-            textOverflow: 'ellipsis',
-            paddingRight: 24
-          }}
-        />
-        <Text
-          text={current.description}
-          size="xs"
-          color="textDim"
+            position: 'absolute',
+            top: 8,
+            right: 8,
+            width: 20,
+            height: 20,
+            borderRadius: 10,
+            background: '#828282',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            cursor: 'pointer',
+            zIndex: 10
+          }}>
+          <CloseOutlined style={{ fontSize: 10, color: '#000' }} />
+        </div>
+
+        {/* Header badge */}
+        <Row
           style={{
-            display: '-webkit-box',
-            WebkitLineClamp: 2,
-            WebkitBoxOrient: 'vertical',
-            overflow: 'hidden'
-          }}
-        />
+            display: 'inline-flex',
+            background: 'rgba(255,255,255,0.1)',
+            borderRadius: 20,
+            padding: '2px 8px',
+            alignSelf: 'flex-start'
+          }}>
+          <Text text={`📣 ${t('announcement')}`} size="xs" />
+        </Row>
+
+        {/* Title & description */}
+        <Column style={{ flex: 1, gap: 2 }}>
+          <Column
+            style={{ maxHeight: isLinkable(current) ? CARD_HEIGHT - 80 : '100%', overflow: 'hidden' }}
+            overflowY
+            gap={'xs'}>
+            <Text text={current.title} size="xs" />
+            <Text text={shortDesc(current.description, 100)} size="xs" color="textDim" />
+          </Column>
+
+          {isLinkable(current) && (
+            <Card
+              preset="style2"
+              style={{ height: 24, backgroundColor: 'rgba(255, 255, 255, 0.1)', marginTop: 'auto' }}
+              fullX
+              onClick={() => {
+                handleViewDetails();
+              }}
+              data-testid="wallet-management-entry">
+              <Text text={t('view_detail')} size="xxs" />
+            </Card>
+          )}
+        </Column>
       </Column>
-
-      {/* Footer: dots + view detail */}
-      <Row justifyBetween itemsCenter style={{ marginTop: 'auto' }}>
+      {/* Footer: dots  */}
+      <Row fullX justifyCenter itemsCenter style={{ marginTop: 'auto' }}>
         <Row style={{ gap: 4 }}>
           {validAnnouncements.length > 1 &&
             validAnnouncements.map((_, i) => (
@@ -112,19 +112,6 @@ export function AnnouncementCard() {
               />
             ))}
         </Row>
-
-        {isLinkable(current) && (
-          <Card
-            preset="style2"
-            style={{ height: 28, backgroundColor: 'rgba(255, 255, 255, 0.1)' }}
-            fullX
-            onClick={() => {
-              handleViewDetails();
-            }}
-            data-testid="wallet-management-entry">
-            <Text text={t('view_detail')} size="xxs" ellipsis />
-          </Card>
-        )}
       </Row>
     </Column>
   );

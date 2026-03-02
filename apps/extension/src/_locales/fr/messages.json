@@ -2506,5 +2506,11 @@
   },
   "all_marked_as_read": {
     "message": "Tout marqué comme lu"
+  },
+  "announcement": {
+    "message": "Annonce"
+  },
+  "view_detail": {
+    "message": "Voir le détail"
   }
 }

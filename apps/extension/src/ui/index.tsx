@@ -16,6 +16,7 @@ import { AppDimensions } from './components/Responsive';
 import AsyncMainRoute from './pages/MainRoute';
 import { DeviceProvider } from './providers/DeviceProvider';
 import { I18nProvider } from './providers/I18nProvider';
+import { StorageProvider } from './providers/StorageProvider';
 import { ToolsProvider } from './providers/ToolsProvider';
 import { getAntdConfig, initializeAppConfig } from './utils/appConfig';
 import { applyExternalMonitorFix } from './utils/platformFixes';
@@ -50,23 +51,25 @@ function renderApp() {
   root.render(
     <Provider store={store}>
       <WalletProvider {...antdConfig} wallet={wallet as any}>
-        <DeviceProvider>
-          <I18nProvider>
-            <ToolsProvider>
-              <AppDimensions>
-                <PriceProvider>
-                  <IdleTimerProvider
-                    onAction={() => {
-                      wallet.setLastActiveTime();
-                    }}>
-                    <AccountUpdater />
-                    <AsyncMainRoute />
-                  </IdleTimerProvider>
-                </PriceProvider>
-              </AppDimensions>
-            </ToolsProvider>
-          </I18nProvider>
-        </DeviceProvider>
+        <StorageProvider>
+          <DeviceProvider>
+            <I18nProvider>
+              <ToolsProvider>
+                <AppDimensions>
+                  <PriceProvider>
+                    <IdleTimerProvider
+                      onAction={() => {
+                        wallet.setLastActiveTime();
+                      }}>
+                      <AccountUpdater />
+                      <AsyncMainRoute />
+                    </IdleTimerProvider>
+                  </PriceProvider>
+                </AppDimensions>
+              </ToolsProvider>
+            </I18nProvider>
+          </DeviceProvider>
+        </StorageProvider>
       </WalletProvider>
     </Provider>
   );

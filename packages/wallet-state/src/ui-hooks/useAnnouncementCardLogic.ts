@@ -11,23 +11,28 @@ export function useAnnouncementCardLogic() {
   const [activeIndex, setActiveIndex] = useState(0)
   const [dismissedIds, setDismissedIds] = useState<string[]>([])
   const [announcements, setAnnouncements] = useState<Announcement[]>([])
-  const [loading, setLoading] = useState(true)
+  const [loading, setLoading] = useState(false)
+  const [dismissedLoaded, setDismissedLoaded] = useState(false)
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
   useEffect(() => {
-    fetchAnnouncements()
-    loadDismissedIds()
+    const init = async () => {
+      try {
+        await loadDismissedIds()
+        await fetchAnnouncements()
+      } finally {
+        setDismissedLoaded(true)
+      }
+    }
+    init()
   }, [])
 
   const fetchAnnouncements = async () => {
     try {
-      setLoading(true)
       const response = await wallet.getAnnouncements(0, 10)
       setAnnouncements(Array.isArray(response?.list) ? response.list : [])
     } catch {
       setAnnouncements([])
-    } finally {
-      setLoading(false)
     }
   }
 
@@ -36,7 +41,7 @@ export function useAnnouncementCardLogic() {
     setDismissedIds(saved)
   }
 
-  const validAnnouncements = announcements.filter((a) => {
+  const validAnnouncements = announcements.filter(a => {
     const now = Date.now()
     return now >= a.startTime && now <= a.endTime && !dismissedIds.includes(a.id)
   })
@@ -45,7 +50,7 @@ export function useAnnouncementCardLogic() {
   useEffect(() => {
     if (validAnnouncements.length <= 1) return undefined
     timerRef.current = setInterval(() => {
-      setActiveIndex((prev) => (prev + 1) % validAnnouncements.length)
+      setActiveIndex(prev => (prev + 1) % validAnnouncements.length)
     }, AUTO_PLAY_INTERVAL)
     return () => {
       if (timerRef.current) clearInterval(timerRef.current)
@@ -57,7 +62,7 @@ export function useAnnouncementCardLogic() {
   }, [])
 
   const handleDismissAll = useCallback(async () => {
-    const ids = validAnnouncements.map((a) => a.id)
+    const ids = validAnnouncements.map(a => a.id)
     if (ids.length === 0) return
     const newIds = [...dismissedIds, ...ids]
     setDismissedIds(newIds)

@@ -2509,5 +2509,11 @@
   },
   "all_marked_as_read": {
     "message": "已全部標為已讀"
+  },
+  "announcement": {
+    "message": "公告"
+  },
+  "view_detail": {
+    "message": "查看詳情"
   }
 }

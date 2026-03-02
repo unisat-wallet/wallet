@@ -2506,5 +2506,11 @@
   },
   "all_marked_as_read": {
     "message": "Все отмечено как прочитанное"
+  },
+  "announcement": {
+    "message": "Объявление"
+  },
+  "view_detail": {
+    "message": "Посмотреть детали"
   }
 }

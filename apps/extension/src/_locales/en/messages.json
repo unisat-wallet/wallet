@@ -1955,6 +1955,12 @@
   "all_marked_as_read": {
     "message": "All marked as read"
   },
+  "announcement": {
+    "message": "Announcement"
+  },
+  "view_detail": {
+    "message": "View Detail"
+  },
   "no_notifications": {
     "message": "No notifications"
   },
