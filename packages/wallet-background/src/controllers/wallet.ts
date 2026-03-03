@@ -1833,7 +1833,7 @@ export class WalletController extends BaseController {
     }
   }
   updateConnectSite = (origin: string, data: ConnectedSite) => {
-    permissionService.updateConnectSite(origin, data)
+    permissionService.updateConnectSite(origin, data, true)
     const network = this.getLegacyNetworkName()
     sessionService.broadcastEvent(
       SESSION_EVENTS.networkChanged,

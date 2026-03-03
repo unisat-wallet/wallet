@@ -1,13 +1,13 @@
 import { Button, Card, Column, Content, Footer, Header, Layout, Row, Text } from '@/ui/components';
 import { ColdWalletSignMessage } from '@/ui/components/ColdWallet';
-import WebsiteBar from '@/ui/components/WebsiteBar';
-import { KeystoneSignEnum } from '@unisat/keyring-service/types';
-import { SignMessageProps, useSignMessageLogic } from '@unisat/wallet-state';
-
 import LoadingPage from '@/ui/components/LoadingPage';
 import { PhishingDetection } from '@/ui/components/PhishingDetection';
+import WebsiteBar from '@/ui/components/WebsiteBar';
 import { fontSizes } from '@/ui/theme/font';
+import { KeystoneSignEnum } from '@unisat/keyring-service/types';
 import { SignMessageType } from '@unisat/wallet-shared';
+import { SignMessageProps, useSignMessageLogic } from '@unisat/wallet-state';
+
 import KeystoneSignScreen from '../../Wallet/KeystoneSignScreen';
 import MultiSignDisclaimerModal from './SignPsbt/components/MultiSignDisclaimerModal';
 
@@ -138,23 +138,19 @@ export default function SignMessage(props: SignMessageProps) {
           <Row full>
             <Button preset="default" text={t('reject_all')} onClick={onClickBack} full />
 
-            {allowQuickMultiSign ? (
-              <Button
-                preset="primary"
-                text={isAllSigned ? t('submit') : `(${signedCount}/${toSignMessages.length}) ${t('signed')}`}
-                icon={isAllSigned ? undefined : 'alert'}
-                onClick={onTryMultiSign}
-                full
-              />
-            ) : (
-              <Button
-                preset="primary"
-                text={isAllSigned ? t('submit') : `(${signedCount}/${toSignMessages.length}) ${t('signed')}`}
-                onClick={onClickSign}
-                full
-                disabled={isAllSigned == false}
-              />
-            )}
+            <Button
+              preset="primary"
+              text={isAllSigned ? t('submit') : `(${signedCount}/${toSignMessages.length}) ${t('signed')}`}
+              icon={isAllSigned ? undefined : 'alert'}
+              onClick={() => {
+                if (allowQuickMultiSign) {
+                  onQuickMultiSign();
+                } else {
+                  onTryMultiSign();
+                }
+              }}
+              full
+            />
           </Row>
         </Footer>
         {disclaimerVisible && (

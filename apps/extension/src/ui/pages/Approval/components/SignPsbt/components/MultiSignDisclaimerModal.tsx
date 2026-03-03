@@ -46,11 +46,7 @@ export default function MultiSignDisclaimerModal({
 
         <Row itemsCenter mb="md" onClick={() => setTrustSite((v) => !v)} style={{ cursor: 'pointer' }}>
           <Checkbox checked={trustSite} onChange={(e) => setTrustSite(e.target.checked)} />
-          <Text
-            mt="sm"
-            style={{ fontSize: fontSizes.sm, color: colors.textDim }}
-            text={t('trust_this_site_for_quick_multi_sign')}
-          />
+          <Text mt="sm" style={{ fontSize: fontSizes.sm }} text={t('trust_this_site_for_quick_multi_sign')} />
         </Row>
 
         <Button

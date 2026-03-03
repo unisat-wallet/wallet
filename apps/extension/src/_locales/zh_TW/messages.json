@@ -2500,5 +2500,8 @@
   },
   "sign_psbt_input_error": {
     "message": "psbt 或參數無效，無法進行簽名。"
+  },
+  "trust_this_site_for_quick_multi_sign": {
+    "message": "信任此網站並不再顯示此提示"
   }
 }

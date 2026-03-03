@@ -1,3 +1,6 @@
+import VirtualList, { ListRef } from 'rc-virtual-list';
+import { forwardRef, useEffect, useRef } from 'react';
+
 import { Button, Card, Column, Content, Footer, Header, Layout, Row, Text } from '@/ui/components';
 import ColdWalletSignPsbt from '@/ui/components/ColdWallet/ColdWalletSignPsbt';
 import { ContractPopover } from '@/ui/components/ContractPopover';
@@ -6,12 +9,10 @@ import { PhishingDetection } from '@/ui/components/PhishingDetection';
 import { SignPsbtWithRisksPopover } from '@/ui/components/SignPsbtWithRisksPopover';
 import WebsiteBar from '@/ui/components/WebsiteBar';
 import KeystoneSignScreen from '@/ui/pages/Wallet/KeystoneSignScreen';
+import { fontSizes } from '@/ui/theme/font';
 import { KeystoneSignEnum } from '@unisat/keyring-service/types';
 import { SignPsbtProps, useI18n, useSignPsbtLogic } from '@unisat/wallet-state';
 
-import { fontSizes } from '@/ui/theme/font';
-import VirtualList, { ListRef } from 'rc-virtual-list';
-import { forwardRef, useEffect, useRef } from 'react';
 import ActionOverviewSection from './components/ActionOverviewSection';
 import AssetOverviewSection from './components/AssetOverviewSection';
 import { InputsList } from './components/InputsList';
@@ -19,6 +20,7 @@ import MultiSignDisclaimerModal from './components/MultiSignDisclaimerModal';
 import { OutputsList } from './components/OutputsList';
 import PsbtDataSection from './components/PsbtDataSection';
 import { SignPsbtSection } from './components/Section';
+
 const ITEM_HEIGHT = 64 + 8; // item height + margin top
 
 function TransactionItem(
@@ -201,23 +203,19 @@ export default function SignPsbt(props: SignPsbtProps) {
           <Row full>
             <Button preset="default" text={t('reject_all')} onClick={onClickBack} full />
 
-            {allowQuickMultiSign ? (
-              <Button
-                preset="primary"
-                text={isAllSigned ? t('submit') : `(${signedCount}/${toSignDatas.length}) ${t('signed')}`}
-                icon={isAllSigned ? undefined : 'alert'}
-                onClick={onTryMultiSign}
-                full
-              />
-            ) : (
-              <Button
-                preset="primary"
-                text={isAllSigned ? t('submit') : `(${signedCount}/${toSignDatas.length}) ${t('signed')}`}
-                onClick={onClickSign}
-                full
-                disabled={isAllSigned == false}
-              />
-            )}
+            <Button
+              preset="primary"
+              text={isAllSigned ? t('submit') : `(${signedCount}/${toSignDatas.length}) ${t('signed')}`}
+              onClick={() => {
+                if (allowQuickMultiSign) {
+                  onQuickMultiSign();
+                } else {
+                  onTryMultiSign();
+                }
+              }}
+              icon={allowQuickMultiSign ? undefined : 'alert'}
+              full
+            />
           </Row>
         </Footer>
 

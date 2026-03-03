@@ -2497,5 +2497,8 @@
   },
   "sign_psbt_input_error": {
     "message": "Le psbt ou les paramètres sont invalides et ne peuvent pas être signés."
+  },
+  "trust_this_site_for_quick_multi_sign": {
+    "message": "Faire confiance à ce site et ne plus afficher cette invite"
   }
 }

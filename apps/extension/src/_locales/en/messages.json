@@ -2304,7 +2304,7 @@
     "message": "transactions at once"
   },
   "trust_this_site_for_quick_multi_sign": {
-    "message": "Trust this site for quick multi-sign"
+    "message": "Trust this site and do not show this prompt again"
   },
   "transfer": {
     "message": "Transfer"
