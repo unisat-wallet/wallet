@@ -327,6 +327,11 @@ export function useSignPsbtLogic(props: SignPsbtProps) {
       onSignedData(signedData, signingTxIndex)
     } catch (e) {
       logger.error('Local signing failed:', e)
+      if (e.message.includes('Can not sign for input')) {
+        tools.toastError(t('sign_psbt_input_error'))
+      } else {
+        tools.toastError(e.message)
+      }
       signedStates[signingTxIndex] = SignState.FAILED
       setSignedStates([...signedStates])
     }

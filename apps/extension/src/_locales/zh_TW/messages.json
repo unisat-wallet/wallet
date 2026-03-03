@@ -2497,5 +2497,8 @@
   },
   "your_balance_have_to_be_merged": {
     "message": "您的 "
+  },
+  "sign_psbt_input_error": {
+    "message": "psbt 或參數無效，無法進行簽名。"
   }
 }

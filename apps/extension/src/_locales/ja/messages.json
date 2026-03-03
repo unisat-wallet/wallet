@@ -2494,5 +2494,8 @@
   },
   "your_balance_have_to_be_merged": {
     "message": "あなたの"
+  },
+  "sign_psbt_input_error": {
+    "message": "psbt またはパラメータが無効なため、署名できません。"
   }
 }

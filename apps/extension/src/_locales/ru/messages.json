@@ -2494,5 +2494,8 @@
   },
   "your_balance_have_to_be_merged": {
     "message": "Ваш "
+  },
+  "sign_psbt_input_error": {
+    "message": "Psbt или параметры недействительны и не могут быть подписаны."
   }
 }

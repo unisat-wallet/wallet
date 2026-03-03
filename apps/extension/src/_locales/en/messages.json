@@ -2518,5 +2518,8 @@
   },
   "your_balance_have_to_be_merged": {
     "message": "Your "
+  },
+  "sign_psbt_input_error": {
+    "message": "The psbt or params is invalid and cannot be signed."
   }
 }
