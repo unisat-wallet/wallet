@@ -1952,6 +1952,9 @@
   "all_read": {
     "message": "All Read"
   },
+  "all_marked_as_read": {
+    "message": "All marked as read"
+  },
   "no_notifications": {
     "message": "No notifications"
   },

@@ -1,6 +1,6 @@
 import { StoredNotification } from '@unisat/wallet-shared'
 import { useCallback, useEffect, useState } from 'react'
-import { useWallet } from 'src/context'
+import { useI18n, useTools, useWallet } from 'src/context'
 
 export function useUnreadNotificationsCount() {
   const wallet = useWallet()
@@ -53,11 +53,14 @@ export function useNotificationsLogic() {
     [wallet]
   )
 
+  const tools = useTools()
+  const { t } = useI18n()
   const handleReadAll = useCallback(async () => {
     await wallet.readAllNotifications()
     // Update local state
     const now = Date.now()
     setNotifications(prev => prev.map(n => ({ ...n, readAt: now })))
+    tools.toastSuccess(t('all_marked_as_read'))
   }, [wallet])
 
   const handleDeleteNotification = useCallback(

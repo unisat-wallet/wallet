@@ -2503,5 +2503,8 @@
   },
   "copy_publickey": {
     "message": "公開鍵をコピー"
+  },
+  "all_marked_as_read": {
+    "message": "すべて既読にしました"
   }
 }

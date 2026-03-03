@@ -2506,5 +2506,8 @@
   },
   "copy_publickey": {
     "message": "複製公鑰"
+  },
+  "all_marked_as_read": {
+    "message": "已全部標為已讀"
   }
 }

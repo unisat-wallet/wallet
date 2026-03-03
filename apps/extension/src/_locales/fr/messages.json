@@ -2503,5 +2503,8 @@
   },
   "copy_publickey": {
     "message": "Copier la clé publique"
+  },
+  "all_marked_as_read": {
+    "message": "Tout marqué comme lu"
   }
 }

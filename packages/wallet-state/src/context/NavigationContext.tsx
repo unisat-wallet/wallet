@@ -105,6 +105,7 @@ export type RouteParamList = {
   LanguageScreen: undefined
   ChangePasswordScreen: undefined
   ModuleAssets: undefined
+  NotificationListScreen: undefined
 
   // Tools
   UtxoToolsMainScreen: undefined
