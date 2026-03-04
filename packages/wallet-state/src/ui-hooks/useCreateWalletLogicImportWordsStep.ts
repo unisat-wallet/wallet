@@ -80,10 +80,11 @@ function textToWordsArray(text: string) {
 export function useCreateWalletLogicImportWordsStep(params: CreateWalletLogicParams) {
   const { contextData, updateContextData } = params
   const { t } = useI18n()
+
+  const walletTypeConfig = RESTORE_WALLETS.find(
+    item => item.value === contextData.restoreWalletType
+  )
   const wordsItems: Array<WordsItem> = useMemo(() => {
-    const walletTypeConfig = RESTORE_WALLETS.find(
-      item => item.value === contextData.restoreWalletType
-    )
     const supportedWordsItems: WordsItem[] = []
     if (walletTypeConfig) {
       if (walletTypeConfig.wordsTypes.includes(WordsType.WORDS_12)) {
@@ -117,7 +118,7 @@ export function useCreateWalletLogicImportWordsStep(params: CreateWalletLogicPar
 
   const [enteredWordsCount, setEnteredWordsCount] = useState(0)
 
-  const enablePhrase = contextData.restoreWalletType !== RestoreWalletType.OW
+  const enablePhrase = walletTypeConfig?.phraseSupport
 
   const maxWordsCount = wordsItems[contextData.wordsType].count
 
