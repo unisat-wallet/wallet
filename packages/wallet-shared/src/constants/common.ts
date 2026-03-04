@@ -613,6 +613,8 @@ export const DEFAULT_LOCKTIME_ID = 2
 export const RESTORE_WALLETS: {
   value: RestoreWalletType
   name: string
+  /** If present, use t(i18nKey) for display; otherwise display name directly */
+  i18nKey?: string
   addressTypes: AddressType[]
   wordsTypes: WordsType[]
   customPathSupport: boolean
@@ -673,7 +675,8 @@ export const RESTORE_WALLETS: {
   },
   {
     value: RestoreWalletType.OTHERS,
-    name: 'other_wallet',
+    name: 'Other Wallet',
+    i18nKey: 'other_wallet',
     addressTypes: [
       AddressType.P2PKH,
       AddressType.P2WPKH,

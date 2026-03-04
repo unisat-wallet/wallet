@@ -22,7 +22,7 @@ export function Step0({
               updateContextData({ tabType: TabType.IMPORT_WORDS, restoreWalletType: item.value });
             }}
             data-testid={`restore-wallet-type-option-${index}`}>
-            <Text text={t(item.name)} />
+            <Text text={item.i18nKey ? t(item.i18nKey) : item.name} />
           </Button>
         );
       })}
