@@ -2539,5 +2539,17 @@
   },
   "total_spent": {
     "message": "總支出"
+  },
+  "notifications": {
+    "message": "通知"
+  },
+  "all_read": {
+    "message": "全部已讀"
+  },
+  "no_notifications": {
+    "message": "無通知"
+  },
+  "just_now": {
+    "message": "剛才"
   }
 }

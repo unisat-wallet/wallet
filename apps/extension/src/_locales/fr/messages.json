@@ -2536,5 +2536,17 @@
   },
   "total_spent": {
     "message": "Total dépensé"
+  },
+  "notifications": {
+    "message": "Notifications"
+  },
+  "all_read": {
+    "message": "Tout lu"
+  },
+  "no_notifications": {
+    "message": "Aucune notification"
+  },
+  "just_now": {
+    "message": "À l'instant"
   }
 }

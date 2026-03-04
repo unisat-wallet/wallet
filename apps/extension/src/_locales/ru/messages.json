@@ -2536,5 +2536,17 @@
   },
   "total_spent": {
     "message": "Итого потрачено"
+  },
+  "notifications": {
+    "message": "Уведомления"
+  },
+  "all_read": {
+    "message": "Всё прочитано"
+  },
+  "no_notifications": {
+    "message": "Нет уведомлений"
+  },
+  "just_now": {
+    "message": "Только что"
   }
 }
