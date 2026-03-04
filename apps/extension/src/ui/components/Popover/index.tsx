@@ -1,7 +1,6 @@
 import React from 'react';
 
-import { CloseOutlined } from '@ant-design/icons';
-
+import { Icon } from '../Icon';
 import { Row } from '../Row';
 
 export const Popover = (props: {
@@ -34,7 +33,7 @@ export const Popover = (props: {
             onClick={() => {
               onClose();
             }}>
-            <CloseOutlined />
+            <Icon icon="close" size={12} />
           </Row>
         )}
 

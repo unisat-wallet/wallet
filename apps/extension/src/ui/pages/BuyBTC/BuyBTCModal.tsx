@@ -1,10 +1,9 @@
 import { Skeleton } from 'antd';
 import { useEffect, useState } from 'react';
 
-import { Card, Column, Image, Row, Text } from '@/ui/components';
+import { Card, Column, Icon, Image, Row, Text } from '@/ui/components';
 import { BottomModal } from '@/ui/components/BottomModal';
 import { colors } from '@/ui/theme/colors';
-import { CloseOutlined } from '@ant-design/icons';
 import { BtcChannelItem } from '@unisat/wallet-shared';
 import { useChain, useI18n, useTools, useWallet } from '@unisat/wallet-state';
 
@@ -86,7 +85,7 @@ export const BuyBTCModal = ({ onClose }: { onClose: () => void }) => {
             onClick={() => {
               onClose();
             }}>
-            <CloseOutlined />
+            <Icon icon="close" size={12} />
           </Row>
         </Row>
 

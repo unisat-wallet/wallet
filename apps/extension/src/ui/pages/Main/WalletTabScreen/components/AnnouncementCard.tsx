@@ -1,6 +1,5 @@
-import { Card, Column, Row, Text } from '@/ui/components';
+import { Card, Column, Icon, Row, Text } from '@/ui/components';
 import { shortDesc } from '@/ui/utils';
-import { CloseOutlined } from '@ant-design/icons';
 import { AnnouncementLinkType } from '@unisat/wallet-shared';
 import { useAnnouncementCardLogic, useI18n } from '@unisat/wallet-state';
 
@@ -55,7 +54,7 @@ export function AnnouncementCard() {
             cursor: 'pointer',
             zIndex: 10
           }}>
-          <CloseOutlined style={{ fontSize: 10, color: '#000' }} />
+          <Icon icon="close" size={10} color="black" />
         </div>
 
         {/* Header badge */}

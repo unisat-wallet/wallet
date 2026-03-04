@@ -4,7 +4,6 @@ import { IMAGE_SOURCE_MAP } from '@/shared/constant';
 import { Card, Column, Icon, Image, Row, Text } from '@/ui/components';
 import { BottomModal } from '@/ui/components/BottomModal';
 import { colors } from '@/ui/theme/colors';
-import { CloseOutlined } from '@ant-design/icons';
 import { CHAIN_GROUPS, CHAINS_MAP, TypeChainGroup } from '@unisat/wallet-shared';
 import { useChain, useChangeChainTypeCallback, useI18n, useReloadAccounts, useTools } from '@unisat/wallet-state';
 import { ChainType } from '@unisat/wallet-types';
@@ -129,7 +128,7 @@ export const SwitchChainModal = ({ onClose }: { onClose: () => void }) => {
             onClick={() => {
               onClose();
             }}>
-            <CloseOutlined />
+            <Icon icon="close" size={12} />
           </Row>
         </Row>
 
