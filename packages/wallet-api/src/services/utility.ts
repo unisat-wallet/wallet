@@ -2,7 +2,7 @@
  * Utility and tool related API methods
  */
 
-import type { BaseHttpClient, HttpClient } from '../client/http-client'
+import type { BaseHttpClient } from '../client/http-client'
 import { Announcement, AppSummary } from '../types'
 
 export class UtilityService {
@@ -92,7 +92,7 @@ export class UtilityService {
     cursor: number,
     size: number
   ): Promise<{ hasMore: boolean; list: Announcement[] }> {
-    return this.httpClient.get('/global/announcement/list', {
+    return this.httpClient.get('/v5/announcement/list', {
       query: {
         cursor,
         size,
