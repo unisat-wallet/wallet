@@ -141,7 +141,7 @@ export default function SignPsbt(props: SignPsbtProps) {
   useEffect(() => {
     const timeoutId = setTimeout(() => {
       if (refList.current && signedCount >= 1) {
-        refList.current?.scrollTo({ index: signedCount - 1, align: 'top' });
+        refList.current?.scrollTo({ key: 'psbt_' + (signedCount - 1), align: 'top' });
       }
     });
 

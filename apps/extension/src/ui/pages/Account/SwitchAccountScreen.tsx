@@ -188,7 +188,7 @@ export default function SwitchAccountScreen() {
   useEffect(() => {
     const timeoutId = setTimeout(() => {
       if (refList.current && currentIndex >= 0) {
-        refList.current?.scrollTo({ index: currentIndex, align: 'top' });
+        refList.current?.scrollTo({ key: currentAccount.address, align: 'top' });
       }
     });
 
