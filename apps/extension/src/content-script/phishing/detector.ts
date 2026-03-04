@@ -7,7 +7,18 @@
  * Check if the current site is a phishing site
  * @returns Promise<boolean> - true if the site is phishing
  */
+function isExtensionContextValid(): boolean {
+  try {
+    return !!chrome.runtime?.id;
+  } catch {
+    return false;
+  }
+}
+
 export async function checkPhishing(): Promise<boolean> {
+  if (!isExtensionContextValid()) {
+    return false;
+  }
   try {
     const hostname = window.location.hostname;
     const isPhishing = await new Promise<boolean>((resolve) => {
@@ -19,7 +30,6 @@ export async function checkPhishing(): Promise<boolean> {
         },
         (response) => {
           if (chrome.runtime.lastError) {
-            console.warn('Message channel error:', chrome.runtime.lastError);
             resolve(false);
             return;
           }
@@ -29,27 +39,25 @@ export async function checkPhishing(): Promise<boolean> {
     });
 
     if (isPhishing) {
+      if (!isExtensionContextValid()) return true;
       try {
-        // Send redirect message
         chrome.runtime.sendMessage(
           {
             type: 'REDIRECT_TO_PHISHING_PAGE',
             hostname
           },
           () => {
-            if (chrome.runtime.lastError) {
-              console.warn('Redirect message error:', chrome.runtime.lastError);
-            }
+            // eslint-disable-next-line @typescript-eslint/no-unused-expressions
+            chrome.runtime.lastError;
           }
         );
-      } catch (e) {
-        console.warn('Failed to send redirect message:', e);
+      } catch {
+        // context invalidated, ignore
       }
       return true;
     }
     return false;
-  } catch (e) {
-    console.error('Failed to check phishing:', e);
+  } catch {
     return false;
   }
 }
