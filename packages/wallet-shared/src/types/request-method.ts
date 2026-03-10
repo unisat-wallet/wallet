@@ -94,3 +94,12 @@ export interface RequestMethodGetAvailableUtxosParams {
   cursor: number
   size: number
 }
+
+export interface RequestMethodGetLamportPublicKeyParams {
+  context: string // hex-encoded context bytes
+}
+
+export interface RequestMethodSignWithLamportParams {
+  context: string // hex-encoded context bytes
+  proofBits: number[] // array of 508 values, each 0 or 1
+}

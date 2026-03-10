@@ -36,7 +36,7 @@ class UnlockManager {
 const unlockManager = new UnlockManager()
 
 const isSignApproval = (type: string) => {
-  const SIGN_APPROVALS = ['SignText', 'SignPsbt', 'SignTx', 'SignData']
+  const SIGN_APPROVALS = ['SignText', 'SignPsbt', 'SignTx', 'SignData', 'SignLamport']
   return SIGN_APPROVALS.includes(type)
 }
 const windowHeight = 600

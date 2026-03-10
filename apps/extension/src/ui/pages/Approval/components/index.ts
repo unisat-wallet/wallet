@@ -3,6 +3,7 @@ export { default as CosmosConnect } from './CosmosConnect';
 export { default as CosmosSign } from './CosmosSign';
 export { default as InscribeTransfer } from './InscribeTransfer';
 export { default as SignData } from './SignData';
+export { default as SignLamport } from './SignLamport';
 export { default as SignMessage } from './SignMessage';
 export { default as SignPsbt } from './SignPsbt';
 export { default as SwitchChain } from './SwitchChain';

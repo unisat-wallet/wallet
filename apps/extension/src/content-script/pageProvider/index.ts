@@ -84,6 +84,9 @@ export class UnisatProvider extends EventEmitter {
   inscribeTransfer = async (ticker: string, amount: string) => this.bitcoinAPI.inscribeTransfer(ticker, amount);
   getVersion = async () => this.bitcoinAPI.getVersion();
   getBitcoinUtxos = async (cursor = 0, size = 20) => this.bitcoinAPI.getBitcoinUtxos(cursor, size);
+  getLamportPublicKey = async (context: string) => this.bitcoinAPI.getLamportPublicKey(context);
+  signWithLamport = async (context: string, proofBits: number[]) =>
+    this.bitcoinAPI.signWithLamport(context, proofBits);
 }
 
 declare global {

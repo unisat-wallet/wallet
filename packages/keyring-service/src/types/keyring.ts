@@ -40,6 +40,10 @@ export interface Keyring {
   changeHdPath?(hdPath: string): void
   getAccountByHdPath?(hdPath: string, index: number): string
 
+  // Lamport one-time signature methods (HD keyring only)
+  getLamportPublicKey?(context: string): Promise<{ falseHashes: string[]; trueHashes: string[] }>
+  signWithLamport?(context: string, proofBits: number[]): Promise<string[]>
+
   // Keystone specific methods
   genSignPsbtUr?(psbtHex: string): Promise<{ type: string; cbor: string }>
   parseSignPsbtUr?(type: string, cbor: string): Promise<string>

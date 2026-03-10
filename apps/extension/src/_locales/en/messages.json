@@ -1121,6 +1121,24 @@
   "language_description": {
     "message": "Change the language of the application"
   },
+  "lamport_context": {
+    "message": "Context"
+  },
+  "lamport_public_key_request": {
+    "message": "Lamport Public Key Request"
+  },
+  "lamport_public_key_request_description": {
+    "message": "This site is requesting a Lamport public key derived from your wallet."
+  },
+  "lamport_signature_request": {
+    "message": "Lamport Signature Request"
+  },
+  "lamport_signature_request_description": {
+    "message": "This site is requesting a one-time Lamport signature. This operation is irreversible."
+  },
+  "lamport_signature_warning": {
+    "message": "Lamport signatures are single-use. Do not sign twice with the same context."
+  },
   "latest_version": {
     "message": "Latest Version"
   },

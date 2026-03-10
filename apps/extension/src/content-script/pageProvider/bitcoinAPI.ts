@@ -259,4 +259,18 @@ export class BitcoinAPIMethods {
       params
     });
   };
+
+  getLamportPublicKey = async (context: string) => {
+    return this.provider[requestMethodKey]({
+      method: 'getLamportPublicKey',
+      params: { context }
+    });
+  };
+
+  signWithLamport = async (context: string, proofBits: number[]) => {
+    return this.provider[requestMethodKey]({
+      method: 'signWithLamport',
+      params: { context, proofBits }
+    });
+  };
 }

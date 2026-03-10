@@ -40,6 +40,13 @@ export type ProviderMethodList = {
     signerAddress: string
     data: string
   }
+  getLamportPublicKey: {
+    context: string
+  }
+  signWithLamport: {
+    context: string
+    proofBits: number[]
+  }
 }
 
 export type ProviderMethods = keyof ProviderMethodList

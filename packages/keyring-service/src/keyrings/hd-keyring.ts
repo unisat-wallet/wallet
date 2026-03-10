@@ -5,10 +5,22 @@ import bitcore from 'bitcore-lib'
 import * as hdkey from 'hdkey'
 
 import { ECPairInterface, bitcoin, eccManager } from '@unisat/wallet-bitcoin'
+import { deriveLamportKeypair, lamportPublicKey, lamportSign, LamportPublicKey } from './lamport'
 import { SimpleKeyring } from './simple-keyring'
 
 const hdPathString = "m/44'/0'/0'/0"
 const type = 'HD Key Tree'
+
+/** Validate and decode a hex-encoded context string. */
+function parseHexContext(context: string): Uint8Array {
+  if (typeof context !== 'string' || context.length === 0) {
+    throw new Error('Lamport context must be a non-empty hex string')
+  }
+  if (context.length % 2 !== 0 || !/^[0-9a-fA-F]+$/.test(context)) {
+    throw new Error('Lamport context must be an even-length hex string')
+  }
+  return Buffer.from(context, 'hex')
+}
 
 interface DeserializeOption {
   hdPath?: string
@@ -259,6 +271,49 @@ export class HdKeyring extends SimpleKeyring {
       }
     }
     return null
+  }
+
+  /**
+   * Derive a deterministic Lamport public key from this keyring's seed
+   * and an opaque context byte string.
+   *
+   * @param context - Hex-encoded context bytes (caller-defined).
+   * @returns The Lamport public key as two arrays of hex-encoded Hash160 hashes.
+   */
+  async getLamportPublicKey(context: string): Promise<LamportPublicKey> {
+    if (!this.mnemonic) {
+      throw new Error('Lamport signatures require a mnemonic-based keyring')
+    }
+    const contextBytes = parseHexContext(context)
+    const seedBuf = bip39.mnemonicToSeedSync(this.mnemonic, this.passphrase)
+    const seed = new Uint8Array(seedBuf.buffer, seedBuf.byteOffset, seedBuf.byteLength)
+    try {
+      const keypair = deriveLamportKeypair(seed, contextBytes)
+      return lamportPublicKey(keypair)
+    } finally {
+      seed.fill(0)
+    }
+  }
+
+  /**
+   * Sign with a Lamport keypair derived from this keyring's seed.
+   *
+   * @param context   - Hex-encoded context bytes (same as used for public key).
+   * @param proofBits - Array of 508 values, each 0 or 1.
+   * @returns Array of 508 hex-encoded preimages.
+   */
+  async signWithLamport(context: string, proofBits: number[]): Promise<string[]> {
+    if (!this.mnemonic) {
+      throw new Error('Lamport signatures require a mnemonic-based keyring')
+    }
+    const contextBytes = parseHexContext(context)
+    const seedBuf = bip39.mnemonicToSeedSync(this.mnemonic, this.passphrase)
+    const seed = new Uint8Array(seedBuf.buffer, seedBuf.byteOffset, seedBuf.byteLength)
+    try {
+      return lamportSign(seed, contextBytes, proofBits)
+    } finally {
+      seed.fill(0)
+    }
   }
 
   private _addressFromIndex(i: number) {

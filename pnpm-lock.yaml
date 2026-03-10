@@ -1328,6 +1328,28 @@ importers:
         specifier: 5.0.4
         version: 5.0.4
 
+  packages/approval-service:
+    dependencies:
+      '@unisat/wallet-shared':
+        specifier: workspace:*
+        version: link:../wallet-shared
+      eventemitter3:
+        specifier: ^5.0.1
+        version: 5.0.1
+    devDependencies:
+      '@types/node':
+        specifier: ^20.0.0
+        version: 20.8.0
+      tsup:
+        specifier: ^7.0.0
+        version: 7.2.0(typescript@5.2.2)
+      typescript:
+        specifier: ^5.0.0
+        version: 5.2.2
+      vitest:
+        specifier: ^0.34.0
+        version: 0.34.0(jsdom@27.4.0)
+
   packages/babylon-service:
     dependencies:
       '@babylonlabs-io/babylon-proto-ts':
@@ -1456,6 +1478,9 @@ importers:
       '@metamask/obs-store':
         specifier: ^7.0.0
         version: 7.0.0
+      '@noble/hashes':
+        specifier: ^1.3.0
+        version: 1.8.0
       '@unisat/wallet-bitcoin':
         specifier: workspace:*
         version: link:../wallet-bitcoin
@@ -1517,9 +1542,15 @@ importers:
 
   packages/notification-service:
     dependencies:
+      '@unisat/wallet-api':
+        specifier: workspace:*
+        version: link:../wallet-api
       '@unisat/wallet-shared':
         specifier: workspace:*
         version: link:../wallet-shared
+      '@unisat/wallet-storage':
+        specifier: workspace:*
+        version: link:../wallet-storage
       eventemitter3:
         specifier: ^5.0.1
         version: 5.0.1
@@ -1709,6 +1740,9 @@ importers:
 
   packages/wallet-background:
     dependencies:
+      '@unisat/approval-service':
+        specifier: workspace:*
+        version: link:../approval-service
       '@unisat/babylon-service':
         specifier: workspace:*
         version: link:../babylon-service
@@ -2899,7 +2933,7 @@ packages:
       '@babel/core': ^7.0.0-0
     dependencies:
       '@babel/core': 7.20.2
-      '@babel/helper-plugin-utils': 7.28.6
+      '@babel/helper-plugin-utils': 7.27.1
       '@babel/plugin-syntax-numeric-separator': 7.10.4(@babel/core@7.20.2)
 
   /@babel/plugin-proposal-numeric-separator@7.18.6(@babel/core@7.28.4):
@@ -6010,7 +6044,7 @@ packages:
     resolution: {integrity: sha512-OtB9XVHWaXidLbHvrVDeeXa09yvTl3+IQN884sO6PhIi2/StXfgSH/9zC7IvzrDB8kW3EBJ1PPLuCUJ2hxAT7Q==}
     dependencies:
       chalk: 4.1.2
-      debug: 4.4.1
+      debug: 4.4.3
       dotenv: 16.4.7
       dotenv-expand: 11.0.7
       getenv: 1.0.0
@@ -6154,7 +6188,7 @@ packages:
       '@expo/image-utils': 0.5.1
       '@expo/json-file': 8.3.3
       '@react-native/normalize-colors': 0.74.84
-      debug: 4.4.1
+      debug: 4.4.3
       expo-modules-autolinking: 1.11.0
       fs-extra: 9.1.0
       resolve-from: 5.0.0
@@ -6176,7 +6210,7 @@ packages:
       '@expo/image-utils': 0.5.1
       '@expo/json-file': 8.3.3
       '@react-native/normalize-colors': 0.74.85
-      debug: 4.4.1
+      debug: 4.4.3
       expo-modules-autolinking: 1.11.1
       fs-extra: 9.1.0
       resolve-from: 5.0.0
@@ -10925,7 +10959,7 @@ packages:
       '@typescript-eslint/types': 7.18.0
       '@typescript-eslint/typescript-estree': 7.18.0(typescript@5.0.4)
       '@typescript-eslint/visitor-keys': 7.18.0
-      debug: 4.4.1
+      debug: 4.4.3
       eslint: 8.50.0
       typescript: 5.0.4
     transitivePeerDependencies:
@@ -10968,7 +11002,7 @@ packages:
     dependencies:
       '@typescript-eslint/typescript-estree': 5.59.0(typescript@4.7.2)
       '@typescript-eslint/utils': 5.59.0(eslint@8.50.0)(typescript@4.7.2)
-      debug: 4.4.1
+      debug: 4.4.3
       eslint: 8.50.0
       tsutils: 3.21.0(typescript@4.7.2)
       typescript: 4.7.2
@@ -10988,7 +11022,7 @@ packages:
     dependencies:
       '@typescript-eslint/typescript-estree': 5.59.0(typescript@5.0.4)
       '@typescript-eslint/utils': 5.59.0(eslint@8.50.0)(typescript@5.0.4)
-      debug: 4.4.1
+      debug: 4.4.3
       eslint: 8.50.0
       tsutils: 3.21.0(typescript@5.0.4)
       typescript: 5.0.4
@@ -11048,7 +11082,7 @@ packages:
     dependencies:
       '@typescript-eslint/typescript-estree': 7.18.0(typescript@5.0.4)
       '@typescript-eslint/utils': 7.18.0(eslint@8.50.0)(typescript@5.0.4)
-      debug: 4.4.1
+      debug: 4.4.3
       eslint: 8.50.0
       ts-api-utils: 1.4.3(typescript@5.0.4)
       typescript: 5.0.4
@@ -11166,7 +11200,7 @@ packages:
     dependencies:
       '@typescript-eslint/types': 7.18.0
       '@typescript-eslint/visitor-keys': 7.18.0
-      debug: 4.4.1
+      debug: 4.4.3
       globby: 11.1.0
       is-glob: 4.0.3
       minimatch: 9.0.5
@@ -15439,7 +15473,6 @@ packages:
         optional: true
     dependencies:
       ms: 2.1.3
-    dev: true
 
   /decamelize-keys@1.1.1:
     resolution: {integrity: sha512-WiPxgEirIV0/eIOMcnFBA3/IJZAZqKnwAwWyvvdi4lsr1WCN22nhdf/3db3DoZcUjTV2SqfzIwNyp6y2xs3nmg==}
@@ -19211,7 +19244,7 @@ packages:
     dependencies:
       '@tootallnate/once': 1.1.2
       agent-base: 6.0.2
-      debug: 4.4.1
+      debug: 4.4.3
     transitivePeerDependencies:
       - supports-color
     dev: false
@@ -19222,7 +19255,7 @@ packages:
     dependencies:
       '@tootallnate/once': 2.0.0
       agent-base: 6.0.2
-      debug: 4.4.1
+      debug: 4.4.3
     transitivePeerDependencies:
       - supports-color
 
@@ -19231,7 +19264,7 @@ packages:
     engines: {node: '>= 14'}
     dependencies:
       agent-base: 7.1.4
-      debug: 4.4.1
+      debug: 4.4.3
     transitivePeerDependencies:
       - supports-color
     dev: true
@@ -19295,7 +19328,7 @@ packages:
     engines: {node: '>= 14'}
     dependencies:
       agent-base: 7.1.4
-      debug: 4.4.1
+      debug: 4.4.3
     transitivePeerDependencies:
       - supports-color
 
@@ -29442,7 +29475,7 @@ packages:
     engines: {node: '>= 14'}
     dependencies:
       agent-base: 7.1.4
-      debug: 4.4.1
+      debug: 4.4.3
       socks: 2.8.7
     transitivePeerDependencies:
       - supports-color
@@ -31851,7 +31884,7 @@ packages:
     hasBin: true
     dependencies:
       cac: 6.7.14
-      debug: 4.4.1
+      debug: 4.4.3
       mlly: 1.7.4
       pathe: 1.1.2
       picocolors: 1.1.1

@@ -1,6 +1,7 @@
 import { bitcoin, verifyMessageOfBIP322Simple } from '@unisat/wallet-bitcoin'
 import {
   RequestMethodGetInscriptionsParams,
+  RequestMethodGetLamportPublicKeyParams,
   RequestMethodSendBitcoinParams,
   RequestMethodSendInscriptionParams,
   RequestMethodSendRunesParams,
@@ -8,6 +9,7 @@ import {
   RequestMethodSignMessagesParams,
   RequestMethodSignPsbtParams,
   RequestMethodSignPsbtsParams,
+  RequestMethodSignWithLamportParams,
 } from '@unisat/wallet-shared'
 import { permissionService, sessionService, walletApiService } from '../../services'
 import { getChainInfo, objToUint8Array } from '../../shared/utils'
@@ -444,6 +446,43 @@ class ProviderController extends BaseController {
   private _isKeystoneWallet = async () => {
     const currentKeyring = await wallet.getCurrentKeyring()
     return currentKeyring?.type === 'keystone'
+  }
+
+  @Reflect.metadata('SAFE', true)
+  getLamportPublicKey = async ({ data: { params } }) => {
+    const p: RequestMethodGetLamportPublicKeyParams = params
+    if (!p.context || typeof p.context !== 'string') {
+      throw new Error('context is required')
+    }
+    if (p.context.length === 0 || p.context.length % 2 !== 0 || !/^[0-9a-fA-F]+$/.test(p.context)) {
+      throw new Error('context must be a non-empty even-length hex string')
+    }
+    return await wallet.getLamportPublicKey(p.context)
+  }
+
+  @Reflect.metadata('APPROVAL', [
+    'SignLamport',
+    async req => {
+      const params: RequestMethodSignWithLamportParams = req.data.params
+      if (!params.context || typeof params.context !== 'string') {
+        throw new Error('context is required')
+      }
+      if (params.context.length === 0 || params.context.length % 2 !== 0 || !/^[0-9a-fA-F]+$/.test(params.context)) {
+        throw new Error('context must be a non-empty even-length hex string')
+      }
+      if (!Array.isArray(params.proofBits) || params.proofBits.length !== 508) {
+        throw new Error('proofBits must be an array of 508 values')
+      }
+      for (let i = 0; i < params.proofBits.length; i++) {
+        if (params.proofBits[i] !== 0 && params.proofBits[i] !== 1) {
+          throw new Error('proofBits values must be 0 or 1')
+        }
+      }
+    },
+  ])
+  signWithLamport = async ({ data: { params } }) => {
+    const p: RequestMethodSignWithLamportParams = params
+    return await wallet.signWithLamport(p.context, p.proofBits)
   }
 
   @Reflect.metadata('APPROVAL', [

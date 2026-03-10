@@ -2848,6 +2848,28 @@ export class WalletController extends BaseController {
     return walletApiService.utility.createBuyCoinPaymentUrl(coin, address, channel)
   }
 
+  //  ----------- lamport support --------
+
+  getLamportPublicKey = async (context: string) => {
+    const account = await this.getCurrentAccount()
+    if (!account) throw new Error('No current account')
+    const keyring = await keyringService.getKeyringForAccount(account.pubkey, account.type)
+    if (!keyring?.getLamportPublicKey) {
+      throw new Error('Current keyring does not support Lamport signatures')
+    }
+    return keyring.getLamportPublicKey(context)
+  }
+
+  signWithLamport = async (context: string, proofBits: number[]) => {
+    const account = await this.getCurrentAccount()
+    if (!account) throw new Error('No current account')
+    const keyring = await keyringService.getKeyringForAccount(account.pubkey, account.type)
+    if (!keyring?.signWithLamport) {
+      throw new Error('Current keyring does not support Lamport signatures')
+    }
+    return keyring.signWithLamport(context, proofBits)
+  }
+
   //  ----------- cosmos support --------
 
   getCosmosKeyring = async (chainId: string) => {
