@@ -23,7 +23,7 @@ Derive a deterministic 32-byte value from the wallet's key material and an arbit
 **Derivation Scheme**
 
 ```
-HKDF-SHA-256(ikm=keyMaterial, salt="unisat-derive-context-hash", info=context, length=32)
+HKDF-SHA-256(ikm=keyMaterial, salt="derive-context-hash", info=context, length=32)
 ```
 
 Where `keyMaterial` is:
@@ -40,7 +40,7 @@ try {
   const context = "a1b2c3d4e5f6...";
   const hash = await window.unisat.deriveContextHash(context);
   console.log(hash);
-  // => "16fa55f8a70ecc973e6baa1ffd77cd1db7bf019d78de4310f0011cc201007c02"
+  // => "fb9046c540159d2a3f2ff36c79da7079b9f65b9e231dcc47eaf780e57122359b"
 } catch (e) {
   console.log(e);
 }
@@ -53,7 +53,7 @@ try {
 - HKDF is a formally proven extract-then-expand KDF (Krawczyk, Crypto 2010; RFC 5869).
 - The Extract step ensures even structured inputs (e.g., secp256k1 keys) produce a uniformly random pseudorandom key.
 - The Expand step is a PRF — revealing many outputs for different contexts does not leak the seed or private key.
-- The fixed salt `"unisat-derive-context-hash"` provides domain separation from BIP-32 and other HMAC uses.
+- The fixed salt `"derive-context-hash"` provides domain separation from BIP-32 and other HMAC uses.
 - All intermediate key material is zeroed after use within the wallet.
 - Used by TLS 1.3, Signal Protocol, and Ethereum EIP-2333 for similar key derivation purposes.
 

@@ -139,21 +139,21 @@ describe('deriveContextHash', () => {
       const ctx = Buffer.from('babylon-vault-test', 'utf-8')
       const result = deriveContextHash(freshSeed(), ctx)
       // Pinned value — if this changes, the derivation scheme has changed
-      expect(result).toBe('16fa55f8a70ecc973e6baa1ffd77cd1db7bf019d78de4310f0011cc201007c02')
+      expect(result).toBe('fb9046c540159d2a3f2ff36c79da7079b9f65b9e231dcc47eaf780e57122359b')
     })
 
     it('produces a stable output for a second context', () => {
       const ctx = Buffer.from('babylon-htlc-preimage', 'utf-8')
       const result = deriveContextHash(freshSeed(), ctx)
       // Second pinned value for broader regression coverage
-      expect(result).toBe('471e93f5b1964fde6cde9e83e8277f2268654a9a4178c775f8bf2912843e92ac')
+      expect(result).toBe('31cf9bf4e4311b944414deac608a908ec85dd82b240bea0d5a362f24ff49dc62')
     })
 
     it('produces a stable output for 32-byte private key', () => {
       const privKey = Buffer.from('69f477943dd1591f0261cabade0839e2ffc0c13d8fa1ce0d69f6c6c251163b34', 'hex')
       const ctx = Buffer.from('deadbeef', 'hex')
       const result = deriveContextHash(new Uint8Array(privKey), ctx)
-      expect(result).toBe('98263601b05e6d8e71e901d4f96ec4a23634ef17a7f26ee2f6dae3634f5f62c1')
+      expect(result).toBe('b86b70d096cbb96f290ad04b45734a4fdd232ab846c1d675802150065856fb30')
     })
   })
 })

@@ -380,7 +380,7 @@ describe('bitcoin-simple-keyring', () => {
     it('known-answer test', async () => {
       const newKeyring = new SimpleKeyring([testAccount.key])
       const result = await newKeyring.deriveContextHash(testAccount.address, 'deadbeef')
-      expect(result).toBe('8f2064889f825ec2797ed764668b36998eebe22e682255b425edda0c2f6ed7f9')
+      expect(result).toBe('c75cfa090d2681fdde35ebd22330f0476221fb6d2edd9d9afc2953cab0bd1ce2')
     })
 
     it('different accounts produce different results', async () => {

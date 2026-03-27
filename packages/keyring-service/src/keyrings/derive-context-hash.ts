@@ -8,7 +8,7 @@
  * ## Derivation scheme
  *
  * ```
- * HKDF-SHA-256(ikm=keyMaterial, salt="unisat-derive-context-hash", info=context, length=32)
+ * HKDF-SHA-256(ikm=keyMaterial, salt="derive-context-hash", info=context, length=32)
  * ```
  *
  * Where `keyMaterial` is either the full 64-byte BIP-39 seed or a 32-byte
@@ -32,7 +32,7 @@
 import { hkdf } from '@noble/hashes/hkdf'
 import { sha256 } from '@noble/hashes/sha256'
 
-const SALT = 'unisat-derive-context-hash'
+const SALT = 'derive-context-hash'
 const OUTPUT_LENGTH = 32
 
 /**
