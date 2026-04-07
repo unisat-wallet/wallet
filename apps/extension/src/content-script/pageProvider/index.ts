@@ -83,7 +83,7 @@ export class UnisatProvider extends EventEmitter {
   pushPsbt = async (psbtHex: string) => this.bitcoinAPI.pushPsbt(psbtHex);
   inscribeTransfer = async (ticker: string, amount: string) => this.bitcoinAPI.inscribeTransfer(ticker, amount);
   getVersion = async () => this.bitcoinAPI.getVersion();
-  deriveContextHash = async (context: string) => this.bitcoinAPI.deriveContextHash(context);
+  deriveContextHash = async (appName: string, context: string) => this.bitcoinAPI.deriveContextHash(appName, context);
   getBitcoinUtxos = async (cursor = 0, size = 20) => this.bitcoinAPI.getBitcoinUtxos(cursor, size);
 }
 

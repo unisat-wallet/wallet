@@ -1009,14 +1009,14 @@ export class WalletController extends BaseController {
     }
   }
 
-  deriveContextHash = async (context: string): Promise<string> => {
+  deriveContextHash = async (appName: string, context: string): Promise<string> => {
     const account = preferenceService.getCurrentAccount()
     if (!account) throw new Error('no current account')
     const keyring = await keyringService.getKeyringForAccount(account.pubkey, account.type)
     if (!keyring.deriveContextHash) {
       throw new Error('Current keyring does not support deriveContextHash')
     }
-    return keyring.deriveContextHash(account.pubkey, context)
+    return keyring.deriveContextHash(account.pubkey, appName, context)
   }
 
   addContact = (data: ContactBookItem) => {

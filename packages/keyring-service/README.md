@@ -135,7 +135,7 @@ Main service class for managing keyrings.
 
 ##### Key Derivation
 
-- `deriveContextHash(publicKey: string, context: string): Promise<string>` - Derive a deterministic 32-byte value from the wallet's key material and a hex-encoded context string using HKDF-SHA-256 (RFC 5869). Supported by all keyring types: HD (mnemonic), HD (xpriv), and imported private keys.
+- `deriveContextHash(publicKey: string, appName: string, context: string): Promise<string>` - Derive a deterministic 32-byte value from the wallet's key material, an application name, and a hex-encoded context string using HKDF-SHA-256 (RFC 5869). The `appName` must be 1-64 bytes, lowercase `[a-z0-9\-]`. Supported by all keyring types: HD (mnemonic), HD (xpriv), and imported private keys.
 
 ### Types
 

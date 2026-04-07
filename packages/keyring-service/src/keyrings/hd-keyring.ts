@@ -9,6 +9,8 @@ import { deriveContextHash, parseHexContext } from './derive-context-hash'
 import { SimpleKeyring } from './simple-keyring'
 
 const hdPathString = "m/44'/0'/0'/0"
+// BIP-32 path for deriveContextHash IKM. Purpose index = trunc31_be(SHA-256("derive-context-hash")).
+const DERIVE_CONTEXT_HASH_PATH = "m/73681862'"
 const type = 'HD Key Tree'
 
 interface DeserializeOption {
@@ -264,35 +266,28 @@ export class HdKeyring extends SimpleKeyring {
 
   /**
    * Derive a deterministic context hash from the wallet's key material.
-   * Uses the 64-byte BIP-39 seed for mnemonic keyrings, or the xpriv
-   * root private key (32 bytes) for xpriv-only keyrings.
+   * Uses BIP-32 derivation at m/73681862' from the HD wallet root.
    *
-   * @param publicKey - Public key identifying the account (unused for HD keyrings
-   *   since derivation is from the root, but kept for interface consistency).
+   * @param _publicKey - Unused for HD keyrings (derivation is from root).
+   * @param appName - Application identifier.
    * @param context - Hex-encoded context string.
-   * @returns Hex-encoded 32-byte derived value (64 hex characters).
    */
-  override async deriveContextHash(_publicKey: string, context: string): Promise<string> {
+  override async deriveContextHash(_publicKey: string, appName: string, context: string): Promise<string> {
     const contextBytes = parseHexContext(context)
-    if (this.mnemonic) {
-      const seedBuf = bip39.mnemonicToSeedSync(this.mnemonic, this.passphrase)
-      const seed = new Uint8Array(seedBuf.buffer, seedBuf.byteOffset, seedBuf.byteLength)
-      try {
-        return deriveContextHash(seed, contextBytes)
-      } finally {
-        seed.fill(0)
+    if (!this.hdWallet) {
+      throw new Error('deriveContextHash requires a mnemonic or xpriv-based keyring')
+    }
+    const child = this.hdWallet.derive(DERIVE_CONTEXT_HASH_PATH)
+    const privKeyBytes = new Uint8Array(child.privateKey)
+    try {
+      return deriveContextHash(privKeyBytes, appName, contextBytes)
+    } finally {
+      privKeyBytes.fill(0)
+      // Zero the original BIP-32 node's key buffer as well
+      if (child.privateKey) {
+        child.privateKey.fill(0)
       }
     }
-    // xpriv-only: use the root xpriv private key
-    if (this.root && this.root.privateKey) {
-      const privKeyBytes = new Uint8Array(this.root.privateKey)
-      try {
-        return deriveContextHash(privKeyBytes, contextBytes)
-      } finally {
-        privKeyBytes.fill(0)
-      }
-    }
-    throw new Error('deriveContextHash requires a mnemonic or xpriv-based keyring')
   }
 
   private _addressFromIndex(i: number) {

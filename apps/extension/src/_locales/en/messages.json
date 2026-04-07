@@ -1997,6 +1997,9 @@
   "derive_context_hash_description": {
     "message": "This site is requesting a unique identifier tied to your wallet for the following context."
   },
+  "derive_context_hash_app_name": {
+    "message": "Application"
+  },
   "derive_context_hash_context": {
     "message": "Context"
   },

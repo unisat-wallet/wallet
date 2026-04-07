@@ -39,7 +39,7 @@ export interface Keyring {
 
   changeHdPath?(hdPath: string): void
   getAccountByHdPath?(hdPath: string, index: number): string
-  deriveContextHash?(publicKey: string, context: string): Promise<string>
+  deriveContextHash?(publicKey: string, appName: string, context: string): Promise<string>
 
   // Keystone specific methods
   genSignPsbtUr?(psbtHex: string): Promise<{ type: string; cbor: string }>

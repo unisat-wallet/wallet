@@ -541,29 +541,47 @@ class ProviderController extends BaseController {
     'DeriveContextHash',
     async req => {
       const params: RequestMethodDeriveContextHashParams = req.data.params
-      if (!params.context) {
-        throw new Error('context is required')
+      // Validate appName
+      if (!params.appName || typeof params.appName !== 'string') {
+        throw new Error('appName is required and must be a string')
       }
-      if (typeof params.context !== 'string') {
-        throw new Error('context must be a string')
+      if (params.appName.length === 0) {
+        throw new Error('appName must be non-empty')
+      }
+      const appNameBytes = new TextEncoder().encode(params.appName)
+      if (appNameBytes.length > 64) {
+        throw new Error('appName must be at most 64 bytes')
+      }
+      if (!/^[a-z0-9\-]+$/.test(params.appName)) {
+        throw new Error('appName must contain only lowercase letters, digits, and hyphens')
+      }
+      // Validate context
+      if (!params.context || typeof params.context !== 'string') {
+        throw new Error('context is required and must be a string')
       }
       if (params.context.length === 0) {
         throw new Error('context must be non-empty')
       }
+      if (params.context.startsWith('0x') || params.context.startsWith('0X')) {
+        throw new Error('context must not have a 0x prefix')
+      }
       if (params.context.length % 2 !== 0) {
         throw new Error('context must be an even-length hex string')
       }
-      if (!/^[0-9a-fA-F]+$/.test(params.context)) {
-        throw new Error('context must be a valid hex string')
+      if (params.context.length > 2048) {
+        throw new Error('context must not exceed 2048 hex characters (1024 bytes)')
+      }
+      if (!/^[0-9a-f]+$/.test(params.context)) {
+        throw new Error('context must be a lowercase hex string')
       }
     },
   ])
   deriveContextHash = async ({
     data: {
-      params: { context },
+      params: { appName, context },
     },
   }) => {
-    return await wallet.deriveContextHash(context)
+    return await wallet.deriveContextHash(appName, context)
   }
 }
 

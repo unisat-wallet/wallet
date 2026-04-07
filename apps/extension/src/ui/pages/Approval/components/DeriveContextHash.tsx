@@ -15,6 +15,7 @@ import { useApproval, useI18n } from '@unisat/wallet-state';
 interface Props {
   params: {
     data: {
+      appName: string;
       context: string;
     };
     session: {
@@ -48,6 +49,11 @@ export default function DeriveContextHash({ params: { data, session } }: Props) 
           <Text text={t('derive_context_hash_request')} preset="title-bold" textCenter mt="lg" />
 
           <Text text={t('derive_context_hash_description')} textCenter mt="lg" />
+
+          <Text text={t('derive_context_hash_app_name')} preset="bold" mt="lg" />
+          <Card>
+            <Text text={data.appName} style={{ fontFamily: 'monospace', wordBreak: 'break-all' }} />
+          </Card>
 
           <Text text={t('derive_context_hash_context')} preset="bold" mt="lg" />
           <Card>

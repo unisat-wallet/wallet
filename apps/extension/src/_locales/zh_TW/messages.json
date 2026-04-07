@@ -1976,6 +1976,9 @@
   "derive_context_hash_description": {
     "message": "此網站正在請求一個與您的錢包綁定的唯一識別碼，用於以下上下文。"
   },
+  "derive_context_hash_app_name": {
+    "message": "Application"
+  },
   "derive_context_hash_context": {
     "message": "上下文"
   },

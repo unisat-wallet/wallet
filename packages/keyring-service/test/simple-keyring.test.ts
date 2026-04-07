@@ -362,49 +362,52 @@ describe('bitcoin-simple-keyring', () => {
   })
 
   describe('#deriveContextHash', () => {
+    const APP_NAME = 'test-app'
+
     it('derives a 64-char hex value', async () => {
       const newKeyring = new SimpleKeyring([testAccount.key])
-      const result = await newKeyring.deriveContextHash(testAccount.address, 'deadbeef')
+      const result = await newKeyring.deriveContextHash(testAccount.address, APP_NAME, 'deadbeef')
       expect(result).toHaveLength(64)
       expect(result).toMatch(/^[0-9a-f]{64}$/)
     })
 
     it('produces same result as direct derivation', async () => {
       const newKeyring = new SimpleKeyring([testAccount.key])
-      const result = await newKeyring.deriveContextHash(testAccount.address, 'deadbeef')
+      const result = await newKeyring.deriveContextHash(testAccount.address, APP_NAME, 'deadbeef')
       const privKeyBytes = new Uint8Array(Buffer.from(testAccount.key, 'hex'))
-      const directResult = deriveContextHash(privKeyBytes, parseHexContext('deadbeef'))
+      const directResult = deriveContextHash(privKeyBytes, APP_NAME, parseHexContext('deadbeef'))
       expect(result).toBe(directResult)
-    })
-
-    it('known-answer test', async () => {
-      const newKeyring = new SimpleKeyring([testAccount.key])
-      const result = await newKeyring.deriveContextHash(testAccount.address, 'deadbeef')
-      expect(result).toBe('c75cfa090d2681fdde35ebd22330f0476221fb6d2edd9d9afc2953cab0bd1ce2')
     })
 
     it('different accounts produce different results', async () => {
       const newKeyring = new SimpleKeyring()
       await newKeyring.addAccounts(2)
       const accounts = await newKeyring.getAccounts()
-      const result0 = await newKeyring.deriveContextHash(accounts[0], 'deadbeef')
-      const result1 = await newKeyring.deriveContextHash(accounts[1], 'deadbeef')
+      const result0 = await newKeyring.deriveContextHash(accounts[0], APP_NAME, 'deadbeef')
+      const result1 = await newKeyring.deriveContextHash(accounts[1], APP_NAME, 'deadbeef')
       expect(result0).not.toBe(result1)
+    })
+
+    it('different appNames produce different results', async () => {
+      const newKeyring = new SimpleKeyring([testAccount.key])
+      const result1 = await newKeyring.deriveContextHash(testAccount.address, 'app-one', 'deadbeef')
+      const result2 = await newKeyring.deriveContextHash(testAccount.address, 'app-two', 'deadbeef')
+      expect(result1).not.toBe(result2)
     })
 
     it('throws for unknown public key', async () => {
       const newKeyring = new SimpleKeyring([testAccount.key])
       const fakePubkey = '000000000000000000000000000000000000000000000000000000000000000000'
-      await expect(newKeyring.deriveContextHash(fakePubkey, 'deadbeef')).rejects.toThrow(
+      await expect(newKeyring.deriveContextHash(fakePubkey, APP_NAME, 'deadbeef')).rejects.toThrow(
         'Unable to find matching publicKey'
       )
     })
 
     it('rejects invalid hex context', async () => {
       const newKeyring = new SimpleKeyring([testAccount.key])
-      await expect(newKeyring.deriveContextHash(testAccount.address, 'xyz')).rejects.toThrow()
-      await expect(newKeyring.deriveContextHash(testAccount.address, '')).rejects.toThrow()
-      await expect(newKeyring.deriveContextHash(testAccount.address, 'abc')).rejects.toThrow()
+      await expect(newKeyring.deriveContextHash(testAccount.address, APP_NAME, 'xyz')).rejects.toThrow()
+      await expect(newKeyring.deriveContextHash(testAccount.address, APP_NAME, '')).rejects.toThrow()
+      await expect(newKeyring.deriveContextHash(testAccount.address, APP_NAME, 'abc')).rejects.toThrow()
     })
   })
 })

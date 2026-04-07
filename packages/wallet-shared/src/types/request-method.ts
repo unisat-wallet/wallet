@@ -96,5 +96,6 @@ export interface RequestMethodGetAvailableUtxosParams {
 }
 
 export interface RequestMethodDeriveContextHashParams {
+  appName: string
   context: string
 }

@@ -128,7 +128,7 @@ export class SimpleKeyring extends EventEmitter {
     this.wallets = this.wallets.filter(wallet => wallet.publicKey.toString('hex') !== publicKey)
   }
 
-  async deriveContextHash(publicKey: string, context: string): Promise<string> {
+  async deriveContextHash(publicKey: string, appName: string, context: string): Promise<string> {
     const wallet = this._getWalletForAccount(publicKey)
     if (!wallet.privateKey) {
       throw new Error('deriveContextHash requires access to the private key')
@@ -136,7 +136,7 @@ export class SimpleKeyring extends EventEmitter {
     const contextBytes = parseHexContext(context)
     const privKeyBytes = new Uint8Array(wallet.privateKey)
     try {
-      return deriveContextHash(privKeyBytes, contextBytes)
+      return deriveContextHash(privKeyBytes, appName, contextBytes)
     } finally {
       privKeyBytes.fill(0)
     }

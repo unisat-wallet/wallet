@@ -1,181 +1,138 @@
-import * as bip39 from 'bip39'
 import { describe, expect, it } from 'vitest'
 
-import { deriveContextHash, parseHexContext } from '../src/keyrings/derive-context-hash'
-
-const KNOWN_MNEMONIC =
-  'abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about'
-
-const SAMPLE_MNEMONIC =
-  'finish oppose decorate face calm tragic certain desk hour urge dinosaur mango'
-
-function freshSeed(): Uint8Array {
-  const seed = bip39.mnemonicToSeedSync(KNOWN_MNEMONIC)
-  return new Uint8Array(seed.buffer, seed.byteOffset, seed.byteLength)
-}
+import { deriveContextHash, parseHexContext, validateAppName } from '../src/keyrings/derive-context-hash'
 
 describe('deriveContextHash', () => {
-  describe('output format', () => {
-    it('returns a 64-character hex string (32 bytes) for 64-byte seed', () => {
-      const ctx = Buffer.from('test-context', 'utf-8')
-      const result = deriveContextHash(freshSeed(), ctx)
-      expect(result).toHaveLength(64)
-      expect(result).toMatch(/^[0-9a-f]{64}$/)
-    })
+  const APP_NAME = 'test-app'
 
-    it('returns a 64-character hex string (32 bytes) for 32-byte key', () => {
-      const ctx = Buffer.from('test-context', 'utf-8')
+  describe('output format', () => {
+    it('returns a 64-character hex string (32 bytes)', () => {
+      const ctx = parseHexContext('deadbeef')
       const key = new Uint8Array(32).fill(0xab)
-      const result = deriveContextHash(key, ctx)
+      const result = deriveContextHash(key, APP_NAME, ctx)
       expect(result).toHaveLength(64)
       expect(result).toMatch(/^[0-9a-f]{64}$/)
     })
   })
 
   describe('determinism', () => {
-    it('produces identical results for same seed + context', () => {
-      const ctx = Buffer.from('test-context', 'utf-8')
-      const a = deriveContextHash(freshSeed(), ctx)
-      const b = deriveContextHash(freshSeed(), ctx)
-      expect(a).toBe(b)
-    })
-
-    it('produces identical results for same 32-byte key + context', () => {
-      const ctx = Buffer.from('test-context', 'utf-8')
+    it('produces identical results for same key + appName + context', () => {
+      const ctx = parseHexContext('deadbeef')
       const key = new Uint8Array(32).fill(0xab)
-      const a = deriveContextHash(key, ctx)
-      const b = deriveContextHash(key, ctx)
+      const a = deriveContextHash(key, APP_NAME, ctx)
+      const b = deriveContextHash(key, APP_NAME, ctx)
       expect(a).toBe(b)
     })
   })
 
   describe('context differentiation', () => {
     it('produces different results for different contexts', () => {
-      const ctx1 = Buffer.from('context-1', 'utf-8')
-      const ctx2 = Buffer.from('context-2', 'utf-8')
-      const a = deriveContextHash(freshSeed(), ctx1)
-      const b = deriveContextHash(freshSeed(), ctx2)
+      const key = new Uint8Array(32).fill(0xab)
+      const a = deriveContextHash(key, APP_NAME, parseHexContext('01'))
+      const b = deriveContextHash(key, APP_NAME, parseHexContext('02'))
       expect(a).not.toBe(b)
     })
 
-    it('produces different results for empty vs non-empty context', () => {
-      const empty = new Uint8Array(0)
-      const nonempty = Buffer.from('x', 'utf-8')
-      const a = deriveContextHash(freshSeed(), empty)
-      const b = deriveContextHash(freshSeed(), nonempty)
+    it('produces different results for different appNames', () => {
+      const key = new Uint8Array(32).fill(0xab)
+      const ctx = parseHexContext('deadbeef')
+      const a = deriveContextHash(key, 'app-one', ctx)
+      const b = deriveContextHash(key, 'app-two', ctx)
       expect(a).not.toBe(b)
     })
   })
 
   describe('input validation', () => {
-    it('rejects key material that is not 32 or 64 bytes', () => {
-      const ctx = Buffer.from('test', 'utf-8')
-      expect(() => deriveContextHash(new Uint8Array(16), ctx)).toThrow(
-        'Input key material must be 32 or 64 bytes, got 16'
+    it('rejects key material that is not 32 bytes', () => {
+      const ctx = parseHexContext('deadbeef')
+      expect(() => deriveContextHash(new Uint8Array(16), APP_NAME, ctx)).toThrow(
+        'Input key material must be 32 bytes, got 16'
       )
-      expect(() => deriveContextHash(new Uint8Array(48), ctx)).toThrow(
-        'Input key material must be 32 or 64 bytes, got 48'
-      )
-      expect(() => deriveContextHash(new Uint8Array(128), ctx)).toThrow(
-        'Input key material must be 32 or 64 bytes, got 128'
+      expect(() => deriveContextHash(new Uint8Array(64), APP_NAME, ctx)).toThrow(
+        'Input key material must be 32 bytes, got 64'
       )
     })
-  })
 
-  describe('seed vs private key isolation', () => {
-    it('32-byte key and 64-byte seed produce different results for same context', () => {
-      const ctx = Buffer.from('test-context', 'utf-8')
-      const seed = freshSeed()
-      const key32 = seed.slice(0, 32) // first 32 bytes of seed
-      const a = deriveContextHash(seed, ctx)
-      const b = deriveContextHash(key32, ctx)
-      expect(a).not.toBe(b)
+    it('rejects invalid appName', () => {
+      const key = new Uint8Array(32).fill(0xab)
+      const ctx = parseHexContext('deadbeef')
+      expect(() => deriveContextHash(key, '', ctx)).toThrow('non-empty string')
+      expect(() => deriveContextHash(key, 'UPPER', ctx)).toThrow('lowercase')
+      expect(() => deriveContextHash(key, 'has space', ctx)).toThrow('lowercase')
     })
   })
 
-  describe('binary context edge cases', () => {
-    it('handles all-zero context', () => {
-      const ctx = new Uint8Array(32)
-      const result = deriveContextHash(freshSeed(), ctx)
-      expect(result).toHaveLength(64)
-      expect(result).toMatch(/^[0-9a-f]{64}$/)
+  describe('known-answer tests (spec vectors)', () => {
+    // Spec test vectors use BIP-39 mnemonic "abandon...about" (no passphrase)
+    // IKM = BIP-32 private key at m/73681862'
+    const IKM_HEX = '391cdb922097ec9c96fc13cadb01d5745ccf31f5dbec3a38103440714779ec85'
+    const ikm = new Uint8Array(Buffer.from(IKM_HEX, 'hex'))
+
+    it('vector 1: context=deadbeef', () => {
+      const result = deriveContextHash(ikm, 'test-app', parseHexContext('deadbeef'))
+      expect(result).toBe('3b0e2d90a01122eed8a520648073892f6b2d8f4419216023d63cdbd49500fca3')
     })
 
-    it('handles all-0xff context', () => {
-      const ctx = new Uint8Array(32).fill(0xff)
-      const result = deriveContextHash(freshSeed(), ctx)
-      expect(result).toHaveLength(64)
-      expect(result).toMatch(/^[0-9a-f]{64}$/)
+    it('vector 2: context=00', () => {
+      const result = deriveContextHash(ikm, 'test-app', parseHexContext('00'))
+      expect(result).toBe('50775126782c1a5e4d60daa4666b2c7590f0b5a445a4115b0abd411467c92597')
     })
 
-    it('handles large context (10KB)', () => {
-      const ctx = new Uint8Array(10240).fill(0xab)
-      const result = deriveContextHash(freshSeed(), ctx)
-      expect(result).toHaveLength(64)
-      expect(result).toMatch(/^[0-9a-f]{64}$/)
-    })
-
-    it('all-zero and all-0xff contexts produce different results', () => {
-      const zeros = deriveContextHash(freshSeed(), new Uint8Array(32))
-      const ones = deriveContextHash(freshSeed(), new Uint8Array(32).fill(0xff))
-      expect(zeros).not.toBe(ones)
-    })
-  })
-
-  describe('different mnemonics', () => {
-    it('produces different results for different seeds with same context', () => {
-      const ctx = Buffer.from('test-context', 'utf-8')
-      const seed1 = freshSeed()
-      const seed2Buf = bip39.mnemonicToSeedSync(SAMPLE_MNEMONIC)
-      const seed2 = new Uint8Array(seed2Buf.buffer, seed2Buf.byteOffset, seed2Buf.byteLength)
-      const a = deriveContextHash(seed1, ctx)
-      const b = deriveContextHash(seed2, ctx)
-      expect(a).not.toBe(b)
-    })
-  })
-
-  describe('known-answer tests (HKDF-SHA-256)', () => {
-    it('produces a stable output for regression detection', () => {
-      const ctx = Buffer.from('babylon-vault-test', 'utf-8')
-      const result = deriveContextHash(freshSeed(), ctx)
-      // Pinned value — if this changes, the derivation scheme has changed
-      expect(result).toBe('fb9046c540159d2a3f2ff36c79da7079b9f65b9e231dcc47eaf780e57122359b')
-    })
-
-    it('produces a stable output for a second context', () => {
-      const ctx = Buffer.from('babylon-htlc-preimage', 'utf-8')
-      const result = deriveContextHash(freshSeed(), ctx)
-      // Second pinned value for broader regression coverage
-      expect(result).toBe('31cf9bf4e4311b944414deac608a908ec85dd82b240bea0d5a362f24ff49dc62')
-    })
-
-    it('produces a stable output for 32-byte private key', () => {
-      const privKey = Buffer.from('69f477943dd1591f0261cabade0839e2ffc0c13d8fa1ce0d69f6c6c251163b34', 'hex')
-      const ctx = Buffer.from('deadbeef', 'hex')
-      const result = deriveContextHash(new Uint8Array(privKey), ctx)
-      expect(result).toBe('b86b70d096cbb96f290ad04b45734a4fdd232ab846c1d675802150065856fb30')
+    it('vector 3: context=64 zero bytes', () => {
+      const context128zeros = '00'.repeat(64) // 64 zero bytes = 128 hex chars
+      const result = deriveContextHash(ikm, 'test-app', parseHexContext(context128zeros))
+      expect(result).toBe('d81e4a91f32eabd34df0e55ca36f26f211af65dfe575b7201c95baaa6608cdd9')
     })
   })
 })
 
-// Note: HdKeyring integration tests are in hd-keyring.test.ts
-// because HdKeyring imports @unisat/wallet-bitcoin which requires the package to be built first.
-// SimpleKeyring integration tests are in simple-keyring.test.ts.
+describe('validateAppName', () => {
+  it('accepts valid appNames', () => {
+    expect(() => validateAppName('test-app')).not.toThrow()
+    expect(() => validateAppName('babylon-vault')).not.toThrow()
+    expect(() => validateAppName('a')).not.toThrow()
+    expect(() => validateAppName('a-b-c-123')).not.toThrow()
+  })
+
+  it('rejects empty', () => {
+    expect(() => validateAppName('')).toThrow('non-empty string')
+  })
+
+  it('rejects uppercase', () => {
+    expect(() => validateAppName('Test-App')).toThrow('lowercase')
+  })
+
+  it('rejects spaces', () => {
+    expect(() => validateAppName('test app')).toThrow('lowercase')
+  })
+
+  it('rejects underscores', () => {
+    expect(() => validateAppName('test_app')).toThrow('lowercase')
+  })
+
+  it('rejects > 64 bytes', () => {
+    const longName = 'a'.repeat(65)
+    expect(() => validateAppName(longName)).toThrow('64 bytes')
+  })
+
+  it('accepts exactly 64 bytes', () => {
+    const name64 = 'a'.repeat(64)
+    expect(() => validateAppName(name64)).not.toThrow()
+  })
+})
 
 describe('parseHexContext', () => {
-  it('parses valid hex string', () => {
+  it('parses valid lowercase hex string', () => {
     const result = parseHexContext('deadbeef')
     expect(result).toEqual(new Uint8Array([0xde, 0xad, 0xbe, 0xef]))
   })
 
-  it('handles uppercase hex', () => {
-    const result = parseHexContext('DEADBEEF')
-    expect(result).toEqual(new Uint8Array([0xde, 0xad, 0xbe, 0xef]))
+  it('rejects uppercase hex', () => {
+    expect(() => parseHexContext('DEADBEEF')).toThrow('lowercase')
   })
 
-  it('handles mixed case hex', () => {
-    const result = parseHexContext('DeAdBeEf')
-    expect(result).toEqual(new Uint8Array([0xde, 0xad, 0xbe, 0xef]))
+  it('rejects mixed case hex', () => {
+    expect(() => parseHexContext('DeAdBeEf')).toThrow('lowercase')
   })
 
   it('rejects empty string', () => {
@@ -187,6 +144,24 @@ describe('parseHexContext', () => {
   })
 
   it('rejects non-hex characters', () => {
-    expect(() => parseHexContext('xyz123')).toThrow('valid hex')
+    expect(() => parseHexContext('xyz123')).toThrow('lowercase hex')
+  })
+
+  it('rejects 0x prefix', () => {
+    expect(() => parseHexContext('0xdeadbeef')).toThrow('0x prefix')
+  })
+
+  it('rejects 0X prefix', () => {
+    expect(() => parseHexContext('0Xdeadbeef')).toThrow('0x prefix')
+  })
+
+  it('rejects context exceeding 2048 hex chars', () => {
+    const longHex = 'ab'.repeat(1025) // 2050 hex chars
+    expect(() => parseHexContext(longHex)).toThrow('2048')
+  })
+
+  it('accepts context of exactly 2048 hex chars', () => {
+    const maxHex = 'ab'.repeat(1024) // 2048 hex chars
+    expect(() => parseHexContext(maxHex)).not.toThrow()
   })
 })

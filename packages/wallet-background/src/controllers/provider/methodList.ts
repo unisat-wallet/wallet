@@ -41,6 +41,7 @@ export type ProviderMethodList = {
     data: string
   }
   deriveContextHash: {
+    appName: string
     context: string
   }
 }
