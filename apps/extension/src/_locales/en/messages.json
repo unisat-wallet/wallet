@@ -77,6 +77,12 @@
   "all": {
     "message": "All"
   },
+  "all_marked_as_read": {
+    "message": "All marked as read"
+  },
+  "all_read": {
+    "message": "All Read"
+  },
   "allow_sign_data_requests": {
     "message": "Allow signData requests"
   },
@@ -97,6 +103,9 @@
   },
   "amount_must_be_at_least": {
     "message": "Amount must be at least"
+  },
+  "announcement": {
+    "message": "Announcement"
   },
   "appDescription": {
     "message": "Inscribe and store your inscriptions in the world's first open-source Ordinals Chrome wallet!"
@@ -127,6 +136,42 @@
   },
   "are_you_sure_you_want_to_delete_this_contact": {
     "message": "Are you sure you want to delete this contact?"
+  },
+  "assets": {
+    "message": "Assets"
+  },
+  "assets_filters": {
+    "message": "Filters"
+  },
+  "assets_hide_small_assets": {
+    "message": "Hide Small Balances (<$1)"
+  },
+  "assets_no_assets": {
+    "message": "No assets"
+  },
+  "assets_search_items_count": {
+    "message": "$1 Items"
+  },
+  "assets_search_loading": {
+    "message": "Loading..."
+  },
+  "assets_search_idle_desc": {
+    "message": "Search assets by name, ticker, or inscription number"
+  },
+  "assets_search_idle_title": {
+    "message": "Search assets in your wallet"
+  },
+  "assets_collection_floor_price": {
+    "message": "Floor price"
+  },
+  "assets_collection_view": {
+    "message": "View Collection"
+  },
+  "assets_search_no_results": {
+    "message": "No assets found for \"$1\""
+  },
+  "assets_search_placeholder": {
+    "message": "Search assets"
   },
   "atomicals": {
     "message": "Atomicals"
@@ -524,6 +569,9 @@
   "create_wallet": {
     "message": "Create Wallet"
   },
+  "create_watch_wallet": {
+    "message": "Create Watch Wallet"
+  },
   "create_with_mnemonics_12words": {
     "message": "Create with mnemonics (12-words)"
   },
@@ -722,6 +770,9 @@
   "failed_to_load_inscription": {
     "message": "Failed to load inscription"
   },
+  "failed_to_parse_psbt": {
+    "message": "One or more transactions could not be parsed. Signing aborted."
+  },
   "failed_to_save_contact": {
     "message": "Failed to save contact"
   },
@@ -842,6 +893,9 @@
   "go_to_babylon": {
     "message": "Go to Babylon"
   },
+  "go_to_marketplace": {
+    "message": "Go to the Marketplace"
+  },
   "go_to_stake": {
     "message": "Go to Stake"
   },
@@ -874,6 +928,15 @@
   },
   "history_count": {
     "message": "transactions"
+  },
+  "history_more_count": {
+    "message": "+$1 more"
+  },
+  "history_more_on_uniscan_count": {
+    "message": "+$1 more on UniScan"
+  },
+  "history_no_transactions": {
+    "message": "No transactions"
   },
   "history_pending": {
     "message": "Pending"
@@ -958,6 +1021,9 @@
   },
   "includes_inscriptions_runes_and_unconfirmed_utxos": {
     "message": "Includes Inscriptions, Runes, and unconfirmed UTXO assets."
+  },
+  "incomplete_psbt_warning": {
+    "message": "transaction(s) missing UTXO data, amounts unverifiable"
   },
   "indexer_api_down_risk_description": {
     "message": "The indexer API is currently down. This may affect the accuracy of transaction details and asset balances. Please proceed with caution and verify all information independently."
@@ -1087,6 +1153,9 @@
   },
   "items": {
     "message": "Items"
+  },
+  "just_now": {
+    "message": "Just now"
   },
   "keyring_does_not_exist": {
     "message": "keyring does not exist"
@@ -1295,6 +1364,9 @@
   "missing_browser_permissions_please_grant_keystone_permissions": {
     "message": "Missing browser permissions, please grant Keystone permissions"
   },
+  "mixed": {
+    "message": "Mixed"
+  },
   "mnemonic_phrase_is_invalid": {
     "message": "mnemonic phrase is invalid"
   },
@@ -1309,6 +1381,12 @@
   },
   "more_details": {
     "message": "More details"
+  },
+  "add_liquidity": {
+    "message": "Add Liquidity"
+  },
+  "remove_liquidity": {
+    "message": "Remove Liquidity"
   },
   "msg_already_signed": {
     "message": "This message is already signed"
@@ -1382,6 +1460,9 @@
   "my_address": {
     "message": "My Address"
   },
+  "n_inscriptions": {
+    "message": "$1 inscriptions"
+  },
   "name": {
     "message": "name"
   },
@@ -1390,6 +1471,9 @@
   },
   "name_recognized_and_resolved": {
     "message": "Name recognized and resolved."
+  },
+  "names": {
+    "message": "Names"
   },
   "native_segwit_p2wpkh": {
     "message": "Native Segwit (P2WPKH)"
@@ -1442,6 +1526,12 @@
   "next": {
     "message": "Next"
   },
+  "nft": {
+    "message": "NFT"
+  },
+  "nfts": {
+    "message": "NFTs"
+  },
   "no_address_or_public_key_in_tosigninput": {
     "message": "no address or public key in toSignInput"
   },
@@ -1469,6 +1559,9 @@
   "no_mfp_in_keyring": {
     "message": "no mfp in keyring"
   },
+  "no_notifications": {
+    "message": "No notifications"
+  },
   "no_service_provider_available": {
     "message": "No service provider available."
   },
@@ -1495,6 +1588,9 @@
   },
   "notice": {
     "message": "Notice"
+  },
+  "notifications": {
+    "message": "Notifications"
   },
   "ok": {
     "message": "OK"
@@ -1567,6 +1663,9 @@
   },
   "parent": {
     "message": "parent"
+  },
+  "parse_error": {
+    "message": "Parse error"
   },
   "passphrase": {
     "message": "Passphrase"
@@ -1681,6 +1780,9 @@
   },
   "public_key_must_be_compressed_secp256k1_ie_33_byte": {
     "message": "Public key must be compressed secp256k1, i.e. 33 bytes starting with 0x02 or 0x03"
+  },
+  "quick_sign_assets_detected": {
+    "message": "Cannot quick sign: inputs contain inscriptions or tokens"
   },
   "quit_merging_process": {
     "message": "Quit Merging Process"
@@ -1892,6 +1994,9 @@
   "selected": {
     "message": "Selected"
   },
+  "self_transfer": {
+    "message": "Self Transfer"
+  },
   "send": {
     "message": "Send"
   },
@@ -1946,32 +2051,14 @@
   "settings": {
     "message": "Settings"
   },
-  "notifications": {
-    "message": "Notifications"
-  },
-  "all_read": {
-    "message": "All Read"
-  },
-  "all_marked_as_read": {
-    "message": "All marked as read"
-  },
-  "announcement": {
-    "message": "Announcement"
-  },
-  "view_detail": {
-    "message": "View Detail"
-  },
-  "no_notifications": {
-    "message": "No notifications"
-  },
-  "just_now": {
-    "message": "Just now"
-  },
   "show_private_key": {
     "message": "Show Private Key"
   },
   "show_secret_recovery_phrase": {
     "message": "Show Secret Recovery Phrase"
+  },
+  "sighash_none_detected": {
+    "message": "SIGHASH_NONE detected. Signing aborted for security."
   },
   "sighash_none_risk_description": {
     "message": "SIGHASH_NONE is a special signature type that allows the transaction to be modified after signing. This can lead to potential loss of funds if the transaction is altered maliciously. Please ensure you trust the source of this transaction before proceeding."
@@ -2014,6 +2101,9 @@
   },
   "sign_multiple_transactions": {
     "message": "Sign Multiple Transactions"
+  },
+  "sign_psbt_input_error": {
+    "message": "The psbt or params is invalid and cannot be signed."
   },
   "sign_result": {
     "message": "SIGN RESULT:"
@@ -2291,6 +2381,12 @@
   "total_balance": {
     "message": "TOTAL BALANCE"
   },
+  "total_fee": {
+    "message": "Total fee"
+  },
+  "total_spent": {
+    "message": "Total spent"
+  },
   "total_supply": {
     "message": "Total Supply"
   },
@@ -2299,6 +2395,9 @@
   },
   "transaction": {
     "message": "Transaction"
+  },
+  "transaction_count": {
+    "message": "Transactions"
   },
   "transaction_details": {
     "message": "Transaction Details"
@@ -2315,14 +2414,17 @@
   "transaction_success": {
     "message": "Transaction Success"
   },
+  "transaction_successful": {
+    "message": "Transaction Successful"
+  },
+  "transaction_unconfirmed": {
+    "message": "Unconfirmed"
+  },
   "transactions": {
     "message": "transactions"
   },
   "transactions_at_once": {
     "message": "transactions at once"
-  },
-  "trust_this_site_for_quick_multi_sign": {
-    "message": "Trust this site and do not show this prompt again"
   },
   "transfer": {
     "message": "Transfer"
@@ -2350,6 +2452,9 @@
   },
   "trick_you_into_signing_malicious_transactions": {
     "message": "Trick you into signing malicious transactions"
+  },
+  "trust_this_site_for_quick_multi_sign": {
+    "message": "Trust this site and do not show this prompt again"
   },
   "try_again": {
     "message": "Try again"
@@ -2408,6 +2513,15 @@
   "unisat": {
     "message": "UNISAT"
   },
+  "unisat_credits_label": {
+    "message": "Credits"
+  },
+  "unisat_points_label": {
+    "message": "Points"
+  },
+  "unisat_titles_label": {
+    "message": "Titles"
+  },
   "uniscan_active_addresses_24h": {
     "message": "Active Addresses (24h)"
   },
@@ -2462,6 +2576,9 @@
   "view": {
     "message": "View"
   },
+  "view_detail": {
+    "message": "View Detail"
+  },
   "view_low_fee_mode_guide": {
     "message": "View Sub 1 sat/vB Mode Setup Guide"
   },
@@ -2477,11 +2594,26 @@
   "view_on_unisat_explorer": {
     "message": "View on UniSat Explorer"
   },
+  "view_on_uniscan": {
+    "message": "View on UniScan"
+  },
   "wallet_existed": {
     "message": "Wallet existed."
   },
   "warning": {
     "message": "Warning"
+  },
+  "watch_address": {
+    "message": "Watch Address"
+  },
+  "watch_address_error": {
+    "message": "Invalid Bitcoin address"
+  },
+  "watch_address_placeholder": {
+    "message": "Enter Bitcoin address"
+  },
+  "watch_address_wallet": {
+    "message": "Watch Wallet"
   },
   "weak": {
     "message": "Weak"
@@ -2536,32 +2668,5 @@
   },
   "your_balance_have_to_be_merged": {
     "message": "Your "
-  },
-  "sign_psbt_input_error": {
-    "message": "The psbt or params is invalid and cannot be signed."
-  },
-  "failed_to_parse_psbt": {
-    "message": "One or more transactions could not be parsed. Signing aborted."
-  },
-  "sighash_none_detected": {
-    "message": "SIGHASH_NONE detected. Signing aborted for security."
-  },
-  "quick_sign_assets_detected": {
-    "message": "Cannot quick sign: inputs contain inscriptions or tokens"
-  },
-  "transaction_count": {
-    "message": "Transactions"
-  },
-  "total_fee": {
-    "message": "Total fee"
-  },
-  "total_spent": {
-    "message": "Total spent"
-  },
-  "incomplete_psbt_warning": {
-    "message": "transaction(s) missing UTXO data, amounts unverifiable"
-  },
-  "parse_error": {
-    "message": "Parse error"
   }
 }

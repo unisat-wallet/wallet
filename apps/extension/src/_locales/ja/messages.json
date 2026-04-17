@@ -77,6 +77,12 @@
   "all": {
     "message": "すべて"
   },
+  "all_marked_as_read": {
+    "message": "すべて既読にしました"
+  },
+  "all_read": {
+    "message": "すべて既読"
+  },
   "allow_sign_data_requests": {
     "message": "signDataリクエストを許可する"
   },
@@ -97,6 +103,9 @@
   },
   "amount_must_be_at_least": {
     "message": "金額は少なくとも"
+  },
+  "announcement": {
+    "message": "お知らせ"
   },
   "appDescription": {
     "message": "世界初のオープンソースOrdinals ChromeウォレットでインスクリプションをInscribeして保存しましょう！"
@@ -127,6 +136,36 @@
   },
   "are_you_sure_you_want_to_delete_this_contact": {
     "message": "この連絡先を削除してもよろしいですか？"
+  },
+  "assets": {
+    "message": "資産"
+  },
+  "assets_filters": {
+    "message": "フィルター"
+  },
+  "assets_hide_small_assets": {
+    "message": "少額残高を非表示 (<$1)"
+  },
+  "assets_no_assets": {
+    "message": "資産なし"
+  },
+  "assets_search_items_count": {
+    "message": "$1件"
+  },
+  "assets_search_loading": {
+    "message": "読み込み中..."
+  },
+  "assets_search_idle_desc": {
+    "message": "名前、ティッカー、またはインスクリプション番号で資産を検索"
+  },
+  "assets_search_idle_title": {
+    "message": "ウォレット内の資産を検索"
+  },
+  "assets_search_no_results": {
+    "message": "\"$1\" に一致する資産が見つかりません"
+  },
+  "assets_search_placeholder": {
+    "message": "資産を検索"
   },
   "atomicals": {
     "message": "Atomicals"
@@ -482,6 +521,9 @@
   "copy_address": {
     "message": "アドレスをコピー"
   },
+  "copy_publickey": {
+    "message": "公開鍵をコピー"
+  },
   "copy_to_clipboard": {
     "message": "クリップボードにコピー"
   },
@@ -520,6 +562,9 @@
   },
   "create_wallet": {
     "message": "ウォレットを作成"
+  },
+  "create_watch_wallet": {
+    "message": "ウォッチウォレットを作成"
   },
   "create_with_mnemonics_12words": {
     "message": "ニーモニック (12単語) で作成"
@@ -719,6 +764,9 @@
   "failed_to_load_inscription": {
     "message": "インスクリプションの読み込みに失敗しました"
   },
+  "failed_to_parse_psbt": {
+    "message": "1件以上のトランザクションを解析できませんでした。署名を中止しました。"
+  },
   "failed_to_save_contact": {
     "message": "連絡先の保存に失敗しました"
   },
@@ -839,6 +887,9 @@
   "go_to_babylon": {
     "message": "Babylonへ移動"
   },
+  "go_to_marketplace": {
+    "message": "マーケットプレイスへ移動"
+  },
   "go_to_stake": {
     "message": "ステークへ移動"
   },
@@ -871,6 +922,15 @@
   },
   "history_count": {
     "message": "総取引数"
+  },
+  "history_more_count": {
+    "message": "+$1件"
+  },
+  "history_more_on_uniscan_count": {
+    "message": "UniScanで+$1件"
+  },
+  "history_no_transactions": {
+    "message": "取引なし"
   },
   "history_pending": {
     "message": "保留中"
@@ -955,6 +1015,9 @@
   },
   "includes_inscriptions_runes_and_unconfirmed_utxos": {
     "message": "インスクリプション、Runes、および未確認のUTXOアセットを含みます。"
+  },
+  "incomplete_psbt_warning": {
+    "message": "件のトランザクションにUTXOデータがなく、金額を確認できません"
   },
   "indexer_api_down_risk_description": {
     "message": "インデクサーAPIが現在ダウンしています。これによりトランザクション詳細と資産残高の精度に影響が出る可能性があります。注意して進め、すべての情報を独立して確認してください。"
@@ -1084,6 +1147,9 @@
   },
   "items": {
     "message": "アイテム"
+  },
+  "just_now": {
+    "message": "たった今"
   },
   "keyring_does_not_exist": {
     "message": "キーリングが存在しません"
@@ -1292,6 +1358,9 @@
   "missing_browser_permissions_please_grant_keystone_permissions": {
     "message": "ブラウザの権限がありません。Keystoneに権限を付与してください"
   },
+  "mixed": {
+    "message": "混合"
+  },
   "mnemonic_phrase_is_invalid": {
     "message": "ニーモニックフレーズが無効です"
   },
@@ -1306,6 +1375,12 @@
   },
   "more_details": {
     "message": "詳細"
+  },
+  "add_liquidity": {
+    "message": "Add Liquidity"
+  },
+  "remove_liquidity": {
+    "message": "Remove Liquidity"
   },
   "msg_already_signed": {
     "message": "このメッセージは既に署名されています"
@@ -1379,6 +1454,9 @@
   "my_address": {
     "message": "私のアドレス"
   },
+  "n_inscriptions": {
+    "message": "$1 インスクリプション"
+  },
   "name": {
     "message": "名前"
   },
@@ -1387,6 +1465,9 @@
   },
   "name_recognized_and_resolved": {
     "message": "名前が認識され、解決されました。"
+  },
+  "names": {
+    "message": "名前"
   },
   "native_segwit_p2wpkh": {
     "message": "Native Segwit (P2WPKH)"
@@ -1439,6 +1520,12 @@
   "next": {
     "message": "次へ"
   },
+  "nft": {
+    "message": "NFT"
+  },
+  "nfts": {
+    "message": "NFTs"
+  },
   "no_address_or_public_key_in_tosigninput": {
     "message": "toSignInputにアドレスまたは公開鍵がありません"
   },
@@ -1466,6 +1553,9 @@
   "no_mfp_in_keyring": {
     "message": "キーリングにmfpがありません"
   },
+  "no_notifications": {
+    "message": "通知なし"
+  },
   "no_service_provider_available": {
     "message": "利用可能なサービスプロバイダーがありません。"
   },
@@ -1491,6 +1581,9 @@
     "message": "まだサポートされていません"
   },
   "notice": {
+    "message": "通知"
+  },
+  "notifications": {
     "message": "通知"
   },
   "ok": {
@@ -1564,6 +1657,9 @@
   },
   "parent": {
     "message": "親"
+  },
+  "parse_error": {
+    "message": "解析エラー"
   },
   "passphrase": {
     "message": "パスフレーズ"
@@ -1678,6 +1774,9 @@
   },
   "public_key_must_be_compressed_secp256k1_ie_33_byte": {
     "message": "公開鍵は圧縮されたsecp256k1（つまり、0x02または0x03で始まる33バイト）である必要があります"
+  },
+  "quick_sign_assets_detected": {
+    "message": "クイック署名不可：入力にインスクリプションまたはトークンが含まれています"
   },
   "quit_merging_process": {
     "message": "マージプロセスを終了"
@@ -1889,6 +1988,9 @@
   "selected": {
     "message": "選択済み"
   },
+  "self_transfer": {
+    "message": "自己送金"
+  },
   "send": {
     "message": "送信"
   },
@@ -1949,6 +2051,9 @@
   "show_secret_recovery_phrase": {
     "message": "シークレットリカバリーフレーズを表示"
   },
+  "sighash_none_detected": {
+    "message": "SIGHASH_NONEが検出されました。セキュリティのため署名を中止しました。"
+  },
   "sighash_none_risk_description": {
     "message": "SIGHASH_NONEは署名後にトランザクションの変更を許可する特別な署名タイプです。トランザクションが悪意を持って変更された場合、資金を失う可能性があります。続行する前に、このトランザクションの送信元を信頼していることを確認してください。"
   },
@@ -1990,6 +2095,9 @@
   },
   "sign_multiple_transactions": {
     "message": "複数トランザクションに署名"
+  },
+  "sign_psbt_input_error": {
+    "message": "psbt またはパラメータが無効なため、署名できません。"
   },
   "sign_result": {
     "message": "署名結果:"
@@ -2267,6 +2375,12 @@
   "total_balance": {
     "message": "総残高"
   },
+  "total_fee": {
+    "message": "合計手数料"
+  },
+  "total_spent": {
+    "message": "総支出"
+  },
   "total_supply": {
     "message": "総供給"
   },
@@ -2274,6 +2388,9 @@
     "message": "取引"
   },
   "transaction": {
+    "message": "トランザクション"
+  },
+  "transaction_count": {
     "message": "トランザクション"
   },
   "transaction_details": {
@@ -2290,6 +2407,12 @@
   },
   "transaction_success": {
     "message": "トランザクション成功"
+  },
+  "transaction_successful": {
+    "message": "取引成功"
+  },
+  "transaction_unconfirmed": {
+    "message": "未確認"
   },
   "transactions": {
     "message": "トランザクション"
@@ -2323,6 +2446,9 @@
   },
   "trick_you_into_signing_malicious_transactions": {
     "message": "悪意のあるトランザクションに署名させるよう誘導する"
+  },
+  "trust_this_site_for_quick_multi_sign": {
+    "message": "このサイトを信頼し、このプロンプトを再表示しない"
   },
   "try_again": {
     "message": "再試行"
@@ -2381,6 +2507,15 @@
   "unisat": {
     "message": "UNISAT"
   },
+  "unisat_credits_label": {
+    "message": "割引券"
+  },
+  "unisat_points_label": {
+    "message": "ポイント"
+  },
+  "unisat_titles_label": {
+    "message": "バッジ"
+  },
   "uniscan_active_addresses_24h": {
     "message": "アクティブアドレス (24時間)"
   },
@@ -2435,6 +2570,9 @@
   "view": {
     "message": "表示"
   },
+  "view_detail": {
+    "message": "詳細を見る"
+  },
   "view_low_fee_mode_guide": {
     "message": "1 sat/vB未満モード設定ガイドを見る"
   },
@@ -2450,11 +2588,26 @@
   "view_on_unisat_explorer": {
     "message": "UniSat Explorerで表示"
   },
+  "view_on_uniscan": {
+    "message": "UniScanで見る"
+  },
   "wallet_existed": {
     "message": "ウォレットは既に存在します"
   },
   "warning": {
     "message": "警告"
+  },
+  "watch_address": {
+    "message": "ウォッチアドレス"
+  },
+  "watch_address_error": {
+    "message": "無効なBitcoinアドレス"
+  },
+  "watch_address_placeholder": {
+    "message": "Bitcoinアドレスを入力"
+  },
+  "watch_address_wallet": {
+    "message": "ウォッチウォレット"
   },
   "weak": {
     "message": "弱"
@@ -2509,59 +2662,5 @@
   },
   "your_balance_have_to_be_merged": {
     "message": "あなたの"
-  },
-  "sign_psbt_input_error": {
-    "message": "psbt またはパラメータが無効なため、署名できません。"
-  },
-  "trust_this_site_for_quick_multi_sign": {
-    "message": "このサイトを信頼し、このプロンプトを再表示しない"
-  },
-  "copy_publickey": {
-    "message": "公開鍵をコピー"
-  },
-  "all_marked_as_read": {
-    "message": "すべて既読にしました"
-  },
-  "announcement": {
-    "message": "お知らせ"
-  },
-  "view_detail": {
-    "message": "詳細を見る"
-  },
-  "failed_to_parse_psbt": {
-    "message": "1件以上のトランザクションを解析できませんでした。署名を中止しました。"
-  },
-  "sighash_none_detected": {
-    "message": "SIGHASH_NONEが検出されました。セキュリティのため署名を中止しました。"
-  },
-  "transaction_count": {
-    "message": "トランザクション"
-  },
-  "total_fee": {
-    "message": "合計手数料"
-  },
-  "incomplete_psbt_warning": {
-    "message": "件のトランザクションにUTXOデータがなく、金額を確認できません"
-  },
-  "parse_error": {
-    "message": "解析エラー"
-  },
-  "quick_sign_assets_detected": {
-    "message": "クイック署名不可：入力にインスクリプションまたはトークンが含まれています"
-  },
-  "total_spent": {
-    "message": "総支出"
-  },
-  "notifications": {
-    "message": "通知"
-  },
-  "all_read": {
-    "message": "すべて既読"
-  },
-  "no_notifications": {
-    "message": "通知なし"
-  },
-  "just_now": {
-    "message": "たった今"
   }
 }

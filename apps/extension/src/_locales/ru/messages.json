@@ -77,6 +77,12 @@
   "all": {
     "message": "Все"
   },
+  "all_marked_as_read": {
+    "message": "Все отмечено как прочитанное"
+  },
+  "all_read": {
+    "message": "Всё прочитано"
+  },
   "allow_sign_data_requests": {
     "message": "Разрешить запросы signData"
   },
@@ -97,6 +103,9 @@
   },
   "amount_must_be_at_least": {
     "message": "Сумма должна быть не менее"
+  },
+  "announcement": {
+    "message": "Объявление"
   },
   "appDescription": {
     "message": "Создавайте и храните свои надписи в первом в мире Chrome-кошельке для Ordinals с открытым исходным кодом!"
@@ -127,6 +136,36 @@
   },
   "are_you_sure_you_want_to_delete_this_contact": {
     "message": "Вы уверены, что хотите удалить этот контакт?"
+  },
+  "assets": {
+    "message": "Активы"
+  },
+  "assets_filters": {
+    "message": "Фильтры"
+  },
+  "assets_hide_small_assets": {
+    "message": "Скрыть небольшие балансы (<$1)"
+  },
+  "assets_no_assets": {
+    "message": "Нет активов"
+  },
+  "assets_search_items_count": {
+    "message": "$1 элементов"
+  },
+  "assets_search_loading": {
+    "message": "Загрузка..."
+  },
+  "assets_search_idle_desc": {
+    "message": "Ищите активы по названию, тикеру или номеру инскрипции"
+  },
+  "assets_search_idle_title": {
+    "message": "Ищите активы в вашем кошельке"
+  },
+  "assets_search_no_results": {
+    "message": "Активы для \"$1\" не найдены"
+  },
+  "assets_search_placeholder": {
+    "message": "Поиск активов"
   },
   "atomicals": {
     "message": "Atomicals"
@@ -482,6 +521,9 @@
   "copy_address": {
     "message": "Скопировать адрес"
   },
+  "copy_publickey": {
+    "message": "Копировать публичный ключ"
+  },
   "copy_to_clipboard": {
     "message": "Скопировать в буфер обмена"
   },
@@ -520,6 +562,9 @@
   },
   "create_wallet": {
     "message": "Создать кошелёк"
+  },
+  "create_watch_wallet": {
+    "message": "Создать наблюдательный кошелёк"
   },
   "create_with_mnemonics_12words": {
     "message": "Создать с помощью мнемоники (12 слов)"
@@ -719,6 +764,9 @@
   "failed_to_load_inscription": {
     "message": "Не удалось загрузить надпись"
   },
+  "failed_to_parse_psbt": {
+    "message": "Одну или несколько транзакций не удалось разобрать. Подпись отменена."
+  },
   "failed_to_save_contact": {
     "message": "Не удалось сохранить контакт"
   },
@@ -839,6 +887,9 @@
   "go_to_babylon": {
     "message": "Перейти в Babylon"
   },
+  "go_to_marketplace": {
+    "message": "Перейти в Marketplace"
+  },
   "go_to_stake": {
     "message": "Перейти к стейкингу"
   },
@@ -871,6 +922,15 @@
   },
   "history_count": {
     "message": "Общее количество транзакций"
+  },
+  "history_more_count": {
+    "message": "+$1 ещё"
+  },
+  "history_more_on_uniscan_count": {
+    "message": "+$1 ещё на UniScan"
+  },
+  "history_no_transactions": {
+    "message": "Нет транзакций"
   },
   "history_pending": {
     "message": "Ожидание"
@@ -955,6 +1015,9 @@
   },
   "includes_inscriptions_runes_and_unconfirmed_utxos": {
     "message": "Включает надписи, Runes и неподтвержденные UTXO активы."
+  },
+  "incomplete_psbt_warning": {
+    "message": "транзакция(и) без данных UTXO, суммы не проверяемы"
   },
   "indexer_api_down_risk_description": {
     "message": "API индексатора в настоящее время недоступен. Это может повлиять на точность деталей транзакции и балансов активов. Действуйте с осторожностью и проверяйте всю информацию независимо."
@@ -1084,6 +1147,9 @@
   },
   "items": {
     "message": "Элементы"
+  },
+  "just_now": {
+    "message": "Только что"
   },
   "keyring_does_not_exist": {
     "message": "keyring не существует"
@@ -1292,6 +1358,9 @@
   "missing_browser_permissions_please_grant_keystone_permissions": {
     "message": "Отсутствуют разрешения браузера, пожалуйста, предоставьте разрешения Keystone"
   },
+  "mixed": {
+    "message": "Смешанный"
+  },
   "mnemonic_phrase_is_invalid": {
     "message": "мнемоническая фраза недействительна"
   },
@@ -1306,6 +1375,12 @@
   },
   "more_details": {
     "message": "Подробнее"
+  },
+  "add_liquidity": {
+    "message": "Add Liquidity"
+  },
+  "remove_liquidity": {
+    "message": "Remove Liquidity"
   },
   "msg_already_signed": {
     "message": "Это сообщение уже подписано"
@@ -1379,6 +1454,9 @@
   "my_address": {
     "message": "Мой адрес"
   },
+  "n_inscriptions": {
+    "message": "$1 надписей"
+  },
   "name": {
     "message": "имя"
   },
@@ -1387,6 +1465,9 @@
   },
   "name_recognized_and_resolved": {
     "message": "Имя распознано и разрешено."
+  },
+  "names": {
+    "message": "Имена"
   },
   "native_segwit_p2wpkh": {
     "message": "Native Segwit (P2WPKH)"
@@ -1439,6 +1520,12 @@
   "next": {
     "message": "Далее"
   },
+  "nft": {
+    "message": "NFT"
+  },
+  "nfts": {
+    "message": "NFTs"
+  },
   "no_address_or_public_key_in_tosigninput": {
     "message": "нет адреса или публичного ключа в toSignInput"
   },
@@ -1466,6 +1553,9 @@
   "no_mfp_in_keyring": {
     "message": "нет mfp в keyring"
   },
+  "no_notifications": {
+    "message": "Нет уведомлений"
+  },
   "no_service_provider_available": {
     "message": "Нет доступных поставщиков услуг."
   },
@@ -1492,6 +1582,9 @@
   },
   "notice": {
     "message": "Уведомление"
+  },
+  "notifications": {
+    "message": "Уведомления"
   },
   "ok": {
     "message": "OK"
@@ -1564,6 +1657,9 @@
   },
   "parent": {
     "message": "родительский"
+  },
+  "parse_error": {
+    "message": "Ошибка разбора"
   },
   "passphrase": {
     "message": "Парольная фраза"
@@ -1678,6 +1774,9 @@
   },
   "public_key_must_be_compressed_secp256k1_ie_33_byte": {
     "message": "Публичный ключ должен быть сжатым secp256k1, т.е. 33 байта, начинающихся с 0x02 или 0x03"
+  },
+  "quick_sign_assets_detected": {
+    "message": "Быстрая подпись невозможна: входы содержат надписи или токены"
   },
   "quit_merging_process": {
     "message": "Прервать процесс объединения"
@@ -1889,6 +1988,9 @@
   "selected": {
     "message": "Выбрано"
   },
+  "self_transfer": {
+    "message": "Самоперевод"
+  },
   "send": {
     "message": "Отправить"
   },
@@ -1949,6 +2051,9 @@
   "show_secret_recovery_phrase": {
     "message": "Показать секретную фразу восстановления"
   },
+  "sighash_none_detected": {
+    "message": "Обнаружен SIGHASH_NONE. Подпись отменена в целях безопасности."
+  },
   "sighash_none_risk_description": {
     "message": "SIGHASH_NONE - это специальный тип подписи, который позволяет изменять транзакцию после подписания. Это может привести к потенциальной потере средств, если транзакция будет злонамеренно изменена. Пожалуйста, убедитесь, что вы доверяете источнику этой транзакции, прежде чем продолжить."
   },
@@ -1990,6 +2095,9 @@
   },
   "sign_multiple_transactions": {
     "message": "Подписать несколько транзакций"
+  },
+  "sign_psbt_input_error": {
+    "message": "Psbt или параметры недействительны и не могут быть подписаны."
   },
   "sign_result": {
     "message": "РЕЗУЛЬТАТ ПОДПИСИ:"
@@ -2267,6 +2375,12 @@
   "total_balance": {
     "message": "Общий баланс"
   },
+  "total_fee": {
+    "message": "Общая комиссия"
+  },
+  "total_spent": {
+    "message": "Итого потрачено"
+  },
   "total_supply": {
     "message": "Общее предложение"
   },
@@ -2275,6 +2389,9 @@
   },
   "transaction": {
     "message": "Транзакция"
+  },
+  "transaction_count": {
+    "message": "Транзакции"
   },
   "transaction_details": {
     "message": "Детали транзакции"
@@ -2290,6 +2407,12 @@
   },
   "transaction_success": {
     "message": "Транзакция успешна"
+  },
+  "transaction_successful": {
+    "message": "Транзакция успешна"
+  },
+  "transaction_unconfirmed": {
+    "message": "Не подтверждено"
   },
   "transactions": {
     "message": "транзакции"
@@ -2323,6 +2446,9 @@
   },
   "trick_you_into_signing_malicious_transactions": {
     "message": "Обманом заставить вас подписать вредоносные транзакции"
+  },
+  "trust_this_site_for_quick_multi_sign": {
+    "message": "Доверять этому сайту и больше не показывать это сообщение"
   },
   "try_again": {
     "message": "Попробовать снова"
@@ -2381,6 +2507,15 @@
   "unisat": {
     "message": "UNISAT"
   },
+  "unisat_credits_label": {
+    "message": "Купоны"
+  },
+  "unisat_points_label": {
+    "message": "Баллы"
+  },
+  "unisat_titles_label": {
+    "message": "Значки"
+  },
   "uniscan_active_addresses_24h": {
     "message": "Активные адреса (24ч)"
   },
@@ -2435,6 +2570,9 @@
   "view": {
     "message": "Посмотреть"
   },
+  "view_detail": {
+    "message": "Посмотреть детали"
+  },
   "view_low_fee_mode_guide": {
     "message": "Посмотреть руководство по режиму менее 1 sat/vB"
   },
@@ -2450,11 +2588,26 @@
   "view_on_unisat_explorer": {
     "message": "Посмотреть в UniSat Explorer"
   },
+  "view_on_uniscan": {
+    "message": "Смотреть на UniScan"
+  },
   "wallet_existed": {
     "message": "Кошелёк уже существует."
   },
   "warning": {
     "message": "Предупреждение"
+  },
+  "watch_address": {
+    "message": "Наблюдательный адрес"
+  },
+  "watch_address_error": {
+    "message": "Неверный Bitcoin-адрес"
+  },
+  "watch_address_placeholder": {
+    "message": "Введите Bitcoin-адрес"
+  },
+  "watch_address_wallet": {
+    "message": "Наблюдательный кошелёк"
   },
   "weak": {
     "message": "Слабый"
@@ -2509,59 +2662,5 @@
   },
   "your_balance_have_to_be_merged": {
     "message": "Ваш "
-  },
-  "sign_psbt_input_error": {
-    "message": "Psbt или параметры недействительны и не могут быть подписаны."
-  },
-  "trust_this_site_for_quick_multi_sign": {
-    "message": "Доверять этому сайту и больше не показывать это сообщение"
-  },
-  "copy_publickey": {
-    "message": "Копировать публичный ключ"
-  },
-  "all_marked_as_read": {
-    "message": "Все отмечено как прочитанное"
-  },
-  "announcement": {
-    "message": "Объявление"
-  },
-  "view_detail": {
-    "message": "Посмотреть детали"
-  },
-  "failed_to_parse_psbt": {
-    "message": "Одну или несколько транзакций не удалось разобрать. Подпись отменена."
-  },
-  "sighash_none_detected": {
-    "message": "Обнаружен SIGHASH_NONE. Подпись отменена в целях безопасности."
-  },
-  "transaction_count": {
-    "message": "Транзакции"
-  },
-  "total_fee": {
-    "message": "Общая комиссия"
-  },
-  "incomplete_psbt_warning": {
-    "message": "транзакция(и) без данных UTXO, суммы не проверяемы"
-  },
-  "parse_error": {
-    "message": "Ошибка разбора"
-  },
-  "quick_sign_assets_detected": {
-    "message": "Быстрая подпись невозможна: входы содержат надписи или токены"
-  },
-  "total_spent": {
-    "message": "Итого потрачено"
-  },
-  "notifications": {
-    "message": "Уведомления"
-  },
-  "all_read": {
-    "message": "Всё прочитано"
-  },
-  "no_notifications": {
-    "message": "Нет уведомлений"
-  },
-  "just_now": {
-    "message": "Только что"
   }
 }
