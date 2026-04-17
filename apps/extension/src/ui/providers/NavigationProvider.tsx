@@ -121,6 +121,11 @@ export function NavigationProvider({ children }: { children: React.ReactNode }) 
         window.open(url);
       },
 
+      navToMarketPlace() {
+        const url = `${chain.unisatUrl}/market`;
+        window.open(url);
+      },
+
       navToMarketPlaceBrc20(ticker: string) {
         let url = '';
         if (chain.enum === ChainType.BITCOIN_MAINNET) {
