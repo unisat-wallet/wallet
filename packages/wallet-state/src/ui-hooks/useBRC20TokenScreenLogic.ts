@@ -23,6 +23,12 @@ export enum BRC20TokenScreenTabKey {
   HISTORY = 'history',
 }
 
+export interface BRC20OutWalletBalanceItem {
+  key: 'wallet' | 'swap' | 'prog'
+  label: string
+  amount: string
+}
+
 export function useBRC20TokenHistoryLogic(props: { ticker: string; displayName?: string }) {
   const wallet = useWallet()
   const { t } = useI18n()
@@ -126,7 +132,12 @@ export function useBRC20TokenHistoryLogic(props: { ticker: string; displayName?:
             subTitle = t('brc20_history_type_unwrap') + ' brc2.0'
             icon = 'history_inscribe'
           } else {
-            return null
+            const isSendLike = item.from === account.address
+            mainTitle = isSendLike ? t('brc20_history_type_send') : t('brc20_history_type_receive')
+            subTitle = isSendLike
+              ? t('brc20_history_to') + ' ' + shortAddress(item.to)
+              : t('brc20_history_from') + ' ' + shortAddress(item.from)
+            icon = isSendLike ? 'history_send' : 'history_receive'
           }
 
           const amount = item.amount
@@ -142,8 +153,8 @@ export function useBRC20TokenHistoryLogic(props: { ticker: string; displayName?:
           }
         })
         .filter(v => v !== null),
-    }))
-  }, [t, groupedItems])
+    })).filter(group => group.items.length > 0)
+  }, [account.address, t, groupedItems])
 
   return {
     displayItems,
@@ -296,6 +307,33 @@ export function useBRC20TokenScreenLogic() {
   const onSwapBalance = tokenSummary?.tokenBalance?.swapBalance
   const onProgBalance = tokenSummary?.tokenBalance?.progBalance
   const inWalletBalance = tokenSummary?.tokenBalance?.overallBalance
+  const outWalletBalanceItems = useMemo<BRC20OutWalletBalanceItem[]>(() => {
+    const items: BRC20OutWalletBalanceItem[] = [
+      {
+        key: 'wallet',
+        label: t('brc20_in_wallet'),
+        amount: inWalletBalance || '0',
+      },
+    ]
+
+    if (onSwapBalance && onSwapBalance !== '0') {
+      items.push({
+        key: 'swap',
+        label: t('brc20_on_swap'),
+        amount: onSwapBalance,
+      })
+    }
+
+    if (onProgBalance && onProgBalance !== '0') {
+      items.push({
+        key: 'prog',
+        label: t('brc20_on_prog'),
+        amount: onProgBalance,
+      })
+    }
+
+    return items
+  }, [inWalletBalance, onProgBalance, onSwapBalance, t])
   const totalBalance = useMemo(() => {
     if (!inWalletBalance) {
       return '--'
@@ -331,6 +369,16 @@ export function useBRC20TokenScreenLogic() {
 
   const onClickSwapInSwap = () => {
     const url = `https://inswap.cc/swap?t0=${encodeURIComponent(ticker)}`
+    nav.navToUrl(url)
+  }
+
+  const onClickAddLiquidityInSwap = () => {
+    const url = `https://inswap.cc/swap/pools?t0=${encodeURIComponent(ticker)}&t1=sFB___000&action=add`
+    nav.navToUrl(url)
+  }
+
+  const onClickRemoveLiquidityInSwap = () => {
+    const url = `https://inswap.cc/swap/pools?t0=${encodeURIComponent(ticker)}&t1=sFB___000&action=remove`
     nav.navToUrl(url)
   }
 
@@ -380,6 +428,7 @@ export function useBRC20TokenScreenLogic() {
     onSwapBalance,
     onProgBalance,
     inWalletBalance,
+    outWalletBalanceItems,
     hasOutWalletBalance,
     enableHistory,
     enableTrade,
@@ -402,6 +451,8 @@ export function useBRC20TokenScreenLogic() {
     onClickSendBrc20Prog,
 
     onClickSwapInSwap,
+    onClickAddLiquidityInSwap,
+    onClickRemoveLiquidityInSwap,
     onClickWrapInSwap,
     onClickUnwrapInSwap,
     onClickSendInSwap,

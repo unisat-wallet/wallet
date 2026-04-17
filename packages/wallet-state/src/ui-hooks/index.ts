@@ -15,6 +15,7 @@ export {
 } from './useBRC20SendScreenLogic'
 export { BRC20SingleStepKey, useBRC20SingleStepScreenLogic } from './useBRC20SingleStepScreenLogic'
 export {
+  type BRC20OutWalletBalanceItem,
   BRC20TokenScreenTabKey,
   useBRC20TokenHistoryLogic,
   useBRC20TokenScreenLogic,

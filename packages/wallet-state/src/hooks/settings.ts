@@ -157,6 +157,11 @@ export function useCAT20TokenInfoExplorerUrl(version: CAT_VERSION, tokenId: stri
   }
 }
 
+export function useBRC20TokenInfoExplorerUrl(ticker: string) {
+  const chain = useChain()!
+  return `${chain.unisatExplorerUrl}/brc20/${encodeURIComponent(ticker)}`
+}
+
 export function useUnisatWebsite() {
   const chainType = useChainType()
   return CHAINS_MAP[chainType]!.unisatUrl

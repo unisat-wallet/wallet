@@ -1,9 +1,9 @@
-import { Column, Text } from '@/ui/components';
+import { Column, Icon, Row, Text } from '@/ui/components';
 import { Line } from '@/ui/components/Line';
 import { Section } from '@/ui/components/Section';
 import { shortAddress, showLongNumber } from '@/ui/utils';
 import { AddressTokenSummary, Inscription } from '@unisat/wallet-shared';
-import { useI18n, useNavigation } from '@unisat/wallet-state';
+import { useBRC20TokenInfoExplorerUrl, useI18n, useNavigation } from '@unisat/wallet-state';
 
 export function BRC20TokenDetail(props: {
   ticker: string;
@@ -13,6 +13,8 @@ export function BRC20TokenDetail(props: {
   const { t } = useI18n();
   const nav = useNavigation();
   const { ticker, tokenSummary, deployInscription } = props;
+  const tokenUrl = useBRC20TokenInfoExplorerUrl(ticker);
+
   return (
     <Column>
       <Column
@@ -62,6 +64,24 @@ export function BRC20TokenDetail(props: {
         <Section title={t('holders_count')} value={showLongNumber(tokenSummary.tokenInfo.holdersCount)} />
 
         <Section title={t('history_count')} value={showLongNumber(tokenSummary.tokenInfo.historyCount)} />
+
+        <Row
+          justifyCenter
+          itemsCenter
+          clickable
+          onClick={() => {
+            window.open(tokenUrl);
+          }}
+          style={{
+            minHeight: 40,
+            marginTop: 20,
+            borderRadius: 8,
+            backgroundColor: 'rgba(255,255,255,0.05)',
+            gap: 10
+          }}>
+          <Text text={t('view_on_uniscan')} size="sm" style={{ color: 'rgba(255,255,255,0.65)' }} />
+          <Icon icon="right" size={12} color="textDim" />
+        </Row>
       </Column>
     </Column>
   );
