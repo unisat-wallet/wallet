@@ -29,7 +29,7 @@ export function TokenScreenIcon({ iconInfo }: { iconInfo: { iconShortName?: stri
             size={ICON_SIZE}
             style={{ borderRadius: ICON_SIZE }}
             src={iconUrl}
-            fallbackSrc="./images/icons/unknown.png"
+            fallbackSrc="./images/icons/artifacts/unknown.png"
           />
         )}
       </Button>

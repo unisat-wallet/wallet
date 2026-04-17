@@ -35,6 +35,7 @@ export function RefreshButton({
       mx="md"
       itemsCenter
       onClick={(e) => {
+        e.stopPropagation();
         if (disabled) {
           return;
         }
@@ -47,7 +48,8 @@ export function RefreshButton({
 
         wait(5);
         onClick(e);
-      }}>
+      }}
+      style={{ padding: '6px 8px', margin: '-6px -8px' }}>
       <ReloadOutlined className={isRotating ? styles.rotate : ''} style={{ fontSize: 14, color: 'rgba(0,0,0,0.5)' }} />
       {!hideText && (
         <Text text={disabled ? `${leftTime} ${t('secs')}` : t('refresh')} color="black_muted" size="sm" textCenter />

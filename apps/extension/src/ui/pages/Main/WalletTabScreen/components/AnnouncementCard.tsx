@@ -58,7 +58,7 @@ export function AnnouncementCard() {
         </div>
 
         <Image
-          src={'./images/artifacts/announcement_art.png'}
+          src={'./images/icons/artifacts/announcement_art.png'}
           size={64}
           style={{ position: 'absolute', top: 15, right: 15 }}
         />

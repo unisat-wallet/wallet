@@ -140,7 +140,8 @@ export default function BabylonTxConfirmScreen() {
                 justifyCenter
                 onClick={() => {
                   window.open(`${babylonChain.explorer}/transaction/${result.txid}`, '_blank');
-                }}>
+                }}
+              >
                 <Icon icon="eye" color="textDim" />
                 <Text preset="regular-bold" text={t('view_on_block_explorer')} color="textDim" />
               </Row>
@@ -246,7 +247,7 @@ export default function BabylonTxConfirmScreen() {
             <Card style={{ backgroundColor: '#272626', flex: '1' }}>
               <Column fullX itemsCenter>
                 <Row itemsCenter justifyCenter>
-                  <Image src={'./images/icons/baby.svg'} size={24} />
+                  <Image src={'/images/icons/babylon/baby.svg'} size={24} />
                   <Text text={babylonChain.currencies[0].coinDenom} />
                 </Row>
                 <Row

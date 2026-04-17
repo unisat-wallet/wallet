@@ -18,7 +18,7 @@ function SupportPaymentList({ list }: { list: string[] }) {
         return (
           <Image
             key={item}
-            src={`./images/artifacts/${item.replaceAll(' ', '').toLowerCase()}.png`}
+            src={`./images/icons/artifacts/${item.replaceAll(' ', '').toLowerCase()}.png`}
             width={28}
             height={19}
           />

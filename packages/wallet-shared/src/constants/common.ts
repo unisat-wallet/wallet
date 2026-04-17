@@ -554,16 +554,16 @@ export const UNCONFIRMED_HEIGHT = 4194303
 export const PAYMENT_CHANNELS = {
   moonpay: {
     name: 'MoonPay',
-    img: './images/artifacts/moonpay.png',
+    img: './images/icons/artifacts/moonpay.png',
   },
   alchemypay: {
     name: 'Alchemy Pay',
-    img: './images/artifacts/alchemypay.png',
+    img: './images/icons/artifacts/alchemypay.png',
   },
 
   transak: {
     name: 'Transak',
-    img: './images/artifacts/transak.png',
+    img: './images/icons/artifacts/transak.png',
   },
 }
 

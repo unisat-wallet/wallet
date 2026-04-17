@@ -30,8 +30,12 @@ export function BalanceCard() {
   } = useBalanceCardLogic();
 
   const backgroundImage = chain.isFractal
-    ? './images/artifacts/balance-bg-fb.png'
-    : './images/artifacts/balance-bg-btc.png';
+    ? './images/icons/artifacts/balance-bg-fb.png'
+    : './images/icons/artifacts/balance-bg-btc.png';
+
+  const stopCardToggle = (event: { stopPropagation: () => void }) => {
+    event.stopPropagation();
+  };
 
   return (
     <Column
@@ -40,13 +44,18 @@ export function BalanceCard() {
         borderRadius: 16,
         padding: 8,
         position: 'relative'
+      }}
+      onClick={() => {
+        handleExpandToggle();
       }}>
       <Column style={{ padding: 8 }} gap={'md'}>
         <Image src={backgroundImage} size={64} style={{ position: 'absolute', top: 0, right: 0 }} />
         <Row itemsCenter>
           <Text size="sm" text={t('total_balance')} style={{ color: 'rgba(0,0,0,0.55)' }} />
           <Row
-            onClick={() => {
+            style={{ padding: 6, margin: -6 }}
+            onClick={(event) => {
+              stopCardToggle(event);
               handleHiddenToggle();
             }}>
             <Icon color={'black_muted'} icon={isBalanceHidden ? 'balance-eyes-closed' : 'balance-eyes'} size={20} />
@@ -56,14 +65,7 @@ export function BalanceCard() {
 
         <Row itemsCenter>
           <BtcDisplay balance={balanceValue} hideBalance={isBalanceHidden} />
-          <Icon
-            color={'black_muted'}
-            size={16}
-            icon={isDetailExpanded ? 'up' : 'down'}
-            onClick={() => {
-              handleExpandToggle();
-            }}
-          />
+          <Icon color={'black_muted'} size={16} icon={isDetailExpanded ? 'up' : 'down'} />
         </Row>
 
         {isCurrentChainBalance && (

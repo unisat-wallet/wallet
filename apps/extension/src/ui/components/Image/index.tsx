@@ -11,10 +11,11 @@ interface ImageProps {
   style?: CSSProperties;
   containerStyle?: CSSProperties;
   onClick?: React.MouseEventHandler<HTMLDivElement>;
+  onError?: React.ReactEventHandler<HTMLImageElement>;
 }
 
 export function Image(props: ImageProps) {
-  const { src, fallbackSrc, size, width, height, style: $imageStyleOverride, onClick } = props;
+  const { src, fallbackSrc, size, width, height, style: $imageStyleOverride, onClick, onError } = props;
 
   return (
     <img
@@ -28,6 +29,7 @@ export function Image(props: ImageProps) {
         if (fallbackSrc && e.currentTarget.src.indexOf('unknown.png') === -1) {
           e.currentTarget.src = fallbackSrc;
         }
+        onError?.(e);
       }}
     />
   );

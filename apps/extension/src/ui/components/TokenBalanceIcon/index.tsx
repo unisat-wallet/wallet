@@ -3,7 +3,7 @@ import { Column } from '../Column';
 import { Image } from '../Image';
 import { Text } from '../Text';
 
-const CONTAINER_SIZE = 36;
+const CONTAINER_SIZE = 35;
 const ICON_SIZE = 32;
 export function TokenBalanceIcon({ iconInfo }: { iconInfo: { iconShortName?: string; iconUrl: string } }) {
   const { iconUrl, iconShortName } = iconInfo;
@@ -11,9 +11,10 @@ export function TokenBalanceIcon({ iconInfo }: { iconInfo: { iconShortName?: str
     <Button
       preset="default"
       style={{
-        minHeight: CONTAINER_SIZE,
+        height: CONTAINER_SIZE,
         width: CONTAINER_SIZE,
-        borderRadius: CONTAINER_SIZE,
+        minHeight: CONTAINER_SIZE,
+        borderRadius: CONTAINER_SIZE / 2,
         justifyContent: 'center',
         alignItems: 'center',
         borderColor: 'rgba(255,255,255,0.1)'
@@ -27,7 +28,7 @@ export function TokenBalanceIcon({ iconInfo }: { iconInfo: { iconShortName?: str
           size={ICON_SIZE}
           style={{ borderRadius: ICON_SIZE }}
           src={iconUrl}
-          fallbackSrc="./images/icons/unknown.png"
+          fallbackSrc="./images/icons/artifacts/unknown.png"
         />
       )}
     </Button>

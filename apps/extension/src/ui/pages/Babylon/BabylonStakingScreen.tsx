@@ -148,7 +148,7 @@ function Section3(props: { onClick: () => void }) {
       }}
       onClick={props.onClick}>
       <Row justifyCenter itemsCenter>
-        <Image src={'./images/artifacts/wallet.png'} width={32} height={32} />
+        <Image src={'./images/icons/artifacts/wallet.png'} width={32} height={32} />
 
         <Column gap="sm">
           <Row itemsCenter>
@@ -209,12 +209,12 @@ function EnableImportBabyPopover({ onClose }: { onClose: () => void }) {
         <StepItem
           step={1}
           title={t('click_the_account_on_the_main_page')}
-          images={['./images/artifacts/how-to-import-baby-1.png']}
+          images={['./images/icons/artifacts/how-to-import-baby-1.png']}
         />
         <StepItem
           step={2}
           title={t('tap_the_more_menu_then_select_the_export_private_key_option')}
-          images={['./images/artifacts/how-to-import-baby-2.png', './images/artifacts/how-to-import-baby-3.png']}
+          images={['./images/icons/artifacts/how-to-import-baby-2.png', './images/icons/artifacts/how-to-import-baby-3.png']}
         />
         <StepItem
           step={3}
