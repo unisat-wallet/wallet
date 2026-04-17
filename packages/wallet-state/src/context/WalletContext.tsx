@@ -684,6 +684,10 @@ export interface WalletController {
 
   createKeyringWithPublicKey(data: string, addressType: AddressType): Promise<void>
 
+  createTmpKeyringWithAddress(address: string): Promise<WalletKeyring>
+
+  createKeyringWithAddress(address: string): Promise<void>
+
   createDummyPsbt(params: { txType: DummyTxType }): Promise<ToSignData>
 }
 

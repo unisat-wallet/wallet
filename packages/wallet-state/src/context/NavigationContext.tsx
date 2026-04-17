@@ -52,6 +52,7 @@ export type RouteParamList = {
     goBack?: boolean
   }
   CreateSimpleWalletScreen: undefined
+  CreateWatchWalletScreen: undefined
   CreateColdWalletScreen: {
     fromUnlock?: boolean
   }

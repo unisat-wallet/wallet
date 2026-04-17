@@ -10,6 +10,7 @@ import {
   KeystoneKeyring,
   ReadonlyKeyring,
   SimpleKeyring,
+  WatchAddressKeyring,
 } from './keyrings'
 import { EmptyKeyring } from './keyrings/empty-keyring'
 import {
@@ -33,6 +34,7 @@ const KEYRING_SDK_TYPES = {
   KeystoneKeyring,
   ColdWalletKeyring,
   ReadonlyKeyring,
+  WatchAddressKeyring,
 }
 
 /**
@@ -324,6 +326,13 @@ export class KeyringService extends EventEmitter {
     // await this.persistAllKeyrings()
     const keyring = await this.addNewKeyring('Readonly', [pubkey], addressType)
     // await this.persistAllKeyrings()
+    this.setUnlocked()
+    this.fullUpdate()
+    return keyring
+  }
+
+  importWatchAddress = async (address: string, addressType: AddressType) => {
+    const keyring = await this.addNewKeyring('Watch Address', [address], addressType)
     this.setUnlocked()
     this.fullUpdate()
     return keyring

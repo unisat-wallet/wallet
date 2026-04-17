@@ -27,6 +27,7 @@ import CreateHDWalletScreen from './Account/CreateHDWalletScreen';
 import CreateKeystoneWalletScreen from './Account/CreateKeystoneWalletScreen';
 import CreatePasswordScreen from './Account/CreatePasswordScreen';
 import CreateSimpleWalletScreen from './Account/CreateSimpleWalletScreen';
+import CreateWatchWalletScreen from './Account/CreateWatchWalletScreen';
 import SwitchAccountScreen from './Account/SwitchAccountScreen';
 import SwitchKeyringScreen from './Account/SwitchKeyringScreen';
 import UnlockScreen from './Account/UnlockScreen';
@@ -232,6 +233,10 @@ export const routes = {
   CreateColdWalletScreen: {
     path: '/account/create-cold-wallet',
     element: <CreateColdWalletScreen />
+  },
+  CreateWatchWalletScreen: {
+    path: '/account/create-watch-wallet',
+    element: <CreateWatchWalletScreen />
   },
   UpgradeNoticeScreen: {
     path: '/settings/upgrade-notice',

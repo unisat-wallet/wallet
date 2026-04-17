@@ -17,6 +17,7 @@ import {
   bitcoin,
   eccManager,
   genPsbtOfBIP322Simple,
+  getAddressType,
   getSignatureFromPsbtOfBIP322Simple,
   isValidAddress,
   publicKeyToAddress,
@@ -1611,6 +1612,11 @@ export class WalletController extends BaseController {
           pubkey = account.pubkey || ''
           address = account.address || publicKeyToAddress(pubkey, addressType, networkType)
         }
+      } else if (type === KeyringType.WatchAddressKeyring) {
+        // getAccounts() returns addresses directly for WatchAddressKeyring
+        const addressFromKeyring = displayedKeyring.accounts[j]!.pubkey
+        pubkey = ''
+        address = addressFromKeyring
       } else {
         const { pubkey: accountPubkey } = displayedKeyring.accounts[j]!
         pubkey = accountPubkey
@@ -3429,6 +3435,33 @@ export class WalletController extends BaseController {
       displayedKeyring,
       keyringService.keyrings.length - 1
     )
+    await this.changeKeyring(keyring)
+  }
+
+  createTmpKeyringWithAddress = async (address: string) => {
+    const networkType = this.getNetworkType()
+    if (!isValidAddress(address, networkType)) {
+      throw new Error('Invalid address')
+    }
+    const addressType = getAddressType(address, networkType)
+    const originKeyring = keyringService.createTmpKeyring(KeyringType.WatchAddressKeyring, [address])
+    const displayedKeyring = await keyringService.displayForKeyring(originKeyring, addressType, -1)
+    return this.displayedKeyringToWalletKeyring(displayedKeyring, -1, false)
+  }
+
+  createKeyringWithAddress = async (address: string) => {
+    const networkType = this.getNetworkType()
+    if (!isValidAddress(address, networkType)) {
+      throw new Error('Invalid address')
+    }
+    const addressType = getAddressType(address, networkType)
+    const originKeyring = await keyringService.importWatchAddress(address, addressType)
+    const displayedKeyring = await keyringService.displayForKeyring(
+      originKeyring,
+      addressType,
+      keyringService.keyrings.length - 1
+    )
+    const keyring = this.displayedKeyringToWalletKeyring(displayedKeyring, keyringService.keyrings.length - 1)
     await this.changeKeyring(keyring)
   }
 

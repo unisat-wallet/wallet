@@ -5,6 +5,7 @@ export enum KeyringType {
   KeystoneKeyring = 'Keystone',
   ColdWalletKeyring = 'Cold Wallet',
   ReadonlyKeyring = 'Readonly',
+  WatchAddressKeyring = 'Watch Address',
   Empty = 'Empty',
 }
 
@@ -87,6 +88,7 @@ export const KEYRING_TYPE_TEXT = {
   [KeyringType.SimpleKeyring]: 'Imported by Private Key',
   [KeyringType.KeystoneKeyring]: 'Import from Keystone',
   [KeyringType.ColdWalletKeyring]: 'Cold Wallet',
+  [KeyringType.WatchAddressKeyring]: 'Watch Address',
 }
 export const BRAND_ALIAN_TYPE_TEXT = {
   [KeyringType.HdKeyring]: 'Account',
@@ -94,6 +96,7 @@ export const BRAND_ALIAN_TYPE_TEXT = {
   [KeyringType.KeystoneKeyring]: 'Account',
   [KeyringType.ColdWalletKeyring]: 'Account',
   [KeyringType.ReadonlyKeyring]: 'Readonly',
+  [KeyringType.WatchAddressKeyring]: 'Watch',
 }
 
 export const KEYRING_TYPES: {
@@ -127,6 +130,11 @@ export const KEYRING_TYPES: {
     name: 'Readonly',
     tag: 'READONLY',
     alianName: 'Readonly',
+  },
+  'Watch Address': {
+    name: 'Watch Address',
+    tag: 'WATCH',
+    alianName: 'Watch Wallet',
   },
 }
 
