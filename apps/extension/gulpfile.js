@@ -11,7 +11,7 @@ const uglify = require('gulp-uglify');
 
 //parse arguments
 var knownOptions = {
-  string: ['env', 'browser', 'manifest', 'channel'],
+  string: ['env', 'browser', 'manifest', 'channel', 'artifact-version'],
   default: {
     env: 'dev',
     browser: 'chrome',
@@ -32,6 +32,7 @@ var options = {
   manifest: knownOptions.default.manifest
 };
 options = minimist(process.argv.slice(2), knownOptions);
+var artifactVersion = options['artifact-version'] || version;
 if (!supported_envs.includes(options.env)) {
   console.error(`not supported env: [${options.env}]. It should be one of ${supported_envs.join(', ')}.`);
   exit(0);
@@ -43,6 +44,12 @@ if (!supported_browsers.includes(options.browser)) {
 if (!supported_mvs.includes(options.manifest)) {
   console.error(`not supported browser: [${options.manifest}]. It should be one of ${supported_mvs.join(', ')}.`);
   exit(0);
+}
+if (artifactVersion !== validVersion && !artifactVersion.startsWith(`${validVersion}-`)) {
+  console.error(
+    `invalid artifact-version: [${artifactVersion}]. It should match ${validVersion} or start with ${validVersion}- .`
+  );
+  exit(1);
 }
 
 //tasks...
@@ -106,12 +113,12 @@ function task_package(cb) {
     if (options.browser == 'firefox') {
       return gulp
         .src(`dist/${options.browser}/**/*`)
-        .pipe(zip(`${brandName}-${options.browser}-${options.manifest}-v${version}.xpi`))
+        .pipe(zip(`${brandName}-${options.browser}-${options.manifest}-v${artifactVersion}.xpi`))
         .pipe(gulp.dest('./dist'));
     } else {
       return gulp
         .src(`dist/${options.browser}/**/*`)
-        .pipe(zip(`${brandName}-${options.browser}-${options.manifest}-v${version}.zip`))
+        .pipe(zip(`${brandName}-${options.browser}-${options.manifest}-v${artifactVersion}.zip`))
         .pipe(gulp.dest('./dist'));
     }
   }

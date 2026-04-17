@@ -12,7 +12,9 @@
     "lint": "pnpm -r lint",
     "clean": "pnpm -r clean",
     "typecheck": "pnpm -r typecheck",
-    "dev": "pnpm -r dev"
+    "dev": "pnpm -r dev",
+    "mobile:doctor": "./apps/unisat-wallet-mobile/scripts/doctor.sh",
+    "mobile:bootstrap": "./scripts/bootstrap-mobile.sh"
   },
   "keywords": [
     "bitcoin",
@@ -44,8 +46,8 @@
     "vitest": "^0.34.0"
   },
   "engines": {
-    "node": ">=16.0.0",
-    "pnpm": ">=8.0.0"
+    "node": ">=20 <21",
+    "pnpm": ">=8 <9"
   },
   "packageManager": "pnpm@8.6.0",
   "dependencies": {

@@ -89,13 +89,39 @@ All tags reference commits in this repository. Shared package changes are reflec
 
 ### Requirements
 
-- Node.js >= 18
-- pnpm >= 8
+- Node.js 20.20.2
+- pnpm 8.6.0
 
 ### Install dependencies
 
 ```bash
 pnpm install
+```
+
+### Mobile Inner Repo Setup
+
+The Android/iOS mobile app lives in a separate repository and must be checked out into:
+
+```bash
+apps/unisat-wallet-mobile
+```
+
+Once the mobile repo is present, use the shared bootstrap flow:
+
+```bash
+pnpm mobile:bootstrap
+```
+
+This does three things:
+
+- installs root workspace dependencies with `pnpm`
+- checks the mobile toolchain and local env files
+- prepares the mobile app for monorepo builds
+
+You can run the mobile environment check at any time with:
+
+```bash
+pnpm mobile:doctor
 ```
 
 ### Run apps
