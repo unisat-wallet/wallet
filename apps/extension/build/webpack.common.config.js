@@ -519,6 +519,7 @@ const config = (env) => {
     resolve: {
       alias: {
         ...singletonPackages,
+        '@bufbuild/protobuf/dist/cjs/wire$': require.resolve('@bufbuild/protobuf/wire'),
         moment: require.resolve('dayjs'),
         stream: require.resolve('stream-browserify')
       },
