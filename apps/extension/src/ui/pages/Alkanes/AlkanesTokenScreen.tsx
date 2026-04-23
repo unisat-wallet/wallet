@@ -1,4 +1,4 @@
-import { Button, Column, Content, Footer, Header, Icon, Layout, Row, Text } from '@/ui/components';
+import { Button, Column, Content, Footer, Header, Icon, Layout, Loading, Row, Text } from '@/ui/components';
 import { BRC20Ticker } from '@/ui/components/BRC20Ticker';
 import { Line } from '@/ui/components/Line';
 import { Section } from '@/ui/components/Section';
@@ -8,7 +8,6 @@ import { WarningPopover } from '@/ui/components/WarningPopover';
 import { colors } from '@/ui/theme/colors';
 import { fontSizes } from '@/ui/theme/font';
 import { showLongNumber } from '@/ui/utils';
-import { LoadingOutlined } from '@ant-design/icons';
 import { bnUtils } from '@unisat/base-utils';
 import { useAlkanesTokenScreenLogic } from '@unisat/wallet-state';
 
@@ -33,7 +32,7 @@ export default function AlkanesTokenScreen() {
       <Layout>
         <Content itemsCenter justifyCenter>
           <Icon size={fontSizes.xxxl} color="gold">
-            <LoadingOutlined />
+            <Loading />
           </Icon>
         </Content>
       </Layout>
@@ -176,7 +175,7 @@ export default function AlkanesTokenScreen() {
               text={t('mint')}
               preset="brc20-action"
               disabled={!enableMint}
-              icon="pencil"
+              icon="mint_action"
               onClick={onClickMint}
               full
             />
