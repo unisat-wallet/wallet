@@ -5,7 +5,7 @@ export interface BRC20MoreActionItem {
   key: string;
   label: string;
   symbol?: string;
-  icon?: 'send' | 'swap_send' | 'swap_more';
+  icon?: 'send_grey' | 'swap_send' | 'swap_more' | 'add_liquidity';
   onClick: () => void;
 }
 
@@ -45,7 +45,13 @@ export function BRC20InSwapMoreSheet(props: BRC20InSwapMoreSheetProps) {
           }}>
           <Stack fullX style={{ gap: layout.actionsGap }}>
             {actions.map((action) => (
-              <ActionRow key={action.key} label={action.label} symbol={action.symbol} icon={action.icon} onClick={action.onClick} />
+              <ActionRow
+                key={action.key}
+                label={action.label}
+                symbol={action.symbol}
+                icon={action.icon}
+                onClick={action.onClick}
+              />
             ))}
           </Stack>
         </Stack>
@@ -63,7 +69,7 @@ function ActionRow({
   key?: string;
   label: string;
   symbol?: string;
-  icon?: 'send' | 'swap_send' | 'swap_more';
+  icon?: 'send_grey' | 'swap_send' | 'swap_more' | 'add_liquidity';
   onClick: () => void;
 }) {
   return (

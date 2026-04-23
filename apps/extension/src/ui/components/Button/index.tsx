@@ -298,7 +298,7 @@ const $textPresets: Record<Presets, CSSProperties> = {
     fontSize: 12
   }),
   swap: Object.assign({}, $baseTextStyle, {
-    color: 'rgba(255, 255, 255, 0.85)',
+    color: 'rgba(255, 255, 255, 0.65)',
     fontSize: 12
   })
 };

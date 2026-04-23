@@ -1,6 +1,12 @@
-import React, { useEffect, useState } from 'react';
+import React, { CSSProperties, useEffect, useState } from 'react';
 
-export const BottomModal = ({ children, onClose }: { children: React.ReactNode; onClose?: () => void }) => {
+interface BottomModalProps {
+  children: React.ReactNode;
+  onClose?: () => void;
+  bodyStyle?: CSSProperties;
+}
+
+export const BottomModal = ({ children, onClose, bodyStyle }: BottomModalProps) => {
   const [isVisible, setIsVisible] = useState(false);
 
   useEffect(() => {
@@ -18,6 +24,15 @@ export const BottomModal = ({ children, onClose }: { children: React.ReactNode; 
       onClose();
     }, 300);
   };
+
+  const resolvedBodyStyle = Object.assign(
+    {
+      width: '100%',
+      padding: 20,
+      boxSizing: 'border-box'
+    } as CSSProperties,
+    bodyStyle
+  );
 
   return (
     <div
@@ -43,16 +58,16 @@ export const BottomModal = ({ children, onClose }: { children: React.ReactNode; 
       }}>
       <div
         style={{
-          backgroundColor: '#24282F',
+          backgroundColor: '#181A1F',
           width: '100%',
-          padding: 20,
           borderRadius: '15px 15px 0 0',
           position: 'fixed',
           bottom: 0,
           transform: isVisible ? 'translateY(0)' : 'translateY(100%)',
-          transition: 'transform 0.3s ease-out'
+          transition: 'transform 0.3s ease-out',
+          overflow: 'hidden'
         }}>
-        {children}
+        <div style={resolvedBodyStyle}>{children}</div>
       </div>
     </div>
   );

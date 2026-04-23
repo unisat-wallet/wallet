@@ -26,6 +26,7 @@ export const svgRegistry = {
 
   // action
   send: '/images/icons/action/send.svg',
+  send_grey: '/images/icons/action/send_grey.svg',
   receive: '/images/icons/action/qrcode.svg',
   qrcode: '/images/icons/action/qrcode.svg',
   copy: '/images/icons/action/copy.svg',
@@ -48,6 +49,7 @@ export const svgRegistry = {
   userContact: '/images/icons/action/user-contact.svg',
   search: '/images/icons/action/search.svg',
   filter: '/images/icons/action/filter.svg',
+  add_liquidity: '/images/icons/action/add_liquidity.svg',
 
   // status
   success: '/images/icons/status/success.svg',
@@ -190,7 +192,6 @@ const iconImgList: Array<IconTypes> = [
   'send',
   'history',
   'utxo',
-  'more',
   'balance-right',
   'balance-eyes',
   'balance-eyes-closed',
@@ -220,7 +221,9 @@ const iconImgList: Array<IconTypes> = [
   'unisat_points_gem',
   'unisat_credits_coin',
 
-  'emptyBox'
+  'emptyBox',
+  'mint_action',
+  'trade'
 ];
 
 export type IconTypes = keyof typeof svgRegistry;
@@ -284,8 +287,7 @@ export function Icon(props: IconProps) {
           $imageStyleOverride || {},
           onClick ? { cursor: 'pointer' } : {}
         )}
-        data-testid={dataTestId}
-      >
+        data-testid={dataTestId}>
         {children}
       </div>
     );

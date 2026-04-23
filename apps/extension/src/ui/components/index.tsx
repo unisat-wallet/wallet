@@ -1,5 +1,7 @@
 import { Loading } from './ActionComponent/Loading';
 import { AddressBar } from './AddressBar';
+import { BottomSheetHeader } from './BottomSheetHeader';
+import { Box } from './Box';
 import { Button } from './Button';
 import { Card } from './Card';
 import { Carousel } from './Carousel';
@@ -8,11 +10,12 @@ import { Column } from './Column';
 import { Content } from './Content';
 import { Footer } from './Footer';
 import { Grid } from './Grid';
-import { Header } from './Header';
 import { HeadPicture } from './HeadPicture';
+import { Header } from './Header';
 import { Icon } from './Icon';
 import { Image } from './Image';
 import { InfiniteList } from './InfiniteList';
+import { Inline } from './Inline';
 import { Input } from './Input';
 import { Layout } from './Layout';
 import { Logo } from './Logo';
@@ -22,6 +25,7 @@ import { Row } from './Row';
 import { ScrollableList } from './ScrollableList';
 import { Slider } from './Slider';
 import { Spin } from './Spin';
+import { Stack } from './Stack';
 import { Switch } from './Switch';
 import { Text } from './Text';
 import { TextArea } from './TextArea';
@@ -29,6 +33,8 @@ import { Tooltip } from './Tooltip';
 
 export {
   AddressBar,
+  BottomSheetHeader,
+  Box,
   Button,
   Card,
   Carousel,
@@ -37,11 +43,12 @@ export {
   Content,
   Footer,
   Grid,
-  Header,
   HeadPicture,
+  Header,
   Icon,
   Image,
   InfiniteList,
+  Inline,
   Input,
   Layout,
   Loading,
@@ -53,6 +60,7 @@ export {
   ScrollableList,
   Slider,
   Spin,
+  Stack,
   Switch,
   Text,
   TextArea,

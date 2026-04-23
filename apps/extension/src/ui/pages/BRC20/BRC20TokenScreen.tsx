@@ -7,6 +7,7 @@ import { TickUsdWithoutPrice, TokenType } from '@/ui/components/TickUsd';
 import { TokenScreenIcon } from '@/ui/components/TokenScreenIcon';
 import { colors } from '@/ui/theme/colors';
 import { BRC20TokenScreenTabKey, useBRC20TokenScreenLogic, useNavigation } from '@unisat/wallet-state';
+
 import { BRC20InSwapMoreSheet } from './components/BRC20InSwapMoreSheet';
 import { BRC20OutWalletBalance, type BRC20OutWalletBalanceItem } from './components/BRC20OutWalletBalance';
 import { BRC20TokenDetail } from './components/BRC20TokenDetail';
@@ -316,7 +317,7 @@ export default function BRC20TokenScreen() {
             {
               key: 'add-liquidity',
               label: t('add_liquidity'),
-              symbol: '+',
+              icon: 'add_liquidity',
               onClick: () => runInSwapMoreAction(onClickAddLiquidityInSwap)
             },
             {
@@ -328,7 +329,7 @@ export default function BRC20TokenScreen() {
             {
               key: 'send',
               label: t('send'),
-              icon: 'send',
+              icon: 'send_grey',
               onClick: () => runInSwapMoreAction(onClickSendInSwap)
             }
           ]}
@@ -342,7 +343,7 @@ export default function BRC20TokenScreen() {
             {
               key: 'send',
               label: t('send'),
-              icon: 'send',
+              icon: 'send_grey',
               onClick: () => runProgMoreAction(onClickSendBrc20Prog)
             }
           ]}
