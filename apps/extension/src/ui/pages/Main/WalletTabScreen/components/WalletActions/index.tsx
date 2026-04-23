@@ -31,6 +31,17 @@ type WalletActionItem = {
 };
 
 const MAX_PRIMARY_ACTIONS = 4;
+const ACTION_BUTTON_SIZE = 64;
+const actionButtonStyle = {
+  minWidth: ACTION_BUTTON_SIZE,
+  minHeight: ACTION_BUTTON_SIZE,
+  width: ACTION_BUTTON_SIZE
+};
+const actionButtonTextStyle = {
+  fontSize: 12,
+  lineHeight: '14px',
+  maxWidth: ACTION_BUTTON_SIZE - 10
+};
 
 export const WalletActions = ({ chain }: WalletActionsProps) => {
   const [showOverflowActions, setShowOverflowActions] = useState(false);
@@ -112,6 +123,7 @@ export const WalletActions = ({ chain }: WalletActionsProps) => {
         icon: 'utxo',
         onClick: handleUtxoClick,
         priority: 6,
+        overflowPreset: 'homeGold',
         dataTestId: 'utxo-button'
       });
     }
@@ -148,6 +160,9 @@ export const WalletActions = ({ chain }: WalletActionsProps) => {
       icon={action.icon}
       onClick={action.onClick}
       disabled={action.disabled}
+      style={actionButtonStyle}
+      textStyle={actionButtonTextStyle}
+      max2Lines
       data-testid={action.dataTestId}
     />
   );
@@ -162,6 +177,9 @@ export const WalletActions = ({ chain }: WalletActionsProps) => {
             preset={showOverflowActions ? 'homeGold' : 'home'}
             icon="more"
             onClick={() => setShowOverflowActions((prev) => !prev)}
+            style={actionButtonStyle}
+            textStyle={actionButtonTextStyle}
+            max2Lines
             data-testid="more-button"
           />
         )}
@@ -171,13 +189,13 @@ export const WalletActions = ({ chain }: WalletActionsProps) => {
         <Row justifyCenter mt="md" style={{ flexWrap: 'wrap' }}>
           {/* add empty action place to align the overflow button to the right*/}
           {MAX_PRIMARY_ACTIONS - overflowActions.length > 0 && (
-            <Button preset="homeGold" style={{ opacity: 0 }}></Button>
+            <Button preset="homeGold" style={{ ...actionButtonStyle, opacity: 0 }}></Button>
           )}
           {MAX_PRIMARY_ACTIONS - overflowActions.length > 1 && (
-            <Button preset="homeGold" style={{ opacity: 0 }}></Button>
+            <Button preset="homeGold" style={{ ...actionButtonStyle, opacity: 0 }}></Button>
           )}
           {MAX_PRIMARY_ACTIONS - overflowActions.length > 2 && (
-            <Button preset="homeGold" style={{ opacity: 0 }}></Button>
+            <Button preset="homeGold" style={{ ...actionButtonStyle, opacity: 0 }}></Button>
           )}
 
           {overflowActions.map((action) => renderActionButton(action, 'overflow'))}

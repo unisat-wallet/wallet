@@ -57,6 +57,7 @@ export interface ButtonProps {
   };
   disabled?: boolean;
   full?: boolean;
+  max2Lines?: boolean;
 }
 
 const $baseViewStyle: CSSProperties = {
@@ -322,6 +323,7 @@ export function Button(props: ButtonProps) {
     iconSize,
     disabled,
     full,
+    max2Lines,
     ...rest
   } = props;
 
@@ -388,7 +390,7 @@ export function Button(props: ButtonProps) {
             containerStyle={iconSize ? iconSize : {}}
           />
         )}
-        {text && <Text style={$textStyle} text={text} preset="regular" mt="sm" />}
+        {text && <Text style={$textStyle} text={text} preset="regular" mt="sm" max2Lines={max2Lines} />}
       </div>
     );
   }
