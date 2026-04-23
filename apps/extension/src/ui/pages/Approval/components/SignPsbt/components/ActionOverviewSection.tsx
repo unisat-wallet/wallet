@@ -1,7 +1,7 @@
 import { IMAGE_SOURCE_MAP } from '@/shared/constant';
 import { Card, Column, Icon, Image, Row, Text } from '@/ui/components';
 import { BtcUsd } from '@/ui/components/BtcUsd';
-import { shortAddress } from '@/ui/utils';
+import { shortAddress, shortDesc } from '@/ui/utils';
 import { bnUtils, numUtils } from '@unisat/base-utils';
 import { DecodedPsbt, PsbtActionDetail, PsbtActionDetailType } from '@unisat/wallet-shared';
 import { ActionOverviewSectionProps, useActionOverviewSectionLogic, useBTCUnit, useI18n } from '@unisat/wallet-state';
@@ -42,9 +42,10 @@ function DetailItemRow({ detail, decodedPsbt }: { detail: PsbtActionDetail; deco
         <Row justifyBetween>
           {LabelCom}
           <Text
-            text={`${bnUtils.toDecimalAmount(detail.value.runeAmount, foundRune.divisibility)} ${
-              foundRune.spacedRune
-            } `}
+            text={shortDesc(
+              `${bnUtils.toDecimalAmount(detail.value.runeAmount, foundRune.divisibility)} ${foundRune.spacedRune}`,
+              30
+            )}
             preset={detail.highlight ? 'bold' : 'regular'}
             color={detail.warning ? 'warning' : detail.highlight ? 'gold' : 'white'}
             size="sm"
