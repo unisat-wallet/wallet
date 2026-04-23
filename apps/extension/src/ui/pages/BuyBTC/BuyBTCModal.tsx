@@ -76,41 +76,49 @@ export const BuyBTCModal = ({ onClose }: { onClose: () => void }) => {
       });
   }, []);
 
+  const handleBuyModalClose = () => {
+    setDisclaimerModalVisible(false);
+    onClose();
+  };
+
   return (
-    <BottomModal onClose={onClose}>
-      <Column justifyCenter itemsCenter>
-        <Row justifyBetween itemsCenter style={{ height: 20 }} fullX>
-          <Text text={`${t('buy')} ${chain.unit}`} size="md" />
-          <Row
-            onClick={() => {
-              onClose();
-            }}>
-            <Icon icon="close" size={12} />
+    <>
+      <BottomModal onClose={handleBuyModalClose}>
+        <Column justifyCenter itemsCenter>
+          <Row justifyBetween itemsCenter style={{ height: 20 }} fullX>
+            <Text text={`${t('buy')} ${chain.unit}`} size="md" />
+            <Row
+              onClick={() => {
+                handleBuyModalClose();
+              }}>
+              <Icon icon="close" size={12} />
+            </Row>
           </Row>
-        </Row>
 
-        <Row fullX style={{ borderTopWidth: 1, borderColor: colors.border }} my="md" />
+          <Row fullX style={{ borderTopWidth: 1, borderColor: colors.border }} my="md" />
 
-        <Column gap="zero" mt="sm" mb="lg">
-          <Text size="sm" color="textDim" text={`${t('buy_service_provider')} ${chain.unit}.`} />
-          {!channels ? (
-            <Skeleton active />
-          ) : channels.length <= 0 ? (
-            <Text size="sm" color="textDim" text={t('no_service_provider_available')} />
-          ) : (
-            channels.map((channel, index) => (
-              <PaymentItem
-                key={index}
-                channel={channel}
-                onClick={() => {
-                  setChannelType(channel.channel);
-                  setDisclaimerModalVisible(true);
-                }}
-              />
-            ))
-          )}
+          <Column gap="zero" mt="sm" mb="lg">
+            <Text size="sm" color="textDim" text={`${t('buy_service_provider')} ${chain.unit}.`} />
+            {!channels ? (
+              <Skeleton active />
+            ) : channels.length <= 0 ? (
+              <Text size="sm" color="textDim" text={t('no_service_provider_available')} />
+            ) : (
+              channels.map((channel, index) => (
+                <PaymentItem
+                  key={index}
+                  channel={channel}
+                  onClick={() => {
+                    setChannelType(channel.channel);
+                    setDisclaimerModalVisible(true);
+                  }}
+                />
+              ))
+            )}
+          </Column>
         </Column>
-      </Column>
+      </BottomModal>
+
       {disclaimerModalVisible && (
         <DisclaimerModal
           channelType={channelType}
@@ -119,6 +127,6 @@ export const BuyBTCModal = ({ onClose }: { onClose: () => void }) => {
           }}
         />
       )}
-    </BottomModal>
+    </>
   );
 };
