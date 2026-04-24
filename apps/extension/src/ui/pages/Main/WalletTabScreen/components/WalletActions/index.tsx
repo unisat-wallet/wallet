@@ -38,9 +38,8 @@ const actionButtonStyle = {
   width: ACTION_BUTTON_SIZE
 };
 const actionButtonTextStyle = {
-  fontSize: 12,
-  lineHeight: '14px',
-  maxWidth: ACTION_BUTTON_SIZE - 10
+  fontSize: 10,
+  lineHeight: '14px'
 };
 
 export const WalletActions = ({ chain }: WalletActionsProps) => {
