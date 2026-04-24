@@ -1,5 +1,28 @@
 # UniSat Wallet Release Notes
 
+## v1.7.12
+
+### New Features
+
+- Added new API method: `unisat.deriveContextHash(appName, context)`. See docs: [`../api/derive-context-hash.md`](../api/derive-context-hash.md)
+  - `deriveContextHash` derives a deterministic 32-byte value from wallet key material using HKDF-
+    SHA-256 with app-level and context-level domain separation.
+  - This method requires explicit user approval before returning the derived value.
+  - `deriveContextHash` is currently marked as **Experimental**.
+
+### Improvements
+
+- Improved approval UX for concurrent requests: when a new approval request arrives while another
+  is still pending, the new request is rejected, and the existing approval window is brought to
+  front so users can continue the active confirmation flow.
+- Enhanced transaction safety checks by improving dangerous sighash detection, including
+  SIGHASH_NONE and SIGHASH_SINGLE | SIGHASH_ANYONECANPAY patterns.
+
+### Bug Fixes
+
+- Fixed repository ignore rule that unintentionally ignored `apps/extension/src/_locales/es/` by
+  narrowing `es/` to root-only `/es/`.
+
 ## v1.7.11
 
 ### New Features
