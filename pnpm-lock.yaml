@@ -91,7 +91,7 @@ importers:
         version: 5.2.2
       vitest:
         specifier: ^0.34.0
-        version: 0.34.0(jsdom@27.4.0)
+        version: 0.34.0(@vitest/ui@0.34.0)
 
   apps/extension:
     dependencies:
@@ -1354,7 +1354,7 @@ importers:
         version: 5.2.2
       vitest:
         specifier: ^0.34.0
-        version: 0.34.0(jsdom@27.4.0)
+        version: 0.34.0(@vitest/ui@0.34.0)
 
   packages/babylon-service:
     dependencies:
@@ -1421,7 +1421,7 @@ importers:
         version: 5.2.2
       vitest:
         specifier: ^0.34.0
-        version: 0.34.0(jsdom@27.4.0)
+        version: 0.34.0(@vitest/ui@0.34.0)
 
   packages/base-utils:
     dependencies:
@@ -1449,7 +1449,7 @@ importers:
         version: 5.2.2
       vitest:
         specifier: ^0.34.0
-        version: 0.34.0(jsdom@27.4.0)
+        version: 0.34.0(@vitest/ui@0.34.0)
 
   packages/contact-book:
     dependencies:
@@ -1474,7 +1474,7 @@ importers:
         version: 5.2.2
       vitest:
         specifier: ^0.34.0
-        version: 0.34.0(jsdom@27.4.0)
+        version: 0.34.0(@vitest/ui@0.34.0)
 
   packages/keyring-service:
     dependencies:
@@ -1544,7 +1544,7 @@ importers:
         version: 5.2.2
       vitest:
         specifier: ^0.34.0
-        version: 0.34.0(jsdom@27.4.0)
+        version: 0.34.0(@vitest/ui@0.34.0)
 
   packages/notification-service:
     dependencies:
@@ -1572,7 +1572,7 @@ importers:
         version: 5.2.2
       vitest:
         specifier: ^0.34.0
-        version: 0.34.0(jsdom@27.4.0)
+        version: 0.34.0(@vitest/ui@0.34.0)
 
   packages/permission-service:
     dependencies:
@@ -1597,7 +1597,7 @@ importers:
         version: 5.2.2
       vitest:
         specifier: ^0.34.0
-        version: 0.34.0(jsdom@27.4.0)
+        version: 0.34.0(@vitest/ui@0.34.0)
 
   packages/phishing-detect:
     dependencies:
@@ -1625,7 +1625,7 @@ importers:
         version: 5.2.2
       vitest:
         specifier: ^0.34.0
-        version: 0.34.0(jsdom@27.4.0)
+        version: 0.34.0(@vitest/ui@0.34.0)
 
   packages/preference-service:
     dependencies:
@@ -1668,7 +1668,7 @@ importers:
         version: 5.2.2
       vitest:
         specifier: ^0.34.0
-        version: 0.34.0(jsdom@27.4.0)
+        version: 0.34.0(@vitest/ui@0.34.0)
 
   packages/tx-helpers:
     dependencies:
@@ -1711,7 +1711,7 @@ importers:
         version: 5.2.2
       vitest:
         specifier: ^0.34.0
-        version: 0.34.0(jsdom@27.4.0)
+        version: 0.34.0(@vitest/ui@0.34.0)
 
   packages/wallet-api:
     dependencies:
@@ -1742,7 +1742,7 @@ importers:
         version: 5.2.2
       vitest:
         specifier: ^0.34.0
-        version: 0.34.0(jsdom@27.4.0)
+        version: 0.34.0(@vitest/ui@0.34.0)
 
   packages/wallet-background:
     dependencies:
@@ -1839,7 +1839,7 @@ importers:
         version: 5.2.2
       vitest:
         specifier: ^0.34.0
-        version: 0.34.0(jsdom@27.4.0)
+        version: 0.34.0(@vitest/ui@0.34.0)
 
   packages/wallet-bitcoin:
     dependencies:
@@ -1930,7 +1930,7 @@ importers:
         version: 5.5.3
       vitest:
         specifier: ^0.34.0
-        version: 0.34.0(jsdom@27.4.0)
+        version: 0.34.0(@vitest/ui@0.34.0)
 
   packages/wallet-connect-react:
     dependencies:
@@ -1964,7 +1964,7 @@ importers:
         version: 5.5.3
       vitest:
         specifier: ^0.34.0
-        version: 0.34.0(jsdom@27.4.0)
+        version: 0.34.0(@vitest/ui@0.34.0)
 
   packages/wallet-shared:
     dependencies:
@@ -2066,6 +2066,9 @@ importers:
       jsdom:
         specifier: ^27.4.0
         version: 27.4.0
+      react-dom:
+        specifier: 18.2.0
+        version: 18.2.0(react@18.2.0)
       tsup:
         specifier: ^7.0.0
         version: 7.2.0(typescript@5.2.2)
@@ -2114,7 +2117,7 @@ importers:
         version: 5.2.2
       vitest:
         specifier: ^0.34.0
-        version: 0.34.0(jsdom@27.4.0)
+        version: 0.34.0(@vitest/ui@0.34.0)
 
   packages/wallet-types:
     devDependencies:
@@ -2460,7 +2463,7 @@ packages:
       '@babel/helper-optimise-call-expression': 7.27.1
       '@babel/helper-replace-supers': 7.27.1(@babel/core@7.28.4)
       '@babel/helper-skip-transparent-expression-wrappers': 7.27.1
-      '@babel/traverse': 7.29.0
+      '@babel/traverse': 7.28.4
       semver: 6.3.1
     transitivePeerDependencies:
       - supports-color
@@ -2477,7 +2480,7 @@ packages:
       '@babel/helper-optimise-call-expression': 7.27.1
       '@babel/helper-replace-supers': 7.27.1(@babel/core@7.29.0)
       '@babel/helper-skip-transparent-expression-wrappers': 7.27.1
-      '@babel/traverse': 7.29.0
+      '@babel/traverse': 7.28.4
       semver: 6.3.1
     transitivePeerDependencies:
       - supports-color
@@ -6043,7 +6046,7 @@ packages:
       '@babel/core': ^7.0.0-0
     dependencies:
       '@babel/core': 7.28.4
-      '@babel/helper-plugin-utils': 7.27.1
+      '@babel/helper-plugin-utils': 7.28.6
       '@babel/helper-validator-option': 7.27.1
       '@babel/plugin-transform-react-display-name': 7.28.0(@babel/core@7.28.4)
       '@babel/plugin-transform-react-jsx': 7.27.1(@babel/core@7.28.4)
@@ -9788,7 +9791,7 @@ packages:
       '@babel/preset-env': ^7.1.6
     dependencies:
       '@babel/parser': 7.29.2
-      '@babel/preset-env': 7.28.3(@babel/core@7.20.2)
+      '@babel/preset-env': 7.28.3(@babel/core@7.29.0)
       glob: 7.2.3
       hermes-parser: 0.19.1
       invariant: 2.2.4

@@ -1,6 +1,6 @@
 {
   "name": "@unisat/tx-helpers",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Bitcoin transaction helpers for UniSat Wallet - supports BTC, Inscriptions, Runes, and Atomicals",
   "main": "lib/index.js",
   "module": "lib/index.mjs",

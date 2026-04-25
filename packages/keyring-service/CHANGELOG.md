@@ -1,5 +1,16 @@
 # @unisat/keyring-service
 
+## 1.0.1
+
+### Patch Changes
+
+- release: publish unpublished packages and ship accumulated fixes/features since latest npm versions.
+- Updated dependencies
+  - @unisat/wallet-storage@0.2.0
+  - @unisat/wallet-bitcoin@1.0.1
+  - @unisat/wallet-shared@0.1.3
+  - @unisat/wallet-types@1.0.1
+
 ## 1.0.0
 
 ### Major Changes

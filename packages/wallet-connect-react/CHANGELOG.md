@@ -1,6 +1,6 @@
-# @unisat/approval-service
+# @unisat/wallet-connect-react
 
-## 1.1.0
+## 0.2.0
 
 ### Minor Changes
 
@@ -9,4 +9,4 @@
 ### Patch Changes
 
 - Updated dependencies
-  - @unisat/wallet-shared@0.1.3
+  - @unisat/wallet-connect@0.2.0

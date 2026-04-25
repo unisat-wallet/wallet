@@ -1,6 +1,6 @@
 {
   "name": "@unisat/notification-service",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "Cross-platform permission management service for web3 applications",
   "main": "lib/index.js",
   "module": "lib/index.mjs",

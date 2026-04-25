@@ -1,6 +1,6 @@
 {
   "name": "@unisat/wallet-connect",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Web3 wallet connection library for Bitcoin wallets (UniSat, OKX, Xverse)",
   "main": "lib/index.js",
   "module": "lib/index.mjs",

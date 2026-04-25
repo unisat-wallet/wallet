@@ -1,6 +1,6 @@
 {
   "name": "@unisat/wallet-api",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "UniSat wallet API client with comprehensive Bitcoin ecosystem support",
   "main": "lib/index.js",
   "module": "lib/index.mjs",
@@ -25,7 +25,7 @@
   "scripts": {
     "build": "tsup",
     "dev": "tsup --watch",
-    "test": "cd ../.. && npx vitest packages/api/test",
+    "test": "vitest run",
     "test:run": "cd ../.. && npx vitest run packages/api/test",
     "lint": "eslint src --ext .ts,.tsx",
     "typecheck": "tsc --noEmit",

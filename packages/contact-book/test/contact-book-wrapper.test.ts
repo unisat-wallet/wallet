@@ -4,7 +4,7 @@ import contactBookService, {
   ExtensionContactBookItem,
   UIContactBookItem,
 } from './contact-book-wrapper'
-import { ContactBook } from '../src/contact-book'
+import { ContactBookService as CoreContactBookService } from '../src/contact-book'
 import { ChainType } from '@unisat/wallet-types'
 
 describe('ContactBookService (Extension-style wrapper)', () => {
@@ -30,11 +30,11 @@ describe('ContactBookService (Extension-style wrapper)', () => {
     it('should create a new instance successfully', () => {
       expect(contactBook).toBeDefined()
       expect(contactBook).toBeInstanceOf(ContactBookService)
-      expect(contactBook).toBeInstanceOf(ContactBook)
+      expect(contactBook).toBeInstanceOf(CoreContactBookService)
     })
 
     it('should initialize successfully', async () => {
-      await expect(contactBook.init()).resolves.not.toThrow()
+      await expect(contactBook.init()).resolves.toBeUndefined()
     })
 
     it('should handle multiple init calls gracefully', async () => {

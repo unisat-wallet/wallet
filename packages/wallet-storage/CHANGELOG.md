@@ -1,6 +1,6 @@
-# @unisat/approval-service
+# @unisat/wallet-storage
 
-## 1.1.0
+## 0.2.0
 
 ### Minor Changes
 
@@ -10,3 +10,4 @@
 
 - Updated dependencies
   - @unisat/wallet-shared@0.1.3
+  - @unisat/wallet-types@1.0.1

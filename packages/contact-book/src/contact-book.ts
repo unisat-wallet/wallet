@@ -40,8 +40,20 @@ export class ContactBookService {
    * Initialize the contact book - loads data from storage
    */
   async init(config: ContactBookConfig): Promise<void> {
+    if (this.initialized) {
+      return
+    }
+
     if (config.storage) {
       this.storage = config.storage
+    }
+
+    if (config.storageKey) {
+      this.storageKey = config.storageKey
+    }
+
+    if (typeof config.autoSync === 'boolean') {
+      this.autoSync = config.autoSync
     }
 
     if (config.logger) {

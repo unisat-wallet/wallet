@@ -1,6 +1,6 @@
 {
   "name": "@unisat/contact-book",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Universal contact book management with multi-chain support",
   "main": "lib/index.js",
   "module": "lib/index.mjs",
@@ -25,7 +25,7 @@
   "scripts": {
     "build": "tsup",
     "dev": "tsup --watch",
-    "test": "cd ../.. && npx vitest packages/contact-book/test",
+    "test": "vitest run",
     "test:run": "cd ../.. && npx vitest run packages/contact-book/test",
     "lint": "eslint src --ext .ts,.tsx",
     "typecheck": "tsc --noEmit",

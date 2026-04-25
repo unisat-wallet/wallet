@@ -1,6 +1,6 @@
 {
   "name": "@unisat/wallet-connect-react",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "React components for Bitcoin wallet connections (UniSat, OKX, Xverse)",
   "main": "lib/index.js",
   "module": "lib/index.mjs",

@@ -1,6 +1,6 @@
 {
   "name": "@unisat/wallet-state",
-  "version": "1.0.5",
+  "version": "1.0.6",
   "description": "Redux state management for UniSat wallet, shared between platforms",
   "main": "lib/index.js",
   "module": "lib/index.mjs",
@@ -38,8 +38,8 @@
     "@unisat/wallet-types": "workspace:*",
     "bignumber.js": "^9.1.2",
     "bip39": "^3.1.0",
-    "react-redux": "8.0.1",
-    "loglevel": "^1.8.0"
+    "loglevel": "^1.8.0",
+    "react-redux": "8.0.1"
   },
   "peerDependencies": {
     "@reduxjs/toolkit": "^1.9.2",
@@ -57,6 +57,7 @@
     "@types/react": "^18.0.0",
     "eslint": "^8.0.0",
     "jsdom": "^27.4.0",
+    "react-dom": "18.2.0",
     "tsup": "^7.0.0",
     "typescript": "^5.0.0",
     "vitest": "^0.34.0"

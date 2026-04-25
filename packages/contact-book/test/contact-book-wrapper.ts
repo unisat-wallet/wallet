@@ -1,15 +1,22 @@
-import { ContactBook } from '../src/contact-book'
-import { ExtensionPersistStoreAdapter } from '../src/adapters/extensionPersist'
+import { ContactBookService as CoreContactBookService } from '../src/contact-book'
 import { ChainType } from '@unisat/wallet-types'
 
-// Mock createPersistStore function to simulate extension behavior
-const mockCreatePersistStore = async (config: any) => {
-  // Return a simple object that behaves like extension storage
-  const store: any = config.template || {}
-  return store
+class MemoryStorageAdapter {
+  private storage: Record<string, any> = {}
+
+  async get(key: string): Promise<any> {
+    return this.storage[key]
+  }
+
+  async set(key: string, value: any): Promise<void> {
+    this.storage[key] = value
+  }
+
+  async remove(key: string): Promise<void> {
+    delete this.storage[key]
+  }
 }
 
-// Export interfaces for compatibility with extension
 export interface ExtensionContactBookItem {
   name: string
   address: string
@@ -24,24 +31,17 @@ export interface UIContactBookItem {
   address: string
 }
 
-/**
- * ContactBook service - simple wrapper that initializes and exposes the ContactBook instance
- * This mimics the exact structure from unisat-extension
- */
-export class ContactBookService extends ContactBook {
-  constructor() {
-    // Create storage adapter using the existing ExtensionPersistStoreAdapter
-    const storage = new ExtensionPersistStoreAdapter(mockCreatePersistStore, 'contactBook')
+export class ContactBookService extends CoreContactBookService {
+  private readonly _storage = new MemoryStorageAdapter()
 
-    // Call parent constructor with extension-compatible storage
-    super({
-      storage,
-      logger: console, // Use console for logging in development
+  async init(): Promise<void> {
+    return super.init({
+      storage: this._storage as any,
+      logger: console,
     })
   }
 }
 
-// Create singleton instance like in the extension
 const contactBookService = new ContactBookService()
 
 export default contactBookService

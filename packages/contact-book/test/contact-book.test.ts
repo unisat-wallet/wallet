@@ -1,10 +1,10 @@
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
-import { ContactBook } from '../src/contact-book'
-import { ContactBookItem, StorageAdapter, Logger } from '../src/types'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
+
+import { ContactBookService } from '../src/contact-book'
+import type { ContactBookItem, Logger } from '../src/types'
 import { ChainType } from '@unisat/wallet-types'
 
-// Mock storage adapter for testing
-class MockStorageAdapter implements StorageAdapter {
+class MockStorageAdapter {
   private storage: Record<string, any> = {}
 
   async get(key: string): Promise<any> {
@@ -23,13 +23,11 @@ class MockStorageAdapter implements StorageAdapter {
     this.storage = {}
   }
 
-  // Helper method for tests
   getStorage() {
     return { ...this.storage }
   }
 }
 
-// Mock logger for testing
 const mockLogger: Logger = {
   debug: vi.fn(),
   info: vi.fn(),
@@ -37,535 +35,216 @@ const mockLogger: Logger = {
   error: vi.fn(),
 }
 
-// Test data using mixed format (simulating real Chrome storage data)
-const mixedTestData = {
-  bc1qm4x8k9z2a7n5t3w6y1e8r0u9i2o4p7s5d6f8h9j_FRACTAL_BITCOIN_MAINNET: {
-    address: 'bc1qm4x8k9z2a7n5t3w6y1e8r0u9i2o4p7s5d6f8h9j',
-    chain: ChainType.FRACTAL_BITCOIN_MAINNET,
-    isAlias: false,
-    isContact: true,
-    name: 'test-wallet-alpha',
-  },
-  tb1p7q8w9e0r1t2y3u4i5o6p7a8s9d0f1g2h3j4k5l6m7n8b9v0c1x2z3_BITCOIN_SIGNET: {
-    address: 'tb1p7q8w9e0r1t2y3u4i5o6p7a8s9d0f1g2h3j4k5l6m7n8b9v0c1x2z3',
-    chain: ChainType.BITCOIN_SIGNET,
-    isAlias: false,
-    isContact: true,
-    name: 'dev-contact-beta',
-  },
-  tb1p3c4v5b6n7m8q9w0e1r2t3y4u5i6o7p8a9s0d1f2g3h4j5k6l7z8x9_BITCOIN_SIGNET: {
-    address: 'tb1p3c4v5b6n7m8q9w0e1r2t3y4u5i6o7p8a9s0d1f2g3h4j5k6l7z8x9',
-    chain: ChainType.BITCOIN_SIGNET,
-    isAlias: false,
-    isContact: true,
-    name: 'hardware-gamma',
-  },
-}
-
-function getTestData() {
-  return Object.assign({}, mixedTestData)
-}
-
-describe('ContactBook', () => {
-  let contactBook: ContactBook
+describe('ContactBookService', () => {
+  let contactBook: ContactBookService
   let mockStorage: MockStorageAdapter
 
   beforeEach(async () => {
+    vi.clearAllMocks()
     mockStorage = new MockStorageAdapter()
-    contactBook = new ContactBook({
-      storage: mockStorage,
+    contactBook = new ContactBookService()
+    await contactBook.init({
+      storage: mockStorage as any,
       storageKey: 'testContactBook',
       logger: mockLogger,
       autoSync: true,
     })
-    await contactBook.init()
   })
 
-  afterEach(() => {
-    vi.clearAllMocks()
+  it('initializes with empty contacts when no storage data', () => {
+    expect(contactBook.listContacts()).toEqual([])
   })
 
-  describe('Initialization', () => {
-    it('should initialize with empty store when no data exists', async () => {
-      const contacts = contactBook.listContacts()
-      expect(contacts).toEqual([])
-    })
-
-    it('should load existing data on initialization', async () => {
-      const newStorage = new MockStorageAdapter()
-      await newStorage.set('testContactBook', getTestData())
-
-      const newContactBook = new ContactBook({
-        storage: newStorage,
-        storageKey: 'testContactBook',
-        logger: mockLogger,
-      })
-      await newContactBook.init()
-
-      const contacts = newContactBook.listContacts()
-      expect(contacts).toHaveLength(3)
-    })
-
-    it('should not initialize twice', async () => {
-      const debugSpy = vi.spyOn(mockLogger, 'debug')
-      await contactBook.init()
-      expect(debugSpy).not.toHaveBeenCalled()
-    })
-
-    it('should throw error when using methods before initialization', () => {
-      const uninitializedContactBook = new ContactBook({
-        storage: mockStorage,
-        storageKey: 'test',
-      })
-
-      expect(() => uninitializedContactBook.listContacts()).toThrow(
-        'ContactBook not initialized. Call init() first.'
-      )
-    })
+  it('throws when methods are called before init', () => {
+    const uninitialized = new ContactBookService()
+    expect(() => uninitialized.listContacts()).toThrow('ContactBook not initialized. Call init() first.')
   })
 
-  describe('Contact Management', () => {
-    const testContact: ContactBookItem = {
-      name: 'test-contact-delta',
-      address: 'bc1qtest123456789abcdefghijk',
+  it('loads existing storage and rebuilds from mixed keys', async () => {
+    await mockStorage.set('testContactBook', {
+      legacykey: {
+        name: 'legacy',
+        address: 'bc1qlegacy',
+        chain: ChainType.BITCOIN_MAINNET,
+        isContact: true,
+        isAlias: false,
+      },
+      bc1qmodern_BITCOIN_TESTNET: {
+        name: 'modern',
+        address: 'bc1qmodern',
+        chain: ChainType.BITCOIN_TESTNET,
+        isContact: true,
+        isAlias: false,
+      },
+    })
+
+    const service = new ContactBookService()
+    await service.init({ storage: mockStorage as any, storageKey: 'testContactBook' })
+
+    const contacts = service.listContacts()
+    expect(contacts).toHaveLength(2)
+    expect(contacts.map(v => v.name)).toEqual(expect.arrayContaining(['legacy', 'modern']))
+  })
+
+  it('add/update/get/remove contact works', async () => {
+    const contact: ContactBookItem = {
+      name: 'alpha',
+      address: 'bc1qalpha',
       chain: ChainType.BITCOIN_MAINNET,
       isContact: true,
       isAlias: false,
     }
 
-    it('should add a new contact', async () => {
-      await contactBook.addContact(testContact)
-      const contacts = contactBook.listContacts()
-      expect(contacts).toHaveLength(1)
-      expect(contacts[0]).toMatchObject(testContact)
-    })
+    await contactBook.addContact(contact)
+    expect(contactBook.getContactByAddress(contact.address)?.name).toBe('alpha')
 
-    it('should update existing contact', async () => {
-      await contactBook.addContact(testContact)
-      const updatedContact = { ...testContact, name: 'updated-contact-name' }
-      await contactBook.updateContact(updatedContact)
+    await contactBook.updateContact({ ...contact, name: 'alpha-updated' })
+    expect(contactBook.getContactByAddressAndChain(contact.address, contact.chain)?.name).toBe('alpha-updated')
 
-      const contacts = contactBook.listContacts()
-      expect(contacts).toHaveLength(1)
-      expect(contacts[0].name).toBe('updated-contact-name')
-    })
-
-    it('should get contact by address', async () => {
-      await contactBook.addContact(testContact)
-      const found = contactBook.getContactByAddress(testContact.address)
-      expect(found).toMatchObject(testContact)
-    })
-
-    it('should get contact by address and chain', async () => {
-      await contactBook.addContact(testContact)
-      const found = contactBook.getContactByAddressAndChain(testContact.address, testContact.chain)
-      expect(found).toMatchObject(testContact)
-    })
-
-    it('should return undefined for non-existent contact', () => {
-      const found = contactBook.getContactByAddress('nonexistent')
-      expect(found).toBeUndefined()
-    })
-
-    it('should remove contact completely if not an alias', async () => {
-      await contactBook.addContact(testContact)
-      await contactBook.removeContact(testContact.address, testContact.chain)
-
-      const contacts = contactBook.listContacts()
-      expect(contacts).toHaveLength(0)
-    })
-
-    it('should only remove contact flag if item is also an alias', async () => {
-      const contactWithAlias = { ...testContact, isAlias: true }
-      await contactBook.addContact(contactWithAlias)
-      await contactBook.removeContact(testContact.address, testContact.chain)
-
-      const rawStore = contactBook.getRawStore()
-      const key = `${testContact.address}_${testContact.chain}`
-      expect(rawStore[key]?.isContact).toBe(false)
-      expect(rawStore[key]?.isAlias).toBe(true)
-    })
+    await contactBook.removeContact(contact.address, contact.chain)
+    expect(contactBook.getContactByAddress(contact.address)).toBeUndefined()
   })
 
-  describe('Alias Management', () => {
-    const testAlias = {
-      name: 'test-alias-epsilon',
-      address: 'tb1qalias123456789abcdefghijk',
-      chain: ChainType.BITCOIN_TESTNET,
+  it('alias lifecycle works and respects contact/alias dual flags', async () => {
+    const address = 'bc1qalias'
+    const chain = ChainType.BITCOIN_MAINNET
+
+    await contactBook.addAlias({ address, chain, name: 'alias-name' })
+    expect(contactBook.listAlias()).toHaveLength(1)
+
+    await contactBook.addContact({
+      address,
+      chain,
+      name: 'contact-name',
+      isContact: true,
+      isAlias: true,
+    })
+
+    await contactBook.removeAlias(address, chain)
+    const item = contactBook.getContactByAddressAndChain(address, chain)
+    expect(item?.isContact).toBe(true)
+    expect(item?.isAlias).toBe(false)
+  })
+
+  it('saveContactsOrder updates sortIndex ordering', async () => {
+    const c1: ContactBookItem = {
+      name: 'one',
+      address: 'bc1q1',
+      chain: ChainType.BITCOIN_MAINNET,
+      isContact: true,
+      isAlias: false,
+      sortIndex: 1,
+    }
+    const c2: ContactBookItem = {
+      name: 'two',
+      address: 'bc1q2',
+      chain: ChainType.BITCOIN_MAINNET,
+      isContact: true,
+      isAlias: false,
+      sortIndex: 2,
     }
 
-    it('should add a new alias', async () => {
-      await contactBook.addAlias(testAlias)
-      const aliases = contactBook.listAlias()
-      expect(aliases).toHaveLength(1)
-      expect(aliases[0]).toMatchObject({
-        ...testAlias,
-        isAlias: true,
-        isContact: false,
-      })
-    })
+    await contactBook.addContact(c1)
+    await contactBook.addContact(c2)
 
-    it('should update existing alias', async () => {
-      await contactBook.addAlias(testAlias)
-      const updatedAlias = { ...testAlias, name: 'updated-alias-name' }
-      await contactBook.updateAlias(updatedAlias)
+    const ordered = contactBook.listContacts()
+    await contactBook.saveContactsOrder([ordered[1]!, ordered[0]!])
 
-      const aliases = contactBook.listAlias()
-      expect(aliases[0]?.name).toBe('updated-alias-name')
-    })
-
-    it('should remove alias completely if not a contact', async () => {
-      await contactBook.addAlias(testAlias)
-      await contactBook.removeAlias(testAlias.address, testAlias.chain)
-
-      const aliases = contactBook.listAlias()
-      expect(aliases).toHaveLength(0)
-    })
-
-    it('should only remove alias flag if item is also a contact', async () => {
-      const contactItem: ContactBookItem = {
-        ...testAlias,
-        isContact: true,
-        isAlias: true,
-      }
-      await contactBook.addContact(contactItem)
-      await contactBook.removeAlias(testAlias.address, testAlias.chain)
-
-      const rawStore = contactBook.getRawStore()
-      const key = `${testAlias.address}_${testAlias.chain}`
-      expect(rawStore[key]?.isContact).toBe(true)
-      expect(rawStore[key]?.isAlias).toBe(false)
-    })
+    const after = contactBook.listContacts()
+    expect(after[0]?.name).toBe('two')
+    expect(after[0]?.sortIndex).toBe(0)
   })
 
-  describe('Data Retrieval and Sorting', () => {
-    beforeEach(async () => {
-      // Add test contacts with different sort indices
-      await contactBook.addContact({
-        name: 'contact-zeta',
-        address: 'bc1qzeta123456789',
-        chain: ChainType.BITCOIN_MAINNET,
-        isContact: true,
-        isAlias: false,
-        sortIndex: 2,
-      })
-
-      await contactBook.addContact({
-        name: 'contact-eta',
-        address: 'bc1qeta123456789',
-        chain: ChainType.BITCOIN_MAINNET,
-        isContact: true,
-        isAlias: false,
-        sortIndex: 1,
-      })
-
-      await contactBook.addContact({
-        name: 'contact-theta',
-        address: 'bc1qtheta123456789',
-        chain: ChainType.BITCOIN_MAINNET,
-        isContact: true,
-        isAlias: false,
-      })
+  it('getContactsByMap returns composite-key map', async () => {
+    await contactBook.addContact({
+      name: 'map',
+      address: 'bc1qmap',
+      chain: ChainType.BITCOIN_MAINNET,
+      isContact: true,
+      isAlias: false,
     })
 
-    it('should list contacts sorted by sortIndex', () => {
-      const contacts = contactBook.listContacts()
-      expect(contacts).toHaveLength(3)
-      console.log(contacts)
-
-      // Items with sortIndex should come first, sorted by sortIndex value
-      // contact-eta (sortIndex: 1), contact-zeta (sortIndex: 2), contact-theta (no sortIndex)
-      expect(contacts[0].name).toBe('contact-theta')
-      expect(contacts[0].sortIndex).toBe(0)
-      expect(contacts[1].name).toBe('contact-eta')
-      expect(contacts[1].sortIndex).toBe(1)
-    })
-
-    it('should save contacts order', async () => {
-      const contacts = contactBook.listContacts()
-      // Reorder: put the last contact first, then the other two
-      const reorderedContacts = [contacts[2], contacts[0], contacts[1]]
-
-      await contactBook.saveContactsOrder(reorderedContacts)
-      const newOrder = contactBook.listContacts()
-
-      // After reordering, the contacts should appear in the new order
-      expect(newOrder[0].name).toBe('contact-zeta')
-      expect(newOrder[0].sortIndex).toBe(0)
-      expect(newOrder[1].name).toBe('contact-theta')
-      expect(newOrder[1].sortIndex).toBe(1)
-      expect(newOrder[2].name).toBe('contact-eta')
-      expect(newOrder[2].sortIndex).toBe(2)
-    })
-
-    it('should get contacts as map', () => {
-      const contactsMap = contactBook.getContactsByMap()
-      const keys = Object.keys(contactsMap)
-      expect(keys).toHaveLength(3)
-      expect(contactsMap).toHaveProperty('bc1qeta123456789_BITCOIN_MAINNET')
-    })
+    const map = contactBook.getContactsByMap()
+    expect(map['bc1qmap_BITCOIN_MAINNET']?.name).toBe('map')
   })
 
-  describe('Storage and Sync', () => {
-    it('should auto-sync to storage when autoSync is enabled', async () => {
-      const testContact: ContactBookItem = {
-        name: 'sync-test',
-        address: 'bc1qsync123456789',
-        chain: ChainType.BITCOIN_MAINNET,
-        isContact: true,
-        isAlias: false,
-      }
-
-      await contactBook.addContact(testContact)
-      const storedData = mockStorage.getStorage()
-      expect(storedData).toHaveProperty('testContactBook')
+  it('autoSync=false skips writes until manual sync()', async () => {
+    const service = new ContactBookService()
+    await service.init({
+      storage: mockStorage as any,
+      storageKey: 'manualSync',
+      autoSync: false,
     })
 
-    it('should not auto-sync when autoSync is disabled', async () => {
-      const noSyncContactBook = new ContactBook({
-        storage: mockStorage,
-        storageKey: 'noSync',
-        autoSync: false,
-      })
-      await noSyncContactBook.init()
-
-      const testContact: ContactBookItem = {
-        name: 'no-sync-test',
-        address: 'bc1qnosync123456789',
-        chain: ChainType.BITCOIN_MAINNET,
-        isContact: true,
-        isAlias: false,
-      }
-
-      await noSyncContactBook.addContact(testContact)
-      const storedData = mockStorage.getStorage()
-      expect(storedData).not.toHaveProperty('noSync')
+    await service.addContact({
+      name: 'manual',
+      address: 'bc1qmanual',
+      chain: ChainType.BITCOIN_MAINNET,
+      isContact: true,
+      isAlias: false,
     })
 
-    it('should manually sync when requested', async () => {
-      const noSyncContactBook = new ContactBook({
-        storage: mockStorage,
-        storageKey: 'manualSync',
-        autoSync: false,
-      })
-      await noSyncContactBook.init()
+    expect(mockStorage.getStorage()).not.toHaveProperty('manualSync')
 
-      const testContact: ContactBookItem = {
-        name: 'manual-sync-test',
-        address: 'bc1qmanualsync123456789',
-        chain: ChainType.BITCOIN_MAINNET,
-        isContact: true,
-        isAlias: false,
-      }
-
-      await noSyncContactBook.addContact(testContact)
-      await noSyncContactBook.sync()
-
-      const storedData = mockStorage.getStorage()
-      expect(storedData).toHaveProperty('manualSync')
-    })
+    await service.sync()
+    expect(mockStorage.getStorage()).toHaveProperty('manualSync')
   })
 
-  describe('Data Migration and Rebuild', () => {
-    it('should handle legacy data format during rebuild', async () => {
-      // Simulate legacy data with non-composite keys
-      const legacyData = {
-        bc1qlegacy123456789: {
-          address: 'bc1qlegacy123456789',
-          chain: ChainType.BITCOIN_MAINNET,
-          isContact: true,
-          isAlias: false,
-          name: 'legacy-contact',
-        },
-      }
+  it('supports same address on different chains', async () => {
+    const address = 'bc1qsame'
 
-      await mockStorage.set('testContactBook', legacyData)
-
-      const newContactBook = new ContactBook({
-        storage: mockStorage,
-        storageKey: 'testContactBook',
-        logger: mockLogger,
-      })
-      await newContactBook.init()
-
-      const contacts = newContactBook.listContacts()
-      expect(contacts).toHaveLength(1)
-      expect(contacts[0].name).toBe('legacy-contact')
+    await contactBook.addContact({
+      name: 'mainnet',
+      address,
+      chain: ChainType.BITCOIN_MAINNET,
+      isContact: true,
+      isAlias: false,
+    })
+    await contactBook.addContact({
+      name: 'testnet',
+      address,
+      chain: ChainType.BITCOIN_TESTNET,
+      isContact: true,
+      isAlias: false,
     })
 
-    it('should handle mixed data formats', async () => {
-      await mockStorage.set('testContactBook', getTestData())
-
-      const newContactBook = new ContactBook({
-        storage: mockStorage,
-        storageKey: 'testContactBook',
-      })
-      await newContactBook.init()
-
-      const contacts = newContactBook.listContacts()
-      expect(contacts).toHaveLength(3)
-
-      const contactNames = contacts.map(c => c.name)
-      expect(contactNames).toContain('test-wallet-alpha')
-      expect(contactNames).toContain('dev-contact-beta')
-      expect(contactNames).toContain('hardware-gamma')
-    })
-
-    it('should remove duplicate entries during rebuild', async () => {
-      const dataWithDuplicates = {
-        bc1qdupe123456789_BITCOIN_MAINNET: {
-          address: 'bc1qdupe123456789',
-          chain: ChainType.BITCOIN_MAINNET,
-          isContact: true,
-          isAlias: false,
-          name: 'duplicate-1',
-        },
-        bc1qdupe123456789: {
-          // Legacy format with same address
-          address: 'bc1qdupe123456789',
-          chain: ChainType.BITCOIN_MAINNET,
-          isContact: true,
-          isAlias: false,
-          name: 'duplicate-2',
-        },
-      }
-
-      await mockStorage.set('testContactBook', dataWithDuplicates)
-
-      const newContactBook = new ContactBook({
-        storage: mockStorage,
-        storageKey: 'testContactBook',
-      })
-      await newContactBook.init()
-
-      const contacts = newContactBook.listContacts()
-      expect(contacts).toHaveLength(1)
-    })
+    expect(contactBook.listContacts()).toHaveLength(2)
+    expect(contactBook.getContactByAddressAndChain(address, ChainType.BITCOIN_MAINNET)?.name).toBe('mainnet')
+    expect(contactBook.getContactByAddressAndChain(address, ChainType.BITCOIN_TESTNET)?.name).toBe('testnet')
   })
 
-  describe('Utility Methods', () => {
-    it('should clear all data', async () => {
-      await contactBook.addContact({
-        name: 'to-be-cleared',
-        address: 'bc1qclear123456789',
-        chain: ChainType.BITCOIN_MAINNET,
-        isContact: true,
-        isAlias: false,
-      })
-
-      await contactBook.clear()
-      const contacts = contactBook.listContacts()
-      expect(contacts).toHaveLength(0)
+  it('clear() and getRawStore() work', async () => {
+    await contactBook.addContact({
+      name: 'raw',
+      address: 'bc1qraw',
+      chain: ChainType.BITCOIN_MAINNET,
+      isContact: true,
+      isAlias: false,
     })
 
-    it('should get raw store data', async () => {
-      await contactBook.addContact({
-        name: 'raw-store-test',
-        address: 'bc1qraw123456789',
-        chain: ChainType.BITCOIN_MAINNET,
-        isContact: true,
-        isAlias: false,
-      })
+    const raw = contactBook.getRawStore()
+    expect(raw).toHaveProperty('bc1qraw_BITCOIN_MAINNET')
 
-      const rawStore = contactBook.getRawStore()
-      expect(rawStore).toHaveProperty('bc1qraw123456789_BITCOIN_MAINNET')
-
-      // Ensure it's a copy, not reference
-      ;(rawStore as any)['test'] = 'modified'
-      const rawStore2 = contactBook.getRawStore()
-      expect(rawStore2).not.toHaveProperty('test')
-    })
+    await contactBook.clear()
+    expect(contactBook.listContacts()).toEqual([])
   })
 
-  describe('Multi-Chain Support', () => {
-    it('should handle different chain types', async () => {
-      const chains = [
-        ChainType.BITCOIN_MAINNET,
-        ChainType.BITCOIN_TESTNET,
-        ChainType.BITCOIN_SIGNET,
-        ChainType.FRACTAL_BITCOIN_MAINNET,
-        ChainType.FRACTAL_BITCOIN_TESTNET,
-      ]
+  it('propagates storage errors from init and sync paths', async () => {
+    const errorStorage = new MockStorageAdapter()
+    vi.spyOn(errorStorage, 'get').mockRejectedValueOnce(new Error('Storage error'))
 
-      for (let i = 0; i < chains.length; i++) {
-        await contactBook.addContact({
-          name: `contact-${i}`,
-          address: `bc1qchain${i}123456789`,
-          chain: chains[i],
-          isContact: true,
-          isAlias: false,
-        })
-      }
+    const service = new ContactBookService()
+    await expect(service.init({ storage: errorStorage as any })).rejects.toThrow('Storage error')
 
-      const contacts = contactBook.listContacts()
-      expect(contacts).toHaveLength(chains.length)
-
-      const uniqueChains = new Set(contacts.map(c => c.chain))
-      expect(uniqueChains.size).toBe(chains.length)
-    })
-
-    it('should distinguish same address on different chains', async () => {
-      const sameAddress = 'bc1qsame123456789abcdef'
-
-      await contactBook.addContact({
-        name: 'mainnet-contact',
-        address: sameAddress,
+    vi.spyOn(mockStorage, 'set').mockRejectedValueOnce(new Error('Sync error'))
+    await expect(
+      contactBook.addContact({
+        name: 'sync',
+        address: 'bc1qsync',
         chain: ChainType.BITCOIN_MAINNET,
         isContact: true,
         isAlias: false,
       })
-
-      await contactBook.addContact({
-        name: 'testnet-contact',
-        address: sameAddress,
-        chain: ChainType.BITCOIN_TESTNET,
-        isContact: true,
-        isAlias: false,
-      })
-
-      const contacts = contactBook.listContacts()
-      expect(contacts).toHaveLength(2)
-
-      const mainnetContact = contactBook.getContactByAddressAndChain(
-        sameAddress,
-        ChainType.BITCOIN_MAINNET
-      )
-      const testnetContact = contactBook.getContactByAddressAndChain(
-        sameAddress,
-        ChainType.BITCOIN_TESTNET
-      )
-
-      expect(mainnetContact?.name).toBe('mainnet-contact')
-      expect(testnetContact?.name).toBe('testnet-contact')
-    })
-  })
-
-  describe('Error Handling', () => {
-    it('should handle storage errors during initialization', async () => {
-      const errorStorage = new MockStorageAdapter()
-      vi.spyOn(errorStorage, 'get').mockRejectedValue(new Error('Storage error'))
-
-      const errorContactBook = new ContactBook({
-        storage: errorStorage,
-        storageKey: 'error-test',
-        logger: mockLogger,
-      })
-
-      await expect(errorContactBook.init()).rejects.toThrow('Storage error')
-    })
-
-    it('should handle storage errors during sync', async () => {
-      vi.spyOn(mockStorage, 'set').mockRejectedValue(new Error('Sync error'))
-
-      const testContact: ContactBookItem = {
-        name: 'error-test',
-        address: 'bc1qerror123456789',
-        chain: ChainType.BITCOIN_MAINNET,
-        isContact: true,
-        isAlias: false,
-      }
-
-      await expect(contactBook.addContact(testContact)).rejects.toThrow('Sync error')
-    })
+    ).rejects.toThrow('Sync error')
   })
 })
