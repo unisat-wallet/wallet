@@ -1,5 +1,16 @@
 # @unisat/wallet-shared
 
+## 0.2.0
+
+### Minor Changes
+
+- release: minor wave for long-overdue updates while preserving compatibility assumptions.
+
+### Patch Changes
+
+- Updated dependencies
+  - @unisat/wallet-types@1.1.0
+
 ## 0.1.3
 
 ### Patch Changes

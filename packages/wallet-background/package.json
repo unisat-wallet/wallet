@@ -1,6 +1,6 @@
 {
   "name": "@unisat/wallet-background",
-  "version": "1.0.0",
+  "version": "2.0.0",
   "description": "Complete wallet background logic for UniSat wallet, cross-platform compatible",
   "main": "lib/index.js",
   "module": "lib/index.mjs",

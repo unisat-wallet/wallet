@@ -1,5 +1,25 @@
 # @unisat/wallet-background
 
+## 2.0.0
+
+### Patch Changes
+
+- Updated dependencies
+  - @unisat/babylon-service@1.1.0
+  - @unisat/base-utils@0.2.0
+  - @unisat/contact-book@1.1.0
+  - @unisat/keyring-service@1.1.0
+  - @unisat/permission-service@1.1.0
+  - @unisat/phishing-detect@0.2.0
+  - @unisat/preference-service@0.2.0
+  - @unisat/tx-helpers@1.1.0
+  - @unisat/wallet-api@1.1.0
+  - @unisat/wallet-bitcoin@1.1.0
+  - @unisat/wallet-shared@0.2.0
+  - @unisat/wallet-types@1.1.0
+  - @unisat/notification-service@1.1.1
+  - @unisat/approval-service@1.1.1
+
 ## 1.0.0
 
 ### Patch Changes

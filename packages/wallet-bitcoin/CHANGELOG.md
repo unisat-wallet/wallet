@@ -1,5 +1,16 @@
 # @unisat/wallet-bitcoin
 
+## 1.1.0
+
+### Minor Changes
+
+- release: minor wave for long-overdue updates while preserving compatibility assumptions.
+
+### Patch Changes
+
+- Updated dependencies
+  - @unisat/wallet-types@1.1.0
+
 ## 1.0.1
 
 ### Patch Changes

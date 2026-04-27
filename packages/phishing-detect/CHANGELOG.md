@@ -1,5 +1,11 @@
 # @unisat/phishing-detect
 
+## 0.2.0
+
+### Minor Changes
+
+- release: minor wave for long-overdue updates while preserving compatibility assumptions.
+
 ## 0.1.3
 
 ### Patch Changes

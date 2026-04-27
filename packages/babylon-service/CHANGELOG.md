@@ -1,5 +1,11 @@
 # @unisat/babylon-service
 
+## 1.1.0
+
+### Minor Changes
+
+- release: minor wave for long-overdue updates while preserving compatibility assumptions.
+
 ## 1.0.2
 
 ### Patch Changes

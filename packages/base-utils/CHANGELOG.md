@@ -1,5 +1,11 @@
 # @unisat/base-utils
 
+## 0.2.0
+
+### Minor Changes
+
+- release: minor wave for long-overdue updates while preserving compatibility assumptions.
+
 ## 0.1.4
 
 ### Patch Changes

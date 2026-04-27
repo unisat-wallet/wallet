@@ -1,5 +1,20 @@
 # @unisat/wallet-state
 
+## 1.1.0
+
+### Minor Changes
+
+- release: minor wave for long-overdue updates while preserving compatibility assumptions.
+
+### Patch Changes
+
+- Updated dependencies
+  - @unisat/babylon-service@1.1.0
+  - @unisat/base-utils@0.2.0
+  - @unisat/keyring-service@1.1.0
+  - @unisat/wallet-shared@0.2.0
+  - @unisat/wallet-types@1.1.0
+
 ## 1.0.6
 
 ### Patch Changes

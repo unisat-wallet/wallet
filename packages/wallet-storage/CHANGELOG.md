@@ -1,5 +1,13 @@
 # @unisat/wallet-storage
 
+## 0.2.1
+
+### Patch Changes
+
+- Updated dependencies
+  - @unisat/wallet-shared@0.2.0
+  - @unisat/wallet-types@1.1.0
+
 ## 0.2.0
 
 ### Minor Changes
