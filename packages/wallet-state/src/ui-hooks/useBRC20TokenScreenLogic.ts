@@ -31,6 +31,7 @@ export interface BRC20OutWalletBalanceItem {
 
 const INSWAP_TICKER_WRAP_FB = 'sFB___000'
 const INSWAP_TICKER_WRAP_BTC = 'sBTC___000'
+const INSWAP_SWAP_ANCHOR = '#swap'
 
 export function useBRC20TokenHistoryLogic(props: { ticker: string; displayName?: string }) {
   const wallet = useWallet()
@@ -385,32 +386,27 @@ export function useBRC20TokenScreenLogic() {
 
   // inswap
   const onClickSwapInSwap = () => {
-    const url = `https://inswap.cc/swap?t0=${inswap_ticker0}&t1=${inswap_ticker1}`
+    const url = `https://inswap.cc/swap/pools?q=${inswap_ticker0}`
     nav.navToUrl(url)
   }
 
   const onClickAddLiquidityInSwap = () => {
-    const url = `https://inswap.cc/swap/pools?t0=${inswap_ticker0}&t1=${inswap_ticker1}&action=add`
-    nav.navToUrl(url)
-  }
-
-  const onClickRemoveLiquidityInSwap = () => {
-    const url = `https://inswap.cc/swap/pools?t0=${inswap_ticker0}&t1=${inswap_ticker1}&action=remove`
+    const url = `https://inswap.cc/swap/pools?q=${inswap_ticker0}`
     nav.navToUrl(url)
   }
 
   const onClickWrapInSwap = () => {
-    const url = `https://inswap.cc/swap?tab=deposit&t=${inswap_ticker0}`
+    const url = `https://inswap.cc/swap?tab=deposit&t=${inswap_ticker0}${INSWAP_SWAP_ANCHOR}`
     nav.navToUrl(url)
   }
 
   const onClickUnwrapInSwap = () => {
-    const url = `https://inswap.cc/swap?tab=withdraw&t=${inswap_ticker0}`
+    const url = `https://inswap.cc/swap?tab=withdraw&t=${inswap_ticker0}${INSWAP_SWAP_ANCHOR}`
     nav.navToUrl(url)
   }
 
   const onClickSendInSwap = () => {
-    const url = `https://inswap.cc/swap/assets/account`
+    const url = `https://inswap.cc/swap/assets/account?tab=assets&t=${inswap_ticker0}&action=send`
     nav.navToUrl(url)
   }
 
@@ -469,7 +465,6 @@ export function useBRC20TokenScreenLogic() {
 
     onClickSwapInSwap,
     onClickAddLiquidityInSwap,
-    onClickRemoveLiquidityInSwap,
     onClickWrapInSwap,
     onClickUnwrapInSwap,
     onClickSendInSwap,

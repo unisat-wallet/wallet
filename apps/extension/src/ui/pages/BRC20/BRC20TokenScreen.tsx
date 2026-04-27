@@ -20,7 +20,6 @@ export default function BRC20TokenScreen() {
   const screenLogic = useBRC20TokenScreenLogic() as ReturnType<typeof useBRC20TokenScreenLogic> & {
     outWalletBalanceItems: BRC20OutWalletBalanceItem[];
     onClickAddLiquidityInSwap: () => void;
-    onClickRemoveLiquidityInSwap: () => void;
   };
   const outWalletCardStyle = {
     backgroundColor: 'rgba(255,255,255,0.08)',
@@ -66,7 +65,6 @@ export default function BRC20TokenScreen() {
 
     onClickSwapInSwap,
     onClickAddLiquidityInSwap,
-    onClickRemoveLiquidityInSwap,
     onClickWrapInSwap,
     onClickUnwrapInSwap,
     onClickSendInSwap,
