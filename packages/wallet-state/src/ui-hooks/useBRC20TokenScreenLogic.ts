@@ -29,6 +29,9 @@ export interface BRC20OutWalletBalanceItem {
   amount: string
 }
 
+const INSWAP_TICKER_WRAP_FB = 'sFB___000'
+const INSWAP_TICKER_WRAP_BTC = 'sBTC___000'
+
 export function useBRC20TokenHistoryLogic(props: { ticker: string; displayName?: string }) {
   const wallet = useWallet()
   const { t } = useI18n()
@@ -356,43 +359,53 @@ export function useBRC20TokenScreenLogic() {
     hasOutWalletBalance = true
   }
 
+  const brc20prog_ticker = encodeURIComponent(ticker)
+
+  // brc20prog
   const onClickWrapBrc20Prog = () => {
-    const url = `https://link.unisat.space/btc/wrap?tick=${encodeURIComponent(ticker)}`
+    const url = `https://link.unisat.space/btc/wrap?tick=${brc20prog_ticker}`
     nav.navToUrl(url)
   }
 
   const onClickUnwrapBrc20Prog = () => {
-    const url = `https://link.unisat.space/btc/wrap?action=unwrap&tick=${encodeURIComponent(ticker)}`
+    const url = `https://link.unisat.space/btc/wrap?action=unwrap&tick=${brc20prog_ticker}`
     nav.navToUrl(url)
   }
 
   const onClickSendBrc20Prog = () => {
-    const url = `https://bestinslot.xyz/brc2.0/${encodeURIComponent(ticker)}/transfer`
+    const url = `https://bestinslot.xyz/brc2.0/${brc20prog_ticker}/transfer`
     nav.navToUrl(url)
   }
 
+  const inswap_ticker0 = encodeURIComponent(ticker)
+  let inswap_ticker1 = INSWAP_TICKER_WRAP_FB
+  if (inswap_ticker0 === INSWAP_TICKER_WRAP_FB) {
+    inswap_ticker1 = INSWAP_TICKER_WRAP_BTC
+  }
+
+  // inswap
   const onClickSwapInSwap = () => {
-    const url = `https://inswap.cc/swap?t0=${encodeURIComponent(ticker)}`
+    const url = `https://inswap.cc/swap?t0=${inswap_ticker0}&t1=${inswap_ticker1}`
     nav.navToUrl(url)
   }
 
   const onClickAddLiquidityInSwap = () => {
-    const url = `https://inswap.cc/swap/pools?t0=${encodeURIComponent(ticker)}&t1=sFB___000&action=add`
+    const url = `https://inswap.cc/swap/pools?t0=${inswap_ticker0}&t1=${inswap_ticker1}&action=add`
     nav.navToUrl(url)
   }
 
   const onClickRemoveLiquidityInSwap = () => {
-    const url = `https://inswap.cc/swap/pools?t0=${encodeURIComponent(ticker)}&t1=sFB___000&action=remove`
+    const url = `https://inswap.cc/swap/pools?t0=${inswap_ticker0}&t1=${inswap_ticker1}&action=remove`
     nav.navToUrl(url)
   }
 
   const onClickWrapInSwap = () => {
-    const url = `https://inswap.cc/swap?tab=deposit&t=${encodeURIComponent(ticker)}`
+    const url = `https://inswap.cc/swap?tab=deposit&t=${inswap_ticker0}`
     nav.navToUrl(url)
   }
 
   const onClickUnwrapInSwap = () => {
-    const url = `https://inswap.cc/swap?tab=withdraw&t=${encodeURIComponent(ticker)}`
+    const url = `https://inswap.cc/swap?tab=withdraw&t=${inswap_ticker0}`
     nav.navToUrl(url)
   }
 
