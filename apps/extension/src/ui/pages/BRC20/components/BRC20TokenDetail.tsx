@@ -70,7 +70,7 @@ export function BRC20TokenDetail(props: {
           itemsCenter
           clickable
           onClick={() => {
-            window.open(tokenUrl);
+            nav.navToUrl(tokenUrl);
           }}
           style={{
             minHeight: 40,

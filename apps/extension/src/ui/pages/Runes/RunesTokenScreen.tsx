@@ -24,7 +24,8 @@ export default function RunesTokenScreen() {
     ordinalsWebsite,
     txExplorerUrl,
     enableTrade,
-    onClickTrade
+    onClickTrade,
+    onClickViewOnExplorer
   } = useRunesTokenScreenLogic();
   if (loading) {
     return (
@@ -138,6 +139,21 @@ export default function RunesTokenScreen() {
                 link={`${ordinalsWebsite}/inscription/${tokenSummary.runeInfo.parent}`}
               />
             ) : null}
+
+            <Row
+              justifyCenter
+              itemsCenter
+              clickable
+              onClick={onClickViewOnExplorer}
+              style={{
+                minHeight: 40,
+                borderRadius: 8,
+                backgroundColor: 'rgba(255,255,255,0.05)',
+                gap: 10
+              }}>
+              <Text text={t('view_on_uniscan')} size="sm" style={{ color: 'rgba(255,255,255,0.65)' }} />
+              <Icon icon="right" size={12} color="textDim" />
+            </Row>
           </Column>
         </Content>
       )}

@@ -10,6 +10,7 @@ import {
   useRunesIconInfo,
   useRunesInscribeUrl,
   useRunesMarketUrl,
+  useRunesTokenInfoExplorerUrl,
   useTxExplorerUrl,
 } from 'src/hooks'
 
@@ -106,6 +107,7 @@ export function useRunesTokenScreenLogic() {
   const iconInfo = useRunesIconInfo(tokenSummary.runeInfo.spacedRune)
   const inscribeUrl = useRunesInscribeUrl(tokenSummary.runeInfo.rune)
   const marketPlaceUrl = useRunesMarketUrl(tokenSummary.runeInfo.spacedRune)
+  const runesExplorerUrl = useRunesTokenInfoExplorerUrl(tokenSummary.runeInfo.runeid)
 
   const onClickMint = () => {
     nav.navToUrl(inscribeUrl)
@@ -123,6 +125,10 @@ export function useRunesTokenScreenLogic() {
     if (marketPlaceUrl) {
       nav.navToUrl(marketPlaceUrl)
     }
+  }
+
+  const onClickViewOnExplorer = () => {
+    nav.navToUrl(runesExplorerUrl)
   }
 
   return {
@@ -145,5 +151,6 @@ export function useRunesTokenScreenLogic() {
 
     enableTrade,
     onClickTrade,
+    onClickViewOnExplorer,
   }
 }

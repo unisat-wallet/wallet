@@ -3,14 +3,13 @@ import { BRC20Ticker } from '@/ui/components/BRC20Ticker';
 import { Line } from '@/ui/components/Line';
 import { Section } from '@/ui/components/Section';
 import { TickUsdWithoutPrice, TokenType } from '@/ui/components/TickUsd';
+import { TokenScreenIcon } from '@/ui/components/TokenScreenIcon';
 import { colors } from '@/ui/theme/colors';
 import { fontSizes } from '@/ui/theme/font';
 import { showLongNumber } from '@/ui/utils';
 import { LoadingOutlined } from '@ant-design/icons';
 import { bnUtils } from '@unisat/base-utils';
 import { useCAT20TokenScreenLogic } from '@unisat/wallet-state';
-
-import { TokenScreenIcon } from '@/ui/components/TokenScreenIcon';
 
 export default function CAT20TokenScreen() {
   const {
@@ -24,6 +23,7 @@ export default function CAT20TokenScreen() {
     onClickSend,
     onClickTrade,
     onClickBack,
+    onClickViewOnExplorer,
     t
   } = useCAT20TokenScreenLogic();
 
@@ -117,6 +117,21 @@ export default function CAT20TokenScreen() {
                 tokenSummary.cat20Info.symbol
               }`}
             />
+
+            <Row
+              justifyCenter
+              itemsCenter
+              clickable
+              onClick={onClickViewOnExplorer}
+              style={{
+                minHeight: 40,
+                borderRadius: 8,
+                backgroundColor: 'rgba(255,255,255,0.05)',
+                gap: 10
+              }}>
+              <Text text={t('view_on_uniscan')} size="sm" style={{ color: 'rgba(255,255,255,0.65)' }} />
+              <Icon icon="right" size={12} color="textDim" />
+            </Row>
           </Column>
         </Content>
       )}

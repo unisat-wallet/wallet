@@ -162,6 +162,11 @@ export function useBRC20TokenInfoExplorerUrl(ticker: string) {
   return `${chain.unisatExplorerUrl}/brc20/${encodeURIComponent(ticker)}`
 }
 
+export function useRunesTokenInfoExplorerUrl(runeId: string) {
+  const chain = useChain()!
+  return `${chain.unisatExplorerUrl}/runes/detail/${encodeURIComponent(runeId)}`
+}
+
 export function useUnisatWebsite() {
   const chainType = useChainType()
   return CHAINS_MAP[chainType]!.unisatUrl

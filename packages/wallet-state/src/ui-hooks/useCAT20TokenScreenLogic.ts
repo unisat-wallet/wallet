@@ -104,6 +104,10 @@ export function useCAT20TokenScreenLogic() {
     nav.navToUrl(marketPlaceUrl)
   }
 
+  const onClickViewOnExplorer = e => {
+    nav.navToUrl(tokenUrl)
+  }
+
   const iconInfo = useCAT20IconInfo(tokenSummary.cat20Info.name, tokenSummary.cat20Info.tokenId)
 
   return {
@@ -117,6 +121,7 @@ export function useCAT20TokenScreenLogic() {
     onClickSend,
     onClickTrade,
     onClickBack,
+    onClickViewOnExplorer,
     t,
   }
 }
