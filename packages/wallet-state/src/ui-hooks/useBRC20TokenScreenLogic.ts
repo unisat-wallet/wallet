@@ -312,8 +312,19 @@ export function useBRC20TokenScreenLogic() {
     }
   }, [t, enableHistory])
 
+  let showSwapBalance = false
+  if (chain.isFractal) {
+    showSwapBalance = true
+  }
+
+  let showProgBalance = false
+  if (chain.enableBrc20Prog) {
+    showProgBalance = true
+  }
+
   const onSwapBalance = tokenSummary?.tokenBalance?.swapBalance
   const onProgBalance = tokenSummary?.tokenBalance?.progBalance
+
   const inWalletBalance = tokenSummary?.tokenBalance?.overallBalance
   const outWalletBalanceItems = useMemo<BRC20OutWalletBalanceItem[]>(() => {
     const items: BRC20OutWalletBalanceItem[] = [
@@ -324,7 +335,7 @@ export function useBRC20TokenScreenLogic() {
       },
     ]
 
-    if (onSwapBalance && onSwapBalance !== '0') {
+    if (showSwapBalance) {
       items.push({
         key: 'swap',
         label: t('brc20_on_swap'),
@@ -332,7 +343,7 @@ export function useBRC20TokenScreenLogic() {
       })
     }
 
-    if (onProgBalance && onProgBalance !== '0') {
+    if (showProgBalance) {
       items.push({
         key: 'prog',
         label: t('brc20_on_prog'),
@@ -351,14 +362,6 @@ export function useBRC20TokenScreenLogic() {
       .plus(new BigNumber(onProgBalance || 0))
       .toString()
   }, [onSwapBalance, onProgBalance, inWalletBalance])
-
-  let hasOutWalletBalance = false
-  if (onSwapBalance && onSwapBalance !== '0') {
-    hasOutWalletBalance = true
-  }
-  if (onProgBalance && onProgBalance !== '0') {
-    hasOutWalletBalance = true
-  }
 
   const brc20prog_ticker = encodeURIComponent(ticker)
 
@@ -442,7 +445,6 @@ export function useBRC20TokenScreenLogic() {
     onProgBalance,
     inWalletBalance,
     outWalletBalanceItems,
-    hasOutWalletBalance,
     enableHistory,
     enableTrade,
     enableMint,
@@ -459,6 +461,8 @@ export function useBRC20TokenScreenLogic() {
     tools,
     isBrc20Prog,
     iconInfo,
+    showProgBalance,
+    showSwapBalance,
     onClickWrapBrc20Prog,
     onClickUnwrapBrc20Prog,
     onClickSendBrc20Prog,
