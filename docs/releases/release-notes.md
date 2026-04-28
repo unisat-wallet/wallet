@@ -1,5 +1,21 @@
 # UniSat Wallet Release Notes
 
+## v1.7.13
+
+### Improvements
+
+- Reorganized wallet assets navigation by moving Alkanes under the top-level `More` tab, with dedicated `Alkanes` and `Alkanes Collections` entries.
+- Unified the "View on UniScan" entry across BRC20, CAT20, and Runes token detail screens with a shared component for consistent UX and easier maintenance.
+- Improved `AddressDetailPopover` logic and display consistency by reusing the shared UniScan action component.
+- Improved BRC20 request handling for special ticker encoding cases to increase compatibility and stability.
+- Unified BRC20 parameter structures across API/background/state layers to reduce cross-layer mismatch risk.
+
+### Bug Fixes
+
+- Fixed inconsistent ticker query behavior in some BRC20 encoding scenarios (including duplicate-encoding edge cases).
+- Fixed several consistency issues in BRC20 balance display and related navigation logic.
+- Fixed dangerous sighash detection to correctly flag `SIGHASH_NONE` (including `SIGHASH_NONE | ANYONECANPAY`) while not misclassifying `SIGHASH_SINGLE | ANYONECANPAY`.
+
 ## v1.7.12
 
 ### New Features
