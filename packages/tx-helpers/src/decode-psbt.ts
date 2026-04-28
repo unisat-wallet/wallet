@@ -8,12 +8,7 @@ const CAT20_GUARD_SIG_SIZE = 3650
 function isDangerousSighashType(sighashType?: number): boolean {
   if (typeof sighashType !== 'number') return false
   const outputType = sighashType & bitcoin.Transaction.SIGHASH_OUTPUT_MASK
-  const hasAnyoneCanPay = (sighashType & bitcoin.Transaction.SIGHASH_ANYONECANPAY) !== 0
-
-  return (
-    outputType === bitcoin.Transaction.SIGHASH_NONE ||
-    (outputType === bitcoin.Transaction.SIGHASH_SINGLE && hasAnyoneCanPay)
-  )
+  return outputType === bitcoin.Transaction.SIGHASH_NONE
 }
 
 interface InputInfo {
@@ -319,7 +314,9 @@ export class PsbtDecoder {
   }
 
   checkSigHashTypes() {
-    const foundDangerousSighash = this._psbt.data.inputs.some(v => isDangerousSighashType(v.sighashType))
+    const foundDangerousSighash = this._psbt.data.inputs.some(v =>
+      isDangerousSighashType(v.sighashType)
+    )
     if (foundDangerousSighash) {
       this.risks.push({
         type: RiskType.SIGHASH_NONE,
