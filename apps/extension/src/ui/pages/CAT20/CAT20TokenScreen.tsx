@@ -1,4 +1,4 @@
-import { Button, Column, Content, Footer, Header, Icon, Layout, Row, Text } from '@/ui/components';
+import { Button, Column, Content, Footer, Header, Icon, Layout, Row, Text, ViewOnExplorerAction } from '@/ui/components';
 import { BRC20Ticker } from '@/ui/components/BRC20Ticker';
 import { Line } from '@/ui/components/Line';
 import { Section } from '@/ui/components/Section';
@@ -118,20 +118,7 @@ export default function CAT20TokenScreen() {
               }`}
             />
 
-            <Row
-              justifyCenter
-              itemsCenter
-              clickable
-              onClick={onClickViewOnExplorer}
-              style={{
-                minHeight: 40,
-                borderRadius: 8,
-                backgroundColor: 'rgba(255,255,255,0.05)',
-                gap: 10
-              }}>
-              <Text text={t('view_on_uniscan')} size="sm" style={{ color: 'rgba(255,255,255,0.65)' }} />
-              <Icon icon="right" size={12} color="textDim" />
-            </Row>
+            <ViewOnExplorerAction onClick={onClickViewOnExplorer} />
           </Column>
         </Content>
       )}

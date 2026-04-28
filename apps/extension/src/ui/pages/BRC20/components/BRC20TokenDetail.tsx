@@ -1,4 +1,4 @@
-import { Column, Icon, Row, Text } from '@/ui/components';
+import { Column, Text, ViewOnExplorerAction } from '@/ui/components';
 import { Line } from '@/ui/components/Line';
 import { Section } from '@/ui/components/Section';
 import { shortAddress, showLongNumber } from '@/ui/utils';
@@ -65,23 +65,11 @@ export function BRC20TokenDetail(props: {
 
         <Section title={t('history_count')} value={showLongNumber(tokenSummary.tokenInfo.historyCount)} />
 
-        <Row
-          justifyCenter
-          itemsCenter
-          clickable
+        <ViewOnExplorerAction
           onClick={() => {
             nav.navToUrl(tokenUrl);
           }}
-          style={{
-            minHeight: 40,
-            marginTop: 20,
-            borderRadius: 8,
-            backgroundColor: 'rgba(255,255,255,0.05)',
-            gap: 10
-          }}>
-          <Text text={t('view_on_uniscan')} size="sm" style={{ color: 'rgba(255,255,255,0.65)' }} />
-          <Icon icon="right" size={12} color="textDim" />
-        </Row>
+        />
       </Column>
     </Column>
   );

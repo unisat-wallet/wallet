@@ -30,6 +30,7 @@ import { Switch } from './Switch';
 import { Text } from './Text';
 import { TextArea } from './TextArea';
 import { Tooltip } from './Tooltip';
+import { ViewOnExplorerAction } from './ViewOnExplorerAction';
 
 export {
   AddressBar,
@@ -64,5 +65,6 @@ export {
   Switch,
   Text,
   TextArea,
-  Tooltip
+  Tooltip,
+  ViewOnExplorerAction
 };
