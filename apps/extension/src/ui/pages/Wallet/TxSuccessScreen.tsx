@@ -18,7 +18,7 @@ export default function TxSuccessScreen() {
           <Text preset="title" text={t('tx_sent_title')} textCenter />
           <Text preset="sub" text={t('tx_sent_desc')} color="textDim" textCenter />
 
-          <Row justifyCenter onClick={onClickExploreTx}>
+          <Row justifyCenter itemsCenter onClick={onClickExploreTx}>
             <Icon icon="eye" color="textDim" />
             <Text preset="regular-bold" text={t('view_on_block_explorer')} color="textDim" />
           </Row>
