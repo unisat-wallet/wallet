@@ -29,8 +29,6 @@ export interface BRC20OutWalletBalanceItem {
   amount: string
 }
 
-const INSWAP_TICKER_WRAP_FB = 'sFB___000'
-const INSWAP_TICKER_WRAP_BTC = 'sBTC___000'
 const INSWAP_SWAP_ANCHOR = '#swap'
 
 export function useBRC20TokenHistoryLogic(props: { ticker: string; displayName?: string }) {
@@ -316,15 +314,10 @@ export function useBRC20TokenScreenLogic() {
     }
   }, [t, enableHistory])
 
-  let showSwapBalance = false
-  if (chain.isFractal) {
-    showSwapBalance = true
-  }
-
-  let showProgBalance = false
-  if (chain.enableBrc20Prog) {
-    showProgBalance = true
-  }
+  const showSwapBalance = chain.isFractal
+  const showProgBalance = chain.enableBrc20Prog
+  const swapSiteEnabled = chain.enum === ChainType.FRACTAL_BITCOIN_MAINNET
+  const progSiteEnabled = chain.enum === ChainType.BITCOIN_MAINNET
 
   const onSwapBalance = tokenSummary?.tokenBalance?.swapBalance
   const onProgBalance = tokenSummary?.tokenBalance?.progBalance
@@ -368,52 +361,63 @@ export function useBRC20TokenScreenLogic() {
   }, [onSwapBalance, onProgBalance, inWalletBalance])
 
   const brc20prog_ticker = encodeURIComponent(ticker)
+  const ensureSiteEnabled = (enabled: boolean) => {
+    if (!enabled) {
+      tools.toastError(t('not_supported'))
+      return false
+    }
+    return true
+  }
 
   // brc20prog
   const onClickWrapBrc20Prog = () => {
+    if (!ensureSiteEnabled(progSiteEnabled)) return
     const url = `https://link.unisat.space/btc/wrap?tick=${brc20prog_ticker}`
     nav.navToUrl(url)
   }
 
   const onClickUnwrapBrc20Prog = () => {
+    if (!ensureSiteEnabled(progSiteEnabled)) return
     const url = `https://link.unisat.space/btc/wrap?action=unwrap&tick=${brc20prog_ticker}`
     nav.navToUrl(url)
   }
 
   const onClickSendBrc20Prog = () => {
+    if (!ensureSiteEnabled(progSiteEnabled)) return
     const url = `https://bestinslot.xyz/brc2.0/${brc20prog_ticker}/transfer`
     nav.navToUrl(url)
   }
 
-  const inswap_ticker0 = encodeURIComponent(ticker)
-  let inswap_ticker1 = INSWAP_TICKER_WRAP_FB
-  if (inswap_ticker0 === INSWAP_TICKER_WRAP_FB) {
-    inswap_ticker1 = INSWAP_TICKER_WRAP_BTC
-  }
+  const inswap_ticker = encodeURIComponent(ticker)
 
   // inswap
   const onClickSwapInSwap = () => {
-    const url = `https://inswap.cc/swap/pools?q=${inswap_ticker0}`
+    if (!ensureSiteEnabled(swapSiteEnabled)) return
+    const url = `https://inswap.cc/swap/pools?q=${inswap_ticker}`
     nav.navToUrl(url)
   }
 
   const onClickAddLiquidityInSwap = () => {
-    const url = `https://inswap.cc/swap/pools?q=${inswap_ticker0}`
+    if (!ensureSiteEnabled(swapSiteEnabled)) return
+    const url = `https://inswap.cc/swap/pools?q=${inswap_ticker}`
     nav.navToUrl(url)
   }
 
   const onClickWrapInSwap = () => {
-    const url = `https://inswap.cc/swap?tab=deposit&t=${inswap_ticker0}${INSWAP_SWAP_ANCHOR}`
+    if (!ensureSiteEnabled(swapSiteEnabled)) return
+    const url = `https://inswap.cc/swap?tab=deposit&t=${inswap_ticker}${INSWAP_SWAP_ANCHOR}`
     nav.navToUrl(url)
   }
 
   const onClickUnwrapInSwap = () => {
-    const url = `https://inswap.cc/swap?tab=withdraw&t=${inswap_ticker0}${INSWAP_SWAP_ANCHOR}`
+    if (!ensureSiteEnabled(swapSiteEnabled)) return
+    const url = `https://inswap.cc/swap?tab=withdraw&t=${inswap_ticker}${INSWAP_SWAP_ANCHOR}`
     nav.navToUrl(url)
   }
 
   const onClickSendInSwap = () => {
-    const url = `https://inswap.cc/swap/assets/account?tab=assets&t=${inswap_ticker0}&action=send`
+    if (!ensureSiteEnabled(swapSiteEnabled)) return
+    const url = `https://inswap.cc/swap/assets/account?tab=assets&t=${inswap_ticker}&action=send`
     nav.navToUrl(url)
   }
 
