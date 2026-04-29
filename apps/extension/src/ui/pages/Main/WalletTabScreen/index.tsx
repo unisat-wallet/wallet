@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 
-import { Card, Column, Content, Footer, Header, Layout, Row, Text } from '@/ui/components';
+import { Card, Column, Content, Footer, Header, Icon, Layout, Row, Text } from '@/ui/components';
 import AccountSelect from '@/ui/components/AccountSelect';
 import { FeeRateIcon } from '@/ui/components/FeeRateIcon';
 import LoadingPage from '@/ui/components/LoadingPage';
@@ -16,6 +16,7 @@ import { VersionDetail } from '@unisat/wallet-shared';
 import '@unisat/wallet-state';
 import {
   AssetTabKey,
+  MoreAssetTabKey,
   uiActions,
   useAppDispatch,
   useAssetTabKey,
@@ -24,6 +25,7 @@ import {
   useCurrentKeyring,
   useI18n,
   useIsUnlocked,
+  useMoreAssetTabKey,
   useNavigation,
   useSkipVersionCallback,
   useSupportedAssets,
@@ -33,8 +35,9 @@ import {
 
 import { useNavigate } from '../../MainRoute';
 import { SwitchChainModal } from '../../Settings/SwitchChainModal';
-import { AlkanesTab } from './AlkanesTab';
 import { CATTab } from './CATTab';
+import { MoreActionSheet } from './MoreActionSheet';
+import { MoreTab } from './MoreTab';
 import { OrdinalsTab } from './OrdinalsTab';
 import { RunesList } from './RunesList';
 import { SidePanelExpand } from './SidePanelExpand';
@@ -58,6 +61,7 @@ export default function WalletTabScreen() {
   const [connected, setConnected] = useState(false);
   const dispatch = useAppDispatch();
   const assetTabKey = useAssetTabKey();
+  const moreAssetTabKey = useMoreAssetTabKey();
 
   const skipVersion = useSkipVersionCallback();
 
@@ -128,7 +132,7 @@ export default function WalletTabScreen() {
   const tabItems = useMemo(() => {
     const items: {
       key: AssetTabKey;
-      label: string;
+      label: string | JSX.Element;
       children: JSX.Element;
     }[] = [];
     if (supportedAssets.assets.ordinals) {
@@ -148,9 +152,14 @@ export default function WalletTabScreen() {
     }
     if (supportedAssets.assets.alkanes) {
       items.push({
-        key: AssetTabKey.ALKANES,
-        label: 'Alkanes',
-        children: <AlkanesTab />
+        key: AssetTabKey.MORE,
+        label: (
+          <Row itemsCenter>
+            <Text text={t('more')} color={assetTabKey === AssetTabKey.MORE ? 'gold' : 'textDim'} size="md" />
+            <Icon icon="drop_down" color={assetTabKey === AssetTabKey.MORE ? 'gold' : 'textDim'} size={10} />
+          </Row>
+        ),
+        children: <MoreTab />
       });
     }
     if (supportedAssets.assets.CAT20) {
@@ -161,7 +170,7 @@ export default function WalletTabScreen() {
       });
     }
     return items;
-  }, [supportedAssets.key]);
+  }, [supportedAssets.key, t, assetTabKey]);
 
   const finalAssetTabKey = useMemo(() => {
     if (!supportedAssets.tabKeys.includes(assetTabKey)) {
@@ -171,6 +180,8 @@ export default function WalletTabScreen() {
   }, [assetTabKey, supportedAssets.key]);
 
   const [switchChainModalVisible, setSwitchChainModalVisible] = useState(false);
+  const [moreSheetOpen, setMoreSheetOpen] = useState(false);
+  const [moreSheetSelection, setMoreSheetSelection] = useState<MoreAssetTabKey | undefined>(undefined);
 
   if (!currentAccount.address) {
     return <LoadingPage />;
@@ -224,10 +235,34 @@ export default function WalletTabScreen() {
             activeKey={finalAssetTabKey as unknown as string}
             items={tabItems as unknown as any[]}
             onTabClick={(key) => {
+              if ((key as unknown as AssetTabKey) === AssetTabKey.MORE) {
+                if (assetTabKey === AssetTabKey.MORE) {
+                  setMoreSheetSelection(moreAssetTabKey);
+                } else {
+                  setMoreSheetSelection(undefined);
+                }
+                setMoreSheetOpen(true);
+                return;
+              }
               dispatch(uiActions.updateAssetTabScreen({ assetTabKey: key as unknown as AssetTabKey }));
             }}
           />
         </Column>
+        {moreSheetOpen ? (
+          <MoreActionSheet
+            currentSelection={moreSheetSelection}
+            onClose={() => setMoreSheetOpen(false)}
+            onSelect={(selection) => {
+              setMoreSheetOpen(false);
+              dispatch(
+                uiActions.updateAssetTabScreen({
+                  assetTabKey: AssetTabKey.MORE,
+                  moreAssetTabKey: selection
+                })
+              );
+            }}
+          />
+        ) : null}
         {showSafeNotice && (
           <NoticePopover
             onClose={() => {

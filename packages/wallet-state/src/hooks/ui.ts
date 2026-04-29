@@ -33,6 +33,11 @@ export function useAlkanesAssetTabKey() {
   return uiState.alkanesAssetTabKey
 }
 
+export function useMoreAssetTabKey() {
+  const uiState = useUIState()
+  return uiState.moreAssetTabKey
+}
+
 export function useUiTxCreateScreen() {
   const uiState = useUIState()
   return uiState.uiTxCreateScreen
@@ -202,7 +207,7 @@ export function getSupportedAssets(chainType: ChainType, address: string) {
 
   if (chainType === ChainType.BITCOIN_MAINNET || chainType === ChainType.BITCOIN_SIGNET) {
     assets.alkanes = true
-    assetTabKeys.push(AssetTabKey.ALKANES)
+    assetTabKeys.push(AssetTabKey.MORE)
   }
 
   if (chainType === ChainType.BITCOIN_MAINNET || chainType === ChainType.BITCOIN_SIGNET) {

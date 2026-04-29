@@ -62,6 +62,9 @@
   "alkanes": {
     "message": "Alkanes"
   },
+  "alkanes_collections": {
+    "message": "Alkanes 收藏"
+  },
   "alkanes_burning_risk_description": {
     "message": "此交易涉及Alkanes銷毀。請確保您了解此操作的影響，然後再繼續。"
   },

@@ -3,7 +3,7 @@ export enum AssetTabKey {
   ATOMICALS = 1, // IGNORED
   RUNES = 2,
   CAT = 3,
-  ALKANES = 4,
+  MORE = 4,
 }
 
 export enum OrdinalsAssetTabKey {
@@ -22,6 +22,11 @@ export enum CATAssetTabKey {
 export enum AlkanesAssetTabKey {
   TOKEN,
   COLLECTION,
+}
+
+export enum MoreAssetTabKey {
+  ALKANES_TOKEN,
+  ALKANES_COLLECTION,
 }
 
 export enum NavigationSource {

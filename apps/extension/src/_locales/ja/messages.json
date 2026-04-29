@@ -62,6 +62,9 @@
   "alkanes": {
     "message": "Alkanes"
   },
+  "alkanes_collections": {
+    "message": "Alkanes コレクション"
+  },
   "alkanes_burning_risk_description": {
     "message": "このトランザクションにはAlkanesの燃焼が含まれています。続行する前に、この操作の影響を理解していることを確認してください。"
   },

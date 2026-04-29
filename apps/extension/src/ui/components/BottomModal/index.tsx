@@ -1,4 +1,5 @@
 import React, { CSSProperties, useEffect, useState } from 'react';
+import { createPortal } from 'react-dom';
 
 interface BottomModalProps {
   children: React.ReactNode;
@@ -8,8 +9,10 @@ interface BottomModalProps {
 
 export const BottomModal = ({ children, onClose, bodyStyle }: BottomModalProps) => {
   const [isVisible, setIsVisible] = useState(false);
+  const [portalReady, setPortalReady] = useState(false);
 
   useEffect(() => {
+    setPortalReady(true);
     const timer = setTimeout(() => {
       setIsVisible(true);
     }, 50);
@@ -34,7 +37,11 @@ export const BottomModal = ({ children, onClose, bodyStyle }: BottomModalProps) 
     bodyStyle
   );
 
-  return (
+  if (!portalReady || typeof document === 'undefined' || !document.body) {
+    return null;
+  }
+
+  return createPortal(
     <div
       className="popover-container"
       style={{
@@ -70,5 +77,7 @@ export const BottomModal = ({ children, onClose, bodyStyle }: BottomModalProps) 
         <div style={resolvedBodyStyle}>{children}</div>
       </div>
     </div>
+    ,
+    document.body
   );
 };

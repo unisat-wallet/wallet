@@ -105,6 +105,7 @@ export const svgRegistry = {
   atomicals: '/images/icons/protocol/atomicals.svg',
   unisat: '/images/icons/protocol/unisat.svg',
   gas: '/images/icons/protocol/gas.svg',
+  alkanes: '/images/icons/protocol/alkanes.svg',
 
   // tx
   utxo: '/images/icons/tx/utxo.svg',

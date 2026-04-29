@@ -62,6 +62,9 @@
   "alkanes": {
     "message": "Alkanes"
   },
+  "alkanes_collections": {
+    "message": "Collections Alkanes"
+  },
   "alkanes_burning_risk_description": {
     "message": "Cette transaction implique la destruction d'Alkanes. Veuillez vous assurer de comprendre les implications de cette action avant de continuer."
   },

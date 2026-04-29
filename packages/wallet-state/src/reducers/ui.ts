@@ -6,6 +6,7 @@ import {
   AlkanesAssetTabKey,
   AssetTabKey,
   CATAssetTabKey,
+  MoreAssetTabKey,
   NavigationSource,
   OrdinalsAssetTabKey,
 } from '../types'
@@ -23,6 +24,7 @@ export interface UIState {
   ordinalsAssetTabKey: OrdinalsAssetTabKey
   catAssetTabKey: CATAssetTabKey
   alkanesAssetTabKey: AlkanesAssetTabKey
+  moreAssetTabKey: MoreAssetTabKey
   uiTxCreateScreen: {
     toInfo: {
       address: string
@@ -64,6 +66,7 @@ export const initialState: UIState = {
   ordinalsAssetTabKey: OrdinalsAssetTabKey.ALL,
   catAssetTabKey: CATAssetTabKey.CAT20,
   alkanesAssetTabKey: AlkanesAssetTabKey.TOKEN,
+  moreAssetTabKey: MoreAssetTabKey.ALKANES_TOKEN,
   uiTxCreateScreen: {
     toInfo: {
       address: '',
@@ -113,6 +116,7 @@ const slice: Slice<UIState> = createSlice({
           ordinalsAssetTabKey?: OrdinalsAssetTabKey
           catAssetTabKey?: CATAssetTabKey
           alkanesAssetTabKey?: AlkanesAssetTabKey
+          moreAssetTabKey?: MoreAssetTabKey
         }
       }
     ) {
@@ -129,6 +133,9 @@ const slice: Slice<UIState> = createSlice({
       }
       if (payload.alkanesAssetTabKey !== undefined) {
         state.alkanesAssetTabKey = payload.alkanesAssetTabKey
+      }
+      if (payload.moreAssetTabKey !== undefined) {
+        state.moreAssetTabKey = payload.moreAssetTabKey
       }
       return state
     },
@@ -273,6 +280,12 @@ const slice: Slice<UIState> = createSlice({
       }
       if (!state.alkanesAssetTabKey) {
         state.alkanesAssetTabKey = AlkanesAssetTabKey.TOKEN
+      }
+      if (state.moreAssetTabKey === undefined) {
+        state.moreAssetTabKey = MoreAssetTabKey.ALKANES_TOKEN
+      }
+      if (state.assetTabKey === (4 as AssetTabKey)) {
+        state.assetTabKey = AssetTabKey.MORE
       }
       if (!state.uiTxCreateScreen) {
         state.uiTxCreateScreen = initialState.uiTxCreateScreen

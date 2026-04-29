@@ -8,7 +8,7 @@ import { Text } from '../Text';
 
 interface TabItem {
   key: string;
-  label: string;
+  label: React.ReactNode;
   children: React.ReactNode;
 }
 
@@ -45,7 +45,11 @@ export function Tabs({ preset, items, defaultActiveKey, activeKey, onTabClick }:
                 color={isActiveItem ? 'gold' : 'white_muted'}
                 onClick={() => onTabClick(item.key)}
                 data-testid={`tab-item-${item.key}`}>
-                <Text text={item.label} size="xs" color={isActiveItem ? 'gold' : 'white_muted'} mx="md" my="sm" />
+                {typeof item.label === 'string' ? (
+                  <Text text={item.label} size="xs" color={isActiveItem ? 'gold' : 'white_muted'} mx="md" my="sm" />
+                ) : (
+                  item.label
+                )}
               </Column>
             );
           })}
@@ -60,10 +64,14 @@ export function Tabs({ preset, items, defaultActiveKey, activeKey, onTabClick }:
               return (
                 <Row key={item.key} onClick={() => onTabClick(item.key)} mx="md" data-testid={`tab-item-${item.key}`}>
                   <Column gap="zero" justifyCenter itemsCenter>
-                    <Text text={item.label} color={isActiveItem ? 'gold' : 'textDim'} size="md" />
+                    {typeof item.label === 'string' ? (
+                      <Text text={item.label} color={isActiveItem ? 'gold' : 'textDim'} size="md" />
+                    ) : (
+                      item.label
+                    )}
                     <Row
                       style={{
-                        width: 40,
+                        width: '100%',
                         borderBottomWidth: 2,
                         paddingBottom: 10,
                         borderColor: isActiveItem ? colors.gold : colors.transparent
@@ -95,7 +103,7 @@ export function Tabs({ preset, items, defaultActiveKey, activeKey, onTabClick }:
       {tabBar}
 
       {/* Content */}
-      <Column>
+      <Column mt="md">
         {items.map((item) => {
           if (!renderedTabs.current.has(item.key)) return null;
 
