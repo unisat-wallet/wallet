@@ -10,7 +10,7 @@
 unisat.deriveContextHash(appName, context)
 ```
 
-Derive a deterministic 32-byte value from the wallet's key material, an application name, and an arbitrary context string. The derivation uses HKDF-SHA-256 (RFC 5869).
+Derive a deterministic 32-byte value from the connected account's key material, an application name, and an arbitrary context string. The derivation uses HKDF-SHA-256 (RFC 5869).
 
 **Requires user approval** — the wallet will show a confirmation dialog displaying the application name, context string, and requesting origin before deriving the value.
 
@@ -28,17 +28,27 @@ Derive a deterministic 32-byte value from the wallet's key material, an applicat
 **Derivation Scheme**
 
 ```
-ikm    = BIP-32 private key at m/73681862' (32 bytes)
+ikm    = the connected account's 32-byte private key
 salt   = "derive-context-hash"
 info   = SHA-256(UTF8(appName)) || decode_hex(context)
 output = HKDF-SHA-256(ikm, salt, info, 32)
 ```
 
-Where `ikm` is:
-- For mnemonic/xpriv wallets: the 32-byte private key scalar at BIP-32 path `m/73681862'` (hardened), derived from the wallet's HD root.
-- For imported key wallets: the raw 32-byte private key directly (no BIP-32 derivation, since imported keys lack a BIP-32 hierarchy).
+Where `ikm` is the connected account's private key:
+- For mnemonic wallets: the BIP-32 private key at the **account-level node** `m/purpose'/coin_type'/account'` (3-deep, hardened) — e.g. `m/44'/0'/0'` for default BIP-44 account 0; `m/86'/0'/0'` for Taproot account 0. All receive addresses under the same account share the same IKM.
+- For imported xpriv wallets: the imported xpriv's own private key (the imported xpriv represents the user's account identity).
+- For imported raw private key wallets: the raw 32-byte private key.
 
 The `info` field is constructed by concatenating SHA-256(UTF8(appName)) (32 bytes, fixed-length) with the raw context bytes decoded from hex. Hashing appName ensures a fixed 32-byte prefix, eliminating length-confusion collisions.
+
+**Output semantics — per-account-xpub**
+
+Output is bound to the connected account's xpub. Within one wallet:
+- Different receive addresses under the same account → **same** output.
+- Different account index, address type (BIP-44 vs BIP-86, etc.), or imported xpriv → **different** output.
+- BIP-39 passphrase change → different seed → different output.
+
+dApps that need per-address (rather than per-account) differentiation should encode the address into `context` themselves.
 
 ---
 
@@ -50,7 +60,7 @@ try {
   const context = "a1b2c3d4e5f6..."; // hex-encoded context
   const hash = await window.unisat.deriveContextHash(appName, context);
   console.log(hash);
-  // => "3b0e2d90a01122eed8a520648073892f6b2d8f4419216023d63cdbd49500fca3"
+  // 64 lowercase hex chars (depends on the connected account's key material)
 } catch (e) {
   console.log(e);
 }

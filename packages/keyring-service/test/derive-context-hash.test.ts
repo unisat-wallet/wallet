@@ -62,9 +62,11 @@ describe('deriveContextHash', () => {
     })
   })
 
-  describe('known-answer tests (spec vectors)', () => {
-    // Spec test vectors use BIP-39 mnemonic "abandon...about" (no passphrase)
-    // IKM = BIP-32 private key at m/73681862'
+  describe('known-answer tests (HKDF function-level)', () => {
+    // These vectors pin the pure HKDF composition (ikm, appName, context).
+    // They are independent of how the keyring sources IKM at runtime — the
+    // keyring layer's contract (account-level vs wallet-level) is tested in
+    // the keyring-specific test files.
     const IKM_HEX = '391cdb922097ec9c96fc13cadb01d5745ccf31f5dbec3a38103440714779ec85'
     const ikm = new Uint8Array(Buffer.from(IKM_HEX, 'hex'))
 

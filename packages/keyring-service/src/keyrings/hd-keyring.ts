@@ -9,8 +9,6 @@ import { deriveContextHash, parseHexContext } from './derive-context-hash'
 import { SimpleKeyring } from './simple-keyring'
 
 const hdPathString = "m/44'/0'/0'/0"
-// BIP-32 path for deriveContextHash IKM. Purpose index = trunc31_be(SHA-256("derive-context-hash")).
-const DERIVE_CONTEXT_HASH_PATH = "m/73681862'"
 const type = 'HD Key Tree'
 
 interface DeserializeOption {
@@ -265,28 +263,68 @@ export class HdKeyring extends SimpleKeyring {
   }
 
   /**
-   * Derive a deterministic context hash from the wallet's key material.
-   * Uses BIP-32 derivation at m/73681862' from the HD wallet root.
+   * Derive a deterministic context hash bound to the connected BIP-32
+   * account-level node (3-deep, hardened: m/purpose'/coin_type'/account').
    *
-   * @param _publicKey - Unused for HD keyrings (derivation is from root).
-   * @param appName - Application identifier.
-   * @param context - Hex-encoded context string.
+   * Per-account semantics: all receive addresses under the same account
+   * share the same output; switching account index, purpose (address type),
+   * or imported xpriv changes the output.
+   *
+   * The leaf-index lookup and account-path resolution are intentionally
+   * inlined rather than extracted to shared helpers — deriveContextHash's
+   * output is a deterministic secret whose bytes must remain stable across
+   * the wallet's lifetime, so we keep its derivation isolated from any
+   * future modification of unrelated lookup or path-mapping helpers.
    */
-  override async deriveContextHash(_publicKey: string, appName: string, context: string): Promise<string> {
+  override async deriveContextHash(publicKey: string, appName: string, context: string): Promise<string> {
     const contextBytes = parseHexContext(context)
     if (!this.hdWallet) {
-      throw new Error('deriveContextHash requires a mnemonic or xpriv-based keyring')
+      throw new Error('deriveContextHash requires an initialized HD keyring')
     }
-    const child = this.hdWallet.derive(DERIVE_CONTEXT_HASH_PATH)
-    const privKeyBytes = new Uint8Array(child.privateKey)
+
+    // Find which leaf the connected pubkey corresponds to.
+    let leafIndex: number | null = null
+    for (const key in this._index2wallet) {
+      const entry = this._index2wallet[key]
+      if (entry && entry[1].publicKey.toString('hex') === publicKey) {
+        leafIndex = Number(key)
+        break
+      }
+    }
+    if (leafIndex === null) {
+      throw new Error('deriveContextHash: Unable to find matching publicKey')
+    }
+
+    // Resolve the BIP-32 account-level (3-deep, hardened) node.
+    let accountNode: any
+    if (this.xpriv) {
+      // An imported xpriv represents the user's account identity at
+      // whatever depth they imported.
+      accountNode = this.hdWallet
+    } else {
+      // _buildAccountLevelPath is the canonical path mapper used by
+      // address derivation; reuse it here so any future BIP-32 path
+      // convention change ripples consistently.
+      const basePath = this.accountIndexDerivation
+        ? this._buildAccountLevelPath(this.hdPath, leafIndex)
+        : this.hdPath
+      const segments = basePath.split('/')
+      if (segments.length < 4) {
+        throw new Error('deriveContextHash: hdPath must have at least 3 hardened components')
+      }
+      segments.length = 4 // m/purpose'/coin_type'/account'
+      accountNode = this.hdWallet.derive(segments.join('/'))
+    }
+
+    if (!accountNode.privateKey) {
+      throw new Error('deriveContextHash: account-level BIP-32 node has no private key')
+    }
+
+    const privKeyBytes = new Uint8Array(accountNode.privateKey)
     try {
       return deriveContextHash(privKeyBytes, appName, contextBytes)
     } finally {
       privKeyBytes.fill(0)
-      // Zero the original BIP-32 node's key buffer as well
-      if (child.privateKey) {
-        child.privateKey.fill(0)
-      }
     }
   }
 

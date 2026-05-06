@@ -299,7 +299,7 @@ describe('bitcoin-hd-keyring', () => {
       expect(result).toMatch(/^[0-9a-f]{64}$/)
     })
 
-    it('produces same result as direct derivation with BIP-32 derived key', async () => {
+    it('produces same result as direct derivation at the account-level (3-deep) BIP-32 node', async () => {
       const keyring = new HdKeyring({
         mnemonic: sampleMnemonic,
         activeIndexes: [0],
@@ -308,18 +308,22 @@ describe('bitcoin-hd-keyring', () => {
       const contextHex = 'deadbeef'
       const keyringResult = await keyring.deriveContextHash(accounts[0], APP_NAME, contextHex)
 
-      // Manually derive BIP-32 key at m/73681862' and compute directly
+      // IKM = the BIP-32 private key at the account-level node
+      // m/purpose'/coin'/account' (3-deep) — for the default hdPath
+      // "m/44'/0'/0'/0", that's "m/44'/0'/0'".
       const bip39 = await import('bip39')
       const hdkey = await import('hdkey')
       const seedBuf = bip39.mnemonicToSeedSync(sampleMnemonic)
       const master = hdkey.fromMasterSeed(seedBuf)
-      const child = master.derive("m/73681862'")
-      const privKey = new Uint8Array(child.privateKey)
+      const accountNode = master.derive("m/44'/0'/0'")
+      const privKey = new Uint8Array(accountNode.privateKey)
       const directResult = deriveContextHash(privKey, APP_NAME, parseHexContext(contextHex))
       expect(keyringResult).toBe(directResult)
     })
 
-    it('mnemonic keyring produces same result regardless of which account pubkey is passed', async () => {
+    it('default mode: different leaves under the same account share the same hash', async () => {
+      // Default hdPath "m/44'/0'/0'/0" — leaves 0 and 1 are addresses under
+      // the same account-level node m/44'/0'/0'. Output must match.
       const keyring = new HdKeyring({
         mnemonic: sampleMnemonic,
         activeIndexes: [0, 1],
@@ -328,6 +332,52 @@ describe('bitcoin-hd-keyring', () => {
       const result0 = await keyring.deriveContextHash(accounts[0], APP_NAME, 'deadbeef')
       const result1 = await keyring.deriveContextHash(accounts[1], APP_NAME, 'deadbeef')
       expect(result0).toBe(result1)
+      expect(result0).toMatch(/^[0-9a-f]{64}$/)
+    })
+
+    it('accountIndexDerivation mode: different account indices produce different hashes', async () => {
+      // hdPath "m/84'/0'/0'/0" with accountIndexDerivation — leaf i lives
+      // under m/84'/0'/i', so leaves 0 and 1 are different accounts and
+      // MUST produce different hashes.
+      const keyring = new HdKeyring({
+        mnemonic: sampleMnemonic,
+        hdPath: "m/84'/0'/0'/0",
+        accountIndexDerivation: true,
+        activeIndexes: [0, 1],
+      })
+      const accounts = await keyring.getAccounts()
+      const result0 = await keyring.deriveContextHash(accounts[0], APP_NAME, 'deadbeef')
+      const result1 = await keyring.deriveContextHash(accounts[1], APP_NAME, 'deadbeef')
+      expect(result0).not.toBe(result1)
+    })
+
+    it('changing hdPath (BIP standard) rotates the account-level secret', async () => {
+      const keyringBip44 = new HdKeyring({
+        mnemonic: sampleMnemonic,
+        hdPath: "m/44'/0'/0'/0",
+        activeIndexes: [0],
+      })
+      const keyringBip86 = new HdKeyring({
+        mnemonic: sampleMnemonic,
+        hdPath: "m/86'/0'/0'/0",
+        activeIndexes: [0],
+      })
+      const accounts44 = await keyringBip44.getAccounts()
+      const accounts86 = await keyringBip86.getAccounts()
+      const result44 = await keyringBip44.deriveContextHash(accounts44[0], APP_NAME, 'deadbeef')
+      const result86 = await keyringBip86.deriveContextHash(accounts86[0], APP_NAME, 'deadbeef')
+      expect(result44).not.toBe(result86)
+    })
+
+    it('mnemonic keyring produces identical result for the same account pubkey across calls', async () => {
+      const keyring = new HdKeyring({
+        mnemonic: sampleMnemonic,
+        activeIndexes: [0],
+      })
+      const accounts = await keyring.getAccounts()
+      const a = await keyring.deriveContextHash(accounts[0], APP_NAME, 'deadbeef')
+      const b = await keyring.deriveContextHash(accounts[0], APP_NAME, 'deadbeef')
+      expect(a).toBe(b)
     })
 
     it('xpriv-only keyring derives from BIP-32 path', async () => {
@@ -343,7 +393,7 @@ describe('bitcoin-hd-keyring', () => {
       expect(result).toMatch(/^[0-9a-f]{64}$/)
     })
 
-    it('xpriv result is stable regardless of account activation order', async () => {
+    it('xpriv keyring: same leaf-pubkey produces same hash regardless of activation order', async () => {
       const sampleXpriv =
         'xprvA2JBuYsdqVhrC2wGmb9QhBejk9gXXYgM3Jg9xgVYmDMsakDoURc8V7UYos1pP1kev1tG51PPA9A8VMYYCLov1L5c3J7npraxwjeJCquGhDi'
       const keyring1 = new HdKeyring({
@@ -356,9 +406,25 @@ describe('bitcoin-hd-keyring', () => {
       })
       const accounts1 = await keyring1.getAccounts()
       const accounts2 = await keyring2.getAccounts()
-      const result1 = await keyring1.deriveContextHash(accounts1[0], APP_NAME, 'deadbeef')
-      const result2 = await keyring2.deriveContextHash(accounts2[0], APP_NAME, 'deadbeef')
+      // accounts1[0] = leaf 0, accounts2[1] = leaf 0 — pick the same pubkey.
+      const leafZeroPubkey = accounts1[0]
+      expect(accounts2[1]).toBe(leafZeroPubkey)
+      const result1 = await keyring1.deriveContextHash(leafZeroPubkey, APP_NAME, 'deadbeef')
+      const result2 = await keyring2.deriveContextHash(leafZeroPubkey, APP_NAME, 'deadbeef')
       expect(result1).toBe(result2)
+    })
+
+    it('xpriv keyring: different leaves share the same hash (one xpriv = one identity)', async () => {
+      const sampleXpriv =
+        'xprvA2JBuYsdqVhrC2wGmb9QhBejk9gXXYgM3Jg9xgVYmDMsakDoURc8V7UYos1pP1kev1tG51PPA9A8VMYYCLov1L5c3J7npraxwjeJCquGhDi'
+      const keyring = new HdKeyring({
+        xpriv: sampleXpriv,
+        activeIndexes: [0, 1],
+      })
+      const accounts = await keyring.getAccounts()
+      const result0 = await keyring.deriveContextHash(accounts[0], APP_NAME, 'deadbeef')
+      const result1 = await keyring.deriveContextHash(accounts[1], APP_NAME, 'deadbeef')
+      expect(result0).toBe(result1)
     })
 
     it('rejects invalid hex context', async () => {
@@ -372,14 +438,31 @@ describe('bitcoin-hd-keyring', () => {
       await expect(keyring.deriveContextHash(accounts[0], APP_NAME, 'abc')).rejects.toThrow()
     })
 
-    it('rejects uninitialized keyring', async () => {
+    it('rejects when keyring is uninitialized', async () => {
       const keyring = new HdKeyring()
       await expect(keyring.deriveContextHash('anypubkey', APP_NAME, 'deadbeef')).rejects.toThrow(
-        'requires a mnemonic or xpriv-based keyring'
+        'requires an initialized HD keyring'
       )
     })
 
-    it('spec vector 1 with known mnemonic', async () => {
+    it('rejects unknown publicKey on an initialized keyring', async () => {
+      const keyring = new HdKeyring({
+        mnemonic: sampleMnemonic,
+        activeIndexes: [0],
+      })
+      const unknownPubkey = '02' + 'aa'.repeat(32)
+      await expect(keyring.deriveContextHash(unknownPubkey, APP_NAME, 'deadbeef')).rejects.toThrow(
+        'Unable to find matching publicKey'
+      )
+    })
+
+    // KAT: IKM = the BIP-32 private key at the account-level node
+    // m/44'/0'/0' (3-deep, hardened) from the standard BIP-39 test mnemonic
+    // "abandon abandon abandon abandon abandon abandon abandon abandon abandon
+    // abandon abandon about" (no passphrase). This is the canonical
+    // cross-wallet interop fixture: any conforming wallet that connects this
+    // mnemonic with default BIP-44 hdPath must produce this exact output.
+    it('spec vector: known mnemonic, BIP-44 account 0, appName=test-app, context=deadbeef', async () => {
       const knownMnemonic =
         'abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about'
       const keyring = new HdKeyring({
@@ -388,7 +471,7 @@ describe('bitcoin-hd-keyring', () => {
       })
       const accounts = await keyring.getAccounts()
       const result = await keyring.deriveContextHash(accounts[0], 'test-app', 'deadbeef')
-      expect(result).toBe('3b0e2d90a01122eed8a520648073892f6b2d8f4419216023d63cdbd49500fca3')
+      expect(result).toBe('2909f0c437a8a8b51206ac02a3abb88a1656a2266ec05c0102ae2209c3f2a30c')
     })
   })
 
