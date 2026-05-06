@@ -263,68 +263,36 @@ export class HdKeyring extends SimpleKeyring {
   }
 
   /**
-   * Derive a deterministic context hash bound to the connected BIP-32
-   * account-level node (3-deep, hardened: m/purpose'/coin_type'/account').
+   * Derive a deterministic context hash bound to the connected leaf
+   * public key. IKM is the leaf private key, so different receive
+   * addresses (different leaf pubkeys) produce different secrets — the
+   * same connected pubkey called twice produces the same secret.
    *
-   * Per-account semantics: all receive addresses under the same account
-   * share the same output; switching account index, purpose (address type),
-   * or imported xpriv changes the output.
-   *
-   * The leaf-index lookup and account-path resolution are intentionally
-   * inlined rather than extracted to shared helpers — deriveContextHash's
-   * output is a deterministic secret whose bytes must remain stable across
-   * the wallet's lifetime, so we keep its derivation isolated from any
-   * future modification of unrelated lookup or path-mapping helpers.
+   * Implementation is kept self-contained (independent of SimpleKeyring's
+   * inheritance) — this method's output stability is a forever invariant,
+   * so we don't want it perturbed by future modifications to unrelated
+   * code paths.
    */
   override async deriveContextHash(publicKey: string, appName: string, context: string): Promise<string> {
     const contextBytes = parseHexContext(context)
-    if (!this.hdWallet) {
-      throw new Error('deriveContextHash requires an initialized HD keyring')
-    }
 
-    // Find which leaf the connected pubkey corresponds to.
-    let leafIndex: number | null = null
-    for (const key in this._index2wallet) {
-      const entry = this._index2wallet[key]
-      if (entry && entry[1].publicKey.toString('hex') === publicKey) {
-        leafIndex = Number(key)
+    // Find the leaf ECPair whose public key matches the connected pubkey.
+    let leafPrivateKey: Buffer | undefined
+    for (const wallet of this.wallets) {
+      if (wallet.publicKey.toString('hex') === publicKey) {
+        leafPrivateKey = wallet.privateKey
         break
       }
     }
-    if (leafIndex === null) {
+    if (!leafPrivateKey) {
       throw new Error('deriveContextHash: Unable to find matching publicKey')
     }
 
-    // Resolve the BIP-32 account-level (3-deep, hardened) node.
-    let accountNode: any
-    if (this.xpriv) {
-      // An imported xpriv represents the user's account identity at
-      // whatever depth they imported.
-      accountNode = this.hdWallet
-    } else {
-      // _buildAccountLevelPath is the canonical path mapper used by
-      // address derivation; reuse it here so any future BIP-32 path
-      // convention change ripples consistently.
-      const basePath = this.accountIndexDerivation
-        ? this._buildAccountLevelPath(this.hdPath, leafIndex)
-        : this.hdPath
-      const segments = basePath.split('/')
-      if (segments.length < 4) {
-        throw new Error('deriveContextHash: hdPath must have at least 3 hardened components')
-      }
-      segments.length = 4 // m/purpose'/coin_type'/account'
-      accountNode = this.hdWallet.derive(segments.join('/'))
-    }
-
-    if (!accountNode.privateKey) {
-      throw new Error('deriveContextHash: account-level BIP-32 node has no private key')
-    }
-
-    const privKeyBytes = new Uint8Array(accountNode.privateKey)
+    const ikmBytes = new Uint8Array(leafPrivateKey)
     try {
-      return deriveContextHash(privKeyBytes, appName, contextBytes)
+      return deriveContextHash(ikmBytes, appName, contextBytes)
     } finally {
-      privKeyBytes.fill(0)
+      ikmBytes.fill(0)
     }
   }
 

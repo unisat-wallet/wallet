@@ -1,19 +1,19 @@
 /**
  * Deterministic context-based key derivation using HKDF (RFC 5869).
  *
- * ## Derivation scheme (account-level)
+ * ## Derivation scheme (per-public-key)
  *
  * ```
- * ikm    = the connected account's 32-byte private key
+ * ikm    = the connected leaf's 32-byte private key
  * salt   = "derive-context-hash"
  * info   = SHA-256(UTF8(appName)) || contextBytes
  * output = HKDF-SHA-256(ikm, salt, info, 32)
  * ```
  *
- * For HD wallets, the IKM is the BIP-32 private key at the **account-level**
- * node m/purpose'/coin_type'/account' (3-deep, hardened) — i.e. all receive
- * addresses under the same xpub share the same IKM. For imported wallets,
- * the IKM is the raw imported private key.
+ * For HD wallets, the IKM is the connected leaf private key (the BIP-32
+ * leaf at the receive-address path). Different leaves (different leaf
+ * pubkeys) produce different secrets. For imported wallets, the IKM is
+ * the raw imported private key.
  *
  * @module derive-context-hash
  */
