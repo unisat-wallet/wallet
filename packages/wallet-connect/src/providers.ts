@@ -29,6 +29,15 @@ export interface UnisatWalletProvider {
   getInscriptions(num: number): Promise<void>;
   getVersion(): Promise<string>;
   pushPsbt(psbt: string): Promise<string>;
+  /**
+   * @experimental
+   * Derive a deterministic 32-byte value bound to the connected leaf's public
+   * key, using HKDF-SHA-256. Output rotates per-connected-leaf (different
+   * receive address, account, or address type → different output). Requires
+   * user approval. May change in future versions; integrators should
+   * feature-detect.
+   */
+  deriveContextHash(appName: string, context: string): Promise<string>;
 }
 
 /**

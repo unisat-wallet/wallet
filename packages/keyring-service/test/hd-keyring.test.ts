@@ -353,6 +353,47 @@ describe('bitcoin-hd-keyring', () => {
       expect(result44).not.toBe(result86)
     })
 
+    it('different account index rotates the secret', async () => {
+      // Spec v2.0 §4.2: "m/44'/0'/0'/0/0" vs "m/44'/0'/1'/0/0" — different
+      // BIP-44 account segment → different leaf pubkey → different output.
+      const keyringAccount0 = new HdKeyring({
+        mnemonic: sampleMnemonic,
+        hdPath: "m/44'/0'/0'/0",
+        activeIndexes: [0],
+      })
+      const keyringAccount1 = new HdKeyring({
+        mnemonic: sampleMnemonic,
+        hdPath: "m/44'/0'/1'/0",
+        activeIndexes: [0],
+      })
+      const accounts0 = await keyringAccount0.getAccounts()
+      const accounts1 = await keyringAccount1.getAccounts()
+      expect(accounts0[0]).not.toBe(accounts1[0])
+      const result0 = await keyringAccount0.deriveContextHash(accounts0[0], APP_NAME, 'deadbeef')
+      const result1 = await keyringAccount1.deriveContextHash(accounts1[0], APP_NAME, 'deadbeef')
+      expect(result0).not.toBe(result1)
+    })
+
+    it('different BIP-39 passphrase rotates the secret', async () => {
+      // Spec v2.0 §4.2: same mnemonic with different BIP-39 passphrase yields
+      // a different seed, hence a different leaf privkey at the same path.
+      const keyringNoPass = new HdKeyring({
+        mnemonic: sampleMnemonic,
+        activeIndexes: [0],
+      })
+      const keyringWithPass = new HdKeyring({
+        mnemonic: sampleMnemonic,
+        passphrase: 'TREZOR',
+        activeIndexes: [0],
+      })
+      const accountsNoPass = await keyringNoPass.getAccounts()
+      const accountsWithPass = await keyringWithPass.getAccounts()
+      expect(accountsNoPass[0]).not.toBe(accountsWithPass[0])
+      const resultNoPass = await keyringNoPass.deriveContextHash(accountsNoPass[0], APP_NAME, 'deadbeef')
+      const resultWithPass = await keyringWithPass.deriveContextHash(accountsWithPass[0], APP_NAME, 'deadbeef')
+      expect(resultNoPass).not.toBe(resultWithPass)
+    })
+
     it('mnemonic keyring produces identical result for the same leaf pubkey across calls', async () => {
       const keyring = new HdKeyring({
         mnemonic: sampleMnemonic,

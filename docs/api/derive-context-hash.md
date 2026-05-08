@@ -45,7 +45,8 @@ The `info` field is constructed by concatenating SHA-256(UTF8(appName)) (32 byte
 Output is bound to the connected leaf's public key:
 - Different connected receive addresses (different leaf pubkeys) → **different** output, even within the same wallet.
 - Same connected leaf called twice → **same** output.
-- Different mnemonic, BIP-39 passphrase, address type, account index, or network → different output (different leaf path → different leaf pubkey).
+- Different mnemonic, BIP-39 passphrase, address type, or account index → different output (different leaf path → different leaf pubkey).
+- Switching mainnet ↔ testnet does **not** rotate the output: UniSat uses BIP-44 `coin_type = 0` paths for both, so the leaf private key is unchanged across networks. Applications that need network-bound outputs MUST encode the network in the `context`.
 
 ---
 
@@ -73,6 +74,10 @@ try {
 - The fixed salt `"derive-context-hash"` provides domain separation from BIP-32 and other HMAC uses.
 - SHA-256(appName) prefix in the info field provides mandatory app-level domain separation.
 - All intermediate key material is zeroed after use within the wallet.
+
+**Known divergence from spec v2.0**
+
+Spec v2.0 §2.2 requires that a wallet return an error when BIP-32 child derivation produces an invalid key (`IL ≥ n` or `kpar + IL ≡ 0 mod n`), rather than advancing to the next index. UniSat's BIP-32 derivation is provided by the `hdkey` library, which silently retries with `index + 1` in those cases. This applies to all BIP-32 derivations in the wallet (account creation, signing, and `deriveContextHash`), not just this method. The probability of an invalid child at any given index on secp256k1 is ≈ 2⁻¹²⁷ and has not been observed in practice. Cross-wallet reproducibility against another conforming wallet would diverge only if both wallets attempt to use the same astronomically-rare invalid leaf path; standard receive-address paths are unaffected.
 
 **Use Cases**
 

@@ -1,5 +1,12 @@
 # UniSat Wallet Release Notes
 
+## Unreleased
+
+### Breaking Changes (Experimental API)
+
+- **`unisat.deriveContextHash` IKM source changed (spec v1.0 → v2.0).** The 32-byte derived value is now bound to the connected leaf's public key instead of a fixed wallet-level BIP-32 path (`m/73681862'`). For HD wallets the IKM is now the leaf private key at the active receive-address path (e.g. `m/44'/0'/0'/0/0`); for imported wallets the behavior is unchanged. Output is **per-public-key**: switching the connected receive address (different index, account, or address type) now yields a different output. Switching mainnet ↔ testnet still returns the same value because UniSat uses `coin_type = 0` for both networks; applications that need network-bound outputs MUST encode the network in the `context`.
+- **Outputs change for any prior caller.** Any dApp that persisted v1.0 outputs (e.g. an HTLC pre-image, a Lamport seed) must re-derive against v2.0 — there is no version-discovery mechanism. The API remains marked `@experimental`. See [`../api/derive-context-hash.md`](../api/derive-context-hash.md) for the updated contract.
+
 ## v1.7.13
 
 ### Improvements
