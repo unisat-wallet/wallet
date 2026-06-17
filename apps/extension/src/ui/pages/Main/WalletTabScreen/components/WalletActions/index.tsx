@@ -12,9 +12,12 @@ import {
   useNavigation,
   useResetFeeRateBar,
   useResetUiTxCreateScreen,
+  useSupportedAssets,
   useWalletConfig
 } from '@unisat/wallet-state';
 import { ChainType } from '@unisat/wallet-types';
+
+import { ReceiveActionSheet, type ReceiveAssetKey } from '../../ReceiveActionSheet';
 
 interface WalletActionsProps {
   chain: TypeChain;
@@ -45,6 +48,7 @@ const actionButtonTextStyle = {
 
 export const WalletActions = ({ chain }: WalletActionsProps) => {
   const [showOverflowActions, setShowOverflowActions] = useState(false);
+  const [receiveActionSheetVisible, setReceiveActionSheetVisible] = useState(false);
   const isFractal = chain.isFractal;
   const nav = useNavigation();
   const resetUiTxCreateScreen = useResetUiTxCreateScreen();
@@ -55,12 +59,28 @@ export const WalletActions = ({ chain }: WalletActionsProps) => {
   const address = useCurrentAddress();
   const { t } = useI18n();
   const accountCapabilities = useCurrentAccountCapabilities();
+  const supportedAssets = useSupportedAssets();
 
   const handleUtxoClick = () => {
     nav.navToUtxoTools();
   };
 
   const onReceiveClick = () => {
+    if (supportedAssets.assets.rgb) {
+      setReceiveActionSheetVisible(true);
+      return;
+    }
+
+    nav.navigate('ReceiveScreen');
+  };
+
+  const onReceiveAssetSelect = (selection: ReceiveAssetKey) => {
+    setReceiveActionSheetVisible(false);
+    if (selection === 'rgb') {
+      nav.navigate('RGBReceiveScreen', {});
+      return;
+    }
+
     nav.navigate('ReceiveScreen');
   };
 
@@ -132,7 +152,14 @@ export const WalletActions = ({ chain }: WalletActionsProps) => {
     }
 
     return items;
-  }, [accountCapabilities.canCreateSigningRequest, buyDisabled, handleUtxoClick, isFractal, t, walletConfig.disableUtxoTools]);
+  }, [
+    accountCapabilities.canCreateSigningRequest,
+    buyDisabled,
+    handleUtxoClick,
+    isFractal,
+    t,
+    walletConfig.disableUtxoTools
+  ]);
 
   const { primaryActions, overflowActions } = useMemo(() => {
     const items = actionItems.sort((a, b) => a.priority - b.priority);
@@ -212,6 +239,14 @@ export const WalletActions = ({ chain }: WalletActionsProps) => {
           }}
         />
       )}
+
+      {receiveActionSheetVisible ? (
+        <ReceiveActionSheet
+          chain={chain}
+          onClose={() => setReceiveActionSheetVisible(false)}
+          onSelect={onReceiveAssetSelect}
+        />
+      ) : null}
     </>
   );
 };

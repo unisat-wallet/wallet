@@ -1,10 +1,7 @@
-import QRCode from 'qrcode.react';
-
-import { AddressBar, Column, Content, Header, Icon, Layout, Row, Text } from '@/ui/components';
-import { sizes } from '@/ui/theme/spacing';
+import { IMAGE_SOURCE_MAP } from '@/shared/constant';
+import { Column, Content, Header, Layout, ReceiveQRCodeCard } from '@/ui/components';
 import { useAccountAddress, useChain, useCurrentAccount, useI18n } from '@unisat/wallet-state';
 
-import { IMAGE_SOURCE_MAP } from '@/shared/constant';
 import './index.less';
 
 export default function ReceiveScreen() {
@@ -19,32 +16,18 @@ export default function ReceiveScreen() {
         onBack={() => {
           window.history.go(-1);
         }}
-        title={t('address_label')}
+        title={t('receive')}
       />
       <Content>
-        <Column gap="xl" mt="lg">
-          <Column
-            justifyCenter
-            rounded
-            style={{ backgroundColor: 'white', alignSelf: 'center', alignItems: 'center', padding: 10 }}>
-            <QRCode
-              value={address || ''}
-              renderAs="svg"
-              size={sizes.qrcode}
-              imageRendering={IMAGE_SOURCE_MAP[chain.icon]}
-              imageSettings={{
-                src: IMAGE_SOURCE_MAP[chain.icon],
-                width: 30,
-                height: 30,
-                excavate: true
-              }}></QRCode>
-          </Column>
-
-          <Row justifyCenter>
-            <Icon icon="user" />
-            <Text preset="regular-bold" text={currentAccount?.alianName} />
-          </Row>
-          <AddressBar />
+        <Column gap="lg">
+          <ReceiveQRCodeCard
+            title={currentAccount?.alianName || ''}
+            description={t('use_this_address_to_receive', { unit: chain.unit, chain: chain.label })}
+            value={address || ''}
+            valueLabel={t('receive_address')}
+            qrIconSrc={IMAGE_SOURCE_MAP[chain.icon]}
+            accentColor="#F4B62C"
+          />
         </Column>
       </Content>
     </Layout>

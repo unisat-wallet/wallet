@@ -106,6 +106,7 @@ export const svgRegistry = {
   unisat: '/images/icons/protocol/unisat.svg',
   gas: '/images/icons/protocol/gas.svg',
   alkanes: '/images/icons/protocol/alkanes.svg',
+  rgb: '/images/icons/protocol/rgb.png',
 
   // tx
   utxo: '/images/icons/tx/utxo.svg',
@@ -119,6 +120,7 @@ export const svgRegistry = {
   psbt_output: '/images/icons/tx/psbt_output.svg',
   psbt_opreturn: '/images/icons/tx/psbt_opreturn.svg',
   'brc20-single-step': '/images/icons/tx/brc20-single-step.svg',
+  invoice: '/images/icons/tx/invoice.svg',
 
   // swap
   swap_swap: '/images/icons/swap/swap_swap.svg',
@@ -226,7 +228,8 @@ const iconImgList: Array<IconTypes> = [
 
   'emptyBox',
   'mint_action',
-  'trade'
+  'trade',
+  'rgb'
 ];
 
 export type IconTypes = keyof typeof svgRegistry;

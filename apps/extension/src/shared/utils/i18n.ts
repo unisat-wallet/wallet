@@ -36,6 +36,11 @@ const processSubstitutions = (
           const regex = new RegExp(`\\$${index + 1}`, 'g');
           message = message.replace(regex, substitution);
         });
+      } else {
+        Object.entries(substitutions).forEach(([key, substitution]) => {
+          const regex = new RegExp(`\\$${key}`, 'g');
+          message = message.replace(regex, String(substitution));
+        });
       }
     }
 

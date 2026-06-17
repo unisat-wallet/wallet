@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 
 import { BottomSheetHeader, Icon, Inline, Stack, Text } from '@/ui/components';
 import { BottomModal } from '@/ui/components/BottomModal';
-import { MoreAssetTabKey, useI18n } from '@unisat/wallet-state';
+import { MoreAssetTabKey, useI18n, useNavigation, useSupportedAssets } from '@unisat/wallet-state';
 
 export function MoreActionSheet(props: {
   currentSelection?: MoreAssetTabKey;
@@ -11,7 +11,9 @@ export function MoreActionSheet(props: {
 }) {
   const { currentSelection, onClose, onSelect } = props;
   const { t } = useI18n();
+  const supportedAssets = useSupportedAssets();
   const [selected, setSelected] = useState<MoreAssetTabKey | undefined>(currentSelection);
+  const nav = useNavigation();
 
   useEffect(() => {
     setSelected(currentSelection);
@@ -30,24 +32,40 @@ export function MoreActionSheet(props: {
             gap: 12,
             boxSizing: 'border-box'
           }}>
-          <MoreActionRow
-            label={t('alkanes')}
-            icon="alkanes"
-            selected={selected === MoreAssetTabKey.ALKANES_TOKEN}
-            onClick={() => {
-              setSelected(MoreAssetTabKey.ALKANES_TOKEN);
-              onSelect(MoreAssetTabKey.ALKANES_TOKEN);
-            }}
-          />
-          <MoreActionRow
-            label={t('alkanes_collections')}
-            icon="alkanes"
-            selected={selected === MoreAssetTabKey.ALKANES_COLLECTION}
-            onClick={() => {
-              setSelected(MoreAssetTabKey.ALKANES_COLLECTION);
-              onSelect(MoreAssetTabKey.ALKANES_COLLECTION);
-            }}
-          />
+          {supportedAssets.assets.alkanes ? (
+            <>
+              <MoreActionRow
+                label={t('alkanes')}
+                icon="alkanes"
+                selected={selected === MoreAssetTabKey.ALKANES_TOKEN}
+                onClick={() => {
+                  setSelected(MoreAssetTabKey.ALKANES_TOKEN);
+                  onSelect(MoreAssetTabKey.ALKANES_TOKEN);
+                }}
+              />
+              <MoreActionRow
+                label={t('alkanes_collections')}
+                icon="alkanes"
+                selected={selected === MoreAssetTabKey.ALKANES_COLLECTION}
+                onClick={() => {
+                  setSelected(MoreAssetTabKey.ALKANES_COLLECTION);
+                  onSelect(MoreAssetTabKey.ALKANES_COLLECTION);
+                }}
+              />
+            </>
+          ) : null}
+
+          {supportedAssets.assets.rgb ? (
+            <MoreActionRow
+              label={t('rgb')}
+              icon="rgb"
+              selected={selected === MoreAssetTabKey.RGB_TOKEN_LIST}
+              onClick={() => {
+                setSelected(MoreAssetTabKey.RGB_TOKEN_LIST);
+                onSelect(MoreAssetTabKey.RGB_TOKEN_LIST);
+              }}
+            />
+          ) : null}
         </Stack>
       </Stack>
     </BottomModal>
@@ -62,7 +80,7 @@ function MoreActionRow({
   selected
 }: {
   label: string;
-  icon: 'alkanes';
+  icon: 'alkanes' | 'rgb';
   tag?: string;
   onClick: () => void;
   selected: boolean;

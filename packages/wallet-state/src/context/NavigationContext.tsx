@@ -17,6 +17,7 @@ import {
 } from '@unisat/wallet-shared'
 import { ChainType } from '@unisat/wallet-types'
 import React, { useContext } from 'react'
+import type { RgbBalance } from '../types'
 
 export type RouteParamList = {
   WelcomeScreen: undefined
@@ -183,6 +184,26 @@ export type RouteParamList = {
   }
   SendAlkanesNFTScreen: {
     alkanesInfo: AlkanesInfo
+  }
+
+  // RGB
+  RGBIssueScreen: undefined
+  RGBReceiveScreen: {
+    assetId?: string
+    tokenBalance?: RgbBalance
+  }
+  RGBTokenScreen: {
+    assetId: string
+    tokenBalance?: RgbBalance
+  }
+  SendRGBScreen: {
+    assetId: string
+    tokenBalance?: RgbBalance
+  }
+  RGBSendCompleteScreen: {
+    assetId: string
+    tokenBalance?: RgbBalance
+    txid?: string
   }
 
   // CAT

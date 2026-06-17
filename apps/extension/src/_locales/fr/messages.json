@@ -528,7 +528,7 @@
     "message": "Copier la clé publique"
   },
   "copy_to_clipboard": {
-    "message": "Copier dans le presse-papiers"
+    "message": "Copier"
   },
   "cosmos_sign_demo": {
     "message": "Démo de Signature Cosmos"
@@ -2725,5 +2725,164 @@
   },
   "readonly_signing_signature_placeholder": {
     "message": "Signature"
+  },
+  "receive_address": {
+    "message": "Adresse de réception"
+  },
+  "use_this_address_to_receive": {
+    "message": "Utilisez cette adresse pour recevoir $unit sur $chain"
+  },
+  "rgb_invoice": {
+    "message": "Facture RGB"
+  },
+  "paste_rgb_invoice": {
+    "message": "Collez la facture RGB"
+  },
+  "enter_amount_greater_than_0": {
+    "message": "Saisissez un montant supérieur à 0."
+  },
+  "select_asset": {
+    "message": "Sélectionner un actif"
+  },
+  "loading_assets": {
+    "message": "Chargement des actifs..."
+  },
+  "use_this_invoice_to_receive": {
+    "message": "Utilisez cette facture pour recevoir $ticker."
+  },
+  "receiving_invoice": {
+    "message": "Facture de réception"
+  },
+  "releasing_invoice": {
+    "message": "Libération de la facture..."
+  },
+  "release_invoice": {
+    "message": "Libérer la facture"
+  },
+  "any_amount": {
+    "message": "N’importe quel montant"
+  },
+  "fixed_amount": {
+    "message": "Montant fixe"
+  },
+  "accept_any_rgb_amount": {
+    "message": "Autoriser l’expéditeur à préciser le montant."
+  },
+  "set_exact_rgb_amount": {
+    "message": "Définissez le montant exact pour cette facture."
+  },
+  "pending_blind_invoices": {
+    "message": "Factures blind en attente"
+  },
+  "waiting_counterparty": {
+    "message": "En attente de la contrepartie"
+  },
+  "loading_pending_invoices": {
+    "message": "Chargement des factures en attente..."
+  },
+  "no_pending_blind_invoices": {
+    "message": "Aucune facture blind en attente."
+  },
+  "creating": {
+    "message": "Création..."
+  },
+  "create_invoice": {
+    "message": "Créer une facture"
+  },
+  "rgb_sent": {
+    "message": "RGB envoyé"
+  },
+  "rgb_transfer_submitted": {
+    "message": "Votre transfert RGB a été soumis."
+  },
+  "settled": {
+    "message": "Réglé"
+  },
+  "activity": {
+    "message": "Activité"
+  },
+  "issue": {
+    "message": "Émettre"
+  },
+  "rgb_send_transaction_unavailable": {
+    "message": "La transaction d’envoi RGB est indisponible"
+  },
+  "rgb_psbt_signing_missing_result": {
+    "message": "La signature PSBT RGB n’a pas renvoyé psbtHex"
+  },
+  "rgb": {
+    "message": "RGB"
+  },
+  "rgb_asset": {
+    "message": "Actif RGB"
+  },
+  "rgb_history": {
+    "message": "Historique RGB"
+  },
+  "asset_id": {
+    "message": "ID de l’actif"
+  },
+  "precision_rgb": {
+    "message": "Précision"
+  },
+  "issued_supply_rgb": {
+    "message": "Offre émise"
+  },
+  "schema_rgb": {
+    "message": "Schéma"
+  },
+  "protocol_data_unavailable": {
+    "message": "Données du protocole indisponibles"
+  },
+  "asset": {
+    "message": "Actif"
+  },
+  "type": {
+    "message": "Type"
+  },
+  "assignment": {
+    "message": "Attribution"
+  },
+  "endpoint": {
+    "message": "Endpoint"
+  },
+  "issue_rgb20": {
+    "message": "Émettre RGB20"
+  },
+  "issue_nia_asset": {
+    "message": "Émettre un actif NIA"
+  },
+  "create_rgb_utxo_first": {
+    "message": "Créez d’abord un UTXO RGB, puis réessayez l’émission."
+  },
+  "create_rgb_utxo": {
+    "message": "Créer un UTXO RGB"
+  },
+  "decoded_invoice": {
+    "message": "Facture décodée"
+  },
+  "invalid_rgb_invoice": {
+    "message": "Facture RGB invalide."
+  },
+  "invoice_asset_mismatch": {
+    "message": "L’actif de la facture ne correspond pas à ce token RGB."
+  },
+  "pending_invoices": {
+    "message": "Factures en attente"
+  },
+  "view_all": {
+    "message": "Tout voir"
+  },
+  "any_rgb_asset": {
+    "message": "N’importe quel actif RGB"
+  },
+  "release_invoice_confirm_title": {
+    "message": "Libérer cette facture ?"
+  },
+  "release_invoice_confirm_description": {
+    "message": "Cela libérera l’UTXO réservé. La facture ne sera plus disponible."
+  },
+  "keep_invoice": {
+    "message": "Conserver la facture"
   }
 }

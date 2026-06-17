@@ -20,7 +20,10 @@ import { Input } from './Input';
 import { Layout } from './Layout';
 import { Logo } from './Logo';
 import { Progress } from './Progress';
+import { RGBAssetIcon } from './RGBAssetIcon';
 import { Radio, RadioGroup } from './Radio';
+import { ReceiveAssetTabs } from './ReceiveAssetTabs';
+import { ReceiveQRCodeCard } from './ReceiveQRCodeCard';
 import { Row } from './Row';
 import { ScrollableList } from './ScrollableList';
 import { Slider } from './Slider';
@@ -57,6 +60,9 @@ export {
   Progress,
   Radio,
   RadioGroup,
+  ReceiveAssetTabs,
+  ReceiveQRCodeCard,
+  RGBAssetIcon,
   Row,
   ScrollableList,
   Slider,

@@ -1,10 +1,10 @@
 import { useCallback, useMemo } from 'react'
 
-import { CHAINS_MAP, Inscription } from '@unisat/wallet-shared'
+import { CHAINS_MAP, Inscription, KeyringType } from '@unisat/wallet-shared'
 import { AddressType, ChainType } from '@unisat/wallet-types'
 import { getAddressType } from '../utils/bitcoin-utils'
 
-import { AppState, AssetTabKey } from '..'
+import { AppState, AssetTabKey, useCurrentKeyring } from '..'
 import { useCurrentAddress } from '../hooks/accounts'
 import { useAppDispatch, useAppSelector } from '../hooks/base'
 import { useChainType, useIconBaseUrl, useUnisatWebsite } from '../hooks/settings'
@@ -190,7 +190,13 @@ export const useThrottle = (callback, delay, lastCallRef) => {
   )
 }
 
-export function getSupportedAssets(chainType: ChainType, address: string) {
+export function getSupportedAssets(
+  chainType: ChainType,
+  address: string,
+  opts?: {
+    keyringType?: string
+  }
+) {
   const assetTabKeys: AssetTabKey[] = []
 
   const chain = CHAINS_MAP[chainType]
@@ -202,6 +208,7 @@ export function getSupportedAssets(chainType: ChainType, address: string) {
     runes: false,
     CAT20: false,
     alkanes: false,
+    rgb: false,
     brc20Prog: false,
   }
 
@@ -225,6 +232,19 @@ export function getSupportedAssets(chainType: ChainType, address: string) {
     assetTabKeys.push(AssetTabKey.MORE)
   }
 
+  if (
+    (chainType === ChainType.BITCOIN_MAINNET ||
+      chainType === ChainType.BITCOIN_SIGNET ||
+      chainType === ChainType.BITCOIN_TESTNET4) &&
+    addressType === AddressType.P2TR &&
+    opts?.keyringType === KeyringType.HdKeyring
+  ) {
+    assets.rgb = true
+    if (!assetTabKeys.includes(AssetTabKey.MORE)) {
+      assetTabKeys.push(AssetTabKey.MORE)
+    }
+  }
+
   if (chainType === ChainType.BITCOIN_MAINNET || chainType === ChainType.BITCOIN_SIGNET) {
     assets.brc20Prog = true
   }
@@ -238,7 +258,10 @@ export function getSupportedAssets(chainType: ChainType, address: string) {
 export function useSupportedAssets() {
   const chainType = useChainType()
   const currentAddress = useCurrentAddress()
-  const supportedAssets = getSupportedAssets(chainType, currentAddress)
+  const currentKeyring = useCurrentKeyring()
+  const supportedAssets = getSupportedAssets(chainType, currentAddress, {
+    keyringType: currentKeyring?.type,
+  })
   return supportedAssets
 }
 

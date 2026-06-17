@@ -65,6 +65,30 @@
   "alkanes_collections": {
     "message": "Alkanes 收藏"
   },
+  "rgb": {
+    "message": "RGB"
+  },
+  "rgb_asset": {
+    "message": "RGB 資產"
+  },
+  "rgb_history": {
+    "message": "RGB 歷史紀錄"
+  },
+  "asset_id": {
+    "message": "資產 ID"
+  },
+  "precision_rgb": {
+    "message": "精度"
+  },
+  "issued_supply_rgb": {
+    "message": "已發行供應量"
+  },
+  "schema_rgb": {
+    "message": "Schema"
+  },
+  "protocol_data_unavailable": {
+    "message": "協議資料暫不可用"
+  },
   "alkanes_burning_risk_description": {
     "message": "此交易涉及Alkanes銷毀。請確保您了解此操作的影響，然後再繼續。"
   },
@@ -528,7 +552,7 @@
     "message": "複製公鑰"
   },
   "copy_to_clipboard": {
-    "message": "複製到剪貼簿"
+    "message": "複製"
   },
   "cosmos_sign_demo": {
     "message": "Cosmos 簽署演示"
@@ -2728,5 +2752,140 @@
   },
   "readonly_signing_signature_placeholder": {
     "message": "簽名"
+  },
+  "receive_address": {
+    "message": "收款地址"
+  },
+  "use_this_address_to_receive": {
+    "message": "使用此地址在 $chain 接收 $unit"
+  },
+  "rgb_invoice": {
+    "message": "RGB 發票"
+  },
+  "paste_rgb_invoice": {
+    "message": "貼上 RGB 發票"
+  },
+  "enter_amount_greater_than_0": {
+    "message": "請輸入大於 0 的數量。"
+  },
+  "select_asset": {
+    "message": "選擇資產"
+  },
+  "loading_assets": {
+    "message": "正在載入資產..."
+  },
+  "use_this_invoice_to_receive": {
+    "message": "使用此發票接收 $ticker。"
+  },
+  "receiving_invoice": {
+    "message": "收款發票"
+  },
+  "releasing_invoice": {
+    "message": "正在釋放發票..."
+  },
+  "release_invoice": {
+    "message": "釋放發票"
+  },
+  "any_amount": {
+    "message": "任意數量"
+  },
+  "fixed_amount": {
+    "message": "固定數量"
+  },
+  "accept_any_rgb_amount": {
+    "message": "允許發送方指定數量。"
+  },
+  "set_exact_rgb_amount": {
+    "message": "為此發票設定精確數量。"
+  },
+  "pending_blind_invoices": {
+    "message": "待處理盲發票"
+  },
+  "waiting_counterparty": {
+    "message": "等待交易對手"
+  },
+  "loading_pending_invoices": {
+    "message": "正在載入待處理發票..."
+  },
+  "no_pending_blind_invoices": {
+    "message": "沒有待處理的盲發票。"
+  },
+  "creating": {
+    "message": "正在建立..."
+  },
+  "create_invoice": {
+    "message": "建立發票"
+  },
+  "rgb_sent": {
+    "message": "RGB 已送出"
+  },
+  "rgb_transfer_submitted": {
+    "message": "你的 RGB 轉帳已提交。"
+  },
+  "settled": {
+    "message": "已結算"
+  },
+  "activity": {
+    "message": "活動"
+  },
+  "issue": {
+    "message": "發行"
+  },
+  "rgb_send_transaction_unavailable": {
+    "message": "RGB 發送交易不可用"
+  },
+  "rgb_psbt_signing_missing_result": {
+    "message": "RGB PSBT 簽名未返回 psbtHex"
+  },
+  "asset": {
+    "message": "資產"
+  },
+  "type": {
+    "message": "類型"
+  },
+  "assignment": {
+    "message": "分配"
+  },
+  "endpoint": {
+    "message": "端點"
+  },
+  "issue_rgb20": {
+    "message": "發行 RGB20"
+  },
+  "issue_nia_asset": {
+    "message": "發行 NIA 資產"
+  },
+  "create_rgb_utxo_first": {
+    "message": "請先建立 RGB UTXO，然後再發行。"
+  },
+  "create_rgb_utxo": {
+    "message": "建立 RGB UTXO"
+  },
+  "decoded_invoice": {
+    "message": "已解碼發票"
+  },
+  "invalid_rgb_invoice": {
+    "message": "無效的 RGB 發票。"
+  },
+  "invoice_asset_mismatch": {
+    "message": "發票資產與此 RGB 代幣不符。"
+  },
+  "pending_invoices": {
+    "message": "待處理發票"
+  },
+  "view_all": {
+    "message": "查看全部"
+  },
+  "any_rgb_asset": {
+    "message": "任意 RGB 資產"
+  },
+  "release_invoice_confirm_title": {
+    "message": "釋放此發票？"
+  },
+  "release_invoice_confirm_description": {
+    "message": "這將釋放已預留的 UTXO。此發票將不再可用。"
+  },
+  "keep_invoice": {
+    "message": "保留發票"
   }
 }

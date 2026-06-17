@@ -103,6 +103,18 @@ export const initialState: UIState = {
   },
 }
 
+const normalizeMoreAssetTabKey = (tabKey: MoreAssetTabKey | undefined): MoreAssetTabKey => {
+  if (
+    tabKey === MoreAssetTabKey.ALKANES_TOKEN ||
+    tabKey === MoreAssetTabKey.ALKANES_COLLECTION ||
+    tabKey === MoreAssetTabKey.RGB_TOKEN_LIST
+  ) {
+    return tabKey
+  }
+
+  return MoreAssetTabKey.ALKANES_TOKEN
+}
+
 const slice: Slice<UIState> = createSlice({
   name: 'ui',
   initialState,
@@ -137,7 +149,7 @@ const slice: Slice<UIState> = createSlice({
         state.alkanesAssetTabKey = payload.alkanesAssetTabKey
       }
       if (payload.moreAssetTabKey !== undefined) {
-        state.moreAssetTabKey = payload.moreAssetTabKey
+        state.moreAssetTabKey = normalizeMoreAssetTabKey(payload.moreAssetTabKey)
       }
       return state
     },
@@ -287,9 +299,7 @@ const slice: Slice<UIState> = createSlice({
       if (!state.alkanesAssetTabKey) {
         state.alkanesAssetTabKey = AlkanesAssetTabKey.TOKEN
       }
-      if (state.moreAssetTabKey === undefined) {
-        state.moreAssetTabKey = MoreAssetTabKey.ALKANES_TOKEN
-      }
+      state.moreAssetTabKey = normalizeMoreAssetTabKey(state.moreAssetTabKey)
       if (state.assetTabKey === (4 as AssetTabKey)) {
         state.assetTabKey = AssetTabKey.MORE
       }

@@ -17,6 +17,8 @@ type UiTypeCheck = {
   isSidePanel: boolean;
 };
 
+export const IS_DEVELOPMENT = process.env.NODE_ENV === 'development';
+
 export const getUiType = (): UiTypeCheck => {
   const { pathname } = window.location;
   return Object.entries(UI_TYPE).reduce((m, [key, value]) => {

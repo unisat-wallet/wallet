@@ -528,7 +528,7 @@
     "message": "Copiar clave pública"
   },
   "copy_to_clipboard": {
-    "message": "Copiar al portapapeles"
+    "message": "Copiar"
   },
   "cosmos_sign_demo": {
     "message": "Demo de Firma Cosmos"
@@ -2716,5 +2716,164 @@
   },
   "readonly_signing_signature_placeholder": {
     "message": "Firma"
+  },
+  "receive_address": {
+    "message": "Dirección de recepción"
+  },
+  "use_this_address_to_receive": {
+    "message": "Usa esta dirección para recibir $unit en $chain"
+  },
+  "rgb_invoice": {
+    "message": "Factura RGB"
+  },
+  "paste_rgb_invoice": {
+    "message": "Pega la factura RGB"
+  },
+  "enter_amount_greater_than_0": {
+    "message": "Introduce un importe mayor que 0."
+  },
+  "select_asset": {
+    "message": "Seleccionar activo"
+  },
+  "loading_assets": {
+    "message": "Cargando activos..."
+  },
+  "use_this_invoice_to_receive": {
+    "message": "Usa esta factura para recibir $ticker."
+  },
+  "receiving_invoice": {
+    "message": "Factura de recepción"
+  },
+  "releasing_invoice": {
+    "message": "Liberando factura..."
+  },
+  "release_invoice": {
+    "message": "Liberar factura"
+  },
+  "any_amount": {
+    "message": "Cualquier importe"
+  },
+  "fixed_amount": {
+    "message": "Importe fijo"
+  },
+  "accept_any_rgb_amount": {
+    "message": "Permite que el remitente especifique el importe."
+  },
+  "set_exact_rgb_amount": {
+    "message": "Define el importe exacto para esta factura."
+  },
+  "pending_blind_invoices": {
+    "message": "Facturas blind pendientes"
+  },
+  "waiting_counterparty": {
+    "message": "Esperando contraparte"
+  },
+  "loading_pending_invoices": {
+    "message": "Cargando facturas pendientes..."
+  },
+  "no_pending_blind_invoices": {
+    "message": "No hay facturas blind pendientes."
+  },
+  "creating": {
+    "message": "Creando..."
+  },
+  "create_invoice": {
+    "message": "Crear factura"
+  },
+  "rgb_sent": {
+    "message": "RGB enviado"
+  },
+  "rgb_transfer_submitted": {
+    "message": "Tu transferencia RGB se ha enviado."
+  },
+  "settled": {
+    "message": "Liquidado"
+  },
+  "activity": {
+    "message": "Actividad"
+  },
+  "issue": {
+    "message": "Emitir"
+  },
+  "rgb_send_transaction_unavailable": {
+    "message": "La transacción de envío RGB no está disponible"
+  },
+  "rgb_psbt_signing_missing_result": {
+    "message": "La firma PSBT de RGB no devolvió psbtHex"
+  },
+  "rgb": {
+    "message": "RGB"
+  },
+  "rgb_asset": {
+    "message": "Activo RGB"
+  },
+  "rgb_history": {
+    "message": "Historial RGB"
+  },
+  "asset_id": {
+    "message": "ID de activo"
+  },
+  "precision_rgb": {
+    "message": "Precisión"
+  },
+  "issued_supply_rgb": {
+    "message": "Suministro emitido"
+  },
+  "schema_rgb": {
+    "message": "Esquema"
+  },
+  "protocol_data_unavailable": {
+    "message": "Datos del protocolo no disponibles"
+  },
+  "asset": {
+    "message": "Activo"
+  },
+  "type": {
+    "message": "Tipo"
+  },
+  "assignment": {
+    "message": "Asignación"
+  },
+  "endpoint": {
+    "message": "Endpoint"
+  },
+  "issue_rgb20": {
+    "message": "Emitir RGB20"
+  },
+  "issue_nia_asset": {
+    "message": "Emitir activo NIA"
+  },
+  "create_rgb_utxo_first": {
+    "message": "Crea primero un UTXO RGB y luego vuelve a emitir."
+  },
+  "create_rgb_utxo": {
+    "message": "Crear UTXO RGB"
+  },
+  "decoded_invoice": {
+    "message": "Factura decodificada"
+  },
+  "invalid_rgb_invoice": {
+    "message": "Factura RGB no válida."
+  },
+  "invoice_asset_mismatch": {
+    "message": "El activo de la factura no coincide con este token RGB."
+  },
+  "pending_invoices": {
+    "message": "Facturas pendientes"
+  },
+  "view_all": {
+    "message": "Ver todo"
+  },
+  "any_rgb_asset": {
+    "message": "Cualquier activo RGB"
+  },
+  "release_invoice_confirm_title": {
+    "message": "¿Liberar esta factura?"
+  },
+  "release_invoice_confirm_description": {
+    "message": "Esto liberará el UTXO reservado. La factura ya no estará disponible."
+  },
+  "keep_invoice": {
+    "message": "Conservar factura"
   }
 }

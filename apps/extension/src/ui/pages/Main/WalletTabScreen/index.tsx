@@ -150,7 +150,7 @@ export default function WalletTabScreen() {
         children: <RunesList />
       });
     }
-    if (supportedAssets.assets.alkanes) {
+    if (supportedAssets.assets.alkanes || supportedAssets.assets.rgb) {
       items.push({
         key: AssetTabKey.MORE,
         label: (

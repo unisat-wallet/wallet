@@ -65,6 +65,30 @@
   "alkanes_collections": {
     "message": "Alkanes Collections"
   },
+  "rgb": {
+    "message": "RGB"
+  },
+  "rgb_asset": {
+    "message": "RGB Asset"
+  },
+  "rgb_history": {
+    "message": "RGB History"
+  },
+  "asset_id": {
+    "message": "Asset ID"
+  },
+  "precision_rgb": {
+    "message": "Precision"
+  },
+  "issued_supply_rgb": {
+    "message": "Issued Supply"
+  },
+  "schema_rgb": {
+    "message": "Schema"
+  },
+  "protocol_data_unavailable": {
+    "message": "Protocol data unavailable"
+  },
   "alkanes_burning_risk_description": {
     "message": "This transaction involves the burning of Alkanes. Please ensure you understand the implications of this action before proceeding."
   },
@@ -534,7 +558,7 @@
     "message": "Copy Public Key"
   },
   "copy_to_clipboard": {
-    "message": "Copy to clipboard"
+    "message": "Copy"
   },
   "cosmos_sign_demo": {
     "message": "Cosmos Sign Demo"
@@ -2731,5 +2755,140 @@
   },
   "readonly_signing_signature_placeholder": {
     "message": "Signature"
+  },
+  "receive_address": {
+    "message": "Receive Address"
+  },
+  "use_this_address_to_receive": {
+    "message": "Use this address to receive $unit on $chain"
+  },
+  "rgb_invoice": {
+    "message": "RGB Invoice"
+  },
+  "paste_rgb_invoice": {
+    "message": "Paste RGB invoice"
+  },
+  "enter_amount_greater_than_0": {
+    "message": "Enter an amount greater than 0."
+  },
+  "select_asset": {
+    "message": "Select Asset"
+  },
+  "loading_assets": {
+    "message": "Loading assets..."
+  },
+  "use_this_invoice_to_receive": {
+    "message": "Use this invoice to receive $ticker."
+  },
+  "receiving_invoice": {
+    "message": "Receiving invoice"
+  },
+  "releasing_invoice": {
+    "message": "Releasing invoice..."
+  },
+  "release_invoice": {
+    "message": "Release Invoice"
+  },
+  "any_amount": {
+    "message": "Any Amount"
+  },
+  "fixed_amount": {
+    "message": "Fixed Amount"
+  },
+  "accept_any_rgb_amount": {
+    "message": "Allow the sender to specify the amount."
+  },
+  "set_exact_rgb_amount": {
+    "message": "Set the exact amount for this invoice."
+  },
+  "pending_blind_invoices": {
+    "message": "Pending blind invoices"
+  },
+  "waiting_counterparty": {
+    "message": "WaitingCounterparty"
+  },
+  "loading_pending_invoices": {
+    "message": "Loading pending invoices..."
+  },
+  "no_pending_blind_invoices": {
+    "message": "No pending blind invoices."
+  },
+  "creating": {
+    "message": "Creating..."
+  },
+  "create_invoice": {
+    "message": "Create Invoice"
+  },
+  "rgb_sent": {
+    "message": "RGB Sent"
+  },
+  "rgb_transfer_submitted": {
+    "message": "Your RGB transfer has been submitted."
+  },
+  "settled": {
+    "message": "Settled"
+  },
+  "activity": {
+    "message": "Activity"
+  },
+  "issue": {
+    "message": "Issue"
+  },
+  "rgb_send_transaction_unavailable": {
+    "message": "RGB send transaction is unavailable"
+  },
+  "rgb_psbt_signing_missing_result": {
+    "message": "RGB PSBT signing did not return psbtHex"
+  },
+  "asset": {
+    "message": "Asset"
+  },
+  "type": {
+    "message": "Type"
+  },
+  "assignment": {
+    "message": "Assignment"
+  },
+  "endpoint": {
+    "message": "Endpoint"
+  },
+  "issue_rgb20": {
+    "message": "Issue RGB20"
+  },
+  "issue_nia_asset": {
+    "message": "Issue NIA Asset"
+  },
+  "create_rgb_utxo_first": {
+    "message": "Create an RGB UTXO first, then issue again."
+  },
+  "create_rgb_utxo": {
+    "message": "Create RGB UTXO"
+  },
+  "decoded_invoice": {
+    "message": "Decoded invoice"
+  },
+  "invalid_rgb_invoice": {
+    "message": "Invalid RGB invoice."
+  },
+  "invoice_asset_mismatch": {
+    "message": "Invoice asset does not match this RGB token."
+  },
+  "pending_invoices": {
+    "message": "Pending Invoices"
+  },
+  "view_all": {
+    "message": "View All"
+  },
+  "any_rgb_asset": {
+    "message": "Any RGB asset"
+  },
+  "release_invoice_confirm_title": {
+    "message": "Release this invoice?"
+  },
+  "release_invoice_confirm_description": {
+    "message": "This will free the reserved UTXO. The invoice will no longer be available."
+  },
+  "keep_invoice": {
+    "message": "Keep Invoice"
   }
 }

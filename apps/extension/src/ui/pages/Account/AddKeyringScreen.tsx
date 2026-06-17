@@ -1,7 +1,6 @@
 import { Card, Column, Content, Header, Layout, Text } from '@/ui/components';
+import { IS_DEVELOPMENT } from '@/ui/utils';
 import { useDeveloperMode, useDevice, useI18n, useNavigation } from '@unisat/wallet-state';
-
-const isDevelopment = process.env.NODE_ENV === 'development';
 
 export default function AddKeyringScreen() {
   const nav = useNavigation();
@@ -97,7 +96,7 @@ export default function AddKeyringScreen() {
             </>
           )}
 
-          {isDevelopment && (
+          {IS_DEVELOPMENT && (
             <>
               <Text text={t('watch_address_wallet')} preset="regular-bold" mt="lg" />
 

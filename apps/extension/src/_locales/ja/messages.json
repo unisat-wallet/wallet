@@ -528,7 +528,7 @@
     "message": "公開鍵をコピー"
   },
   "copy_to_clipboard": {
-    "message": "クリップボードにコピー"
+    "message": "コピー"
   },
   "cosmos_sign_demo": {
     "message": "Cosmos署名デモ"
@@ -2725,5 +2725,164 @@
   },
   "readonly_signing_signature_placeholder": {
     "message": "署名"
+  },
+  "receive_address": {
+    "message": "受取アドレス"
+  },
+  "use_this_address_to_receive": {
+    "message": "このアドレスで $chain の $unit を受け取ります"
+  },
+  "rgb_invoice": {
+    "message": "RGB インボイス"
+  },
+  "paste_rgb_invoice": {
+    "message": "RGB インボイスを貼り付け"
+  },
+  "enter_amount_greater_than_0": {
+    "message": "0 より大きい数量を入力してください。"
+  },
+  "select_asset": {
+    "message": "資産を選択"
+  },
+  "loading_assets": {
+    "message": "資産を読み込み中..."
+  },
+  "use_this_invoice_to_receive": {
+    "message": "このインボイスで $ticker を受け取ります。"
+  },
+  "receiving_invoice": {
+    "message": "受取インボイス"
+  },
+  "releasing_invoice": {
+    "message": "インボイスを解放中..."
+  },
+  "release_invoice": {
+    "message": "インボイスを解放"
+  },
+  "any_amount": {
+    "message": "任意の数量"
+  },
+  "fixed_amount": {
+    "message": "固定数量"
+  },
+  "accept_any_rgb_amount": {
+    "message": "送信者が数量を指定できるようにします。"
+  },
+  "set_exact_rgb_amount": {
+    "message": "このインボイスの正確な数量を設定します。"
+  },
+  "pending_blind_invoices": {
+    "message": "保留中の blind インボイス"
+  },
+  "waiting_counterparty": {
+    "message": "相手方を待機中"
+  },
+  "loading_pending_invoices": {
+    "message": "保留中のインボイスを読み込み中..."
+  },
+  "no_pending_blind_invoices": {
+    "message": "保留中の blind インボイスはありません。"
+  },
+  "creating": {
+    "message": "作成中..."
+  },
+  "create_invoice": {
+    "message": "インボイスを作成"
+  },
+  "rgb_sent": {
+    "message": "RGB を送信しました"
+  },
+  "rgb_transfer_submitted": {
+    "message": "RGB 送金が送信されました。"
+  },
+  "settled": {
+    "message": "確定済み"
+  },
+  "activity": {
+    "message": "アクティビティ"
+  },
+  "issue": {
+    "message": "発行"
+  },
+  "rgb_send_transaction_unavailable": {
+    "message": "RGB 送金トランザクションは利用できません"
+  },
+  "rgb_psbt_signing_missing_result": {
+    "message": "RGB PSBT 署名で psbtHex が返されませんでした"
+  },
+  "rgb": {
+    "message": "RGB"
+  },
+  "rgb_asset": {
+    "message": "RGB 資産"
+  },
+  "rgb_history": {
+    "message": "RGB 履歴"
+  },
+  "asset_id": {
+    "message": "資産 ID"
+  },
+  "precision_rgb": {
+    "message": "精度"
+  },
+  "issued_supply_rgb": {
+    "message": "発行済み供給量"
+  },
+  "schema_rgb": {
+    "message": "スキーマ"
+  },
+  "protocol_data_unavailable": {
+    "message": "プロトコルデータを利用できません"
+  },
+  "asset": {
+    "message": "資産"
+  },
+  "type": {
+    "message": "種類"
+  },
+  "assignment": {
+    "message": "割り当て"
+  },
+  "endpoint": {
+    "message": "エンドポイント"
+  },
+  "issue_rgb20": {
+    "message": "RGB20 を発行"
+  },
+  "issue_nia_asset": {
+    "message": "NIA 資産を発行"
+  },
+  "create_rgb_utxo_first": {
+    "message": "先に RGB UTXO を作成してから、もう一度発行してください。"
+  },
+  "create_rgb_utxo": {
+    "message": "RGB UTXO を作成"
+  },
+  "decoded_invoice": {
+    "message": "デコード済みインボイス"
+  },
+  "invalid_rgb_invoice": {
+    "message": "無効な RGB インボイスです。"
+  },
+  "invoice_asset_mismatch": {
+    "message": "インボイスの資産がこの RGB トークンと一致しません。"
+  },
+  "pending_invoices": {
+    "message": "保留中のインボイス"
+  },
+  "view_all": {
+    "message": "すべて表示"
+  },
+  "any_rgb_asset": {
+    "message": "任意の RGB 資産"
+  },
+  "release_invoice_confirm_title": {
+    "message": "このインボイスを解放しますか？"
+  },
+  "release_invoice_confirm_description": {
+    "message": "予約済みの UTXO が解放されます。このインボイスは利用できなくなります。"
+  },
+  "keep_invoice": {
+    "message": "インボイスを保持"
   }
 }

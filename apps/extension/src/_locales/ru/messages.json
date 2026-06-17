@@ -528,7 +528,7 @@
     "message": "Копировать публичный ключ"
   },
   "copy_to_clipboard": {
-    "message": "Скопировать в буфер обмена"
+    "message": "Копировать"
   },
   "cosmos_sign_demo": {
     "message": "Демо подписи Cosmos"
@@ -2725,5 +2725,164 @@
   },
   "readonly_signing_signature_placeholder": {
     "message": "Подпись"
+  },
+  "receive_address": {
+    "message": "Адрес получения"
+  },
+  "use_this_address_to_receive": {
+    "message": "Используйте этот адрес для получения $unit в $chain"
+  },
+  "rgb_invoice": {
+    "message": "RGB-инвойс"
+  },
+  "paste_rgb_invoice": {
+    "message": "Вставьте RGB-инвойс"
+  },
+  "enter_amount_greater_than_0": {
+    "message": "Введите сумму больше 0."
+  },
+  "select_asset": {
+    "message": "Выберите актив"
+  },
+  "loading_assets": {
+    "message": "Загрузка активов..."
+  },
+  "use_this_invoice_to_receive": {
+    "message": "Используйте этот инвойс для получения $ticker."
+  },
+  "receiving_invoice": {
+    "message": "Инвойс для получения"
+  },
+  "releasing_invoice": {
+    "message": "Освобождение инвойса..."
+  },
+  "release_invoice": {
+    "message": "Освободить инвойс"
+  },
+  "any_amount": {
+    "message": "Любая сумма"
+  },
+  "fixed_amount": {
+    "message": "Фиксированная сумма"
+  },
+  "accept_any_rgb_amount": {
+    "message": "Разрешить отправителю указать сумму."
+  },
+  "set_exact_rgb_amount": {
+    "message": "Задайте точную сумму для этого инвойса."
+  },
+  "pending_blind_invoices": {
+    "message": "Ожидающие blind-инвойсы"
+  },
+  "waiting_counterparty": {
+    "message": "Ожидание контрагента"
+  },
+  "loading_pending_invoices": {
+    "message": "Загрузка ожидающих инвойсов..."
+  },
+  "no_pending_blind_invoices": {
+    "message": "Нет ожидающих blind-инвойсов."
+  },
+  "creating": {
+    "message": "Создание..."
+  },
+  "create_invoice": {
+    "message": "Создать инвойс"
+  },
+  "rgb_sent": {
+    "message": "RGB отправлен"
+  },
+  "rgb_transfer_submitted": {
+    "message": "Ваш RGB-перевод отправлен."
+  },
+  "settled": {
+    "message": "Подтверждено"
+  },
+  "activity": {
+    "message": "Активность"
+  },
+  "issue": {
+    "message": "Выпуск"
+  },
+  "rgb_send_transaction_unavailable": {
+    "message": "Транзакция отправки RGB недоступна"
+  },
+  "rgb_psbt_signing_missing_result": {
+    "message": "Подписание RGB PSBT не вернуло psbtHex"
+  },
+  "rgb": {
+    "message": "RGB"
+  },
+  "rgb_asset": {
+    "message": "RGB-актив"
+  },
+  "rgb_history": {
+    "message": "История RGB"
+  },
+  "asset_id": {
+    "message": "ID актива"
+  },
+  "precision_rgb": {
+    "message": "Точность"
+  },
+  "issued_supply_rgb": {
+    "message": "Выпущенное предложение"
+  },
+  "schema_rgb": {
+    "message": "Схема"
+  },
+  "protocol_data_unavailable": {
+    "message": "Данные протокола недоступны"
+  },
+  "asset": {
+    "message": "Актив"
+  },
+  "type": {
+    "message": "Тип"
+  },
+  "assignment": {
+    "message": "Назначение"
+  },
+  "endpoint": {
+    "message": "Endpoint"
+  },
+  "issue_rgb20": {
+    "message": "Выпустить RGB20"
+  },
+  "issue_nia_asset": {
+    "message": "Выпустить актив NIA"
+  },
+  "create_rgb_utxo_first": {
+    "message": "Сначала создайте RGB UTXO, затем повторите выпуск."
+  },
+  "create_rgb_utxo": {
+    "message": "Создать RGB UTXO"
+  },
+  "decoded_invoice": {
+    "message": "Декодированный инвойс"
+  },
+  "invalid_rgb_invoice": {
+    "message": "Недействительный RGB-инвойс."
+  },
+  "invoice_asset_mismatch": {
+    "message": "Актив в инвойсе не соответствует этому RGB-токену."
+  },
+  "pending_invoices": {
+    "message": "Ожидающие инвойсы"
+  },
+  "view_all": {
+    "message": "Показать все"
+  },
+  "any_rgb_asset": {
+    "message": "Любой RGB-актив"
+  },
+  "release_invoice_confirm_title": {
+    "message": "Освободить этот инвойс?"
+  },
+  "release_invoice_confirm_description": {
+    "message": "Это освободит зарезервированный UTXO. Инвойс больше не будет доступен."
+  },
+  "keep_invoice": {
+    "message": "Оставить инвойс"
   }
 }
