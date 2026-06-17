@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
+import { bitcoin, toXOnly } from '@unisat/wallet-bitcoin'
 import { deriveContextHash, parseHexContext } from '../src/keyrings/derive-context-hash'
 import { HdKeyring } from '../src/keyrings/hd-keyring'
 const sampleMnemonic =
@@ -283,6 +284,115 @@ describe('bitcoin-hd-keyring', () => {
       expect(accounts[0]).eq('02d16db9d525d8623e80c04e33c4463450285791124381bc545bb85e5e8925a776') // m/84'/0'/0'/0/0
       expect(accounts[1]).eq('023f0b3115a6c5a51ec62d8cbe6e834e79fe4bf22555e095a163e0e451a6fdc4d5') // m/84'/0'/0'/0/1
     })
+
+    it('RGB wallet context uses the active account index for account-index derivation', async () => {
+      const standardKeyring = new HdKeyring({
+        mnemonic: sampleMnemonic,
+        activeIndexes: [0, 1],
+        hdPath: "m/86'/0'/0'/0",
+      })
+      const accountIndexKeyring = new HdKeyring({
+        mnemonic: sampleMnemonic,
+        activeIndexes: [0, 1],
+        hdPath: "m/86'/0'/0'/0",
+        accountIndexDerivation: true,
+      })
+
+      const standardContext = await standardKeyring.getRgbWalletContext(0)
+      const accountIndexContext = await accountIndexKeyring.getRgbWalletContext(0)
+
+      expect(standardContext.xpubVan).toBe(accountIndexContext.xpubVan)
+    })
+  })
+
+  describe('#signTransaction with PSBT derivation paths', () => {
+    function createP2trPsbt(pubkey: string, path: string, masterFingerprint: Buffer) {
+      const network = bitcoin.networks.bitcoin
+      const xOnlyPubkey = toXOnly(Buffer.from(pubkey, 'hex'))
+      const payment = bitcoin.payments.p2tr({
+        internalPubkey: xOnlyPubkey,
+        network,
+      })
+
+      const txToSpend = new bitcoin.Transaction()
+      txToSpend.version = 0
+      txToSpend.addInput(Buffer.alloc(32), 0xffffffff, 0)
+      txToSpend.addOutput(payment.output!, 10000)
+
+      const psbt = new bitcoin.Psbt({ network })
+      psbt.addInput({
+        hash: txToSpend.getHash(),
+        index: 0,
+        sequence: 0,
+        witnessUtxo: {
+          script: payment.output!,
+          value: 10000,
+        },
+        tapInternalKey: xOnlyPubkey,
+        tapBip32Derivation: [
+          {
+            masterFingerprint,
+            path,
+            pubkey: xOnlyPubkey,
+            leafHashes: [],
+          },
+        ],
+      })
+      psbt.addOutput({
+        address: payment.address!,
+        value: 9500,
+      })
+      return psbt
+    }
+
+    it('rejects PSBT derivation when the requested publicKey does not match the derived key', async () => {
+      const keyring = new HdKeyring({
+        mnemonic: sampleMnemonic,
+        activeIndexes: [0],
+        hdPath: "m/86'/0'/0'/0",
+      })
+      const accounts = await keyring.getAccounts()
+      const psbt = createP2trPsbt(accounts[0], "m/86'/0'/0'/0/0", Buffer.from('817c1e36', 'hex'))
+      const wrongPubkey = '02' + '11'.repeat(32)
+
+      await expect(
+        keyring.signTransaction(psbt, [{ index: 0, publicKey: wrongPubkey }], {
+          network: bitcoin.networks.bitcoin,
+        })
+      ).rejects.toThrow('Unable to find matching RGB PSBT publicKey')
+    })
+
+    it('signs a non-active derived input when request publicKey, PSBT pubkey, and path agree', async () => {
+      const keyring = new HdKeyring({
+        mnemonic: sampleMnemonic,
+        activeIndexes: [0],
+        hdPath: "m/86'/0'/0'/0",
+      })
+      const derivedPubkey = keyring.getAccountByHdPath("m/86'/0'/0'/0", 3)
+      const psbt = createP2trPsbt(derivedPubkey, "m/86'/0'/0'/0/3", Buffer.from('817c1e36', 'hex'))
+
+      await keyring.signTransaction(psbt, [{ index: 0, publicKey: derivedPubkey }], {
+        network: bitcoin.networks.bitcoin,
+      })
+
+      expect(psbt.data.inputs[0].tapKeySig).toBeDefined()
+    })
+
+    it('rejects non-RGB derivation paths even when the derived pubkey matches', async () => {
+      const keyring = new HdKeyring({
+        mnemonic: sampleMnemonic,
+        activeIndexes: [0],
+        hdPath: "m/84'/0'/0'/0",
+      })
+      const derivedPubkey = keyring.getAccountByHdPath("m/84'/0'/0'/0", 3)
+      const psbt = createP2trPsbt(derivedPubkey, "m/84'/0'/0'/0/3", Buffer.from('817c1e36', 'hex'))
+
+      await expect(
+        keyring.signTransaction(psbt, [{ index: 0, publicKey: derivedPubkey }], {
+          network: bitcoin.networks.bitcoin,
+        })
+      ).rejects.toThrow('Unable to find matching RGB PSBT publicKey')
+    })
   })
 
   describe('deriveContextHash (v2.0)', () => {
@@ -307,11 +417,18 @@ describe('bitcoin-hd-keyring', () => {
       })
       const accounts = await keyring.getAccounts()
       const contextHex = 'deadbeef'
-      const keyringResult = await keyring.deriveContextHash(accounts[0], APP_NAME, NETWORK, contextHex)
+      const keyringResult = await keyring.deriveContextHash(
+        accounts[0],
+        APP_NAME,
+        NETWORK,
+        contextHex
+      )
 
       // Manually derive BIP-32 key at m/73681862' and compute directly with all 5 args.
       const bip39 = await import('bip39')
+      // @ts-ignore
       const hdkey = await import('hdkey')
+
       const seedBuf = bip39.mnemonicToSeedSync(sampleMnemonic)
       const master = hdkey.fromMasterSeed(seedBuf)
       const child = master.derive("m/73681862'")
@@ -322,7 +439,7 @@ describe('bitcoin-hd-keyring', () => {
         APP_NAME,
         NETWORK,
         pubkeyBytes,
-        parseHexContext(contextHex),
+        parseHexContext(contextHex)
       )
       expect(keyringResult).toBe(directResult)
     })
@@ -348,9 +465,24 @@ describe('bitcoin-hd-keyring', () => {
         activeIndexes: [0],
       })
       const accounts = await keyring.getAccounts()
-      const mainnet = await keyring.deriveContextHash(accounts[0], APP_NAME, 'bitcoin-mainnet', 'deadbeef')
-      const testnet = await keyring.deriveContextHash(accounts[0], APP_NAME, 'bitcoin-testnet', 'deadbeef')
-      const signet = await keyring.deriveContextHash(accounts[0], APP_NAME, 'bitcoin-signet', 'deadbeef')
+      const mainnet = await keyring.deriveContextHash(
+        accounts[0],
+        APP_NAME,
+        'bitcoin-mainnet',
+        'deadbeef'
+      )
+      const testnet = await keyring.deriveContextHash(
+        accounts[0],
+        APP_NAME,
+        'bitcoin-testnet',
+        'deadbeef'
+      )
+      const signet = await keyring.deriveContextHash(
+        accounts[0],
+        APP_NAME,
+        'bitcoin-signet',
+        'deadbeef'
+      )
       expect(mainnet).not.toBe(testnet)
       expect(mainnet).not.toBe(signet)
       expect(testnet).not.toBe(signet)
@@ -398,16 +530,20 @@ describe('bitcoin-hd-keyring', () => {
         activeIndexes: [0],
       })
       const accounts = await keyring.getAccounts()
-      await expect(keyring.deriveContextHash(accounts[0], APP_NAME, NETWORK, 'xyz')).rejects.toThrow()
+      await expect(
+        keyring.deriveContextHash(accounts[0], APP_NAME, NETWORK, 'xyz')
+      ).rejects.toThrow()
       await expect(keyring.deriveContextHash(accounts[0], APP_NAME, NETWORK, '')).rejects.toThrow()
-      await expect(keyring.deriveContextHash(accounts[0], APP_NAME, NETWORK, 'abc')).rejects.toThrow()
+      await expect(
+        keyring.deriveContextHash(accounts[0], APP_NAME, NETWORK, 'abc')
+      ).rejects.toThrow()
     })
 
     it('rejects uninitialized keyring', async () => {
       const keyring = new HdKeyring()
       const fakePubkey = '02' + '11'.repeat(32)
       await expect(
-        keyring.deriveContextHash(fakePubkey, APP_NAME, NETWORK, 'deadbeef'),
+        keyring.deriveContextHash(fakePubkey, APP_NAME, NETWORK, 'deadbeef')
       ).rejects.toThrow('requires a mnemonic or xpriv-based keyring')
     })
 
@@ -421,14 +557,12 @@ describe('bitcoin-hd-keyring', () => {
       const accounts = await keyring.getAccounts()
       // accounts[0] is the m/44'/0'/0'/0/0 compressed pubkey for this mnemonic:
       // 03aaeb52dd7494c361049de67cc680e83ebcbbbdbeb13637d92cd845f70308af5e
-      expect(accounts[0]).toBe(
-        '03aaeb52dd7494c361049de67cc680e83ebcbbbdbeb13637d92cd845f70308af5e',
-      )
+      expect(accounts[0]).toBe('03aaeb52dd7494c361049de67cc680e83ebcbbbdbeb13637d92cd845f70308af5e')
       const result = await keyring.deriveContextHash(
         accounts[0],
         'test-app',
         'bitcoin-mainnet',
-        'deadbeef',
+        'deadbeef'
       )
       expect(result).toBe('f82ced3be0e29591a7863ece03d65f79fb494fe0de7203549855f462455df008')
     })

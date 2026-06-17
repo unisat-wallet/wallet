@@ -313,6 +313,22 @@ export class KeystoneKeyring extends EventEmitter {
     return child.publicKey.toString('hex')
   }
 
+  getIndexByAddress(publicKey: string) {
+    const isChangeAddressPath =
+      this.hdPath !== null &&
+      this.hdPath !== undefined &&
+      this.hdPath.length >= 13 &&
+      this.hdPath[this.hdPath.length - 1] === '1'
+    const index = this.activeIndexes.find(i => {
+      if (isChangeAddressPath) {
+        const child = this.root.derive(`m/${i}`)
+        return child.publicKey.toString('hex') === publicKey
+      }
+      return this.getWalletByIndex(i).publicKey === publicKey
+    })
+    return index ?? null
+  }
+
   getChangeAddressAccountByHdPath(hdPath: string, index: number) {
     const root = this.getHDPublicKey(hdPath)
     const child = root.derive(`m/1/${index}`)

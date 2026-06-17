@@ -32,18 +32,24 @@ export interface Keyring {
   getNextPage?(): Promise<{ address: string; index: number }[]>
   getPreviousPage?(): Promise<{ address: string; index: number }[]>
   getAddresses?(start: number, end: number): { address: string; index: number }[]
-  getIndexByAddress?(address: string): number
+  getIndexByAddress?(address: string): number | null
 
   getAccountsWithBrand?(): { address: string; index: number }[]
   activeAccounts?(indexes: number[]): string[]
 
   changeHdPath?(hdPath: string): void
   getAccountByHdPath?(hdPath: string, index: number): string
+  getRgbWalletContext?(networkType: number): Promise<{
+    xpubVan: string
+    xpubCol: string
+    masterFingerprint: string
+    vanillaKeychain: number
+  }>
   deriveContextHash?(
     publicKey: string,
     appName: string,
     canonicalNetworkName: string,
-    context: string,
+    context: string
   ): Promise<string>
 
   // Keystone specific methods

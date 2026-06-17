@@ -4,13 +4,16 @@ import bitcore from 'bitcore-lib'
 //@ts-ignore
 import * as hdkey from 'hdkey'
 
-import { ECPairInterface, bitcoin, eccManager } from '@unisat/wallet-bitcoin'
+import { ECPairInterface, bitcoin, eccManager, toXOnly, tweakSigner } from '@unisat/wallet-bitcoin'
+import { isTaprootInput } from 'bitcoinjs-lib/src/psbt/bip371.js'
 import { deriveContextHash, parseHexContext } from './derive-context-hash'
 import { SimpleKeyring } from './simple-keyring'
 
 const hdPathString = "m/44'/0'/0'/0"
 // BIP-32 path for deriveContextHash IKM. Purpose index = trunc31_be(SHA-256("derive-context-hash")).
 const DERIVE_CONTEXT_HASH_PATH = "m/73681862'"
+const RGB_MAINNET_COIN_TYPE = 827166
+const RGB_TESTNET_COIN_TYPE = 827167
 const type = 'HD Key Tree'
 
 interface DeserializeOption {
@@ -20,6 +23,35 @@ interface DeserializeOption {
   activeIndexes?: number[]
   passphrase?: string
   accountIndexDerivation?: boolean
+}
+
+function normalizeHex(value: unknown): string | null {
+  if (!value) return null
+  if (typeof value === 'string') return value.toLowerCase()
+  return Buffer.from(value as any)
+    .toString('hex')
+    .toLowerCase()
+}
+
+function xpubFingerprint(hdNode: any): string {
+  const identifier = hdNode?._identifier || hdNode?.identifier
+  if (identifier) {
+    return Buffer.from(identifier).subarray(0, 4).toString('hex')
+  }
+  if (typeof hdNode?.fingerprint === 'number') {
+    return hdNode.fingerprint.toString(16).padStart(8, '0')
+  }
+  throw new Error('HD Keyring - Unable to calculate master fingerprint.')
+}
+
+function normalizeDerivationPath(path: string): string {
+  return path.startsWith('m/') ? path : `m/${path}`
+}
+
+function isNonHardenedIndex(segment: string | undefined): boolean {
+  if (!segment || segment.endsWith("'")) return false
+  const index = Number(segment)
+  return Number.isInteger(index) && index >= 0
 }
 
 export class HdKeyring extends SimpleKeyring {
@@ -154,12 +186,149 @@ export class HdKeyring extends SimpleKeyring {
     return address
   }
 
+  async getRgbWalletContext(networkType: number) {
+    if (!this.mnemonic && !this.xpriv) {
+      throw new Error('RGB wallet context requires a mnemonic or master xpriv')
+    }
+
+    const isMainnet = networkType === 0
+    const bitcoreNetwork = isMainnet ? bitcore.Networks.livenet : bitcore.Networks.testnet
+    const root = this.mnemonic
+      ? bitcore.HDPrivateKey.fromSeed(
+          bip39.mnemonicToSeedSync(this.mnemonic, this.passphrase),
+          bitcoreNetwork
+        )
+      : new bitcore.HDPrivateKey(this.xpriv)
+    const coinType = isMainnet ? 0 : 1
+    const rgbCoinType = isMainnet ? RGB_MAINNET_COIN_TYPE : RGB_TESTNET_COIN_TYPE
+
+    return {
+      xpubVan: root.deriveChild(`m/86'/${coinType}'/0'`).hdPublicKey.toString(),
+      xpubCol: root.deriveChild(`m/86'/${rgbCoinType}'/0'`).hdPublicKey.toString(),
+      masterFingerprint: root.hdPublicKey.fingerPrint.toString('hex'),
+      vanillaKeychain: 0,
+    }
+  }
+
+  override async signTransaction(psbt: bitcoin.Psbt, inputs: any[], opts?: any) {
+    inputs.forEach(input => {
+      const keyPair = this._getPrivateKeyForPsbtInput(
+        psbt.data.inputs[input.index],
+        input.publicKey
+      )
+      if (isTaprootInput(psbt.data.inputs[input.index] as any)) {
+        let signer: bitcoin.Signer = keyPair
+        let tweak = true
+        if (typeof input.useTweakedSigner === 'boolean') {
+          tweak = input.useTweakedSigner
+        } else if (typeof input.disableTweakSigner === 'boolean') {
+          tweak = !input.disableTweakSigner
+        }
+
+        if (tweak) {
+          signer = tweakSigner(keyPair, opts)
+        }
+        psbt.signTaprootInput(
+          input.index,
+          signer,
+          input.tapLeafHashToSign as any,
+          input.sighashTypes
+        )
+      } else {
+        let signer: bitcoin.Signer = keyPair
+        let tweak = false
+        if (typeof input.useTweakedSigner === 'boolean') {
+          tweak = input.useTweakedSigner
+        }
+        if (tweak) {
+          signer = tweakSigner(keyPair, opts)
+        }
+        psbt.signInput(input.index, signer, input.sighashTypes)
+      }
+    })
+    return psbt
+  }
+
   // Build a path where account segment (index 3) is replaced by accountIndex
   // e.g. "m/84'/0'/0'/0" + accountIndex=2 → "m/84'/0'/2'/0"
   private _buildAccountLevelPath(hdPath: string, accountIndex: number): string {
     const segments = hdPath.split('/')
     segments[3] = `${accountIndex}'`
     return segments.join('/')
+  }
+
+  private _getPrivateKeyForPsbtInput(psbtInput: any, publicKey: string) {
+    const wallet = this.wallets.find(wallet => {
+      const walletPubkey = wallet.publicKey.toString('hex')
+      return walletPubkey === publicKey || toXOnly(wallet.publicKey).toString('hex') === publicKey
+    })
+    if (wallet) {
+      return wallet
+    }
+
+    const derivations = [
+      ...(psbtInput?.tapBip32Derivation || []),
+      ...(psbtInput?.bip32Derivation || []),
+    ]
+    for (const derivation of derivations) {
+      const path = derivation?.path
+      if (!path) continue
+      if (!this._matchesDerivationFingerprint(derivation)) continue
+      if (!this._isAllowedRgbPsbtPath(path)) continue
+      const child = this.hdWallet?.derive(normalizeDerivationPath(path))
+      if (!child?.privateKey) continue
+      const derived = eccManager.eccPair.fromPrivateKey(child.privateKey, { network: this.network })
+      const derivedPubkey = derived.publicKey.toString('hex')
+      const derivedXOnly = toXOnly(derived.publicKey).toString('hex')
+      const derivationPubkey = normalizeHex(derivation.pubkey)
+      const requestedPubkey = publicKey.toLowerCase()
+      if (
+        derivationPubkey &&
+        (requestedPubkey === derivedPubkey || requestedPubkey === derivedXOnly) &&
+        (derivationPubkey === derivedPubkey || derivationPubkey === derivedXOnly)
+      ) {
+        return derived
+      }
+    }
+
+    throw new Error('HD Keyring - Unable to find matching RGB PSBT publicKey.')
+  }
+
+  private _matchesDerivationFingerprint(derivation: any) {
+    const fingerprint = normalizeHex(derivation?.masterFingerprint)
+    return fingerprint === xpubFingerprint(this.hdWallet)
+  }
+
+  private _isAllowedRgbPsbtPath(path: string) {
+    const segments = normalizeDerivationPath(path).split('/')
+    if (segments.length !== 6 || segments[1] !== "86'") {
+      return false
+    }
+
+    const coinType = segments[2]
+    const allowedCoinTypes = new Set([
+      "0'",
+      "1'",
+      `${RGB_MAINNET_COIN_TYPE}'`,
+      `${RGB_TESTNET_COIN_TYPE}'`,
+    ])
+    if (!allowedCoinTypes.has(coinType as any)) {
+      return false
+    }
+
+    const accountIndex = Number(segments[3]?.replace(/'$/, ''))
+    if (!Number.isInteger(accountIndex) || accountIndex < 0 || !segments[3]?.endsWith("'")) {
+      return false
+    }
+
+    if (!isNonHardenedIndex(segments[4]) || !isNonHardenedIndex(segments[5])) {
+      return false
+    }
+
+    if (this.accountIndexDerivation) {
+      return this.activeIndexes.includes(accountIndex)
+    }
+    return accountIndex === 0
   }
 
   override addAccounts(numberOfAccounts = 1) {
@@ -277,7 +446,7 @@ export class HdKeyring extends SimpleKeyring {
     publicKey: string,
     appName: string,
     canonicalNetworkName: string,
-    context: string,
+    context: string
   ): Promise<string> {
     const contextBytes = parseHexContext(context)
     const pubkeyBytes = Uint8Array.from(Buffer.from(publicKey, 'hex'))
@@ -287,7 +456,13 @@ export class HdKeyring extends SimpleKeyring {
     const child = this.hdWallet.derive(DERIVE_CONTEXT_HASH_PATH)
     const privKeyBytes = new Uint8Array(child.privateKey)
     try {
-      return deriveContextHash(privKeyBytes, appName, canonicalNetworkName, pubkeyBytes, contextBytes)
+      return deriveContextHash(
+        privKeyBytes,
+        appName,
+        canonicalNetworkName,
+        pubkeyBytes,
+        contextBytes
+      )
     } finally {
       privKeyBytes.fill(0)
       // Zero the original BIP-32 node's key buffer as well
