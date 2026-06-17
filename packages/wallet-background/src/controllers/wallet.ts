@@ -306,6 +306,21 @@ type RgbSignPsbtRequest = {
 const RGB_MAINNET_COIN_TYPE = 827166
 const RGB_TESTNET_COIN_TYPE = 827167
 
+export const chainTypeToRgbNetwork = (chainType: ChainType): string => {
+  switch (chainType) {
+    case ChainType.BITCOIN_MAINNET:
+      return 'mainnet'
+    case ChainType.BITCOIN_TESTNET:
+      return 'testnet'
+    case ChainType.BITCOIN_TESTNET4:
+      return 'testnet4'
+    case ChainType.BITCOIN_SIGNET:
+      return 'signet'
+    default:
+      throw new Error(`wallet chain "${chainType}" is not supported by RGB`)
+  }
+}
+
 const normalizeRgbDerivationHex = (value: unknown): string | null => {
   if (!value) return null
   if (typeof value === 'string') return value.toLowerCase()
@@ -2923,11 +2938,12 @@ export class WalletController extends BaseController {
     }
 
     const networkType = this.getNetworkType()
+    const chainType = this.getChainType()
     const keyringAddressIndex = keyring.getIndexByAddress?.(account.pubkey)
     const addressIndex =
       typeof keyringAddressIndex === 'number' ? keyringAddressIndex : (account.index ?? 0)
     const context = await keyring.getRgbWalletContext(networkType)
-    const network = networkType === NetworkType.MAINNET ? 'mainnet' : 'testnet'
+    const network = chainTypeToRgbNetwork(chainType)
     const walletId = `unisat-${context.masterFingerprint}-${addressIndex}`
 
     return {

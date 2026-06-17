@@ -3,7 +3,11 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { KeyringType } from '@unisat/keyring-service/types'
 import { AddressType, ChainType, NetworkType } from '@unisat/wallet-types'
 import log from 'loglevel'
-import { WalletController, canDeriveAddressFromPublicKey } from '../src/controllers/wallet'
+import {
+  WalletController,
+  canDeriveAddressFromPublicKey,
+  chainTypeToRgbNetwork,
+} from '../src/controllers/wallet'
 import { keyringService, preferenceService } from '../src/services'
 
 vi.mock('@unisat/babylon-service', () => ({
@@ -148,5 +152,20 @@ describe('WalletController keyring recovery', () => {
 
     expect(preferenceService.setCurrentKeyringIndex).not.toHaveBeenCalled()
     expect(preferenceService.setCurrentAccount).not.toHaveBeenCalled()
+  })
+})
+
+describe('chainTypeToRgbNetwork', () => {
+  it('keeps testnet4 distinct from testnet for RGB resolvers', () => {
+    expect(chainTypeToRgbNetwork(ChainType.BITCOIN_MAINNET)).toBe('mainnet')
+    expect(chainTypeToRgbNetwork(ChainType.BITCOIN_TESTNET)).toBe('testnet')
+    expect(chainTypeToRgbNetwork(ChainType.BITCOIN_TESTNET4)).toBe('testnet4')
+    expect(chainTypeToRgbNetwork(ChainType.BITCOIN_SIGNET)).toBe('signet')
+  })
+
+  it('rejects non-Bitcoin chains for RGB wallet refs', () => {
+    expect(() => chainTypeToRgbNetwork(ChainType.FRACTAL_BITCOIN_MAINNET)).toThrow(
+      'not supported by RGB'
+    )
   })
 })
