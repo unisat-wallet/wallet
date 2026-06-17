@@ -13,8 +13,8 @@ import {
   RequestMethodSignMessageParams,
   RequestMethodSignMessagesParams
 } from '@unisat/wallet-shared';
-
 import { TxType } from '@unisat/wallet-shared';
+
 import { requestMethodKey } from './providerState';
 
 export class BitcoinAPIMethods {
@@ -272,6 +272,43 @@ export class BitcoinAPIMethods {
     return this.provider[requestMethodKey]({
       method: 'getBitcoinUtxos',
       params
+    });
+  };
+
+  createRgbBlindReceive = async (params: {
+    assetId?: string;
+    amount?: number | string;
+    minConfirmations?: number;
+    durationSeconds?: number;
+  }) => {
+    return this.provider[requestMethodKey]({
+      method: 'createRgbBlindReceive',
+      params
+    });
+  };
+
+  createRgbWitnessReceive = async (params: {
+    assetId?: string;
+    amount: number | string;
+    minConfirmations?: number;
+    durationSeconds?: number;
+  }) => {
+    return this.provider[requestMethodKey]({
+      method: 'createRgbWitnessReceive',
+      params
+    });
+  };
+
+  getRgbFundingAddress = async () => {
+    return this.provider[requestMethodKey]({
+      method: 'getRgbFundingAddress'
+    });
+  };
+
+  signRgbPsbt = async (psbt: string) => {
+    return this.provider[requestMethodKey]({
+      method: 'signRgbPsbt',
+      params: { psbt }
     });
   };
 }

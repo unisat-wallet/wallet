@@ -1,8 +1,4 @@
-import {
-  bitcoin,
-  verifyMessageOfBIP322Simple,
-  verifyMessageOfECDSA,
-} from '@unisat/wallet-bitcoin'
+import { bitcoin, verifyMessageOfBIP322Simple, verifyMessageOfECDSA } from '@unisat/wallet-bitcoin'
 import {
   RequestMethodDeriveContextHashParams,
   RequestMethodGetInscriptionsParams,
@@ -84,7 +80,11 @@ function assertSameUnsignedTx(psbt: bitcoin.Psbt, sourcePsbt: bitcoin.Psbt) {
     psbt.txOutputs.length === sourcePsbt.txOutputs.length &&
     psbt.txOutputs.every((output, index) => {
       const sourceOutput = sourcePsbt.txOutputs[index]
-      return sourceOutput && output.value === sourceOutput.value && output.script.equals(sourceOutput.script)
+      return (
+        sourceOutput &&
+        output.value === sourceOutput.value &&
+        output.script.equals(sourceOutput.script)
+      )
     })
 
   if (!hasSameInputs || !hasSameOutputs) {
@@ -97,7 +97,12 @@ function assertRequiredSignatures(psbt: bitcoin.Psbt, toSignData: ToSignData) {
     const input = psbt.data.inputs[toSignInput.index]
     if (!input) return false
 
-    if (input.finalScriptSig || input.finalScriptWitness || input.tapKeySig || input.tapScriptSig?.length) {
+    if (
+      input.finalScriptSig ||
+      input.finalScriptWitness ||
+      input.tapKeySig ||
+      input.tapScriptSig?.length
+    ) {
       return true
     }
 
@@ -341,9 +346,19 @@ class ProviderController extends BaseController {
       params.toSignDatas = [toSignData]
     },
   ])
-  sendBitcoin = async ({ data: { params }, approvalRes }: { data: { params: RequestMethodSendBitcoinParams }, approvalRes: SignPsbtResult }) => {
+  sendBitcoin = async ({
+    data: { params },
+    approvalRes,
+  }: {
+    data: { params: RequestMethodSendBitcoinParams }
+    approvalRes: SignPsbtResult
+  }) => {
     const account = await wallet.getCurrentAccount()
-    assertReadonlySignedPsbt(account, getToSignDatas(params.toSignDatas)[0]!, approvalRes[0]!.psbtHex)
+    assertReadonlySignedPsbt(
+      account,
+      getToSignDatas(params.toSignDatas)[0]!,
+      approvalRes[0]!.psbtHex
+    )
     const psbt = bitcoin.Psbt.fromHex(approvalRes[0]!.psbtHex!)
     const tx = psbt.extractTransaction(true)
     const rawtx = tx.toHex()
@@ -368,9 +383,19 @@ class ProviderController extends BaseController {
       params.toSignDatas = [toSignData]
     },
   ])
-  sendInscription = async ({ data: { params }, approvalRes }: { data: { params: RequestMethodSendInscriptionParams }, approvalRes: SignPsbtResult }) => {
+  sendInscription = async ({
+    data: { params },
+    approvalRes,
+  }: {
+    data: { params: RequestMethodSendInscriptionParams }
+    approvalRes: SignPsbtResult
+  }) => {
     const account = await wallet.getCurrentAccount()
-    assertReadonlySignedPsbt(account, getToSignDatas(params.toSignDatas)[0]!, approvalRes[0]!.psbtHex)
+    assertReadonlySignedPsbt(
+      account,
+      getToSignDatas(params.toSignDatas)[0]!,
+      approvalRes[0]!.psbtHex
+    )
     const psbt = bitcoin.Psbt.fromHex(approvalRes[0]!.psbtHex!)
     const tx = psbt.extractTransaction(true)
     const rawtx = tx.toHex()
@@ -399,9 +424,19 @@ class ProviderController extends BaseController {
       params.toSignDatas = [toSignData]
     },
   ])
-  sendRunes = async ({ data: { params }, approvalRes }: { data: { params: RequestMethodSendRunesParams }, approvalRes: SignPsbtResult }) => {
+  sendRunes = async ({
+    data: { params },
+    approvalRes,
+  }: {
+    data: { params: RequestMethodSendRunesParams }
+    approvalRes: SignPsbtResult
+  }) => {
     const account = await wallet.getCurrentAccount()
-    assertReadonlySignedPsbt(account, getToSignDatas(params.toSignDatas)[0]!, approvalRes[0]!.psbtHex)
+    assertReadonlySignedPsbt(
+      account,
+      getToSignDatas(params.toSignDatas)[0]!,
+      approvalRes[0]!.psbtHex
+    )
     const psbt = bitcoin.Psbt.fromHex(approvalRes[0]!.psbtHex!)
     const tx = psbt.extractTransaction(true)
     const rawtx = tx.toHex()
@@ -420,9 +455,19 @@ class ProviderController extends BaseController {
       ]
     },
   ])
-  signMessage = async ({ data: { params }, approvalRes }: { data: { params: RequestMethodSignMessageParams }, approvalRes: SignMessageResult }) => {
+  signMessage = async ({
+    data: { params },
+    approvalRes,
+  }: {
+    data: { params: RequestMethodSignMessageParams }
+    approvalRes: SignMessageResult
+  }) => {
     const account = await wallet.getCurrentAccount()
-    assertReadonlyMessageSignature(account, getToSignMessages(params.toSignMessages)[0]!, approvalRes[0]!.signature)
+    assertReadonlyMessageSignature(
+      account,
+      getToSignMessages(params.toSignMessages)[0]!,
+      approvalRes[0]!.signature
+    )
     return approvalRes[0]!.signature
   }
 
@@ -451,9 +496,19 @@ class ProviderController extends BaseController {
       params.toSignDatas = [toSignData]
     },
   ])
-  signPsbt = async ({ data: { params }, approvalRes }: { data: { params: RequestMethodSignPsbtParams }, approvalRes: SignPsbtResult }) => {
+  signPsbt = async ({
+    data: { params },
+    approvalRes,
+  }: {
+    data: { params: RequestMethodSignPsbtParams }
+    approvalRes: SignPsbtResult
+  }) => {
     const account = await wallet.getCurrentAccount()
-    assertReadonlySignedPsbt(account, getToSignDatas(params.toSignDatas)[0]!, approvalRes[0]!.psbtHex)
+    assertReadonlySignedPsbt(
+      account,
+      getToSignDatas(params.toSignDatas)[0]!,
+      approvalRes[0]!.psbtHex
+    )
     return approvalRes[0]!.psbtHex
   }
 
@@ -478,7 +533,13 @@ class ProviderController extends BaseController {
       delete params.options
     },
   ])
-  multiSignPsbt = async ({ data: { params }, approvalRes }: { data: { params: RequestMethodSignPsbtsParams }, approvalRes: SignPsbtResult }) => {
+  multiSignPsbt = async ({
+    data: { params },
+    approvalRes,
+  }: {
+    data: { params: RequestMethodSignPsbtsParams }
+    approvalRes: SignPsbtResult
+  }) => {
     const account = await wallet.getCurrentAccount()
     getToSignDatas(params.toSignDatas).forEach((toSignData, index) => {
       assertReadonlySignedPsbt(account, toSignData, approvalRes[index]!.psbtHex)
@@ -509,7 +570,13 @@ class ProviderController extends BaseController {
       }))
     },
   ])
-  multiSignMessage = async ({ data: { params }, approvalRes }: { data: { params: RequestMethodSignMessagesParams }, approvalRes: SignMessageResult }) => {
+  multiSignMessage = async ({
+    data: { params },
+    approvalRes,
+  }: {
+    data: { params: RequestMethodSignMessagesParams }
+    approvalRes: SignMessageResult
+  }) => {
     const account = await wallet.getCurrentAccount()
     getToSignMessages(params.toSignMessages).forEach((toSignMessage, index) => {
       assertReadonlyMessageSignature(account, toSignMessage, approvalRes[index]!.signature)
@@ -708,6 +775,74 @@ class ProviderController extends BaseController {
     },
   }) => {
     return await wallet.deriveContextHash(appName, context)
+  }
+
+  @Reflect.metadata('APPROVAL', [
+    'SignData',
+    async req => {
+      const params = req.data.params || {}
+      if (params.amount !== undefined && params.amount !== null && String(params.amount).length === 0) {
+        throw new Error('amount is invalid')
+      }
+      req.data.params.data = JSON.stringify({
+        method: 'createRgbBlindReceive',
+        assetId: params.assetId || 'any',
+        amount: params.amount ?? 'any',
+      })
+    },
+  ])
+  createRgbBlindReceive = async ({ data: { params } }) => {
+    const { data, ...receiveParams } = params || {}
+    return wallet.createRgbBlindReceive(receiveParams)
+  }
+
+  @Reflect.metadata('APPROVAL', [
+    'SignData',
+    async req => {
+      const params = req.data.params || {}
+      if (params.amount === undefined || params.amount === null || String(params.amount).length === 0) {
+        throw new Error('amount is required')
+      }
+      req.data.params.data = JSON.stringify({
+        method: 'createRgbWitnessReceive',
+        assetId: params.assetId || 'any',
+        amount: params.amount,
+      })
+    },
+  ])
+  createRgbWitnessReceive = async ({ data: { params } }) => {
+    const { data, ...receiveParams } = params || {}
+    return wallet.createRgbWitnessReceive(receiveParams)
+  }
+
+  getRgbFundingAddress = async () => {
+    return wallet.getRgbFundingAddress()
+  }
+
+  @Reflect.metadata('APPROVAL', [
+    'SignPsbt',
+    async req => {
+      const params = req.data.params
+      if (!params.psbt) {
+        throw new Error('psbt is required')
+      }
+      params.toSignDatas = [await wallet.getRgbToSignData({ psbt: params.psbt })]
+    },
+  ])
+  signRgbPsbt = async ({
+    data: { params },
+    approvalRes,
+  }: {
+    data: { params: any }
+    approvalRes: SignPsbtResult
+  }) => {
+    const account = await wallet.getCurrentAccount()
+    assertReadonlySignedPsbt(
+      account,
+      getToSignDatas(params.toSignDatas)[0]!,
+      approvalRes[0]!.psbtHex
+    )
+    return approvalRes[0]!.psbtHex
   }
 }
 

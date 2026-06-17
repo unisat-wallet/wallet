@@ -1,16 +1,12 @@
 // this script is injected into webpage's context
 import { EventEmitter } from 'events';
 
-import PushEventHandlers from './pushEventHandlers';
 import { BitcoinAPIMethods } from './bitcoinAPI';
 import { CosmosAPIMethods } from './cosmosAPI';
-import {
-  initializeProvider,
-  requestMethod,
-  requestPromiseCheckVisibility
-} from './providerCore';
+import { initializeProvider, requestMethod } from './providerCore';
 import { createProviderProxy, injectProviderToWindow } from './providerInjection';
 import { _unisatProviderPrivate, requestMethodKey } from './providerState';
+import PushEventHandlers from './pushEventHandlers';
 import { Interceptor } from './types';
 
 export { Interceptor };
@@ -85,6 +81,12 @@ export class UnisatProvider extends EventEmitter {
   getVersion = async () => this.bitcoinAPI.getVersion();
   deriveContextHash = async (appName: string, context: string) => this.bitcoinAPI.deriveContextHash(appName, context);
   getBitcoinUtxos = async (cursor = 0, size = 20) => this.bitcoinAPI.getBitcoinUtxos(cursor, size);
+  createRgbBlindReceive = async (params: Parameters<BitcoinAPIMethods['createRgbBlindReceive']>[0]) =>
+    this.bitcoinAPI.createRgbBlindReceive(params);
+  createRgbWitnessReceive = async (params: Parameters<BitcoinAPIMethods['createRgbWitnessReceive']>[0]) =>
+    this.bitcoinAPI.createRgbWitnessReceive(params);
+  getRgbFundingAddress = async () => this.bitcoinAPI.getRgbFundingAddress();
+  signRgbPsbt = async (psbt: string) => this.bitcoinAPI.signRgbPsbt(psbt);
 }
 
 declare global {

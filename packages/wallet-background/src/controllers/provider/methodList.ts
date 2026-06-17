@@ -47,6 +47,23 @@ export type ProviderMethodList = {
     appName: string
     context: string
   }
+  createRgbBlindReceive: {
+    assetId?: string
+    amount?: number | string
+    minConfirmations?: number
+    durationSeconds?: number
+  }
+  createRgbWitnessReceive: {
+    assetId?: string
+    amount: number | string
+    minConfirmations?: number
+    durationSeconds?: number
+  }
+  getRgbFundingAddress: undefined
+  signRgbPsbt: {
+    psbt: string
+    toSignDatas?: any[]
+  }
 }
 
 export type ProviderMethods = keyof ProviderMethodList

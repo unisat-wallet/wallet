@@ -105,6 +105,249 @@ export type AccountAsset = {
   value: string
 }
 
+type RgbActivityType = 'issue' | 'send' | 'receive'
+
+type RgbControllerPageResponse<T = unknown> = {
+  total: number
+  list: T[]
+}
+
+type RgbControllerApiService = {
+  getRgbAssetList: (
+    address: string,
+    page: number,
+    pageSize: number
+  ) => Promise<RgbControllerPageResponse>
+  getRgbAssetBalance: (address: string, assetId: string) => Promise<unknown>
+  getRgbAssetDetail: (assetId: string) => Promise<unknown>
+  getRgbAssetActivity: (
+    assetId: string,
+    params: {
+      page: number
+      pageSize: number
+      address?: string
+      type?: RgbActivityType
+    }
+  ) => Promise<RgbControllerPageResponse>
+  getAddressRgbActivity: (
+    address: string,
+    params: {
+      page: number
+      pageSize: number
+      assetId?: string
+      type?: RgbActivityType
+    }
+  ) => Promise<RgbControllerPageResponse>
+  createBlindReceiveInvoice: (params: RgbReceiveInvoiceRequest) => Promise<unknown>
+  createWitnessReceiveInvoice: (params: RgbReceiveInvoiceRequest) => Promise<unknown>
+  getPendingReceiveInvoices: (
+    params: RgbPendingReceiveInvoicesRequest
+  ) => Promise<RgbPendingReceiveInvoicesResult>
+  cancelReceiveInvoice: (
+    params: RgbCancelReceiveInvoiceRequest
+  ) => Promise<RgbCancelReceiveInvoiceResult>
+  getRgbFundingAddress: (params: { wallet: RgbWalletRef }) => Promise<{ address: string }>
+  issueNiaAsset: (params: RgbIssueNiaRequest) => Promise<unknown>
+  createRgbUtxosBegin: (params: RgbCreateUtxosBeginRequest) => Promise<unknown>
+  createRgbUtxosEnd: (params: RgbCreateUtxosEndRequest) => Promise<unknown>
+  getPendingVanillaTxs: (params: RgbPendingVanillaTxsRequest) => Promise<RgbPendingVanillaTxsResult>
+  abortVanillaTx: (params: RgbAbortVanillaTxRequest) => Promise<RgbAbortVanillaTxResult>
+  getRgbAllocationSummary: (
+    params: RgbAllocationSummaryRequest
+  ) => Promise<RgbAllocationSummaryResult>
+  createSendRgbTx: (params: RgbSendBeginRequest) => Promise<unknown>
+  acceptRgbTx: (params: RgbSendEndRequest) => Promise<unknown>
+}
+
+const getRgbApiService = () => (walletApiService as unknown as { rgb: RgbControllerApiService }).rgb
+
+type RgbWalletRef = {
+  walletId?: string
+  xpubVan: string
+  xpubCol: string
+  masterFingerprint: string
+  network?: string
+  dataDirKey?: string
+  addressIndex?: number
+  transportEndpoint?: string
+  indexerUrl?: string
+  reuseAddresses?: boolean
+  maxAllocationsPerUtxo?: number
+  vanillaKeychain?: number
+}
+
+type RgbReceiveInvoiceRequest = {
+  wallet: RgbWalletRef
+  assetId?: string
+  amount?: number | string
+  minConfirmations?: number
+  durationSeconds?: number
+}
+
+type RgbPendingReceiveInvoicesRequest = {
+  wallet: RgbWalletRef
+}
+
+type RgbPendingReceiveInvoice = {
+  invoice: string
+  recipientId?: string
+  assetId?: string | null
+  amount?: number | string
+  status?: string
+  kind?: string
+  transferKind?: string
+  batchTransferIdx?: number
+  expirationTimestamp?: number
+  createdAt?: number
+  [key: string]: any
+}
+
+type RgbPendingReceiveInvoicesResult = {
+  list: RgbPendingReceiveInvoice[]
+  [key: string]: any
+}
+
+type RgbCancelReceiveInvoiceRequest = {
+  wallet: RgbWalletRef
+  batchTransferIdx: number
+  skipSync?: boolean
+}
+
+type RgbCancelReceiveInvoiceResult = {
+  changed: boolean
+  [key: string]: any
+}
+
+type RgbIssueNiaRequest = {
+  wallet: RgbWalletRef
+  ticker: string
+  name: string
+  precision: number
+  amounts: Array<number | string>
+}
+
+type RgbCreateUtxosBeginRequest = {
+  wallet: RgbWalletRef
+  upTo?: boolean
+  num?: number
+  size?: number
+  feeRate?: number
+  skipSync?: boolean
+  dryRun?: boolean
+}
+
+type RgbCreateUtxosEndRequest = {
+  wallet: RgbWalletRef
+  signedPsbt: string
+}
+
+type RgbPendingVanillaTxsRequest = {
+  wallet: RgbWalletRef
+}
+
+type RgbPendingVanillaTx = {
+  txid: string
+  type?: string
+  [key: string]: any
+}
+
+type RgbPendingVanillaTxsResult = {
+  list: RgbPendingVanillaTx[]
+  [key: string]: any
+}
+
+type RgbAbortVanillaTxRequest = {
+  wallet: RgbWalletRef
+  txid: string
+}
+
+type RgbAbortVanillaTxResult = {
+  aborted: boolean
+  [key: string]: any
+}
+
+type RgbAllocationSummaryRequest = {
+  wallet: RgbWalletRef
+  skipSync?: boolean
+}
+
+type RgbAllocationSummaryResult = {
+  available?: boolean
+  availableAllocationCount?: number
+  freeAllocationCount?: number
+  colorableUtxoCount?: number
+  [key: string]: any
+}
+
+type RgbSendBeginRequest = {
+  wallet: RgbWalletRef
+  invoice: string
+  assetId: string
+  amount?: number | string
+  feeRate?: number
+  minConfirmations?: number
+  donation?: boolean
+  witnessData?: {
+    amountSat: number | string
+    blinding?: number | string | null
+  }
+}
+
+type RgbSendEndRequest = {
+  wallet: RgbWalletRef
+  signedPsbt: string
+  skipSync?: boolean
+}
+
+type RgbSignPsbtRequest = {
+  psbt: string
+}
+
+const RGB_MAINNET_COIN_TYPE = 827166
+const RGB_TESTNET_COIN_TYPE = 827167
+
+const normalizeRgbDerivationHex = (value: unknown): string | null => {
+  if (!value) return null
+  if (typeof value === 'string') return value.toLowerCase()
+  return Buffer.from(value as any)
+    .toString('hex')
+    .toLowerCase()
+}
+
+const normalizeRgbDerivationPath = (path: string) => (path.startsWith('m/') ? path : `m/${path}`)
+
+const isNonHardenedRgbIndex = (segment: string | undefined) => {
+  if (!segment || segment.endsWith("'")) return false
+  const index = Number(segment)
+  return Number.isInteger(index) && index >= 0
+}
+
+const isAllowedRgbDerivationPath = (path: string, networkType: NetworkType) => {
+  const segments = normalizeRgbDerivationPath(path).split('/')
+  if (segments.length !== 6 || segments[1] !== "86'") return false
+
+  const vanillaCoinType = networkType === NetworkType.MAINNET ? 0 : 1
+  const rgbCoinType =
+    networkType === NetworkType.MAINNET ? RGB_MAINNET_COIN_TYPE : RGB_TESTNET_COIN_TYPE
+  if (segments[2] !== `${vanillaCoinType}'` && segments[2] !== `${rgbCoinType}'`) {
+    return false
+  }
+
+  const accountIndex = Number(segments[3]?.replace(/'$/, ''))
+  if (!Number.isInteger(accountIndex) || accountIndex < 0 || !segments[3]?.endsWith("'")) {
+    return false
+  }
+
+  return isNonHardenedRgbIndex(segments[4]) && isNonHardenedRgbIndex(segments[5])
+}
+
+const getRgbDerivationAccountIndex = (path: string) => {
+  const accountSegment = normalizeRgbDerivationPath(path).split('/')[3]
+  if (!accountSegment?.endsWith("'")) return null
+  const accountIndex = Number(accountSegment.replace(/'$/, ''))
+  return Number.isInteger(accountIndex) && accountIndex >= 0 ? accountIndex : null
+}
+
 const caculateTapLeafHash = (input: any, pubkey: Buffer) => {
   if (input.tapInternalKey && !input.tapLeafScript) {
     return []
@@ -1212,7 +1455,7 @@ export class WalletController extends BaseController {
     }
 
     preferenceService.setChainType(chainType)
-    walletApiService.setEndpoint(CHAINS_MAP[chainType]!.endpoints[0]!)
+    await walletApiService.setEndpoint(CHAINS_MAP[chainType]!.endpoints[0]!)
 
     const currentAccount = await this.getCurrentAccount()
     const keyring = await this.getCurrentKeyring()
@@ -2538,6 +2781,465 @@ export class WalletController extends BaseController {
   getAddressRunesTokenSummary = async (address: string, runeid: string) => {
     const tokenSummary = await walletApiService.runes.getAddressRunesTokenSummary(address, runeid)
     return tokenSummary
+  }
+
+  getRgbAssetList = async (address: string, currentPage: number, pageSize: number) => {
+    const page = currentPage
+    const { total, list } = await getRgbApiService().getRgbAssetList(address, page, pageSize)
+
+    return {
+      currentPage,
+      pageSize,
+      total,
+      list,
+    }
+  }
+
+  getRgbList = async (address: string, currentPage: number, pageSize: number) => {
+    return this.getRgbAssetList(address, currentPage, pageSize)
+  }
+
+  getRGBList = async (_address: string, currentPage: number, pageSize: number) => {
+    const { address } = await this.getRgbFundingAddress()
+    return this.getRgbAssetList(address, currentPage, pageSize)
+  }
+
+  getRgbAssetBalance = async (address: string, assetId: string) => {
+    return getRgbApiService().getRgbAssetBalance(address, assetId)
+  }
+
+  getRGBAssetBalance = async (_address: string, assetId: string) => {
+    const { address } = await this.getRgbFundingAddress()
+    return this.getRgbAssetBalance(address, assetId)
+  }
+
+  getRgbAssetDetail = async (assetId: string) => {
+    return getRgbApiService().getRgbAssetDetail(assetId)
+  }
+
+  getRGBAssetDetail = async (_address: string, assetId: string) => {
+    return this.getRgbAssetDetail(assetId)
+  }
+
+  getRgbAssetActivity = async (
+    assetId: string,
+    currentPage: number,
+    pageSize: number,
+    address?: string,
+    type?: RgbActivityType
+  ) => {
+    const page = currentPage
+    const params: {
+      page: number
+      pageSize: number
+      address?: string
+      type?: RgbActivityType
+    } = {
+      page,
+      pageSize,
+    }
+    if (address) params.address = address
+    if (type) params.type = type
+
+    const { total, list } = await getRgbApiService().getRgbAssetActivity(assetId, params)
+
+    return {
+      currentPage,
+      pageSize,
+      total,
+      list,
+    }
+  }
+
+  getRgbAssetHistory = async (
+    assetId: string,
+    currentPage: number,
+    pageSize: number,
+    address?: string,
+    type?: RgbActivityType
+  ) => {
+    return this.getRgbAssetActivity(assetId, currentPage, pageSize, address, type)
+  }
+
+  getRGBAssetActivity = async (
+    _address: string,
+    assetId: string,
+    currentPage: number,
+    pageSize: number,
+    type?: RgbActivityType
+  ) => {
+    const { address } = await this.getRgbFundingAddress()
+    return this.getRgbAssetActivity(assetId, currentPage, pageSize, address, type)
+  }
+
+  getAddressRgbActivity = async (
+    address: string,
+    currentPage: number,
+    pageSize: number,
+    assetId?: string,
+    type?: RgbActivityType
+  ) => {
+    const page = currentPage
+    const params: {
+      page: number
+      pageSize: number
+      assetId?: string
+      type?: RgbActivityType
+    } = {
+      page,
+      pageSize,
+    }
+    if (assetId) params.assetId = assetId
+    if (type) params.type = type
+
+    const { total, list } = await getRgbApiService().getAddressRgbActivity(address, params)
+
+    return {
+      currentPage,
+      pageSize,
+      total,
+      list,
+    }
+  }
+
+  getAddressRgbHistory = async (
+    address: string,
+    currentPage: number,
+    pageSize: number,
+    assetId?: string,
+    type?: RgbActivityType
+  ) => {
+    return this.getAddressRgbActivity(address, currentPage, pageSize, assetId, type)
+  }
+
+  getCurrentRgbWalletRef = async (): Promise<RgbWalletRef> => {
+    const account = preferenceService.getCurrentAccount()
+    if (!account) throw new Error('no current account')
+    assertCanCreateSigningRequest(account)
+
+    const keyring = await keyringService.getKeyringForAccount(account.pubkey, account.type)
+    if (!keyring?.getRgbWalletContext) {
+      throw new Error('Current wallet does not support RGB transaction construction')
+    }
+
+    const networkType = this.getNetworkType()
+    const keyringAddressIndex = keyring.getIndexByAddress?.(account.pubkey)
+    const addressIndex =
+      typeof keyringAddressIndex === 'number' ? keyringAddressIndex : (account.index ?? 0)
+    const context = await keyring.getRgbWalletContext(networkType)
+    const network = networkType === NetworkType.MAINNET ? 'mainnet' : 'testnet'
+    const walletId = `unisat-${context.masterFingerprint}-${addressIndex}`
+
+    return {
+      walletId,
+      xpubVan: context.xpubVan,
+      xpubCol: context.xpubCol,
+      masterFingerprint: context.masterFingerprint,
+      network,
+      dataDirKey: walletId,
+      addressIndex,
+      reuseAddresses: true,
+      vanillaKeychain: context.vanillaKeychain,
+    }
+  }
+
+  createRgbBlindReceive = async (params: Omit<RgbReceiveInvoiceRequest, 'wallet'>) => {
+    return getRgbApiService().createBlindReceiveInvoice({
+      ...params,
+      wallet: await this.getCurrentRgbWalletRef(),
+    })
+  }
+
+  createRgbWitnessReceive = async (params: Omit<RgbReceiveInvoiceRequest, 'wallet'>) => {
+    return getRgbApiService().createWitnessReceiveInvoice({
+      ...params,
+      wallet: await this.getCurrentRgbWalletRef(),
+    })
+  }
+
+  getRgbPendingReceiveInvoices = async () => {
+    return getRgbApiService().getPendingReceiveInvoices({
+      wallet: await this.getCurrentRgbWalletRef(),
+    })
+  }
+
+  cancelRgbReceiveInvoice = async (params: Omit<RgbCancelReceiveInvoiceRequest, 'wallet'>) => {
+    return getRgbApiService().cancelReceiveInvoice({
+      ...params,
+      wallet: await this.getCurrentRgbWalletRef(),
+    })
+  }
+
+  getRgbFundingAddress = async () => {
+    return getRgbApiService().getRgbFundingAddress({
+      wallet: await this.getCurrentRgbWalletRef(),
+    })
+  }
+
+  createRgbIssueNia = async (params: Omit<RgbIssueNiaRequest, 'wallet'>) => {
+    return getRgbApiService().issueNiaAsset({
+      ...params,
+      wallet: await this.getCurrentRgbWalletRef(),
+    })
+  }
+
+  createRgbUtxosBegin = async (params: Omit<RgbCreateUtxosBeginRequest, 'wallet'>) => {
+    const result = (await getRgbApiService().createRgbUtxosBegin({
+      ...params,
+      wallet: await this.getCurrentRgbWalletRef(),
+    })) as any
+    const psbtValue = result?.psbt
+    if (!psbtValue || typeof psbtValue !== 'string') {
+      return result
+    }
+
+    const toSignData = await this.getRgbToSignData({
+      psbt: psbtValue,
+      action: {
+        name: 'Create RGB UTXO',
+        description: '',
+        details: [
+          {
+            label: 'UTXO Count',
+            type: PsbtActionDetailType.TEXT,
+            value: params.num ? String(params.num) : 'default',
+          },
+          {
+            label: 'Fee Rate',
+            type: PsbtActionDetailType.TEXT,
+            value: String(params.feeRate ?? 1),
+          },
+        ],
+        type: PsbtActionType.CUSTOM,
+      },
+    })
+
+    return {
+      ...result,
+      psbtHex: toSignData.psbtHex,
+      toSignData,
+    }
+  }
+
+  createRgbUtxosEnd = async (params: Omit<RgbCreateUtxosEndRequest, 'wallet'>) => {
+    const signedPsbt = psbtFromString(params.signedPsbt).toBase64()
+    return getRgbApiService().createRgbUtxosEnd({
+      signedPsbt,
+      wallet: await this.getCurrentRgbWalletRef(),
+    })
+  }
+
+  getRgbPendingVanillaTxs = async () => {
+    return getRgbApiService().getPendingVanillaTxs({
+      wallet: await this.getCurrentRgbWalletRef(),
+    })
+  }
+
+  abortRgbVanillaTx = async (params: Omit<RgbAbortVanillaTxRequest, 'wallet'>) => {
+    return getRgbApiService().abortVanillaTx({
+      ...params,
+      wallet: await this.getCurrentRgbWalletRef(),
+    })
+  }
+
+  getRgbAllocationSummary = async (params: Omit<RgbAllocationSummaryRequest, 'wallet'> = {}) => {
+    return getRgbApiService().getRgbAllocationSummary({
+      ...params,
+      wallet: await this.getCurrentRgbWalletRef(),
+    })
+  }
+
+  createRgbSendBegin = async (params: Omit<RgbSendBeginRequest, 'wallet'>) => {
+    const result = (await getRgbApiService().createSendRgbTx({
+      ...params,
+      wallet: await this.getCurrentRgbWalletRef(),
+    })) as any
+    const psbtValue = result?.psbt
+    if (!psbtValue || typeof psbtValue !== 'string') {
+      return result
+    }
+
+    const toSignData = await this.getRgbToSignData({
+      psbt: psbtValue,
+      action: {
+        name: 'Send RGB',
+        description: '',
+        details: [
+          {
+            label: 'Asset ID',
+            type: PsbtActionDetailType.TEXT,
+            value: params.assetId,
+          },
+          {
+            label: 'Amount',
+            type: PsbtActionDetailType.TEXT,
+            value: params.amount === undefined ? 'invoice amount' : String(params.amount),
+          },
+        ],
+        type: PsbtActionType.CUSTOM,
+      },
+    })
+
+    return {
+      ...result,
+      psbtHex: toSignData.psbtHex,
+      toSignData,
+    }
+  }
+
+  createRgbSendEnd = async (params: Omit<RgbSendEndRequest, 'wallet'>) => {
+    const signedPsbt = psbtFromString(params.signedPsbt).toBase64()
+    return getRgbApiService().acceptRgbTx({
+      ...params,
+      signedPsbt,
+      wallet: await this.getCurrentRgbWalletRef(),
+    })
+  }
+
+  getRgbToSignData = async ({
+    psbt,
+    action,
+  }: RgbSignPsbtRequest & { action?: PsbtActionInfo }): Promise<ToSignData> => {
+    const parsedPsbt = psbtFromString(psbt)
+    const toSignInputs = await this.getRgbToSignInputs(parsedPsbt)
+    if (toSignInputs.length === 0) {
+      throw new Error('No RGB PSBT inputs can be signed by this wallet')
+    }
+
+    return {
+      psbtHex: parsedPsbt.toHex(),
+      toSignInputs,
+      autoFinalized: toSignInputs.length === parsedPsbt.inputCount,
+      action: action
+        ? action
+        : {
+            name: 'Sign RGB PSBT',
+            description: '',
+            type: PsbtActionType.CUSTOM,
+          },
+    }
+  }
+
+  private getRgbToSignInputs = async (psbt: bitcoin.Psbt): Promise<ToSignInput[]> => {
+    const account = preferenceService.getCurrentAccount()
+    if (!account) throw new Error('no current account')
+    assertCanCreateSigningRequest(account)
+
+    const keyring = await keyringService.getKeyringForAccount(account.pubkey, account.type)
+    if (!keyring?.getRgbWalletContext) {
+      throw new Error('Current wallet does not support RGB PSBT signing')
+    }
+
+    const networkType = this.getNetworkType()
+    const keyringAddressIndex = keyring.getIndexByAddress?.(account.pubkey)
+    const addressIndex =
+      typeof keyringAddressIndex === 'number' ? keyringAddressIndex : (account.index ?? 0)
+    const context = await keyring.getRgbWalletContext(networkType)
+    const allowedFingerprint = context.masterFingerprint.toLowerCase()
+
+    const toSignInputs: ToSignInput[] = []
+    psbt.data.inputs.forEach((input: any, index) => {
+      const isSigned =
+        input.finalScriptSig ||
+        input.finalScriptWitness ||
+        input.tapKeySig ||
+        input.partialSig ||
+        input.tapScriptSig
+      if (isSigned) return
+
+      const tapDerivation = input.tapBip32Derivation?.[0]
+      if (
+        tapDerivation?.pubkey &&
+        this.isCurrentRgbDerivation(
+          tapDerivation,
+          allowedFingerprint,
+          networkType,
+          addressIndex,
+          keyring as any
+        )
+      ) {
+        const leafHashes = tapDerivation.leafHashes || []
+        const toSignInput: ToSignInput = {
+          index,
+          publicKey: Buffer.from(tapDerivation.pubkey).toString('hex'),
+          sighashTypes: input.sighashType ? [input.sighashType] : undefined,
+          useTweakedSigner: leafHashes.length === 0,
+        }
+        if (leafHashes[0]) {
+          toSignInput.tapLeafHashToSign = Buffer.from(leafHashes[0]).toString('hex')
+        }
+        toSignInputs.push(toSignInput)
+        return
+      }
+
+      const derivation = input.bip32Derivation?.[0]
+      if (
+        derivation?.pubkey &&
+        this.isCurrentRgbDerivation(
+          derivation,
+          allowedFingerprint,
+          networkType,
+          addressIndex,
+          keyring as any
+        )
+      ) {
+        toSignInputs.push({
+          index,
+          publicKey: Buffer.from(derivation.pubkey).toString('hex'),
+          sighashTypes: input.sighashType ? [input.sighashType] : undefined,
+        })
+      }
+    })
+
+    return toSignInputs
+  }
+
+  private isCurrentRgbDerivation(
+    derivation: any,
+    allowedFingerprint: string,
+    networkType: NetworkType,
+    addressIndex: number,
+    keyring: any
+  ) {
+    const fingerprint = normalizeRgbDerivationHex(derivation?.masterFingerprint)
+    if (fingerprint !== allowedFingerprint) {
+      return false
+    }
+
+    const path = derivation?.path
+    if (!path || !isAllowedRgbDerivationPath(path, networkType)) {
+      return false
+    }
+    const derivationAccountIndex = getRgbDerivationAccountIndex(path)
+    const expectedAccountIndex = keyring.accountIndexDerivation ? addressIndex : 0
+    if (derivationAccountIndex !== expectedAccountIndex) {
+      return false
+    }
+
+    const pubkey = normalizeRgbDerivationHex(derivation.pubkey)
+    if (!pubkey) {
+      return false
+    }
+
+    const child = this.getRgbDerivedPublicKey(path, keyring)
+    if (!child) {
+      return false
+    }
+
+    return pubkey === child.compressed || pubkey === child.xOnly
+  }
+
+  private getRgbDerivedPublicKey(path: string, keyring: any) {
+    const child = keyring?.hdWallet?.derive(normalizeRgbDerivationPath(path))
+    if (!child?.publicKey) {
+      return null
+    }
+
+    const publicKey = Buffer.from(child.publicKey)
+    return {
+      compressed: publicKey.toString('hex'),
+      xOnly: toXOnly(publicKey).toString('hex'),
+    }
   }
 
   createSendRunesPsbt = async ({
