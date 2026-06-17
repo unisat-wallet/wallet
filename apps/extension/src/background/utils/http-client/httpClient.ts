@@ -4,8 +4,6 @@
 
 /// <reference lib="dom" />
 
-import { preferenceService } from '@unisat/wallet-background';
-import { CHAINS_MAP } from '@unisat/wallet-shared';
 import {
   ApiClientError,
   HttpError,
@@ -44,8 +42,6 @@ export class HttpClient implements BaseHttpClient {
   private readonly defaultConfig: Required<Pick<ClientConfig, 'timeout' | 'retries'>>;
   private readonly defaultHeaders: Record<string, string>;
 
-  private globalEndpointIndex = 0;
-
   constructor(config: ClientConfig = {}) {
     this.baseURL = config.endpoint || 'https://api.unisat.io';
     this.defaultConfig = {
@@ -63,18 +59,6 @@ export class HttpClient implements BaseHttpClient {
     if (config.apiKey) {
       this.defaultHeaders['Authorization'] = `Bearer ${config.apiKey}`;
     }
-  }
-
-  private getCurrentEndpoint(): string {
-    const chainType = preferenceService.getChainType();
-    const chain = CHAINS_MAP[chainType];
-
-    // 确保索引不超范围
-    if (this.globalEndpointIndex >= chain.endpoints.length) {
-      this.globalEndpointIndex = 0;
-    }
-
-    return chain.endpoints[this.globalEndpointIndex];
   }
 
   /**
@@ -159,9 +143,8 @@ export class HttpClient implements BaseHttpClient {
    * Build URL with query parameters
    */
   private buildUrl(path: string, query?: Record<string, any>): string {
-    const endpoint = this.getCurrentEndpoint();
     // Ensure baseURL ends with / and path doesn't start with /
-    const normalizedBaseURL = endpoint.endsWith('/') ? endpoint : endpoint + '/';
+    const normalizedBaseURL = this.baseURL.endsWith('/') ? this.baseURL : this.baseURL + '/';
     const normalizedPath = path.startsWith('/') ? path.slice(1) : path;
     const url = new URL(normalizedPath, normalizedBaseURL);
 
