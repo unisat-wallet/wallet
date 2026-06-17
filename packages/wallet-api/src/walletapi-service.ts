@@ -127,6 +127,9 @@ export class WalletApiService {
   get runes() {
     return this.client.runes
   }
+  get rgb() {
+    return this.client.rgb
+  }
   get alkanes() {
     return this.client.alkanes
   }
