@@ -2075,6 +2075,12 @@
   "sighash_none_risk_title": {
     "message": "SIGHASH_NONE detected"
   },
+  "sighash_single_risk_description": {
+    "message": "SIGHASH_SINGLE binds only one output. Other outputs can be changed after signing, which can lead to unexpected fund movement. Review outputs carefully before signing."
+  },
+  "sighash_single_risk_title": {
+    "message": "SIGHASH_SINGLE detected"
+  },
   "sign": {
     "message": "Sign"
   },

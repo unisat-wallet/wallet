@@ -1,15 +1,19 @@
 import { Encryptor } from '../types'
+import { WebCryptoVaultEncryptor } from './webcrypto-vault-encryptor'
 
-// @ts-ignore
-import * as browserPassworder from 'browser-passworder'
-
-// Production-ready encryptor using browser-passworder
+/**
+ * Production encryptor.
+ * Historically wrapped browser-passworder (PBKDF2 10k).
+ * Now uses WebCryptoVaultEncryptor (PBKDF2 600k) with legacy 10k decrypt fallback.
+ */
 export class BrowserPassworderEncryptor implements Encryptor {
+  private readonly impl = new WebCryptoVaultEncryptor()
+
   async encrypt(password: string, data: any): Promise<string> {
-    return await browserPassworder.encrypt(password, data)
+    return this.impl.encrypt(password, data)
   }
 
   async decrypt(password: string, encryptedData: string): Promise<any> {
-    return await browserPassworder.decrypt(password, encryptedData)
+    return this.impl.decrypt(password, encryptedData)
   }
 }

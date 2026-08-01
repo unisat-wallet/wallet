@@ -8,12 +8,15 @@ const Iframe = ({ preview, style, ref, onLoad }: IframeProps) => {
       <iframe
         onClick={(e) => e.preventDefault()}
         ref={ref}
-        style={Object.assign({}, { pointerEvents: 'auto' }, style)}
+        style={Object.assign({}, { pointerEvents: 'none' }, style)}
         src={preview}
         onLoad={onLoad}
-        sandbox="allow-scripts allow-same-origin allow-forms"
+        // Scripts allowed for HTML inscriptions; same-origin removed to reduce sandbox escape risk.
+        sandbox="allow-scripts"
         scrolling="no"
-        loading="lazy"></iframe>
+        loading="lazy"
+        referrerPolicy="no-referrer"
+      />
     ),
     [preview]
   );

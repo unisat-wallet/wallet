@@ -1,8 +1,30 @@
 import { useSearchParams } from 'react-router-dom';
+import { useMemo } from 'react';
 
 import { useI18n } from '@unisat/wallet-state';
 
 import './PhishingScreen.css';
+
+/**
+ * Only allow http(s) navigation after phishing proceed.
+ * Blocks chrome-extension:, javascript:, data:, etc. (open-redirect / WAR pivot).
+ */
+function sanitizeProceedHref(href: string | null, hostname: string | null): string | null {
+  if (href) {
+    try {
+      const u = new URL(href);
+      if (u.protocol === 'http:' || u.protocol === 'https:') {
+        return u.toString();
+      }
+    } catch {
+      // fall through
+    }
+  }
+  if (hostname && /^[a-z0-9.-]+$/i.test(hostname)) {
+    return `https://${hostname}`;
+  }
+  return null;
+}
 
 const PhishingScreen = () => {
   const [searchParams] = useSearchParams();
@@ -10,26 +32,36 @@ const PhishingScreen = () => {
   const href = searchParams.get('href');
   const { t } = useI18n();
 
+  const isFramed = useMemo(() => {
+    try {
+      return window.top !== window;
+    } catch {
+      // cross-origin frame access denied ⇒ we are framed
+      return true;
+    }
+  }, []);
+
+  const safeHref = useMemo(() => sanitizeProceedHref(href, hostname), [href, hostname]);
+
   const handleProceed = async () => {
-    // Send message to background to proceed (one-time bypass, not adding to whitelist)
+    if (isFramed) {
+      return;
+    }
+    if (!hostname || !safeHref) {
+      return;
+    }
+
     await chrome.runtime.sendMessage({
       type: 'SKIP_PHISHING_PROTECTION',
       hostname
     });
 
-    // Redirect to the original URL if available
-    if (href) {
-      window.location.href = href;
-    } else {
-      // Fallback to hostname if full URL is not available
-      window.location.href = `https://${hostname}`;
-    }
+    window.location.href = safeHref;
   };
 
   return (
     <div className="phishing-container">
       <div className="phishing-content">
-        {/* Logo & Warning */}
         <div className="phishing-header">
           <img src={chrome.runtime.getURL('/images/logo/wallet-logo.png')} alt="UniSat" className="phishing-logo" />
           <div className="phishing-divider" />
@@ -47,13 +79,11 @@ const PhishingScreen = () => {
           </div>
         </div>
 
-        {/* Title & Domain */}
         <div className="phishing-title-section">
           <h1>{t('danger_potential_phishing_website_detected')}</h1>
           <p className="phishing-domain">{hostname}</p>
         </div>
 
-        {/* Warning Message */}
         <div className="phishing-warning-box">
           <p>{t('this_website_has_been_identified_as_malicious_by_unisat_and_may')}</p>
           <ul>
@@ -63,7 +93,6 @@ const PhishingScreen = () => {
           </ul>
         </div>
 
-        {/* Actions */}
         <div className="phishing-actions">
           <a
             href="https://github.com/unisat-wallet/phishing-detect/issues/new"
@@ -72,12 +101,22 @@ const PhishingScreen = () => {
             className="phishing-report-link">
             {t('think_this_is_a_false_positive_click_here_to_report_an_issue')}
           </a>
-          <p className="phishing-proceed-text">
-            {t('if_you_insist_on_continuing_proceed_at_your_own_risk')}
-            <button onClick={handleProceed} className="phishing-proceed-button">
-              {t('continue_to')} {hostname}
-            </button>
-          </p>
+          {isFramed ? (
+            <p className="phishing-proceed-text">
+              This warning must be opened as a top-level tab (not inside a page iframe). Close this embed and revisit
+              the site so UniSat can show a full-page warning.
+            </p>
+          ) : (
+            <p className="phishing-proceed-text">
+              {t('if_you_insist_on_continuing_proceed_at_your_own_risk')}
+              <button
+                onClick={handleProceed}
+                className="phishing-proceed-button"
+                disabled={!safeHref || !hostname}>
+                {t('continue_to')} {hostname}
+              </button>
+            </p>
+          )}
         </div>
       </div>
     </div>

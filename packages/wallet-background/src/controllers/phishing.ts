@@ -89,6 +89,13 @@ class PhishingController {
             return false
           }
 
+          // Only extension pages may whitelist (not arbitrary extension contexts without URL).
+          const extensionOrigin = chrome.runtime.getURL('')
+          if (!sender.url || !sender.url.startsWith(extensionOrigin)) {
+            sendResponse({ error: 'Unauthorized' })
+            return false
+          }
+
           phishingService.addToWhitelist(message.hostname)
           sendResponse({ success: true })
           return false
@@ -117,7 +124,10 @@ class PhishingController {
             const url = new URL(message.url)
 
             // Skip checks for phishing warning page URL
-            if (message.url.includes(chrome.runtime.getURL('index.html#/phishing'))) {
+            if (
+              message.url.includes(chrome.runtime.getURL('phishing.html#/phishing')) ||
+              message.url.includes(chrome.runtime.getURL('index.html#/phishing'))
+            ) {
               sendResponse({ isPhishing: false, skipped: true })
               return false
             }
@@ -160,7 +170,7 @@ class PhishingController {
       const currentUrl = tab.url || ''
 
       // If already on warning page, don't redirect again
-      if (currentUrl.includes('index.html#/phishing')) {
+      if (currentUrl.includes('phishing.html#/phishing') || currentUrl.includes('index.html#/phishing')) {
         return
       }
 
@@ -170,7 +180,7 @@ class PhishingController {
         timestamp: Date.now().toString(), // Add timestamp to prevent caching
       })
 
-      const redirectUrl = chrome.runtime.getURL(`index.html#/phishing?${params}`)
+      const redirectUrl = chrome.runtime.getURL(`phishing.html#/phishing?${params}`)
       await chrome.tabs.update(tabId, { url: redirectUrl, active: true })
     } catch (error) {
       log.error('[Phishing] Failed to redirect tab:', error)
@@ -283,7 +293,7 @@ class PhishingController {
           type: chrome.declarativeNetRequest.RuleActionType.REDIRECT,
           redirect: {
             url: chrome.runtime.getURL(
-              `index.html#/phishing?hostname=${encodeURIComponent(domain)}&timestamp=${Date.now()}`
+              `phishing.html#/phishing?hostname=${encodeURIComponent(domain)}&timestamp=${Date.now()}`
             ),
           },
         },

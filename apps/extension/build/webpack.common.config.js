@@ -476,6 +476,12 @@ const config = (env) => {
       }),
       new HtmlWebpackPlugin({
         inject: true,
+        template: paths.phishingHtml,
+        chunks: ['ui'],
+        filename: 'phishing.html'
+      }),
+      new HtmlWebpackPlugin({
+        inject: true,
         template: paths.backgroundHtml,
         chunks: ['background'],
         filename: 'background.html'

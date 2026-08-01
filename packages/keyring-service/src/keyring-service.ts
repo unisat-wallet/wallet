@@ -338,15 +338,15 @@ export class KeyringService extends EventEmitter {
     return keyring
   }
 
-  generateMnemonic = (): string => {
-    return bip39.generateMnemonic(128)
+  generateMnemonic = (strength: 128 | 256 = 128): string => {
+    return bip39.generateMnemonic(strength)
   }
 
-  generatePreMnemonic = async (): Promise<string> => {
+  generatePreMnemonic = async (strength: 128 | 256 = 128): Promise<string> => {
     if (!this.password) {
       throw new Error(this.t('you_need_to_unlock_wallet_first'))
     }
-    const mnemonic = this.generateMnemonic()
+    const mnemonic = this.generateMnemonic(strength)
 
     const preMnemonics = await this.encryptor.encrypt(this.password, mnemonic)
     this.memStore.updateState({ preMnemonics })

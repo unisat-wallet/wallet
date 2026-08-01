@@ -386,8 +386,8 @@ export class WalletController extends BaseController {
   }
 
   getPreMnemonics = () => keyringService.getPreMnemonics()
-  generatePreMnemonic = async () => {
-    return await keyringService.generatePreMnemonic()
+  generatePreMnemonic = async (strength: 128 | 256 = 128) => {
+    return await keyringService.generatePreMnemonic(strength)
   }
   removePreMnemonics = () => keyringService.removePreMnemonics()
   createKeyringWithMnemonics = async (

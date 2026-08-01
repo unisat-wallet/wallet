@@ -43,12 +43,12 @@
 
   "web_accessible_resources": [
     {
-      "resources": ["pageProvider.js", "index.html"],
+      "resources": ["pageProvider.js", "phishing.html"],
       "matches": ["<all_urls>"]
     }
   ],
   "content_security_policy": {
-    "extension_pages": "script-src 'self' 'wasm-unsafe-eval'; object-src 'self'"
+    "extension_pages": "script-src 'self' 'wasm-unsafe-eval'; object-src 'self'; frame-ancestors 'none'"
   },
   "side_panel": {
     "default_path": "sidepanel.html"

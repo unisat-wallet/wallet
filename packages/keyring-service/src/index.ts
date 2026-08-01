@@ -6,6 +6,7 @@ export { SimpleKeyring, HdKeyring, KeystoneKeyring, ColdWalletKeyring } from './
 
 // encryptor
 export { BrowserPassworderEncryptor } from './encryptor/browser-encryptor'
+export { WebCryptoVaultEncryptor, webCryptoVaultEncryptor } from './encryptor/webcrypto-vault-encryptor'
 export { SimpleEncryptor } from './encryptor/simple-encryptor'
 
 export * from './types'

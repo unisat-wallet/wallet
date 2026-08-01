@@ -152,7 +152,7 @@ export interface WalletController {
     alianName?: string
   ): Promise<Account[]>
   getPreMnemonics(): Promise<any>
-  generatePreMnemonic(): Promise<string>
+  generatePreMnemonic(strength?: 128 | 256): Promise<string>
   removePreMnemonics(): void
   createKeyringWithMnemonics(
     mnemonic: string,

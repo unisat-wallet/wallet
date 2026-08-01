@@ -11,6 +11,12 @@ function isDangerousSighashType(sighashType?: number): boolean {
   return outputType === bitcoin.Transaction.SIGHASH_NONE
 }
 
+function isSighashSingleType(sighashType?: number): boolean {
+  if (typeof sighashType !== 'number') return false
+  const outputType = sighashType & bitcoin.Transaction.SIGHASH_OUTPUT_MASK
+  return outputType === bitcoin.Transaction.SIGHASH_SINGLE
+}
+
 interface InputInfo {
   txid: string
   vout: number
@@ -323,6 +329,16 @@ export class PsbtDecoder {
         level: 'danger',
         title: 'sighash_none_risk_title',
         desc: 'sighash_none_risk_description',
+      })
+    }
+
+    const foundSighashSingle = this._psbt.data.inputs.some(v => isSighashSingleType(v.sighashType))
+    if (foundSighashSingle) {
+      this.risks.push({
+        type: RiskType.SIGHASH_SINGLE,
+        level: 'warning',
+        title: 'sighash_single_risk_title',
+        desc: 'sighash_single_risk_description',
       })
     }
   }

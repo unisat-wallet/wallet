@@ -8,7 +8,7 @@ import {
   walletController
 } from '@unisat/wallet-background';
 import { BUS_EVENTS, MESSAGE_TYPE, PORT_CHANNELS } from '@unisat/wallet-shared';
-import { browserRuntimeOnConnect } from '../webapi/browser';
+import browser, { browserRuntimeOnConnect } from '../webapi/browser';
 export function initMessaging() {
   // for page provider
   browserRuntimeOnConnect((port) => {
@@ -16,8 +16,14 @@ export function initMessaging() {
 
     const pm = new PortMessage(port as any);
 
-    // UI ports
+    // UI ports — only accept connections from this extension
     if (['popup', 'notification', 'tab', 'sidepanel'].includes(portName)) {
+      const selfId = browser.runtime?.id;
+      if (port.sender?.id && selfId && port.sender.id !== selfId) {
+        port.disconnect();
+        return;
+      }
+
       // listen the message from UI
       pm.listen((data) => {
         if (!data?.type) return;
