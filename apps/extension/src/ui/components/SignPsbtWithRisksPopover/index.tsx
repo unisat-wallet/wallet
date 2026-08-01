@@ -37,6 +37,11 @@ function getRiskContentKey(riskType: RiskType) {
         title: 'sighash_none_risk_title',
         description: 'sighash_none_risk_description'
       };
+    case RiskType.SIGHASH_SINGLE:
+      return {
+        title: 'sighash_single_risk_title',
+        description: 'sighash_single_risk_description'
+      };
     case RiskType.SCAMMER_ADDRESS:
       return {
         title: 'scammer_address_risk_title',

@@ -18,7 +18,8 @@
     "moduleResolution": "bundler",
     "resolveJsonModule": true,
     "isolatedModules": true,
-    "noEmit": false
+    "noEmit": false,
+    "lib": ["ES2020", "DOM"]
   },
   "include": [
     "src/**/*"
