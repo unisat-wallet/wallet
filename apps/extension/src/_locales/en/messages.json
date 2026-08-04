@@ -570,7 +570,13 @@
     "message": "Create Watch Wallet"
   },
   "create_with_mnemonics_12words": {
-    "message": "Create with mnemonics (12-words)"
+    "message": "Create with mnemonics (12 or 24 words)"
+  },
+  "confirm_backup_by_selecting_words": {
+    "message": "Select the correct word for each numbered position to confirm your backup (you do not need to enter the full phrase)."
+  },
+  "word_number": {
+    "message": "Word #$1"
   },
   "current": {
     "message": "Current"
@@ -755,6 +761,91 @@
   "export_private_key": {
     "message": "Export Private Key"
   },
+  "export_descriptor_xpub": {
+    "message": "Export descriptor / xpub"
+  },
+  "export_descriptor_title": {
+    "message": "Export descriptor / xpub"
+  },
+  "export_descriptor_help": {
+    "message": "Watch-only export. Prefer descriptors for Sparrow (path + script type + checksum). Account xpub is also available. Never includes private keys or xprv."
+  },
+  "export_descriptor_policy": {
+    "message": "Policy: $1"
+  },
+  "export_descriptor_receive": {
+    "message": "Receive descriptor (0/*)"
+  },
+  "export_descriptor_change": {
+    "message": "Change descriptor (1/*)"
+  },
+  "export_descriptor_account_xpub": {
+    "message": "Account xpub"
+  },
+  "export_descriptor_copy_receive": {
+    "message": "Copy receive descriptor"
+  },
+  "export_descriptor_copy_xpub": {
+    "message": "Copy account xpub"
+  },
+  "import_descriptor": {
+    "message": "Import descriptor"
+  },
+  "import_descriptor_title": {
+    "message": "Import Descriptor"
+  },
+  "import_descriptor_help": {
+    "message": "Paste a watch-only singlesig descriptor (wpkh / tr / sh(wpkh)). Checksum (#…) required. Sparrow multipath (/<0;1>/*) is accepted and expanded to receive + change."
+  },
+  "import_descriptor_watch_only_note": {
+    "message": "Imports as Watch Address: balances/inscriptions can show; signing is disabled. Private xprv descriptors are rejected."
+  },
+  "watch_only": {
+    "message": "Watch only"
+  },
+    "import_descriptor_preview": {
+    "message": "Check addresses"
+  },
+  "import_descriptor_confirm_title": {
+    "message": "Confirm watch-only addresses"
+  },
+  "import_descriptor_confirm_note": {
+    "message": "Anyone who gave you this descriptor controls these addresses. Confirm #0 matches the source wallet before importing."
+  },
+  "import_descriptor_confirm_button": {
+    "message": "Import watch-only wallet"
+  },
+  "cold_wallet_fingerprint": {
+    "message": "Fingerprint"
+  },
+  "cold_wallet_fingerprint_verify": {
+    "message": "Verify this fingerprint on your cold device before continuing."
+  },
+  "cold_wallet_fingerprint_omitted": {
+    "message": "No master fingerprint in QR — descriptor export will omit [fingerprint/path] origin."
+  },
+"import_descriptor_gap_note": {
+    "message": "Stores the descriptor so you can add more receive addresses later (gap discovery). v1 indexes the receive chain (0/*); change (1/*) is stored for export when the paste is /0/* or Sparrow /<0;1>/*. Initial scan size:"
+  },
+  "import_descriptor_wallet_name": {
+    "message": "Wallet name (optional)"
+  },
+  "import_descriptor_placeholder": {
+    "message": "wpkh([fpr/84h/0h/0h]xpub…/0/*)#checksum or …/<0;1>/*)#…"
+  },
+  "import_descriptor_button": {
+    "message": "Import watch-only"
+  },
+  "import_descriptor_gap_20": {
+    "message": "20 addresses"
+  },
+  "import_descriptor_gap_50": {
+    "message": "50 addresses"
+  },
+  "import_descriptor_gap_100": {
+    "message": "100 addresses"
+  },
+
   "failed_to_delete_contact": {
     "message": "Failed to delete contact"
   },
@@ -2546,7 +2637,10 @@
   "utxo_indexing_risk_title": {
     "message": "UTXO Indexing in Progress"
   },
-  "utxo_not_found": {
+    "utxo": {
+    "message": "UTXO"
+  },
+"utxo_not_found": {
     "message": "UTXO not found."
   },
   "verify_recovery_phrase": {

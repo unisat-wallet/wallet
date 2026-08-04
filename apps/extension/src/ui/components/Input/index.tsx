@@ -43,6 +43,8 @@ export interface InputProps {
   autoComplete?: string;
   spellCheck?: boolean;
   inputMode?: React.HTMLAttributes<HTMLInputElement>['inputMode'];
+  /** When > 1, TextInput renders a textarea (long pastes / descriptors). */
+  rows?: number;
   enableStepper?: boolean;
   step?: number;
   min?: number;

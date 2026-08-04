@@ -1,5 +1,5 @@
-import VirtualList, { ListRef } from 'rc-virtual-list';
-import { forwardRef, useEffect, useMemo, useRef, useState } from 'react';
+import VirtualList from 'rc-virtual-list';
+import { forwardRef, useMemo, useState } from 'react';
 
 import { Card, Column, Content, Header, Icon, Layout, Row, Text } from '@/ui/components';
 import { colors } from '@/ui/theme/colors';
@@ -189,25 +189,11 @@ export default function SwitchAccountScreen() {
     }
 
     return _items;
-  }, []);
-
-  const currentAccount = useCurrentAccount();
-  const currentIndex = keyring.accounts.findIndex((v) => v.pubkey == currentAccount.pubkey);
+  }, [keyring.accounts]);
 
   const ForwardMyItem = forwardRef(MyItem);
-  const refList = useRef<ListRef>(null);
-
-  useEffect(() => {
-    const timeoutId = setTimeout(() => {
-      if (refList.current && currentIndex >= 0) {
-        refList.current?.scrollTo({ key: currentAccount.address, align: 'top' });
-      }
-    });
-
-    return () => clearTimeout(timeoutId);
-  }, []);
-
   const layoutHeight = Math.ceil((window.innerHeight - 64) / ITEM_HEIGHT) * ITEM_HEIGHT;
+  // No auto scrollTo — avoids rc-virtual-list "max limitation" warning.
   const canCreateAccount = ACCOUNT_CREATABLE_KEYRING_TYPES.includes(keyring.type as KeyringType);
 
   return (
@@ -237,7 +223,6 @@ export default function SwitchAccountScreen() {
           height={layoutHeight}
           itemHeight={ITEM_HEIGHT}
           itemKey={(item) => item.key}
-          ref={refList}
         >
           {(item, index) => <ForwardMyItem account={item.account} autoNav={true} />}
         </VirtualList>

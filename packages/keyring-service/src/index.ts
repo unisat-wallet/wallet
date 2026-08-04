@@ -7,6 +7,7 @@ export {
   HdKeyring,
   KeystoneKeyring,
   ColdWalletKeyring,
+  WatchAddressKeyring,
   isKeystoneSupportedHdPath,
   KEYSTONE_SUPPORTED_HD_PATH,
 } from './keyrings'

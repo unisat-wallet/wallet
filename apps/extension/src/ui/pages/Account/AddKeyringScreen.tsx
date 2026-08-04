@@ -24,7 +24,7 @@ export default function AddKeyringScreen() {
             }}
             data-testid="create-wallet-with-mnemonics-option">
             <Column full justifyCenter>
-              <Text text={t('create_with_mnemonics_12words')} size="sm" />
+              <Text text={t('create_with_mnemonics_12words') || 'Create with mnemonics (12 or 24 words)'} size="sm" />
             </Column>
           </Card>
 

@@ -201,7 +201,8 @@ export function useVersionInfo() {
   }
 
   // skip if current version is greater or equal to new version
-  if (currentVesion && newVersion) {
+  // compare-versions throws TypeError if either arg is not a string
+  if (typeof currentVesion === 'string' && typeof newVersion === 'string' && currentVesion && newVersion) {
     if (compareVersions(currentVesion, newVersion) >= 0) {
       skipped = true
     } else {

@@ -62,6 +62,7 @@
     "@unisat/babylon-service": "workspace:*",
     "@unisat/base-utils": "workspace:*",
     "@unisat/contact-book": "workspace:*",
+    "@unisat/descriptor-service": "workspace:*",
     "@unisat/keyring-service": "workspace:*",
     "@unisat/permission-service": "workspace:*",
     "@unisat/phishing-detect": "workspace:*",

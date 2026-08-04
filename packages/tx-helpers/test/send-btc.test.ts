@@ -287,6 +287,27 @@ describe('sendBTC', () => {
     })
   })
 
+  describe('safe UTXO (descriptor integration regression)', function () {
+    it('rejects inscription-bearing UTXOs with NOT_SAFE_UTXOS', async function () {
+      const wallet = LocalWallet.fromRandom(AddressType.P2WPKH, NetworkType.MAINNET)
+      await expect(
+        sendBTC({
+          btcUtxos: [
+            genDummyUtxo(wallet, 10000, {
+              inscriptions: [{ inscriptionId: 'i0', offset: 0 }],
+            }),
+          ],
+          tos: [{ address: wallet.address, satoshis: 1000 }],
+          networkType: NetworkType.MAINNET,
+          changeAddress: wallet.address,
+          feeRate: 1,
+        })
+      ).rejects.toMatchObject({
+        code: ErrorCodes.NOT_SAFE_UTXOS,
+      })
+    })
+  })
+
   describe('P2PKH', function () {
     const wallet_P2WPKH = LocalWallet.fromRandom(AddressType.P2WPKH, NetworkType.MAINNET)
     const wallet_P2PKH = LocalWallet.fromRandom(AddressType.P2PKH, NetworkType.MAINNET)

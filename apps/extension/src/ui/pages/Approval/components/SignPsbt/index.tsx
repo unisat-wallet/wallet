@@ -29,6 +29,7 @@ import AssetOverviewSection from './components/AssetOverviewSection';
 import { InputsList } from './components/InputsList';
 import MultiSignDisclaimerModal from './components/MultiSignDisclaimerModal';
 import { OutputsList } from './components/OutputsList';
+import { PolicyChip } from './components/PolicyChip';
 import PsbtDataSection from './components/PsbtDataSection';
 import { SignPsbtSection } from './components/Section';
 import { getIncrementalListResetKey } from './components/useIncrementalList';
@@ -298,6 +299,8 @@ export default function SignPsbt(props: SignPsbtProps) {
       {header}
       <Content>
         <Column gap="xl">
+          <PolicyChip />
+
           <ActionOverviewSection decodedPsbt={currentDecodedPsbt} action={currentToSignData.action!} />
 
           <AssetOverviewSection

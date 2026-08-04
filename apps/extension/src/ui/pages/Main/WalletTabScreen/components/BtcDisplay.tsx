@@ -2,6 +2,7 @@ import { Column, Row, Text } from '@/ui/components';
 import { useBtcDisplayLogic, useBTCUnit, useChainType } from '@unisat/wallet-state';
 
 type Presets = keyof typeof $viewPresets;
+type Variant = 'gold' | 'grey';
 
 const $viewPresets = {
   main: {
@@ -24,18 +25,27 @@ const $viewPresets = {
   }
 };
 
+const $greyOverrides = {
+  mainPartColor: '#F5F5F7',
+  subPartColor: 'rgba(245, 245, 247, 0.55)',
+  unitPartColor: '#F5F5F7'
+};
+
 export function BtcDisplay({
   balance,
   hideBalance,
-  preset
+  preset,
+  variant = 'gold'
 }: {
   balance: string;
   hideBalance?: boolean;
   preset?: Presets;
+  variant?: Variant;
 }) {
   const chainType = useChainType();
   const btcUnit = useBTCUnit();
-  const $style = preset ? $viewPresets[preset] : $viewPresets['main'];
+  const base = preset ? $viewPresets[preset] : $viewPresets['main'];
+  const $style = variant === 'grey' ? { ...base, ...$greyOverrides } : base;
 
   const { totalAmountMainPart, totalAmountSubPart } = useBtcDisplayLogic(balance);
 

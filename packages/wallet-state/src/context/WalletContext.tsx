@@ -132,6 +132,36 @@ export interface WalletController {
     password: string,
     account: { address: string; type: string }
   ): Promise<{ hex: string; wif: string }>
+  exportAccountDescriptor(opts?: {
+    keyringIndex?: number
+    accountSlot?: number
+    chain?: 0 | 1
+  }): Promise<{
+    descriptor: string
+    changeDescriptor?: string
+    policy: { label: string; kind: string; isComplex: boolean }
+    watchOnly: true
+    xpub?: string
+    accountPath?: string
+    fingerprint?: string
+  }>
+  previewDescriptor(
+    rawDescriptor: string,
+    accountCount?: number
+  ): Promise<{
+    policy: { label: string; kind: string; isComplex: boolean }
+    previewAddresses: string[]
+    addressType: AddressType
+    network: string
+    watchOnly: true
+  }>
+  canExportAccountDescriptor(): Promise<boolean>
+  getAccountPolicySummary(): Promise<{ label: string; kind: string; isComplex: boolean }>
+  importDescriptor(
+    rawDescriptor: string,
+    alianName?: string,
+    accountCount?: number
+  ): Promise<WalletKeyring>
   getMnemonics(
     password: string,
     keyring: WalletKeyring
@@ -190,7 +220,8 @@ export interface WalletController {
     addressType: AddressType,
     alianName?: string,
     hdPath?: string,
-    accountCount?: number
+    accountCount?: number,
+    fingerprint?: string
   ): Promise<WalletKeyring>
 
   deriveAccountsFromXpub(

@@ -1,5 +1,5 @@
-import VirtualList, { ListRef } from 'rc-virtual-list';
-import { forwardRef, useEffect, useMemo, useRef, useState } from 'react';
+import VirtualList from 'rc-virtual-list';
+import { forwardRef, useMemo, useState } from 'react';
 
 import { Card, Column, Content, Header, Icon, Layout, Row, Text } from '@/ui/components';
 import { RemoveWalletPopover } from '@/ui/components/RemoveWalletPopover';
@@ -245,7 +245,6 @@ export default function SwitchKeyringScreen() {
   const { t } = useI18n();
 
   const ForwardMyItem = forwardRef(MyItem);
-  const refList = useRef<ListRef>(null);
 
   const items = useMemo(() => {
     const _items: ItemData[] = keyrings.map((v) => {
@@ -264,20 +263,9 @@ export default function SwitchKeyringScreen() {
     return _items;
   }, [keyrings]);
 
-  const currentKeyring = useCurrentKeyring();
-  const currentIndex = keyrings.findIndex((v) => v.key == currentKeyring.key);
-
-  useEffect(() => {
-    const timeoutId = setTimeout(() => {
-      if (refList.current && currentIndex >= 0) {
-        refList.current?.scrollTo({ index: currentIndex, align: 'top' });
-      }
-    });
-
-    return () => clearTimeout(timeoutId);
-  }, []);
-
   const layoutHeight = Math.ceil((window.innerHeight - 64) / ITEM_HEIGHT) * ITEM_HEIGHT;
+  // Do not auto scrollTo — rc-virtual-list warns when content fits the viewport
+  // ("reach the max limitation"). List order is fine without it.
 
   return (
     <Layout>
@@ -299,7 +287,6 @@ export default function SwitchKeyringScreen() {
       />
       <Content style={{ padding: 5 }}>
         <VirtualList
-          ref={refList}
           data={items}
           data-id="list"
           height={layoutHeight}
