@@ -47,6 +47,8 @@ export { useBRC20BalanceCardLogic, type BRC20BalanceCardProps } from './useBRC20
 
 export { useExportMnemonicsScreenLogic } from './useExportMnemonicsScreenLogic'
 export { useExportPrivateKeyScreenLogic } from './useExportPrivateKeyScreenLogic'
+export { useExportDescriptorScreenLogic } from './useExportDescriptorScreenLogic'
+export { useImportDescriptorScreenLogic } from './useImportDescriptorScreenLogic'
 export { useSendRunesScreenLogic } from './useSendRunesScreenLogic'
 
 export { useEditContactScreenLogic } from './useEditContactScreenLogic'

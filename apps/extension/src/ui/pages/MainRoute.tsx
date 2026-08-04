@@ -64,7 +64,9 @@ import EditAccountNameScreen from './Settings/EditAccountNameScreen';
 import EditContactScreen from './Settings/EditContactScreen';
 import EditWalletNameScreen from './Settings/EditWalletNameScreen';
 import ExportMnemonicsScreen from './Settings/ExportMnemonicsScreen';
+import ExportDescriptorScreen from './Settings/ExportDescriptorScreen';
 import ExportPrivateKeyScreen from './Settings/ExportPrivateKeyScreen';
+import ImportDescriptorScreen from './Settings/ImportDescriptorScreen';
 import LanguageScreen from './Settings/LanguageScreen';
 import NetworkTypeScreen from './Settings/NetworkTypeScreen';
 import NotificationListScreen from './Settings/NotificationListScreen';
@@ -181,6 +183,14 @@ export const routes = {
   ExportPrivateKeyScreen: {
     path: '/settings/export-privatekey',
     element: <ExportPrivateKeyScreen />
+  },
+  ExportDescriptorScreen: {
+    path: '/settings/export-descriptor',
+    element: <ExportDescriptorScreen />
+  },
+  ImportDescriptorScreen: {
+    path: '/settings/import-descriptor',
+    element: <ImportDescriptorScreen />
   },
   AdvancedScreen: {
     path: '/settings/advanced',

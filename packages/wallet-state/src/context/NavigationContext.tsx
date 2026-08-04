@@ -64,6 +64,8 @@ export type RouteParamList = {
   ExportPrivateKeyScreen: {
     account: Account
   }
+  ExportDescriptorScreen: undefined
+  ImportDescriptorScreen: undefined
   SwitchAccountScreen: undefined
   ReceiveScreen: undefined
   HistoryScreen: undefined
