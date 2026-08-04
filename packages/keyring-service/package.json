@@ -48,6 +48,7 @@
   "dependencies": {
     "@keystonehq/keystone-sdk": "^0.3.0",
     "@metamask/obs-store": "^7.0.0",
+    "@unisat/descriptor-service": "workspace:*",
     "@unisat/wallet-bitcoin": "workspace:*",
     "@unisat/wallet-shared": "workspace:*",
     "@unisat/wallet-storage": "workspace:*",
