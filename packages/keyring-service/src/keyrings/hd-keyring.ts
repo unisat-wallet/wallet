@@ -124,6 +124,76 @@ export class HdKeyring extends SimpleKeyring {
     this.passphrase = ''
   }
 
+  /**
+   * Watch-only descriptor material: master fingerprint + account-level xpub.
+   * UniSat hdPath is typically m/purpose'/coin'/account'/change — account path drops change.
+   * Short paths (e.g. Ordinals Wallet `m/86'/0'/0'` with no change segment) use xpubLevel
+   * `chain` so export is `…xpub/*` (children = wallet addresses), not wrong `…/0/*`.
+   *
+   * Fingerprint is only returned for mnemonic-rooted keyrings (true master fpr).
+   * xpriv-only roots omit fingerprint — never emit a wrong `[fpr/…]` origin.
+   */
+  getAccountXpubMaterial(accountIndex = 0): {
+    fingerprint?: string
+    accountPath: string
+    xpub: string
+    /** `account` → descriptor `xpub/0/*`; `chain` → `xpub/*` (no separate change) */
+    xpubLevel: 'account' | 'chain'
+  } {
+    if (!this.hdWallet) {
+      throw new Error('Btc-Hd-Keyring: Not support')
+    }
+
+    // m / purpose' / coin' / account' [/ change]
+    const hasChangeSegment = this.hdPath.split('/').length >= 5
+    const xpubLevel: 'account' | 'chain' = hasChangeSegment ? 'account' : 'chain'
+
+    // Multi-account short path: wallet only uses /0 per account', but chain-level
+    // export would advertise xpub/* — refuse rather than misrepresent the address set.
+    if (this.accountIndexDerivation && xpubLevel === 'chain') {
+      throw new Error(
+        'Cannot export a ranged descriptor for multi-account short-path wallets; use a standard BIP path that includes a change segment'
+      )
+    }
+
+    let accountPath: string
+    if (this.accountIndexDerivation) {
+      accountPath = this._buildAccountLevelPath(this.hdPath, accountIndex)
+      // drop trailing change segment if present
+      const parts = accountPath.split('/')
+      if (parts.length >= 5) {
+        accountPath = parts.slice(0, 4).join('/')
+      }
+    } else {
+      const parts = this.hdPath.split('/')
+      if (parts.length >= 5) {
+        accountPath = parts.slice(0, 4).join('/')
+      } else {
+        accountPath = this.hdPath
+      }
+    }
+
+    const accountNode = this.hdWallet.derive(accountPath)
+
+    // Master fingerprint only when rooted at mnemonic seed (hdWallet = master).
+    // xpriv-imported nodes expose the node's own identifier — not the master fpr.
+    let fingerprint: string | undefined
+    if (this.mnemonic) {
+      const identifier: Buffer = this.hdWallet.identifier || this.hdWallet._identifier
+      if (!identifier || identifier.length < 4) {
+        throw new Error('Btc-Hd-Keyring: master fingerprint unavailable')
+      }
+      fingerprint = Buffer.from(identifier).subarray(0, 4).toString('hex')
+    }
+
+    return {
+      ...(fingerprint ? { fingerprint } : {}),
+      accountPath,
+      xpub: accountNode.publicExtendedKey,
+      xpubLevel,
+    }
+  }
+
   changeHdPath(hdPath: string) {
     if (!this.hdWallet) {
       throw new Error('Btc-Hd-Keyring: Not support')

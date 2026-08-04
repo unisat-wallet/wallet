@@ -1,6 +1,13 @@
 import { bitcoin } from '@unisat/wallet-bitcoin'
 import { CosmosSignDataType, Keyring, KeyringType, ToSignInput } from '../types'
 
+function normalizeOptionalFingerprint(raw?: string): string | undefined {
+  if (!raw) return undefined
+  const hex = raw.trim().toLowerCase().replace(/^0x/, '')
+  if (!/^[0-9a-f]{8}$/.test(hex) || /^0+$/.test(hex)) return undefined
+  return hex
+}
+
 export interface ColdWalletKeyringOptions {
   xpub: string
   addresses: string[]
@@ -8,6 +15,8 @@ export interface ColdWalletKeyringOptions {
   hdPath?: string
   publicKeys?: string[]
   accounts?: { pubkey: string; address: string }[]
+  /** 8-hex master fingerprint when known (from QR / hardware); omit if unknown */
+  fingerprint?: string
 }
 
 export class ColdWalletKeyring implements Keyring {
@@ -19,6 +28,7 @@ export class ColdWalletKeyring implements Keyring {
   hdPath?: string = undefined
   publicKeys?: string[] = undefined
   accounts?: string[] = undefined
+  fingerprint?: string = undefined
 
   constructor(opts?: ColdWalletKeyringOptions) {
     if (!opts) {
@@ -36,6 +46,7 @@ export class ColdWalletKeyring implements Keyring {
     this.addresses = opts.addresses || []
     this.connectionType = opts.connectionType || 'QR'
     this.hdPath = opts.hdPath || ''
+    this.fingerprint = normalizeOptionalFingerprint(opts.fingerprint)
 
     // Deal with publicKeys, compatible with the old version of accounts format
     if (opts.publicKeys) {
@@ -53,6 +64,7 @@ export class ColdWalletKeyring implements Keyring {
       connectionType: this.connectionType,
       hdPath: this.hdPath || '',
       publicKeys: this.publicKeys || [],
+      fingerprint: this.fingerprint || '',
     }
   }
 
@@ -65,6 +77,7 @@ export class ColdWalletKeyring implements Keyring {
     this.addresses = opts.addresses || []
     this.connectionType = opts.connectionType || 'QR'
     this.hdPath = opts.hdPath || ''
+    this.fingerprint = normalizeOptionalFingerprint(opts.fingerprint)
 
     if (opts.publicKeys) {
       this.publicKeys = opts.publicKeys

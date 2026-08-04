@@ -15,6 +15,7 @@ export default defineConfig({
   treeshake: true,
   external: [
     'bitcoinjs-lib',
+    '@unisat/descriptor-service',
     '@unisat/keyring-service',
     '@unisat/permission-service',
     '@unisat/wallet-types',

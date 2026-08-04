@@ -10,10 +10,25 @@ import {
   getDelegationsV2,
 } from '@unisat/babylon-service'
 import {
+  addressTypeHintFromKind,
+  DescriptorAddressType,
+  DescriptorError,
+  descriptorBodyWithoutOrigin,
+  deriveAddresses,
+  extractSinglesigKey,
+  hdAccountToDescriptor,
+  parseDescriptor,
+  PolicySummary,
+  normalizeMultipathImport,
+  siblingChangeDescriptor,
+} from '@unisat/descriptor-service'
+import {
   ColdWalletKeyring,
+  HdKeyring,
   isKeystoneSupportedHdPath,
   KEYSTONE_SUPPORTED_HD_PATH,
   KeystoneKeyring,
+  WatchAddressKeyring,
 } from '@unisat/keyring-service'
 import { DisplayedKeyring, Keyring, KeyringType, ToSignInput } from '@unisat/keyring-service/types'
 import * as txHelpers from '@unisat/tx-helpers'
@@ -639,8 +654,12 @@ export class WalletController extends BaseController {
     addressType: AddressType,
     alianName?: string,
     hdPath?: string,
-    accountCount = 1
+    accountCount = 1,
+    fingerprint?: string
   ) => {
+    if (hdPath) {
+      this._assertColdXpubPathDepth(xpub, hdPath)
+    }
     const accounts = await this.deriveAccountsFromXpub(xpub, addressType, hdPath, accountCount)
     const addresses = accounts.map(acc => acc.address)
     const publicKeys = accounts.map(acc => acc.pubkey)
@@ -651,6 +670,7 @@ export class WalletController extends BaseController {
       connectionType: 'QR',
       hdPath: hdPath!,
       publicKeys,
+      ...(fingerprint ? { fingerprint } : {}),
     })
 
     const originKeyring = await keyringService.addKeyring(coldWalletKeyring, addressType)
@@ -723,7 +743,16 @@ export class WalletController extends BaseController {
   }
 
   deriveNewAccountFromMnemonic = async (keyring: WalletKeyring, alianName?: string) => {
-    if (keyring.type !== KeyringType.HdKeyring && keyring.type !== KeyringType.KeystoneKeyring) {
+    const origin = keyringService.keyrings[keyring.index]
+    const canExpandWatch =
+      keyring.type === KeyringType.WatchAddressKeyring &&
+      origin instanceof WatchAddressKeyring &&
+      origin.hasDescriptor()
+    if (
+      keyring.type !== KeyringType.HdKeyring &&
+      keyring.type !== KeyringType.KeystoneKeyring &&
+      !canExpandWatch
+    ) {
       throw new Error(t('not_supported'))
     }
     const _keyring = keyringService.keyrings[keyring.index]!
@@ -3587,6 +3616,424 @@ export class WalletController extends BaseController {
   getBTCUnit() {
     const chainType = this.getChainType()
     return CHAINS_MAP[chainType]!.unit
+  }
+
+  private _toDescriptorAddressType(addressType: AddressType): DescriptorAddressType {
+    // Explicit map — never rely on numeric enum coincidence with DescriptorAddressType
+    const map: Partial<Record<AddressType, DescriptorAddressType>> = {
+      [AddressType.P2PKH]: DescriptorAddressType.P2PKH,
+      [AddressType.P2WPKH]: DescriptorAddressType.P2WPKH,
+      [AddressType.P2TR]: DescriptorAddressType.P2TR,
+      [AddressType.P2SH_P2WPKH]: DescriptorAddressType.P2SH_P2WPKH,
+    }
+    const mapped = map[addressType]
+    if (mapped !== undefined) return mapped
+    // Deprecated UniSat M44+segwit/taproot uses purpose 44' with non-BIP script
+    if (addressType === AddressType.M44_P2WPKH || addressType === AddressType.M44_P2TR) {
+      throw new Error(
+        'Legacy M44 address type uses non-standard derivation; switch to Native SegWit or Taproot to export a BIP-compatible descriptor'
+      )
+    }
+    throw new Error('Address type does not support descriptor export')
+  }
+
+  private _descriptorNetwork(): 'mainnet' | 'testnet' | 'regtest' {
+    const n = this.getNetworkType()
+    if (n === NetworkType.TESTNET) return 'testnet'
+    if (n === NetworkType.REGTEST) return 'regtest'
+    return 'mainnet'
+  }
+
+  /** Descriptors are Bitcoin BIP-380 — not defined for Fractal chain params. */
+  private _assertBitcoinDescriptorChain(): void {
+    const chain = CHAINS_MAP[this.getChainType()]
+    if (chain?.isFractal) {
+      throw new Error(
+        'Descriptor export/import is only supported on Bitcoin networks (not Fractal)'
+      )
+    }
+  }
+
+  /** Fail closed when cold QR path depth ≠ xpub depth (wrong origin in Sparrow/PSBT). */
+  private _assertColdXpubPathDepth(xpub: string, hdPath: string): void {
+    let depth: number
+    try {
+      depth = new bitcore.HDPublicKey(xpub).depth
+    } catch {
+      throw new Error('Invalid cold wallet xpub')
+    }
+    const segments = hdPath
+      .replace(/^m\/?/, '')
+      .split('/')
+      .filter(Boolean).length
+    if (depth !== segments) {
+      throw new Error(
+        `Cold wallet xpub depth (${depth}) does not match hdPath (${hdPath}); refusing mismatched descriptor origin`
+      )
+    }
+  }
+
+  private _parseImportDescriptor(
+    rawDescriptor: string,
+    accountCount: number
+  ): {
+    trimmed: string
+    addressType: AddressType
+    network: 'mainnet' | 'testnet' | 'regtest'
+    addresses: string[]
+    policy: PolicySummary
+    changeDescriptor?: string
+    previewAddresses: string[]
+  } {
+    let trimmed = rawDescriptor.trim()
+    if (/(?:^|[[(,/\s])([xtyuz]prv)/i.test(trimmed)) {
+      throw new Error('Private descriptors are not allowed; paste a watch-only xpub descriptor')
+    }
+
+    // Sparrow default: …/<0;1>/* → expand to receive /0/* + change /1/* before derive
+    let changeDescriptor: string | undefined
+    try {
+      const multipath = normalizeMultipathImport(trimmed)
+      if (multipath) {
+        trimmed = multipath.receive
+        changeDescriptor = multipath.change
+      }
+    } catch (e) {
+      if (e instanceof DescriptorError) {
+        throw new Error(e.message)
+      }
+      throw e
+    }
+
+    let parsed
+    try {
+      parsed = parseDescriptor(trimmed)
+    } catch (e) {
+      if (e instanceof DescriptorError) {
+        throw new Error(e.message)
+      }
+      throw e
+    }
+
+    const keyBody = descriptorBodyWithoutOrigin(parsed.body)
+    if (!keyBody.includes('/*')) {
+      throw new Error('Ranged descriptor required (must include /*), e.g. …/0/*)#checksum')
+    }
+    if (keyBody.includes('/1/*') && !keyBody.includes('/0/*')) {
+      throw new Error('Paste the receive descriptor (…/0/*), not a change-only descriptor (…/1/*)')
+    }
+
+    const { kind, xpub, chainPath } = extractSinglesigKey(parsed.body)
+    if (chainPath === '1') {
+      throw new Error('Paste the receive descriptor (…/0/*), not a change-only descriptor (…/1/*)')
+    }
+    const hint = addressTypeHintFromKind(kind)
+    const addressTypeMap: Record<string, AddressType> = {
+      P2WPKH: AddressType.P2WPKH,
+      P2TR: AddressType.P2TR,
+      P2SH_P2WPKH: AddressType.P2SH_P2WPKH,
+      P2PKH: AddressType.P2PKH,
+    }
+    const addressType = addressTypeMap[hint]
+    if (addressType === undefined) {
+      throw new Error('Unsupported descriptor script type')
+    }
+
+    const count = Math.min(Math.max(accountCount, 1), 100)
+    const network = this._descriptorNetwork()
+    const isTestPub = /\btpub/.test(xpub)
+    if (network === 'mainnet' && isTestPub) {
+      throw new Error(
+        'This descriptor uses a testnet xpub (tpub); switch network or paste a mainnet descriptor'
+      )
+    }
+    if (network !== 'mainnet' && !isTestPub) {
+      throw new Error(
+        'This descriptor uses a mainnet xpub (xpub); switch to Bitcoin mainnet or paste a tpub descriptor'
+      )
+    }
+    const addresses = deriveAddresses(trimmed, {
+      network,
+      start: 0,
+      count,
+    })
+    if (!addresses.length) {
+      throw new Error('No addresses derived from descriptor')
+    }
+
+    if (!changeDescriptor) {
+      try {
+        changeDescriptor = siblingChangeDescriptor(trimmed)
+      } catch {
+        changeDescriptor = undefined
+      }
+    }
+
+    return {
+      trimmed,
+      addressType,
+      network,
+      addresses,
+      policy: parsed.policy,
+      ...(changeDescriptor ? { changeDescriptor } : {}),
+      previewAddresses: addresses.slice(0, 3),
+    }
+  }
+
+  /**
+   * Preview a watch-only descriptor without persisting (confirm addresses before import).
+   */
+  previewDescriptor = async (
+    rawDescriptor: string,
+    accountCount = 20
+  ): Promise<{
+    policy: PolicySummary
+    previewAddresses: string[]
+    addressType: AddressType
+    network: string
+    watchOnly: true
+  }> => {
+    this._assertBitcoinDescriptorChain()
+    const parsed = this._parseImportDescriptor(rawDescriptor, accountCount)
+    return {
+      policy: parsed.policy,
+      previewAddresses: parsed.previewAddresses,
+      addressType: parsed.addressType,
+      network: parsed.network,
+      watchOnly: true,
+    }
+  }
+
+  /** Whether Advanced → Export descriptor should be offered for the current keyring. */
+  canExportAccountDescriptor = async (): Promise<boolean> => {
+    try {
+      this._assertBitcoinDescriptorChain()
+      const keyring = await this.getCurrentKeyring()
+      if (!keyring) return false
+      if (keyring.type === KeyringType.HdKeyring || keyring.type === KeyringType.ColdWalletKeyring) {
+        return true
+      }
+      if (keyring.type === KeyringType.WatchAddressKeyring) {
+        const origin = keyringService.keyrings[keyring.index] as WatchAddressKeyring
+        return Boolean(origin?.hasDescriptor?.())
+      }
+      return false
+    } catch {
+      return false
+    }
+  }
+
+  /**
+   * Export a BIP-380 watch-only descriptor for the current (or given) keyring.
+   * Never includes private keys.
+   */
+  exportAccountDescriptor = async (opts?: {
+    keyringIndex?: number
+    /** UI account slot when exporting a non-current keyring with accountIndexDerivation */
+    accountSlot?: number
+    chain?: 0 | 1
+  }): Promise<{
+    descriptor: string
+    changeDescriptor?: string
+    policy: PolicySummary
+    watchOnly: true
+    /** Account-level xpub (HD) or chain-level xpub (cold); never xprv */
+    xpub?: string
+    accountPath?: string
+    fingerprint?: string
+  }> => {
+    this._assertBitcoinDescriptorChain()
+    const keyrings = await this.getKeyrings()
+    const keyring =
+      opts?.keyringIndex !== undefined
+        ? keyrings[opts.keyringIndex]
+        : await this.getCurrentKeyring()
+    if (!keyring || !('addressType' in keyring)) {
+      throw new Error('No keyring')
+    }
+
+    const addressType = this._toDescriptorAddressType(keyring.addressType)
+    const chain = opts?.chain ?? 0
+
+    if (keyring.type === KeyringType.HdKeyring) {
+      const origin = keyringService.keyrings[keyring.index] as HdKeyring
+      if (!origin?.getAccountXpubMaterial) {
+        throw new Error('HD keyring unavailable')
+      }
+      // When accountIndexDerivation is on, map UI slot → BIP account' via activeIndexes.
+      // Prefer explicit accountSlot; else only use current account when exporting the
+      // current keyring (never borrow another keyring's slot).
+      let accountIndex = 0
+      if (origin.accountIndexDerivation) {
+        let slot = opts?.accountSlot
+        if (slot === undefined) {
+          const currentKeyring = await this.getCurrentKeyring()
+          const current = await this.getCurrentAccount()
+          if (
+            currentKeyring?.index === keyring.index &&
+            current &&
+            current.type === KeyringType.HdKeyring &&
+            typeof current.index === 'number'
+          ) {
+            slot = current.index
+          } else {
+            slot = 0
+          }
+        }
+        const active = origin.activeIndexes
+        accountIndex =
+          Array.isArray(active) && typeof active[slot] === 'number' ? active[slot]! : slot
+      }
+      const material = origin.getAccountXpubMaterial(accountIndex)
+      const originOpt = material.fingerprint
+        ? { origin: { fingerprint: material.fingerprint, path: material.accountPath } }
+        : {}
+
+      // Short hdPath (e.g. OW m/86'/0'/0'): wallet addresses are xpub/* — not xpub/0/*
+      if (material.xpubLevel === 'chain') {
+        const descriptor = hdAccountToDescriptor({
+          addressType,
+          ...originOpt,
+          xpub: material.xpub,
+          xpubLevel: 'chain',
+        })
+        const policy = parseDescriptor(descriptor).policy
+        return {
+          descriptor,
+          policy,
+          watchOnly: true,
+          xpub: material.xpub,
+          accountPath: material.accountPath,
+          ...(material.fingerprint ? { fingerprint: material.fingerprint } : {}),
+        }
+      }
+
+      const receive = hdAccountToDescriptor({
+        addressType,
+        ...originOpt,
+        xpub: material.xpub,
+        chain: 0,
+      })
+      const change = hdAccountToDescriptor({
+        addressType,
+        ...originOpt,
+        xpub: material.xpub,
+        chain: 1,
+      })
+      const policy = parseDescriptor(receive).policy
+      const descriptor = chain === 1 ? change : receive
+      return {
+        descriptor,
+        changeDescriptor: change,
+        policy,
+        watchOnly: true,
+        xpub: material.xpub,
+        accountPath: material.accountPath,
+        ...(material.fingerprint ? { fingerprint: material.fingerprint } : {}),
+      }
+    }
+
+    if (keyring.type === KeyringType.ColdWalletKeyring) {
+      const origin = keyringService.keyrings[keyring.index] as ColdWalletKeyring
+      if (!origin?.xpub) {
+        throw new Error('Cold wallet xpub missing')
+      }
+      const hdPath =
+        origin.hdPath ||
+        keyring.hdPath ||
+        ADDRESS_TYPES.find(a => a.value === keyring.addressType)?.hdPath
+      if (!hdPath) {
+        throw new Error('Cold wallet hdPath missing')
+      }
+      this._assertColdXpubPathDepth(origin.xpub, hdPath)
+      // Cold wallet xpubs in UniSat are receive-chain level (…/0).
+      // Use real fingerprint when stored; otherwise omit origin (never fake 00000000).
+      const fingerprint = origin.fingerprint
+      const descriptor = hdAccountToDescriptor({
+        addressType,
+        ...(fingerprint ? { origin: { fingerprint, path: hdPath } } : {}),
+        xpub: origin.xpub,
+        xpubLevel: 'chain',
+      })
+      const policy = parseDescriptor(descriptor).policy
+      return {
+        descriptor,
+        policy,
+        watchOnly: true,
+        xpub: origin.xpub,
+        accountPath: hdPath,
+        ...(fingerprint ? { fingerprint } : {}),
+      }
+    }
+
+    if (keyring.type === KeyringType.WatchAddressKeyring) {
+      const origin = keyringService.keyrings[keyring.index] as WatchAddressKeyring
+      if (!origin?.descriptor) {
+        throw new Error('This watch wallet has no stored descriptor to export')
+      }
+      const policy = parseDescriptor(origin.descriptor).policy
+      return {
+        descriptor: origin.descriptor,
+        ...(origin.changeDescriptor ? { changeDescriptor: origin.changeDescriptor } : {}),
+        policy,
+        watchOnly: true,
+      }
+    }
+
+    throw new Error('Descriptor export is only supported for HD, cold, and descriptor watch keyrings')
+  }
+
+  /** Policy chip data for approvals / receive UI */
+  getAccountPolicySummary = async (): Promise<PolicySummary> => {
+    try {
+      const { policy } = await this.exportAccountDescriptor()
+      return policy
+    } catch {
+      // Do not invent a "simple" policy when export is unsupported — chip should hide
+      return {
+        label: '',
+        kind: 'unknown',
+        isComplex: true,
+      }
+    }
+  }
+
+  /**
+   * Import a watch-only singlesig descriptor (no signing keys).
+   * Uses WatchAddressKeyring so signMethod=None (not Cold Wallet QR signing).
+   * Call previewDescriptor first so the UI can confirm addresses.
+   */
+  importDescriptor = async (
+    rawDescriptor: string,
+    alianName?: string,
+    accountCount = 20
+  ): Promise<WalletKeyring> => {
+    this._assertBitcoinDescriptorChain()
+    const parsed = this._parseImportDescriptor(rawDescriptor, accountCount)
+
+    const watchKeyring = new WatchAddressKeyring({
+      addresses: parsed.addresses,
+      descriptor: parsed.trimmed,
+      ...(parsed.changeDescriptor ? { changeDescriptor: parsed.changeDescriptor } : {}),
+      network: parsed.network,
+      receiveCount: parsed.addresses.length,
+    })
+    const originKeyring = await keyringService.addKeyring(watchKeyring, parsed.addressType)
+    const displayedKeyring = await keyringService.displayForKeyring(
+      originKeyring,
+      parsed.addressType,
+      keyringService.keyrings.length - 1
+    )
+    const keyring = this.displayedKeyringToWalletKeyring(
+      displayedKeyring,
+      keyringService.keyrings.length - 1
+    )
+    if (alianName) {
+      this.setKeyringAlianName(keyring, alianName)
+    }
+    await this.changeKeyring(keyring)
+    preferenceService.setShowSafeNotice(true)
+    return keyring
   }
 }
 export default new WalletController()
