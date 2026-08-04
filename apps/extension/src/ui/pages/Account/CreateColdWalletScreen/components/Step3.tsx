@@ -135,7 +135,14 @@ export default function Step3({ onBack, contextData }: Step3Props) {
       tools.showLoading(true);
       const walletName = contextData.walletName || 'Cold Wallet';
       const accountCount = contextData.accountCount || displayCount;
-      await createColdWallet(contextData.xpub, addressType, walletName, contextData.hdPath, accountCount);
+      await createColdWallet(
+        contextData.xpub,
+        addressType,
+        walletName,
+        contextData.hdPath,
+        accountCount,
+        contextData.fingerprint
+      );
 
       navigate('MainScreen');
     } catch (e) {
@@ -157,6 +164,37 @@ export default function Step3({ onBack, contextData }: Step3Props) {
             textCenter
             style={{ marginBottom: '16px', lineHeight: '20px' }}
           />
+
+          {contextData.fingerprint ? (
+            <Column gap="xs" style={{ marginBottom: 12 }}>
+              <Text
+                text={`${t('cold_wallet_fingerprint') || 'Fingerprint'}: ${contextData.fingerprint}`}
+                size="sm"
+                color="gold"
+                textCenter
+              />
+              <Text
+                text={
+                  t('cold_wallet_fingerprint_verify') ||
+                  'Verify this fingerprint on your cold device before continuing.'
+                }
+                preset="sub"
+                size="xs"
+                textCenter
+              />
+            </Column>
+          ) : (
+            <Text
+              text={
+                t('cold_wallet_fingerprint_omitted') ||
+                'No master fingerprint in QR — descriptor export will omit [fingerprint/path] origin.'
+              }
+              preset="sub"
+              size="xs"
+              textCenter
+              style={{ marginBottom: 12 }}
+            />
+          )}
 
           <Row justifyBetween itemsCenter style={{ marginBottom: '8px' }}>
             <Row itemsCenter gap="sm">

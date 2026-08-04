@@ -309,9 +309,17 @@ export function useCreateColdWalletCallback() {
       addressType: AddressType,
       alianName?: string,
       hdPath?: string,
-      accountCount?: number
+      accountCount?: number,
+      fingerprint?: string
     ) => {
-      await wallet.createKeyringWithColdWallet(xpub, addressType, alianName, hdPath, accountCount)
+      await wallet.createKeyringWithColdWallet(
+        xpub,
+        addressType,
+        alianName,
+        hdPath,
+        accountCount,
+        fingerprint
+      )
       dispatch(globalActions.update({ isUnlocked: true }))
     },
     [dispatch, wallet]

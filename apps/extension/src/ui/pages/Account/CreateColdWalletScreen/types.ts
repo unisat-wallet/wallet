@@ -8,6 +8,8 @@ export interface ContextData {
   walletName?: string;
   hdPath?: string;
   accountCount?: number;
+  /** Optional 8-hex master fingerprint from cold QR when provided */
+  fingerprint?: string;
 }
 
 // Component props interfaces

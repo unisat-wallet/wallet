@@ -55,7 +55,14 @@ export default function Step2({ onBack, onNext }: Step2Props) {
         throw new Error('Account count must be between 1 and 20');
       }
 
-      return coldWalletData as ContextData;
+      const rawFpr =
+        coldWalletData.fingerprint || coldWalletData.masterFingerprint || coldWalletData.mfp || '';
+      const fingerprint =
+        typeof rawFpr === 'string' && /^[0-9a-fA-F]{8}$/.test(rawFpr.replace(/^0x/, ''))
+          ? rawFpr.replace(/^0x/, '').toLowerCase()
+          : undefined;
+
+      return { ...(coldWalletData as ContextData), fingerprint };
     },
     []
   );
