@@ -2,8 +2,8 @@ import React, { CSSProperties } from 'react';
 
 import { colors } from '@/ui/theme/colors';
 import { Inscription } from '@unisat/wallet-shared';
-
 import { ChainType } from '@unisat/wallet-types';
+
 import { $textPresets } from '../Text';
 import { AddressInput } from './AddressInput';
 import { AmountInput } from './AmountInput';
@@ -68,7 +68,7 @@ export const $baseContainerStyle: CSSProperties = {
   paddingTop: 11,
   paddingBottom: 11,
   borderRadius: 10,
-  minHeight: '56.5px',
+  minHeight: '45.5px',
   alignSelf: 'stretch',
   borderWidth: 1,
   borderColor: colors.line2

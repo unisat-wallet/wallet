@@ -109,12 +109,12 @@ export default function CreateHDWalletScreen() {
         return [
           {
             key: TabType.CHOOSE_RESTORE_WALLET,
-            label: t('step_1'),
+            label: t('choose_wallet'),
             children: <Step0 contextData={contextData} updateContextData={updateContextData} />
           },
           {
             key: TabType.IMPORT_WORDS,
-            label: t('step_2'),
+            label: t('seed_phrase'),
             children: <Step1_Import contextData={contextData} updateContextData={updateContextData} />
           }
         ];
@@ -122,17 +122,17 @@ export default function CreateHDWalletScreen() {
         return [
           {
             key: TabType.CHOOSE_RESTORE_WALLET,
-            label: t('step_1'),
+            label: t('choose_wallet'),
             children: <Step0 contextData={contextData} updateContextData={updateContextData} />
           },
           {
             key: TabType.IMPORT_WORDS,
-            label: t('step_2'),
+            label: t('seed_phrase'),
             children: <Step1_Import contextData={contextData} updateContextData={updateContextData} />
           },
           {
             key: TabType.CHOOSE_ADDRESS_TYPE,
-            label: t('step_3'),
+            label: t('address_type'),
             children: (
               <Step2
                 contextData={contextData}
@@ -147,17 +147,17 @@ export default function CreateHDWalletScreen() {
       return [
         {
           key: TabType.CREATE_WORDS,
-          label: t('step_1'),
+          label: t('seed_phrase'),
           children: <Step1_Create contextData={contextData} updateContextData={updateContextData} />
         },
         {
           key: TabType.CONFIRM_WORDS,
-          label: t('step_2'),
+          label: t('verify_seed_phrase'),
           children: <Step1_Confirm contextData={contextData} updateContextData={updateContextData} />
         },
         {
           key: TabType.CHOOSE_ADDRESS_TYPE,
-          label: t('step_3'),
+          label: t('address_type'),
           children: (
             <Step2
               contextData={contextData}
@@ -175,14 +175,6 @@ export default function CreateHDWalletScreen() {
     return item?.children;
   }, [items, contextData.tabType]);
 
-  const activeTabIndex = useMemo(() => {
-    const index = items.findIndex((v) => v.key === contextData.tabType);
-    if (index === -1) {
-      return 0;
-    } else {
-      return index;
-    }
-  }, [items, contextData.tabType]);
   return (
     <Layout>
       <Header
@@ -199,12 +191,14 @@ export default function CreateHDWalletScreen() {
       <Content>
         <Row justifyCenter>
           <TabBar
+            preset="number-step"
             progressEnabled
+            numberStepList={items.map((v) => v.label)}
             defaultActiveKey={contextData.tabType}
             activeKey={contextData.tabType}
-            items={items.map((v) => ({
+            items={items.map((v, index) => ({
               key: v.key,
-              label: v.label
+              label: `${index + 1}`
             }))}
             onTabClick={(key) => {
               const toTabType = key as TabType;

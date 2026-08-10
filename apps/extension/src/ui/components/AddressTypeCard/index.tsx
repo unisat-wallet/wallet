@@ -36,10 +36,17 @@ export function AddressTypeCard(props: AddressTypeCardProps) {
       px="zero"
       py="zero"
       gap="zero"
-      rounded
       onClick={disabled ? undefined : onClick}
       data-testid={dataTestId}
-      style={{ opacity: disabled ? 0.5 : undefined, cursor: disabled ? 'not-allowed' : undefined }}>
+      style={{
+        opacity: disabled ? 0.5 : undefined,
+        cursor: disabled ? 'not-allowed' : undefined,
+        borderWidth: 1,
+        borderColor: checked ? colors.gold : colors.transparent,
+        borderRadius: 10,
+        overflow: 'hidden'
+      }}
+    >
       <Column full>
         <Row justifyBetween px="md" pt="md">
           <Column justifyCenter>
@@ -84,7 +91,19 @@ export function AddressTypeCard2(props: AddressTypeCardProp2) {
   const btcUnit = useBTCUnit();
   const { onClick, label, items, checked, 'data-testid': dataTestId } = props;
   return (
-    <Card px="zero" py="zero" gap={'zero'} rounded onClick={onClick} data-testid={dataTestId}>
+    <Card
+      px="zero"
+      py="zero"
+      gap={'zero'}
+      onClick={onClick}
+      data-testid={dataTestId}
+      style={{
+        borderWidth: 1,
+        borderColor: checked ? colors.gold_dark : colors.transparent,
+        borderRadius: 10,
+        overflow: 'hidden'
+      }}
+    >
       <Column full>
         <Row justifyBetween px="md" pt="md">
           <Column justifyCenter>
@@ -102,7 +121,8 @@ export function AddressTypeCard2(props: AddressTypeCardProp2) {
             style={{
               borderBottomWidth: items.length > 1 ? 1 : 0,
               borderBottomColor: colors.line2
-            }}>
+            }}
+          >
             <Row fullX>
               <CopyableAddress address={v.address} />
             </Row>

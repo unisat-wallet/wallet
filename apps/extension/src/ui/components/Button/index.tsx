@@ -84,7 +84,7 @@ const $viewPresets = {
   default: Object.assign({}, $baseViewStyle, {
     borderWidth: 1,
     minHeight: 50,
-    borderColor: colors.white_muted,
+    borderColor: colors.white_light2,
     borderRadius: 12
   }) as CSSProperties,
 

@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { colors } from '@/ui/theme/colors';
 
 import { Column } from '../Column';
+import { Icon } from '../Icon';
 import { Row } from '../Row';
 import { Text } from '../Text';
 import './index.less';
@@ -20,11 +21,12 @@ interface TabBarProps {
   items: TabProps[];
   onTabClick: (string) => void;
   progressEnabled?: boolean;
-  preset?: 'number-page' | 'default' | 'style1' | 'style2' | 'style3';
+  preset?: 'number-page' | 'number-step' | 'default' | 'style1' | 'style2' | 'style3';
+  numberStepList?: string[];
 }
 
 export function TabBar(props: TabBarProps) {
-  const { items, defaultActiveKey, activeKey, onTabClick, progressEnabled, preset } = props;
+  const { items, defaultActiveKey, activeKey, onTabClick, progressEnabled, preset, numberStepList } = props;
   const [uncontrolledTabKey, setUncontrolledTabKey] = useState(defaultActiveKey);
   const tabKey = activeKey ?? uncontrolledTabKey;
   const progress = items.findIndex((v) => v.key === tabKey);
@@ -39,7 +41,7 @@ export function TabBar(props: TabBarProps) {
   if (preset == 'number-page') {
     return (
       <Row>
-        {items.map((v, index) => {
+        {items.map((v) => {
           const isSelected = v.key === tabKey;
           const reach = isSelected; //index <= (tabKey as number);
           return (
@@ -63,6 +65,69 @@ export function TabBar(props: TabBarProps) {
             >
               <Text text={v.label} color={'white'} />
             </Column>
+          );
+        })}
+      </Row>
+    );
+  }
+
+  if (preset == 'number-step') {
+    return (
+      <Row gap="zero" style={{ paddingBottom: numberStepList ? 35 : 0 }}>
+        {items.map((v, index) => {
+          const isCurrent = index === progress;
+          const isCompleted = index < progress;
+          const stepLabel = numberStepList?.[index];
+
+          return (
+            <Row key={v.key} gap="zero" itemsCenter>
+              <Column itemsCenter style={{ width: 64, position: 'relative', flexShrink: 0 }}>
+                <Column
+                  justifyCenter
+                  itemsCenter
+                  onClick={() => {
+                    selectTab(v.key);
+                  }}
+                  style={{
+                    width: 40,
+                    height: 40,
+                    borderRadius: 20,
+                    boxSizing: 'border-box',
+                    borderWidth: isCurrent ? 6 : 1,
+                    borderColor: isCurrent ? 'rgba(255, 255, 255, 0.2)' : colors.light,
+                    background: isCurrent ? 'linear-gradient(135deg, #EBB94C 0%, #E97E00 100%)' : 'transparent',
+                    backgroundClip: isCurrent ? 'padding-box' : undefined
+                  }}
+                  data-testid={`number-step-${v.key}`}
+                >
+                  {isCompleted ? (
+                    <Icon icon="check" size={16} color="white" />
+                  ) : (
+                    <Text text={v.label} color={isCurrent ? 'white' : 'textDim'} />
+                  )}
+                </Column>
+                {stepLabel && (
+                  <Text
+                    text={stepLabel}
+                    size="xxs"
+                    textCenter
+                    color={isCurrent ? 'white' : 'textDim'}
+                    style={{ position: 'absolute', width: 64, top: 45, left: 0 }}
+                  />
+                )}
+              </Column>
+
+              {index < items.length - 1 && (
+                <Column
+                  style={{
+                    width: 30,
+                    height: 1,
+                    flexShrink: 0,
+                    backgroundColor: isCurrent ? colors.gold : colors.light
+                  }}
+                />
+              )}
+            </Row>
           );
         })}
       </Row>

@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
-import { Button, Column, Icon, Input, Row, Text } from '@/ui/components';
-import { AddressTypeCard2 } from '@/ui/components/AddressTypeCard';
+import { Button, Checkbox, Column, Icon, Input, Row, Text } from '@/ui/components';
+import { AddressTypeCard, AddressTypeCard2 } from '@/ui/components/AddressTypeCard';
 import { FooterButtonContainer } from '@/ui/components/FooterButtonContainer';
 import { ContextData, UpdateContextDataParams } from '@/ui/pages/Account/createHDWalletComponents/types';
 import { useNavigate } from '@/ui/pages/MainRoute';
@@ -102,6 +102,7 @@ export function Step2({
   const isMagicEden = contextData.restoreWalletType === RestoreWalletType.MAGIC_EDEN;
 
   const [pathText, setPathText] = useState(contextData.customHdPath);
+  const [customHdPathEnabled, setCustomHdPathEnabled] = useState(Boolean(contextData.customHdPath));
 
   const [recommendedTypeIndex, setRecommendedTypeIndex] = useState(0);
 
@@ -399,8 +400,14 @@ export function Step2({
   return (
     <Column>
       {contextData.isRestore && scanned == false ? (
-        <Row justifyBetween>
-          <Text text={t('address_type')} preset="bold" data-testid="address-type-title" />
+        <Row justifyBetween itemsCenter style={{ marginBottom: scanned ? 10 : 0 }}>
+          <Text
+            text={t('address_type')}
+            preset="bold"
+            color="textDim"
+            style={{ fontSize: 13 }}
+            data-testid="address-type-title"
+          />
           <Text
             text={t('scan_in_more_addresses')}
             preset="link"
@@ -410,7 +417,13 @@ export function Step2({
           />
         </Row>
       ) : (
-        <Text text={t('address_type')} preset="bold" data-testid="address-type-title" />
+        <Text
+          text={t('address_type')}
+          preset="bold"
+          color="textDim"
+          style={{ fontSize: 13 }}
+          data-testid="address-type-title"
+        />
       )}
 
       {scannedGroups.length > 0 &&
@@ -423,7 +436,7 @@ export function Step2({
           return (
             <AddressTypeCard2
               key={index}
-              label={`${options.label}`}
+              label={`${options.label} (${options.hdPath})`}
               items={item.address_arr.map((v, index) => ({
                 address: v,
                 satoshis: item.satoshis_arr[index],
@@ -455,16 +468,11 @@ export function Step2({
 
           const hdPath = getAccountDerivationPath(contextData.customHdPath || item.hdPath, 0, isMagicEden);
           return (
-            <AddressTypeCard2
+            <AddressTypeCard
               key={index}
-              label={`${item.label}`}
-              items={[
-                {
-                  address,
-                  satoshis: assets.satoshis,
-                  path: hdPath
-                }
-              ]}
+              label={`${item.label} (${hdPath})`}
+              address={address}
+              assets={assets}
               checked={index == contextData.addressTypeIndex}
               onClick={() => {
                 updateContextData({
@@ -478,10 +486,23 @@ export function Step2({
         })}
 
       {!scanned && restoreWallet.customPathSupport && (
-        <Column mt="lg">
-          <Text text={t('custom_hdpath_optional')} preset="bold" />
-          <Column>
+        <Column gap="xs" style={{ marginTop: 20 }}>
+          <Checkbox
+            checked={customHdPathEnabled}
+            onChange={(e) => {
+              const enabled = e.target.checked;
+              setCustomHdPathEnabled(enabled);
+              if (!enabled) {
+                submitCustomHdPath('');
+              }
+            }}
+            data-testid="custom-hdpath-enabled-checkbox"
+          >
+            <Text text={t('custom_hdpath_optional')} color="textDim" />
+          </Checkbox>
+          {customHdPathEnabled && (
             <Input
+              containerStyle={{ marginTop: 5 }}
               placeholder={t('custom_hdpath')}
               value={pathText}
               onChange={(e) => {
@@ -489,7 +510,7 @@ export function Step2({
               }}
               data-testid="custom-hdpath-input"
             />
-          </Column>
+          )}
           {pathError && <Text text={pathError} color="error" />}
         </Column>
       )}

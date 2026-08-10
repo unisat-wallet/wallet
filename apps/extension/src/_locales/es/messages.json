@@ -356,6 +356,9 @@
   "choose_a_wallet_you_want_to_restore_from": {
     "message": "Elige una billetera desde la que quieras restaurar"
   },
+  "choose_wallet": {
+    "message": "Elegir billetera"
+  },
   "claim": {
     "message": "Reclamar"
   },
@@ -985,6 +988,9 @@
   },
   "import_an_existing_wallet_with_your_secret_recover": {
     "message": "Importa una billetera existente con tu frase secreta de recuperación"
+  },
+  "CreateHDwallet_StepImport_RecoverTheWallet": {
+    "message": "Ingrese una frase semilla de 12 o 24 palabras para recuperar la billetera."
   },
   "important_to_not_transfer_this_token": {
     "message": "Importante: No transferas este token debido a una discrepancia temporal en el índice. Esperamos la resolución del equipo fundador del protocolo. Otros tokens no afectados."
@@ -1706,14 +1712,23 @@
   "passphrase_optional": {
     "message": "Frase de contraseña BIP39 (opcional)"
   },
+  "passphrase_recovery_notice": {
+    "message": "Introduzca una frase de contraseña solo si la billetera original usó una frase de contraseña BIP39. Una frase de contraseña diferente restaura una billetera diferente."
+  },
   "passphrase_warning_title": {
     "message": "Alerta de seguridad"
   },
   "passphrase_backup_notice": {
-    "message": "Una frase de contraseña opcional añade una capa adicional de protección a su billetera. Una frase larga y única puede mejorar significativamente la seguridad; guárdela de forma segura, ya que no se puede recuperar si se pierde."
+    "message": "Una frase de contraseña opcional añade una capa adicional de protección a su billetera. Use una frase larga, aleatoria y única, y no reutilice ninguna otra contraseña. Guárdela de forma segura, ya que no se puede recuperar si se pierde."
   },
   "passphrase_warning_confirm": {
     "message": "Entiendo"
+  },
+  "confirm_bip39_passphrase": {
+    "message": "Confirmar frase de contraseña BIP39"
+  },
+  "passphrases_do_not_match": {
+    "message": "Las frases de contraseña no coinciden."
   },
   "please_be_aware_that": {
     "message": "Ten en cuenta que:"
@@ -1972,6 +1987,9 @@
   },
   "secret_recovery_phrase": {
     "message": "Frase Secreta de Recuperación"
+  },
+  "seed_phrase": {
+    "message": "Frase semilla"
   },
   "secret_recovery_phrase_is_only_stored_in_your_brow": {
     "message": "¡Es tu responsabilidad mantener la Frase Secreta de Recuperación segura!"
@@ -2560,6 +2578,15 @@
   },
   "verify_recovery_phrase": {
     "message": "Verificar Frase de Recuperación"
+  },
+  "verify_mnemonic_phrase": {
+    "message": "Verificar frase mnemónica"
+  },
+  "verify_mnemonic_phrase_hint": {
+    "message": "Haga clic en las palabras para colocarlas en el orden correcto para verificar si la frase mnemónica de la que realizó una copia de seguridad es correcta"
+  },
+  "verify_seed_phrase": {
+    "message": "Verificar frase semilla"
   },
   "version": {
     "message": "Versión:"

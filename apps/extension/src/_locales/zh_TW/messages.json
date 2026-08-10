@@ -356,6 +356,9 @@
   "choose_a_wallet_you_want_to_restore_from": {
     "message": "選擇您想從中恢復的錢包"
   },
+  "choose_wallet": {
+    "message": "選擇錢包"
+  },
   "claim": {
     "message": "領取"
   },
@@ -985,6 +988,9 @@
   },
   "import_an_existing_wallet_with_your_secret_recover": {
     "message": "使用您的助記詞匯入現有錢包"
+  },
+  "CreateHDwallet_StepImport_RecoverTheWallet": {
+    "message": "請輸入 12 或 24 個助記詞以恢復錢包。"
   },
   "important_to_not_transfer_this_token": {
     "message": "重要: 請不要轉移此代幣，因為存在臨時索引不一致的問題。我們正在等待協議創始團隊的解決方案。其他代幣不受影響。"
@@ -1709,14 +1715,23 @@
   "passphrase_optional": {
     "message": "BIP39 密碼短語（選填）"
   },
+  "passphrase_recovery_notice": {
+    "message": "僅當原錢包使用 BIP39 密碼短語時才輸入。不同的密碼短語將恢復不同的錢包。"
+  },
   "passphrase_warning_title": {
     "message": "安全警報"
   },
   "passphrase_backup_notice": {
-    "message": "設定額外密碼短語可為錢包增加一層保護。使用長且獨特的密碼短語能大幅提升安全性；請妥善備份，遺失後將無法恢復。"
+    "message": "設定額外密碼短語可為錢包增加一層保護。請使用長、隨機且獨特的密碼短語，切勿重複使用其他密碼。請妥善備份，遺失後將無法恢復。"
   },
   "passphrase_warning_confirm": {
     "message": "我已理解"
+  },
+  "confirm_bip39_passphrase": {
+    "message": "確認 BIP39 密碼短語"
+  },
+  "passphrases_do_not_match": {
+    "message": "密碼短語不一致。"
   },
   "please_be_aware_that": {
     "message": "請注意："
@@ -1974,6 +1989,9 @@
     "message": "秒前"
   },
   "secret_recovery_phrase": {
+    "message": "助記詞"
+  },
+  "seed_phrase": {
     "message": "助記詞"
   },
   "secret_recovery_phrase_is_only_stored_in_your_brow": {
@@ -2571,6 +2589,15 @@
     "message": "找不到 UTXO。"
   },
   "verify_recovery_phrase": {
+    "message": "驗證助記詞"
+  },
+  "verify_mnemonic_phrase": {
+    "message": "驗證助記詞"
+  },
+  "verify_mnemonic_phrase_hint": {
+    "message": "點擊單字以將它們按照正確的順序排列，以驗證您備份的助記詞是否正確"
+  },
+  "verify_seed_phrase": {
     "message": "驗證助記詞"
   },
   "version": {

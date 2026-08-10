@@ -72,6 +72,7 @@ const getWords24Item = t => ({
 interface CreateWalletLogicParams {
   contextData: ContextData
   updateContextData: (params: UpdateContextDataParams) => void
+  autoDetectWordsType?: boolean
 }
 
 function textToWordsArray(text: string) {
@@ -79,7 +80,7 @@ function textToWordsArray(text: string) {
 }
 
 export function useCreateWalletLogicImportWordsStep(params: CreateWalletLogicParams) {
-  const { contextData, updateContextData } = params
+  const { contextData, updateContextData, autoDetectWordsType = false } = params
   const { t } = useI18n()
 
   const walletTypeConfig = RESTORE_WALLETS.find(
@@ -105,9 +106,14 @@ export function useCreateWalletLogicImportWordsStep(params: CreateWalletLogicPar
   const [disabled, setDisabled] = useState(true)
 
   const selectedWordsItem =
-    wordsItems.find(item => item.key === contextData.wordsType) ?? wordsItems[0]!
+    wordsItems.find(item => item.key === contextData.wordsType) ??
+    wordsItems[0] ??
+    getWords12Item(t)
+  const maxWordsCount = autoDetectWordsType
+    ? Math.max(selectedWordsItem.count, ...wordsItems.map(item => item.count))
+    : selectedWordsItem.count
   const [inputWords, setInputWords] = useState<Array<string>>(() =>
-    new Array(selectedWordsItem.count).fill('')
+    new Array(maxWordsCount).fill('')
   )
   const [inputWordsText, setInputWordsText] = useState('')
   const [inputWordsError, setInputWordsError] = useState(false)
@@ -122,8 +128,6 @@ export function useCreateWalletLogicImportWordsStep(params: CreateWalletLogicPar
   const [enteredWordsCount, setEnteredWordsCount] = useState(0)
 
   const enablePhrase = walletTypeConfig?.phraseSupport
-
-  const maxWordsCount = selectedWordsItem.count
 
   const initKey = async () => {
     let totalKeyringCount = 0
@@ -141,6 +145,10 @@ export function useCreateWalletLogicImportWordsStep(params: CreateWalletLogicPar
   }, [])
 
   useEffect(() => {
+    if (autoDetectWordsType) {
+      return
+    }
+
     setDisabled(true)
 
     const words = textToWordsArray(inputWordsText)
@@ -154,7 +162,13 @@ export function useCreateWalletLogicImportWordsStep(params: CreateWalletLogicPar
     }
 
     setDisabled(false)
-  }, [inputWordsText, maxWordsCount])
+  }, [autoDetectWordsType, inputWordsText, maxWordsCount])
+
+  const autoDetectedWords = textToWordsArray(inputWordsText)
+  const hasValidAutoDetectedMnemonic =
+    autoDetectWordsType &&
+    wordsItems.some(item => item.count === autoDetectedWords.length) &&
+    validateMnemonic(autoDetectedWords.join(' '))
 
   const updateWords = (words: Array<string>, isEndedWithSpace?: boolean) => {
     setInputWords(words)
@@ -218,16 +232,25 @@ export function useCreateWalletLogicImportWordsStep(params: CreateWalletLogicPar
 
   const onClickNext = async () => {
     try {
-      const mnemonics = inputWords.join(' ')
+      const enteredWords = autoDetectWordsType ? textToWordsArray(inputWordsText) : inputWords
+      const detectedWordsItem = autoDetectWordsType
+        ? wordsItems.find(item => item.count === enteredWords.length)
+        : selectedWordsItem
+      const mnemonics = enteredWords.join(' ')
 
-      if (contextData.wordsType === WordsType.WORDS_12) {
+      if (!detectedWordsItem) {
+        tools.toastError(t('ErrorPrompt_CreateHDwallet_StepImport_InvalidMnemonic'))
+        return
+      }
+
+      if (!autoDetectWordsType && contextData.wordsType === WordsType.WORDS_12) {
         if (inputWords.length !== 12) {
           tools.toastError(t('ErrorPrompt_CreateHDwallet_StepImport_Not_12_words'))
           return
         }
       }
 
-      if (contextData.wordsType === WordsType.WORDS_24) {
+      if (!autoDetectWordsType && contextData.wordsType === WordsType.WORDS_24) {
         if (inputWords.length !== 24) {
           tools.toastError(t('ErrorPrompt_CreateHDwallet_StepImport_Not_24_words'))
           return
@@ -267,6 +290,7 @@ export function useCreateWalletLogicImportWordsStep(params: CreateWalletLogicPar
         updateContextData({
           walletName: contextData.walletName,
           mnemonics,
+          wordsType: detectedWordsItem.key,
           tabType: TabType.CHOOSE_ADDRESS_TYPE,
         })
       }
@@ -290,7 +314,7 @@ export function useCreateWalletLogicImportWordsStep(params: CreateWalletLogicPar
   return {
     wordsItems,
     t,
-    disabled,
+    disabled: autoDetectWordsType ? !hasValidAutoDetectedMnemonic : disabled,
     inputWords,
     inputWordsText,
     onHandleEventPaste,

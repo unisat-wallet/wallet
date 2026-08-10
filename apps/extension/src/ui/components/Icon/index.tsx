@@ -57,6 +57,7 @@ export const svgRegistry = {
   warning: '/images/icons/status/warning.svg',
   warning2: '/images/icons/status/warning2.svg',
   warn: '/images/icons/status/warn.svg',
+  prompt: '/images/icons/status/prompt.svg',
   danger: '/images/icons/status/danger.svg',
   alert: '/images/icons/status/alert.svg',
   risk: '/images/icons/status/risk.svg',
@@ -75,6 +76,7 @@ export const svgRegistry = {
   intro: '/images/icons/wallet/intro.svg',
   'wallet-info': '/images/icons/wallet/wallet-info.svg',
   frame: '/images/icons/wallet/frame.svg',
+  mnemonicreminder: '/images/icons/wallet/mnemonic-reminder.svg',
 
   // settings
   addressType: '/images/icons/settings/address-type.svg',

@@ -356,6 +356,9 @@
   "choose_a_wallet_you_want_to_restore_from": {
     "message": "復元したいウォレットを選択してください"
   },
+  "choose_wallet": {
+    "message": "ウォレットを選択"
+  },
   "claim": {
     "message": "請求"
   },
@@ -985,6 +988,9 @@
   },
   "import_an_existing_wallet_with_your_secret_recover": {
     "message": "シークレットリカバリーフレーズで既存のウォレットをインポート"
+  },
+  "CreateHDwallet_StepImport_RecoverTheWallet": {
+    "message": "12語または24語のシードフレーズを入力してウォレットを復元してください。"
   },
   "important_to_not_transfer_this_token": {
     "message": "重要: 一時的なインデックス作成の不一致のため、このトークンを転送しないでください。プロトコルの創設チームからの解決を待っています。他のトークンは影響を受けません。"
@@ -1706,14 +1712,23 @@
   "passphrase_optional": {
     "message": "BIP39 パスフレーズ（任意）"
   },
+  "passphrase_recovery_notice": {
+    "message": "元のウォレットで BIP39 パスフレーズを使用していた場合にのみ入力してください。異なるパスフレーズを入力すると、別のウォレットが復元されます。"
+  },
   "passphrase_warning_title": {
     "message": "セキュリティ警告"
   },
   "passphrase_backup_notice": {
-    "message": "任意のパスフレーズを設定すると、ウォレットに保護層を追加できます。長く固有のパスフレーズは安全性を大幅に高めます。紛失すると復元できないため、安全に保管してください。"
+    "message": "任意のパスフレーズを設定すると、ウォレットに保護層を追加できます。長く、ランダムで固有のパスフレーズを使用し、他のパスワードを使い回さないでください。紛失すると復元できないため、安全に保管してください。"
   },
   "passphrase_warning_confirm": {
     "message": "理解しました"
+  },
+  "confirm_bip39_passphrase": {
+    "message": "BIP39 パスフレーズを確認"
+  },
+  "passphrases_do_not_match": {
+    "message": "パスフレーズが一致しません。"
   },
   "please_be_aware_that": {
     "message": "ご注意ください："
@@ -1972,6 +1987,9 @@
   },
   "secret_recovery_phrase": {
     "message": "シークレットリカバリーフレーズ"
+  },
+  "seed_phrase": {
+    "message": "シードフレーズ"
   },
   "secret_recovery_phrase_is_only_stored_in_your_brow": {
     "message": "シークレットリカバリーフレーズを安全に保管するのはあなたの責任です！"
@@ -2569,6 +2587,15 @@
   },
   "verify_recovery_phrase": {
     "message": "リカバリーフレーズを確認"
+  },
+  "verify_mnemonic_phrase": {
+    "message": "ニーモニックフレーズの確認"
+  },
+  "verify_mnemonic_phrase_hint": {
+    "message": "単語をクリックして正しい順序で並べ、バックアップしたニーモニックフレーズが正しいかどうかを確認します"
+  },
+  "verify_seed_phrase": {
+    "message": "シードフレーズの確認"
   },
   "version": {
     "message": "バージョン:"

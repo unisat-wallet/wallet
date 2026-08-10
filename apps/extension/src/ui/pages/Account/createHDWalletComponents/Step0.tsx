@@ -1,5 +1,6 @@
-import { Button, Column, Text } from '@/ui/components';
+import { Button, Column, Row, Text } from '@/ui/components';
 import { ContextData, TabType, UpdateContextDataParams } from '@/ui/pages/Account/createHDWalletComponents/types';
+import { colors } from '@/ui/theme/colors';
 import { RESTORE_WALLETS, WordsType } from '@unisat/wallet-shared';
 import { useI18n } from '@unisat/wallet-state';
 
@@ -13,22 +14,39 @@ export function Step0({
   const { t } = useI18n();
   return (
     <Column gap="lg" data-testid="create-hd-wallet-step-0">
-      <Text text={t('choose_a_wallet_you_want_to_restore_from')} preset="title-bold" textCenter mt="xl" />
+      <Text
+        text={t('choose_a_wallet_you_want_to_restore_from')}
+        preset="title"
+        color="textDim"
+        style={{ fontSize: 13 }}
+      />
       {RESTORE_WALLETS.map((item, index) => {
         return (
-          <Button
-            key={index}
-            preset="default"
-            onClick={() => {
-              const wordsType = item.wordsTypes.includes(contextData.wordsType)
-                ? contextData.wordsType
-                : item.wordsTypes[0] ?? WordsType.WORDS_12;
+          <Row key={item.value}>
+            <Button
+              preset="default"
+              mt="sm"
+              style={{
+                flex: 1,
+                minHeight: 55,
+                justifyContent: 'flex-start',
+                padding: 15,
+                borderRadius: 10,
+                borderWidth: 1,
+                backgroundColor: colors.black_dark,
+                borderColor: colors.white_light2
+              }}
+              onClick={() => {
+                const wordsType = item.wordsTypes.includes(contextData.wordsType)
+                  ? contextData.wordsType
+                  : item.wordsTypes[0] ?? WordsType.WORDS_12;
 
-              updateContextData({ tabType: TabType.IMPORT_WORDS, restoreWalletType: item.value, wordsType });
-            }}
-            data-testid={`restore-wallet-type-option-${index}`}>
-            <Text text={item.i18nKey ? t(item.i18nKey) : item.name} />
-          </Button>
+                updateContextData({ tabType: TabType.IMPORT_WORDS, restoreWalletType: item.value, wordsType });
+              }}
+              data-testid={`restore-wallet-type-option-${index}`}>
+              <Text text={item.i18nKey ? t(item.i18nKey) : item.name} />
+            </Button>
+          </Row>
         );
       })}
     </Column>

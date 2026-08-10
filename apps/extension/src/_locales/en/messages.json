@@ -362,6 +362,9 @@
   "choose_a_wallet_you_want_to_restore_from": {
     "message": "Choose a wallet you want to restore from"
   },
+  "choose_wallet": {
+    "message": "Choose Wallet"
+  },
   "claim": {
     "message": "Claim"
   },
@@ -991,6 +994,9 @@
   },
   "import_an_existing_wallet_with_your_secret_recover": {
     "message": "Import an existing wallet with your secret recovery phrase"
+  },
+  "CreateHDwallet_StepImport_RecoverTheWallet": {
+    "message": "Please enter a 12 or 24 word seed phrase to recover the wallet."
   },
   "important_to_not_transfer_this_token": {
     "message": "Important: Please do not transfer this token due to a temporary indexing discrepancy. We are awaiting resolution from the protocol's founding team. Other tokens unaffected."
@@ -1712,14 +1718,23 @@
   "passphrase_optional": {
     "message": "BIP39 Passphrase (Optional)"
   },
+  "passphrase_recovery_notice": {
+    "message": "Only enter this if the original wallet used a BIP39 passphrase. A different passphrase restores a different wallet."
+  },
   "passphrase_warning_title": {
     "message": "Security Alert"
   },
   "passphrase_backup_notice": {
-    "message": "An optional passphrase adds an extra layer of protection to your wallet. A long, unique passphrase can significantly improve security; store it safely, as lost passphrases cannot be recovered."
+    "message": "An optional passphrase adds an extra layer of protection to your wallet. Use a long, random, unique passphrase and do not reuse another password. Store it safely, as lost passphrases cannot be recovered."
   },
   "passphrase_warning_confirm": {
     "message": "I understood"
+  },
+  "confirm_bip39_passphrase": {
+    "message": "Confirm BIP39 Passphrase"
+  },
+  "passphrases_do_not_match": {
+    "message": "Passphrases do not match."
   },
   "please_be_aware_that": {
     "message": "Please be aware that:"
@@ -1978,6 +1993,9 @@
   },
   "secret_recovery_phrase": {
     "message": "Secret Recovery Phrase"
+  },
+  "seed_phrase": {
+    "message": "Seed Phrase"
   },
   "secret_recovery_phrase_is_only_stored_in_your_brow": {
     "message": "It's your responsibilities to keep your Secret Recovery Phrase  safe!"
@@ -2575,6 +2593,15 @@
   },
   "verify_recovery_phrase": {
     "message": "Verify Recovery Phrase"
+  },
+  "verify_mnemonic_phrase": {
+    "message": "Verify mnemonic phrase"
+  },
+  "verify_mnemonic_phrase_hint": {
+    "message": "Click on the words to put them in the correct order to verify if the mnemonic phrase you backed up is correct"
+  },
+  "verify_seed_phrase": {
+    "message": "Verify Seed Phrase"
   },
   "version": {
     "message": "Version:"

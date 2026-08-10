@@ -356,6 +356,9 @@
   "choose_a_wallet_you_want_to_restore_from": {
     "message": "Choisissez un portefeuille à partir duquel vous souhaitez restaurer"
   },
+  "choose_wallet": {
+    "message": "Choisir un portefeuille"
+  },
   "claim": {
     "message": "Réclamer"
   },
@@ -985,6 +988,9 @@
   },
   "import_an_existing_wallet_with_your_secret_recover": {
     "message": "Importer un portefeuille existant avec votre phrase secrète de récupération"
+  },
+  "CreateHDwallet_StepImport_RecoverTheWallet": {
+    "message": "Veuillez saisir une phrase de départ de 12 ou 24 mots pour récupérer le portefeuille."
   },
   "important_to_not_transfer_this_token": {
     "message": "Important: Veuillez ne pas transférer ce jeton en raison d'une anomalie temporaire d'indexation. Nous attendons la résolution du projet fondateur. Les autres jetons ne sont pas affectés."
@@ -1706,14 +1712,23 @@
   "passphrase_optional": {
     "message": "Phrase de passe BIP39 (facultative)"
   },
+  "passphrase_recovery_notice": {
+    "message": "Saisissez une phrase de passe uniquement si le portefeuille d'origine utilisait une phrase de passe BIP39. Une phrase de passe différente restaure un portefeuille différent."
+  },
   "passphrase_warning_title": {
     "message": "Alerte de sécurité"
   },
   "passphrase_backup_notice": {
-    "message": "Une phrase secrète facultative ajoute une couche de protection à votre portefeuille. Une phrase longue et unique peut renforcer considérablement la sécurité ; conservez-la en lieu sûr, car elle ne peut pas être récupérée si elle est perdue."
+    "message": "Une phrase secrète facultative ajoute une couche de protection à votre portefeuille. Utilisez une phrase longue, aléatoire et unique, sans réutiliser un autre mot de passe. Conservez-la en lieu sûr, car elle ne peut pas être récupérée si elle est perdue."
   },
   "passphrase_warning_confirm": {
     "message": "J'ai compris"
+  },
+  "confirm_bip39_passphrase": {
+    "message": "Confirmer la phrase de passe BIP39"
+  },
+  "passphrases_do_not_match": {
+    "message": "Les phrases de passe ne correspondent pas."
   },
   "please_be_aware_that": {
     "message": "Veuillez noter que :"
@@ -1972,6 +1987,9 @@
   },
   "secret_recovery_phrase": {
     "message": "Phrase Secrète de Récupération"
+  },
+  "seed_phrase": {
+    "message": "Phrase de départ"
   },
   "secret_recovery_phrase_is_only_stored_in_your_brow": {
     "message": "Il est de votre responsabilité de garder la Phrase Secrète de Récupération en sécurité !"
@@ -2569,6 +2587,15 @@
   },
   "verify_recovery_phrase": {
     "message": "Vérifier la Phrase de Récupération"
+  },
+  "verify_mnemonic_phrase": {
+    "message": "Vérifier la phrase mnémonique"
+  },
+  "verify_mnemonic_phrase_hint": {
+    "message": "Cliquez sur les mots pour les mettre dans le bon ordre afin de vérifier si la phrase mnémonique que vous avez sauvegardée est correcte"
+  },
+  "verify_seed_phrase": {
+    "message": "Vérifier la phrase de départ"
   },
   "version": {
     "message": "Version :"
