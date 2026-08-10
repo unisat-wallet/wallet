@@ -24,6 +24,7 @@ export function Step1_Create({
   const [generating, setGenerating] = useState(false);
   const generationRequestRef = useRef(0);
   const generationQueueRef = useRef(Promise.resolve());
+  const walletNameInitializedRef = useRef(Boolean(contextData.walletName));
   const { t } = useI18n();
   const wallet = useWallet();
 
@@ -65,7 +66,7 @@ export function Step1_Create({
   }, []);
 
   useEffect(() => {
-    if (contextData.walletName) {
+    if (walletNameInitializedRef.current || contextData.walletName) {
       return;
     }
 
@@ -74,9 +75,11 @@ export function Step1_Create({
       try {
         const totalKeyringCount = await wallet.getTotalKeyringCount();
         if (!cancelled) {
+          walletNameInitializedRef.current = true;
           updateContextData({ walletName: `HD Wallet #${totalKeyringCount + 1}` });
         }
       } catch {
+        walletNameInitializedRef.current = true;
         // The keyring service assigns its standard name if the lookup is unavailable.
       }
     };
@@ -274,6 +277,7 @@ export function Step1_Create({
         <Input
           value={contextData.walletName}
           onChange={(e) => {
+            walletNameInitializedRef.current = true;
             updateContextData({ walletName: e.target.value });
           }}
           maxLength={MAX_ALIAS_NAME_LENGTH}
