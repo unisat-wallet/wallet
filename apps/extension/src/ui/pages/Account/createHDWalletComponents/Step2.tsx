@@ -9,7 +9,15 @@ import { satoshisToAmount } from '@/ui/utils';
 import { isValidHdPath } from '@/ui/utils/bitcoin-utils';
 import { LoadingOutlined } from '@ant-design/icons';
 import { ADDRESS_TYPES, RESTORE_WALLETS, RestoreWalletType, getAccountDerivationPath } from '@unisat/wallet-shared';
-import { useCreateAccountCallback, useCreatePreMnemonicAccountCallback, useI18n, useTools, useWallet } from '@unisat/wallet-state';
+import {
+  keyringsActions,
+  useAppDispatch,
+  useCreateAccountCallback,
+  useCreatePreMnemonicAccountCallback,
+  useI18n,
+  useTools,
+  useWallet
+} from '@unisat/wallet-state';
 import { AddressType } from '@unisat/wallet-types';
 
 export function Step2({
@@ -22,6 +30,7 @@ export function Step2({
   clearSensitiveState: () => void;
 }) {
   const wallet = useWallet();
+  const dispatch = useAppDispatch();
   const tools = useTools();
   const { t } = useI18n();
 
@@ -153,7 +162,15 @@ export function Step2({
         setPreviewLoading(false);
       }
     }
-  }, [contextData.customHdPath, contextData.isRestore, contextData.mnemonics, contextData.passphrase, hdPathOptions, isMagicEden, wallet]);
+  }, [
+    contextData.customHdPath,
+    contextData.isRestore,
+    contextData.mnemonics,
+    contextData.passphrase,
+    hdPathOptions,
+    isMagicEden,
+    wallet
+  ]);
 
   const [scanned, setScanned] = useState(false);
 
@@ -297,13 +314,22 @@ export function Step2({
             isMagicEden
           );
         } else {
-          await createAccountFromPreMnemonic(
-            hdPath,
-            contextData.passphrase,
-            contextData.addressType,
-            1,
-            isMagicEden
-          );
+          await createAccountFromPreMnemonic(hdPath, contextData.passphrase, contextData.addressType, 1, isMagicEden);
+        }
+      }
+
+      const walletName = contextData.walletName.trim();
+      if (walletName) {
+        try {
+          const keyrings = await wallet.getKeyrings();
+          const createdKeyring = keyrings[keyrings.length - 1];
+          if (createdKeyring) {
+            const renamedKeyring = await wallet.setKeyringAlianName(createdKeyring, walletName);
+            dispatch(keyringsActions.updateKeyringName(renamedKeyring));
+          }
+        } catch (e) {
+          // The keyring is already created, so do not leave the user in a retryable create flow.
+          tools.toastError((e as Error).message);
         }
       }
       clearSensitiveState();
@@ -469,24 +495,6 @@ export function Step2({
       )}
 
       {!pathError && error && <Text text={error} color="error" />}
-
-      {!scanned && restoreWallet.phraseSupport && (
-        <Column mt="lg">
-          <Text text={t('phrase_optional')} preset="bold" />
-          <Input
-            placeholder={t('passphrase')}
-            value={contextData.passphrase}
-            onChange={async (e) => {
-              updateContextData({
-                passphrase: e.target.value
-              });
-            }}
-            autoComplete="off"
-            spellCheck={false}
-            data-testid="passphrase-input"
-          />
-        </Column>
-      )}
 
       <FooterButtonContainer>
         <Button

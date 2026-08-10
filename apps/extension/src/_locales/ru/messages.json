@@ -1343,6 +1343,27 @@
   "mnemonics_24_words": {
     "message": "24 слова"
   },
+  "mnemonic_recovery_info_title": {
+    "message": "Информация"
+  },
+  "mnemonic_recovery_info": {
+    "message": "Вам понадобится секретная фраза восстановления для доступа к своей учетной записи на новом устройстве или в случае потери пароля."
+  },
+  "mnemonic_intro_title": {
+    "message": "Введение"
+  },
+  "mnemonic_intro": {
+    "message": "Запишите эту секретную фразу восстановления и сохраните ее в месте, которому вы доверяете и к которому есть доступ только у вас."
+  },
+  "mnemonic_danger_title": {
+    "message": "Опасность"
+  },
+  "mnemonic_danger": {
+    "message": "Эта фраза - единственный способ восстановить ваш кошелек. Не делитесь ею ни с кем!"
+  },
+  "mnemonics_12_words_security_warning_title": {
+    "message": "Уровень безопасности"
+  },
   "more": {
     "message": "Ещё"
   },
@@ -1682,8 +1703,17 @@
   "phishing_detection": {
     "message": "Обнаружение фишинга"
   },
-  "phrase_optional": {
-    "message": "Фраза (необязательно)"
+  "passphrase_optional": {
+    "message": "Парольная фраза BIP39 (необязательно)"
+  },
+  "passphrase_warning_title": {
+    "message": "Предупреждение о безопасности"
+  },
+  "passphrase_backup_notice": {
+    "message": "Дополнительная парольная фраза добавляет еще один уровень защиты вашему кошельку. Длинная и уникальная фраза может значительно повысить безопасность; храните ее надежно, так как восстановить ее при утере невозможно."
+  },
+  "passphrase_warning_confirm": {
+    "message": "Я понял"
   },
   "please_be_aware_that": {
     "message": "Пожалуйста, имейте в виду, что:"
@@ -2566,6 +2596,9 @@
   },
   "view_on_uniscan": {
     "message": "Смотреть на UniScan"
+  },
+  "wallet_name": {
+    "message": "Имя кошелька"
   },
   "wallet_existed": {
     "message": "Кошелёк уже существует."

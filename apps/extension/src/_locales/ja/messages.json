@@ -1343,6 +1343,27 @@
   "mnemonics_24_words": {
     "message": "24 語"
   },
+  "mnemonic_recovery_info_title": {
+    "message": "情報"
+  },
+  "mnemonic_recovery_info": {
+    "message": "新しいデバイスでアカウントにアクセスする場合、またはパスワードを忘れた場合は、シークレットリカバリーフレーズが必要になります。"
+  },
+  "mnemonic_intro_title": {
+    "message": "はじめに"
+  },
+  "mnemonic_intro": {
+    "message": "このシークレットリカバリーフレーズを書き留め、信頼できる、自分だけがアクセスできる場所に保存してください。"
+  },
+  "mnemonic_danger_title": {
+    "message": "危険"
+  },
+  "mnemonic_danger": {
+    "message": "このフレーズはウォレットを復元するための唯一の方法です。誰とも共有しないでください！"
+  },
+  "mnemonics_12_words_security_warning_title": {
+    "message": "セキュリティレベル"
+  },
   "more": {
     "message": "もっと"
   },
@@ -1682,8 +1703,17 @@
   "phishing_detection": {
     "message": "フィッシング検出"
   },
-  "phrase_optional": {
-    "message": "フレーズ (オプション)"
+  "passphrase_optional": {
+    "message": "BIP39 パスフレーズ（任意）"
+  },
+  "passphrase_warning_title": {
+    "message": "セキュリティ警告"
+  },
+  "passphrase_backup_notice": {
+    "message": "任意のパスフレーズを設定すると、ウォレットに保護層を追加できます。長く固有のパスフレーズは安全性を大幅に高めます。紛失すると復元できないため、安全に保管してください。"
+  },
+  "passphrase_warning_confirm": {
+    "message": "理解しました"
   },
   "please_be_aware_that": {
     "message": "ご注意ください："
@@ -2566,6 +2596,9 @@
   },
   "view_on_uniscan": {
     "message": "UniScanで見る"
+  },
+  "wallet_name": {
+    "message": "ウォレット名"
   },
   "wallet_existed": {
     "message": "ウォレットは既に存在します"

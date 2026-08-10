@@ -28,6 +28,7 @@ export default function CreateHDWalletScreen() {
     mnemonics: '',
     hdPath: '',
     passphrase: '',
+    walletName: '',
     addressType: AddressType.P2WPKH,
     step1CreateWordsCompleted: false,
     mnemonicVerified: false,
@@ -53,6 +54,7 @@ export default function CreateHDWalletScreen() {
       ...current,
       mnemonics: '',
       passphrase: '',
+      walletName: '',
       mnemonicVerified: false,
       step1CreateWordsCompleted: false
     }));
@@ -69,9 +71,12 @@ export default function CreateHDWalletScreen() {
       }
     }, 10 * 1000); // Trigger every 10 seconds
 
-    const timeout = setTimeout(() => {
-      clearInterval(interval);
-    }, 10 * 60 * 1000);
+    const timeout = setTimeout(
+      () => {
+        clearInterval(interval);
+      },
+      10 * 60 * 1000
+    );
 
     return () => {
       clearInterval(interval);

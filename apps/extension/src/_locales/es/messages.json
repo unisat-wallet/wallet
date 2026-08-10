@@ -1343,6 +1343,27 @@
   "mnemonics_24_words": {
     "message": "24 palabras"
   },
+  "mnemonic_recovery_info_title": {
+    "message": "Información"
+  },
+  "mnemonic_recovery_info": {
+    "message": "Necesitará la frase de recuperación secreta para acceder a su cuenta en un nuevo dispositivo o en caso de que pierda su contraseña."
+  },
+  "mnemonic_intro_title": {
+    "message": "Introducción"
+  },
+  "mnemonic_intro": {
+    "message": "Anote esta frase de recuperación secreta y guárdela en un lugar en el que confíe y al que solo usted pueda acceder."
+  },
+  "mnemonic_danger_title": {
+    "message": "Peligro"
+  },
+  "mnemonic_danger": {
+    "message": "Esta frase es la única forma de recuperar su billetera. ¡No la comparta con nadie!"
+  },
+  "mnemonics_12_words_security_warning_title": {
+    "message": "Nivel de seguridad"
+  },
   "more": {
     "message": "Más"
   },
@@ -1682,8 +1703,17 @@
   "phishing_detection": {
     "message": "Detección de Phishing"
   },
-  "phrase_optional": {
-    "message": "Frase (Opcional)"
+  "passphrase_optional": {
+    "message": "Frase de contraseña BIP39 (opcional)"
+  },
+  "passphrase_warning_title": {
+    "message": "Alerta de seguridad"
+  },
+  "passphrase_backup_notice": {
+    "message": "Una frase de contraseña opcional añade una capa adicional de protección a su billetera. Una frase larga y única puede mejorar significativamente la seguridad; guárdela de forma segura, ya que no se puede recuperar si se pierde."
+  },
+  "passphrase_warning_confirm": {
+    "message": "Entiendo"
   },
   "please_be_aware_that": {
     "message": "Ten en cuenta que:"
@@ -2557,6 +2587,9 @@
   },
   "view_on_uniscan": {
     "message": "Ver en UniScan"
+  },
+  "wallet_name": {
+    "message": "Nombre de la billetera"
   },
   "wallet_existed": {
     "message": "La billetera ya existe"

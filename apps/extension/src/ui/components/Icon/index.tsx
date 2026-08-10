@@ -56,6 +56,8 @@ export const svgRegistry = {
   success: '/images/icons/status/success.svg',
   warning: '/images/icons/status/warning.svg',
   warning2: '/images/icons/status/warning2.svg',
+  warn: '/images/icons/status/warn.svg',
+  danger: '/images/icons/status/danger.svg',
   alert: '/images/icons/status/alert.svg',
   risk: '/images/icons/status/risk.svg',
   info: '/images/icons/status/info.svg',
@@ -69,6 +71,10 @@ export const svgRegistry = {
   overview: '/images/icons/status/overview.svg',
   notification: '/images/icons/status/notification.svg',
   emptyBox: '/images/icons/status/empty-box.svg',
+
+  intro: '/images/icons/wallet/intro.svg',
+  'wallet-info': '/images/icons/wallet/wallet-info.svg',
+  frame: '/images/icons/wallet/frame.svg',
 
   // settings
   addressType: '/images/icons/settings/address-type.svg',
@@ -292,7 +298,8 @@ export function Icon(props: IconProps) {
           $imageStyleOverride || {},
           onClick ? { cursor: 'pointer' } : {}
         )}
-        data-testid={dataTestId}>
+        data-testid={dataTestId}
+      >
         {children}
       </div>
     );

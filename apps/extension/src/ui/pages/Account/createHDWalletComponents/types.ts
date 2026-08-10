@@ -17,6 +17,7 @@ export interface ContextData {
   mnemonics: string;
   hdPath: string;
   passphrase: string;
+  walletName: string;
   addressType: AddressType;
   step1CreateWordsCompleted: boolean;
   mnemonicVerified: boolean;
@@ -33,6 +34,7 @@ export interface UpdateContextDataParams {
   mnemonics?: string;
   hdPath?: string;
   passphrase?: string;
+  walletName?: string;
   addressType?: AddressType;
   step1CreateWordsCompleted?: boolean;
   mnemonicVerified?: boolean;

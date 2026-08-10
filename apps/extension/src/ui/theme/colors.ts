@@ -39,7 +39,8 @@ const palette = {
   orange_light: '#ff8f42',
   orange_light2: '#FF7C2A',
 
-  gold: '#eac249'
+  gold: '#eac249',
+  gold_dark: 'rgba(235, 185, 76, 0.8)'
 };
 
 export const colors = Object.assign({}, palette, {

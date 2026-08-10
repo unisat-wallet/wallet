@@ -1343,6 +1343,27 @@
   "mnemonics_24_words": {
     "message": "24 詞"
   },
+  "mnemonic_recovery_info_title": {
+    "message": "資訊"
+  },
+  "mnemonic_recovery_info": {
+    "message": "您將需要助記詞才能在新裝置上或在您遺失密碼的情況下存取您的帳戶。"
+  },
+  "mnemonic_intro_title": {
+    "message": "簡介"
+  },
+  "mnemonic_intro": {
+    "message": "寫下此助記詞，並將其保存在您信任且只有您可以存取的地方。"
+  },
+  "mnemonic_danger_title": {
+    "message": "危險"
+  },
+  "mnemonic_danger": {
+    "message": "此短語是恢復您錢包的唯一途徑。請勿與任何人分享！"
+  },
+  "mnemonics_12_words_security_warning_title": {
+    "message": "安全等級"
+  },
   "more": {
     "message": "更多"
   },
@@ -1685,8 +1706,17 @@
   "phishing_detection": {
     "message": "釣魚偵測"
   },
-  "phrase_optional": {
-    "message": "密碼短語 (選填)"
+  "passphrase_optional": {
+    "message": "BIP39 密碼短語（選填）"
+  },
+  "passphrase_warning_title": {
+    "message": "安全警報"
+  },
+  "passphrase_backup_notice": {
+    "message": "設定額外密碼短語可為錢包增加一層保護。使用長且獨特的密碼短語能大幅提升安全性；請妥善備份，遺失後將無法恢復。"
+  },
+  "passphrase_warning_confirm": {
+    "message": "我已理解"
   },
   "please_be_aware_that": {
     "message": "請注意："
@@ -2569,6 +2599,9 @@
   },
   "view_on_uniscan": {
     "message": "在 UniScan 上查看"
+  },
+  "wallet_name": {
+    "message": "錢包名稱"
   },
   "wallet_existed": {
     "message": "錢包已存在"

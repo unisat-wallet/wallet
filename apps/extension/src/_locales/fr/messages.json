@@ -1343,6 +1343,27 @@
   "mnemonics_24_words": {
     "message": "24 mots"
   },
+  "mnemonic_recovery_info_title": {
+    "message": "Info"
+  },
+  "mnemonic_recovery_info": {
+    "message": "Vous aurez besoin de la phrase de récupération secrète pour accéder à votre compte sur un nouvel appareil ou en cas de perte de votre mot de passe."
+  },
+  "mnemonic_intro_title": {
+    "message": "Présentation"
+  },
+  "mnemonic_intro": {
+    "message": "Notez cette phrase de récupération secrète et enregistrez-la dans un endroit de confiance et auquel vous seul pouvez accéder."
+  },
+  "mnemonic_danger_title": {
+    "message": "Danger"
+  },
+  "mnemonic_danger": {
+    "message": "Cette phrase est le seul moyen de récupérer votre portefeuille. Ne la partagez avec personne !"
+  },
+  "mnemonics_12_words_security_warning_title": {
+    "message": "Niveau de sécurité"
+  },
   "more": {
     "message": "Plus"
   },
@@ -1682,8 +1703,17 @@
   "phishing_detection": {
     "message": "Détection de Phishing"
   },
-  "phrase_optional": {
-    "message": "Phrase (Optionnel)"
+  "passphrase_optional": {
+    "message": "Phrase de passe BIP39 (facultative)"
+  },
+  "passphrase_warning_title": {
+    "message": "Alerte de sécurité"
+  },
+  "passphrase_backup_notice": {
+    "message": "Une phrase secrète facultative ajoute une couche de protection à votre portefeuille. Une phrase longue et unique peut renforcer considérablement la sécurité ; conservez-la en lieu sûr, car elle ne peut pas être récupérée si elle est perdue."
+  },
+  "passphrase_warning_confirm": {
+    "message": "J'ai compris"
   },
   "please_be_aware_that": {
     "message": "Veuillez noter que :"
@@ -2566,6 +2596,9 @@
   },
   "view_on_uniscan": {
     "message": "Voir sur UniScan"
+  },
+  "wallet_name": {
+    "message": "Nom du portefeuille"
   },
   "wallet_existed": {
     "message": "Le portefeuille existe déjà"

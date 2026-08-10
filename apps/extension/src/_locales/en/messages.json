@@ -1349,6 +1349,27 @@
   "mnemonics_24_words": {
     "message": "24 words"
   },
+  "mnemonic_recovery_info_title": {
+    "message": "Info"
+  },
+  "mnemonic_recovery_info": {
+    "message": "You will need the Secret Recovery Phrase to access your account on a new device or in case you lose your password."
+  },
+  "mnemonic_intro_title": {
+    "message": "Intro"
+  },
+  "mnemonic_intro": {
+    "message": "Write down this Secret Recovery Phrase and save it in a place that you trust and only you can access."
+  },
+  "mnemonic_danger_title": {
+    "message": "Danger"
+  },
+  "mnemonic_danger": {
+    "message": "This phrase is the only way to recover your wallet. Do not share it with anyone!"
+  },
+  "mnemonics_12_words_security_warning_title": {
+    "message": "Security level"
+  },
   "more": {
     "message": "More"
   },
@@ -1688,8 +1709,17 @@
   "phishing_detection": {
     "message": "Phishing Detection"
   },
-  "phrase_optional": {
-    "message": "Phrase (Optional)"
+  "passphrase_optional": {
+    "message": "BIP39 Passphrase (Optional)"
+  },
+  "passphrase_warning_title": {
+    "message": "Security Alert"
+  },
+  "passphrase_backup_notice": {
+    "message": "An optional passphrase adds an extra layer of protection to your wallet. A long, unique passphrase can significantly improve security; store it safely, as lost passphrases cannot be recovered."
+  },
+  "passphrase_warning_confirm": {
+    "message": "I understood"
   },
   "please_be_aware_that": {
     "message": "Please be aware that:"
@@ -2572,6 +2602,9 @@
   },
   "view_on_uniscan": {
     "message": "View on UniScan"
+  },
+  "wallet_name": {
+    "message": "Wallet name"
   },
   "wallet_existed": {
     "message": "Wallet existed."
