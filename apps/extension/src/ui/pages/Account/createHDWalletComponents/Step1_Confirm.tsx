@@ -19,8 +19,13 @@ function shuffledIndexes(length: number): number[] {
   return indexes;
 }
 
-const SLOTS_PER_ROW = 3;
-const INITIAL_VISIBLE_SLOT_COUNT = SLOTS_PER_ROW * 2;
+function getVerificationCount(wordCount: number): number {
+  if (wordCount === 24) {
+    return 6;
+  }
+
+  return Math.min(wordCount, 3);
+}
 
 export function Step1_Confirm({
   contextData,
@@ -31,26 +36,34 @@ export function Step1_Confirm({
 }) {
   const { t } = useI18n();
   const words = useMemo(() => contextData.mnemonics.split(' ').filter(Boolean), [contextData.mnemonics]);
-  const choices = useMemo(() => shuffledIndexes(words.length), [words.length, contextData.mnemonics]);
+  const verificationIndexes = useMemo(
+    () =>
+      shuffledIndexes(words.length)
+        .slice(0, getVerificationCount(words.length))
+        .sort((first, second) => first - second),
+    [words.length, contextData.mnemonics]
+  );
+  const choices = useMemo(
+    () => shuffledIndexes(verificationIndexes.length).map((index) => verificationIndexes[index]!),
+    [verificationIndexes]
+  );
   const [selectedIndexes, setSelectedIndexes] = useState<number[]>([]);
 
   useEffect(() => {
     setSelectedIndexes([]);
   }, [contextData.mnemonics]);
 
-  const hasIncorrectSelection = selectedIndexes.some((wordIndex, slotIndex) => words[wordIndex] !== words[slotIndex]);
-  const isVerified = selectedIndexes.length === words.length && !hasIncorrectSelection;
-  const visibleSlotCount = Math.min(
-    words.length,
-    INITIAL_VISIBLE_SLOT_COUNT + Math.floor(selectedIndexes.length / SLOTS_PER_ROW) * SLOTS_PER_ROW
+  const hasIncorrectSelection = selectedIndexes.some(
+    (wordIndex, slotIndex) => wordIndex !== verificationIndexes[slotIndex]
   );
+  const isVerified = selectedIndexes.length === verificationIndexes.length && !hasIncorrectSelection;
 
   const onSelect = (wordIndex: number) => {
     setSelectedIndexes((current) => {
       if (current.includes(wordIndex)) {
         return current.filter((index) => index !== wordIndex);
       }
-      if (current.some((selectedWordIndex, slotIndex) => words[selectedWordIndex] !== words[slotIndex])) {
+      if (current.some((selectedWordIndex, slotIndex) => selectedWordIndex !== verificationIndexes[slotIndex])) {
         return current;
       }
       return [...current, wordIndex];
@@ -69,15 +82,15 @@ export function Step1_Confirm({
       />
 
       <Grid columns={3} gap="sm" style={{ width: '100%' }}>
-        {words.slice(0, visibleSlotCount).map((_, index) => {
-          const selectedWordIndex = selectedIndexes[index];
-          const isIncorrect = selectedWordIndex !== undefined && words[selectedWordIndex] !== words[index];
+        {verificationIndexes.map((expectedWordIndex, slotIndex) => {
+          const selectedWordIndex = selectedIndexes[slotIndex];
+          const isIncorrect = selectedWordIndex !== undefined && selectedWordIndex !== expectedWordIndex;
           const isSelected = selectedWordIndex !== undefined;
-          const isCurrentSlot = !hasIncorrectSelection && !isSelected && index === selectedIndexes.length;
+          const isCurrentSlot = !hasIncorrectSelection && !isSelected && slotIndex === selectedIndexes.length;
 
           return (
             <Card
-              key={index}
+              key={expectedWordIndex}
               preset="style3"
               onClick={isIncorrect && selectedWordIndex !== undefined ? () => onSelect(selectedWordIndex) : undefined}
               style={{
@@ -100,8 +113,14 @@ export function Step1_Confirm({
                   ? 'rgba(227, 187, 95, 0.08)'
                   : colors.card
               }}
-              data-testid={`mnemonic-confirm-slot-${index}`}>
-              <Text text={`${index + 1}.`} size="xs" style={{ width: 20 }} color={isIncorrect ? 'error' : 'textDim'} />
+              data-testid={`mnemonic-confirm-slot-${expectedWordIndex}`}
+            >
+              <Text
+                text={`${expectedWordIndex + 1}.`}
+                size="xs"
+                style={{ width: 20 }}
+                color={isIncorrect ? 'error' : 'textDim'}
+              />
               <Text
                 text={selectedWordIndex === undefined ? '' : words[selectedWordIndex]!}
                 size="xs"
@@ -118,7 +137,7 @@ export function Step1_Confirm({
         <Grid columns={3} gap="sm" style={{ width: '100%' }}>
           {choices.map((wordIndex) => {
             const slotIndex = selectedIndexes.indexOf(wordIndex);
-            const isIncorrect = slotIndex >= 0 && words[wordIndex] !== words[slotIndex];
+            const isIncorrect = slotIndex >= 0 && wordIndex !== verificationIndexes[slotIndex];
             const isSelected = slotIndex >= 0;
 
             return (
@@ -140,7 +159,8 @@ export function Step1_Confirm({
                     : '#151313',
                   cursor: isSelected && !isIncorrect ? 'default' : 'pointer'
                 }}
-                data-testid={`mnemonic-confirm-word-${wordIndex}`}>
+                data-testid={`mnemonic-confirm-word-${wordIndex}`}
+              >
                 <Text
                   text={words[wordIndex]!}
                   size="sm"
