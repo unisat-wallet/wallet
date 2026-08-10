@@ -10,7 +10,13 @@ import { Popover } from '../Popover';
 import { Row } from '../Row';
 import { Text } from '../Text';
 
-export const UpgradePopover = ({ onClose }: { onClose: () => void }) => {
+export const UpgradePopover = ({
+  onClose,
+  onSkip
+}: {
+  onClose: () => void;
+  onSkip: () => void | Promise<void>;
+}) => {
   const versionInfo = useVersionInfo();
 
   const [versionDetail, setVersionDetail] = useState<VersionDetail>({
@@ -50,10 +56,8 @@ export const UpgradePopover = ({ onClose }: { onClose: () => void }) => {
           <Button
             text="Skip"
             full
-            onClick={(e) => {
-              if (onClose) {
-                onClose();
-              }
+            onClick={() => {
+              onSkip();
             }}
           />
 
@@ -61,7 +65,7 @@ export const UpgradePopover = ({ onClose }: { onClose: () => void }) => {
             text="Go to update"
             full
             preset="primary"
-            onClick={(e) => {
+            onClick={() => {
               window.open('https://unisat.io/extension/update');
             }}
           />

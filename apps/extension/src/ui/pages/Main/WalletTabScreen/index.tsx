@@ -8,7 +8,6 @@ import { NavTabBar } from '@/ui/components/NavTabBar';
 import { NoticePopover } from '@/ui/components/NoticePopover';
 import { SwitchNetworkBar } from '@/ui/components/SwitchNetworkBar';
 import { Tabs } from '@/ui/components/Tabs';
-import { UpgradePopover } from '@/ui/components/UpgradePopover';
 import { VersionNotice } from '@/ui/components/VersionNotice';
 import { getCurrentTab } from '@/ui/web/tabs';
 import { KeyringType } from '@unisat/keyring-service/types';
@@ -27,7 +26,6 @@ import {
   useIsUnlocked,
   useMoreAssetTabKey,
   useNavigation,
-  useSkipVersionCallback,
   useSupportedAssets,
   useVersionInfo,
   useWallet
@@ -61,8 +59,6 @@ export default function WalletTabScreen() {
   const dispatch = useAppDispatch();
   const assetTabKey = useAssetTabKey();
   const moreAssetTabKey = useMoreAssetTabKey();
-
-  const skipVersion = useSkipVersionCallback();
 
   const versionInfo = useVersionInfo();
 
@@ -107,12 +103,12 @@ export default function WalletTabScreen() {
           needFetchVersionDetail = true;
         } else {
           versionDetail = JSON.parse(item || '{}');
-          if (versionDetail && versionDetail.version !== versionInfo.currentVesion) {
+          if (versionDetail && versionDetail.version !== versionInfo.currentVersion) {
             needFetchVersionDetail = true;
           }
         }
         if (needFetchVersionDetail) {
-          versionDetail = await wallet.getVersionDetail(versionInfo.currentVesion);
+          versionDetail = await wallet.getVersionDetail(versionInfo.currentVersion);
           localStorage.setItem(STORAGE_VERSION_KEY, JSON.stringify(versionDetail));
 
           if (versionDetail && versionDetail.notice) {
@@ -263,14 +259,6 @@ export default function WalletTabScreen() {
             }}
           />
         )}
-        {!versionInfo.skipped && (
-          <UpgradePopover
-            onClose={() => {
-              skipVersion(versionInfo.newVersion);
-            }}
-          />
-        )}
-
         {switchChainModalVisible && (
           <SwitchChainModal
             onClose={() => {

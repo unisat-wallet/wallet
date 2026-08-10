@@ -203,7 +203,7 @@ export default function SettingsTabScreen() {
               }}
             />
           </Row>
-          <Text text={`${t('version')} ${versionInfo.currentVesion}`} preset="sub" textCenter />
+          <Text text={`${t('version')} ${versionInfo.currentVersion}`} preset="sub" textCenter />
         </Column>
       </Content>
       <Footer px="zero" py="zero">

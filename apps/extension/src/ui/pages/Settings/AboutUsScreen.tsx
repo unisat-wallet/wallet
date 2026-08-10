@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 
 import { Column, Content, Header, Icon, Layout, Row, Text } from '@/ui/components';
+import { UpgradePopover } from '@/ui/components/UpgradePopover';
 import { spacing } from '@/ui/theme/spacing';
 import { PlatformEnv, PRIVACY_POLICY_URL, TERMS_OF_SERVICE_URL } from '@unisat/wallet-shared';
 import {
@@ -8,6 +9,7 @@ import {
   useI18n,
   useNavigation,
   useSetDeveloperModeCallback,
+  useSkipVersionCallback,
   useTools,
   useVersionInfo
 } from '@unisat/wallet-state';
@@ -15,14 +17,16 @@ import {
 export default function AboutUsScreen() {
   const nav = useNavigation();
   const versionInfo = useVersionInfo();
-  const hasUpdate = versionInfo.latestVersion && versionInfo.latestVersion !== versionInfo.currentVesion;
+  const hasUpdate = versionInfo.hasUpdate;
   const { t } = useI18n();
   const tools = useTools();
   const developerMode = useDeveloperMode();
   const setDeveloperMode = useSetDeveloperModeCallback();
+  const skipVersion = useSkipVersionCallback();
 
   const [tapCount, setTapCount] = useState(0);
   const [lastTapTime, setLastTapTime] = useState(0);
+  const [showUpgradePopover, setShowUpgradePopover] = useState(false);
 
   useEffect(() => {
     if (tapCount >= 10) {
@@ -87,7 +91,7 @@ export default function AboutUsScreen() {
                   whiteSpace: 'nowrap',
                   gap: 0
                 }}
-                onClick={() => nav.navToUrl('https://unisat.io/extension/update')}>
+                onClick={() => setShowUpgradePopover(true)}>
                 <Icon icon="arrowUp" size={14} />
                 <Text text={t('about_new_update')} style={{ marginLeft: 3, whiteSpace: 'nowrap', color: '#EBB94C' }} />
               </Row>
@@ -136,6 +140,15 @@ export default function AboutUsScreen() {
           </Column>
         </Column>
       </Content>
+      {showUpgradePopover && versionInfo.hasUpdate && (
+        <UpgradePopover
+          onClose={() => setShowUpgradePopover(false)}
+          onSkip={async () => {
+            await skipVersion(versionInfo.newVersion);
+            setShowUpgradePopover(false);
+          }}
+        />
+      )}
     </Layout>
   );
 }
