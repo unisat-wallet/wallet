@@ -61,6 +61,7 @@ import {
   getAccountCapabilities,
   getLockTimeInfo,
   isChangeAddressHdPath,
+  isKeystoneAccountHdPath,
   t,
 } from '@unisat/wallet-shared'
 import { AddressType, ChainType, NetworkType } from '@unisat/wallet-types'
@@ -573,11 +574,17 @@ export class WalletController extends BaseController {
     hdPath: string,
     accountCount: number
   ) => {
+    if (hdPath !== '' && !isKeystoneAccountHdPath(hdPath) && !isChangeAddressHdPath(hdPath)) {
+      throw new Error('Invalid derivation path')
+    }
     const tmpKeyring = new KeystoneKeyring()
     await tmpKeyring.initFromUR(urType, urCbor)
     if (isChangeAddressHdPath(hdPath)) {
       tmpKeyring.changeChangeAddressHdPath(hdPath)
       tmpKeyring.addAccounts(accountCount)
+    } else if (isKeystoneAccountHdPath(hdPath)) {
+      tmpKeyring.changeHdPath(`${hdPath}/0`)
+      accountCount && tmpKeyring.addAccounts(accountCount)
     } else {
       tmpKeyring.changeHdPath(ADDRESS_TYPES[addressType]!.hdPath)
       accountCount && tmpKeyring.addAccounts(accountCount)

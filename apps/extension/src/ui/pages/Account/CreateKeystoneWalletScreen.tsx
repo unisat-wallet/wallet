@@ -9,7 +9,6 @@ import KeystonePopover from '@/ui/components/Keystone/Popover';
 import KeystoneScan from '@/ui/components/Keystone/Scan';
 import KeystoneFetchKey from '@/ui/components/Keystone/usb/FetchKey';
 import { colors } from '@/ui/theme/colors';
-import { isValidHdPath } from '@/ui/utils/bitcoin-utils';
 import { ScanOutlined, UsbOutlined } from '@ant-design/icons';
 import {
   useI18n,
@@ -20,7 +19,7 @@ import {
 } from '@unisat/wallet-state';
 import { AddressType } from '@unisat/wallet-types';
 
-import { ADDRESS_TYPES, isChangeAddressHdPath } from '@unisat/wallet-shared';
+import { ADDRESS_TYPES, isChangeAddressHdPath, isKeystoneAccountHdPath } from '@unisat/wallet-shared';
 import { useNavigate } from '../MainRoute';
 
 interface ContextData {
@@ -263,7 +262,7 @@ function Step3({
     scanVaultAddress(1);
   }, []);
   useEffect(() => {
-    if (isChangeAddressHdPath(contextData.customHdPath)) {
+    if (isKeystoneAccountHdPath(contextData.customHdPath) || isChangeAddressHdPath(contextData.customHdPath)) {
       scanVaultAddress(1);
       setScanned(false);
     }
@@ -317,13 +316,16 @@ function Step3({
         });
       });
 
-      // only the  customsan path is not empty and click thie scan button , then only show the custom path address type
-      if (isChangeAddressHdPath(contextData.customHdPath) && isScanned) {
+      const isCustomKeystonePath =
+        isKeystoneAccountHdPath(contextData.customHdPath) || isChangeAddressHdPath(contextData.customHdPath);
+      // Restrict a custom path scan to its matching purpose and select that type.
+      if (isCustomKeystonePath) {
         const saveAddressType = contextData.customHdPath.split('/')[1];
-        // find address type index by hdpath contains the saveAddressType
-        const saveAddressTypeIndex = addressTypes.findIndex((v) => v.hdPath.includes(saveAddressType));
-        // remove the groups which is not equal to saveAddressType
-        groups = groups.filter((v) => v.type === saveAddressTypeIndex);
+        const matchingAddressType = addressTypes.find((v) => v.hdPath.includes(saveAddressType));
+        if (matchingAddressType) {
+          groups = groups.filter((v) => v.type === matchingAddressType.value);
+          setAddressType(matchingAddressType.value);
+        }
       }
 
       // if res is empty and groups is empty, then only show the first wallet
@@ -368,6 +370,17 @@ function Step3({
         filtItems.push(items[0]);
       }
       return filtItems;
+    } else if (isKeystoneAccountHdPath(contextData.customHdPath)) {
+      const items = group.address_arr.map((v, index) => ({
+        address: v,
+        satoshis: group.satoshis_arr[index],
+        path: `${contextData.customHdPath}/0/${index}`
+      }));
+      const filtItems = items.filter((v) => v.satoshis >= 0);
+      if (filtItems.length === 0) {
+        filtItems.push(items[0]);
+      }
+      return filtItems;
     } else {
       const hdPath = addressTypes.find((v) => v.value === addressType)?.hdPath;
       const items = group.address_arr.map((v, index) => ({
@@ -387,7 +400,7 @@ function Step3({
     setPathError('');
     setPathText(text);
     if (text !== '') {
-      const isValid = isValidHdPath(text);
+      const isValid = isKeystoneAccountHdPath(text) || isChangeAddressHdPath(text);
       if (!isValid) {
         setPathError('Invalid derivation path.');
         return;
@@ -484,7 +497,7 @@ function Step3({
       )}
 
       <Footer>
-        <Button preset="primary" onClick={onConfirm} text={t('continue')} />
+        <Button disabled={Boolean(pathError)} preset="primary" onClick={onConfirm} text={t('continue')} />
       </Footer>
     </Layout>
   );

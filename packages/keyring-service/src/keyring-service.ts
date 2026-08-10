@@ -25,7 +25,13 @@ import {
   ToSignInput,
 } from './types'
 
-import { BUS_EVENTS, BUS_METHODS, isChangeAddressHdPath, WalletKeyring } from '@unisat/wallet-shared'
+import {
+  BUS_EVENTS,
+  BUS_METHODS,
+  isChangeAddressHdPath,
+  isKeystoneAccountHdPath,
+  WalletKeyring,
+} from '@unisat/wallet-shared'
 import { ProxyStorageAdapter } from '@unisat/wallet-storage'
 
 const KEYRING_SDK_TYPES = {
@@ -536,11 +542,17 @@ export class KeyringService extends EventEmitter {
     if (accountCount < 1) {
       throw new Error(this.t('keyring_error_account_count'))
     }
+    if (hdPath !== '' && !isKeystoneAccountHdPath(hdPath) && !isChangeAddressHdPath(hdPath)) {
+      throw new Error(this.t('invalid_derivation_path'))
+    }
     // await this.persistAllKeyrings();
     const tmpKeyring = new KeystoneKeyring()
     await tmpKeyring.initFromUR(urType, urCbor, connectionType)
     if (isChangeAddressHdPath(hdPath)) {
       tmpKeyring.changeChangeAddressHdPath(hdPath)
+      tmpKeyring.addAccounts(accountCount)
+    } else if (isKeystoneAccountHdPath(hdPath)) {
+      tmpKeyring.changeHdPath(`${hdPath}/0`)
       tmpKeyring.addAccounts(accountCount)
     } else {
       const typeConfig = ADDRESS_TYPES[addressType]

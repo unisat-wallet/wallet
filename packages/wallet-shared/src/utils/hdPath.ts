@@ -24,6 +24,20 @@ export function getAccountDerivationPath(
   return hdPath + '/' + accountIndex
 }
 
+/** Returns whether a path points to a BIP44 account-level xpub. */
+export function isKeystoneAccountHdPath(hdPath: unknown): hdPath is string {
+  if (typeof hdPath !== 'string') {
+    return false
+  }
+
+  const segments = hdPath.split('/')
+  return (
+    segments.length === 4 &&
+    segments[0] === 'm' &&
+    segments.slice(1).every(segment => /^(?:0|[1-9]\d*)'$/.test(segment))
+  )
+}
+
 /**
  * Returns whether a path points to the BIP44 change branch of an account.
  * Keystone exports xpubs at the account level, so this identifies paths that
@@ -37,8 +51,7 @@ export function isChangeAddressHdPath(hdPath: unknown): hdPath is string {
   const segments = hdPath.split('/')
   return (
     segments.length === 5 &&
-    segments[0] === 'm' &&
-    segments.slice(1, 4).every(segment => /^(?:0|[1-9]\d*)'$/.test(segment)) &&
+    isKeystoneAccountHdPath(segments.slice(0, 4).join('/')) &&
     segments[4] === '1'
   )
 }

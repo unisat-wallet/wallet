@@ -1,6 +1,10 @@
 import { describe, expect, it } from 'vitest'
 
-import { getAccountDerivationPath, isChangeAddressHdPath } from '../src/utils/hdPath'
+import {
+  getAccountDerivationPath,
+  isChangeAddressHdPath,
+  isKeystoneAccountHdPath,
+} from '../src/utils/hdPath'
 
 describe('getAccountDerivationPath', () => {
   it('appends account index in standard mode', () => {
@@ -33,5 +37,23 @@ describe('isChangeAddressHdPath', () => {
     undefined,
   ])('rejects non-change path %j', hdPath => {
     expect(isChangeAddressHdPath(hdPath)).toBe(false)
+  })
+})
+
+describe('isKeystoneAccountHdPath', () => {
+  it('identifies an account-level BIP44 path', () => {
+    expect(isKeystoneAccountHdPath("m/84'/0'/0'")).toBe(true)
+  })
+
+  it.each([
+    "m/84'/0'/0'/0",
+    "m/84'/0'/0'/1",
+    "m/84'/0'/0'/0/0",
+    "m/84'/0'/0",
+    "m/84'/0'/0'/",
+    'not-a-path',
+    undefined,
+  ])('rejects a non-account path %j', hdPath => {
+    expect(isKeystoneAccountHdPath(hdPath)).toBe(false)
   })
 })
