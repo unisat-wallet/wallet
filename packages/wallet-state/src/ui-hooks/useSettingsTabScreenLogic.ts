@@ -31,8 +31,7 @@ export function useSettingsTabScreenLogic() {
   const tools = useTools()
   const [connected, setConnected] = useState(false)
   const versionInfo = useVersionInfo()
-  const hasUpdate =
-    versionInfo.latestVersion && versionInfo.latestVersion !== versionInfo.currentVesion
+  const hasUpdate = versionInfo.hasUpdate
   const { t } = useI18n()
 
   const { isExtensionInExpandView } = useDevice()

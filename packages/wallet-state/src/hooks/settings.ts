@@ -182,55 +182,89 @@ export function useWalletConfig() {
   return accountsState.walletConfig
 }
 
+export interface VersionInfo {
+  currentVersion: string
+  /** @deprecated Use currentVersion. */
+  currentVesion: string
+  newVersion: string
+  latestVersion: string
+  skipped: boolean
+  isNewest: boolean
+  hasUpdate: boolean
+  isVersionCheckAvailable: boolean
+  downloadUrl: string
+}
+
+export function getVersionInfo({
+  currentVersion,
+  newVersion,
+  skippedVersion,
+}: {
+  currentVersion: string
+  newVersion: string
+  skippedVersion: string
+}): VersionInfo {
+  const unavailableVersionInfo = (): VersionInfo => ({
+    currentVersion,
+    currentVesion: currentVersion,
+    newVersion,
+    latestVersion: '',
+    skipped: false,
+    isNewest: false,
+    hasUpdate: false,
+    isVersionCheckAvailable: false,
+    downloadUrl: '',
+  })
+
+  if (!currentVersion || !newVersion || currentVersion === '0.0.0') {
+    return unavailableVersionInfo()
+  }
+
+  let comparison: -1 | 0 | 1
+  try {
+    comparison = compareVersions(currentVersion, newVersion)
+  } catch {
+    return unavailableVersionInfo()
+  }
+
+  const isNewest = comparison >= 0
+  const hasNewerVersion = comparison < 0
+  const skipped = hasNewerVersion && newVersion === skippedVersion
+  const hasUpdate = hasNewerVersion && !skipped
+
+  return {
+    currentVersion,
+    currentVesion: currentVersion,
+    newVersion,
+    latestVersion: hasUpdate ? newVersion : '',
+    skipped,
+    isNewest,
+    hasUpdate,
+    isVersionCheckAvailable: true,
+    downloadUrl: '',
+  }
+}
+
 export function useVersionInfo() {
   const accountsState = useSettingsState()
   const walletConfig = accountsState.walletConfig
-  const newVersion = walletConfig.version
-  const skippedVersion = accountsState.skippedVersion
-  const currentVesion = PlatformEnv.VERSION
-  let skipped = false
-  let latestVersion = ''
-  // skip if new version is empty
-  if (!newVersion) {
-    skipped = true
-  }
-
-  // skip if skipped
-  if (newVersion == skippedVersion) {
-    skipped = true
-  }
-
-  // skip if current version is greater or equal to new version
-  if (currentVesion && newVersion) {
-    if (compareVersions(currentVesion, newVersion) >= 0) {
-      skipped = true
-    } else {
-      latestVersion = newVersion
-    }
-  }
-
-  // skip if current version is 0.0.0
-  if (currentVesion === '0.0.0') {
-    skipped = true
-  }
-  return {
-    currentVesion,
-    newVersion,
-    latestVersion,
-    skipped,
-    downloadUrl: '',
-    isNewest: false,
-  }
+  return getVersionInfo({
+    currentVersion: PlatformEnv.VERSION,
+    newVersion: walletConfig.version,
+    skippedVersion: accountsState.skippedVersion,
+  })
 }
 
 export function useSkipVersionCallback() {
   const wallet = useWallet()
   const dispatch = useAppDispatch()
-  return useCallback((version: string) => {
-    wallet.setSkippedVersion(version).then(v => {
+  return useCallback(
+    async (version: string) => {
+      await wallet.setSkippedVersion(version)
       dispatch((settingsActions as any).updateSettings({ skippedVersion: version }))
-    })
-  }, [])
+    },
+    [dispatch, wallet]
+  )
 }
 
 export function useAutoLockTimeId() {
