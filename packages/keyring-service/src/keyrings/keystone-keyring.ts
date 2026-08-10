@@ -5,6 +5,7 @@ import { Psbt } from 'bitcoinjs-lib'
 import bitcore from 'bitcore-lib'
 import { EventEmitter } from 'events'
 import { verifyMessageOfECDSA } from '@unisat/wallet-bitcoin'
+import { isChangeAddressHdPath } from '@unisat/wallet-shared'
 
 interface KeystoneKey {
   path: string
@@ -99,12 +100,7 @@ export class KeystoneKeyring extends EventEmitter {
     this.activeIndexes = opts.activeIndexes ? [...opts.activeIndexes] : []
     this.connectionType = opts.connectionType ?? DEFAULT_CONNECTION_TYPE
     this.initRoot()
-    if (
-      opts.hdPath !== null &&
-      opts.hdPath !== undefined &&
-      opts.hdPath.length >= 13 &&
-      opts.hdPath[opts.hdPath.length - 1] === '1'
-    ) {
+    if (isChangeAddressHdPath(opts.hdPath)) {
       this.root = this.root.derive(`m/1`)
     }
   }
@@ -158,12 +154,7 @@ export class KeystoneKeyring extends EventEmitter {
   }
 
   async getAccounts() {
-    if (
-      this.hdPath !== null &&
-      this.hdPath !== undefined &&
-      this.hdPath.length >= 13 &&
-      this.hdPath[this.hdPath.length - 1] === '1'
-    ) {
+    if (isChangeAddressHdPath(this.hdPath)) {
       return this.activeIndexes.map(index => {
         const child = this.root.derive(`m/${index}`)
         return child.publicKey.toString('hex')
@@ -343,12 +334,7 @@ export class KeystoneKeyring extends EventEmitter {
       origin: this.origin,
     })
     let i = undefined
-    if (
-      this.hdPath !== null &&
-      this.hdPath !== undefined &&
-      this.hdPath.length >= 13 &&
-      this.hdPath[this.hdPath.length - 1] === '1'
-    ) {
+    if (isChangeAddressHdPath(this.hdPath)) {
       const root = this.getHDPublicKey(this.hdPath)
       i = this.activeIndexes.find(i => {
         const child = root.derive(`m/1/${i}`)

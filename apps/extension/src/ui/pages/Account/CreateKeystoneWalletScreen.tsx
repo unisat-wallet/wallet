@@ -20,7 +20,7 @@ import {
 } from '@unisat/wallet-state';
 import { AddressType } from '@unisat/wallet-types';
 
-import { ADDRESS_TYPES } from '@unisat/wallet-shared';
+import { ADDRESS_TYPES, isChangeAddressHdPath } from '@unisat/wallet-shared';
 import { useNavigate } from '../MainRoute';
 
 interface ContextData {
@@ -263,7 +263,7 @@ function Step3({
     scanVaultAddress(1);
   }, []);
   useEffect(() => {
-    if (contextData.customHdPath.length >= 13) {
+    if (isChangeAddressHdPath(contextData.customHdPath)) {
       scanVaultAddress(1);
       setScanned(false);
     }
@@ -318,12 +318,7 @@ function Step3({
       });
 
       // only the  customsan path is not empty and click thie scan button , then only show the custom path address type
-      if (
-        contextData.customHdPath !== null &&
-        contextData.customHdPath !== '' &&
-        contextData.customHdPath.length >= 13 &&
-        isScanned
-      ) {
+      if (isChangeAddressHdPath(contextData.customHdPath) && isScanned) {
         const saveAddressType = contextData.customHdPath.split('/')[1];
         // find address type index by hdpath contains the saveAddressType
         const saveAddressTypeIndex = addressTypes.findIndex((v) => v.hdPath.includes(saveAddressType));
@@ -362,7 +357,7 @@ function Step3({
     // }
     // const group = groups[addressType];
     const group = groups.find((v) => v.type === addressType);
-    if (contextData.customHdPath !== null && contextData.customHdPath !== '' && contextData.customHdPath.length >= 13) {
+    if (isChangeAddressHdPath(contextData.customHdPath)) {
       const items = group.address_arr.map((v, index) => ({
         address: v,
         satoshis: group.satoshis_arr[index],

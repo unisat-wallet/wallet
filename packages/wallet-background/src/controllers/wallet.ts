@@ -60,6 +60,7 @@ import {
   bgI18n,
   getAccountCapabilities,
   getLockTimeInfo,
+  isChangeAddressHdPath,
   t,
 } from '@unisat/wallet-shared'
 import { AddressType, ChainType, NetworkType } from '@unisat/wallet-types'
@@ -574,7 +575,7 @@ export class WalletController extends BaseController {
   ) => {
     const tmpKeyring = new KeystoneKeyring()
     await tmpKeyring.initFromUR(urType, urCbor)
-    if (hdPath.length >= 13) {
+    if (isChangeAddressHdPath(hdPath)) {
       tmpKeyring.changeChangeAddressHdPath(hdPath)
       tmpKeyring.addAccounts(accountCount)
     } else {

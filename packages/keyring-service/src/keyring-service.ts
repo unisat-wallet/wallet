@@ -25,7 +25,7 @@ import {
   ToSignInput,
 } from './types'
 
-import { BUS_EVENTS, BUS_METHODS, WalletKeyring } from '@unisat/wallet-shared'
+import { BUS_EVENTS, BUS_METHODS, isChangeAddressHdPath, WalletKeyring } from '@unisat/wallet-shared'
 import { ProxyStorageAdapter } from '@unisat/wallet-storage'
 
 const KEYRING_SDK_TYPES = {
@@ -539,7 +539,7 @@ export class KeyringService extends EventEmitter {
     // await this.persistAllKeyrings();
     const tmpKeyring = new KeystoneKeyring()
     await tmpKeyring.initFromUR(urType, urCbor, connectionType)
-    if (hdPath.length >= 13) {
+    if (isChangeAddressHdPath(hdPath)) {
       tmpKeyring.changeChangeAddressHdPath(hdPath)
       tmpKeyring.addAccounts(accountCount)
     } else {

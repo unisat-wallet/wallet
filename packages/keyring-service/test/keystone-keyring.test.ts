@@ -50,6 +50,18 @@ describe('bitcoin-keystone-keyring', () => {
 
       expect(accounts).deep.eq([firstAccount.publicKey, secondAccount.publicKey])
     })
+
+    it('restores accounts from a change-address path', async () => {
+      const keyring = new KeystoneKeyring({
+        ...initOpts,
+        hdPath: "m/44'/0'/0'/1",
+        activeIndexes: [0],
+      })
+
+      expect(await keyring.getAccounts()).deep.eq([
+        '026cc2828e3163f567fa63a20215260dba29bca82b3a1a4e81622fd02a275e2f99',
+      ])
+    })
   })
 
   describe('init', () => {
