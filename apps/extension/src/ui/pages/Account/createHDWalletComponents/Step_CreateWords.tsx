@@ -3,12 +3,14 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { Button, Card, Checkbox, Column, Grid, Icon, Input, Row, Text } from '@/ui/components';
 import { FooterButtonContainer } from '@/ui/components/FooterButtonContainer';
 import { Popover } from '@/ui/components/Popover';
+import {
+  hasBip39PassphraseWhitespace,
+  MAX_BIP39_PASSPHRASE_LENGTH
+} from '@/ui/pages/Account/createHDWalletComponents/passphrase';
 import { ContextData, TabType, UpdateContextDataParams } from '@/ui/pages/Account/createHDWalletComponents/types';
 import { colors } from '@/ui/theme/colors';
 import { MAX_ALIAS_NAME_LENGTH, WordsType } from '@unisat/wallet-shared';
 import { useI18n, useWallet } from '@unisat/wallet-state';
-
-const MAX_PASSPHRASE_LENGTH = 1024;
 
 function wordsTypeToStrength(wordsType: WordsType): 128 | 256 {
   return wordsType === WordsType.WORDS_24 ? 256 : 128;
@@ -351,7 +353,7 @@ export function Step_CreateWords({
               placeholder={t('passphrase')}
               value={contextData.passphrase}
               onChange={(e) => {
-                if (/\s/.test(e.target.value)) {
+                if (hasBip39PassphraseWhitespace(e.target.value)) {
                   setPassphraseInputError(true);
                   return;
                 }
@@ -361,7 +363,7 @@ export function Step_CreateWords({
                   passphrase: e.target.value
                 });
               }}
-              maxLength={MAX_PASSPHRASE_LENGTH}
+              maxLength={MAX_BIP39_PASSPHRASE_LENGTH}
               autoComplete="off"
               spellCheck={false}
               data-testid="passphrase-input"

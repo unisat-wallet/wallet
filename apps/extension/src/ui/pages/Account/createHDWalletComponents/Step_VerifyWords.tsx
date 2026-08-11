@@ -1,8 +1,13 @@
 import bip39EnglishWordlist from 'bip39/src/wordlists/english.json';
-import { useEffect, useMemo, useState } from 'react';
+import { CSSProperties, useEffect, useMemo, useState } from 'react';
 
 import { Button, Card, Column, Grid, Icon, Input, Row, Text } from '@/ui/components';
 import { FooterButtonContainer } from '@/ui/components/FooterButtonContainer';
+import {
+  hasBip39PassphraseWhitespace,
+  MAX_BIP39_PASSPHRASE_LENGTH,
+  normalizeBip39Passphrase
+} from '@/ui/pages/Account/createHDWalletComponents/passphrase';
 import { ContextData, TabType, UpdateContextDataParams } from '@/ui/pages/Account/createHDWalletComponents/types';
 import { colors } from '@/ui/theme/colors';
 import { useI18n } from '@unisat/wallet-state';
@@ -26,10 +31,6 @@ function getVerificationCount(wordCount: number): number {
   }
 
   return Math.min(wordCount, 3);
-}
-
-function normalizePassphrase(value: string): string {
-  return value.normalize('NFKD');
 }
 
 interface MnemonicChoice {
@@ -68,10 +69,14 @@ export function Step_VerifyWords({
   const choiceWordsById = useMemo(() => new Map(choices.map((choice) => [choice.id, choice.word])), [choices]);
   const [selectedIndexes, setSelectedIndexes] = useState<number[]>([]);
   const [passphraseConfirmation, setPassphraseConfirmation] = useState('');
+  const [passphraseInputError, setPassphraseInputError] = useState(false);
+  const [showPassphraseConfirmation, setShowPassphraseConfirmation] = useState(false);
 
   useEffect(() => {
     setSelectedIndexes([]);
     setPassphraseConfirmation('');
+    setPassphraseInputError(false);
+    setShowPassphraseConfirmation(false);
   }, [contextData.mnemonics, contextData.passphrase]);
 
   const hasIncorrectSelection = selectedIndexes.some(
@@ -80,7 +85,8 @@ export function Step_VerifyWords({
   const isPassphraseRequired = Boolean(contextData.passphrase);
   const isPassphraseConfirmed =
     !isPassphraseRequired ||
-    normalizePassphrase(contextData.passphrase) === normalizePassphrase(passphraseConfirmation);
+    (!passphraseInputError &&
+      normalizeBip39Passphrase(contextData.passphrase) === normalizeBip39Passphrase(passphraseConfirmation));
   const isVerified =
     selectedIndexes.length === verificationIndexes.length && !hasIncorrectSelection && isPassphraseConfirmed;
 
@@ -116,7 +122,8 @@ export function Step_VerifyWords({
           borderRadius: 5,
           backgroundColor: colors.transparent
         }}
-        data-testid="mnemonic-reminder">
+        data-testid="mnemonic-reminder"
+      >
         <Column gap="zero" style={{ margin: 10, flexShrink: 0 }}>
           <Icon icon="mnemonicreminder" size={20} />
         </Column>
@@ -150,18 +157,19 @@ export function Step_VerifyWords({
                 borderColor: isIncorrect
                   ? colors.error
                   : isCurrentSlot
-                  ? colors.primary
-                  : isSelected
-                  ? 'rgba(255, 255, 255, 0.3)'
-                  : colors.border2,
+                    ? colors.primary
+                    : isSelected
+                      ? 'rgba(255, 255, 255, 0.3)'
+                      : colors.border2,
                 boxShadow: isCurrentSlot ? '0 0 0 1px rgba(227, 187, 95, 0.3)' : undefined,
                 backgroundColor: isIncorrect
                   ? 'rgba(229, 41, 55, 0.12)'
                   : isSelected
-                  ? 'rgba(227, 187, 95, 0.08)'
-                  : colors.card
+                    ? 'rgba(227, 187, 95, 0.08)'
+                    : colors.card
               }}
-              data-testid={`mnemonic-confirm-slot-${expectedWordIndex}`}>
+              data-testid={`mnemonic-confirm-slot-${expectedWordIndex}`}
+            >
               <Text
                 text={`${expectedWordIndex + 1}.`}
                 size="xs"
@@ -169,7 +177,7 @@ export function Step_VerifyWords({
                 color={isIncorrect ? 'error' : 'textDim'}
               />
               <Text
-                text={selectedWordIndex === undefined ? '' : choiceWordsById.get(selectedWordIndex) ?? ''}
+                text={selectedWordIndex === undefined ? '' : (choiceWordsById.get(selectedWordIndex) ?? '')}
                 size="xs"
                 ellipsis
                 color={isIncorrect ? 'error' : isSelected ? 'primary' : undefined}
@@ -202,11 +210,12 @@ export function Step_VerifyWords({
                   backgroundColor: isIncorrect
                     ? 'rgba(229, 41, 55, 0.12)'
                     : isSelected
-                    ? 'rgba(227, 187, 95, 0.08)'
-                    : '#151313',
+                      ? 'rgba(227, 187, 95, 0.08)'
+                      : '#151313',
                   cursor: isSelected && !isIncorrect ? 'default' : 'pointer'
                 }}
-                data-testid={`mnemonic-confirm-word-${choice.id}`}>
+                data-testid={`mnemonic-confirm-word-${choice.id}`}
+              >
                 <Text
                   text={choice.word}
                   size="sm"
@@ -223,20 +232,48 @@ export function Step_VerifyWords({
       {isPassphraseRequired && (
         <Column gap="sm" mt="md">
           <Text text={t('confirm_bip39_passphrase')} preset="bold" mb="md" />
-          <Input
-            preset="password"
-            value={passphraseConfirmation}
-            onChange={(e) => {
-              setPassphraseConfirmation(e.target.value);
-            }}
-            maxLength={contextData.passphrase.length}
-            autoComplete="off"
-            spellCheck={false}
-            data-testid="passphrase-confirm-input"
-          />
-          {passphraseConfirmation && !isPassphraseConfirmed && (
+          <Column style={{ position: 'relative' }}>
+            <Input
+              preset="text"
+              containerStyle={{ paddingRight: 42 }}
+              style={{ WebkitTextSecurity: showPassphraseConfirmation ? 'none' : 'disc' } as CSSProperties}
+              value={passphraseConfirmation}
+              onChange={(e) => {
+                if (hasBip39PassphraseWhitespace(e.target.value)) {
+                  setPassphraseInputError(true);
+                  return;
+                }
+
+                setPassphraseInputError(false);
+                setPassphraseConfirmation(e.target.value);
+              }}
+              maxLength={MAX_BIP39_PASSPHRASE_LENGTH}
+              autoComplete="off"
+              spellCheck={false}
+              inputMode="text"
+              data-testid="passphrase-confirm-input"
+            />
+            <Icon
+              icon={showPassphraseConfirmation ? 'eye' : 'eye-slash'}
+              size={16}
+              color="textDim"
+              containerStyle={{
+                position: 'absolute',
+                top: '50%',
+                right: 15,
+                transform: 'translateY(-50%)'
+              }}
+              onClick={() => {
+                setShowPassphraseConfirmation((current) => !current);
+              }}
+              data-testid="passphrase-confirm-visibility"
+            />
+          </Column>
+          {passphraseInputError ? (
+            <Text text={t('passphrase_spaces_not_allowed')} color="error" />
+          ) : passphraseConfirmation && !isPassphraseConfirmed ? (
             <Text text={t('passphrases_do_not_match')} color="error" />
-          )}
+          ) : null}
         </Column>
       )}
 
