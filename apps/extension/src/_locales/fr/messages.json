@@ -1391,6 +1391,9 @@
   "mnemonic_danger": {
     "message": "Cette phrase est le seul moyen de récupérer votre portefeuille. Ne la partagez avec personne !"
   },
+  "mnemonic_words_recorded": {
+    "message": "Je l'ai notée"
+  },
   "mnemonics_12_words_security_warning_title": {
     "message": "Niveau de sécurité"
   },

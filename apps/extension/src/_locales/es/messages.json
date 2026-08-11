@@ -1391,6 +1391,9 @@
   "mnemonic_danger": {
     "message": "Esta frase es la única forma de recuperar su billetera. ¡No la comparta con nadie!"
   },
+  "mnemonic_words_recorded": {
+    "message": "Ya la he anotado"
+  },
   "mnemonics_12_words_security_warning_title": {
     "message": "Nivel de seguridad"
   },

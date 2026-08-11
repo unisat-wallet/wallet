@@ -1397,6 +1397,9 @@
   "mnemonic_danger": {
     "message": "This phrase is the only way to recover your wallet. Do not share it with anyone!"
   },
+  "mnemonic_words_recorded": {
+    "message": "I have recorded it"
+  },
   "mnemonics_12_words_security_warning_title": {
     "message": "Security level"
   },

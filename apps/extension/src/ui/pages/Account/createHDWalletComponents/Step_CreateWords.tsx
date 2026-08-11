@@ -379,7 +379,7 @@ export function Step_CreateWords({
       <FooterButtonContainer>
         <Button
           disabled={generating || words.length === 0}
-          text={t('continue')}
+          text={t('mnemonic_words_recorded')}
           preset="primary"
           onClick={btnClick}
           data-testid="mnemonic-continue-button"

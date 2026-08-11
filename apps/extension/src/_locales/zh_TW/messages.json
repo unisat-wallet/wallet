@@ -1391,6 +1391,9 @@
   "mnemonic_danger": {
     "message": "此短語是恢復您錢包的唯一途徑。請勿與任何人分享！"
   },
+  "mnemonic_words_recorded": {
+    "message": "我已記錄"
+  },
   "mnemonics_12_words_security_warning_title": {
     "message": "安全等級"
   },
