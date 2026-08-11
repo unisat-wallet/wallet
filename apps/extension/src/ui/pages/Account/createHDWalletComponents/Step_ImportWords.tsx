@@ -5,6 +5,7 @@ import { Button, Card, Checkbox, Column, Grid, Icon, Input, Row, Text } from '@/
 import { FooterButtonContainer } from '@/ui/components/FooterButtonContainer';
 import { ContextData, UpdateContextDataParams } from '@/ui/pages/Account/createHDWalletComponents/types';
 import { colors } from '@/ui/theme/colors';
+import { MAX_ALIAS_NAME_LENGTH } from '@unisat/wallet-shared';
 import { useCreateWalletLogicImportWordsStep } from '@unisat/wallet-state';
 
 const BIP39_ENGLISH_WORDS = new Set(wordlists.english);
@@ -29,8 +30,16 @@ export function Step_ImportWords(params: {
   const [showAdditionalWordInput, setShowAdditionalWordInput] = useState(false);
   const [showWords, setShowWords] = useState(false);
 
-  const { t, inputWords, onClickNext, onInputWordsReplace, disabled, enablePhrase } =
-    useCreateWalletLogicImportWordsStep({ ...params, autoDetectWordsType: true } as any);
+  const {
+    t,
+    inputWords,
+    onClickNext,
+    onInputWordsReplace,
+    disabled,
+    enablePhrase,
+    walletName,
+    onInputWalletNameChange
+  } = useCreateWalletLogicImportWordsStep({ ...params, autoDetectWordsType: true } as any);
   const enteredWords = inputWords.filter((word) => word.trim());
   const isInitialEntry = enteredWords.length === 0;
   const inputIndex = activeIndex ?? enteredWords.length;
@@ -394,6 +403,19 @@ export function Step_ImportWords(params: {
           )}
         </Column>
       )}
+
+      <Column gap="xs">
+        <Text text={t('wallet_name')} color="textDim" />
+        <Input
+          containerStyle={{ marginTop: 5 }}
+          value={walletName ?? ''}
+          onChange={onInputWalletNameChange}
+          maxLength={MAX_ALIAS_NAME_LENGTH}
+          autoComplete="off"
+          spellCheck={false}
+          data-testid="import-wallet-name-input"
+        />
+      </Column>
 
       <FooterButtonContainer>
         <Button
