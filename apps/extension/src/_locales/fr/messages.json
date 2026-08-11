@@ -992,6 +992,15 @@
   "CreateHDwallet_StepImport_RecoverTheWallet": {
     "message": "Veuillez saisir une phrase de départ de 12 ou 24 mots pour récupérer le portefeuille."
   },
+  "clear_all": {
+    "message": "Tout effacer"
+  },
+  "paste": {
+    "message": "Coller"
+  },
+  "mnemonic_import_initial_placeholder": {
+    "message": "Saisissez vos mots de récupération dans leur ordre d'origine. Appuyez sur Espace ou Entrée après chaque mot. Ne les partagez jamais avec qui que ce soit."
+  },
   "important_to_not_transfer_this_token": {
     "message": "Important: Veuillez ne pas transférer ce jeton en raison d'une anomalie temporaire d'indexation. Nous attendons la résolution du projet fondateur. Les autres jetons ne sont pas affectés."
   },

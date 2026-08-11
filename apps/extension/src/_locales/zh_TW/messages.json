@@ -992,6 +992,15 @@
   "CreateHDwallet_StepImport_RecoverTheWallet": {
     "message": "請輸入 12 或 24 個助記詞以恢復錢包。"
   },
+  "clear_all": {
+    "message": "全部清除"
+  },
+  "paste": {
+    "message": "貼上"
+  },
+  "mnemonic_import_initial_placeholder": {
+    "message": "請依原始順序輸入助記詞，每個單字後按空格鍵或 Enter。請勿向任何人分享。"
+  },
   "important_to_not_transfer_this_token": {
     "message": "重要: 請不要轉移此代幣，因為存在臨時索引不一致的問題。我們正在等待協議創始團隊的解決方案。其他代幣不受影響。"
   },

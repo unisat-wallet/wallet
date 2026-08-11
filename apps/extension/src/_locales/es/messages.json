@@ -992,6 +992,15 @@
   "CreateHDwallet_StepImport_RecoverTheWallet": {
     "message": "Ingrese una frase semilla de 12 o 24 palabras para recuperar la billetera."
   },
+  "clear_all": {
+    "message": "Borrar todo"
+  },
+  "paste": {
+    "message": "Pegar"
+  },
+  "mnemonic_import_initial_placeholder": {
+    "message": "Introduzca sus palabras de recuperación en el orden original. Pulse Espacio o Intro después de cada palabra. Nunca las comparta con nadie."
+  },
   "important_to_not_transfer_this_token": {
     "message": "Importante: No transferas este token debido a una discrepancia temporal en el índice. Esperamos la resolución del equipo fundador del protocolo. Otros tokens no afectados."
   },

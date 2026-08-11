@@ -206,6 +206,11 @@ export function useCreateWalletLogicImportWordsStep(params: CreateWalletLogicPar
     updateWords(newKeys)
   }
 
+  const onInputWordsReplace = (words: Array<string>): void => {
+    const normalizedWords = words.slice(0, maxWordsCount).map(normalizeWhitespace)
+    updateWords([...normalizedWords, ...new Array(maxWordsCount - normalizedWords.length).fill('')])
+  }
+
   // extension
   const onHandleEventPaste = (event, index: number) => {
     const copyText = event.clipboardData?.getData('text/plain')
@@ -323,6 +328,7 @@ export function useCreateWalletLogicImportWordsStep(params: CreateWalletLogicPar
     inputWordsError,
     onInputWordsTextChange,
     onInputWordsChange,
+    onInputWordsReplace,
     loading,
     enablePhrase,
     walletName: contextData.walletName,
