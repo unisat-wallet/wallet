@@ -2622,7 +2622,7 @@
     "message": "驗證助記詞"
   },
   "verify_mnemonic_phrase_hint": {
-    "message": "點擊單字以將它們按照正確的順序排列，以驗證您備份的助記詞是否正確"
+    "message": "請依序選擇與編號空格相符的單字。"
   },
   "verify_seed_phrase": {
     "message": "驗證助記詞"

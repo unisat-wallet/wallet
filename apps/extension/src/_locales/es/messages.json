@@ -2610,7 +2610,7 @@
     "message": "Verificar frase mnemónica"
   },
   "verify_mnemonic_phrase_hint": {
-    "message": "Haga clic en las palabras para colocarlas en el orden correcto para verificar si la frase mnemónica de la que realizó una copia de seguridad es correcta"
+    "message": "Seleccione en orden las palabras que correspondan a los espacios numerados."
   },
   "verify_seed_phrase": {
     "message": "Verificar frase semilla"

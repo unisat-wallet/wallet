@@ -2625,7 +2625,7 @@
     "message": "Verify mnemonic phrase"
   },
   "verify_mnemonic_phrase_hint": {
-    "message": "Click on the words to put them in the correct order to verify if the mnemonic phrase you backed up is correct"
+    "message": "Select the matching words for the numbered slots in order."
   },
   "verify_seed_phrase": {
     "message": "Verify Seed Phrase"

@@ -2619,7 +2619,7 @@
     "message": "ニーモニックフレーズの確認"
   },
   "verify_mnemonic_phrase_hint": {
-    "message": "単語をクリックして正しい順序で並べ、バックアップしたニーモニックフレーズが正しいかどうかを確認します"
+    "message": "番号付きの空欄に対応する単語を順に選択してください。"
   },
   "verify_seed_phrase": {
     "message": "シードフレーズの確認"

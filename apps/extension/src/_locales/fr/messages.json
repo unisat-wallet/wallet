@@ -2619,7 +2619,7 @@
     "message": "Vérifier la phrase mnémonique"
   },
   "verify_mnemonic_phrase_hint": {
-    "message": "Cliquez sur les mots pour les mettre dans le bon ordre afin de vérifier si la phrase mnémonique que vous avez sauvegardée est correcte"
+    "message": "Sélectionnez dans l'ordre les mots correspondant aux emplacements numérotés."
   },
   "verify_seed_phrase": {
     "message": "Vérifier la phrase de départ"
