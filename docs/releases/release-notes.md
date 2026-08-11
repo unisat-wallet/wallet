@@ -1,5 +1,20 @@
 # UniSat Wallet Release Notes
 
+## v1.7.20
+
+### Improvements
+
+- Refined wallet creation and recovery with clearer steps for selecting a wallet type, entering a recovery phrase, verifying the backup, and choosing an address type.
+- Improved recovery-phrase entry with full-phrase paste, per-word editing, clear-all, and visibility controls.
+- Recovery phrases, optional BIP39 passphrases, and exported private keys are now masked by default and require an explicit reveal action.
+- Reorganized wallet-add options and aligned the private-key wallet creation flow for a more consistent setup experience.
+- Moved the extension update prompt to Settings > About and made the update status and Skip action more reliable.
+
+### Bug Fixes
+
+- Fixed invalid Keystone derivation paths and removed unsupported custom derivation-path entry from the Keystone import flow.
+- Fixed version-update state handling, including current-version display and skipped-update status.
+
 ## v1.7.19
 
 ### New Features
