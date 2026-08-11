@@ -199,16 +199,7 @@ export default function ExportMnemonicsScreen() {
               >
                 <Row itemsCenter mb="md">
                   <Text text={t('passphrase')} color="white" size="sm" />
-                  <Tooltip
-                    title={
-                      <Column gap="sm" style={{ maxWidth: 280 }}>
-                        <Text text={t('passphrase_recovery_notice')} color="white" size="xs" wrap />
-                        <Text text={t('passphrase_backup_notice')} color="white" size="xs" wrap />
-                      </Column>
-                    }
-                    placement="right"
-                    overlayStyle={{ maxWidth: '280px' }}
-                  >
+                  <Tooltip title={t('passphrase_export_notice')} placement="right" overlayStyle={{ maxWidth: '280px' }}>
                     <Icon icon="circle-question" color="textDim" size={14} />
                   </Tooltip>
                 </Row>

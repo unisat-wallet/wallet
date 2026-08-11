@@ -1745,6 +1745,9 @@
   "passphrase_recovery_notice": {
     "message": "僅當原錢包使用 BIP39 密碼短語時才輸入。不同的密碼短語將恢復不同的錢包。"
   },
+  "passphrase_export_notice": {
+    "message": "此錢包已設定 Passphrase。恢復時必須同時提供助記詞和 Passphrase，缺少任一項將永久失去資產。請將兩者分開妥善保管。"
+  },
   "passphrase_warning_title": {
     "message": "安全警報"
   },

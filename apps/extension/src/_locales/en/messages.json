@@ -1748,6 +1748,9 @@
   "passphrase_recovery_notice": {
     "message": "Only enter this if the original wallet used a BIP39 passphrase. A different passphrase restores a different wallet."
   },
+  "passphrase_export_notice": {
+    "message": "This wallet uses a passphrase. To recover it, you must provide both the recovery phrase and the passphrase. Losing either permanently loses access to your assets. Store them separately and securely."
+  },
   "passphrase_warning_title": {
     "message": "Security Alert"
   },
