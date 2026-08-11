@@ -998,6 +998,18 @@
   "paste": {
     "message": "Pegar"
   },
+  "mnemonic_mask_reveal_title": {
+    "message": "Haga clic para mostrar"
+  },
+  "mnemonic_mask_reveal_hint": {
+    "message": "Asegúrese de que nadie pueda ver su pantalla."
+  },
+  "hide": {
+    "message": "Ocultar"
+  },
+  "show": {
+    "message": "Mostrar"
+  },
   "mnemonic_import_initial_placeholder": {
     "message": "Introduzca sus palabras de recuperación en el orden original. Pulse Espacio o Intro después de cada palabra. Nunca las comparta con nadie."
   },

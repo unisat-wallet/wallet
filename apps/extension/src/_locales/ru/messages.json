@@ -998,6 +998,18 @@
   "paste": {
     "message": "Вставить"
   },
+  "mnemonic_mask_reveal_title": {
+    "message": "Нажмите, чтобы показать"
+  },
+  "mnemonic_mask_reveal_hint": {
+    "message": "Убедитесь, что никто не видит ваш экран."
+  },
+  "hide": {
+    "message": "Скрыть"
+  },
+  "show": {
+    "message": "Показать"
+  },
   "mnemonic_import_initial_placeholder": {
     "message": "Введите слова для восстановления в исходном порядке. После каждого слова нажимайте Пробел или Enter. Никому их не сообщайте."
   },

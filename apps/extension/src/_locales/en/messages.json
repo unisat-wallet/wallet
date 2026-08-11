@@ -1004,6 +1004,18 @@
   "paste": {
     "message": "Paste"
   },
+  "mnemonic_mask_reveal_title": {
+    "message": "Click to reveal"
+  },
+  "mnemonic_mask_reveal_hint": {
+    "message": "Make sure no one can see your screen."
+  },
+  "hide": {
+    "message": "Hide"
+  },
+  "show": {
+    "message": "Show"
+  },
   "mnemonic_import_initial_placeholder": {
     "message": "Enter your recovery words in their original order. Press Space or Enter after each word. Never share them with anyone."
   },

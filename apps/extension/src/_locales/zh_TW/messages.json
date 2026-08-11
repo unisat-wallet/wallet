@@ -998,6 +998,18 @@
   "paste": {
     "message": "貼上"
   },
+  "mnemonic_mask_reveal_title": {
+    "message": "點擊顯示"
+  },
+  "mnemonic_mask_reveal_hint": {
+    "message": "請確認沒有人能看到您的螢幕。"
+  },
+  "hide": {
+    "message": "隱藏"
+  },
+  "show": {
+    "message": "顯示"
+  },
   "mnemonic_import_initial_placeholder": {
     "message": "請依原始順序輸入助記詞，每個單字後按空格鍵或 Enter。請勿向任何人分享。"
   },

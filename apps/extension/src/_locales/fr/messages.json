@@ -998,6 +998,18 @@
   "paste": {
     "message": "Coller"
   },
+  "mnemonic_mask_reveal_title": {
+    "message": "Cliquez pour afficher"
+  },
+  "mnemonic_mask_reveal_hint": {
+    "message": "Assurez-vous que personne ne peut voir votre écran."
+  },
+  "hide": {
+    "message": "Masquer"
+  },
+  "show": {
+    "message": "Afficher"
+  },
   "mnemonic_import_initial_placeholder": {
     "message": "Saisissez vos mots de récupération dans leur ordre d'origine. Appuyez sur Espace ou Entrée après chaque mot. Ne les partagez jamais avec qui que ce soit."
   },

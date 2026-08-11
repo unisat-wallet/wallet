@@ -998,6 +998,18 @@
   "paste": {
     "message": "貼り付け"
   },
+  "mnemonic_mask_reveal_title": {
+    "message": "クリックして表示"
+  },
+  "mnemonic_mask_reveal_hint": {
+    "message": "誰にも画面が見られていないことを確認してください。"
+  },
+  "hide": {
+    "message": "隠す"
+  },
+  "show": {
+    "message": "表示"
+  },
   "mnemonic_import_initial_placeholder": {
     "message": "リカバリーワードを元の順番どおりに入力し、各単語の後でスペースまたはEnterを押してください。誰にも共有しないでください。"
   },

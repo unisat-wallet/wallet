@@ -23,6 +23,7 @@ export function Step_CreateWords({
 }) {
   const [passphraseEnabled, setPassphraseEnabled] = useState(Boolean(contextData.passphrase));
   const [showPassphraseNotice, setShowPassphraseNotice] = useState(false);
+  const [showWords, setShowWords] = useState(false);
   const [generating, setGenerating] = useState(false);
   const generationRequestRef = useRef(0);
   const generationQueueRef = useRef(Promise.resolve());
@@ -33,6 +34,7 @@ export function Step_CreateWords({
   const generate = useCallback(
     async (wordsType: WordsType) => {
       const requestId = ++generationRequestRef.current;
+      setShowWords(false);
       setGenerating(true);
       try {
         const strength = wordsTypeToStrength(wordsType);
@@ -109,6 +111,10 @@ export function Step_CreateWords({
   const words = contextData.mnemonics ? contextData.mnemonics.split(' ') : [];
   const isTwelveWords = contextData.wordsType === WordsType.WORDS_12;
 
+  useEffect(() => {
+    setShowWords(false);
+  }, [contextData.mnemonics]);
+
   return (
     <Column gap="xl">
       <Card
@@ -124,8 +130,7 @@ export function Step_CreateWords({
           borderRadius: 10,
           backgroundColor: colors.transparent
         }}
-        data-testid="mnemonic-security-notice"
-      >
+        data-testid="mnemonic-security-notice">
         <Column gap="zero">
           <Row itemsCenter mb="xs">
             <Icon icon="intro" size={12} color="gold" />
@@ -181,8 +186,7 @@ export function Step_CreateWords({
               gap="zero"
               onClick={generating ? undefined : () => void onSelectWordsType(option.type)}
               style={{ marginRight: 20, opacity: generating ? 0.5 : 1, cursor: generating ? 'not-allowed' : 'pointer' }}
-              data-testid={`mnemonic-words-type-${option.type}`}
-            >
+              data-testid={`mnemonic-words-type-${option.type}`}>
               {selected ? (
                 <Icon icon="frame" size={22} color="gold" />
               ) : (
@@ -204,40 +208,112 @@ export function Step_CreateWords({
         })}
       </Row>
 
-      <Row justifyCenter fullX>
-        <Grid columns={3} gap="md" style={{ width: '100%', maxWidth: 400 }}>
-          {words.map((v, index) => {
-            return (
-              <Row key={index} itemsCenter gap="zero" style={{ minWidth: 0 }}>
+      <Column gap="xs" style={{ width: '100%', maxWidth: 400, alignSelf: 'center' }}>
+        <Column
+          style={{
+            position: 'relative',
+            border: '1px solid rgba(255, 255, 255, 0.16)',
+            borderRadius: 8,
+            padding: 8,
+            overflow: 'hidden'
+          }}>
+          <Grid columns={3} gap="md" style={{ width: '100%' }}>
+            {words.map((v, index) => {
+              return (
+                <Row key={index} itemsCenter gap="zero" style={{ minWidth: 0 }}>
+                  <Text
+                    text={`${index + 1}`}
+                    size="xxs"
+                    textEnd
+                    color="textDim"
+                    style={{ width: 15, flexShrink: 0 }}
+                    mx="sm"
+                  />
+                  <Card
+                    preset="style3"
+                    style={{
+                      flex: 1,
+                      minWidth: 0,
+                      minHeight: 32,
+                      justifyContent: 'flex-start',
+                      borderRadius: 5,
+                      paddingLeft: 8,
+                      paddingRight: 5
+                    }}
+                    data-index={index}
+                    data-testid={`mnemonic-word-${index}`}>
+                    <Text text={v} size="xs" selectText disableTranslate ellipsis style={{ minWidth: 0 }} />
+                  </Card>
+                </Row>
+              );
+            })}
+          </Grid>
+
+          {!showWords && words.length > 0 && (
+            <Column
+              justifyCenter
+              itemsCenter
+              onClick={() => {
+                setShowWords(true);
+              }}
+              style={{
+                position: 'absolute',
+                inset: 0,
+                borderRadius: 8,
+                padding: 20,
+                boxSizing: 'border-box',
+                backgroundColor: 'rgba(7, 6, 6, 0.52)',
+                backdropFilter: 'blur(8px)',
+                WebkitBackdropFilter: 'blur(8px)',
+                cursor: 'pointer',
+                zIndex: 1
+              }}
+              data-testid="mnemonic-words-mask">
+              <Column gap="xs" itemsCenter style={{ maxWidth: 260 }}>
+                <Icon icon="eye-slash" size={28} color="textWhite" />
+                <Text text={t('mnemonic_mask_reveal_title')} color="textWhite" textCenter />
                 <Text
-                  text={`${index + 1}`}
-                  size="xxs"
-                  textEnd
+                  text={t('mnemonic_mask_reveal_hint')}
+                  preset="sub"
                   color="textDim"
-                  style={{ width: 15, flexShrink: 0 }}
-                  mx="sm"
+                  textCenter
+                  style={{ lineHeight: '18px' }}
                 />
-                <Card
-                  preset="style3"
-                  style={{
-                    flex: 1,
-                    minWidth: 0,
-                    minHeight: 32,
-                    justifyContent: 'flex-start',
-                    borderRadius: 5,
-                    paddingLeft: 8,
-                    paddingRight: 5
-                  }}
-                  data-index={index}
-                  data-testid={`mnemonic-word-${index}`}
-                >
-                  <Text text={v} size="xs" selectText disableTranslate ellipsis style={{ minWidth: 0 }} />
-                </Card>
-              </Row>
-            );
-          })}
-        </Grid>
-      </Row>
+              </Column>
+            </Column>
+          )}
+        </Column>
+
+        {words.length > 0 && showWords && (
+          <Row
+            justifyCenter
+            itemsCenter
+            gap="xs"
+            mt="sm"
+            onClick={() => {
+              setShowWords((current) => !current);
+            }}
+            style={{
+              alignSelf: 'flex-end',
+              minHeight: 28,
+              minWidth: 96,
+              paddingLeft: 10,
+              paddingRight: 10,
+              borderRadius: 5,
+              backgroundColor: colors.black_dark,
+              cursor: 'pointer'
+            }}
+            data-testid="mnemonic-words-visibility">
+            <Icon icon={showWords ? 'eye-slash' : 'eye'} size={16} color="textDim" />
+
+            <Text
+              text={showWords ? t('hide') : t('show')}
+              color="textDim"
+              data-testid="mnemonic-words-visibility-label"
+            />
+          </Row>
+        )}
+      </Column>
 
       <Column gap="xs">
         <Checkbox
@@ -251,8 +327,7 @@ export function Step_CreateWords({
               updateContextData({ passphrase: '' });
             }
           }}
-          data-testid="passphrase-enabled-checkbox"
-        >
+          data-testid="passphrase-enabled-checkbox">
           <Text text={t('passphrase_optional')} color="textDim" />
         </Checkbox>
 
@@ -303,14 +378,12 @@ export function Step_CreateWords({
       {showPassphraseNotice && (
         <Popover
           contentStyle={{ width: 340, padding: 30, boxSizing: 'border-box' }}
-          data-testid="passphrase-warning-popover"
-        >
+          data-testid="passphrase-warning-popover">
           <Column itemsCenter>
             <Column
               justifyCenter
               itemsCenter
-              style={{ width: 64, height: 64, borderRadius: 43, backgroundColor: 'rgba(255, 255, 255, 0.03)' }}
-            >
+              style={{ width: 64, height: 64, borderRadius: 43, backgroundColor: 'rgba(255, 255, 255, 0.03)' }}>
               <Icon icon="warning2" size={32} color="gold" />
             </Column>
             <Text text={t('passphrase_warning_title')} preset="title" color="gold" textCenter />
