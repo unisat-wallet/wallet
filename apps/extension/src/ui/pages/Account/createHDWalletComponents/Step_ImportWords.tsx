@@ -67,6 +67,11 @@ export function Step_ImportWords(params: {
 
   const handleActiveWordBlur = () => {
     if (activeIndex === null) {
+      if (activeWord.trim()) {
+        commitWords([activeWord]);
+        return;
+      }
+
       setShowAdditionalWordInput(false);
       return;
     }
