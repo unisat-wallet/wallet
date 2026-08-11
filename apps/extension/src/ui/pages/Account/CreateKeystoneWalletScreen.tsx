@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import KeystoneProductImg from '@/ui/assets/keystone-product.png';
-import { Button, Card, Column, Content, Footer, Header, Input, Layout, Row, Text } from '@/ui/components';
+import { Button, Card, Column, Content, Footer, Header, Layout, Row, Text } from '@/ui/components';
 import { AddressTypeCard2 } from '@/ui/components/AddressTypeCard';
 import KeystoneLogo from '@/ui/components/Keystone/Logo';
 import KeystoneLogoWithText from '@/ui/components/Keystone/LogoWithText';
@@ -10,6 +10,7 @@ import KeystoneScan from '@/ui/components/Keystone/Scan';
 import KeystoneFetchKey from '@/ui/components/Keystone/usb/FetchKey';
 import { colors } from '@/ui/theme/colors';
 import { ScanOutlined, UsbOutlined } from '@ant-design/icons';
+import { ADDRESS_TYPES, isChangeAddressHdPath, isKeystoneAccountHdPath } from '@unisat/wallet-shared';
 import {
   useI18n,
   useImportAccountsFromKeystoneCallback,
@@ -19,7 +20,6 @@ import {
 } from '@unisat/wallet-state';
 import { AddressType } from '@unisat/wallet-types';
 
-import { ADDRESS_TYPES, isChangeAddressHdPath, isKeystoneAccountHdPath } from '@unisat/wallet-shared';
 import { useNavigate } from '../MainRoute';
 
 interface ContextData {
@@ -215,7 +215,6 @@ function Step3({
   >([]);
   const [isScanned, setScanned] = useState(false);
   const [error, setError] = useState('');
-  const [pathText, setPathText] = useState(contextData.customHdPath);
   const [pathError, setPathError] = useState('');
 
   const onConfirm = async () => {
@@ -396,27 +395,6 @@ function Step3({
     }
   };
 
-  const submitCustomHdPath = (text: string) => {
-    setPathError('');
-    setPathText(text);
-    if (text !== '') {
-      const isValid = isKeystoneAccountHdPath(text) || isChangeAddressHdPath(text);
-      if (!isValid) {
-        setPathError('Invalid derivation path.');
-        return;
-      }
-      updateContextData({
-        ...contextData,
-        customHdPath: text
-      });
-    } else {
-      updateContextData({
-        ...contextData,
-        customHdPath: ''
-      });
-    }
-  };
-
   return (
     <Layout>
       <Header onBack={onBack} title={t('address_type')} />
@@ -466,21 +444,7 @@ function Step3({
             // );
           })}
         </Column>
-        {!isScanned && (
-          <>
-            <Text text={t('custom_hdpath_optional')} preset="bold" mt="lg" />
-            <Column>
-              <Input
-                placeholder={t('custom_hdpath')}
-                value={pathText}
-                onChange={(e) => {
-                  submitCustomHdPath(e.target.value);
-                }}
-              />
-            </Column>
-            {pathError && <Text text={pathError} color="error" />}
-          </>
-        )}
+
         {error && <Text text={error} color="error" />}
       </Content>
       {error && (
