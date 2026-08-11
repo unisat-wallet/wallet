@@ -116,8 +116,7 @@ export function Step_VerifyWords({
           borderRadius: 5,
           backgroundColor: colors.transparent
         }}
-        data-testid="mnemonic-reminder"
-      >
+        data-testid="mnemonic-reminder">
         <Column gap="zero" style={{ margin: 10, flexShrink: 0 }}>
           <Icon icon="mnemonicreminder" size={20} />
         </Column>
@@ -151,19 +150,18 @@ export function Step_VerifyWords({
                 borderColor: isIncorrect
                   ? colors.error
                   : isCurrentSlot
-                    ? colors.primary
-                    : isSelected
-                      ? 'rgba(255, 255, 255, 0.3)'
-                      : colors.border2,
+                  ? colors.primary
+                  : isSelected
+                  ? 'rgba(255, 255, 255, 0.3)'
+                  : colors.border2,
                 boxShadow: isCurrentSlot ? '0 0 0 1px rgba(227, 187, 95, 0.3)' : undefined,
                 backgroundColor: isIncorrect
                   ? 'rgba(229, 41, 55, 0.12)'
                   : isSelected
-                    ? 'rgba(227, 187, 95, 0.08)'
-                    : colors.card
+                  ? 'rgba(227, 187, 95, 0.08)'
+                  : colors.card
               }}
-              data-testid={`mnemonic-confirm-slot-${expectedWordIndex}`}
-            >
+              data-testid={`mnemonic-confirm-slot-${expectedWordIndex}`}>
               <Text
                 text={`${expectedWordIndex + 1}.`}
                 size="xs"
@@ -171,7 +169,7 @@ export function Step_VerifyWords({
                 color={isIncorrect ? 'error' : 'textDim'}
               />
               <Text
-                text={selectedWordIndex === undefined ? '' : (choiceWordsById.get(selectedWordIndex) ?? '')}
+                text={selectedWordIndex === undefined ? '' : choiceWordsById.get(selectedWordIndex) ?? ''}
                 size="xs"
                 ellipsis
                 color={isIncorrect ? 'error' : isSelected ? 'primary' : undefined}
@@ -204,12 +202,11 @@ export function Step_VerifyWords({
                   backgroundColor: isIncorrect
                     ? 'rgba(229, 41, 55, 0.12)'
                     : isSelected
-                      ? 'rgba(227, 187, 95, 0.08)'
-                      : '#151313',
+                    ? 'rgba(227, 187, 95, 0.08)'
+                    : '#151313',
                   cursor: isSelected && !isIncorrect ? 'default' : 'pointer'
                 }}
-                data-testid={`mnemonic-confirm-word-${choice.id}`}
-              >
+                data-testid={`mnemonic-confirm-word-${choice.id}`}>
                 <Text
                   text={choice.word}
                   size="sm"
@@ -224,8 +221,8 @@ export function Step_VerifyWords({
       </Row>
 
       {isPassphraseRequired && (
-        <Column gap="xs">
-          <Text text={t('confirm_bip39_passphrase')} preset="bold" />
+        <Column gap="sm" mt="md">
+          <Text text={t('confirm_bip39_passphrase')} preset="bold" mb="md" />
           <Input
             preset="password"
             value={passphraseConfirmation}
