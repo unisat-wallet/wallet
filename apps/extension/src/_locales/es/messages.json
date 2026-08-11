@@ -1742,6 +1742,9 @@
   "passphrase_recovery_notice": {
     "message": "Introduzca una frase de contraseña solo si la billetera original usó una frase de contraseña BIP39. Una frase de contraseña diferente restaura una billetera diferente."
   },
+  "passphrase_spaces_not_allowed": {
+    "message": "No se permiten espacios al crear una frase de contraseña."
+  },
   "passphrase_export_notice": {
     "message": "Esta billetera tiene una frase de contraseña configurada. Para recuperarla, debe proporcionar tanto la frase mnemotécnica como la frase de contraseña. Perder cualquiera de las dos implica la pérdida permanente de sus activos. Guárdelas por separado y de forma segura."
   },

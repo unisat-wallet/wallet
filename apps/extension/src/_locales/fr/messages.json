@@ -1742,6 +1742,9 @@
   "passphrase_recovery_notice": {
     "message": "Saisissez une phrase de passe uniquement si le portefeuille d'origine utilisait une phrase de passe BIP39. Une phrase de passe différente restaure un portefeuille différent."
   },
+  "passphrase_spaces_not_allowed": {
+    "message": "Les espaces ne sont pas autorisés lors de la création d'une phrase de passe."
+  },
   "passphrase_export_notice": {
     "message": "Ce portefeuille utilise une phrase de passe. Pour le restaurer, vous devez fournir à la fois la phrase mnémonique et la phrase de passe. La perte de l'une ou l'autre entraînera la perte définitive de vos actifs. Conservez-les séparément en lieu sûr."
   },

@@ -22,6 +22,7 @@ export function Step_CreateWords({
   updateContextData: (params: UpdateContextDataParams) => void;
 }) {
   const [passphraseEnabled, setPassphraseEnabled] = useState(Boolean(contextData.passphrase));
+  const [passphraseInputError, setPassphraseInputError] = useState(false);
   const [showPassphraseNotice, setShowPassphraseNotice] = useState(false);
   const [showWords, setShowWords] = useState(false);
   const [generating, setGenerating] = useState(false);
@@ -334,6 +335,7 @@ export function Step_CreateWords({
             if (enabled) {
               setShowPassphraseNotice(true);
             } else {
+              setPassphraseInputError(false);
               updateContextData({ passphrase: '' });
             }
           }}
@@ -343,20 +345,29 @@ export function Step_CreateWords({
         </Checkbox>
 
         {passphraseEnabled && (
-          <Input
-            containerStyle={{ marginTop: 5 }}
-            placeholder={t('passphrase')}
-            value={contextData.passphrase}
-            onChange={(e) => {
-              updateContextData({
-                passphrase: e.target.value
-              });
-            }}
-            maxLength={MAX_PASSPHRASE_LENGTH}
-            autoComplete="off"
-            spellCheck={false}
-            data-testid="passphrase-input"
-          />
+          <>
+            <Input
+              containerStyle={{ marginTop: 5 }}
+              placeholder={t('passphrase')}
+              value={contextData.passphrase}
+              onChange={(e) => {
+                if (/\s/.test(e.target.value)) {
+                  setPassphraseInputError(true);
+                  return;
+                }
+
+                setPassphraseInputError(false);
+                updateContextData({
+                  passphrase: e.target.value
+                });
+              }}
+              maxLength={MAX_PASSPHRASE_LENGTH}
+              autoComplete="off"
+              spellCheck={false}
+              data-testid="passphrase-input"
+            />
+            {passphraseInputError && <Text text={t('passphrase_spaces_not_allowed')} color="error" />}
+          </>
         )}
       </Column>
 
@@ -378,7 +389,7 @@ export function Step_CreateWords({
 
       <FooterButtonContainer>
         <Button
-          disabled={generating || words.length === 0}
+          disabled={generating || words.length === 0 || passphraseInputError}
           text={t('mnemonic_words_recorded')}
           preset="primary"
           onClick={btnClick}
