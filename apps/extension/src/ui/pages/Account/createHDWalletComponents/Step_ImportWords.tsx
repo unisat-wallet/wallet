@@ -59,18 +59,47 @@ export function Step_ImportWords(params: {
     setShowWords(false);
   };
 
-  const handleBackspace = () => {
-    if (activeWord || inputIndex === 0 || activeIndex !== null) {
-      return;
+  const handleBackspace = (): boolean => {
+    if (activeWord) {
+      return false;
     }
 
-    const previousIndex = inputIndex - 1;
+    if (activeIndex === null) {
+      if (inputIndex === 0) {
+        return false;
+      }
+
+      const previousIndex = inputIndex - 1;
+      setActiveIndex(previousIndex);
+      setActiveWord(enteredWords[previousIndex]);
+      setShowWords(false);
+      return true;
+    }
+
+    if (activeIndex === 0) {
+      onInputWordsReplace([]);
+      setActiveIndex(null);
+      setActiveWord('');
+      setShowAdditionalWordInput(false);
+      setShowWords(false);
+      return true;
+    }
+
     const nextWords = [...enteredWords];
-    const [previousWord] = nextWords.splice(previousIndex, 1);
+    nextWords.splice(activeIndex, 1);
     onInputWordsReplace(nextWords);
-    setActiveIndex(previousIndex);
-    setActiveWord(previousWord);
+
+    const previousIndex = activeIndex - 1;
+    if (previousIndex >= 0) {
+      setActiveIndex(previousIndex);
+      setActiveWord(nextWords[previousIndex]);
+    } else {
+      setActiveIndex(null);
+      setActiveWord('');
+      setShowAdditionalWordInput(false);
+    }
     setShowWords(false);
+    return true;
   };
 
   const handleActiveWordBlur = () => {
@@ -118,7 +147,8 @@ export function Step_ImportWords(params: {
             borderColor: colors.primary,
             boxShadow: '0 0 0 1px rgba(227, 187, 95, 0.3)',
             backgroundColor: colors.card
-          }}>
+          }}
+        >
           <Text text={`${inputIndex + 1}.`} size="xs" style={{ width: 20, flexShrink: 0 }} color="textDim" />
           <Input
             containerStyle={{
@@ -147,8 +177,8 @@ export function Step_ImportWords(params: {
               if (e.key === ' ' || e.key === 'Enter') {
                 e.preventDefault();
                 commitWords([activeWord], true);
-              } else if (e.key === 'Backspace') {
-                handleBackspace();
+              } else if (e.key === 'Backspace' && handleBackspace()) {
+                e.preventDefault();
               }
             }}
             onBlur={handleActiveWordBlur}
@@ -191,7 +221,8 @@ export function Step_ImportWords(params: {
             minHeight: 136,
             borderRadius: 8,
             backgroundColor: colors.black_dark
-          }}>
+          }}
+        >
           {isInitialEntry ? (
             <>
               <textarea
@@ -266,7 +297,8 @@ export function Step_ImportWords(params: {
                         boxShadow: isInvalidWord ? `0 0 0 1px ${colors.error}` : undefined,
                         backgroundColor: colors.card
                       }}
-                      data-testid={`mnemonic-import-word-${index}`}>
+                      data-testid={`mnemonic-import-word-${index}`}
+                    >
                       <Text text={`${index + 1}.`} size="xs" style={{ width: 20, flexShrink: 0 }} color="textDim" />
                       <Text
                         text={showWords ? word : '\u2022'.repeat(5)}
@@ -325,7 +357,8 @@ export function Step_ImportWords(params: {
                 updateContextData({ passphrase: '' });
               }
             }}
-            data-testid="import-passphrase-enabled-checkbox">
+            data-testid="import-passphrase-enabled-checkbox"
+          >
             <Text text={t('passphrase_optional')} color="textDim" />
           </Checkbox>
 
