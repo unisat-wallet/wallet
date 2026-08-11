@@ -4,7 +4,7 @@ import { colors } from '@/ui/theme/colors';
 import { RESTORE_WALLETS, WordsType } from '@unisat/wallet-shared';
 import { useI18n } from '@unisat/wallet-state';
 
-export function Step0({
+export function Step_ChooseRestoreWallet({
   contextData,
   updateContextData
 }: {
@@ -39,11 +39,12 @@ export function Step0({
               onClick={() => {
                 const wordsType = item.wordsTypes.includes(contextData.wordsType)
                   ? contextData.wordsType
-                  : item.wordsTypes[0] ?? WordsType.WORDS_12;
+                  : (item.wordsTypes[0] ?? WordsType.WORDS_12);
 
                 updateContextData({ tabType: TabType.IMPORT_WORDS, restoreWalletType: item.value, wordsType });
               }}
-              data-testid={`restore-wallet-type-option-${index}`}>
+              data-testid={`restore-wallet-type-option-${index}`}
+            >
               <Text text={item.i18nKey ? t(item.i18nKey) : item.name} />
             </Button>
           </Row>

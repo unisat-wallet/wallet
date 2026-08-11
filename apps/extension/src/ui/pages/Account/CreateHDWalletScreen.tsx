@@ -3,11 +3,11 @@ import { useLocation } from 'react-router-dom';
 
 import { Content, Header, Layout, Row } from '@/ui/components';
 import { TabBar } from '@/ui/components/TabBar';
-import { Step0 } from '@/ui/pages/Account/createHDWalletComponents/Step0';
-import { Step1_Create } from '@/ui/pages/Account/createHDWalletComponents/Step1_Create';
-import { Step1_Confirm } from '@/ui/pages/Account/createHDWalletComponents/Step1_Confirm';
-import { Step1_Import } from '@/ui/pages/Account/createHDWalletComponents/Step1_Import';
-import { Step2 } from '@/ui/pages/Account/createHDWalletComponents/Step2';
+import { Step_ChooseAddressType } from '@/ui/pages/Account/createHDWalletComponents/Step_ChooseAddressType';
+import { Step_ChooseRestoreWallet } from '@/ui/pages/Account/createHDWalletComponents/Step_ChooseRestoreWallet';
+import { Step_CreateWords } from '@/ui/pages/Account/createHDWalletComponents/Step_CreateWords';
+import { Step_ImportWords } from '@/ui/pages/Account/createHDWalletComponents/Step_ImportWords';
+import { Step_VerifyWords } from '@/ui/pages/Account/createHDWalletComponents/Step_VerifyWords';
 import { ContextData, TabType, UpdateContextDataParams } from '@/ui/pages/Account/createHDWalletComponents/types';
 import { BUS_METHODS, RestoreWalletType, WordsType } from '@unisat/wallet-shared';
 import { uiEventBus, useI18n, useWallet } from '@unisat/wallet-state';
@@ -110,12 +110,12 @@ export default function CreateHDWalletScreen() {
           {
             key: TabType.CHOOSE_RESTORE_WALLET,
             label: t('choose_wallet'),
-            children: <Step0 contextData={contextData} updateContextData={updateContextData} />
+            children: <Step_ChooseRestoreWallet contextData={contextData} updateContextData={updateContextData} />
           },
           {
             key: TabType.IMPORT_WORDS,
             label: t('seed_phrase'),
-            children: <Step1_Import contextData={contextData} updateContextData={updateContextData} />
+            children: <Step_ImportWords contextData={contextData} updateContextData={updateContextData} />
           }
         ];
       } else {
@@ -123,18 +123,18 @@ export default function CreateHDWalletScreen() {
           {
             key: TabType.CHOOSE_RESTORE_WALLET,
             label: t('choose_wallet'),
-            children: <Step0 contextData={contextData} updateContextData={updateContextData} />
+            children: <Step_ChooseRestoreWallet contextData={contextData} updateContextData={updateContextData} />
           },
           {
             key: TabType.IMPORT_WORDS,
             label: t('seed_phrase'),
-            children: <Step1_Import contextData={contextData} updateContextData={updateContextData} />
+            children: <Step_ImportWords contextData={contextData} updateContextData={updateContextData} />
           },
           {
             key: TabType.CHOOSE_ADDRESS_TYPE,
             label: t('address_type'),
             children: (
-              <Step2
+              <Step_ChooseAddressType
                 contextData={contextData}
                 updateContextData={updateContextData}
                 clearSensitiveState={clearSensitiveState}
@@ -148,18 +148,18 @@ export default function CreateHDWalletScreen() {
         {
           key: TabType.CREATE_WORDS,
           label: t('seed_phrase'),
-          children: <Step1_Create contextData={contextData} updateContextData={updateContextData} />
+          children: <Step_CreateWords contextData={contextData} updateContextData={updateContextData} />
         },
         {
           key: TabType.CONFIRM_WORDS,
           label: t('verify_seed_phrase'),
-          children: <Step1_Confirm contextData={contextData} updateContextData={updateContextData} />
+          children: <Step_VerifyWords contextData={contextData} updateContextData={updateContextData} />
         },
         {
           key: TabType.CHOOSE_ADDRESS_TYPE,
           label: t('address_type'),
           children: (
-            <Step2
+            <Step_ChooseAddressType
               contextData={contextData}
               updateContextData={updateContextData}
               clearSensitiveState={clearSensitiveState}

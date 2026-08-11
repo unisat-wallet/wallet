@@ -26,7 +26,7 @@ function getRequiredVisibleSlotCount(words: string[]): number {
   return Math.min(words.length, Math.max(INITIAL_VISIBLE_SLOT_COUNT, (completedRowCount + 1) * SLOTS_PER_ROW));
 }
 
-export function Step1_Import(params: {
+export function Step_ImportWords(params: {
   contextData: ContextData;
   updateContextData: (params: UpdateContextDataParams) => void;
 }) {

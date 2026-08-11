@@ -14,7 +14,7 @@ function wordsTypeToStrength(wordsType: WordsType): 128 | 256 {
   return wordsType === WordsType.WORDS_24 ? 256 : 128;
 }
 
-export function Step1_Create({
+export function Step_CreateWords({
   contextData,
   updateContextData
 }: {
@@ -124,7 +124,8 @@ export function Step1_Create({
           borderRadius: 10,
           backgroundColor: colors.transparent
         }}
-        data-testid="mnemonic-security-notice">
+        data-testid="mnemonic-security-notice"
+      >
         <Column gap="zero">
           <Row itemsCenter mb="xs">
             <Icon icon="intro" size={12} color="gold" />
@@ -180,7 +181,8 @@ export function Step1_Create({
               gap="zero"
               onClick={generating ? undefined : () => void onSelectWordsType(option.type)}
               style={{ marginRight: 20, opacity: generating ? 0.5 : 1, cursor: generating ? 'not-allowed' : 'pointer' }}
-              data-testid={`mnemonic-words-type-${option.type}`}>
+              data-testid={`mnemonic-words-type-${option.type}`}
+            >
               {selected ? (
                 <Icon icon="frame" size={22} color="gold" />
               ) : (
@@ -227,7 +229,8 @@ export function Step1_Create({
                     paddingRight: 5
                   }}
                   data-index={index}
-                  data-testid={`mnemonic-word-${index}`}>
+                  data-testid={`mnemonic-word-${index}`}
+                >
                   <Text text={v} size="xs" selectText disableTranslate ellipsis style={{ minWidth: 0 }} />
                 </Card>
               </Row>
@@ -248,7 +251,8 @@ export function Step1_Create({
               updateContextData({ passphrase: '' });
             }
           }}
-          data-testid="passphrase-enabled-checkbox">
+          data-testid="passphrase-enabled-checkbox"
+        >
           <Text text={t('passphrase_optional')} color="textDim" />
         </Checkbox>
 
@@ -299,12 +303,14 @@ export function Step1_Create({
       {showPassphraseNotice && (
         <Popover
           contentStyle={{ width: 340, padding: 30, boxSizing: 'border-box' }}
-          data-testid="passphrase-warning-popover">
+          data-testid="passphrase-warning-popover"
+        >
           <Column itemsCenter>
             <Column
               justifyCenter
               itemsCenter
-              style={{ width: 64, height: 64, borderRadius: 43, backgroundColor: 'rgba(255, 255, 255, 0.03)' }}>
+              style={{ width: 64, height: 64, borderRadius: 43, backgroundColor: 'rgba(255, 255, 255, 0.03)' }}
+            >
               <Icon icon="warning2" size={32} color="gold" />
             </Column>
             <Text text={t('passphrase_warning_title')} preset="title" color="gold" textCenter />

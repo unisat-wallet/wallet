@@ -20,7 +20,7 @@ import {
 } from '@unisat/wallet-state';
 import { AddressType } from '@unisat/wallet-types';
 
-export function Step2({
+export function Step_ChooseAddressType({
   contextData,
   updateContextData,
   clearSensitiveState

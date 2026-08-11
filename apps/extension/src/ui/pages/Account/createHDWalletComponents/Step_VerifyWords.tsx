@@ -1,3 +1,4 @@
+import bip39EnglishWordlist from 'bip39/src/wordlists/english.json';
 import { useEffect, useMemo, useState } from 'react';
 
 import { Button, Card, Column, Grid, Icon, Input, Row, Text } from '@/ui/components';
@@ -5,7 +6,6 @@ import { FooterButtonContainer } from '@/ui/components/FooterButtonContainer';
 import { ContextData, TabType, UpdateContextDataParams } from '@/ui/pages/Account/createHDWalletComponents/types';
 import { colors } from '@/ui/theme/colors';
 import { useI18n } from '@unisat/wallet-state';
-import bip39EnglishWordlist from 'bip39/src/wordlists/english.json';
 
 function shuffledIndexes(length: number): number[] {
   const indexes = Array.from({ length }, (_, index) => index);
@@ -37,7 +37,7 @@ interface MnemonicChoice {
   word: string;
 }
 
-export function Step1_Confirm({
+export function Step_VerifyWords({
   contextData,
   updateContextData
 }: {
