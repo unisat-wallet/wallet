@@ -39,6 +39,15 @@ export function Step_ImportWords(params: {
   const hasUncommittedWord =
     activeIndex === null ? Boolean(activeWord.trim()) : activeWord.trim() !== enteredWords[activeIndex];
   const hasInvalidMnemonicWords = enteredWords.some(hasInvalidMnemonicWord);
+  const actionButtonStyle = {
+    minHeight: 28,
+    minWidth: 96,
+    paddingLeft: 10,
+    paddingRight: 10,
+    borderRadius: 5,
+    backgroundColor: colors.black_dark,
+    cursor: 'pointer'
+  };
 
   const commitWords = (words: string[], continueWithAnotherWord = false) => {
     const wordsToCommit = words.flatMap(getWords);
@@ -147,8 +156,7 @@ export function Step_ImportWords(params: {
             borderColor: colors.primary,
             boxShadow: '0 0 0 1px rgba(227, 187, 95, 0.3)',
             backgroundColor: colors.card
-          }}
-        >
+          }}>
           <Text text={`${inputIndex + 1}.`} size="xs" style={{ width: 20, flexShrink: 0 }} color="textDim" />
           <Input
             containerStyle={{
@@ -200,17 +208,6 @@ export function Step_ImportWords(params: {
         <Column gap="zero">
           <Text text={t('CreateHDwallet_StepImport_RecoverTheWallet')} preset="sub" style={{ fontSize: 12 }} />
         </Column>
-        {isInitialEntry ? null : (
-          <Icon
-            icon={showWords ? 'eye' : 'eye-slash'}
-            size={16}
-            color="textDim"
-            onClick={() => {
-              setShowWords((current) => !current);
-            }}
-            data-testid="mnemonic-import-words-visibility"
-          />
-        )}
       </Row>
 
       <Column gap="xs">
@@ -221,8 +218,7 @@ export function Step_ImportWords(params: {
             minHeight: 136,
             borderRadius: 8,
             backgroundColor: colors.black_dark
-          }}
-        >
+          }}>
           {isInitialEntry ? (
             <>
               <textarea
@@ -297,8 +293,7 @@ export function Step_ImportWords(params: {
                         boxShadow: isInvalidWord ? `0 0 0 1px ${colors.error}` : undefined,
                         backgroundColor: colors.card
                       }}
-                      data-testid={`mnemonic-import-word-${index}`}
-                    >
+                      data-testid={`mnemonic-import-word-${index}`}>
                       <Text text={`${index + 1}.`} size="xs" style={{ width: 20, flexShrink: 0 }} color="textDim" />
                       <Text
                         text={showWords ? word : '\u2022'.repeat(5)}
@@ -316,21 +311,24 @@ export function Step_ImportWords(params: {
           )}
         </Column>
 
-        <Row justifyEnd style={{ paddingRight: 2, marginTop: 6 }}>
+        <Row justifyEnd gap="sm" style={{ paddingRight: 2, marginTop: 6 }}>
           {isInitialEntry ? (
-            <Text
-              text={t('paste')}
-              color="textDim"
-              style={{ cursor: 'pointer' }}
+            <Row
+              justifyCenter
+              itemsCenter
+              gap="xs"
               onClick={handleClipboardPaste}
-              data-testid="mnemonic-import-paste"
-            />
+              style={actionButtonStyle}
+              data-testid="mnemonic-import-paste">
+              <Icon icon="copy" size={12} color="textDim" />
+              <Text text={t('paste')} color="textDim" />
+            </Row>
           ) : (
             <>
-              <Text
-                text={t('clear_all')}
-                color="textDim"
-                style={{ cursor: 'pointer' }}
+              <Row
+                justifyCenter
+                itemsCenter
+                gap="xs"
                 onClick={() => {
                   onInputWordsReplace([]);
                   setActiveWord('');
@@ -338,8 +336,23 @@ export function Step_ImportWords(params: {
                   setShowAdditionalWordInput(false);
                   setShowWords(false);
                 }}
-                data-testid="mnemonic-import-clear-all"
-              />
+                style={actionButtonStyle}
+                data-testid="mnemonic-import-clear-all">
+                <Icon icon="sheet-close" size={10} />
+                <Text text={t('clear_all')} color="textDim" />
+              </Row>
+              <Row
+                justifyCenter
+                itemsCenter
+                gap="xs"
+                onClick={() => {
+                  setShowWords((current) => !current);
+                }}
+                style={actionButtonStyle}
+                data-testid="mnemonic-import-words-visibility">
+                <Icon icon={showWords ? 'eye-slash' : 'eye'} size={16} color="textDim" />
+                <Text text={showWords ? t('hide') : t('show')} color="textDim" />
+              </Row>
             </>
           )}
         </Row>
@@ -357,8 +370,7 @@ export function Step_ImportWords(params: {
                 updateContextData({ passphrase: '' });
               }
             }}
-            data-testid="import-passphrase-enabled-checkbox"
-          >
+            data-testid="import-passphrase-enabled-checkbox">
             <Text text={t('passphrase_optional')} color="textDim" />
           </Checkbox>
 
