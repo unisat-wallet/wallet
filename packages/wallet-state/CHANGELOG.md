@@ -1,5 +1,23 @@
 # @unisat/wallet-state
 
+## 1.8.0
+
+### Minor Changes
+
+- fix
+
+## 1.7.0
+
+### Minor Changes
+
+- v1.7.20
+
+### Patch Changes
+
+- Updated dependencies
+  - @unisat/keyring-service@1.6.0
+  - @unisat/wallet-shared@0.7.0
+
 ## 1.6.0
 
 ### Minor Changes

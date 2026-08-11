@@ -1,5 +1,24 @@
 # @unisat/wallet-background
 
+## 8.0.0
+
+### Minor Changes
+
+- v1.7.20
+
+### Patch Changes
+
+- Updated dependencies
+  - @unisat/keyring-service@1.6.0
+  - @unisat/wallet-shared@0.7.0
+  - @unisat/tx-helpers@1.4.1
+  - @unisat/approval-service@1.1.4
+  - @unisat/notification-service@1.1.4
+  - @unisat/preference-service@0.4.1
+  - @unisat/wallet-api@1.3.1
+  - @unisat/contact-book@1.1.3
+  - @unisat/permission-service@1.2.1
+
 ## 7.0.0
 
 ### Minor Changes
