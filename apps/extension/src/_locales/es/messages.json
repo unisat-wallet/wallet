@@ -1362,7 +1362,7 @@
     "message": "La frase mnemotécnica no es válida"
   },
   "mnemonic_word_invalid": {
-    "message": "Use solo palabras mnemotécnicas BIP39 en minúsculas. Revise la ortografía."
+    "message": "Palabra mnemotécnica BIP39 no válida. Revise la ortografía."
   },
   "mnemonics_12_words": {
     "message": "12 palabras"

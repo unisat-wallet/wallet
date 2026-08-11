@@ -1362,7 +1362,7 @@
     "message": "ニーモニックフレーズが無効です"
   },
   "mnemonic_word_invalid": {
-    "message": "小文字の BIP39 ニーモニック単語のみを使用してください。スペルを確認してください。"
+    "message": "無効な BIP39 ニーモニック単語です。スペルを確認してください。"
   },
   "mnemonics_12_words": {
     "message": "12 語"
