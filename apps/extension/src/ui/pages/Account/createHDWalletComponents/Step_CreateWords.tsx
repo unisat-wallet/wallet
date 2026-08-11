@@ -130,7 +130,8 @@ export function Step_CreateWords({
           borderRadius: 10,
           backgroundColor: colors.transparent
         }}
-        data-testid="mnemonic-security-notice">
+        data-testid="mnemonic-security-notice"
+      >
         <Column gap="zero">
           <Row itemsCenter mb="xs">
             <Icon icon="intro" size={12} color="gold" />
@@ -186,7 +187,8 @@ export function Step_CreateWords({
               gap="zero"
               onClick={generating ? undefined : () => void onSelectWordsType(option.type)}
               style={{ marginRight: 20, opacity: generating ? 0.5 : 1, cursor: generating ? 'not-allowed' : 'pointer' }}
-              data-testid={`mnemonic-words-type-${option.type}`}>
+              data-testid={`mnemonic-words-type-${option.type}`}
+            >
               {selected ? (
                 <Icon icon="frame" size={22} color="gold" />
               ) : (
@@ -212,11 +214,13 @@ export function Step_CreateWords({
         <Column
           style={{
             position: 'relative',
+            zIndex: 0,
             border: '1px solid rgba(255, 255, 255, 0.16)',
             borderRadius: 8,
             padding: 8,
             overflow: 'hidden'
-          }}>
+          }}
+        >
           <Grid columns={3} gap="md" style={{ width: '100%' }}>
             {words.map((v, index) => {
               return (
@@ -241,7 +245,8 @@ export function Step_CreateWords({
                       paddingRight: 5
                     }}
                     data-index={index}
-                    data-testid={`mnemonic-word-${index}`}>
+                    data-testid={`mnemonic-word-${index}`}
+                  >
                     <Text text={v} size="xs" selectText disableTranslate ellipsis style={{ minWidth: 0 }} />
                   </Card>
                 </Row>
@@ -258,7 +263,10 @@ export function Step_CreateWords({
               }}
               style={{
                 position: 'absolute',
-                inset: 0,
+                top: 0,
+                right: 0,
+                bottom: 0,
+                left: 0,
                 borderRadius: 8,
                 padding: 20,
                 boxSizing: 'border-box',
@@ -268,7 +276,8 @@ export function Step_CreateWords({
                 cursor: 'pointer',
                 zIndex: 1
               }}
-              data-testid="mnemonic-words-mask">
+              data-testid="mnemonic-words-mask"
+            >
               <Column gap="xs" itemsCenter style={{ maxWidth: 260 }}>
                 <Icon icon="eye-slash" size={28} color="textWhite" />
                 <Text text={t('mnemonic_mask_reveal_title')} color="textWhite" textCenter />
@@ -303,7 +312,8 @@ export function Step_CreateWords({
               backgroundColor: colors.black_dark,
               cursor: 'pointer'
             }}
-            data-testid="mnemonic-words-visibility">
+            data-testid="mnemonic-words-visibility"
+          >
             <Icon icon={showWords ? 'eye-slash' : 'eye'} size={16} color="textDim" />
 
             <Text
@@ -327,7 +337,8 @@ export function Step_CreateWords({
               updateContextData({ passphrase: '' });
             }
           }}
-          data-testid="passphrase-enabled-checkbox">
+          data-testid="passphrase-enabled-checkbox"
+        >
           <Text text={t('passphrase_optional')} color="textDim" />
         </Checkbox>
 
@@ -378,12 +389,14 @@ export function Step_CreateWords({
       {showPassphraseNotice && (
         <Popover
           contentStyle={{ width: 340, padding: 30, boxSizing: 'border-box' }}
-          data-testid="passphrase-warning-popover">
+          data-testid="passphrase-warning-popover"
+        >
           <Column itemsCenter>
             <Column
               justifyCenter
               itemsCenter
-              style={{ width: 64, height: 64, borderRadius: 43, backgroundColor: 'rgba(255, 255, 255, 0.03)' }}>
+              style={{ width: 64, height: 64, borderRadius: 43, backgroundColor: 'rgba(255, 255, 255, 0.03)' }}
+            >
               <Icon icon="warning2" size={32} color="gold" />
             </Column>
             <Text text={t('passphrase_warning_title')} preset="title" color="gold" textCenter />
