@@ -1,3 +1,4 @@
+import { decode } from 'bs58check';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { Button, Column, Content, Header, Input, Layout, Row, Text } from '@/ui/components';
@@ -5,11 +6,10 @@ import { AddressTypeCard } from '@/ui/components/AddressTypeCard';
 import { FooterButtonContainer } from '@/ui/components/FooterButtonContainer';
 import { TabBar } from '@/ui/components/TabBar';
 import { satoshisToAmount } from '@/ui/utils';
-import { uiEventBus, useI18n, useTools, useWallet } from '@unisat/wallet-state';
-
 import { ADDRESS_TYPES, BUS_METHODS } from '@unisat/wallet-shared';
+import { uiEventBus, useI18n, useTools, useWallet } from '@unisat/wallet-state';
 import { AddressType } from '@unisat/wallet-types';
-import { decode } from 'bs58check';
+
 import { useNavigate } from '../MainRoute';
 import { TabType } from './createHDWalletComponents/types';
 
@@ -73,7 +73,7 @@ function Step1({
 
   return (
     <Column gap="lg">
-      <Text text={t('private_key')} textCenter preset="bold" />
+      <Text text={t('private_key')} preset="sub" />
 
       <Input
         placeholder={t('wif_private_key_or_hex_private_key')}
@@ -88,7 +88,13 @@ function Step1({
         data-testid="private-key-input"
       />
       <FooterButtonContainer>
-        <Button disabled={disabled} text={t('continue')} preset="primary" onClick={btnClick} data-testid="private-key-continue-button" />
+        <Button
+          disabled={disabled}
+          text={t('continue')}
+          preset="primary"
+          onClick={btnClick}
+          data-testid="private-key-continue-button"
+        />
       </FooterButtonContainer>
     </Column>
   );
@@ -180,7 +186,10 @@ function Step2({
   const run = async () => {
     const addresses: string[] = [];
     self.maxSatoshis = 0;
-    self.recommended = Math.max(0, addressCandidates.findIndex((candidate) => !candidate.unsupported));
+    self.recommended = Math.max(
+      0,
+      addressCandidates.findIndex((candidate) => !candidate.unsupported)
+    );
     self.addressBalances = {};
     for (let i = 0; i < addressCandidates.length; i++) {
       const options = addressCandidates[i];
@@ -224,8 +233,7 @@ function Step2({
   const pathIndex = useMemo(() => {
     return addressCandidates.findIndex(
       (candidate) =>
-        candidate.addressType === contextData.addressType &&
-        candidate.compressed === contextData.compressed
+        candidate.addressType === contextData.addressType && candidate.compressed === contextData.compressed
     );
   }, [addressCandidates, contextData.addressType, contextData.compressed]);
 
@@ -251,7 +259,7 @@ function Step2({
   };
   return (
     <Column gap="lg">
-      <Text text={t('address_type')} preset="bold" />
+      <Text text={t('address_type')} preset="sub" />
       {addressCandidates.map((item, index) => {
         const address = previewAddresses[index];
         const assets = addressAssets[address] || {
@@ -271,9 +279,13 @@ function Step2({
             assets={assets}
             checked={index == pathIndex && !item.unsupported}
             disabled={item.unsupported}
-            onClick={item.unsupported ? undefined : () => {
-              updateContextData({ addressType: item.addressType, compressed: item.compressed });
-            }}
+            onClick={
+              item.unsupported
+                ? undefined
+                : () => {
+                    updateContextData({ addressType: item.addressType, compressed: item.compressed });
+                  }
+            }
             data-testid={`address-type-card-${index}`}
           />
         );
@@ -347,12 +359,12 @@ export default function CreateSimpleWalletScreen() {
   const items = [
     {
       key: TabType.IMPORT_WORDS,
-      label: t('step_1'),
+      label: t('private_key'),
       children: <Step1 contextData={contextData} updateContextData={updateContextData} />
     },
     {
       key: TabType.CHOOSE_ADDRESS_TYPE,
-      label: t('step_2'),
+      label: t('address_type'),
       children: <Step2 contextData={contextData} updateContextData={updateContextData} />
     }
   ];
@@ -371,10 +383,15 @@ export default function CreateSimpleWalletScreen() {
       <Content>
         <Row justifyCenter>
           <TabBar
+            preset="number-step"
             progressEnabled
+            numberStepList={items.map((v) => v.label)}
             defaultActiveKey={TabType.IMPORT_WORDS}
-            items={items}
             activeKey={contextData.tabType}
+            items={items.map((v, index) => ({
+              key: v.key,
+              label: `${index + 1}`
+            }))}
             onTabClick={(key) => {
               const toTabType = key as TabType;
               if (toTabType === TabType.CHOOSE_ADDRESS_TYPE) {

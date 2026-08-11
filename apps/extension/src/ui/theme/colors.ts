@@ -14,7 +14,7 @@ const palette = {
   grey: '#495361',
   light: '#A2A4AA',
 
-  black_dark: '#2a2626',
+  black_dark: 'rgba(255, 255, 255, 0.10)',
   white_light2: 'rgba(255, 255, 255, 0.2)',
 
   green_dark2: '#2D7E24',
