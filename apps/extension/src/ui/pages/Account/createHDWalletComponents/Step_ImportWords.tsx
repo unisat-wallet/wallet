@@ -65,6 +65,23 @@ export function Step_ImportWords(params: {
     setShowWords(false);
   };
 
+  const handleActiveWordBlur = () => {
+    if (activeIndex === null) {
+      setShowAdditionalWordInput(false);
+      return;
+    }
+
+    const nextWord = activeWord.trim();
+    if (nextWord && nextWord !== enteredWords[activeIndex]) {
+      commitWords([nextWord]);
+      return;
+    }
+
+    setActiveWord('');
+    setActiveIndex(null);
+    setShowAdditionalWordInput(false);
+  };
+
   const handleClipboardPaste = async () => {
     try {
       commitWords(getWords(await navigator.clipboard.readText()));
@@ -87,7 +104,8 @@ export function Step_ImportWords(params: {
           borderColor: colors.primary,
           boxShadow: '0 0 0 1px rgba(227, 187, 95, 0.3)',
           backgroundColor: colors.card
-        }}>
+        }}
+      >
         <Text text={`${inputIndex + 1}.`} size="xs" style={{ width: 20, flexShrink: 0 }} color="textDim" />
         <Input
           containerStyle={{
@@ -120,7 +138,8 @@ export function Step_ImportWords(params: {
               handleBackspace();
             }
           }}
-          autoFocus
+          onBlur={handleActiveWordBlur}
+          autoFocus={activeIndex !== null || showAdditionalWordInput}
           preset="text"
           autoComplete="off"
           spellCheck={false}
@@ -158,7 +177,8 @@ export function Step_ImportWords(params: {
             minHeight: 136,
             borderRadius: 8,
             backgroundColor: colors.black_dark
-          }}>
+          }}
+        >
           {isInitialEntry ? (
             <textarea
               autoFocus
@@ -223,7 +243,8 @@ export function Step_ImportWords(params: {
                       borderColor: colors.border2,
                       backgroundColor: colors.card
                     }}
-                    data-testid={`mnemonic-import-word-${index}`}>
+                    data-testid={`mnemonic-import-word-${index}`}
+                  >
                     <Text text={`${index + 1}.`} size="xs" style={{ width: 20, flexShrink: 0 }} color="textDim" />
                     <Text
                       text={showWords ? word : '\u2022'.repeat(5)}
@@ -280,7 +301,8 @@ export function Step_ImportWords(params: {
                 updateContextData({ passphrase: '' });
               }
             }}
-            data-testid="import-passphrase-enabled-checkbox">
+            data-testid="import-passphrase-enabled-checkbox"
+          >
             <Text text={t('passphrase_optional')} color="textDim" />
           </Checkbox>
 
