@@ -1361,6 +1361,9 @@
   "mnemonic_phrase_is_invalid": {
     "message": "La phrase mnémonique est invalide"
   },
+  "mnemonic_word_invalid": {
+    "message": "Utilisez uniquement des mots mnémoniques BIP39 en minuscules. Vérifiez l'orthographe."
+  },
   "mnemonics_12_words": {
     "message": "12 mots"
   },

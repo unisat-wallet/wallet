@@ -1361,6 +1361,9 @@
   "mnemonic_phrase_is_invalid": {
     "message": "мнемоническая фраза недействительна"
   },
+  "mnemonic_word_invalid": {
+    "message": "Используйте только строчные мнемонические слова BIP39. Проверьте написание."
+  },
   "mnemonics_12_words": {
     "message": "12 слов"
   },

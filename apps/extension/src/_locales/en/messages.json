@@ -1367,6 +1367,9 @@
   "mnemonic_phrase_is_invalid": {
     "message": "mnemonic phrase is invalid"
   },
+  "mnemonic_word_invalid": {
+    "message": "Use lowercase BIP39 mnemonic words only. Please check the spelling."
+  },
   "mnemonics_12_words": {
     "message": "12 words"
   },

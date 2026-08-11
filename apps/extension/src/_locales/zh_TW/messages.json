@@ -1361,6 +1361,9 @@
   "mnemonic_phrase_is_invalid": {
     "message": "助記詞無效"
   },
+  "mnemonic_word_invalid": {
+    "message": "僅使用小寫的 BIP39 助記詞，請檢查拼寫。"
+  },
   "mnemonics_12_words": {
     "message": "12 詞"
   },

@@ -1,3 +1,4 @@
+import { wordlists } from 'bip39';
 import { useState } from 'react';
 
 import { Button, Card, Checkbox, Column, Grid, Icon, Input, Row, Text } from '@/ui/components';
@@ -6,8 +7,14 @@ import { ContextData, UpdateContextDataParams } from '@/ui/pages/Account/createH
 import { colors } from '@/ui/theme/colors';
 import { useCreateWalletLogicImportWordsStep } from '@unisat/wallet-state';
 
+const BIP39_ENGLISH_WORDS = new Set(wordlists.english);
+
 function getWords(value: string): string[] {
   return value.normalize('NFKD').trim().split(/\s+/).filter(Boolean);
+}
+
+function hasInvalidMnemonicWord(value: string): boolean {
+  return getWords(value).some((word) => !/^[a-z]+$/.test(word) || !BIP39_ENGLISH_WORDS.has(word));
 }
 
 export function Step_ImportWords(params: {
@@ -31,6 +38,7 @@ export function Step_ImportWords(params: {
   const shouldShowActiveWordInput = activeIndex !== null || !hasValidTwelveWordMnemonic || showAdditionalWordInput;
   const hasUncommittedWord =
     activeIndex === null ? Boolean(activeWord.trim()) : activeWord.trim() !== enteredWords[activeIndex];
+  const hasInvalidMnemonicWords = enteredWords.some(hasInvalidMnemonicWord);
 
   const commitWords = (words: string[], continueWithAnotherWord = false) => {
     const wordsToCommit = words.flatMap(getWords);
@@ -97,62 +105,63 @@ export function Step_ImportWords(params: {
 
   const activeWordInput =
     !isInitialEntry && shouldShowActiveWordInput && inputIndex < inputWords.length ? (
-      <Card
-        key={`active-word-${inputIndex}`}
-        preset="style3"
-        style={{
-          minHeight: 40,
-          justifyContent: 'flex-start',
-          padding: '0 10px',
-          gap: 6,
-          borderWidth: 1,
-          borderColor: colors.primary,
-          boxShadow: '0 0 0 1px rgba(227, 187, 95, 0.3)',
-          backgroundColor: colors.card
-        }}
-      >
-        <Text text={`${inputIndex + 1}.`} size="xs" style={{ width: 20, flexShrink: 0 }} color="textDim" />
-        <Input
-          containerStyle={{
-            flex: 1,
-            minWidth: 0,
-            minHeight: 38,
-            height: 38,
-            padding: 0,
-            borderWidth: 0,
-            borderRadius: 0,
-            backgroundColor: colors.transparent
-          }}
-          style={{ minWidth: 0, fontSize: 12 }}
-          value={activeWord}
-          onChange={(e) => {
-            setActiveWord(e.target.value);
-          }}
-          onPaste={(e) => {
-            e.preventDefault();
-            commitWords(getWords(e.clipboardData.getData('text/plain')));
-          }}
-          onKeyDown={(e) => {
-            if (e.nativeEvent.isComposing) {
-              return;
-            }
-            if (e.key === ' ' || e.key === 'Enter') {
+      <Column key={`active-word-${inputIndex}`} gap="xs">
+        <Card
+          key={`active-word-${inputIndex}`}
+          preset="style3"
+          style={{
+            minHeight: 40,
+            justifyContent: 'flex-start',
+            padding: '0 10px',
+            gap: 6,
+            borderWidth: 1,
+            borderColor: colors.primary,
+            boxShadow: '0 0 0 1px rgba(227, 187, 95, 0.3)',
+            backgroundColor: colors.card
+          }}>
+          <Text text={`${inputIndex + 1}.`} size="xs" style={{ width: 20, flexShrink: 0 }} color="textDim" />
+          <Input
+            containerStyle={{
+              flex: 1,
+              minWidth: 0,
+              minHeight: 38,
+              height: 38,
+              padding: 0,
+              borderWidth: 0,
+              borderRadius: 0,
+              backgroundColor: colors.transparent
+            }}
+            style={{ minWidth: 0, fontSize: 12 }}
+            value={activeWord}
+            onChange={(e) => {
+              setActiveWord(e.target.value);
+            }}
+            onPaste={(e) => {
               e.preventDefault();
-              commitWords([activeWord], true);
-            } else if (e.key === 'Backspace') {
-              handleBackspace();
-            }
-          }}
-          onBlur={handleActiveWordBlur}
-          autoFocus={activeIndex !== null || showAdditionalWordInput}
-          preset="text"
-          autoComplete="off"
-          spellCheck={false}
-          inputMode="text"
-          placeholder=""
-          data-testid={`mnemonic-import-active-word-${inputIndex}`}
-        />
-      </Card>
+              commitWords(getWords(e.clipboardData.getData('text/plain')));
+            }}
+            onKeyDown={(e) => {
+              if (e.nativeEvent.isComposing) {
+                return;
+              }
+              if (e.key === ' ' || e.key === 'Enter') {
+                e.preventDefault();
+                commitWords([activeWord], true);
+              } else if (e.key === 'Backspace') {
+                handleBackspace();
+              }
+            }}
+            onBlur={handleActiveWordBlur}
+            autoFocus={activeIndex !== null || showAdditionalWordInput}
+            preset="text"
+            autoComplete="off"
+            spellCheck={false}
+            inputMode="text"
+            placeholder=""
+            data-testid={`mnemonic-import-active-word-${inputIndex}`}
+          />
+        </Card>
+      </Column>
     ) : null;
 
   return (
@@ -182,47 +191,53 @@ export function Step_ImportWords(params: {
             minHeight: 136,
             borderRadius: 8,
             backgroundColor: colors.black_dark
-          }}
-        >
+          }}>
           {isInitialEntry ? (
-            <textarea
-              autoFocus
-              value={activeWord}
-              onChange={(e) => {
-                setActiveWord(e.target.value);
-              }}
-              onPaste={(e) => {
-                e.preventDefault();
-                commitWords(getWords(e.clipboardData.getData('text/plain')));
-              }}
-              onKeyDown={(e) => {
-                if (e.nativeEvent.isComposing) {
-                  return;
-                }
-                if (e.key === ' ' || e.key === 'Enter') {
+            <>
+              <textarea
+                autoFocus
+                value={activeWord}
+                onChange={(e) => {
+                  setActiveWord(e.target.value);
+                }}
+                onPaste={(e) => {
                   e.preventDefault();
-                  commitWords([activeWord], true);
-                }
-              }}
-              placeholder={t('mnemonic_import_initial_placeholder')}
-              autoComplete="off"
-              spellCheck={false}
-              style={{
-                boxSizing: 'border-box',
-                width: '100%',
-                minHeight: 180,
-                resize: 'none',
-                padding: 16,
-                border: 0,
-                borderRadius: 8,
-                outline: 0,
-                color: colors.text,
-                backgroundColor: colors.transparent,
-                fontSize: 14,
-                lineHeight: '22px'
-              }}
-              data-testid="mnemonic-import-initial-input"
-            />
+                  commitWords(getWords(e.clipboardData.getData('text/plain')));
+                }}
+                onKeyDown={(e) => {
+                  if (e.nativeEvent.isComposing) {
+                    return;
+                  }
+                  if (e.key === ' ' || e.key === 'Enter') {
+                    e.preventDefault();
+                    commitWords([activeWord], true);
+                  }
+                }}
+                onBlur={() => {
+                  if (activeWord.trim()) {
+                    commitWords([activeWord]);
+                  }
+                }}
+                placeholder={t('mnemonic_import_initial_placeholder')}
+                autoComplete="off"
+                spellCheck={false}
+                style={{
+                  boxSizing: 'border-box',
+                  width: '100%',
+                  minHeight: 180,
+                  resize: 'none',
+                  padding: 16,
+                  border: 0,
+                  borderRadius: 8,
+                  outline: 0,
+                  color: colors.text,
+                  backgroundColor: colors.transparent,
+                  fontSize: 14,
+                  lineHeight: '22px'
+                }}
+                data-testid="mnemonic-import-initial-input"
+              />
+            </>
           ) : (
             <Grid columns={3} gap="sm" style={{ width: '100%' }}>
               {enteredWords.map((word, index) => {
@@ -230,34 +245,37 @@ export function Step_ImportWords(params: {
                   return activeWordInput;
                 }
 
+                const isInvalidWord = hasInvalidMnemonicWord(word);
+
                 return (
-                  <Card
-                    key={`word-${index}`}
-                    preset="style3"
-                    onClick={() => {
-                      setActiveIndex(index);
-                      setActiveWord(word);
-                    }}
-                    style={{
-                      minHeight: 40,
-                      justifyContent: 'flex-start',
-                      padding: '0 10px',
-                      gap: 6,
-                      cursor: 'text',
-                      borderWidth: 1,
-                      borderColor: colors.border2,
-                      backgroundColor: colors.card
-                    }}
-                    data-testid={`mnemonic-import-word-${index}`}
-                  >
-                    <Text text={`${index + 1}.`} size="xs" style={{ width: 20, flexShrink: 0 }} color="textDim" />
-                    <Text
-                      text={showWords ? word : '\u2022'.repeat(5)}
-                      ellipsis={showWords}
-                      style={{ flex: 1, minWidth: 0 }}
-                      disableTranslate
-                    />
-                  </Card>
+                  <Column key={`word-${index}`} gap="xs">
+                    <Card
+                      preset="style3"
+                      onClick={() => {
+                        setActiveIndex(index);
+                        setActiveWord(word);
+                      }}
+                      style={{
+                        minHeight: 40,
+                        justifyContent: 'flex-start',
+                        padding: '0 10px',
+                        gap: 6,
+                        cursor: 'text',
+                        borderWidth: 0.2,
+                        borderColor: isInvalidWord ? colors.error : colors.border2,
+                        boxShadow: isInvalidWord ? `0 0 0 1px ${colors.error}` : undefined,
+                        backgroundColor: colors.card
+                      }}
+                      data-testid={`mnemonic-import-word-${index}`}>
+                      <Text text={`${index + 1}.`} size="xs" style={{ width: 20, flexShrink: 0 }} color="textDim" />
+                      <Text
+                        text={showWords ? word : '\u2022'.repeat(5)}
+                        ellipsis={showWords}
+                        style={{ flex: 1, minWidth: 0 }}
+                        disableTranslate
+                      />
+                    </Card>
+                  </Column>
                 );
               })}
 
@@ -293,6 +311,7 @@ export function Step_ImportWords(params: {
             </>
           )}
         </Row>
+        {hasInvalidMnemonicWords && <Text text={t('mnemonic_word_invalid')} color="error" size="xs" wrap />}
       </Column>
 
       {enablePhrase && (
@@ -306,8 +325,7 @@ export function Step_ImportWords(params: {
                 updateContextData({ passphrase: '' });
               }
             }}
-            data-testid="import-passphrase-enabled-checkbox"
-          >
+            data-testid="import-passphrase-enabled-checkbox">
             <Text text={t('passphrase_optional')} color="textDim" />
           </Checkbox>
 
