@@ -34,8 +34,7 @@ export function Step_ImportWords(params: {
   const enteredWords = inputWords.filter((word) => word.trim());
   const isInitialEntry = enteredWords.length === 0;
   const inputIndex = activeIndex ?? enteredWords.length;
-  const hasValidTwelveWordMnemonic = enteredWords.length === 12 && !disabled;
-  const shouldShowActiveWordInput = activeIndex !== null || !hasValidTwelveWordMnemonic || showAdditionalWordInput;
+  const shouldShowActiveWordInput = activeIndex !== null || showAdditionalWordInput;
   const hasUncommittedWord =
     activeIndex === null ? Boolean(activeWord.trim()) : activeWord.trim() !== enteredWords[activeIndex];
   const hasInvalidMnemonicWords = enteredWords.some(hasInvalidMnemonicWord);
@@ -63,9 +62,20 @@ export function Step_ImportWords(params: {
 
     onInputWordsReplace(nextWords);
     setActiveWord('');
-    setActiveIndex(null);
-    setShowAdditionalWordInput(continueWithAnotherWord);
-    setShowWords(false);
+    if (continueWithAnotherWord && activeIndex !== null) {
+      const nextIndex = activeIndex + wordsToCommit.length;
+      if (nextIndex < nextWords.length) {
+        setActiveIndex(nextIndex);
+        setActiveWord(nextWords[nextIndex]);
+        setShowAdditionalWordInput(false);
+      } else {
+        setActiveIndex(null);
+        setShowAdditionalWordInput(true);
+      }
+    } else {
+      setActiveIndex(null);
+      setShowAdditionalWordInput(continueWithAnotherWord);
+    }
   };
 
   const handleBackspace = (): boolean => {
@@ -81,7 +91,6 @@ export function Step_ImportWords(params: {
       const previousIndex = inputIndex - 1;
       setActiveIndex(previousIndex);
       setActiveWord(enteredWords[previousIndex]);
-      setShowWords(false);
       return true;
     }
 
@@ -90,7 +99,6 @@ export function Step_ImportWords(params: {
       setActiveIndex(null);
       setActiveWord('');
       setShowAdditionalWordInput(false);
-      setShowWords(false);
       return true;
     }
 
@@ -107,14 +115,13 @@ export function Step_ImportWords(params: {
       setActiveWord('');
       setShowAdditionalWordInput(false);
     }
-    setShowWords(false);
     return true;
   };
 
   const handleActiveWordBlur = () => {
     if (activeIndex === null) {
       if (activeWord.trim()) {
-        commitWords([activeWord]);
+        commitWords([activeWord], true);
         return;
       }
 
@@ -124,10 +131,15 @@ export function Step_ImportWords(params: {
 
     const nextWord = activeWord.trim();
     if (nextWord && nextWord !== enteredWords[activeIndex]) {
-      commitWords([nextWord]);
+      commitWords([nextWord], activeIndex === enteredWords.length - 1);
       return;
     }
 
+    if (!nextWord) {
+      const nextWords = [...enteredWords];
+      nextWords.splice(activeIndex, 1);
+      onInputWordsReplace(nextWords);
+    }
     setActiveWord('');
     setActiveIndex(null);
     setShowAdditionalWordInput(false);
@@ -311,7 +323,7 @@ export function Step_ImportWords(params: {
             <Row
               justifyCenter
               itemsCenter
-              gap="xs"
+              gap="sm"
               onClick={() => {
                 onInputWordsReplace([]);
                 setActiveWord('');
@@ -328,7 +340,7 @@ export function Step_ImportWords(params: {
             <Row
               justifyCenter
               itemsCenter
-              gap="xs"
+              gap="sm"
               onClick={() => {
                 setShowWords((current) => !current);
               }}

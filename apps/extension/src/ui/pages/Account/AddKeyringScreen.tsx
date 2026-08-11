@@ -35,7 +35,7 @@ export default function AddKeyringScreen() {
               <Text text={t('create_with_mnemonics_12words')} size="sm" />
             </Column>
             <Column style={{ marginLeft: 'auto' }}>
-              <Icon size={30} icon="right" />
+              <Icon size={20} icon="right" />
             </Column>
           </Card>
 
@@ -53,7 +53,7 @@ export default function AddKeyringScreen() {
               <Text text={t('restore_from_mnemonics_12words24words')} size="sm" />
             </Column>
             <Column style={{ marginLeft: 'auto' }}>
-              <Icon size={30} icon="right" />
+              <Icon size={20} icon="right" />
             </Column>
           </Card>
 
@@ -69,7 +69,7 @@ export default function AddKeyringScreen() {
               <Text text={t('restore_from_single_private_key')} size="sm" />
             </Column>
             <Column style={{ marginLeft: 'auto' }}>
-              <Icon size={30} icon="right" />
+              <Icon size={20} icon="right" />
             </Column>
           </Card>
 
@@ -91,7 +91,7 @@ export default function AddKeyringScreen() {
               <Text text={t('keystone_wallet')} size="sm" />
             </Column>
             <Column style={{ marginLeft: 'auto' }}>
-              <Icon size={30} icon="right" />
+              <Icon size={20} icon="right" />
             </Column>
           </Card>
 
@@ -110,7 +110,7 @@ export default function AddKeyringScreen() {
                   <Text text={t('readonly_wallet')} size="sm" />
                 </Column>
                 <Column style={{ marginLeft: 'auto' }}>
-                  <Icon size={30} icon="right" />
+                  <Icon size={20} icon="right" />
                 </Column>
               </Card>
 
@@ -127,7 +127,7 @@ export default function AddKeyringScreen() {
                   <Text text={t('create_cold_wallet')} size="sm" />
                 </Column>
                 <Column style={{ marginLeft: 'auto' }}>
-                  <Icon size={30} icon="right" />
+                  <Icon size={20} icon="right" />
                 </Column>
               </Card>
             </>
@@ -148,7 +148,7 @@ export default function AddKeyringScreen() {
                   <Text text={t('watch_address_wallet')} size="sm" />
                 </Column>
                 <Column style={{ marginLeft: 'auto' }}>
-                  <Icon size={30} icon="right" />
+                  <Icon size={20} icon="right" />
                 </Column>
               </Card>
             </>
