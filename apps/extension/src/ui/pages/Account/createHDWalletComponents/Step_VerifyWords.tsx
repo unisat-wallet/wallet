@@ -89,6 +89,9 @@ export function Step_VerifyWords({
       if (current.includes(wordIndex)) {
         return current.filter((index) => index !== wordIndex);
       }
+      if (current.length >= verificationIndexes.length) {
+        return current;
+      }
       if (current.some((selectedWordIndex, slotIndex) => selectedWordIndex !== verificationIndexes[slotIndex])) {
         return current;
       }
