@@ -45,7 +45,7 @@
   "author": "UniSat",
   "license": "MIT",
   "dependencies": {
-    "axios": "^1.6.0",
+    "axios": "^1.15.1",
     "qs": "^6.11.0",
     "@babylonlabs-io/babylon-proto-ts": "0.0.3-canary.5",
     "@cosmjs/proto-signing": "^0.33.0",
