@@ -1,0 +1,1206 @@
+import {
+  RgbInsufficientBalanceError,
+  RgbServiceError,
+  RgbTransferAwaitingAckError,
+  RgbTransferRejectedError,
+} from './errors'
+import { decodeRgbInvoice } from './protocol/invoice'
+import {
+  decodeNiaConsignment,
+  niaConsignmentSpendableOutputScripts,
+  validateNiaConsignmentParentSpends,
+  validateNiaConsignmentParentState,
+} from './protocol/nia-consignment'
+import { concealBlindSeal, encodeBlindRgbInvoice } from './protocol/receive'
+import { planFungibleTransition } from './protocol/transition'
+import type {
+  RgbCompletedTransfer,
+  RgbPreparedTransfer,
+  RgbPendingIssue,
+  RgbPendingTransfer,
+  RgbPendingUtxoSync,
+  RgbServiceDependencies,
+  RgbServiceState,
+  RgbTransferRequest,
+  RgbUtxo,
+  RgbWalletRef,
+  RgbWalletSnapshot,
+} from './types'
+
+const STORAGE_PREFIX = 'rgb-service:v1:'
+
+function outpointKey(utxo: RgbUtxo) {
+  return `${utxo.outpoint.txid}:${utxo.outpoint.vout}`
+}
+
+function getSpendableAmount(utxo: RgbUtxo, assetId: string) {
+  return utxo.allocations
+    .filter(
+      allocation => allocation.assetId === assetId && allocation.settled && allocation.spendable
+    )
+    .reduce((total, allocation) => total + BigInt(allocation.amount), 0n)
+}
+
+/**
+ * Local RGB wallet orchestration. The only remote calls are address-scoped
+ * state sync and consignment transport; RGB transaction construction remains
+ * in the injected local protocol encoder.
+ */
+export class RgbService {
+  private readonly now: () => number
+  private state?: RgbServiceState
+  private syncInFlight?: Promise<RgbWalletSnapshot>
+  private pendingTransferSyncInFlight?: Promise<void>
+  private prepareSendInFlight?: Promise<void>
+
+  constructor(private readonly dependencies: RgbServiceDependencies) {
+    this.now = dependencies.now || (() => Date.now())
+  }
+
+  async open(wallet: RgbWalletRef) {
+    const storageKey = this.storageKey(wallet)
+    const stored = await this.dependencies.storage.get<RgbServiceState>(storageKey)
+    this.state =
+      stored && stored.wallet.fundingAddress === wallet.fundingAddress
+        ? hydrateState(stored)
+        : {
+            version: 1,
+            wallet,
+            snapshot: { utxos: [], syncedAt: 0 },
+            pending: {},
+          }
+    await this.persist()
+  }
+
+  async sync() {
+    if (this.syncInFlight) return this.syncInFlight
+    const sync = this.syncSnapshot()
+    this.syncInFlight = sync
+    try {
+      return await sync
+    } finally {
+      if (this.syncInFlight === sync) this.syncInFlight = undefined
+    }
+  }
+
+  private async syncSnapshot() {
+    const state = this.requireState()
+    if (this.pendingTransferSyncInFlight) await this.pendingTransferSyncInFlight
+    // Keep allocations that have not reached the indexer from being overwritten
+    // by a stale remote snapshot.
+    if (this.hasPendingIndexerSync()) return state.snapshot
+    // A remote snapshot may still expose consumed outpoints. Finish durable
+    // post-broadcast delivery first, or leave the locally updated snapshot intact.
+    if (Object.keys(state.pending).length) await this.advancePendingTransfers()
+    state.snapshot = await this.dependencies.stateSource.getSnapshot(state.wallet)
+    await this.persist()
+    return state.snapshot
+  }
+
+  /** Advance sender ACK/broadcast state without fetching the full UTXO snapshot. */
+  async syncPendingTransfers() {
+    if (this.syncInFlight) {
+      await this.syncInFlight
+      return
+    }
+    if (this.pendingTransferSyncInFlight) return this.pendingTransferSyncInFlight
+    const sync = this.advancePendingTransfers()
+    this.pendingTransferSyncInFlight = sync
+    try {
+      await sync
+    } finally {
+      if (this.pendingTransferSyncInFlight === sync) this.pendingTransferSyncInFlight = undefined
+    }
+  }
+
+  private async advancePendingTransfers() {
+    const state = this.requireState()
+    for (const [transferId, pending] of Object.entries(state.pending)) {
+      try {
+        if (pending.broadcast) await this.syncBroadcastedTransfer(transferId, pending)
+        else if (pending.delivery) await this.advancePendingDelivery(transferId, pending)
+      } catch (error) {
+        // A delivery awaiting its recipient is a durable local state, not a
+        // wallet-wide sync failure. A rejection has already removed its
+        // pending transfer and recorded history, so later work can continue too.
+        if (
+          error instanceof RgbTransferAwaitingAckError ||
+          error instanceof RgbTransferRejectedError
+        ) {
+          continue
+        }
+        throw error
+      }
+    }
+  }
+
+  async createBlindReceive(input: { assetId?: string; amount?: string; durationSeconds?: number }) {
+    const state = this.requireState()
+    if (!state.snapshot.syncedAt) await this.sync()
+    if (input.amount !== undefined && !/^(0|[1-9][0-9]*)$/.test(input.amount)) {
+      throw new RgbServiceError('RGB receive amount must be an unsigned integer')
+    }
+    const now = this.now()
+    const expirationTimestamp =
+      input.durationSeconds === undefined
+        ? undefined
+        : Math.floor(now / 1000) + input.durationSeconds
+    if (
+      input.durationSeconds !== undefined &&
+      (!Number.isInteger(input.durationSeconds) || input.durationSeconds <= 0)
+    ) {
+      throw new RgbServiceError('RGB receive duration must be positive')
+    }
+    const receives = state.pendingReceives || (state.pendingReceives = [])
+    const transportEndpoints = this.dependencies.transport.getEndpoints?.() || []
+    if (!transportEndpoints.length) {
+      throw new RgbServiceError('RGB proxy endpoint is not configured')
+    }
+    // A newly broadcast funding output can reserve a blind seal immediately,
+    // but callers must keep its invoice unavailable until confirmation.
+    const utxo = this.getAvailableReceiveUtxos()[0] || this.getPendingConfirmationReceiveUtxos()[0]
+    if (!utxo) throw new RgbServiceError('No unallocated RGB funding UTXO is available for receive')
+    const seal = { txid: utxo.outpoint.txid, vout: utxo.outpoint.vout, blinding: randomU64() }
+    const invoice = encodeBlindRgbInvoice({
+      network: state.wallet.network,
+      seal,
+      assetId: input.assetId,
+      amount: input.amount,
+      expirationTimestamp,
+      transportEndpoints,
+      address: state.wallet.fundingAddress,
+    })
+    const recipientId = decodeRgbInvoice(invoice).recipientId
+    const pending = {
+      invoice,
+      recipientId,
+      assetId: input.assetId,
+      amount: input.amount,
+      expirationTimestamp,
+      createdAt: now,
+      seal,
+    }
+    receives.push(pending)
+    await this.persist()
+    return pending
+  }
+
+  getPendingReceives() {
+    const now = Math.floor(this.now() / 1000)
+    return (this.requireState().pendingReceives || []).filter(
+      // Expiration prevents new consignments from being accepted, but it must
+      // not stop an already accepted transfer from being monitored until its
+      // Bitcoin transaction settles.
+      item =>
+        !item.expirationTimestamp ||
+        item.expirationTimestamp > now ||
+        item.receivedConsignment?.accepted === true
+    )
+  }
+
+  getPendingReceiveHistory() {
+    return this.requireState().pendingReceiveHistory || []
+  }
+
+  getPendingUtxoSync() {
+    return this.requireState().pendingUtxoSync
+  }
+
+  getPendingIssues() {
+    return this.requireState().pendingIssues || []
+  }
+
+  async markUtxoSyncCompleted(txid: string) {
+    const state = this.requireState()
+    if (!state.pendingUtxoSync || state.pendingUtxoSync.txid !== txid) return
+    delete state.pendingUtxoSync
+    await this.persist()
+  }
+
+  async markIssueSynced(assetId: string) {
+    const state = this.requireState()
+    const pending = state.pendingIssues || []
+    const next = pending.filter(issue => issue.assetId !== assetId)
+    if (next.length === pending.length) return
+    state.pendingIssues = next
+    await this.persist()
+  }
+
+  /** Keep newly broadcast funding outputs usable while the address indexer catches up. */
+  async queueUtxoSync(input: RgbPendingUtxoSync) {
+    const state = this.requireState()
+    const utxosByOutpoint = new Map(state.snapshot.utxos.map(utxo => [outpointKey(utxo), utxo]))
+    for (const utxo of input.outpoints) {
+      utxosByOutpoint.set(outpointKey(utxo), {
+        ...utxo,
+        chainStatus: utxo.chainStatus || 'mempool',
+      })
+    }
+    const utxos = [...utxosByOutpoint.values()]
+    state.snapshot = {
+      utxos,
+      syncedAt: state.snapshot.syncedAt || this.now(),
+    }
+    state.pendingUtxoSync = { txid: input.txid, outpoints: utxos }
+    await this.persist()
+  }
+
+  /** Persist a local issue and its allocation before contacting the indexer. */
+  async queueIssue(input: {
+    assetId: string
+    contract: Uint8Array
+    genesis: Uint8Array
+    asset: RgbPendingIssue['asset']
+    utxoSync: RgbPendingUtxoSync
+  }) {
+    const state = this.requireState()
+    const contracts = state.contracts || (state.contracts = {})
+    contracts[normalizeAssetId(input.assetId)] = {
+      consignment: Buffer.from(input.contract).toString('base64'),
+      genesis: Buffer.from(input.genesis).toString('base64'),
+      createdAt: this.now(),
+    }
+    state.snapshot = { ...state.snapshot, utxos: input.utxoSync.outpoints }
+    const pending = state.pendingIssues || (state.pendingIssues = [])
+    const task: RgbPendingIssue = {
+      assetId: input.assetId,
+      contract: Buffer.from(input.contract).toString('base64'),
+      genesis: Buffer.from(input.genesis).toString('base64'),
+      asset: input.asset,
+      utxoSync: input.utxoSync,
+    }
+    const index = pending.findIndex(issue => issue.assetId === input.assetId)
+    if (index >= 0) pending[index] = task
+    else pending.push(task)
+    await this.persist()
+  }
+
+  getPendingSendHistory() {
+    return this.requireState().pendingSendHistory || []
+  }
+
+  async markSendHistoryConfirmed(transferId: string) {
+    const state = this.requireState()
+    const history = state.pendingSendHistory || []
+    const next = history.filter(item => item.transferId !== transferId)
+    if (next.length === history.length) return
+    state.pendingSendHistory = next
+    await this.persist()
+  }
+
+  async markReceiveHistorySynced(transferId: string) {
+    const state = this.requireState()
+    const history = state.pendingReceiveHistory || []
+    const next = history.filter(item => item.transferId !== transferId)
+    if (next.length === history.length) return
+    state.pendingReceiveHistory = next
+    await this.persist()
+  }
+
+  getKnownBlindSeals() {
+    const state = this.requireState()
+    const seals = [
+      ...this.getPendingReceives().map(receive => receive.seal),
+      ...(state.receivedBlindSeals || []),
+    ]
+    return seals.filter(
+      (seal, index) => !seals.slice(0, index).some(candidate => sameBlindSeal(candidate, seal))
+    )
+  }
+
+  /** Funding UTXOs reserved by active blind invoices cannot back another invoice. */
+  getAvailableReceiveUtxos() {
+    return this.getUnallocatedReceiveUtxos('confirmed')
+  }
+
+  getPendingConfirmationReceiveUtxos() {
+    return this.getUnallocatedReceiveUtxos('mempool')
+  }
+
+  private getUnallocatedReceiveUtxos(chainStatus: RgbUtxo['chainStatus']) {
+    const state = this.requireState()
+    const reserved = new Set(
+      this.getPendingReceives().map(receive => `${receive.seal.txid}:${receive.seal.vout}`)
+    )
+    return state.snapshot.utxos.filter(
+      utxo =>
+        utxo.chainStatus === chainStatus &&
+        utxo.allocations.length === 0 &&
+        !reserved.has(outpointKey(utxo))
+    )
+  }
+
+  async processClaimedReceives({
+    includeClaimed = true,
+    deferConfirmedSettlement = false,
+  }: { includeClaimed?: boolean; deferConfirmedSettlement?: boolean } = {}) {
+    const state = this.requireState()
+    const getClaimed = this.dependencies.stateSource.getClaimedConsignments
+    let received: Array<{ recipientId: string; payload: string }> = []
+    if (includeClaimed) {
+      try {
+        received = getClaimed ? await getClaimed(state.wallet) : []
+      } catch (error) {
+        if (!this.dependencies.transport.getConsignment) throw error
+      }
+    }
+    const proxyReceived = await this.getProxyConsignments()
+    const receivedItems: Array<{
+      recipientId: string
+      payload: string
+      txid?: string
+      endpoint?: string
+    }> = [...received, ...proxyReceived]
+    const pending = state.pendingReceives || []
+    let count = 0
+    let changed = false
+    let snapshotRequired = false
+
+    // Detect sender cancel for consignments already staged for manual accept.
+    for (let index = pending.length - 1; index >= 0; index--) {
+      const receive = pending[index]!
+      if (!receive.pendingAccept || receive.receivedConsignment) continue
+      const canceled = await this.isReceiveCanceledBySender(receive)
+      if (!canceled) continue
+      this.recordReceiveOutcome(receive, 'canceled', receive.pendingAccept.txid)
+      pending.splice(index, 1)
+      changed = true
+    }
+
+    for (const item of receivedItems) {
+      const receiveIndex = pending.findIndex(receive => receive.recipientId === item.recipientId)
+      if (receiveIndex < 0) continue
+      const receive = pending[receiveIndex]!
+      try {
+        const match = this.validateIncomingConsignment(receive, item)
+        if (!match) {
+          await this.acknowledgeProxyConsignment(item, false)
+          continue
+        }
+        if (receive.rejectedConsignmentTxids?.includes(match.txid)) continue
+
+        // Sender already signaled cancel on the proxy (ack=false).
+        if (await this.isProxyAckRejected(receive, item.endpoint)) {
+          this.recordReceiveOutcome(receive, 'canceled', match.txid)
+          pending.splice(receiveIndex, 1)
+          changed = true
+          continue
+        }
+
+        // Already accepted by the user: advance chain confirmation / settlement.
+        if (receive.receivedConsignment?.accepted) {
+          const settled = await this.advanceAcceptedReceive(
+            receive,
+            item,
+            match,
+            deferConfirmedSettlement
+          )
+          if (settled === 'snapshot_required') {
+            snapshotRequired = true
+            changed = true
+            continue
+          }
+          if (settled) {
+            pending.splice(receiveIndex, 1)
+            count++
+            changed = true
+          } else if (receive.receivedConsignment.broadcastDetectedAt) {
+            changed = true
+          }
+          continue
+        }
+
+        // Stage for explicit Accept/Reject — do not ACK yet.
+        if (
+          !receive.pendingAccept ||
+          receive.pendingAccept.txid !== match.txid ||
+          receive.pendingAccept.payload !== item.payload
+        ) {
+          receive.pendingAccept = {
+            payload: item.payload,
+            txid: match.txid,
+            endpoint: item.endpoint,
+            assetId: match.assetId,
+            amount: match.amount,
+            discoveredAt: receive.receivedConsignment?.receivedAt || this.now(),
+            counterpartyScriptPubKeys: niaConsignmentSpendableOutputScripts(item.payload),
+          }
+          if (!receive.assetId) receive.assetId = match.assetId
+          if (!receive.amount) receive.amount = match.amount
+          if (receive.receivedConsignment && !receive.receivedConsignment.accepted) {
+            delete receive.receivedConsignment
+          }
+          changed = true
+        }
+      } catch (error) {
+        await this.acknowledgeProxyConsignment(item, false)
+        throw error
+      }
+    }
+    if (changed) await this.persist()
+    return { received: count, snapshotRequired }
+  }
+
+  async acceptReceive(recipientId: string) {
+    const state = this.requireState()
+    const pending = state.pendingReceives || []
+    const receive = pending.find(item => item.recipientId === recipientId)
+    if (!receive?.pendingAccept) {
+      throw new RgbServiceError(`RGB receive ${recipientId} is not awaiting acceptance`)
+    }
+    if (await this.isReceiveCanceledBySender(receive)) {
+      this.recordReceiveOutcome(receive, 'canceled', receive.pendingAccept.txid)
+      state.pendingReceives = pending.filter(item => item.recipientId !== recipientId)
+      await this.persist()
+      return { accepted: false, status: 'canceled' as const }
+    }
+
+    const item = {
+      recipientId,
+      payload: receive.pendingAccept.payload,
+      txid: receive.pendingAccept.txid,
+      endpoint: receive.pendingAccept.endpoint,
+    }
+    await this.acknowledgeProxyConsignment(item, true)
+    receive.receivedConsignment = {
+      txid: receive.pendingAccept.txid,
+      receivedAt: this.now(),
+      accepted: true,
+      counterpartyScriptPubKeys: receive.pendingAccept.counterpartyScriptPubKeys,
+    }
+    delete receive.pendingAccept
+    await this.persist()
+
+    // The sender cannot broadcast until this ACK returns, so settlement is
+    // deferred to the next receive refresh instead of fetching the same
+    // consignment and acknowledgement again immediately.
+    return { accepted: true, status: 'accepted' as const }
+  }
+
+  async rejectReceive(recipientId: string) {
+    const state = this.requireState()
+    const pending = state.pendingReceives || []
+    const receive = pending.find(item => item.recipientId === recipientId)
+    if (!receive) throw new RgbServiceError(`RGB receive ${recipientId} was not found`)
+    const pendingAccept = receive.pendingAccept
+    if (!pendingAccept && !receive.receivedConsignment) {
+      throw new RgbServiceError(`RGB receive ${recipientId} is not awaiting acceptance`)
+    }
+    // After accept, rejection is no longer available — transfer is already ACKed.
+    if (receive.receivedConsignment && !pendingAccept) {
+      throw new RgbServiceError(`RGB receive ${recipientId} was already accepted`)
+    }
+
+    await this.acknowledgeProxyConsignment(
+      {
+        recipientId,
+        endpoint: pendingAccept!.endpoint,
+      },
+      false
+    )
+    this.recordReceiveOutcome(receive, 'rejected', pendingAccept!.txid)
+    // A NACK happens before the sender broadcasts, so the blind invoice can
+    // safely be used for another transfer.
+    receive.rejectedConsignmentTxids = [
+      ...new Set([...(receive.rejectedConsignmentTxids || []), pendingAccept!.txid]),
+    ].slice(-20)
+    delete receive.pendingAccept
+    if (receive.receivedConsignment && !receive.receivedConsignment.accepted) {
+      delete receive.receivedConsignment
+    }
+    await this.persist()
+    return { rejected: true }
+  }
+
+  private validateIncomingConsignment(
+    receive: import('./types').RgbPendingReceive,
+    item: { recipientId: string; payload: string; txid?: string; endpoint?: string }
+  ) {
+    const secretSeal = Buffer.from(concealBlindSeal(receive.seal)).toString('hex')
+    const decoded = decodeNiaConsignment(Uint8Array.from(Buffer.from(item.payload, 'base64')))
+    validateNiaConsignmentParentSpends(decoded)
+    const terminalBundleIds = new Set(
+      decoded.terminals
+        .filter(terminal => terminal.secretSeals.includes(secretSeal))
+        .map(terminal => terminal.bundleId)
+    )
+    const match = decoded.witnessBundles
+      .filter(bundle => terminalBundleIds.has(bundle.bundleId))
+      .flatMap(bundle => bundle.transitions)
+      .flatMap(transition =>
+        transition.assignments.map((assignment, assignmentIndex) => ({
+          transition,
+          assignment,
+          assignmentIndex,
+        }))
+      )
+      .find(
+        ({ assignment }) =>
+          'secretSeal' in assignment.seal && assignment.seal.secretSeal === secretSeal
+      )
+    const witness = match
+      ? decoded.witnessBundles.find(bundle =>
+          bundle.transitions.some(transition => transition.opId === match.transition.opId)
+        )
+      : undefined
+    if (!match || !witness || (item.txid !== undefined && witness.txid !== item.txid)) {
+      return undefined
+    }
+    if (
+      (receive.assetId && receive.assetId !== decoded.assetId) ||
+      (receive.amount && receive.amount !== match.assignment.amount.toString())
+    ) {
+      return undefined
+    }
+    return {
+      decoded,
+      match,
+      witness,
+      assetId: decoded.assetId,
+      amount: match.assignment.amount.toString(),
+      txid: witness.txid,
+      opId: match.transition.opId,
+      assignmentIndex: match.assignmentIndex,
+    }
+  }
+
+  private async advanceAcceptedReceive(
+    receive: import('./types').RgbPendingReceive,
+    item: { recipientId: string; payload: string; txid?: string; endpoint?: string },
+    validated: NonNullable<ReturnType<RgbService['validateIncomingConsignment']>>,
+    deferConfirmedSettlement: boolean
+  ) {
+    const state = this.requireState()
+    if (!receive.receivedConsignment) return false
+    const getTransactionStatus = this.dependencies.stateSource.getTransactionStatus
+    if (!getTransactionStatus) {
+      throw new RgbServiceError('RGB receive chain verification is unavailable')
+    }
+    const chain = await getTransactionStatus(state.wallet, validated.txid)
+    if (
+      (chain.status === 'mempool' || chain.status === 'confirmed') &&
+      !receive.receivedConsignment.broadcastDetectedAt
+    ) {
+      receive.receivedConsignment.broadcastDetectedAt = this.now()
+    }
+    if (chain.status !== 'confirmed') return false
+    if (deferConfirmedSettlement) return 'snapshot_required' as const
+
+    const utxo = state.snapshot.utxos.find(
+      candidate =>
+        candidate.outpoint.txid === receive.seal.txid &&
+        candidate.outpoint.vout === receive.seal.vout
+    )
+    if (!utxo) return false
+    if (
+      !utxo.allocations.some(
+        allocation =>
+          allocation.opId === validated.opId &&
+          allocation.assignmentIndex === validated.assignmentIndex
+      )
+    ) {
+      utxo.allocations.push({
+        assetId: validated.assetId,
+        amount: validated.amount,
+        settled: true,
+        spendable: true,
+        opId: validated.opId,
+        assignmentIndex: validated.assignmentIndex,
+        assignmentType: 4000,
+      })
+    }
+    state.pendingUtxoSync = {
+      txid: utxo.outpoint.txid,
+      outpoints: state.snapshot.utxos,
+    }
+    const receivedBlindSeals = state.receivedBlindSeals || (state.receivedBlindSeals = [])
+    if (!receivedBlindSeals.some(seal => sameBlindSeal(seal, receive.seal))) {
+      receivedBlindSeals.push(receive.seal)
+    }
+    this.recordReceiveOutcome(receive, 'settled', validated.txid)
+    const contracts = state.contracts || (state.contracts = {})
+    contracts[normalizeAssetId(validated.assetId)] = {
+      consignment: item.payload,
+      genesis: Buffer.from(validated.decoded.genesis.strict).toString('base64'),
+      createdAt: this.now(),
+    }
+    return true
+  }
+
+  private recordReceiveOutcome(
+    receive: import('./types').RgbPendingReceive,
+    status: 'settled' | 'canceled' | 'rejected',
+    txid: string
+  ) {
+    const state = this.requireState()
+    const pendingReceiveHistory = state.pendingReceiveHistory || (state.pendingReceiveHistory = [])
+    const transferId = `receive:${receive.recipientId}`
+    const existing = pendingReceiveHistory.find(item => item.transferId === transferId)
+    if (existing) {
+      existing.status = status
+      existing.txid = txid || existing.txid
+      existing.counterpartyScriptPubKeys =
+        existing.counterpartyScriptPubKeys ||
+        receive.pendingAccept?.counterpartyScriptPubKeys ||
+        receive.receivedConsignment?.counterpartyScriptPubKeys
+      return
+    }
+    pendingReceiveHistory.push({
+      transferId,
+      assetId: receive.assetId || receive.pendingAccept?.assetId || '',
+      amount: receive.amount || receive.pendingAccept?.amount || '',
+      txid,
+      createdAt:
+        receive.receivedConsignment?.receivedAt ||
+        receive.pendingAccept?.discoveredAt ||
+        this.now(),
+      status,
+      counterpartyScriptPubKeys:
+        receive.pendingAccept?.counterpartyScriptPubKeys ||
+        receive.receivedConsignment?.counterpartyScriptPubKeys,
+    })
+  }
+
+  private async getProxyAcknowledgement(
+    receive: import('./types').RgbPendingReceive,
+    endpoint?: string
+  ) {
+    const getAcknowledgement = this.dependencies.transport.getAcknowledgement
+    if (!getAcknowledgement) return undefined
+    const endpoints = endpoint ? [endpoint] : decodeRgbInvoice(receive.invoice).transportEndpoints
+    if (!endpoints.length) return undefined
+    try {
+      return await getAcknowledgement({
+        recipientId: receive.recipientId,
+        payload: '',
+        assetId: receive.assetId || '',
+        opIds: [],
+        txid: receive.pendingAccept?.txid || receive.receivedConsignment?.txid || '',
+        endpoints,
+      })
+    } catch {
+      return undefined
+    }
+  }
+
+  private async isReceiveCanceledBySender(receive: import('./types').RgbPendingReceive) {
+    if (await this.isProxyAckRejected(receive, receive.pendingAccept?.endpoint)) return true
+    const getConsignment = this.dependencies.transport.getConsignment
+    if (!getConsignment || !receive.pendingAccept) return false
+    const endpoints = decodeRgbInvoice(receive.invoice).transportEndpoints
+    if (!endpoints.length) return false
+    try {
+      const consignment = await getConsignment({ recipientId: receive.recipientId, endpoints })
+      return !consignment
+    } catch {
+      return false
+    }
+  }
+
+  private async isProxyAckRejected(
+    receive: import('./types').RgbPendingReceive,
+    endpoint?: string
+  ) {
+    return (await this.getProxyAcknowledgement(receive, endpoint)) === false
+  }
+
+  async claimPendingReceives() {
+    const state = this.requireState()
+    const claim = this.dependencies.stateSource.claimConsignments
+    if (!claim) return { claimed: 0 }
+    const pending = this.getPendingReceives()
+    try {
+      const claimed = await Promise.all(
+        pending.map(receive => claim(state.wallet, receive.recipientId))
+      )
+      return { claimed: claimed.reduce((total, count) => total + count, 0) }
+    } catch (error) {
+      if (this.dependencies.transport.getConsignment) return { claimed: 0 }
+      throw error
+    }
+  }
+
+  async cancelBlindReceive(recipientId: string) {
+    const state = this.requireState()
+    const receives = state.pendingReceives || []
+    const index = receives.findIndex(item => item.recipientId === recipientId)
+    if (index < 0) return { cancelled: false }
+    // Acceptance ACKs the consignment and allows the sender to broadcast. The
+    // local record is then the durable receipt needed to settle the allocation,
+    // so it cannot be released as an unused invoice.
+    if (receives[index]!.receivedConsignment?.accepted) return { cancelled: false }
+    receives.splice(index, 1)
+    await this.persist()
+    return { cancelled: true }
+  }
+
+  async storeContract(assetId: string, consignment: Uint8Array, genesis?: Uint8Array) {
+    const state = this.requireState()
+    const contracts = state.contracts || (state.contracts = {})
+    contracts[normalizeAssetId(assetId)] = {
+      consignment: Buffer.from(consignment).toString('base64'),
+      ...(genesis ? { genesis: Buffer.from(genesis).toString('base64') } : {}),
+      createdAt: this.now(),
+    }
+    await this.persist()
+  }
+
+  getContractConsignment(assetId: string) {
+    const contract = this.requireState().contracts?.[normalizeAssetId(assetId)]
+    return contract ? Buffer.from(contract.consignment, 'base64').toString('base64') : undefined
+  }
+
+  getContractGenesis(assetId: string) {
+    const contract = this.requireState().contracts?.[normalizeAssetId(assetId)]
+    return contract?.genesis
+  }
+
+  getSnapshot() {
+    return this.requireState().snapshot
+  }
+
+  /** Pending sends survive a background restart until completed or explicitly aborted. */
+  getPendingTransfers() {
+    return Object.entries(this.requireState().pending).map(([id, pending]) => ({ id, ...pending }))
+  }
+
+  async prepareSend(request: RgbTransferRequest) {
+    const previous = this.prepareSendInFlight
+    let release = () => undefined
+    const current = new Promise<void>(resolve => {
+      release = resolve
+    })
+    this.prepareSendInFlight = current
+    if (previous) await previous
+
+    try {
+      return await this.prepareSendOnce(request)
+    } finally {
+      release()
+      if (this.prepareSendInFlight === current) this.prepareSendInFlight = undefined
+    }
+  }
+
+  /** Reserve RGB allocations and persist the pending transfer as one serialized operation. */
+  private async prepareSendOnce(request: RgbTransferRequest) {
+    const state = this.requireState()
+    const invoice = decodeRgbInvoice(request.invoice)
+    const requestedAssetId = normalizeAssetId(request.assetId)
+    if (invoice.assetId && invoice.assetId !== requestedAssetId) {
+      throw new RgbServiceError('RGB invoice asset does not match the requested asset')
+    }
+    if (invoice.network && invoice.network !== state.wallet.network) {
+      throw new RgbServiceError('RGB invoice network does not match the current wallet')
+    }
+    if (
+      invoice.expirationTimestamp &&
+      invoice.expirationTimestamp <= Math.floor(this.now() / 1000)
+    ) {
+      throw new RgbServiceError('RGB invoice has expired')
+    }
+    if (!invoice.transportEndpoints.length) {
+      throw new RgbServiceError('RGB invoice has no proxy transport endpoint')
+    }
+    const amount = request.amount === undefined ? invoice.amount : request.amount
+    if (!amount) {
+      throw new RgbServiceError('RGB transfer amount must be provided by the request or invoice')
+    }
+    if (invoice.amount && invoice.amount !== amount) {
+      throw new RgbServiceError('RGB invoice amount does not match the requested amount')
+    }
+    const resolvedRequest = { ...request, amount }
+    const selectedUtxos = this.selectUtxos(request.assetId, amount)
+    const validationHistory = await this.dependencies.stateSource.getValidationHistory(
+      state.wallet,
+      {
+        assetId: requestedAssetId,
+        allocations: selectedUtxos.flatMap(utxo =>
+          utxo.allocations
+            .filter(allocation => allocation.assetId === requestedAssetId)
+            .map(allocation => {
+              if (
+                !allocation.opId ||
+                allocation.assignmentIndex === undefined ||
+                allocation.assignmentType === undefined
+              ) {
+                throw new RgbServiceError(
+                  'RGB allocation is missing history required for a local transfer'
+                )
+              }
+              return {
+                outpoint: utxo.outpoint,
+                opId: allocation.opId,
+                assignmentIndex: allocation.assignmentIndex,
+                assignmentType: allocation.assignmentType,
+              }
+            })
+        ),
+      }
+    )
+    const localContract = this.getContractConsignment(requestedAssetId)
+    const localGenesis = this.getContractGenesis(requestedAssetId)
+    if (
+      localContract &&
+      !validationHistory.consignments.some(item => item.payload === localContract)
+    ) {
+      validationHistory.consignments.unshift({
+        opId: requestedAssetId.replace(/^rgb:/, ''),
+        payload: localContract,
+      })
+    }
+    if (localContract) validationHistory.localContract = localContract
+    if (localGenesis) validationHistory.localGenesis = localGenesis
+    validationHistory.knownBlindSeals = this.getKnownBlindSeals()
+    const feeFunding = await this.dependencies.feeSource?.getFeeFunding(state.wallet)
+    const intent = {
+      assetId: requestedAssetId,
+      amount,
+      invoice,
+      transition: planFungibleTransition({
+        assetId: requestedAssetId,
+        amount,
+        recipientId: invoice.recipientId,
+        selectedUtxos,
+      }),
+    }
+    const prepared: RgbPreparedTransfer = await this.dependencies.encoder.prepareTransfer({
+      wallet: state.wallet,
+      snapshot: state.snapshot,
+      request: resolvedRequest,
+      intent,
+      selectedUtxos,
+      ...(feeFunding === undefined ? {} : { feeFunding }),
+      validationHistory,
+    })
+
+    const selectedOutpoints = new Set(selectedUtxos.map(outpointKey))
+    const lockedOutpoints = new Set(
+      prepared.lockedOutpoints.map(outpoint => `${outpoint.txid}:${outpoint.vout}`)
+    )
+    if (
+      !prepared.lockedOutpoints.length ||
+      ![...lockedOutpoints].every(key => selectedOutpoints.has(key))
+    ) {
+      throw new RgbServiceError('RGB encoder returned invalid locked outpoints')
+    }
+    if (state.pending[prepared.id]) {
+      throw new RgbServiceError(`RGB transfer ${prepared.id} already exists`)
+    }
+
+    state.pending[prepared.id] = { prepared, request: resolvedRequest, createdAt: this.now() }
+    await this.persist()
+    return prepared
+  }
+
+  async completeSend(transferId: string, signedPsbt: string): Promise<RgbCompletedTransfer> {
+    const state = this.requireState()
+    const pending = state.pending[transferId]
+    if (!pending) throw new RgbServiceError(`RGB transfer ${transferId} does not exist`)
+    if (pending.broadcast) return this.syncBroadcastedTransfer(transferId, pending)
+
+    if (!pending.delivery) {
+      const completed = await this.dependencies.encoder.completeTransfer({
+        wallet: state.wallet,
+        pending,
+        signedPsbt,
+      })
+      const endpoints = decodeRgbInvoice(pending.request.invoice).transportEndpoints
+      if (!endpoints.length)
+        throw new RgbServiceError('RGB invoice has no proxy transport endpoint')
+      pending.delivery = { completed, endpoints }
+      await this.persist()
+    }
+    return this.advancePendingDelivery(transferId, pending)
+  }
+
+  async abortSend(transferId: string) {
+    const state = this.requireState()
+    const pending = state.pending[transferId]
+    if (!pending) return { aborted: false }
+    // Allow cancel until the Bitcoin transaction is broadcast. Consignment
+    // delivery alone is still off-chain and can be discarded by the sender.
+    if (pending.broadcast) return { aborted: false }
+
+    // Best-effort cancel signal: post ACK=false on the proxy so the receiver
+    // can surface "Canceled by sender" instead of waiting forever.
+    if (pending.delivery && this.dependencies.transport.acknowledgeConsignment) {
+      for (const consignment of pending.delivery.completed.consignments) {
+        try {
+          await this.dependencies.transport.acknowledgeConsignment({
+            recipientId: consignment.recipientId,
+            endpoints: pending.delivery.endpoints,
+            acknowledged: false,
+          })
+        } catch {
+          // Local abort still proceeds if the proxy signal fails.
+        }
+      }
+    }
+
+    const sendHistory = state.pendingSendHistory || (state.pendingSendHistory = [])
+    if (!sendHistory.some(item => item.transferId === transferId)) {
+      sendHistory.push({
+        transferId,
+        assetId: pending.request.assetId,
+        amount: pending.request.amount,
+        txid: pending.delivery?.completed.txid,
+        invoice: pending.request.invoice,
+        createdAt: pending.createdAt,
+        status: 'canceled',
+      })
+    }
+
+    delete state.pending[transferId]
+    await this.persist()
+    return { aborted: true, status: 'canceled' as const }
+  }
+
+  private applyFundingUpdate(completed: RgbCompletedTransfer) {
+    const update = completed.fundingUpdate
+    if (!update) return
+    const state = this.requireState()
+    const spent = new Set(
+      update.spentOutpoints.map(outpoint => `${outpoint.txid}:${outpoint.vout}`)
+    )
+    state.snapshot.utxos = state.snapshot.utxos.filter(utxo => !spent.has(outpointKey(utxo)))
+    if (
+      update.createdUtxo &&
+      !state.snapshot.utxos.some(utxo => outpointKey(utxo) === outpointKey(update.createdUtxo!))
+    ) {
+      state.snapshot.utxos.push(update.createdUtxo)
+    }
+    state.snapshot.syncedAt = this.now()
+  }
+
+  private async syncBroadcastedTransfer(transferId: string, pending: RgbPendingTransfer) {
+    const state = this.requireState()
+    const broadcast = pending.broadcast
+    if (!broadcast) throw new RgbServiceError(`RGB transfer ${transferId} has not been broadcast`)
+    // Consignments were durably posted and acknowledged before this transaction was broadcast.
+    await this.dependencies.stateSource.syncBroadcast?.(
+      state.wallet,
+      transferId,
+      broadcast.completed,
+      state.snapshot,
+      {
+        amount: pending.request.amount,
+        createdAt: pending.createdAt,
+        invoice: pending.request.invoice,
+      }
+    )
+    const sendHistory = state.pendingSendHistory || (state.pendingSendHistory = [])
+    const existingHistory = sendHistory.find(item => item.transferId === transferId)
+    const broadcastedHistory = {
+      transferId,
+      assetId: pending.request.assetId,
+      amount: pending.request.amount,
+      txid: broadcast.completed.txid,
+      invoice: pending.request.invoice,
+      createdAt: broadcast.broadcastAt,
+      status: 'broadcasted' as const,
+    }
+    if (existingHistory) Object.assign(existingHistory, broadcastedHistory)
+    else sendHistory.push(broadcastedHistory)
+    delete state.pending[transferId]
+    await this.persist()
+    return broadcast.completed
+  }
+
+  private async advancePendingDelivery(transferId: string, pending: RgbPendingTransfer) {
+    const state = this.requireState()
+    const delivery = pending.delivery
+    if (!delivery) throw new RgbServiceError(`RGB transfer ${transferId} has not been signed`)
+    const consignments = delivery.completed.consignments.map((consignment, index) => ({
+      ...consignment,
+      transportId: `${transferId}:${index}`,
+      txid: delivery.completed.txid,
+      endpoints: delivery.endpoints,
+    }))
+    for (const consignment of consignments) {
+      await this.dependencies.transport.publishConsignment(consignment)
+    }
+    if (!delivery.publishedAt) {
+      delivery.publishedAt = this.now()
+      await this.persist()
+    }
+    const getAcknowledgement = this.dependencies.transport.getAcknowledgement
+    if (!getAcknowledgement)
+      throw new RgbServiceError('RGB transport does not support acknowledgement')
+    const acknowledgements = await Promise.all(
+      consignments.map(consignment => getAcknowledgement(consignment))
+    )
+    if (acknowledgements.some(acknowledged => acknowledged === false)) {
+      const sendHistory = state.pendingSendHistory || (state.pendingSendHistory = [])
+      if (!sendHistory.some(item => item.transferId === transferId)) {
+        sendHistory.push({
+          transferId,
+          assetId: pending.request.assetId,
+          amount: pending.request.amount,
+          txid: delivery.completed.txid,
+          invoice: pending.request.invoice,
+          createdAt: pending.createdAt,
+          status: 'rejected',
+        })
+      }
+      delete state.pending[transferId]
+      await this.persist()
+      throw new RgbTransferRejectedError(transferId, delivery.completed.txid)
+    }
+    if (acknowledgements.some(acknowledged => acknowledged === undefined)) {
+      throw new RgbTransferAwaitingAckError(transferId)
+    }
+    delivery.acknowledgedAt ||= this.now()
+    delete delivery.broadcastError
+    await this.persist()
+
+    let broadcastTxid: string
+    try {
+      broadcastTxid = await this.dependencies.broadcaster.broadcast(delivery.completed.rawTx)
+    } catch (error) {
+      delivery.broadcastError = error instanceof Error ? error.message : String(error)
+      await this.persist()
+      throw error
+    }
+    if (broadcastTxid !== delivery.completed.txid) {
+      throw new RgbServiceError('Broadcast transaction ID does not match the RGB transfer')
+    }
+    this.applyFundingUpdate(delivery.completed)
+    pending.broadcast = { completed: delivery.completed, broadcastAt: this.now() }
+    delete pending.delivery
+    await this.persist()
+    return this.syncBroadcastedTransfer(transferId, pending)
+  }
+
+  private async getProxyConsignments() {
+    const getConsignment = this.dependencies.transport.getConsignment
+    if (!getConsignment) return []
+    return (
+      await Promise.all(
+        this.getPendingReceives().map(async receive => {
+          const endpoints = decodeRgbInvoice(receive.invoice).transportEndpoints
+          if (!endpoints.length) return undefined
+          return getConsignment({ recipientId: receive.recipientId, endpoints })
+        })
+      )
+    ).filter((item): item is NonNullable<typeof item> => !!item)
+  }
+
+  private async acknowledgeProxyConsignment(
+    item: { recipientId: string; endpoint?: string },
+    acknowledged: boolean
+  ) {
+    if (!item.endpoint || !this.dependencies.transport.acknowledgeConsignment) return
+    await this.dependencies.transport.acknowledgeConsignment({
+      recipientId: item.recipientId,
+      endpoints: [item.endpoint],
+      acknowledged,
+    })
+  }
+
+  private selectUtxos(assetId: string, amount: string) {
+    const state = this.requireState()
+    let required: bigint
+    try {
+      required = BigInt(amount)
+    } catch {
+      throw new RgbServiceError('RGB amount must be an unsigned integer')
+    }
+    if (required <= 0n) throw new RgbServiceError('RGB amount must be positive')
+
+    const locked = new Set(
+      Object.values(state.pending).flatMap(pending =>
+        pending.prepared.lockedOutpoints.map(outpoint => `${outpoint.txid}:${outpoint.vout}`)
+      )
+    )
+    const candidates = state.snapshot.utxos
+      .filter(
+        utxo =>
+          (utxo.chainStatus === undefined || utxo.chainStatus === 'confirmed') &&
+          !locked.has(outpointKey(utxo))
+      )
+      .map(utxo => ({ utxo, amount: getSpendableAmount(utxo, assetId) }))
+      .filter(candidate => candidate.amount > 0n)
+      .sort((a, b) => (a.amount === b.amount ? 0 : a.amount < b.amount ? -1 : 1))
+
+    const exact = candidates.find(candidate => candidate.amount === required)
+    if (exact) return [exact.utxo]
+
+    const selected: RgbUtxo[] = []
+    let total = 0n
+    for (const candidate of candidates) {
+      selected.push(candidate.utxo)
+      total += candidate.amount
+      if (total >= required) return selected
+    }
+    throw new RgbInsufficientBalanceError(assetId, amount)
+  }
+
+  private requireState() {
+    if (!this.state) throw new RgbServiceError('RGB service is not open')
+    return this.state
+  }
+
+  private hasPendingIndexerSync() {
+    const state = this.requireState()
+    return Boolean(state.pendingUtxoSync || state.pendingIssues?.length)
+  }
+
+  private async persist() {
+    const state = this.requireState()
+    await this.dependencies.storage.set(this.storageKey(state.wallet), persistState(state))
+  }
+
+  private storageKey(wallet: RgbWalletRef) {
+    return `${STORAGE_PREFIX}${wallet.network}:${wallet.fundingAddress}`
+  }
+}
+
+/** Encrypted feature storage is JSON-based; only the RGB blind-seal u64 crosses this boundary. */
+function persistState(state: RgbServiceState) {
+  return {
+    ...state,
+    pendingReceives: state.pendingReceives?.map(receive => ({
+      ...receive,
+      seal: persistBlindSeal(receive.seal),
+    })),
+    receivedBlindSeals: state.receivedBlindSeals?.map(persistBlindSeal),
+  }
+}
+
+function hydrateState(state: RgbServiceState) {
+  return {
+    ...state,
+    pendingReceives: state.pendingReceives?.map(receive => ({
+      ...receive,
+      seal: hydrateBlindSeal(receive.seal),
+    })),
+    receivedBlindSeals: state.receivedBlindSeals?.map(hydrateBlindSeal),
+  } as RgbServiceState
+}
+
+function persistBlindSeal(seal: import('./protocol/receive').RgbBlindSeal) {
+  return { ...seal, blinding: seal.blinding.toString() }
+}
+
+function hydrateBlindSeal(seal: import('./protocol/receive').RgbBlindSeal) {
+  return { ...seal, blinding: BigInt(seal.blinding as any) }
+}
+
+function sameBlindSeal(
+  left: import('./protocol/receive').RgbBlindSeal,
+  right: import('./protocol/receive').RgbBlindSeal
+) {
+  return left.txid === right.txid && left.vout === right.vout && left.blinding === right.blinding
+}
+
+function randomU64() {
+  const bytes = new Uint8Array(8)
+  if (!globalThis.crypto?.getRandomValues)
+    throw new RgbServiceError('Secure random generation is unavailable')
+  globalThis.crypto.getRandomValues(bytes)
+  return bytes.reduce((value, byte, index) => value | (BigInt(byte) << BigInt(index * 8)), 0n)
+}
+
+function normalizeAssetId(assetId: string) {
+  return assetId.startsWith('rgb:') ? assetId : `rgb:${assetId}`
+}

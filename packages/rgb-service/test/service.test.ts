@@ -1,0 +1,962 @@
+import { describe, expect, it, vi } from 'vitest'
+import type {
+  RgbServiceDependencies,
+  RgbValidationHistory,
+  RgbWalletRef,
+  RgbWalletSnapshot,
+} from '../src'
+import { RgbInsufficientBalanceError, RgbService } from '../src'
+
+const wallet: RgbWalletRef = {
+  walletId: 'rgb-wallet-1',
+  fundingAddress: 'bc1p-rgb-funding',
+  network: 'mainnet',
+}
+
+const blindRecipient = 'bc:utxob:xDfmDF9g-yNOjriV-6Anbe6H-MLJ__g6-lo7Dd4f-dhWBW8S-XYGBm'
+const proxyEndpoint = 'rpcs://proxy.example/json-rpc'
+const rgbInvoice = (amount = 60) =>
+  `rgb:asset/schema/~/${blindRecipient}?amount=${amount}&endpoints=${encodeURIComponent(proxyEndpoint)}`
+
+function createDependencies(): RgbServiceDependencies {
+  const stored = new Map<string, unknown>()
+  return {
+    storage: {
+      get: async <T>(key: string) => stored.get(key) as T | undefined,
+      set: async <T>(key: string, value: T) => void stored.set(key, value),
+      remove: async key => void stored.delete(key),
+    },
+    stateSource: {
+      getSnapshot: vi.fn().mockResolvedValue({
+        syncedAt: 1,
+        utxos: [
+          {
+            outpoint: { txid: 'a'.repeat(64), vout: 0 },
+            satoshis: 1000,
+            scriptPubKey: '5120' + '00'.repeat(32),
+            publicKey: '02' + '11'.repeat(32),
+            allocations: [
+              {
+                assetId: 'rgb:asset',
+                amount: '40',
+                settled: true,
+                spendable: true,
+                opId: 'c'.repeat(64),
+                assignmentIndex: 0,
+                assignmentType: 4000,
+              },
+            ],
+          },
+          {
+            outpoint: { txid: 'b'.repeat(64), vout: 1 },
+            satoshis: 1000,
+            scriptPubKey: '5120' + '11'.repeat(32),
+            publicKey: '02' + '22'.repeat(32),
+            allocations: [
+              {
+                assetId: 'rgb:asset',
+                amount: '60',
+                settled: true,
+                spendable: true,
+                opId: 'd'.repeat(64),
+                assignmentIndex: 0,
+                assignmentType: 4000,
+              },
+            ],
+          },
+        ],
+      }),
+      getValidationHistory: vi.fn().mockResolvedValue({
+        assetId: 'rgb:asset',
+        consignments: [],
+      }),
+      syncBroadcast: vi.fn(),
+    },
+    encoder: {
+      prepareTransfer: vi.fn().mockResolvedValue({
+        id: 'transfer-1',
+        psbt: 'cHNidP8=',
+        toSignInputs: [{ index: 0, publicKey: '02' + '11'.repeat(32) }],
+        lockedOutpoints: [{ txid: 'b'.repeat(64), vout: 1 }],
+      }),
+      completeTransfer: vi.fn().mockResolvedValue({
+        txid: 'c'.repeat(64),
+        rawTx: '02000000000000000000',
+        consignments: [
+          {
+            recipientId: 'recipient',
+            payload: 'consignment',
+            assetId: 'rgb:asset',
+            opIds: ['d'.repeat(64)],
+          },
+        ],
+      }),
+    },
+    transport: {
+      getEndpoints: vi.fn().mockReturnValue([proxyEndpoint]),
+      publishConsignment: vi.fn(),
+      getAcknowledgement: vi.fn().mockResolvedValue(true),
+    },
+    broadcaster: { broadcast: vi.fn().mockResolvedValue('c'.repeat(64)) },
+  }
+}
+
+describe('RgbService', () => {
+  it('persists locally broadcast funding UTXOs until the indexer replacement succeeds', async () => {
+    const dependencies = createDependencies()
+    const service = new RgbService(dependencies)
+    await service.open(wallet)
+    await service.sync()
+    const fundingUtxo = {
+      outpoint: { txid: 'f'.repeat(64), vout: 1 },
+      satoshis: 1_000,
+      scriptPubKey: '5120' + 'ff'.repeat(32),
+      publicKey: '02' + '33'.repeat(32),
+      allocations: [],
+    }
+
+    await service.queueUtxoSync({ txid: fundingUtxo.outpoint.txid, outpoints: [fundingUtxo] })
+    const restoredService = new RgbService(dependencies)
+    await restoredService.open(wallet)
+
+    expect(restoredService.getSnapshot().utxos).toContainEqual(
+      expect.objectContaining({ ...fundingUtxo, chainStatus: 'mempool' })
+    )
+    expect(restoredService.getPendingUtxoSync()).toMatchObject({
+      txid: fundingUtxo.outpoint.txid,
+      outpoints: expect.arrayContaining([expect.objectContaining(fundingUtxo)]),
+    })
+    await restoredService.sync()
+    expect(dependencies.stateSource.getSnapshot).toHaveBeenCalledTimes(1)
+
+    await restoredService.markUtxoSyncCompleted(fundingUtxo.outpoint.txid)
+    await restoredService.sync()
+    expect(dependencies.stateSource.getSnapshot).toHaveBeenCalledTimes(2)
+  })
+
+  it('does not read wallet-api claimed consignments during proxy-only receive polling', async () => {
+    const dependencies = createDependencies()
+    dependencies.stateSource.getClaimedConsignments = vi.fn().mockResolvedValue([])
+    const service = new RgbService(dependencies)
+    await service.open(wallet)
+
+    await service.processClaimedReceives({ includeClaimed: false })
+
+    expect(dependencies.stateSource.getClaimedConsignments).not.toHaveBeenCalled()
+  })
+
+  it('coalesces concurrent snapshot synchronizations', async () => {
+    const dependencies = createDependencies()
+    let releaseSnapshot: (() => void) | undefined
+    const snapshot: RgbWalletSnapshot = { syncedAt: 1, utxos: [] }
+    vi.mocked(dependencies.stateSource.getSnapshot).mockImplementation(
+      () =>
+        new Promise<RgbWalletSnapshot>(resolve => {
+          releaseSnapshot = () => resolve(snapshot)
+        })
+    )
+    const service = new RgbService(dependencies)
+    await service.open(wallet)
+
+    const synchronizations = [service.sync(), service.sync(), service.sync()]
+    expect(dependencies.stateSource.getSnapshot).toHaveBeenCalledTimes(1)
+
+    releaseSnapshot!()
+    await expect(Promise.all(synchronizations)).resolves.toEqual([snapshot, snapshot, snapshot])
+  })
+
+  it('rejects an endpoint-less invoice before locking RGB allocations', async () => {
+    const dependencies = createDependencies()
+    const service = new RgbService(dependencies)
+    await service.open(wallet)
+    await service.sync()
+
+    await expect(
+      service.prepareSend({
+        assetId: 'rgb:asset',
+        amount: '60',
+        invoice: `rgb:asset/schema/~/${blindRecipient}?amount=60`,
+        feeRate: 2,
+      })
+    ).rejects.toThrow('RGB invoice has no proxy transport endpoint')
+
+    expect(dependencies.encoder.prepareTransfer).not.toHaveBeenCalled()
+    expect(service.getPendingTransfers()).toEqual([])
+  })
+
+  it('serializes concurrent send preparation before selecting RGB allocations', async () => {
+    const dependencies = createDependencies()
+    let releaseHistory: (() => void) | undefined
+    let signalHistoryStarted: (() => void) | undefined
+    const historyStarted = new Promise<void>(resolve => (signalHistoryStarted = resolve))
+    vi.mocked(dependencies.stateSource.getValidationHistory).mockImplementationOnce(
+      () =>
+        new Promise<RgbValidationHistory>(resolve => {
+          signalHistoryStarted!()
+          releaseHistory = () => resolve({ assetId: 'rgb:asset', consignments: [] })
+        })
+    )
+    const service = new RgbService(dependencies)
+    await service.open(wallet)
+    await service.sync()
+
+    const first = service.prepareSend({
+      assetId: 'rgb:asset',
+      amount: '60',
+      invoice: rgbInvoice(),
+      feeRate: 2,
+    })
+    await historyStarted
+    const second = service.prepareSend({
+      assetId: 'rgb:asset',
+      amount: '60',
+      invoice: rgbInvoice(),
+      feeRate: 2,
+    })
+    releaseHistory!()
+
+    await expect(first).resolves.toMatchObject({ id: 'transfer-1' })
+    await expect(second).rejects.toBeInstanceOf(RgbInsufficientBalanceError)
+    expect(dependencies.encoder.prepareTransfer).toHaveBeenCalledTimes(1)
+    expect(service.getPendingTransfers()).toHaveLength(1)
+  })
+
+  it('persists an issuance outbox and retains its local allocation until indexed', async () => {
+    const dependencies = createDependencies()
+    const service = new RgbService(dependencies)
+    await service.open(wallet)
+    const outpoints = [
+      {
+        outpoint: { txid: 'f'.repeat(64), vout: 0 },
+        satoshis: 330,
+        scriptPubKey: '5120' + '33'.repeat(32),
+        publicKey: '02' + '33'.repeat(32),
+        chainStatus: 'confirmed' as const,
+        allocations: [
+          {
+            assetId: 'rgb:issued',
+            amount: '1',
+            settled: true,
+            spendable: true,
+            opId: 'e'.repeat(64),
+            assignmentIndex: 0,
+            assignmentType: 4000,
+          },
+        ],
+      },
+    ]
+
+    await service.queueIssue({
+      assetId: 'rgb:issued',
+      contract: Uint8Array.from([1]),
+      genesis: Uint8Array.from([2]),
+      asset: {
+        ticker: 'ISS',
+        name: 'Issued',
+        precision: 0,
+        schema: 'NIA',
+        issuedSupply: '1',
+      },
+      utxoSync: { txid: outpoints[0]!.outpoint.txid, outpoints },
+    })
+
+    await service.sync()
+    expect(dependencies.stateSource.getSnapshot).not.toHaveBeenCalled()
+    expect(service.getSnapshot().utxos).toEqual(outpoints)
+
+    const reopened = new RgbService(dependencies)
+    await reopened.open(wallet)
+    expect(reopened.getPendingIssues()).toEqual([
+      expect.objectContaining({ assetId: 'rgb:issued', utxoSync: { txid: outpoints[0]!.outpoint.txid, outpoints } }),
+    ])
+    expect(reopened.getSnapshot().utxos).toEqual(outpoints)
+  })
+
+  it('releases a rejected send instead of leaving it pending', async () => {
+    const dependencies = createDependencies()
+    dependencies.transport.getAcknowledgement = vi.fn().mockResolvedValue(false)
+    const service = new RgbService(dependencies)
+    await service.open(wallet)
+    await service.sync()
+    const prepared = await service.prepareSend({
+      assetId: 'rgb:asset',
+      amount: '60',
+      invoice: rgbInvoice(),
+      feeRate: 2,
+    })
+
+    await expect(service.completeSend(prepared.id, 'signed-psbt')).rejects.toThrow(
+      'was rejected by the recipient'
+    )
+    expect(service.getPendingTransfers()).toEqual([])
+  })
+
+  it('persists blind receive seal bigint values through JSON-based encrypted storage', async () => {
+    const dependencies = createDependencies()
+    vi.mocked(dependencies.stateSource.getSnapshot).mockResolvedValue({
+      syncedAt: 1,
+      utxos: [
+        {
+          outpoint: { txid: 'f'.repeat(64), vout: 0 },
+          satoshis: 1_000,
+          scriptPubKey: '5120' + '11'.repeat(32),
+          publicKey: '02' + '22'.repeat(32),
+          chainStatus: 'confirmed',
+          confirmations: 1,
+          allocations: [],
+        },
+      ],
+    })
+    const service = new RgbService(dependencies)
+    await service.open(wallet)
+    await service.sync()
+
+    await expect(
+      service.createBlindReceive({ assetId: 'rgb:asset', amount: '1' })
+    ).resolves.toMatchObject({ assetId: 'rgb:asset' })
+    expect(service.getAvailableReceiveUtxos()).toEqual([])
+  })
+
+  it('creates a pending invoice from an unconfirmed funding UTXO', async () => {
+    const dependencies = createDependencies()
+    vi.mocked(dependencies.stateSource.getSnapshot).mockResolvedValue({
+      syncedAt: 1,
+      utxos: [
+        {
+          outpoint: { txid: 'e'.repeat(64), vout: 0 },
+          satoshis: 1_000,
+          scriptPubKey: '5120' + '11'.repeat(32),
+          publicKey: '02' + '22'.repeat(32),
+          chainStatus: 'mempool',
+          confirmations: 0,
+          allocations: [],
+        },
+      ],
+    })
+    const service = new RgbService(dependencies)
+    await service.open(wallet)
+    await service.sync()
+
+    await expect(service.createBlindReceive({ assetId: 'rgb:asset', amount: '1' })).resolves.toMatchObject({
+      assetId: 'rgb:asset',
+    })
+    expect(service.getPendingConfirmationReceiveUtxos()).toEqual([])
+  })
+
+  it('does not select unconfirmed RGB allocations for a transfer', async () => {
+    const dependencies = createDependencies()
+    vi.mocked(dependencies.stateSource.getSnapshot).mockResolvedValue({
+      syncedAt: 1,
+      utxos: [
+        {
+          outpoint: { txid: 'e'.repeat(64), vout: 0 },
+          satoshis: 1_000,
+          scriptPubKey: '5120' + '11'.repeat(32),
+          publicKey: '02' + '22'.repeat(32),
+          chainStatus: 'mempool',
+          confirmations: 0,
+          allocations: [
+            {
+              assetId: 'rgb:asset',
+              amount: '60',
+              settled: true,
+              spendable: true,
+              opId: 'd'.repeat(64),
+              assignmentIndex: 0,
+              assignmentType: 4000,
+            },
+          ],
+        },
+      ],
+    })
+    const service = new RgbService(dependencies)
+    await service.open(wallet)
+    await service.sync()
+
+    await expect(
+      service.prepareSend({
+        assetId: 'rgb:asset',
+        amount: '60',
+        invoice: rgbInvoice(),
+        feeRate: 2,
+      })
+    ).rejects.toBeInstanceOf(RgbInsufficientBalanceError)
+  })
+
+  it('selects and locks local colored UTXOs before requesting a local PSBT', async () => {
+    const dependencies = createDependencies()
+    const service = new RgbService(dependencies)
+    await service.open(wallet)
+    await service.sync()
+
+    await service.prepareSend({
+      assetId: 'rgb:asset',
+      amount: '60',
+      invoice: rgbInvoice(),
+      feeRate: 2,
+    })
+
+    expect(dependencies.encoder.prepareTransfer).toHaveBeenCalledWith(
+      expect.objectContaining({
+        intent: expect.objectContaining({
+          invoice: expect.objectContaining({ recipientType: 'blind' }),
+          transition: expect.objectContaining({
+            inputAmount: '60',
+            recipientAmount: '60',
+            changeAmount: '0',
+          }),
+        }),
+        selectedUtxos: [expect.objectContaining({ outpoint: { txid: 'b'.repeat(64), vout: 1 } })],
+      })
+    )
+    expect(dependencies.stateSource.getValidationHistory).toHaveBeenCalledWith(wallet, {
+      assetId: 'rgb:asset',
+      allocations: [
+        {
+          outpoint: { txid: 'b'.repeat(64), vout: 1 },
+          opId: 'd'.repeat(64),
+          assignmentIndex: 0,
+          assignmentType: 4000,
+        },
+      ],
+    })
+    await expect(
+      service.prepareSend({
+        assetId: 'rgb:asset',
+        amount: '60',
+        invoice: rgbInvoice(),
+        feeRate: 2,
+      })
+    ).rejects.toBeInstanceOf(RgbInsufficientBalanceError)
+  })
+
+  it('restores a persisted pending transfer after the service is reopened', async () => {
+    const dependencies = createDependencies()
+    const service = new RgbService(dependencies)
+    await service.open(wallet)
+    await service.sync()
+    await service.prepareSend({
+      assetId: 'rgb:asset',
+      amount: '60',
+      invoice: rgbInvoice(),
+      feeRate: 2,
+    })
+
+    const reopened = new RgbService(dependencies)
+    await reopened.open(wallet)
+
+    expect(reopened.getPendingTransfers()).toEqual([expect.objectContaining({ id: 'transfer-1' })])
+    await reopened.completeSend('transfer-1', 'signed-psbt')
+    expect(dependencies.broadcaster.broadcast).toHaveBeenCalled()
+  })
+
+  it('rejects a locally decoded invoice for another asset before invoking the encoder', async () => {
+    const dependencies = createDependencies()
+    const service = new RgbService(dependencies)
+    await service.open(wallet)
+    await service.sync()
+
+    await expect(
+      service.prepareSend({
+        assetId: 'rgb:asset',
+        amount: '60',
+        invoice: `rgb:other/schema/~/${blindRecipient}`,
+        feeRate: 2,
+      })
+    ).rejects.toThrow('RGB invoice asset does not match the requested asset')
+    expect(dependencies.encoder.prepareTransfer).not.toHaveBeenCalled()
+  })
+
+  it('uses a fixed invoice amount when the caller does not provide one', async () => {
+    const dependencies = createDependencies()
+    const service = new RgbService(dependencies)
+    await service.open(wallet)
+    await service.sync()
+
+    await service.prepareSend({
+      assetId: 'rgb:asset',
+      invoice: rgbInvoice(),
+      feeRate: 2,
+    })
+
+    expect(dependencies.encoder.prepareTransfer).toHaveBeenCalledWith(
+      expect.objectContaining({
+        request: expect.objectContaining({ amount: '60' }),
+        intent: expect.objectContaining({ amount: '60' }),
+      })
+    )
+  })
+
+  it('adds the locally stored contract to self-issued asset history', async () => {
+    const dependencies = createDependencies()
+    const service = new RgbService(dependencies)
+    await service.open(wallet)
+    await service.sync()
+    await service.storeContract('rgb:asset', Uint8Array.from([1, 2, 3]))
+
+    await service.prepareSend({
+      assetId: 'rgb:asset',
+      amount: '60',
+      invoice: `rgb:asset/schema/~/${blindRecipient}?amount=60&endpoints=${encodeURIComponent(proxyEndpoint)}`,
+      feeRate: 2,
+    })
+
+    expect(dependencies.encoder.prepareTransfer).toHaveBeenCalledWith(
+      expect.objectContaining({
+        validationHistory: {
+          assetId: 'rgb:asset',
+          consignments: [{ opId: 'asset', payload: Buffer.from([1, 2, 3]).toString('base64') }],
+          localContract: Buffer.from([1, 2, 3]).toString('base64'),
+          knownBlindSeals: [],
+        },
+      })
+    )
+  })
+
+  it('publishes and receives acknowledgement before broadcasting the completed transfer', async () => {
+    const dependencies = createDependencies()
+    const service = new RgbService(dependencies)
+    await service.open(wallet)
+    await service.sync()
+    await service.prepareSend({
+      assetId: 'rgb:asset',
+      amount: '60',
+      invoice: rgbInvoice(),
+      feeRate: 2,
+    })
+
+    const completed = await service.completeSend('transfer-1', 'signed-psbt')
+
+    expect(dependencies.transport.publishConsignment).toHaveBeenCalledWith({
+      recipientId: 'recipient',
+      payload: 'consignment',
+      assetId: 'rgb:asset',
+      opIds: ['d'.repeat(64)],
+      transportId: 'transfer-1:0',
+      txid: 'c'.repeat(64),
+      endpoints: [proxyEndpoint],
+    })
+    expect(dependencies.broadcaster.broadcast).toHaveBeenCalledWith(completed.rawTx)
+    expect(vi.mocked(dependencies.transport.publishConsignment).mock.invocationCallOrder[0]).toBeLessThan(
+      vi.mocked(dependencies.broadcaster.broadcast).mock.invocationCallOrder[0]!
+    )
+    expect(dependencies.stateSource.syncBroadcast).toHaveBeenCalledWith(
+      wallet,
+      'transfer-1',
+      completed,
+      service.getSnapshot(),
+      { amount: '60', createdAt: expect.any(Number), invoice: rgbInvoice() }
+    )
+    expect(service.getPendingSendHistory()).toEqual([
+      expect.objectContaining({
+        transferId: 'transfer-1',
+        txid: completed.txid,
+        status: 'broadcasted',
+      }),
+    ])
+  })
+
+  it('does not re-fetch a consignment immediately after accepting it', async () => {
+    const dependencies = createDependencies()
+    dependencies.transport.acknowledgeConsignment = vi.fn().mockResolvedValue(undefined)
+    const service = new RgbService(dependencies)
+    await service.open(wallet)
+    ;(service as any).state.pendingReceives = [
+      {
+        invoice: rgbInvoice(),
+        recipientId: 'recipient',
+        assetId: 'rgb:asset',
+        amount: '60',
+        createdAt: 1,
+        seal: { txid: 'a'.repeat(64), vout: 0, blinding: 1n },
+        pendingAccept: {
+          payload: 'consignment',
+          txid: 'c'.repeat(64),
+          endpoint: proxyEndpoint,
+          assetId: 'rgb:asset',
+          amount: '60',
+          discoveredAt: 1,
+        },
+      },
+    ]
+    const processClaimedReceives = vi.spyOn(service, 'processClaimedReceives')
+
+    await expect(service.acceptReceive('recipient')).resolves.toEqual({ accepted: true, status: 'accepted' })
+
+    expect(dependencies.transport.getAcknowledgement).toHaveBeenCalledTimes(1)
+    expect(dependencies.transport.acknowledgeConsignment).toHaveBeenCalledTimes(1)
+    expect(processClaimedReceives).not.toHaveBeenCalled()
+  })
+
+  it('keeps an accepted receive available after its invoice expires so it can settle', async () => {
+    const dependencies = createDependencies()
+    dependencies.now = () => 2_000
+    dependencies.transport.getConsignment = vi.fn().mockResolvedValue({
+      recipientId: 'recipient',
+      payload: 'consignment',
+      txid: 'c'.repeat(64),
+      endpoint: proxyEndpoint,
+    })
+    const service = new RgbService(dependencies)
+    await service.open(wallet)
+    ;(service as any).state.pendingReceives = [
+      {
+        invoice: rgbInvoice(),
+        recipientId: 'recipient',
+        assetId: 'rgb:asset',
+        amount: '60',
+        expirationTimestamp: 1,
+        createdAt: 1,
+        seal: { txid: 'a'.repeat(64), vout: 0, blinding: 1n },
+        receivedConsignment: {
+          txid: 'c'.repeat(64),
+          receivedAt: 1,
+          accepted: true,
+        },
+      },
+    ]
+    ;(service as any).validateIncomingConsignment = vi.fn().mockReturnValue({
+      assetId: 'rgb:asset',
+      amount: '60',
+      txid: 'c'.repeat(64),
+      decoded: {
+        metadata: {
+          ticker: 'TOK',
+          name: 'Token',
+          precision: 0,
+          schema: 'NIA',
+          issuedSupply: '60',
+        },
+      },
+    })
+    const advanceAcceptedReceive = vi
+      .spyOn(service as any, 'advanceAcceptedReceive')
+      .mockResolvedValue(false)
+
+    await service.processClaimedReceives({ includeClaimed: false })
+
+    expect(service.getPendingReceives()).toEqual([
+      expect.objectContaining({ recipientId: 'recipient' }),
+    ])
+    expect(dependencies.transport.getConsignment).toHaveBeenCalledWith({
+      recipientId: 'recipient',
+      endpoints: [proxyEndpoint],
+    })
+    expect(advanceAcceptedReceive).toHaveBeenCalled()
+  })
+
+  it('does not cancel an accepted receive awaiting Bitcoin confirmation', async () => {
+    const dependencies = createDependencies()
+    const service = new RgbService(dependencies)
+    await service.open(wallet)
+    ;(service as any).state.pendingReceives = [
+      {
+        invoice: rgbInvoice(),
+        recipientId: 'recipient',
+        assetId: 'rgb:asset',
+        amount: '60',
+        createdAt: 1,
+        seal: { txid: 'a'.repeat(64), vout: 0, blinding: 1n },
+        receivedConsignment: {
+          txid: 'c'.repeat(64),
+          receivedAt: 1,
+          accepted: true,
+        },
+      },
+    ]
+
+    await expect(service.cancelBlindReceive('recipient')).resolves.toEqual({ cancelled: false })
+    expect(service.getPendingReceives()).toEqual([
+      expect.objectContaining({ recipientId: 'recipient' }),
+    ])
+  })
+
+  it('keeps a rejected receive invoice available for reuse', async () => {
+    const dependencies = createDependencies()
+    dependencies.transport.acknowledgeConsignment = vi.fn().mockResolvedValue(undefined)
+    dependencies.transport.getConsignment = vi.fn().mockResolvedValue({
+      recipientId: 'recipient',
+      payload: 'consignment',
+      txid: 'c'.repeat(64),
+      endpoint: proxyEndpoint,
+    })
+    const service = new RgbService(dependencies)
+    await service.open(wallet)
+    ;(service as any).state.pendingReceives = [
+      {
+        invoice: rgbInvoice(),
+        recipientId: 'recipient',
+        assetId: 'rgb:asset',
+        amount: '60',
+        createdAt: 1,
+        seal: { txid: 'a'.repeat(64), vout: 0, blinding: 1n },
+        pendingAccept: {
+          payload: 'consignment',
+          txid: 'c'.repeat(64),
+          endpoint: proxyEndpoint,
+          assetId: 'rgb:asset',
+          amount: '60',
+          discoveredAt: 1,
+        },
+        receivedConsignment: {
+          txid: 'c'.repeat(64),
+          receivedAt: 1,
+          accepted: false,
+        },
+      },
+    ]
+
+    await expect(service.rejectReceive('recipient')).resolves.toEqual({ rejected: true })
+
+    expect(dependencies.transport.acknowledgeConsignment).toHaveBeenCalledWith({
+      recipientId: 'recipient',
+      endpoints: [proxyEndpoint],
+      acknowledged: false,
+    })
+    expect(service.getPendingReceives()).toEqual([
+      expect.objectContaining({ recipientId: 'recipient', invoice: rgbInvoice() }),
+    ])
+    expect(service.getPendingReceives()[0]).not.toHaveProperty('pendingAccept')
+    expect(service.getPendingReceives()[0]).not.toHaveProperty('receivedConsignment')
+    expect(service.getPendingReceiveHistory()).toEqual([
+      expect.objectContaining({
+        transferId: 'receive:recipient',
+        status: 'rejected',
+        txid: 'c'.repeat(64),
+      }),
+    ])
+
+    ;(service as any).validateIncomingConsignment = vi.fn().mockReturnValue({
+      assetId: 'rgb:asset',
+      amount: '60',
+      txid: 'c'.repeat(64),
+    })
+    await service.processClaimedReceives({ includeClaimed: false })
+
+    expect(service.getPendingReceives()).toEqual([
+      expect.objectContaining({ recipientId: 'recipient', invoice: rgbInvoice() }),
+    ])
+    expect(service.getPendingReceives()[0]).not.toHaveProperty('pendingAccept')
+  })
+
+  it('persists a signed transfer without broadcasting until the proxy returns an acknowledgement', async () => {
+    const dependencies = createDependencies()
+    vi.mocked(dependencies.transport.getAcknowledgement!).mockResolvedValueOnce(undefined)
+    const service = new RgbService(dependencies)
+    await service.open(wallet)
+    await service.sync()
+    await service.prepareSend({
+      assetId: 'rgb:asset',
+      amount: '60',
+      invoice: rgbInvoice(),
+      feeRate: 2,
+    })
+
+    await expect(service.completeSend('transfer-1', 'signed-psbt')).rejects.toThrow(
+      'awaiting recipient acknowledgement'
+    )
+    expect(dependencies.broadcaster.broadcast).not.toHaveBeenCalled()
+    expect(service.getPendingTransfers()).toEqual([
+      expect.objectContaining({ id: 'transfer-1', delivery: expect.any(Object) }),
+    ])
+
+    vi.mocked(dependencies.transport.getAcknowledgement!).mockResolvedValueOnce(true)
+    await service.sync()
+
+    expect(dependencies.broadcaster.broadcast).toHaveBeenCalledTimes(1)
+    expect(service.getPendingTransfers()).toEqual([])
+  })
+
+  it('continues syncing while a signed transfer awaits recipient acknowledgement', async () => {
+    const dependencies = createDependencies()
+    vi.mocked(dependencies.transport.getAcknowledgement!).mockResolvedValue(undefined)
+    const service = new RgbService(dependencies)
+    await service.open(wallet)
+    await service.sync()
+    await service.prepareSend({
+      assetId: 'rgb:asset',
+      amount: '60',
+      invoice: rgbInvoice(),
+      feeRate: 2,
+    })
+
+    await expect(service.completeSend('transfer-1', 'signed-psbt')).rejects.toThrow(
+      'awaiting recipient acknowledgement'
+    )
+    const snapshot = service.getSnapshot()
+    vi.mocked(dependencies.stateSource.getSnapshot).mockResolvedValue({
+      ...snapshot,
+      utxos: [
+        ...snapshot.utxos,
+        {
+          outpoint: { txid: 'e'.repeat(64), vout: 0 },
+          satoshis: 330,
+          scriptPubKey: '5120' + 'ee'.repeat(32),
+          publicKey: '02' + '44'.repeat(32),
+          chainStatus: 'confirmed',
+          allocations: [],
+        },
+      ],
+    })
+    await expect(service.sync()).resolves.toEqual(expect.objectContaining({ utxos: expect.any(Array) }))
+    await expect(service.createBlindReceive({})).resolves.toEqual(
+      expect.objectContaining({ invoice: expect.stringMatching(/^rgb:/) })
+    )
+
+    expect(service.getPendingTransfers()).toEqual([
+      expect.objectContaining({ id: 'transfer-1', delivery: expect.any(Object) }),
+    ])
+    expect(dependencies.broadcaster.broadcast).not.toHaveBeenCalled()
+  })
+
+  it('persists a broadcast failure after acknowledgement and retries the signed transaction', async () => {
+    const dependencies = createDependencies()
+    vi.mocked(dependencies.broadcaster.broadcast)
+      .mockRejectedValueOnce(new Error('broadcast unavailable'))
+      .mockResolvedValueOnce('c'.repeat(64))
+    const service = new RgbService(dependencies)
+    await service.open(wallet)
+    await service.sync()
+    await service.prepareSend({
+      assetId: 'rgb:asset',
+      amount: '60',
+      invoice: rgbInvoice(),
+      feeRate: 2,
+    })
+
+    await expect(service.completeSend('transfer-1', 'signed-psbt')).rejects.toThrow('broadcast unavailable')
+    expect(service.getPendingTransfers()).toEqual([
+      expect.objectContaining({
+        id: 'transfer-1',
+        delivery: expect.objectContaining({
+          acknowledgedAt: expect.any(Number),
+          broadcastError: 'broadcast unavailable',
+        }),
+      }),
+    ])
+
+    const reopened = new RgbService(dependencies)
+    await reopened.open(wallet)
+    expect(reopened.getPendingTransfers()).toEqual([
+      expect.objectContaining({
+        id: 'transfer-1',
+        delivery: expect.objectContaining({ broadcastError: 'broadcast unavailable' }),
+      }),
+    ])
+
+    await reopened.sync()
+
+    expect(dependencies.broadcaster.broadcast).toHaveBeenCalledTimes(2)
+    expect(reopened.getPendingTransfers()).toEqual([])
+  })
+
+  it('allows the sender to abort a delivered transfer before it is broadcast', async () => {
+    const dependencies = createDependencies()
+    vi.mocked(dependencies.transport.getAcknowledgement!).mockResolvedValueOnce(undefined)
+    const service = new RgbService(dependencies)
+    await service.open(wallet)
+    await service.sync()
+    await service.prepareSend({
+      assetId: 'rgb:asset',
+      amount: '60',
+      invoice: rgbInvoice(),
+      feeRate: 2,
+    })
+
+    await expect(service.completeSend('transfer-1', 'signed-psbt')).rejects.toThrow(
+      'awaiting recipient acknowledgement'
+    )
+    expect(service.getPendingTransfers()).toEqual([
+      expect.objectContaining({ id: 'transfer-1', delivery: expect.any(Object) }),
+    ])
+
+    await expect(service.abortSend('transfer-1')).resolves.toEqual({ aborted: true, status: 'canceled' })
+    expect(service.getPendingTransfers()).toEqual([])
+    expect(service.getPendingSendHistory()).toEqual([
+      expect.objectContaining({ transferId: 'transfer-1', status: 'canceled', amount: '60' }),
+    ])
+    expect(dependencies.broadcaster.broadcast).not.toHaveBeenCalled()
+  })
+
+  it('retains a broadcast transfer and retries delivery without rebroadcasting', async () => {
+    const dependencies = createDependencies()
+    vi.mocked(dependencies.stateSource.syncBroadcast)
+      .mockRejectedValueOnce(new Error('indexer unavailable'))
+      .mockResolvedValueOnce(undefined)
+    const service = new RgbService(dependencies)
+    await service.open(wallet)
+    await service.sync()
+    await service.prepareSend({
+      assetId: 'rgb:asset',
+      amount: '60',
+      invoice: rgbInvoice(),
+      feeRate: 2,
+    })
+
+    await expect(service.completeSend('transfer-1', 'signed-psbt')).rejects.toThrow('indexer unavailable')
+    expect(service.getPendingTransfers()).toEqual([
+      expect.objectContaining({ id: 'transfer-1', broadcast: expect.any(Object) }),
+    ])
+    await expect(service.abortSend('transfer-1')).resolves.toEqual({ aborted: false })
+
+    const reopened = new RgbService(dependencies)
+    await reopened.open(wallet)
+    await reopened.sync()
+
+    expect(dependencies.broadcaster.broadcast).toHaveBeenCalledTimes(1)
+    expect(reopened.getPendingTransfers()).toEqual([])
+    expect(dependencies.stateSource.syncBroadcast).toHaveBeenCalledTimes(2)
+  })
+
+  it('replaces spent funding UTXOs with the locally derived RGB change output after broadcast', async () => {
+    const dependencies = createDependencies()
+    vi.mocked(dependencies.encoder.completeTransfer).mockResolvedValue({
+      txid: 'e'.repeat(64),
+      rawTx: '02000000000000000000',
+      consignments: [
+        {
+          recipientId: 'recipient',
+          payload: 'consignment',
+          assetId: 'rgb:asset',
+          opIds: ['d'.repeat(64)],
+        },
+      ],
+      fundingUpdate: {
+        spentOutpoints: [{ txid: 'b'.repeat(64), vout: 1 }],
+        createdUtxo: {
+          outpoint: { txid: 'e'.repeat(64), vout: 1 },
+          satoshis: 700,
+          scriptPubKey: '5120' + '11'.repeat(32),
+          publicKey: '02' + '22'.repeat(32),
+          allocations: [
+            {
+              assetId: 'rgb:asset',
+              amount: '40',
+              settled: true,
+              spendable: true,
+              opId: 'd'.repeat(64),
+              assignmentIndex: 1,
+              assignmentType: 4000,
+            },
+          ],
+        },
+      },
+    })
+    vi.mocked(dependencies.broadcaster.broadcast).mockResolvedValue('e'.repeat(64))
+    const service = new RgbService(dependencies)
+    await service.open(wallet)
+    await service.sync()
+    await service.prepareSend({
+      assetId: 'rgb:asset',
+      amount: '60',
+      invoice: rgbInvoice(),
+      feeRate: 2,
+    })
+    await service.completeSend('transfer-1', 'signed-psbt')
+
+    expect(service.getSnapshot().utxos.map(utxo => utxo.outpoint)).toEqual([
+      { txid: 'a'.repeat(64), vout: 0 },
+      { txid: 'e'.repeat(64), vout: 1 },
+    ])
+  })
+})
