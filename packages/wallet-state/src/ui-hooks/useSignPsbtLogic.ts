@@ -347,7 +347,8 @@ export function useSignPsbtLogic(props: SignPsbtProps) {
           tools.toastError(`Signing failed for PSBT ${i}: ${e.message}`)
         }
       }
-    } catch (e) {
+    } catch {
+      // Individual signing failures have already been surfaced to the user.
     } finally {
       setIsPsbtSigning(false)
       setDisclaimerVisible(false)

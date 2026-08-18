@@ -739,7 +739,7 @@ class ProviderController extends BaseController {
       if (appNameBytes.length > 64) {
         throw new Error('appName must be at most 64 bytes')
       }
-      if (!/^[a-z0-9\-]+$/.test(params.appName)) {
+      if (!/^[a-z0-9-]+$/.test(params.appName)) {
         throw new Error('appName must contain only lowercase letters, digits, and hyphens')
       }
       // Validate context

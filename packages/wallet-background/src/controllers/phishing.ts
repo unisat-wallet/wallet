@@ -12,7 +12,7 @@ const DEFAULT_UPDATE_INTERVAL = 24 * 60 * 60 * 1000
  * PhishingController class for handling all phishing protection related functionality
  */
 class PhishingController {
-  private updateIntervalId: NodeJS.Timeout | null = null
+  private updateIntervalId: ReturnType<typeof setInterval> | null = null
 
   /**
    * Initialize phishing protection features

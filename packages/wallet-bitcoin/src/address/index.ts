@@ -117,7 +117,9 @@ export function decodeAddress(address: string) {
         addressType,
         dust: getAddressTypeDust(addressType),
       }
-    } catch (e) {}
+    } catch {
+      // Not a valid Bech32 address.
+    }
   } else {
     try {
       decodeBase58 = bitcoin.address.fromBase58Check(address)
@@ -147,7 +149,9 @@ export function decodeAddress(address: string) {
         addressType,
         dust: getAddressTypeDust(addressType),
       }
-    } catch (e) {}
+    } catch {
+      // Not a valid Base58 address.
+    }
   }
 
   return {
@@ -170,10 +174,9 @@ function getAddressTypeDust(addressType: AddressType) {
 /**
  * Get address type.
  */
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
 export function getAddressType(
   address: string,
-  networkType: NetworkType = NetworkType.MAINNET
+  _networkType: NetworkType = NetworkType.MAINNET
 ): AddressType {
   return decodeAddress(address).addressType
 }

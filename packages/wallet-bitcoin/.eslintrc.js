@@ -8,7 +8,7 @@ module.exports = {
     '@typescript-eslint'
   ],
   rules: {
-    '@typescript-eslint/no-unused-vars': 'error',
+    '@typescript-eslint/no-unused-vars': ['warn', { argsIgnorePattern: '^_' }],
     '@typescript-eslint/no-explicit-any': 'warn',
     'no-var': 'error',
     'no-console': 'warn'
@@ -19,5 +19,17 @@ module.exports = {
     'coverage/**/*',
     '*.js',
     '*.mjs'
+  ],
+  overrides: [
+    {
+      files: ['test/**/*.{ts,js}', '**/*.test.ts', '**/*.spec.ts'],
+      parserOptions: {
+        project: null
+      },
+      rules: {
+        '@typescript-eslint/prefer-nullish-coalescing': 'off',
+        '@typescript-eslint/prefer-optional-chain': 'off'
+      }
+    }
   ]
 };

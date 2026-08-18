@@ -51,8 +51,7 @@ export function verifyMessageOfECDSA(publicKey: string, text: string, sig: strin
       return false
     }
 
-    // Extract recovery flag and signature
-    const recoveryFlag = sigBuffer[0]
+    // The first byte is the recovery flag and is not needed for verification.
     const signature = sigBuffer.slice(1)
 
     // Verify the signature using ECPair

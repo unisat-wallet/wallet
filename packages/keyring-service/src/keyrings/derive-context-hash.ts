@@ -98,7 +98,7 @@ export function validateAppName(appName: string): void {
   if (bytes.length > 64) {
     throw new Error(`appName must be at most 64 bytes, got ${bytes.length}`)
   }
-  if (!/^[a-z0-9\-]+$/.test(appName)) {
+  if (!/^[a-z0-9-]+$/.test(appName)) {
     throw new Error('appName must contain only lowercase letters, digits, and hyphens')
   }
 }
@@ -130,4 +130,3 @@ export function parseHexContext(context: string): Uint8Array {
   }
   return bytes
 }
-

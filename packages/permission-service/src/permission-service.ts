@@ -14,8 +14,7 @@ export class PermissionService {
   private store: PermissionStore = {
     dumpCache: [],
   }
-  // @ts-ignore
-  private lruCache: LRUCache<string, ConnectedSite> | undefined
+  private lruCache: InstanceType<typeof LRUCache> | undefined
   protected storage: ProxyStorageAdapter = undefined as any
   private storageKey: string = 'permission'
   private logger: Logger = defaultLogger
