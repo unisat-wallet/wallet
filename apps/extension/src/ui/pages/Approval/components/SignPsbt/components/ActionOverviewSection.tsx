@@ -16,7 +16,8 @@ function DetailItemRow({ detail, decodedPsbt }: { detail: PsbtActionDetail; deco
       color="textDim"
       size="sm"
       style={{
-        maxWidth: 100
+        whiteSpace: 'nowrap',
+        flexShrink: 0
       }}
     />
   );
@@ -107,20 +108,18 @@ function DetailItemRow({ detail, decodedPsbt }: { detail: PsbtActionDetail; deco
       );
     } else if (detail.type === PsbtActionDetailType.SATOSHIS) {
       return (
-        <Row justifyBetween>
+        <Row justifyBetween itemsCenter>
           {LabelCom}
-          <Row>
+          <Column itemsEnd gap="zero" style={{ flexShrink: 0 }}>
             <Text
               text={`${numUtils.satoshisToAmount(detail.value as number)} ${btcUnit}`}
               preset={detail.highlight ? 'bold' : 'regular'}
               color={detail.warning ? 'warning' : detail.highlight ? 'gold' : 'white'}
               size="sm"
-              style={{ maxWidth: 250, textAlign: 'right' }}
+              style={{ textAlign: 'right', whiteSpace: 'nowrap' }}
             />
-            <Row justifyCenter>
-              <BtcUsd sats={Math.abs(detail.value as number)} bracket />
-            </Row>
-          </Row>
+            <BtcUsd sats={Math.abs(detail.value as number)} bracket />
+          </Column>
         </Row>
       );
     } else if (detail.type === PsbtActionDetailType.MULTIASSETS) {
@@ -191,6 +190,10 @@ function DetailItemRow({ detail, decodedPsbt }: { detail: PsbtActionDetail; deco
 
 export default function ActionOverviewSection(props: ActionOverviewSectionProps) {
   const { action, decodedPsbt, chain, commonDetails } = useActionOverviewSectionLogic(props);
+  const details = (action.details || [])
+    .filter((detail) => detail.label.trim().toLowerCase() !== 'fee rate')
+    .map((detail) => (detail.label === 'Funding Address' ? { ...detail, label: 'RGB Address' } : detail));
+
   return (
     <Card
       style={{
@@ -219,7 +222,7 @@ export default function ActionOverviewSection(props: ActionOverviewSectionProps)
 
         {action.description && <Text text={action.description} preset="regular" color="white" wrap />}
 
-        {action.details && action.details.length > 0 && (
+        {details.length > 0 && (
           <Row
             style={{
               borderBottomWidth: 1,
@@ -227,21 +230,14 @@ export default function ActionOverviewSection(props: ActionOverviewSectionProps)
             }}></Row>
         )}
 
-        {action.details && action.details.length > 0 && (
-          <Column gap="sm" fullX>
-            {action.details.map((detail, index) => (
+        {details.length > 0 && (
+          <Column gap="lg" fullX>
+            {details.map((detail, index) => (
               <DetailItemRow key={index} detail={detail} decodedPsbt={decodedPsbt} />
             ))}
           </Column>
         )}
 
-        {commonDetails.length > 0 && (
-          <Row
-            style={{
-              borderBottomWidth: 1,
-              borderBottomColor: 'rgba(235, 185, 76, 0.1)'
-            }}></Row>
-        )}
         {commonDetails.map((detail, index) => (
           <DetailItemRow key={index} detail={detail} decodedPsbt={decodedPsbt} />
         ))}

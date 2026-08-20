@@ -4,7 +4,6 @@ import { Column, Content, Layout, Row } from '@/ui/components';
 import { Button } from '@/ui/components/Button';
 import { Input } from '@/ui/components/Input';
 import { Logo } from '@/ui/components/Logo';
-import { Text } from '@/ui/components/Text';
 import { getUiType } from '@/ui/web';
 import { useI18n, useIsUnlocked, useTools, useUnlockCallback, useWallet } from '@unisat/wallet-state';
 
@@ -78,14 +77,20 @@ export default function UnlockScreen() {
           </Row>
 
           <Column gap="xl" mt="xxl">
-            <Text preset="title-bold" text={t('enter_your_password')} textCenter />
             <Input
               preset="password"
-              placeholder={t('password')}
+              placeholder={t('enter_your_password')}
               onChange={(e) => setPassword(e.target.value)}
               onKeyUp={(e) => handleOnKeyUp(e as any)}
               autoFocus={true}
               data-testid="unlock-password-input"
+              containerStyle={{
+                height: 48,
+                minHeight: 48,
+                paddingTop: 0,
+                paddingBottom: 0,
+                boxSizing: 'border-box'
+              }}
             />
             <Button
               disabled={disabled}

@@ -452,7 +452,7 @@ function Step4(params: BRC20InscribeTransferParams) {
         <Content style={{ gap: spacing.small }}>
           <Column justifyCenter mt="xxl" gap="xl">
             <Row justifyCenter>
-              <Icon icon="success" size={50} style={{ alignSelf: 'center' }} />
+              <Icon icon="success" size={100} style={{ alignSelf: 'center' }} />
             </Row>
 
             <Text preset="title" text={t('tx_sent_title')} textCenter />

@@ -2,6 +2,23 @@ import { Button, Column, Content, Footer, Header, Icon, Layout, Row, Text } from
 import { spacing } from '@/ui/theme/spacing';
 import { useTxSuccessScreenLogic } from '@unisat/wallet-state';
 
+const TEXT_COLOR = 'rgba(255, 255, 255, 0.85)';
+
+const footerButtonStyle = {
+  minHeight: 48,
+  height: 48,
+  borderRadius: 8,
+  borderWidth: 1,
+  borderColor: 'rgba(255, 255, 255, 0.45)'
+};
+
+const footerButtonTextStyle = {
+  fontSize: 15,
+  fontWeight: 500,
+  lineHeight: '16px',
+  color: TEXT_COLOR
+};
+
 export default function TxSuccessScreen() {
   const { onClickExploreTx, onClickDone, t } = useTxSuccessScreenLogic();
 
@@ -12,20 +29,35 @@ export default function TxSuccessScreen() {
       <Content style={{ gap: spacing.small }}>
         <Column justifyCenter mt="xxl" gap="xl">
           <Row justifyCenter>
-            <Icon icon="success" size={50} style={{ alignSelf: 'center' }} />
+            <Icon icon="success" size={100} style={{ alignSelf: 'center' }} />
           </Row>
 
-          <Text preset="title" text={t('tx_sent_title')} textCenter />
-          <Text preset="sub" text={t('tx_sent_desc')} color="textDim" textCenter />
-
-          <Row justifyCenter itemsCenter onClick={onClickExploreTx}>
-            <Icon icon="eye" color="textDim" />
-            <Text preset="regular-bold" text={t('view_on_block_explorer')} color="textDim" />
-          </Row>
+          <Column gap="md">
+            <Text preset="title" text={t('tx_sent_title')} textCenter style={{ color: TEXT_COLOR }} />
+            <Text preset="sub" text={t('tx_sent_desc')} textCenter style={{ color: 'rgba(255, 255, 255, 0.65)' }} />
+          </Column>
         </Column>
       </Content>
       <Footer>
-        <Button full text={t('done')} onClick={onClickDone} data-testid="tx-success-done-button" />
+        <Row full style={{ gap: 14 }}>
+          <Button
+            full
+            preset="default"
+            text={t('view_on_uniscan')}
+            onClick={onClickExploreTx}
+            style={footerButtonStyle}
+            textStyle={footerButtonTextStyle}
+          />
+          <Button
+            full
+            preset="default"
+            text={t('done')}
+            onClick={onClickDone}
+            data-testid="tx-success-done-button"
+            style={footerButtonStyle}
+            textStyle={footerButtonTextStyle}
+          />
+        </Row>
       </Footer>
     </Layout>
   );
