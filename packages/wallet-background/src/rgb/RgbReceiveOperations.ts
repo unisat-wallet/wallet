@@ -31,6 +31,9 @@ export class RgbReceiveOperations {
       ...(params.amount === undefined ? {} : { amount: String(params.amount) }),
       ...(params.durationSeconds === undefined ? {} : { durationSeconds: params.durationSeconds }),
     })
+    // Persist recipient ownership before a sender uploads the consignment, so a
+    // reinstalled wallet can discover it even when the proxy is no longer available.
+    await service.claimPendingReceives()
     const batchTransferIdx = service
       .getPendingReceives()
       .findIndex(item => item.recipientId === receive.recipientId)

@@ -3111,7 +3111,7 @@
     "message": "等待確認"
   },
   "rgb_status_waiting_receive": {
-    "message": "等待確認"
+    "message": "等待發送方廣播"
   },
   "rgb_status_pending_accept": {
     "message": "等待你的確認"

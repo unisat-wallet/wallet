@@ -47,7 +47,7 @@ describe('useRGBTransferDetailLogic', () => {
     })
 
     expect(wallet.acceptRgbReceive).toHaveBeenCalledWith({ recipientId: 'recipient-id' })
-    expect(result.current.transfer?.status).toBe('confirming')
+    expect(result.current.transfer?.status).toBe('waiting_receive')
   })
 
   it('rejects a pending receive using its recipient ID', async () => {

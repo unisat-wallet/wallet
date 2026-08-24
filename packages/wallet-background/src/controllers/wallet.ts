@@ -111,6 +111,10 @@ import { RgbServiceRegistry } from '../rgb/RgbServiceRegistry'
 import { createRgbService } from '../rgb/RgbServiceFactory'
 import { RgbIndexerOutbox, toRgbIndexedUtxos } from '../rgb/RgbIndexerOutbox'
 import { RgbIssueOperations } from '../rgb/RgbIssueOperations'
+import {
+  decryptRgbRecoveryCheckpoint,
+  encryptRgbRecoveryCheckpoint,
+} from '../rgb/RgbRecoveryCheckpoint'
 import { RgbReceiveOperations } from '../rgb/RgbReceiveOperations'
 import { RgbSendOperations } from '../rgb/RgbSendOperations'
 import { RgbTransferQuery, type RgbRemoteActivity } from '../rgb/RgbTransferQuery'
@@ -165,6 +169,15 @@ type RgbControllerApiService = {
       timestamp?: number
     }
   }) => Promise<void>
+  saveRgbRecoveryCheckpoint: (params: {
+    wallet: RgbWalletRef
+    payload: string
+    updatedAt: number
+  }) => Promise<void>
+  getRgbRecoveryCheckpoint: (params: { wallet: RgbWalletRef }) => Promise<{
+    payload?: string
+    updatedAt?: number
+  }>
   getRgbAssetDetail: (assetId: string) => Promise<unknown>
   getRgbAssetActivity: (
     assetId: string,
@@ -568,6 +581,40 @@ function stableRgbJson(value: unknown): string {
     .join(',')}}`
 }
 
+/** Recovery diagnostics deliberately exclude invoices, consignments, keys, and signatures. */
+function rgbRecoveryStateSummary(state: unknown) {
+  const record = state && typeof state === 'object' ? (state as Record<string, unknown>) : {}
+  const pending = record['pending'] && typeof record['pending'] === 'object'
+    ? Object.values(record['pending'] as Record<string, unknown>)
+    : []
+  const pendingReceives = Array.isArray(record['pendingReceives']) ? record['pendingReceives'] : []
+  const snapshot = record['snapshot'] && typeof record['snapshot'] === 'object'
+    ? (record['snapshot'] as Record<string, unknown>)
+    : {}
+  return {
+    pendingTransfers: pending.length,
+    preparedTransfers: pending.filter(item => item && typeof item === 'object' && !('delivery' in item) && !('broadcast' in item)).length,
+    deliveredTransfers: pending.filter(item => item && typeof item === 'object' && 'delivery' in item).length,
+    broadcastTransfers: pending.filter(item => item && typeof item === 'object' && 'broadcast' in item).length,
+    pendingReceives: pendingReceives.length,
+    snapshotUtxos: Array.isArray(snapshot['utxos']) ? snapshot['utxos'].length : 0,
+  }
+}
+
+function rgbRecoveryWalletTag(wallet: Pick<LocalRgbWallet, 'network' | 'fundingAddress'>) {
+  return `${wallet.network}:${wallet.fundingAddress.slice(-8)}`
+}
+
+function rgbRecoveryServiceSummary(service: LocalRgbService) {
+  const pendingTransfers = service.getPendingTransfers?.() || []
+  const pendingReceives = service.getPendingReceives?.() || []
+  return rgbRecoveryStateSummary({
+    pending: Object.fromEntries(pendingTransfers.map(transfer => [transfer.id, transfer])),
+    pendingReceives,
+    snapshot: service.getSnapshot?.(),
+  })
+}
+
 export class WalletController extends BaseController {
   timer: any = null
 
@@ -584,6 +631,8 @@ export class WalletController extends BaseController {
     syncReceiveHistory: (receive, wallet) => this.syncRgbReceiveHistoryToIndexer(receive, wallet),
     warn: (message, error) => log.warn(message, error),
   })
+  private readonly rgbRecoveryRestores = new Map<string, Promise<void>>()
+  private readonly rgbRecoveryBackups = new Map<string, Promise<void>>()
   private readonly rgbCoordinator = new RgbWalletCoordinator({
     getContext: () => this.getLocalRgbService(),
     syncIndexerOutbox: (service, wallet) => this.syncRgbIndexerOutbox(service, wallet),
@@ -616,12 +665,12 @@ export class WalletController extends BaseController {
   private readonly rgbSendOperations = new RgbSendOperations({
     getContext: () => this.getLocalRgbService(),
     getFeeRate: async () => (await this.getFeeSummary()).list[1]?.feeRate,
-    getToSignData: ({ psbt, toSignInputs, amountDisplay }) =>
+    getToSignData: ({ psbt, toSignInputs, amountDisplay, actionName }) =>
       this.getRgbToSignData({
         psbt,
         toSignInputs,
         action: {
-          name: 'Send RGB',
+          name: actionName,
           description: '',
           details: [
             {
@@ -648,6 +697,8 @@ export class WalletController extends BaseController {
     keyringService.on?.('lock', () => {
       this.rgbServiceRegistry.clear()
       this.rgbCoordinator.clear()
+      this.rgbRecoveryRestores.clear()
+      this.rgbRecoveryBackups.clear()
     })
   }
 
@@ -3537,8 +3588,11 @@ export class WalletController extends BaseController {
   /** Refresh colored UTXO chain state without polling receive consignments or proxy endpoints. */
   private syncRgbListState = () => this.rgbCoordinator.syncListState()
 
-  private syncRgbPendingTransfers = (service: LocalRgbService) =>
-    this.rgbCoordinator.syncPendingTransfers(service)
+  private syncRgbPendingTransfers = async (service: LocalRgbService) => {
+    log.debug('RGB recovery: advancing restored pending transfers', rgbRecoveryServiceSummary(service))
+    await this.rgbCoordinator.syncPendingTransfers(service)
+    log.debug('RGB recovery: pending transfer advancement completed', rgbRecoveryServiceSummary(service))
+  }
 
   /** Exclude locally locked RGB UTXOs from the UI's spendable balance until a send completes. */
   private getRgbPendingLockedAmounts = () => this.rgbCoordinator.getPendingLockedAmounts()
@@ -3562,8 +3616,91 @@ export class WalletController extends BaseController {
     }
   }
 
+  private rgbRecoveryKey = async (wallet: LocalRgbWallet) => {
+    const context = bitcoin.crypto
+      .sha256(Buffer.from(`unisat-rgb-recovery-v1:${wallet.network}:${wallet.fundingAddress}`))
+      .toString('hex')
+    return this.deriveContextHash('unisat-rgb-recovery-v1', context)
+  }
+
+  private restoreRgbRecoveryIfNeeded = async (context: LocalRgbServiceContext) => {
+    const { service, wallet } = context
+    if (!service.needsRecoveryRestore?.()) return
+    const key = `${wallet.network}:${wallet.fundingAddress}`
+    const active = this.rgbRecoveryRestores.get(key)
+    if (active) return active
+    const restore = (async () => {
+      try {
+        log.debug('RGB recovery: requesting checkpoint', { wallet: rgbRecoveryWalletTag(wallet) })
+        const checkpoint = await getRgbApiService().getRgbRecoveryCheckpoint({ wallet })
+        log.debug('RGB recovery: checkpoint response received', {
+          wallet: rgbRecoveryWalletTag(wallet),
+          hasPayload: Boolean(checkpoint.payload),
+          updatedAt: checkpoint.updatedAt,
+        })
+        if (checkpoint.payload) {
+          const state = await decryptRgbRecoveryCheckpoint(
+            checkpoint.payload,
+            await this.rgbRecoveryKey(wallet)
+          )
+          log.debug('RGB recovery: checkpoint decrypted', {
+            wallet: rgbRecoveryWalletTag(wallet),
+            ...rgbRecoveryStateSummary(state),
+          })
+          const restored = await service.restoreRecoveryState(state)
+          log.debug('RGB recovery: checkpoint restore result', {
+            wallet: rgbRecoveryWalletTag(wallet),
+            restored,
+            ...rgbRecoveryServiceSummary(service),
+          })
+          if (!restored) {
+            throw new Error('RGB recovery checkpoint does not belong to this wallet')
+          }
+        }
+      } catch (error) {
+        log.warn('Failed to restore RGB recovery checkpoint', error)
+      } finally {
+        service.enableRecoveryBackup()
+        log.debug('RGB recovery: backup enabled', {
+          wallet: rgbRecoveryWalletTag(wallet),
+          ...rgbRecoveryServiceSummary(service),
+        })
+      }
+    })()
+    this.rgbRecoveryRestores.set(key, restore)
+    try {
+      await restore
+    } finally {
+      if (this.rgbRecoveryRestores.get(key) === restore) this.rgbRecoveryRestores.delete(key)
+    }
+  }
+
+  private queueRgbRecoveryCheckpoint = (wallet: LocalRgbWallet, state: unknown) => {
+    const key = `${wallet.network}:${wallet.fundingAddress}`
+    const diagnostic = { wallet: rgbRecoveryWalletTag(wallet), ...rgbRecoveryStateSummary(state) }
+    log.debug('RGB recovery: checkpoint queued', diagnostic)
+    const previous = this.rgbRecoveryBackups.get(key) || Promise.resolve()
+    const backup = previous
+      .catch(() => undefined)
+      .then(async () => {
+        const payload = await encryptRgbRecoveryCheckpoint(state, await this.rgbRecoveryKey(wallet))
+        await getRgbApiService().saveRgbRecoveryCheckpoint({
+          wallet,
+          payload,
+          updatedAt: Date.now(),
+        })
+        log.debug('RGB recovery: checkpoint saved', diagnostic)
+      })
+    this.rgbRecoveryBackups.set(key, backup)
+    void backup.catch(error => {
+      log.warn('RGB recovery: checkpoint save failed', diagnostic, error)
+    })
+    return backup
+  }
+
   private getLocalRgbService = async (): Promise<LocalRgbServiceContext> => {
     const context = await this.rgbServiceRegistry.get()
+    await this.restoreRgbRecoveryIfNeeded(context)
     await this.syncRgbIndexerOutbox(context.service, context.wallet)
     return context
   }
@@ -3617,6 +3754,7 @@ export class WalletController extends BaseController {
       encoder: localNiaProtocolEncoder,
       transport: createRgbProxyTransport(CHAINS_MAP[this.getChainType()]?.rgbProxyEndpoints || []),
       broadcaster: { broadcast: rawTx => this.pushTx(rawTx) },
+      onStatePersisted: state => this.queueRgbRecoveryCheckpoint(localWallet, state),
     })
   }
 

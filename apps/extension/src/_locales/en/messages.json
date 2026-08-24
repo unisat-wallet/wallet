@@ -3114,7 +3114,7 @@
     "message": "Awaiting confirmation"
   },
   "rgb_status_waiting_receive": {
-    "message": "Awaiting confirmation"
+    "message": "Awaiting sender broadcast"
   },
   "rgb_status_pending_accept": {
     "message": "Awaiting your acceptance"

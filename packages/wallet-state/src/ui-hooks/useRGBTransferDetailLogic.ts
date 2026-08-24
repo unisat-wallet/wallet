@@ -197,7 +197,7 @@ export function useRGBTransferDetailLogic() {
       }
       if (!result?.accepted) throw new Error(t('rgb_accept_transfer_failed'))
       tools.toastSuccess(t('rgb_accept_transfer_success'))
-      setTransfer(current => (current ? { ...current, status: 'confirming', local: true } : current))
+      setTransfer(current => (current ? { ...current, status: 'waiting_receive', local: true } : current))
       return true
     } catch (e: unknown) {
       const message = e instanceof Error && e.message ? e.message : t('rgb_accept_transfer_failed')

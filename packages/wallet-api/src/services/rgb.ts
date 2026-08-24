@@ -25,6 +25,9 @@ import type {
   RgbWalletUtxoSnapshotResult,
   RgbRequestAuthenticator,
   RgbReceiveTransferSyncRequest,
+  RgbRecoveryCheckpointReadRequest,
+  RgbRecoveryCheckpointReadResult,
+  RgbRecoveryCheckpointSaveRequest,
   RgbTransactionStatusRequest,
   RgbTransactionStatusResult,
 } from '../types'
@@ -80,6 +83,16 @@ export class RgbService {
       ...params,
       asset: { ...params.asset, assetId: normalizeRgbAssetId(params.asset.assetId) },
     })
+  }
+
+  async saveRgbRecoveryCheckpoint(params: RgbRecoveryCheckpointSaveRequest): Promise<void> {
+    await this.privatePost('/v5/rgb/recovery/checkpoint', params)
+  }
+
+  async getRgbRecoveryCheckpoint(
+    params: RgbRecoveryCheckpointReadRequest
+  ): Promise<RgbRecoveryCheckpointReadResult> {
+    return this.privatePost('/v5/rgb/recovery/checkpoint/read', params)
   }
 
   /**

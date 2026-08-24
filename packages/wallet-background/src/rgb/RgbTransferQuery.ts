@@ -190,7 +190,7 @@ export class RgbTransferQuery {
           amount: receive.amount,
           txid: receivedConsignment.txid,
           timestamp: receivedConsignment.receivedAt,
-          status: 'confirming',
+          status: receivedConsignment.broadcastDetectedAt ? 'confirming' : 'waiting_receive',
           local: true,
           from: this.dependencies.getCounterpartyAddress(
             receivedConsignment.counterpartyScriptPubKeys,

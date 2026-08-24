@@ -116,6 +116,9 @@ export class RgbWalletCoordinator {
     context: LocalRgbServiceContext
   ): Promise<LocalRgbServiceContext> {
     const { service, wallet } = context
+    // Claims are durable recipient-to-address bindings. Retrying them here
+    // covers invoices created while the recovery endpoint was unavailable.
+    await service.claimPendingReceives?.()
     await this.dependencies.syncIndexerOutbox(service, wallet)
     await this.syncSnapshot(service, wallet, RECEIVE_SNAPSHOT_SYNC_INTERVAL)
     let processed = await service.processClaimedReceives({

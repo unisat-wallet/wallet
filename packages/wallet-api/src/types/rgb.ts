@@ -255,6 +255,22 @@ export interface RgbClaimedConsignmentsResult {
   consignments: Array<{ recipientId: string; payload: string; assetId?: string; opIds: string[]; createdAt: number }>
 }
 
+/** Opaque ciphertext produced locally from the RGB service state. */
+export interface RgbRecoveryCheckpointSaveRequest {
+  wallet: RgbWalletRef
+  payload: string
+  updatedAt: number
+}
+
+export interface RgbRecoveryCheckpointReadRequest {
+  wallet: RgbWalletRef
+}
+
+export interface RgbRecoveryCheckpointReadResult {
+  payload?: string
+  updatedAt?: number
+}
+
 export interface RgbReceiveInvoiceRequest {
   wallet: RgbWalletRef
   assetId?: string

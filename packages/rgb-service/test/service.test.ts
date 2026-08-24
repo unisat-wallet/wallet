@@ -134,6 +134,51 @@ describe('RgbService', () => {
     expect(dependencies.stateSource.getSnapshot).toHaveBeenCalledTimes(2)
   })
 
+  it('refreshes the wallet snapshot while received asset metadata is waiting to be indexed', async () => {
+    const dependencies = createDependencies()
+    const service = new RgbService(dependencies)
+    await service.open(wallet)
+    ;(service as any).state.pendingAssetMetadata = [
+      {
+        assetId: 'rgb:asset',
+        metadata: { ticker: 'TOK', name: 'Token', precision: 0, schema: 'NIA', issuedSupply: '1' },
+      },
+    ]
+
+    await service.sync()
+
+    expect(dependencies.stateSource.getSnapshot).toHaveBeenCalledTimes(1)
+  })
+
+  it('restores a recovery checkpoint only for the opened funding address', async () => {
+    const dependencies = createDependencies()
+    const service = new RgbService(dependencies)
+    await service.open(wallet)
+    const recovery = {
+      version: 1 as const,
+      wallet,
+      snapshot: {
+        syncedAt: 1,
+        utxos: [
+          {
+            outpoint: { txid: 'a'.repeat(64), vout: 0 },
+            satoshis: 330,
+            scriptPubKey: '5120' + '11'.repeat(32),
+            publicKey: '02' + '22'.repeat(32),
+            allocations: [],
+          },
+        ],
+      },
+      pending: {},
+    }
+
+    await expect(service.restoreRecoveryState(recovery)).resolves.toBe(true)
+    expect(service.getSnapshot().utxos).toHaveLength(1)
+    await expect(
+      service.restoreRecoveryState({ ...recovery, wallet: { ...wallet, fundingAddress: 'bc1p-other' } })
+    ).resolves.toBe(false)
+  })
+
   it('does not read wallet-api claimed consignments during proxy-only receive polling', async () => {
     const dependencies = createDependencies()
     dependencies.stateSource.getClaimedConsignments = vi.fn().mockResolvedValue([])
@@ -366,6 +411,78 @@ describe('RgbService', () => {
       service.createBlindReceive({ assetId: 'rgb:asset', amount: '1' })
     ).resolves.toMatchObject({ assetId: 'rgb:asset' })
     expect(service.getAvailableReceiveUtxos()).toEqual([])
+  })
+
+  it('waits for a recovery checkpoint before returning a new blind invoice', async () => {
+    const dependencies = createDependencies()
+    vi.mocked(dependencies.stateSource.getSnapshot).mockResolvedValue({
+      syncedAt: 1,
+      utxos: [
+        {
+          outpoint: { txid: 'f'.repeat(64), vout: 0 },
+          satoshis: 1_000,
+          scriptPubKey: '5120' + '11'.repeat(32),
+          publicKey: '02' + '22'.repeat(32),
+          chainStatus: 'confirmed',
+          confirmations: 1,
+          allocations: [],
+        },
+      ],
+    })
+    let finishCheckpoint: (() => void) | undefined
+    let checkpointStarted: (() => void) | undefined
+    const checkpointStartedPromise = new Promise<void>(resolve => (checkpointStarted = resolve))
+    dependencies.onStatePersisted = vi.fn(
+      () => {
+        checkpointStarted?.()
+        return new Promise<void>(resolve => (finishCheckpoint = resolve))
+      }
+    )
+    const service = new RgbService(dependencies)
+    await service.open(wallet)
+    await service.sync()
+    service.enableRecoveryBackup()
+
+    let completed = false
+    const creating = service.createBlindReceive({ assetId: 'rgb:asset', amount: '1' }).then(result => {
+      completed = true
+      return result
+    })
+    await checkpointStartedPromise
+
+    expect(dependencies.onStatePersisted).toHaveBeenCalledWith(
+      expect.objectContaining({ pendingReceives: [expect.objectContaining({ assetId: 'rgb:asset' })] })
+    )
+    expect(completed).toBe(false)
+    finishCheckpoint?.()
+    await expect(creating).resolves.toMatchObject({ assetId: 'rgb:asset' })
+  })
+
+  it('does not report a new blind invoice as created when its recovery checkpoint fails', async () => {
+    const dependencies = createDependencies()
+    vi.mocked(dependencies.stateSource.getSnapshot).mockResolvedValue({
+      syncedAt: 1,
+      utxos: [
+        {
+          outpoint: { txid: 'f'.repeat(64), vout: 0 },
+          satoshis: 1_000,
+          scriptPubKey: '5120' + '11'.repeat(32),
+          publicKey: '02' + '22'.repeat(32),
+          chainStatus: 'confirmed',
+          confirmations: 1,
+          allocations: [],
+        },
+      ],
+    })
+    dependencies.onStatePersisted = vi.fn().mockRejectedValue(new Error('recovery unavailable'))
+    const service = new RgbService(dependencies)
+    await service.open(wallet)
+    await service.sync()
+    service.enableRecoveryBackup()
+
+    await expect(service.createBlindReceive({ assetId: 'rgb:asset', amount: '1' })).rejects.toThrow(
+      'recovery unavailable'
+    )
   })
 
   it('creates a pending invoice from an unconfirmed funding UTXO', async () => {

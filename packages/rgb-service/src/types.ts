@@ -361,5 +361,10 @@ export interface RgbServiceDependencies {
   encoder: RgbProtocolEncoder
   transport: RgbTransport
   broadcaster: BitcoinBroadcaster
+  /**
+   * Queues a recovery checkpoint after local state is durably encrypted at
+   * rest. Critical state transitions may await its completion.
+   */
+  onStatePersisted?: (state: unknown) => void | Promise<void>
   now?: () => number
 }

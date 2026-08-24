@@ -526,7 +526,8 @@ describe('RGB wallet references', () => {
       invoice: 'rgb:asset/schema/~/bc:utxob:recipient?amount=8888888888&endpoints=rpc://proxy',
       assetId: 'rgb:asset',
       amount: '8888888888',
-      ticker: 'RGB',
+      ticker: '*',
+      name: 'Star Token',
       precision: 8,
       feeRate: 2,
     })
@@ -534,7 +535,8 @@ describe('RGB wallet references', () => {
     expect(getRgbToSignData).toHaveBeenCalledWith(
       expect.objectContaining({
         action: expect.objectContaining({
-          details: [expect.objectContaining({ label: 'Amount', value: '88.88888888 RGB' })],
+          name: 'Send Star Token',
+          details: [expect.objectContaining({ label: 'Amount', value: '88.88888888 Star Token' })],
         }),
       })
     )
@@ -1261,7 +1263,7 @@ describe('RGB wallet references', () => {
       }),
       expect.objectContaining({
         id: 'local-receive:accepted-unbroadcast',
-        status: 'confirming',
+        status: 'waiting_receive',
         amount: '4',
       }),
       expect.objectContaining({

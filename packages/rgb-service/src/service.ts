@@ -54,6 +54,8 @@ export class RgbService {
   private syncInFlight?: Promise<RgbWalletSnapshot>
   private pendingTransferSyncInFlight?: Promise<void>
   private prepareSendInFlight?: Promise<void>
+  private openedFromStorage = false
+  private recoveryBackupEnabled = false
 
   constructor(private readonly dependencies: RgbServiceDependencies) {
     this.now = dependencies.now || (() => Date.now())
@@ -62,6 +64,8 @@ export class RgbService {
   async open(wallet: RgbWalletRef) {
     const storageKey = this.storageKey(wallet)
     const stored = await this.dependencies.storage.get<RgbServiceState>(storageKey)
+    this.openedFromStorage = Boolean(stored && stored.wallet.fundingAddress === wallet.fundingAddress)
+    this.recoveryBackupEnabled = this.openedFromStorage
     this.state =
       stored && stored.wallet.fundingAddress === wallet.fundingAddress
         ? normalizeStateAssetIds(hydrateState(stored))
@@ -73,6 +77,44 @@ export class RgbService {
           }
     this.hydrateStoredContractMetadata()
     await this.persist()
+  }
+
+  /** True when encrypted extension storage already contained this wallet's RGB state. */
+  wasOpenedFromStorage() {
+    return this.openedFromStorage
+  }
+
+  needsRecoveryRestore() {
+    const state = this.requireState()
+    return (
+      state.snapshot.syncedAt === 0 &&
+      state.snapshot.utxos.length === 0 &&
+      Object.keys(state.pending).length === 0 &&
+      (state.pendingReceives?.length || 0) === 0 &&
+      (state.receivedBlindSeals?.length || 0) === 0 &&
+      Object.keys(state.contracts || {}).length === 0
+    )
+  }
+
+  /** Restore a client-encrypted checkpoint only when it belongs to the opened funding address. */
+  async restoreRecoveryState(recovery: unknown) {
+    const current = this.requireState()
+    if (!isRgbServiceState(recovery) || recovery.wallet.fundingAddress !== current.wallet.fundingAddress)
+      return false
+    try {
+      this.state = normalizeStateAssetIds(hydrateState(recovery))
+      this.openedFromStorage = true
+      this.recoveryBackupEnabled = true
+      await this.persist()
+      return true
+    } catch {
+      return false
+    }
+  }
+
+  /** Enable future best-effort checkpoints after a fresh-wallet restore attempt. */
+  enableRecoveryBackup() {
+    this.recoveryBackupEnabled = true
   }
 
   async sync() {
@@ -91,7 +133,7 @@ export class RgbService {
     if (this.pendingTransferSyncInFlight) await this.pendingTransferSyncInFlight
     // Keep allocations that have not reached the indexer from being overwritten
     // by a stale remote snapshot.
-    if (this.hasPendingIndexerSync()) return state.snapshot
+    if (this.hasPendingSnapshotProtection()) return state.snapshot
     // A remote snapshot may still expose consumed outpoints. Finish durable
     // post-broadcast delivery first, or leave the locally updated snapshot intact.
     if (Object.keys(state.pending).length) await this.advancePendingTransfers()
@@ -187,7 +229,7 @@ export class RgbService {
       seal,
     }
     receives.push(pending)
-    await this.persist()
+    await this.persist({ waitForRecovery: true })
     return pending
   }
 
@@ -502,7 +544,7 @@ export class RgbService {
       counterpartyScriptPubKeys: receive.pendingAccept.counterpartyScriptPubKeys,
     }
     delete receive.pendingAccept
-    await this.persist()
+    await this.persist({ waitForRecovery: true })
 
     // The sender cannot broadcast until this ACK returns, so settlement is
     // deferred to the next receive refresh instead of fetching the same
@@ -924,7 +966,7 @@ export class RgbService {
     }
 
     state.pending[prepared.id] = { prepared, request: resolvedRequest, createdAt: this.now() }
-    await this.persist()
+    await this.persist({ waitForRecovery: true })
     return prepared
   }
 
@@ -944,7 +986,7 @@ export class RgbService {
       if (!endpoints.length)
         throw new RgbServiceError('RGB invoice has no proxy transport endpoint')
       pending.delivery = { completed, endpoints }
-      await this.persist()
+      await this.persist({ waitForRecovery: true })
     }
     return this.advancePendingDelivery(transferId, pending)
   }
@@ -1057,7 +1099,7 @@ export class RgbService {
     }
     if (!delivery.publishedAt) {
       delivery.publishedAt = this.now()
-      await this.persist()
+      await this.persist({ waitForRecovery: true })
     }
     const getAcknowledgement = this.dependencies.transport.getAcknowledgement
     if (!getAcknowledgement)
@@ -1087,14 +1129,14 @@ export class RgbService {
     }
     delivery.acknowledgedAt ||= this.now()
     delete delivery.broadcastError
-    await this.persist()
+    await this.persist({ waitForRecovery: true })
 
     let broadcastTxid: string
     try {
       broadcastTxid = await this.dependencies.broadcaster.broadcast(delivery.completed.rawTx)
     } catch (error) {
       delivery.broadcastError = error instanceof Error ? error.message : String(error)
-      await this.persist()
+      await this.persist({ waitForRecovery: true })
       throw error
     }
     if (broadcastTxid !== delivery.completed.txid) {
@@ -1103,7 +1145,7 @@ export class RgbService {
     this.applyFundingUpdate(delivery.completed)
     pending.broadcast = { completed: delivery.completed, broadcastAt: this.now() }
     delete pending.delivery
-    await this.persist()
+    await this.persist({ waitForRecovery: true })
     return this.syncBroadcastedTransfer(transferId, pending)
   }
 
@@ -1176,16 +1218,21 @@ export class RgbService {
     return this.state
   }
 
-  private hasPendingIndexerSync() {
+  /** Only tasks that can be overwritten by a stale snapshot may block its refresh. */
+  private hasPendingSnapshotProtection() {
     const state = this.requireState()
-    return Boolean(
-      state.pendingUtxoSync || state.pendingIssues?.length || state.pendingAssetMetadata?.length
-    )
+    return Boolean(state.pendingUtxoSync || state.pendingIssues?.length)
   }
 
-  private async persist() {
+  private async persist(options: { waitForRecovery?: boolean } = {}) {
     const state = this.requireState()
-    await this.dependencies.storage.set(this.storageKey(state.wallet), persistState(state))
+    const persisted = persistState(state)
+    await this.dependencies.storage.set(this.storageKey(state.wallet), persisted)
+    if (this.recoveryBackupEnabled && this.dependencies.onStatePersisted) {
+      const recovery = Promise.resolve(this.dependencies.onStatePersisted(persisted))
+      if (options.waitForRecovery) await recovery
+      else void recovery.catch(() => undefined)
+    }
   }
 
   private storageKey(wallet: RgbWalletRef) {
@@ -1252,6 +1299,20 @@ function hydrateState(state: RgbServiceState) {
 
 function persistBlindSeal(seal: import('./protocol/receive').RgbBlindSeal) {
   return { ...seal, blinding: seal.blinding.toString() }
+}
+
+function isRgbServiceState(value: unknown): value is RgbServiceState {
+  if (!value || typeof value !== 'object') return false
+  const state = value as Partial<RgbServiceState>
+  return (
+    state.version === 1 &&
+    !!state.wallet &&
+    typeof state.wallet.fundingAddress === 'string' &&
+    !!state.snapshot &&
+    Array.isArray(state.snapshot.utxos) &&
+    !!state.pending &&
+    typeof state.pending === 'object'
+  )
 }
 
 function hydrateBlindSeal(seal: import('./protocol/receive').RgbBlindSeal) {
