@@ -7,13 +7,15 @@
   display: flex;
   justify-content: center;
   align-items: center;
-  z-index: 1000;
+  // Bottom sheets are rendered through a body portal at z-index 1000.
+  // Keep copy feedback visible above the active sheet.
+  z-index: 1200;
   pointer-events: none;
 }
 
 .toast {
   opacity: 0;
-  margin-bottom: 50px;
+  margin-top: 72px;
   animation: fade, raise;
   animation-duration: 2s, 0.5s;
 
@@ -39,9 +41,9 @@
 
 @keyframes raise {
   0% {
-    margin-bottom: 20px;
+    margin-top: 48px;
   }
   100% {
-    margin-bottom: 50px;
+    margin-top: 72px;
   }
 }

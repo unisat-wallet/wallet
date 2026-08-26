@@ -13,7 +13,7 @@ export interface ToastProps {
 }
 
 const $baseViewStyle = {
-  alignSelf: 'end',
+  alignSelf: 'start',
   padding: 4,
   borderRadius: 4,
   paddingLeft: 8,
