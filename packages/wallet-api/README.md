@@ -47,9 +47,6 @@ Handle Bitcoin transactions, UTXOs, balances, and fee estimation:
 // Get address balance
 const balance = await client.bitcoin.getAddressBalance(address)
 
-// Get available UTXOs
-const utxos = await client.bitcoin.getAvailableUtxos(address)
-
 // Send Bitcoin
 const result = await client.bitcoin.sendBitcoin({
   toAddress: 'recipient-address',

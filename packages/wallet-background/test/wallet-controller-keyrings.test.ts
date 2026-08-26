@@ -47,7 +47,6 @@ vi.mock('../src/services', () => ({
   walletApiService: {
     setClientAddress: vi.fn(),
     bitcoin: {
-      getAvailableUtxos: vi.fn().mockResolvedValue([]),
       getBTCUtxos: vi.fn().mockResolvedValue([]),
     },
   },
@@ -424,65 +423,6 @@ describe('RGB wallet references', () => {
       })
     )
     expect(result).toMatchObject({ local: true, psbtHex: '70736274ff' })
-  })
-
-  it('includes available BTC UTXOs when confirmed btc-utxo outputs cannot fund RGB', async () => {
-    const wallet = new WalletController()
-    const account = {
-      type: KeyringType.HdKeyring,
-      pubkey: validCompressedPubkey,
-      address: 'bc1qexample',
-      key: 'account-0',
-      flag: 0,
-      index: 0,
-    }
-    const keyring = {
-      getRgbFundingAccount: vi.fn().mockReturnValue({
-        address: 'bc1p0rgbfundingaddress',
-        publicKey: validCompressedPubkey,
-        derivationPath: "m/86'/827166'/0'/0/0",
-      }),
-    }
-    const psbt = { toHex: () => '70736274ff' }
-    const availableUtxo = {
-      txid: '11'.repeat(32),
-      vout: 1,
-      satoshis: 20_000,
-      scriptPk: '0014' + '11'.repeat(20),
-      addressType: AddressType.P2WPKH,
-      inscriptions: [],
-    }
-
-    vi.mocked(preferenceService.getCurrentAccount).mockReturnValue(account as any)
-    vi.mocked(keyringService.getKeyringForAccount).mockResolvedValue(keyring as any)
-    vi.mocked(walletApiService.bitcoin.getAvailableUtxos).mockResolvedValue([availableUtxo] as any)
-    vi.spyOn(wallet, 'getBTCUtxos').mockResolvedValue([
-      {
-        txid: '00'.repeat(32),
-        vout: 0,
-        satoshis: 200,
-        scriptPk: '0014' + '00'.repeat(20),
-        pubkey: validCompressedPubkey,
-        addressType: AddressType.P2WPKH,
-        inscriptions: [],
-      },
-    ] as any)
-    vi.spyOn(wallet, 'getToSignData').mockResolvedValue({ psbtHex: '70736274ff' } as any)
-    const sendSpy = vi.spyOn(txHelpers, 'sendBTC').mockResolvedValue({
-      psbt: psbt as any,
-      toSignInputs: [{ index: 0, publicKey: validCompressedPubkey }],
-    })
-
-    await wallet.createRgbUtxosBegin({ num: 1, feeRate: 1 })
-
-    expect(sendSpy).toHaveBeenCalledWith(
-      expect.objectContaining({
-        btcUtxos: expect.arrayContaining([
-          expect.objectContaining({ satoshis: 200 }),
-          expect.objectContaining({ satoshis: 20_000, txid: availableUtxo.txid }),
-        ]),
-      })
-    )
   })
 
   it('persists broadcast RGB funding UTXOs before retrying indexer synchronization', async () => {

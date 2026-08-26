@@ -76,22 +76,6 @@ export class BitcoinService {
   // ========================================
 
   /**
-   * Get available UTXOs (deprecated)
-   */
-  async getAvailableUtxos(address: string): Promise<UTXO[]> {
-    return this.httpClient.get('/v5/address/available-utxo', {
-      query: { address, ignoreAssets: true },
-    })
-  }
-
-  /**
-   * Get unavailable UTXOs (deprecated)
-   */
-  async getUnavailableUtxos(address: string): Promise<UTXO[]> {
-    return this.httpClient.get('/v5/address/unavailable-utxo', { query: { address } })
-  }
-
-  /**
    * Get BTC UTXOs
    */
   async getBTCUtxos(address: string): Promise<UTXO[]> {
