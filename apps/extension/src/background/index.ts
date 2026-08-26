@@ -11,7 +11,7 @@ import { initWindow } from './runtime/window';
 
 log.setDefaultLevel('error');
 if (process.env.NODE_ENV === 'development') {
-  // log.setLevel('debug');
+  log.setLevel('debug');
 }
 
 async function bootstrap() {
