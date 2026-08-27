@@ -1279,7 +1279,6 @@ export class KeyringService extends EventEmitter {
     end?: number,
     includeWatchKeyring = true
   ): Promise<Keyring> => {
-    this.logger.debug(`KeyringController - getKeyringForAccount: ${address}`)
     const keyrings = type ? this.keyrings.filter(keyring => keyring.type === type) : this.keyrings
     for (let i = 0; i < keyrings.length; i++) {
       const keyring = keyrings[i]
