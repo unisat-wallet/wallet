@@ -201,6 +201,7 @@ export default function RGBReceiveScreen() {
     assetId,
     assetTicker,
     assetPrecision,
+    canSetFixedAmount,
     assetSelectorOpen,
     setAssetSelectorOpen,
     mode,
@@ -743,24 +744,26 @@ export default function RGBReceiveScreen() {
 
           <Column gap="lg">
             {renderModeCard('any', t('any_amount'), t('accept_any_rgb_amount'))}
-            {renderModeCard(
-              'fixed',
-              t('fixed_amount'),
-              t('set_exact_rgb_amount'),
-              <Row itemsCenter gap="lg" style={amountInputContainerStyle}>
-                <input
-                  value={amount}
-                  onChange={(e) => {
-                    onAmountChange(e.target.value);
-                    setError('');
-                  }}
-                  inputMode={assetPrecision > 0 ? 'decimal' : 'numeric'}
-                  placeholder={assetPrecision > 0 ? `0.${'0'.repeat(Math.min(assetPrecision, 8))}` : '0'}
-                  style={amountInputFieldStyle}
-                />
-                <Text text={assetDisplayTicker} size="sm" color="white_muted" style={{ flexShrink: 0 }} />
-              </Row>
-            )}
+            {canSetFixedAmount
+              ? renderModeCard(
+                  'fixed',
+                  t('fixed_amount'),
+                  t('set_exact_rgb_amount'),
+                  <Row itemsCenter gap="lg" style={amountInputContainerStyle}>
+                    <input
+                      value={amount}
+                      onChange={(e) => {
+                        onAmountChange(e.target.value);
+                        setError('');
+                      }}
+                      inputMode={assetPrecision > 0 ? 'decimal' : 'numeric'}
+                      placeholder={assetPrecision > 0 ? `0.${'0'.repeat(Math.min(assetPrecision, 8))}` : '0'}
+                      style={amountInputFieldStyle}
+                    />
+                    <Text text={assetDisplayTicker} size="sm" color="white_muted" style={{ flexShrink: 0 }} />
+                  </Row>
+                )
+              : null}
           </Column>
 
           {insufficientBtcForInvoice ? (

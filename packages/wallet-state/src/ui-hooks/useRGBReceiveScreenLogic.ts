@@ -286,7 +286,7 @@ export function useRGBReceiveScreenLogic() {
     routeState?.tokenBalance as RgbAssetItem | undefined
   )
   const [assetSelectorOpen, setAssetSelectorOpen] = useState(false)
-  const [mode, setMode] = useState<RGBReceiveMode>('any')
+  const [mode, setModeState] = useState<RGBReceiveMode>('any')
   const [amount, setAmount] = useState('')
   const [loading, setLoading] = useState(false)
   const [loadingText, setLoadingText] = useState('')
@@ -312,6 +312,11 @@ export function useRGBReceiveScreenLogic() {
   const selectedSpecificAssetId =
     selectedAssetId === ANY_RGB_ASSET_ID ? '' : selectedAssetId || getRgbAssetId(selectedRgbItem)
   const assetId = selectedSpecificAssetId === ANY_RGB_ASSET_ID ? '' : selectedSpecificAssetId
+  // An Any Asset invoice intentionally has no contract metadata. In
+  // particular, it cannot state a human-readable amount because the asset
+  // precision is unknown. Fixed invoice amounts are therefore available only
+  // after selecting a concrete asset.
+  const canSetFixedAmount = Boolean(assetId)
   const assetTicker = getRgbTokenTicker(selectedRgbItem)
   // Balance list responses can omit metadata; retain the route token's
   // precision so fixed invoice amounts are still encoded in atomic units.
@@ -320,7 +325,7 @@ export function useRGBReceiveScreenLogic() {
     tokenInfo: selectedTokenBalance,
   })
   const displayAmount = amount.trim()
-  const isFixedMode = mode === 'fixed'
+  const isFixedMode = mode === 'fixed' && canSetFixedAmount
   const normalizedAmount = isFixedMode ? toRgbAtomicAmount(displayAmount, assetPrecision) : ''
   const isAmountValid =
     !isFixedMode ||
@@ -329,7 +334,18 @@ export function useRGBReceiveScreenLogic() {
     isFixedMode && displayAmount.length > 0 && !isAmountValid
 
   const onAmountChange = (value: string) => {
+    if (!canSetFixedAmount) return
     setAmount(normalizeRgbAmountInput(value, assetPrecision))
+  }
+
+  const setMode = (nextMode: RGBReceiveMode) => {
+    if (nextMode === 'fixed' && !canSetFixedAmount) {
+      setModeState('any')
+      setAmount('')
+      return
+    }
+    setModeState(nextMode)
+    if (nextMode === 'any') setAmount('')
   }
 
   const createReceiveInvoice = (skipSync = false) => {
@@ -342,7 +358,7 @@ export function useRGBReceiveScreenLogic() {
       params.assetId = assetId
     }
 
-    if (isFixedMode) {
+    if (isFixedMode && assetId) {
       params.amount = normalizedAmount
     }
 
@@ -650,9 +666,15 @@ export function useRGBReceiveScreenLogic() {
 
     const itemAssetId = getRgbAssetId(item)
     const itemPrecision = getRgbTokenPrecision(item)
-    setSelectedAssetId(itemAssetId || ANY_RGB_ASSET_ID)
-    setSelectedTokenBalance(itemAssetId ? (item as RgbAssetItem) : undefined)
-    setAmount(currentAmount => normalizeRgbAmountInput(currentAmount, itemPrecision))
+    const isAnyAsset = !itemAssetId || itemAssetId === ANY_RGB_ASSET_ID
+    setSelectedAssetId(isAnyAsset ? ANY_RGB_ASSET_ID : itemAssetId)
+    setSelectedTokenBalance(isAnyAsset ? undefined : (item as RgbAssetItem))
+    if (isAnyAsset) {
+      setModeState('any')
+      setAmount('')
+    } else {
+      setAmount(currentAmount => normalizeRgbAmountInput(currentAmount, itemPrecision))
+    }
     setAssetSelectorOpen(false)
     setInvoice('')
     setSelectedPendingInvoice(undefined)
@@ -691,6 +713,7 @@ export function useRGBReceiveScreenLogic() {
     assetId,
     assetTicker,
     assetPrecision,
+    canSetFixedAmount,
     assetSelectorOpen,
     setAssetSelectorOpen,
     mode,

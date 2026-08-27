@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest'
 
 import { accountActions } from '../../src/reducers/accounts'
 import {
+  ANY_RGB_ASSET,
   isCancelableRgbPendingInvoice,
   useRGBReceiveScreenLogic,
 } from '../../src/ui-hooks/useRGBReceiveScreenLogic'
@@ -40,6 +41,51 @@ describe('useRGBReceiveScreenLogic', () => {
     })
 
     expect(result.current.amountInvalidVisible).toBe(true)
+  })
+
+  it('allows Any Asset invoices only with an unspecified amount', async () => {
+    const { wrapper, wallet } = createHookTestHarness()
+    const { result } = renderHook(() => useRGBReceiveScreenLogic(), { wrapper })
+
+    expect(result.current.canSetFixedAmount).toBe(false)
+
+    await act(async () => {
+      result.current.setMode('fixed')
+      result.current.onAmountChange('1000')
+    })
+
+    expect(result.current.mode).toBe('any')
+    expect(result.current.amount).toBe('')
+    expect(result.current.normalizedAmount).toBe('')
+
+    await act(async () => {
+      await result.current.onCreateInvoice()
+    })
+
+    expect(wallet.createRgbBlindReceive).toHaveBeenCalledWith({ skipSync: true })
+  })
+
+  it('clears a fixed amount when switching back to Any Asset', async () => {
+    const assetId = 'rgb:test-asset'
+    const { wrapper } = createHookTestHarness()
+    const { result } = renderHook(() => useRGBReceiveScreenLogic(), { wrapper })
+
+    await act(async () => {
+      result.current.onSelectAsset({ assetId, ticker: 'RGB', precision: 2 })
+    })
+    await act(async () => {
+      result.current.setMode('fixed')
+      result.current.onAmountChange('10.25')
+    })
+    expect(result.current.normalizedAmount).toBe('1025')
+
+    await act(async () => {
+      result.current.onSelectAsset(ANY_RGB_ASSET)
+    })
+
+    expect(result.current.canSetFixedAmount).toBe(false)
+    expect(result.current.mode).toBe('any')
+    expect(result.current.amount).toBe('')
   })
 
   it('allows decimal fixed amounts up to RGB asset precision and submits atomic amount', async () => {

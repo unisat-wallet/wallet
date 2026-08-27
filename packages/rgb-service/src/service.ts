@@ -288,6 +288,9 @@ export class RgbService {
     const state = this.requireState()
     if (!state.snapshot.syncedAt) await this.sync()
     const assetId = input.assetId ? normalizeAssetId(input.assetId) : undefined
+    if (input.amount !== undefined && !assetId) {
+      throw new RgbServiceError('A fixed RGB receive amount requires an asset ID')
+    }
     if (input.amount !== undefined && !/^(0|[1-9][0-9]*)$/.test(input.amount)) {
       throw new RgbServiceError('RGB receive amount must be an unsigned integer')
     }

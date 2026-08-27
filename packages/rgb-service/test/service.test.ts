@@ -514,6 +514,16 @@ describe('RgbService', () => {
     expect(service.getAvailableReceiveUtxos()).toEqual([])
   })
 
+  it('rejects a fixed receive amount when the invoice does not name an RGB asset', async () => {
+    const dependencies = createDependencies()
+    const service = new RgbService(dependencies)
+    await service.open(wallet)
+
+    await expect(service.createBlindReceive({ amount: '1000' })).rejects.toThrow(
+      'requires an asset ID'
+    )
+  })
+
   it('waits for a recovery checkpoint before returning a new blind invoice', async () => {
     const dependencies = createDependencies()
     vi.mocked(dependencies.stateSource.getSnapshot).mockResolvedValue({
