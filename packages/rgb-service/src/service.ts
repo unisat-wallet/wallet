@@ -237,10 +237,13 @@ export class RgbService {
     // A remote snapshot may still expose consumed outpoints. Finish durable
     // post-broadcast delivery first, or leave the locally updated snapshot intact.
     if (Object.keys(state.pending).length) await this.advancePendingTransfers()
-    state.snapshot = normalizeSnapshot(
-      await this.dependencies.stateSource.getSnapshot(state.wallet)
-    )
-    await this.persist()
+    const snapshot = normalizeSnapshot(await this.dependencies.stateSource.getSnapshot(state.wallet))
+    // Indexers commonly advance syncedAt on every response even if neither
+    // UTXOs nor allocations changed. Keep that local freshness marker, but
+    // do not turn polling into a full encrypted checkpoint upload.
+    const checkpointSnapshotChanged = !sameSnapshotContents(state.snapshot, snapshot)
+    state.snapshot = snapshot
+    await this.persist({ skipRecovery: !checkpointSnapshotChanged })
     return state.snapshot
   }
 
@@ -1489,14 +1492,20 @@ export class RgbService {
     return Boolean(state.pendingUtxoSync || state.pendingIssues?.length)
   }
 
-  private async persist(options: { waitForRecovery?: boolean } = {}) {
+  private async persist(options: { waitForRecovery?: boolean; skipRecovery?: boolean } = {}) {
     const state = this.requireState()
-    if (this.recoveryBackupEnabled && this.dependencies.onStatePersisted) {
+    // A dirty or unverified checkpoint must still retry during a later sync,
+    // even when the latest snapshot itself is unchanged.
+    const shouldQueueRecovery =
+      this.recoveryBackupEnabled &&
+      this.dependencies.onStatePersisted &&
+      (!options.skipRecovery || state.recoveryCheckpoint?.dirty || !state.recoveryCheckpoint?.verified)
+    if (shouldQueueRecovery) {
       state.recoveryCheckpoint = { ...state.recoveryCheckpoint, dirty: true, verified: false }
     }
     const persisted = persistState(state)
     await this.dependencies.storage.set(this.storageKey(state.wallet), persisted)
-    if (this.recoveryBackupEnabled && this.dependencies.onStatePersisted) {
+    if (shouldQueueRecovery) {
       const recovery = Promise.resolve(this.dependencies.onStatePersisted(recoverySnapshot(persisted)))
       if (options.waitForRecovery) {
         const result = await recovery
@@ -1749,6 +1758,11 @@ function normalizeSnapshot(snapshot: RgbWalletSnapshot): RgbWalletSnapshot {
       })),
     })),
   }
+}
+
+/** syncedAt is polling metadata, not recoverable RGB wallet state. */
+function sameSnapshotContents(left: RgbWalletSnapshot, right: RgbWalletSnapshot) {
+  return JSON.stringify(left.utxos) === JSON.stringify(right.utxos)
 }
 
 function normalizeStateAssetIds(state: RgbServiceState): RgbServiceState {

@@ -301,6 +301,36 @@ describe('RgbService', () => {
     await expect(Promise.all(synchronizations)).resolves.toEqual([snapshot, snapshot, snapshot])
   })
 
+  it('does not checkpoint when a snapshot refresh only advances syncedAt', async () => {
+    const dependencies = createDependencies()
+    const checkpoint = vi.fn().mockResolvedValue({ verified: true })
+    dependencies.onStatePersisted = checkpoint
+    const service = new RgbService(dependencies)
+    await service.open(wallet)
+    await service.sync()
+    await service.enableRecoveryBackup()
+
+    expect(checkpoint).toHaveBeenCalledTimes(1)
+
+    const unchanged = {
+      ...(await vi.mocked(dependencies.stateSource.getSnapshot)(wallet)),
+      syncedAt: 2,
+    }
+    vi.mocked(dependencies.stateSource.getSnapshot).mockResolvedValueOnce(unchanged)
+    await service.sync()
+
+    expect(service.getSnapshot().syncedAt).toBe(2)
+    expect(checkpoint).toHaveBeenCalledTimes(1)
+
+    vi.mocked(dependencies.stateSource.getSnapshot).mockResolvedValueOnce({
+      syncedAt: 3,
+      utxos: [],
+    })
+    await service.sync()
+
+    expect(checkpoint).toHaveBeenCalledTimes(2)
+  })
+
   it('rejects an endpoint-less invoice before locking RGB allocations', async () => {
     const dependencies = createDependencies()
     const service = new RgbService(dependencies)
