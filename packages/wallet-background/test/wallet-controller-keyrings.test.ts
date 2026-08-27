@@ -1248,12 +1248,12 @@ describe('RGB wallet references', () => {
         },
         {
           recipientId: 'accepted-unbroadcast',
-          assetId: 'rgb:asset',
-          amount: '4',
           createdAt: 85,
           receivedConsignment: {
             txid: 'e'.repeat(64),
             receivedAt: 86,
+            assetId: 'rgb:received-asset',
+            amount: '400',
             accepted: true,
           },
         },
@@ -1300,7 +1300,8 @@ describe('RGB wallet references', () => {
       expect.objectContaining({
         id: 'local-receive:accepted-unbroadcast',
         status: 'waiting_receive',
-        amount: '4',
+        assetId: 'rgb:received-asset',
+        amount: '400',
       }),
       expect.objectContaining({
         id: 'local-receive:legacy-auto-accepted',

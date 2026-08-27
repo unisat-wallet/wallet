@@ -191,6 +191,10 @@ export interface RgbPendingReceive {
   receivedConsignment?: {
     txid: string
     receivedAt: number
+    /** Actual contract received; distinct from an optional invoice constraint. */
+    assetId?: string
+    /** Actual atomic amount received; distinct from an optional invoice constraint. */
+    amount?: string
     /** True only after acceptReceive(); missing on older auto-accepted state. */
     accepted?: boolean
     /** ACK intent was durably recorded before the proxy acknowledgement request. */

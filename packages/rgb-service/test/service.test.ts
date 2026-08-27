@@ -947,6 +947,10 @@ describe('RgbService', () => {
     const processClaimedReceives = vi.spyOn(service, 'processClaimedReceives')
 
     await expect(service.acceptReceive('recipient')).resolves.toEqual({ accepted: true, status: 'accepted' })
+    expect((service as any).state.pendingReceives[0].receivedConsignment).toMatchObject({
+      assetId: 'rgb:asset',
+      amount: '60',
+    })
 
     expect(dependencies.transport.getAcknowledgement).toHaveBeenCalledTimes(1)
     expect(dependencies.transport.acknowledgeConsignment).toHaveBeenCalledTimes(1)
@@ -1409,6 +1413,38 @@ describe('RgbService', () => {
     expect(advanceAcceptedReceive).toHaveBeenCalled()
   })
 
+  it('discards a staged receive invoice when the sender cancels before ACK', async () => {
+    const dependencies = createDependencies()
+    dependencies.transport.getAcknowledgement = vi.fn().mockResolvedValue(false)
+    const service = new RgbService(dependencies)
+    await service.open(wallet)
+    ;(service as any).state.pendingReceives = [
+      {
+        invoice: rgbInvoice(),
+        recipientId: 'recipient',
+        assetId: 'rgb:asset',
+        amount: '60',
+        createdAt: 1,
+        seal: { txid: 'a'.repeat(64), vout: 0, blinding: 1n },
+        pendingAccept: {
+          payload: 'consignment',
+          txid: 'c'.repeat(64),
+          endpoint: proxyEndpoint,
+          assetId: 'rgb:asset',
+          amount: '60',
+          discoveredAt: 1,
+        },
+      },
+    ]
+
+    await service.processClaimedReceives({ includeClaimed: false })
+
+    expect(service.getPendingReceives()).toEqual([])
+    expect(service.getPendingReceiveHistory()).toEqual([
+      expect.objectContaining({ status: 'canceled', txid: 'c'.repeat(64) }),
+    ])
+  })
+
   it('does not abort a send once the recipient acknowledgement starts broadcasting', async () => {
     const dependencies = createDependencies()
     let resolveBroadcast: ((txid: string) => void) | undefined
@@ -1488,7 +1524,7 @@ describe('RgbService', () => {
     expect(dependencies.broadcaster.broadcast).toHaveBeenCalledTimes(1)
   })
 
-  it('keeps a rejected receive invoice available for reuse', async () => {
+  it('discards a rejected receive invoice because its proxy recipient ID is single-use', async () => {
     const dependencies = createDependencies()
     dependencies.transport.acknowledgeConsignment = vi.fn().mockResolvedValue(undefined)
     dependencies.transport.getConsignment = vi.fn().mockResolvedValue({
@@ -1530,11 +1566,7 @@ describe('RgbService', () => {
       endpoints: [proxyEndpoint],
       acknowledged: false,
     })
-    expect(service.getPendingReceives()).toEqual([
-      expect.objectContaining({ recipientId: 'recipient', invoice: rgbInvoice() }),
-    ])
-    expect(service.getPendingReceives()[0]).not.toHaveProperty('pendingAccept')
-    expect(service.getPendingReceives()[0]).not.toHaveProperty('receivedConsignment')
+    expect(service.getPendingReceives()).toEqual([])
     expect(service.getPendingReceiveHistory()).toEqual([
       expect.objectContaining({
         transferId: 'receive:recipient',
@@ -1543,20 +1575,9 @@ describe('RgbService', () => {
       }),
     ])
 
-    ;(service as any).validateIncomingConsignment = vi.fn().mockReturnValue({
-      assetId: 'rgb:asset',
-      amount: '60',
-      txid: 'c'.repeat(64),
-    })
-    await service.processClaimedReceives({ includeClaimed: false })
-
-    expect(service.getPendingReceives()).toEqual([
-      expect.objectContaining({ recipientId: 'recipient', invoice: rgbInvoice() }),
-    ])
-    expect(service.getPendingReceives()[0]).not.toHaveProperty('pendingAccept')
   })
 
-  it('keeps an Any Amount invoice unconstrained after rejecting a consignment', async () => {
+  it('discards an Any Amount invoice after rejecting a consignment', async () => {
     const dependencies = createDependencies()
     dependencies.transport.acknowledgeConsignment = vi.fn().mockResolvedValue(undefined)
     dependencies.transport.getConsignment = vi.fn().mockResolvedValue({
@@ -1586,12 +1607,7 @@ describe('RgbService', () => {
     await service.processClaimedReceives({ includeClaimed: false })
     await service.rejectReceive('recipient')
 
-    expect(service.getPendingReceives()).toEqual([
-      expect.objectContaining({ recipientId: 'recipient' }),
-    ])
-    expect(service.getPendingReceives()[0]).not.toHaveProperty('assetId')
-    expect(service.getPendingReceives()[0]).not.toHaveProperty('amount')
-    expect(service.getPendingReceives()[0]).not.toHaveProperty('pendingAccept')
+    expect(service.getPendingReceives()).toEqual([])
   })
 
   it('persists a signed transfer without broadcasting until the proxy returns an acknowledgement', async () => {

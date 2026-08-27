@@ -724,6 +724,8 @@ export class RgbService {
       receive.receivedConsignment = {
         txid: receive.pendingAccept.txid,
         receivedAt: this.now(),
+        assetId: receive.pendingAccept.assetId,
+        amount: receive.pendingAccept.amount,
         acknowledgementPending: true,
         payload: receive.pendingAccept.payload,
         endpoint: receive.pendingAccept.endpoint,
@@ -786,15 +788,10 @@ export class RgbService {
       false
     )
     this.recordReceiveOutcome(receive, 'rejected', pendingAccept!.txid)
-    // A NACK happens before the sender broadcasts, so the blind invoice can
-    // safely be used for another transfer.
-    receive.rejectedConsignmentTxids = [
-      ...new Set([...(receive.rejectedConsignmentTxids || []), pendingAccept!.txid]),
-    ].slice(-20)
-    delete receive.pendingAccept
-    if (receive.receivedConsignment && !receive.receivedConsignment.accepted) {
-      delete receive.receivedConsignment
-    }
+    // Proxy recipient IDs are single-use upload keys. Once a consignment has
+    // been posted, a later transfer cannot replace its file even after NACK.
+    // Discard the invoice so the user creates a fresh blinded recipient ID.
+    state.pendingReceives = pending.filter(item => item.recipientId !== recipientId)
     await this.persist()
     return { rejected: true }
   }

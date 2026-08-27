@@ -134,6 +134,10 @@ export class RgbTransferQuery {
     }))
     const localReceives = service.getPendingReceives().flatMap(receive => {
       const receivedConsignment = receive.receivedConsignment
+      const receivedAssetId =
+        receivedConsignment?.assetId ?? receive.pendingAccept?.assetId ?? receive.assetId
+      const receivedAmount =
+        receivedConsignment?.amount ?? receive.pendingAccept?.amount ?? receive.amount
       const acknowledgementPending =
         (receivedConsignment as { acknowledgementPending?: boolean } | undefined)
           ?.acknowledgementPending === true
@@ -144,9 +148,9 @@ export class RgbTransferQuery {
           {
             id: `local-receive:${receive.recipientId}`,
             transferId: receive.recipientId,
-            assetId: receive.pendingAccept?.assetId ?? receive.assetId,
+            assetId: receivedAssetId,
             type: 'receive' as const,
-            amount: receive.pendingAccept?.amount || receive.amount,
+            amount: receivedAmount,
             txid: receivedConsignment.txid,
             timestamp: receivedConsignment.receivedAt,
             status: 'waiting_receive',
@@ -168,9 +172,9 @@ export class RgbTransferQuery {
           {
             id: `local-receive:${receive.recipientId}`,
             transferId: receive.recipientId,
-            assetId: receive.pendingAccept.assetId ?? receive.assetId,
+            assetId: receivedAssetId,
             type: 'receive' as const,
-            amount: receive.pendingAccept.amount || receive.amount,
+            amount: receivedAmount,
             txid: receive.pendingAccept.txid,
             timestamp: receive.pendingAccept.discoveredAt || receive.createdAt,
             status: 'pending_accept',
@@ -193,9 +197,9 @@ export class RgbTransferQuery {
           {
             id: `local-receive:${receive.recipientId}`,
             transferId: receive.recipientId,
-            assetId: receive.assetId,
+            assetId: receivedAssetId,
             type: 'receive' as const,
-            amount: receive.amount,
+            amount: receivedAmount,
             txid: receivedConsignment.txid,
             timestamp: receivedConsignment.receivedAt,
             status: 'pending_accept',
@@ -213,9 +217,9 @@ export class RgbTransferQuery {
         {
           id: `local-receive:${receive.recipientId}`,
           transferId: receive.recipientId,
-          assetId: receive.assetId,
+          assetId: receivedAssetId,
           type: 'receive' as const,
-          amount: receive.amount,
+          amount: receivedAmount,
           txid: receivedConsignment.txid,
           timestamp: receivedConsignment.receivedAt,
           status: receivedConsignment.broadcastDetectedAt ? 'confirming' : 'waiting_receive',
