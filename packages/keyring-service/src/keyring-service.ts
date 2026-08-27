@@ -157,6 +157,9 @@ export class KeyringService extends EventEmitter {
   private initialBoostValue: string = 'true'
   private storageKey: string = 'keyringState'
   private cachedKey: string = 'cached_pubkeys'
+  private encryptedStorageRegistryKey: string = 'encryptedStorageRegistry'
+  private encryptedStorageCache = new Map<string, Record<string, unknown>>()
+  private encryptedStorageMutexes = new Map<string, SimpleMutex>()
   private readonly MAX_CACHE_ITEMS: number = 20
 
   constructor() {
@@ -252,6 +255,7 @@ export class KeyringService extends EventEmitter {
     this.addressTypes = []
     this.cachedDisplayedKeyring = null
     this.password = null
+    this.encryptedStorageCache.clear()
 
     this.logger.debug('[KeyringService] Initialized')
 
@@ -262,6 +266,13 @@ export class KeyringService extends EventEmitter {
 
   // reset total keyrings
   resetAllData = async () => {
+    const encryptedStorageNamespaces = await this.getEncryptedStorageNamespaces()
+    await Promise.all(
+      encryptedStorageNamespaces.map(namespace => this.storage.set(this.encryptedStorageKey(namespace), null))
+    )
+    await this.storage.set(this.encryptedStorageRegistryKey, [])
+    this.encryptedStorageCache.clear()
+
     // Clear persistent storage
     await this.storage.set(this.storageKey, {
       booted: '',
@@ -614,6 +625,7 @@ export class KeyringService extends EventEmitter {
   setLocked = async (): Promise<MemStoreState> => {
     // set locked
     this.password = null
+    this.encryptedStorageCache.clear()
     this.memStore.updateState({ isUnlocked: false })
 
     // remove keyrings
@@ -677,6 +689,7 @@ export class KeyringService extends EventEmitter {
           throw new Error(this.t('password_error'))
         }
         await this.unlockKeyrings(oldPassword, true)
+        await this.reencryptEncryptedStorage(oldPassword, newPassword)
         this.password = newPassword
 
         const boostValue = this.getBoostValue()
@@ -704,6 +717,124 @@ export class KeyringService extends EventEmitter {
 
   private getBoostValue = (): string => {
     return this.store.getState().boostValue || this.initialBoostValue
+  }
+
+  /**
+   * Persist small feature-specific state using the same password encryption as
+   * the wallet vault. Values are grouped by namespace so storage keys never
+   * reveal wallet addresses or other feature data.
+   */
+  async getEncryptedStorageItem<T>(namespace: string, key: string): Promise<T | undefined> {
+    return this.getEncryptedStorageMutex(namespace).lock(async () => {
+      const entries = await this.loadEncryptedStorage(namespace)
+      return entries[key] as T | undefined
+    })
+  }
+
+  async setEncryptedStorageItem<T>(namespace: string, key: string, value: T): Promise<void> {
+    await this.getEncryptedStorageMutex(namespace).lock(async () => {
+      const entries = await this.loadEncryptedStorage(namespace)
+      entries[key] = value
+      await this.persistEncryptedStorage(namespace, entries)
+    })
+  }
+
+  async removeEncryptedStorageItem(namespace: string, key: string): Promise<void> {
+    await this.getEncryptedStorageMutex(namespace).lock(async () => {
+      const entries = await this.loadEncryptedStorage(namespace)
+      if (!(key in entries)) return
+      delete entries[key]
+      await this.persistEncryptedStorage(namespace, entries)
+    })
+  }
+
+  private getEncryptedStorageMutex(namespace: string): SimpleMutex {
+    let mutex = this.encryptedStorageMutexes.get(namespace)
+    if (!mutex) {
+      mutex = new SimpleMutex()
+      this.encryptedStorageMutexes.set(namespace, mutex)
+    }
+    return mutex
+  }
+
+  private async loadEncryptedStorage(namespace: string): Promise<Record<string, unknown>> {
+    this.assertEncryptedStorageNamespace(namespace)
+    const cached = this.encryptedStorageCache.get(namespace)
+    if (cached) return cached
+    if (!this.password) throw new Error(this.t('you_need_to_unlock_wallet_first'))
+
+    const encrypted = await this.storage.get(this.encryptedStorageKey(namespace))
+    if (!encrypted) {
+      const entries: Record<string, unknown> = {}
+      this.encryptedStorageCache.set(namespace, entries)
+      return entries
+    }
+
+    const entries = await this.encryptor.decrypt(this.password, encrypted)
+    if (!entries || typeof entries !== 'object' || Array.isArray(entries)) {
+      throw new Error('Encrypted feature storage is invalid')
+    }
+    this.encryptedStorageCache.set(namespace, entries)
+    return entries
+  }
+
+  private async persistEncryptedStorage(namespace: string, entries: Record<string, unknown>): Promise<void> {
+    if (!this.password) throw new Error(this.t('you_need_to_unlock_wallet_first'))
+    await this.ensureEncryptedStorageNamespace(namespace)
+    const encrypted = await this.encryptor.encrypt(this.password, entries)
+    await this.storage.set(this.encryptedStorageKey(namespace), encrypted)
+    this.encryptedStorageCache.set(namespace, entries)
+  }
+
+  private async reencryptEncryptedStorage(oldPassword: string, newPassword: string): Promise<void> {
+    const namespaces = await this.getEncryptedStorageNamespaces()
+    const decrypted = await Promise.all(
+      namespaces.map(async namespace => {
+        const encrypted = await this.storage.get(this.encryptedStorageKey(namespace))
+        if (!encrypted) return { namespace, entries: {} as Record<string, unknown> }
+        const entries = await this.encryptor.decrypt(oldPassword, encrypted)
+        if (!entries || typeof entries !== 'object' || Array.isArray(entries)) {
+          throw new Error('Encrypted feature storage is invalid')
+        }
+        return { namespace, entries: entries as Record<string, unknown> }
+      })
+    )
+    const reencrypted = await Promise.all(
+      decrypted.map(async ({ namespace, entries }) => ({
+        namespace,
+        entries,
+        encrypted: await this.encryptor.encrypt(newPassword, entries),
+      }))
+    )
+    await Promise.all(
+      reencrypted.map(({ namespace, entries, encrypted }) => {
+        this.encryptedStorageCache.set(namespace, entries)
+        return this.storage.set(this.encryptedStorageKey(namespace), encrypted)
+      })
+    )
+  }
+
+  private encryptedStorageKey(namespace: string) {
+    return `encryptedFeatureStorage:${namespace}`
+  }
+
+  private async getEncryptedStorageNamespaces(): Promise<string[]> {
+    const value = await this.storage.get(this.encryptedStorageRegistryKey)
+    return Array.isArray(value) ? value.filter((item): item is string => typeof item === 'string') : []
+  }
+
+  private async ensureEncryptedStorageNamespace(namespace: string): Promise<void> {
+    this.assertEncryptedStorageNamespace(namespace)
+    const namespaces = await this.getEncryptedStorageNamespaces()
+    if (!namespaces.includes(namespace)) {
+      await this.storage.set(this.encryptedStorageRegistryKey, [...namespaces, namespace])
+    }
+  }
+
+  private assertEncryptedStorageNamespace(namespace: string) {
+    if (!/^[a-z0-9][a-z0-9:-]{0,63}$/i.test(namespace)) {
+      throw new Error('Encrypted storage namespace is invalid')
+    }
   }
 
   /**

@@ -70,13 +70,19 @@ export interface RequestMethodGetInscriptionsParams {
 export interface RequestMethodSignPsbtParams {
   psbtHex: string
   type: TxType
-  options?: any
+  options?: {
+    rgb?: boolean
+    [key: string]: any
+  }
   toSignDatas?: ToSignData[]
 }
 
 export interface RequestMethodSignPsbtsParams {
   psbtHexs?: string[]
-  options?: any
+  options?: Array<{
+    rgb?: boolean
+    [key: string]: any
+  }>
   toSignDatas?: ToSignData[]
 }
 

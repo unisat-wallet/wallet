@@ -26,5 +26,6 @@ export default defineConfig({
     '@unisat/i18n',
     '@unisat/phishing-detect',
     '@unisat/preference-service',
+    '@unisat/rgb-service',
   ],
 })

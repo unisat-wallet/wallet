@@ -1,5 +1,6 @@
 export { ADDRESS_TYPES, KeyringType } from '@unisat/wallet-shared'
 import { CosmosSignDataType } from './cosmos'
+import { NetworkType } from '@unisat/wallet-types'
 
 // ToSignInput interface defined here to avoid circular imports
 export interface ToSignInput {
@@ -34,18 +35,30 @@ export interface Keyring {
   getNextPage?(): Promise<{ address: string; index: number }[]>
   getPreviousPage?(): Promise<{ address: string; index: number }[]>
   getAddresses?(start: number, end: number): { address: string; index: number }[]
-  getIndexByAddress?(address: string): number
+  getIndexByAddress?(address: string): number | null
 
   getAccountsWithBrand?(): { address: string; index: number }[]
   activeAccounts?(indexes: number[]): string[]
 
   changeHdPath?(hdPath: string): void
   getAccountByHdPath?(hdPath: string, index: number): string
+  getRgbWalletContext?(networkType: number): Promise<{
+    xpubVan: string
+    xpubCol: string
+    masterFingerprint: string
+    vanillaKeychain: number
+  }>
+  getRgbFundingAccount?(networkType: NetworkType, accountIndex?: number): {
+    address: string
+    publicKey: string
+    derivationPath: string
+    masterFingerprint: string
+  }
   deriveContextHash?(
     publicKey: string,
     appName: string,
     canonicalNetworkName: string,
-    context: string,
+    context: string
   ): Promise<string>
 
   // Keystone specific methods

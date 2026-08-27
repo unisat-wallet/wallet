@@ -41,6 +41,7 @@
     "@unisat/notification-service": "workspace:*",
     "@unisat/approval-service": "workspace:*",
     "@unisat/tx-helpers": "workspace:*",
+    "@unisat/rgb-service": "workspace:*",
     "@unisat/wallet-api": "workspace:*",
     "@unisat/wallet-bitcoin": "workspace:*",
     "@unisat/wallet-types": "workspace:*",

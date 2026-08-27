@@ -21,6 +21,8 @@ import { BitcoinService } from './services/bitcoin'
 import { BRC20Service } from './services/brc20'
 import { DomainService } from './services/domain'
 import { InscriptionsService } from './services/inscriptions'
+import { RgbService } from './services/rgb'
+import type { RgbRequestAuthenticator } from './types'
 import { RunesService } from './services/runes'
 
 /**
@@ -31,6 +33,7 @@ export class UniSatApiClient {
   public readonly inscriptions: InscriptionsService
   public readonly brc20: BRC20Service
   public readonly runes: RunesService
+  public readonly rgb: RgbService
   public readonly alkanes: AlkanesService
   public readonly market: MarketService
   public readonly domain: DomainService
@@ -48,6 +51,7 @@ export class UniSatApiClient {
     this.inscriptions = new InscriptionsService(this.httpClient)
     this.brc20 = new BRC20Service(this.httpClient)
     this.runes = new RunesService(this.httpClient)
+    this.rgb = new RgbService(this.httpClient)
     this.alkanes = new AlkanesService(this.httpClient)
     this.market = new MarketService(this.httpClient)
     this.domain = new DomainService(this.httpClient)
@@ -72,6 +76,10 @@ export class UniSatApiClient {
    */
   setHeaders(headers: Record<string, string>): void {
     this.httpClient.setHeaders(headers)
+  }
+
+  setRgbRequestAuthenticator(authenticator?: RgbRequestAuthenticator): void {
+    this.rgb.setRequestAuthenticator(authenticator)
   }
 
   /**

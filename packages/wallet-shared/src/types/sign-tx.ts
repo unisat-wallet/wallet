@@ -27,6 +27,7 @@ export interface SignPsbtOptions {
   autoFinalized?: boolean
   toSignInputs?: UserToSignInput[]
   contracts?: any[]
+  rgb?: boolean
 }
 
 export interface ToSignInput {

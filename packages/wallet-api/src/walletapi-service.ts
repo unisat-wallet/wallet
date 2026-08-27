@@ -3,6 +3,7 @@ import { ProxyStorageAdapter } from '@unisat/wallet-storage'
 import randomstring from 'randomstring'
 import { UniSatApiClient } from './api-client'
 import { BaseHttpClient } from './client/http-client'
+import type { RgbRequestAuthenticator } from './types'
 
 interface WalletApiStore {
   deviceId: string
@@ -23,6 +24,7 @@ export class WalletApiService {
   private clientAddress = ''
   private currentEndpoint = ''
   private storageKey: string = 'openapi'
+  private rgbRequestAuthenticator: RgbRequestAuthenticator | undefined
 
   constructor() {
     this.currentEndpoint = 'https://wallet-api-fractal.unisat.space'
@@ -31,6 +33,7 @@ export class WalletApiService {
   init = async (config: WalletServiceConfig) => {
     if (config.httpClient) {
       this.client = new UniSatApiClient(config.httpClient)
+      this.client.setRgbRequestAuthenticator(this.rgbRequestAuthenticator)
     }
 
     if (config.storage) {
@@ -105,6 +108,11 @@ export class WalletApiService {
     this.client.setHeaders(headers)
   }
 
+  setRgbRequestAuthenticator = (authenticator?: RgbRequestAuthenticator) => {
+    this.rgbRequestAuthenticator = authenticator
+    this.client?.setRgbRequestAuthenticator(authenticator)
+  }
+
   private generateDeviceId = (): string => {
     return randomstring.generate(12)
   }
@@ -126,6 +134,9 @@ export class WalletApiService {
   }
   get runes() {
     return this.client.runes
+  }
+  get rgb() {
+    return this.client.rgb
   }
   get alkanes() {
     return this.client.alkanes

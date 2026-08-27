@@ -1,0 +1,99 @@
+import type { RgbService } from '@unisat/rgb-service'
+
+import type { LocalRgbServiceContext } from './RgbWalletCoordinator'
+import {
+  getRgbReceiveInvoiceStatus,
+  toPublicRgbPendingReceiveInvoice,
+  type RgbPendingReceiveInvoice,
+} from './rgbPresentation'
+
+type RgbReceiveOperationsDependencies = {
+  getContext: () => Promise<LocalRgbServiceContext>
+  syncReceivedAllocations: () => Promise<LocalRgbServiceContext>
+}
+
+export type RgbBlindReceiveParams = {
+  assetId?: string
+  amount?: number | string
+  durationSeconds?: number
+  skipSync?: boolean
+}
+
+/** Local blind-invoice lifecycle, independent of controller RPC and keyring details. */
+export class RgbReceiveOperations {
+  constructor(private readonly dependencies: RgbReceiveOperationsDependencies) {}
+
+  async createBlindReceive(params: RgbBlindReceiveParams): Promise<RgbPendingReceiveInvoice> {
+    const { service } = await this.dependencies.getContext()
+    if (!params.skipSync) await service.sync()
+    const receive = await service.createBlindReceive({
+      ...(params.assetId === undefined ? {} : { assetId: params.assetId }),
+      ...(params.amount === undefined ? {} : { amount: String(params.amount) }),
+      ...(params.durationSeconds === undefined ? {} : { durationSeconds: params.durationSeconds }),
+    })
+    const batchTransferIdx = service
+      .getPendingReceives()
+      .findIndex(item => item.recipientId === receive.recipientId)
+    return toPublicRgbPendingReceiveInvoice(
+      receive,
+      batchTransferIdx < 0 ? undefined : batchTransferIdx,
+      getRgbReceiveInvoiceStatus(service.getSnapshot(), receive)
+    )
+  }
+
+  async getPendingReceiveInvoices(): Promise<{ list: RgbPendingReceiveInvoice[] }> {
+    let { service } = await this.dependencies.getContext()
+    if (!service.getPendingReceives().length) return { list: [] }
+    ;({ service } = await this.dependencies.syncReceivedAllocations())
+    return {
+      list: service
+        .getPendingReceives()
+        .map((item, batchTransferIdx) =>
+          toPublicRgbPendingReceiveInvoice(
+            item,
+            batchTransferIdx,
+            getRgbReceiveInvoiceStatus(service.getSnapshot(), item)
+          )
+        ),
+    }
+  }
+
+  async cancelReceiveInvoice(batchTransferIdx: number): Promise<{ changed: boolean }> {
+    const { service } = await this.dependencies.getContext()
+    const pending = service.getPendingReceives()[batchTransferIdx]
+    if (!pending) return { changed: false }
+    const result = await service.cancelBlindReceive(pending.recipientId)
+    return { changed: result.cancelled }
+  }
+
+  async acceptReceive(
+    recipientId: string
+  ): Promise<Awaited<ReturnType<RgbService['acceptReceive']>>> {
+    const { service } = await this.dependencies.getContext()
+    return service.acceptReceive(recipientId)
+  }
+
+  async rejectReceive(
+    recipientId: string
+  ): Promise<Awaited<ReturnType<RgbService['rejectReceive']>>> {
+    const { service } = await this.dependencies.getContext()
+    return service.rejectReceive(recipientId)
+  }
+
+  async getAllocationSummary(params: { skipSync?: boolean } = {}): Promise<{
+    available: boolean
+    availableAllocationCount: number
+    freeAllocationCount: number
+    colorableUtxoCount: number
+  }> {
+    const { service } = await this.dependencies.getContext()
+    if (!params.skipSync) await service.sync()
+    const free = service.getAvailableReceiveUtxos()
+    return {
+      available: free.length > 0,
+      availableAllocationCount: free.length,
+      freeAllocationCount: free.length,
+      colorableUtxoCount: free.length,
+    }
+  }
+}

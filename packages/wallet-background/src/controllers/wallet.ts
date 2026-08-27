@@ -11,11 +11,20 @@ import {
 } from '@unisat/babylon-service'
 import { ColdWalletKeyring, KeystoneKeyring } from '@unisat/keyring-service'
 import { DisplayedKeyring, Keyring, KeyringType, ToSignInput } from '@unisat/keyring-service/types'
+import {
+  RgbService as LocalRgbService,
+  decodeRgbInvoice,
+  invoiceSealToScriptPubKey,
+  localNiaProtocolEncoder,
+  niaConsignmentSpendableOutputScripts,
+  type RgbNetwork,
+} from '@unisat/rgb-service'
 import * as txHelpers from '@unisat/tx-helpers'
 import { UnspentOutput, signMessageOfBIP322Simple } from '@unisat/tx-helpers'
 import {
   UTXO_DUST,
   bitcoin,
+  decodeAddress,
   eccManager,
   genPsbtOfBIP322Simple,
   getAddressType,
@@ -91,6 +100,24 @@ import log from 'loglevel'
 import approvalService from 'src/services/approval'
 import { ContactBookItem } from '../services/contactBook'
 import BaseController from './base'
+import { createRgbProxyTransport } from '../adapters/rgb-proxy'
+import {
+  RgbWalletCoordinator,
+  type LocalRgbServiceContext,
+  type LocalRgbWallet,
+} from '../rgb/RgbWalletCoordinator'
+import { createRgbBackendAdapter, type RgbBackendApi } from '../rgb/RgbBackendAdapter'
+import { RgbServiceRegistry } from '../rgb/RgbServiceRegistry'
+import { createRgbService } from '../rgb/RgbServiceFactory'
+import { RgbIndexerOutbox, toRgbIndexedUtxos } from '../rgb/RgbIndexerOutbox'
+import { RgbIssueOperations } from '../rgb/RgbIssueOperations'
+import { RgbReceiveOperations } from '../rgb/RgbReceiveOperations'
+import { RgbSendOperations } from '../rgb/RgbSendOperations'
+import { RgbTransferQuery, type RgbRemoteActivity } from '../rgb/RgbTransferQuery'
+import {
+  toPublicRgbPendingReceiveInvoice,
+  type RgbPendingReceiveInvoice,
+} from '../rgb/rgbPresentation'
 
 type CorruptedWalletKeyring = WalletKeyring & {
   isCorrupted: true
@@ -105,6 +132,398 @@ export type AccountAsset = {
   amount: string
   value: string
 }
+
+type RgbActivityType = 'issue' | 'send' | 'receive'
+
+type RgbControllerPageResponse<T = unknown> = {
+  total: number
+  list: T[]
+}
+
+type RgbControllerBalance = {
+  assetId?: string
+  spendable?: string | number
+  lockedAmount?: string
+  [key: string]: unknown
+}
+
+type RgbControllerApiService = {
+  getRgbAssetList: (
+    address: string,
+    page: number,
+    pageSize: number
+  ) => Promise<RgbControllerPageResponse<RgbControllerBalance>>
+  getRgbAssetBalance: (address: string, assetId: string) => Promise<RgbControllerBalance>
+  syncRgbAssetMetadata: (params: {
+    asset: {
+      assetId: string
+      ticker: string
+      name: string
+      precision: number
+      schema: string
+      issuedSupply: string
+      timestamp?: number
+    }
+  }) => Promise<void>
+  getRgbAssetDetail: (assetId: string) => Promise<unknown>
+  getRgbAssetActivity: (
+    assetId: string,
+    params: {
+      page: number
+      pageSize: number
+      address?: string
+      type?: RgbActivityType
+    }
+  ) => Promise<RgbControllerPageResponse>
+  getAddressRgbActivity: (
+    address: string,
+    params: {
+      page: number
+      pageSize: number
+      assetId?: string
+      type?: RgbActivityType
+    }
+  ) => Promise<RgbControllerPageResponse>
+  createBlindReceiveInvoice: (params: RgbReceiveInvoiceRequest) => Promise<unknown>
+  createWitnessReceiveInvoice: (params: RgbReceiveInvoiceRequest) => Promise<unknown>
+  getPendingReceiveInvoices: (
+    params: RgbPendingReceiveInvoicesRequest
+  ) => Promise<RgbPendingReceiveInvoicesResult>
+  cancelReceiveInvoice: (
+    params: RgbCancelReceiveInvoiceRequest
+  ) => Promise<RgbCancelReceiveInvoiceResult>
+  issueNiaAsset: (params: RgbIssueNiaRequest) => Promise<unknown>
+  getPendingVanillaTxs: (params: RgbPendingVanillaTxsRequest) => Promise<RgbPendingVanillaTxsResult>
+  abortVanillaTx: (params: RgbAbortVanillaTxRequest) => Promise<RgbAbortVanillaTxResult>
+  getRgbAllocationSummary: (
+    params: RgbAllocationSummaryRequest
+  ) => Promise<RgbAllocationSummaryResult>
+  syncRgbUtxos: (params: {
+    address: string
+    txid: string
+    outpoints: Array<{
+      txid: string
+      vout: number
+      satoshis: number
+      scriptPk: string
+      publicKey: string
+      chainStatus?: 'mempool' | 'confirmed' | 'pending_spend' | 'spent' | 'replaced' | 'unknown'
+      confirmations?: number
+      confirmationHeight?: number
+      allocations: Array<{
+        assetId: string
+        amount: string
+        settled: boolean
+        spendable: boolean
+        opId?: string
+        assignmentIndex?: number
+        assignmentType?: number
+      }>
+    }>
+  }) => Promise<void>
+  replaceRgbUtxos: (params: {
+    address: string
+    txid: string
+    outpoints: Array<{
+      txid: string
+      vout: number
+      satoshis: number
+      scriptPk: string
+      publicKey: string
+      chainStatus?: 'mempool' | 'confirmed' | 'pending_spend' | 'spent' | 'replaced' | 'unknown'
+      confirmations?: number
+      confirmationHeight?: number
+      allocations: Array<{
+        assetId: string
+        amount: string
+        settled: boolean
+        spendable: boolean
+        opId?: string
+        assignmentIndex?: number
+        assignmentType?: number
+      }>
+    }>
+  }) => Promise<void>
+  getRgbWalletUtxoSnapshot: (params: { wallet: RgbWalletRef; forceSync?: boolean }) => Promise<{
+    utxos: Array<{
+      txid: string
+      vout: number
+      satoshis: number
+      scriptPk: string
+      publicKey: string
+      chainStatus?: 'mempool' | 'confirmed' | 'pending_spend' | 'spent' | 'replaced' | 'unknown'
+      confirmations?: number
+      confirmationHeight?: number
+      allocations: Array<{
+        assetId: string
+        amount: string
+        settled: boolean
+        spendable: boolean
+        opId?: string
+        assignmentIndex?: number
+        assignmentType?: number
+      }>
+    }>
+    syncedAt: number
+  }>
+  getRgbTransactionStatus: (
+    txid: string,
+    params: { wallet: RgbWalletRef }
+  ) => Promise<{
+    status: 'mempool' | 'confirmed' | 'pending_spend' | 'spent' | 'replaced' | 'unknown'
+    confirmations: number
+  }>
+  getRgbConsignmentHistory: (params: {
+    wallet: RgbWalletRef
+    assetId: string
+    allocations: Array<{
+      txid: string
+      vout: number
+      opId: string
+      assignmentIndex: number
+      assignmentType: number
+    }>
+  }) => Promise<{
+    assetId: string
+    consignments: Array<{ opId: string; payload: string }>
+  }>
+  publishRgbConsignment: (params: {
+    wallet: RgbWalletRef
+    recipientId: string
+    payload: string
+    assetId: string
+    opIds: string[]
+    transportId?: string
+  }) => Promise<void>
+  claimRgbConsignments: (params: {
+    wallet: RgbWalletRef
+    recipientId: string
+  }) => Promise<{ claimed: number }>
+  getClaimedRgbConsignments: (params: {
+    wallet: RgbWalletRef
+  }) => Promise<{ consignments: Array<{ recipientId: string; payload: string }> }>
+  syncRgbTransfer: (params: {
+    wallet: RgbWalletRef
+    transferId: string
+    txid: string
+    amount: string
+    createdAt: number
+    spentOutpoints: Array<{ txid: string; vout: number }>
+    consignments: Array<{
+      recipientId: string
+      payload: string
+      assetId: string
+      opIds: string[]
+      transportId?: string
+    }>
+  }) => Promise<void>
+  syncRgbReceiveTransfer: (params: {
+    wallet: RgbWalletRef
+    transferId: string
+    assetId: string
+    amount: string
+    txid: string
+    createdAt: number
+    from?: string
+  }) => Promise<void>
+}
+
+const getRgbApiService = () => (walletApiService as unknown as { rgb: RgbControllerApiService }).rgb
+
+type RgbWalletRef = {
+  walletId?: string
+  fundingAddress: string
+  network?: string
+  transportEndpoint?: string
+}
+
+type RgbReceiveInvoiceRequest = {
+  wallet: RgbWalletRef
+  assetId?: string
+  amount?: number | string
+  durationSeconds?: number
+  skipSync?: boolean
+}
+
+type RgbPendingReceiveInvoicesRequest = {
+  wallet: RgbWalletRef
+}
+
+type RgbPendingReceiveInvoicesResult = {
+  list: RgbPendingReceiveInvoice[]
+  [key: string]: any
+}
+
+/**
+ * The blind seal contains a bigint blinding factor and must remain local.
+ * Port messages use JSON serialization, so only return invoice metadata to UI
+ * and provider callers.
+ */
+export { toPublicRgbPendingReceiveInvoice }
+
+type RgbCancelReceiveInvoiceRequest = {
+  wallet: RgbWalletRef
+  batchTransferIdx: number
+  skipSync?: boolean
+}
+
+type RgbCancelReceiveInvoiceResult = {
+  changed: boolean
+  [key: string]: any
+}
+
+type RgbIssueNiaRequest = {
+  wallet: RgbWalletRef
+  ticker: string
+  name: string
+  precision: number
+  amounts: Array<number | string>
+}
+
+type RgbCreateUtxosBeginRequest = {
+  wallet: RgbWalletRef
+  upTo?: boolean
+  num?: number
+  size?: number
+  feeRate?: number
+  skipSync?: boolean
+  dryRun?: boolean
+}
+
+type RgbCreateUtxosEndRequest = {
+  wallet: RgbWalletRef
+  signedPsbt: string
+}
+
+type RgbPendingVanillaTxsRequest = {
+  wallet: RgbWalletRef
+}
+
+type RgbPendingVanillaTx = {
+  txid: string
+  type?: string
+  [key: string]: any
+}
+
+type RgbPendingVanillaTxsResult = {
+  list: RgbPendingVanillaTx[]
+  [key: string]: any
+}
+
+type RgbAbortVanillaTxRequest = {
+  wallet: RgbWalletRef
+  txid: string
+}
+
+type RgbAbortVanillaTxResult = {
+  aborted: boolean
+  [key: string]: any
+}
+
+type RgbAllocationSummaryRequest = {
+  wallet: RgbWalletRef
+  skipSync?: boolean
+}
+
+type RgbAllocationSummaryResult = {
+  available?: boolean
+  availableAllocationCount?: number
+  freeAllocationCount?: number
+  colorableUtxoCount?: number
+  [key: string]: any
+}
+
+type RgbSendBeginRequest = {
+  wallet: RgbWalletRef
+  invoice: string
+  assetId: string
+  amount?: number | string
+  ticker?: string
+  name?: string
+  precision?: number
+  feeRate?: number
+  minConfirmations?: number
+  donation?: boolean
+  witnessData?: {
+    amountSat: number | string
+    blinding?: number | string | null
+  }
+}
+
+type RgbSendEndRequest = {
+  wallet: RgbWalletRef
+  signedPsbt: string
+  transferId?: string
+  skipSync?: boolean
+}
+
+type RgbSignPsbtRequest = {
+  psbt: string
+  toSignInputs?: ToSignInput[]
+}
+
+const RGB_ENCRYPTED_STORAGE_NAMESPACE = 'rgb-service-v1'
+
+function rgbInvoiceDestinationAddress(invoice: string | undefined, networkType: NetworkType) {
+  if (!invoice) return undefined
+  try {
+    const decoded = decodeRgbInvoice(invoice)
+    if (decoded.beneficiaryAddress) return decoded.beneficiaryAddress
+    const script = invoiceSealToScriptPubKey(decoded.seal)
+    if (!script) return undefined
+    const address = scriptPkToAddress(Buffer.from(script).toString('hex'), networkType)
+    return address || undefined
+  } catch {
+    return undefined
+  }
+}
+
+function rgbCounterpartyAddress(
+  scripts: string[] | undefined,
+  networkType: NetworkType,
+  selfAddress: string
+) {
+  for (const script of scripts || []) {
+    const address = scriptPkToAddress(script, networkType)
+    if (address && address !== selfAddress) return address
+  }
+  return undefined
+}
+
+function rgbConsignmentOutputScripts(payload?: string) {
+  if (!payload || typeof niaConsignmentSpendableOutputScripts !== 'function') return undefined
+  try {
+    return niaConsignmentSpendableOutputScripts(payload)
+  } catch {
+    return undefined
+  }
+}
+const RGB_FUNDING_UTXO_DUST = 330
+
+export const chainTypeToRgbNetwork = (chainType: ChainType): string => {
+  switch (chainType) {
+    case ChainType.BITCOIN_MAINNET:
+      return 'mainnet'
+    case ChainType.BITCOIN_TESTNET:
+      return 'testnet'
+    case ChainType.BITCOIN_TESTNET4:
+      return 'testnet4'
+    case ChainType.BITCOIN_SIGNET:
+      return 'signet'
+    default:
+      throw new Error(`wallet chain "${chainType}" is not supported by RGB`)
+  }
+}
+
+const normalizeRgbDerivationHex = (value: unknown): string | null => {
+  if (!value) return null
+  if (typeof value === 'string') return value.toLowerCase()
+  return Buffer.from(value as any)
+    .toString('hex')
+    .toLowerCase()
+}
+
+const normalizeRgbDerivationPath = (path: string) => (path.startsWith('m/') ? path : `m/${path}`)
 
 const caculateTapLeafHash = (input: any, pubkey: Buffer) => {
   if (input.tapInternalKey && !input.tapLeafScript) {
@@ -139,8 +558,97 @@ function assertCanCreateSigningRequest(account: Account | null | undefined) {
   }
 }
 
+function stableRgbJson(value: unknown): string {
+  if (value === null || typeof value !== 'object') return JSON.stringify(value)
+  if (Array.isArray(value)) return `[${value.map(stableRgbJson).join(',')}]`
+  const record = value as Record<string, unknown>
+  return `{${Object.keys(record)
+    .sort()
+    .map(key => `${JSON.stringify(key)}:${stableRgbJson(record[key])}`)
+    .join(',')}}`
+}
+
 export class WalletController extends BaseController {
   timer: any = null
+
+  // Pending transfer locks are intentionally in-memory. After a background
+  // restart the user must explicitly reprepare; no prior transfer is broadcast.
+  private readonly rgbServiceRegistry = new RgbServiceRegistry({
+    getWallet: () => this.getCurrentLocalRgbWallet(),
+    createService: wallet => this.createLocalRgbService(wallet),
+  })
+  private readonly rgbIndexerOutbox = new RgbIndexerOutbox({
+    syncIssue: (issue, wallet) => this.syncRgbIssueToIndexer(issue, wallet),
+    replaceUtxos: (sync, wallet) => this.replaceRgbUtxosInIndexer(sync, wallet),
+    syncReceiveHistory: (receive, wallet) => this.syncRgbReceiveHistoryToIndexer(receive, wallet),
+    warn: (message, error) => log.warn(message, error),
+  })
+  private readonly rgbCoordinator = new RgbWalletCoordinator({
+    getContext: () => this.getLocalRgbService(),
+    syncIndexerOutbox: (service, wallet) => this.syncRgbIndexerOutbox(service, wallet),
+    syncReceiveHistory: (service, wallet) => this.syncRgbReceiveHistory(service, wallet),
+  })
+  private readonly rgbTransferQuery = new RgbTransferQuery({
+    getContext: () => this.getLocalRgbService(),
+    syncReceiveHistory: (service, context) => this.syncRgbReceiveHistory(service, context.wallet),
+    syncPendingTransfers: service => this.syncRgbPendingTransfers(service),
+    syncReceivedAllocations: () => this.syncRgbReceivedAllocations(),
+    getRemoteActivity: async (address, currentPage, pageSize) => {
+      const result = await this.getAddressRgbActivity(address, currentPage, pageSize)
+      return { total: result.total, list: result.list as RgbRemoteActivity[] }
+    },
+    getNetworkType: () => this.getNetworkType(),
+    getInvoiceDestination: rgbInvoiceDestinationAddress,
+    getCounterpartyAddress: rgbCounterpartyAddress,
+    getConsignmentOutputScripts: rgbConsignmentOutputScripts,
+    warn: (message, error) => console.warn(message, error),
+  })
+  private readonly rgbReceiveOperations = new RgbReceiveOperations({
+    getContext: () => this.getLocalRgbService(),
+    syncReceivedAllocations: () => this.syncRgbReceivedAllocations(),
+  })
+  private readonly rgbIssueOperations = new RgbIssueOperations({
+    getContext: () => this.getLocalRgbService(),
+    syncIndexerOutbox: context => this.syncRgbIndexerOutbox(context.service, context.wallet),
+    now: () => Date.now(),
+  })
+  private readonly rgbSendOperations = new RgbSendOperations({
+    getContext: () => this.getLocalRgbService(),
+    getFeeRate: async () => (await this.getFeeSummary()).list[1]?.feeRate,
+    getToSignData: ({ psbt, toSignInputs, amountDisplay }) =>
+      this.getRgbToSignData({
+        psbt,
+        toSignInputs,
+        action: {
+          name: 'Send RGB',
+          description: '',
+          details: [
+            {
+              label: 'Amount',
+              type: PsbtActionDetailType.TEXT,
+              value: amountDisplay,
+              highlight: true,
+            },
+          ],
+          type: PsbtActionType.CUSTOM,
+        },
+      }),
+    getActiveTransferId: address => this.rgbCoordinator.getActiveTransferId(address),
+    setActiveTransferId: (address, transferId) =>
+      this.rgbCoordinator.setActiveTransferId(address, transferId),
+    clearActiveTransferId: address => this.rgbCoordinator.clearActiveTransferId(address),
+  })
+
+  constructor() {
+    super()
+    walletApiService.setRgbRequestAuthenticator?.(async request =>
+      this.createRgbRequestAuthorization(request)
+    )
+    keyringService.on?.('lock', () => {
+      this.rgbServiceRegistry.clear()
+      this.rgbCoordinator.clear()
+    })
+  }
 
   private _cacheCosmosKeyringKey: string | null = null
   private _cosmosKeyring: CosmosKeyring | null = null
@@ -1286,7 +1794,7 @@ export class WalletController extends BaseController {
     }
 
     preferenceService.setChainType(chainType)
-    walletApiService.setEndpoint(CHAINS_MAP[chainType]!.endpoints[0]!)
+    await walletApiService.setEndpoint(CHAINS_MAP[chainType]!.endpoints[0]!)
 
     const currentAccount = await this.getCurrentAccount()
     const keyring = await this.getCurrentKeyring()
@@ -2602,6 +3110,640 @@ export class WalletController extends BaseController {
     return tokenSummary
   }
 
+  getRgbAssetList = async (address: string, currentPage: number, pageSize: number) => {
+    const { total, list } = await getRgbApiService().getRgbAssetList(address, currentPage, pageSize)
+    return {
+      currentPage,
+      pageSize,
+      total,
+      list,
+    }
+  }
+
+  getRgbList = async (address: string, currentPage: number, pageSize: number) => {
+    return this.getRgbAssetList(address, currentPage, pageSize)
+  }
+
+  getRGBList = async (
+    _address: string,
+    currentPage: number,
+    pageSize: number,
+    options?: { skipSync?: boolean }
+  ) => {
+    const { address } = await this.getRgbFundingAddress()
+    if (!options?.skipSync) {
+      await this.syncRgbListState()
+    }
+    const result = await this.getRgbAssetList(address, currentPage, pageSize)
+    const lockedAmounts = await this.getRgbPendingLockedAmounts()
+    return {
+      ...result,
+      list: result.list.map(item => this.applyRgbPendingLock(item, lockedAmounts)),
+    }
+  }
+
+  getRgbAssetBalance = async (address: string, assetId: string) => {
+    return getRgbApiService().getRgbAssetBalance(address, assetId)
+  }
+
+  getRGBAssetBalance = async (_address: string, assetId: string) => {
+    const { address } = await this.getRgbFundingAddress()
+    const balance = await this.getRgbAssetBalance(address, assetId)
+    return this.applyRgbPendingLock(balance, await this.getRgbPendingLockedAmounts())
+  }
+
+  getRgbAssetDetail = async (assetId: string) => {
+    return getRgbApiService().getRgbAssetDetail(assetId)
+  }
+
+  getRGBAssetDetail = async (_address: string, assetId: string) => {
+    return this.getRgbAssetDetail(assetId)
+  }
+
+  getRgbAssetActivity = async (
+    assetId: string,
+    currentPage: number,
+    pageSize: number,
+    address?: string,
+    type?: RgbActivityType
+  ) => {
+    const page = currentPage
+    const params: {
+      page: number
+      pageSize: number
+      address?: string
+      type?: RgbActivityType
+    } = {
+      page,
+      pageSize,
+    }
+    if (address) params.address = address
+    if (type) params.type = type
+
+    const { total, list } = await getRgbApiService().getRgbAssetActivity(assetId, params)
+
+    return {
+      currentPage,
+      pageSize,
+      total,
+      list,
+    }
+  }
+
+  getRgbAssetHistory = async (
+    assetId: string,
+    currentPage: number,
+    pageSize: number,
+    address?: string,
+    type?: RgbActivityType
+  ) => {
+    return this.getRgbAssetActivity(assetId, currentPage, pageSize, address, type)
+  }
+
+  getRGBAssetActivity = async (
+    _address: string,
+    assetId: string,
+    currentPage: number,
+    pageSize: number,
+    type?: RgbActivityType
+  ) => {
+    const { address } = await this.getRgbFundingAddress()
+    return this.getRgbAssetActivity(assetId, currentPage, pageSize, address, type)
+  }
+
+  getAddressRgbActivity = async (
+    address: string,
+    currentPage: number,
+    pageSize: number,
+    assetId?: string,
+    type?: RgbActivityType
+  ) => {
+    const page = currentPage
+    const params: {
+      page: number
+      pageSize: number
+      assetId?: string
+      type?: RgbActivityType
+    } = {
+      page,
+      pageSize,
+    }
+    if (assetId) params.assetId = assetId
+    if (type) params.type = type
+
+    const { total, list } = await getRgbApiService().getAddressRgbActivity(address, params)
+
+    return {
+      currentPage,
+      pageSize,
+      total,
+      list,
+    }
+  }
+
+  getAddressRgbHistory = async (
+    address: string,
+    currentPage: number,
+    pageSize: number,
+    assetId?: string,
+    type?: RgbActivityType
+  ) => {
+    return this.getAddressRgbActivity(address, currentPage, pageSize, assetId, type)
+  }
+
+  getRgbTransfers = (currentPage: number, pageSize: number) =>
+    this.rgbTransferQuery.getTransfers(currentPage, pageSize)
+
+  getCurrentRgbWalletRef = async (): Promise<RgbWalletRef> => {
+    const account = preferenceService.getCurrentAccount()
+    if (!account) throw new Error('no current account')
+    assertCanCreateSigningRequest(account)
+
+    const keyring = await keyringService.getKeyringForAccount(account.pubkey, account.type)
+    if (!keyring?.getRgbFundingAccount) {
+      throw new Error('Current wallet does not support RGB transaction construction')
+    }
+
+    const networkType = this.getNetworkType()
+    const chainType = this.getChainType()
+    const funding = keyring.getRgbFundingAccount(networkType, account.index)
+    const network = chainTypeToRgbNetwork(chainType)
+    const walletId = `unisat-${funding.masterFingerprint}-${account.index}`
+
+    return {
+      walletId,
+      fundingAddress: funding.address,
+      network,
+    }
+  }
+
+  /**
+   * Signs every private RGB API call with the dedicated funding key. The
+   * server binds this exact message to method, route and body hash, so an
+   * intercepted request cannot be replayed or repurposed.
+   */
+  private createRgbRequestAuthorization = async (request: {
+    method: 'POST'
+    path: string
+    body: unknown
+  }) => {
+    const account = preferenceService.getCurrentAccount()
+    if (!account) throw new Error('no current account')
+    assertCanCreateSigningRequest(account)
+    const funding = await this.getCurrentRgbFundingAccount()
+    const bodyHash = bitcoin.crypto.sha256(Buffer.from(stableRgbJson(request.body))).toString('hex')
+    const nonceBytes = new Uint8Array(16)
+    globalThis.crypto.getRandomValues(nonceBytes)
+    const nonce = Buffer.from(nonceBytes).toString('hex')
+    const expiresAt = Math.floor(Date.now() / 1000) + 60
+    const message = [
+      'RGB Authorization v1',
+      request.method,
+      request.path,
+      bodyHash,
+      funding.address,
+      String(expiresAt),
+      nonce,
+    ].join('\n')
+    const psbt = genPsbtOfBIP322Simple({
+      message,
+      address: funding.address,
+      networkType: this.getNetworkType(),
+    })
+    await this.attachRgbPsbtDerivations(psbt)
+    const toSignInputs = await this.getRgbToSignInputs(psbt)
+    if (toSignInputs.length !== 1) throw new Error('Unable to prepare RGB authorization signature')
+    const keyring = await keyringService.getKeyringForAccount(account.pubkey, account.type)
+    await keyringService.signTransaction(keyring, psbt, toSignInputs)
+    psbt.finalizeAllInputs()
+    return {
+      fundingAddress: funding.address,
+      nonce,
+      expiresAt,
+      signature: getSignatureFromPsbtOfBIP322Simple(psbt),
+    }
+  }
+
+  private getCurrentRgbFundingAccount = async (): Promise<{
+    address: string
+    publicKey: string
+    derivationPath: string
+    masterFingerprint: string
+  }> => {
+    const account = preferenceService.getCurrentAccount()
+    if (!account) throw new Error('no current account')
+    assertCanCreateSigningRequest(account)
+
+    const keyring = await keyringService.getKeyringForAccount(account.pubkey, account.type)
+    if (!keyring?.getRgbFundingAccount) {
+      throw new Error('Current wallet does not support local RGB funding addresses')
+    }
+
+    return keyring.getRgbFundingAccount(this.getNetworkType(), account.index)
+  }
+
+  createRgbBlindReceive = async (params: Omit<RgbReceiveInvoiceRequest, 'wallet'>) => {
+    return this.rgbReceiveOperations.createBlindReceive(params)
+  }
+
+  getRgbPendingReceiveInvoices = () => this.rgbReceiveOperations.getPendingReceiveInvoices()
+
+  cancelRgbReceiveInvoice = async (params: Omit<RgbCancelReceiveInvoiceRequest, 'wallet'>) => {
+    return this.rgbReceiveOperations.cancelReceiveInvoice(params.batchTransferIdx)
+  }
+
+  getRgbFundingAddress = async () => {
+    const { address } = await this.getCurrentRgbFundingAccount()
+    return { address }
+  }
+
+  createRgbIssueNia = (params: Omit<RgbIssueNiaRequest, 'wallet'>) =>
+    this.rgbIssueOperations.issueNia(params)
+
+  createRgbUtxosBegin = async (params: Omit<RgbCreateUtxosBeginRequest, 'wallet'>) => {
+    const account = preferenceService.getCurrentAccount()
+    if (!account) throw new Error('no current account')
+    assertCanCreateSigningRequest(account)
+
+    const num = params.num ?? 5
+    const size = params.size ?? RGB_FUNDING_UTXO_DUST
+    const feeRate = params.feeRate ?? (await this.getFeeSummary()).list[1]?.feeRate
+    if (!Number.isInteger(num) || num <= 0) throw new Error('RGB UTXO count must be positive')
+    if (!Number.isInteger(size) || size < RGB_FUNDING_UTXO_DUST) {
+      throw new Error(`RGB UTXO size must be at least ${RGB_FUNDING_UTXO_DUST} sats`)
+    }
+    if (!feeRate || feeRate <= 0) throw new Error('Invalid RGB UTXO fee rate')
+
+    const [btcUtxos, funding] = await Promise.all([
+      this.getBTCUtxos(),
+      this.getCurrentRgbFundingAccount(),
+    ])
+    if (btcUtxos.length === 0) throw new Error('Insufficient balance.')
+
+    // This is a standard Bitcoin transaction. The outputs become RGB-capable
+    // UTXOs only after the indexer observes the confirmed transaction.
+    const { psbt, toSignInputs } = await txHelpers.sendBTC({
+      btcUtxos,
+      tos: Array.from({ length: num }, () => ({ address: funding.address, satoshis: size })),
+      networkType: this.getNetworkType(),
+      changeAddress: account.address,
+      feeRate,
+      enableRBF: true,
+    })
+
+    const toSignData = await this.getToSignData({
+      psbtHex: psbt.toHex(),
+      options: {
+        toSignInputs: toSignInputs as any,
+        autoFinalized: true,
+      },
+      action: {
+        name: 'Create RGB UTXO',
+        description: '',
+        details: [
+          { label: 'UTXO Count', type: PsbtActionDetailType.TEXT, value: String(num) },
+          { label: 'Funding Address', type: PsbtActionDetailType.ADDRESS, value: funding.address },
+          { label: 'Fee Rate', type: PsbtActionDetailType.TEXT, value: String(feeRate) },
+        ],
+        type: PsbtActionType.CUSTOM,
+      },
+    })
+
+    return { local: true, psbtHex: toSignData.psbtHex, toSignData }
+  }
+
+  createRgbUtxosEnd = async (params: Omit<RgbCreateUtxosEndRequest, 'wallet'>) => {
+    const signedPsbt = psbtFromString(params.signedPsbt)
+    const transaction = signedPsbt.extractTransaction(true)
+    const funding = await this.getCurrentRgbFundingAccount()
+    const { service, wallet } = await this.getLocalRgbService()
+    const txid = await this.pushTx(transaction.toHex())
+    const outpoints = transaction.outs
+      .map((output, vout) => ({ output, vout }))
+      .filter(
+        ({ output }) => scriptPkToAddress(output.script, this.getNetworkType()) === funding.address
+      )
+      .map(({ output, vout }) => ({
+        txid,
+        vout,
+        satoshis: Number(output.value),
+        scriptPk: output.script.toString('hex'),
+        publicKey: funding.publicKey,
+        allocations: [],
+      }))
+
+    await service.queueUtxoSync({
+      txid,
+      outpoints: outpoints.map(outpoint => ({
+        outpoint: { txid: outpoint.txid, vout: outpoint.vout },
+        satoshis: outpoint.satoshis,
+        scriptPubKey: outpoint.scriptPk,
+        publicKey: outpoint.publicKey,
+        chainStatus: 'mempool',
+        allocations: outpoint.allocations,
+      })),
+    })
+    await this.syncRgbIndexerOutbox(service, wallet)
+
+    return { txid, outpoints }
+  }
+
+  getRgbPendingVanillaTxs = () => this.rgbSendOperations.getPendingVanillaTxs()
+
+  abortRgbVanillaTx = (params: Omit<RgbAbortVanillaTxRequest, 'wallet'>) =>
+    this.rgbSendOperations.abortVanillaTx(params.txid)
+
+  acceptRgbReceive = (params: { recipientId: string }) =>
+    this.rgbReceiveOperations.acceptReceive(params.recipientId)
+
+  rejectRgbReceive = (params: { recipientId: string }) =>
+    this.rgbReceiveOperations.rejectReceive(params.recipientId)
+
+  getRgbAllocationSummary = (params: Omit<RgbAllocationSummaryRequest, 'wallet'> = {}) =>
+    this.rgbReceiveOperations.getAllocationSummary(params)
+
+  createRgbSendBegin = (params: Omit<RgbSendBeginRequest, 'wallet'>) =>
+    this.rgbSendOperations.begin(params)
+
+  createRgbSendEnd = (params: Omit<RgbSendEndRequest, 'wallet'>) =>
+    this.rgbSendOperations.complete(params)
+
+  retryRgbBroadcast = (params: { transferId: string }) =>
+    this.rgbSendOperations.retryBroadcast(params.transferId)
+
+  private syncRgbReceivedAllocations = () => this.rgbCoordinator.syncReceivedAllocations()
+
+  /** Deliver confirmed receive history through a durable, idempotent local outbox. */
+  private syncRgbReceiveHistory = (service: LocalRgbService, wallet: LocalRgbWallet) =>
+    this.rgbIndexerOutbox.syncReceiveHistory(service, wallet)
+
+  /** Retry durable local RGB allocations before allowing a remote snapshot to replace them. */
+  private syncRgbIndexerOutbox = (service: LocalRgbService, wallet: LocalRgbWallet) =>
+    this.rgbIndexerOutbox.sync(service, wallet)
+
+  private syncRgbIssueToIndexer = async (
+    issue: import('@unisat/rgb-service').RgbPendingIssue,
+    wallet: LocalRgbWallet
+  ) => {
+    await getRgbApiService().syncRgbAssetMetadata({
+      asset: { assetId: issue.assetId, ...issue.asset },
+    })
+    await getRgbApiService().syncRgbUtxos({
+      address: wallet.fundingAddress,
+      txid: issue.utxoSync.txid,
+      outpoints: toRgbIndexedUtxos(issue.utxoSync.outpoints),
+    })
+  }
+
+  private replaceRgbUtxosInIndexer = async (
+    sync: import('@unisat/rgb-service').RgbPendingUtxoSync,
+    wallet: LocalRgbWallet
+  ) => {
+    await getRgbApiService().replaceRgbUtxos({
+      address: wallet.fundingAddress,
+      txid: sync.txid,
+      outpoints: toRgbIndexedUtxos(sync.outpoints),
+    })
+  }
+
+  private syncRgbReceiveHistoryToIndexer = async (
+    receive: import('@unisat/rgb-service').RgbPendingReceiveHistory,
+    wallet: LocalRgbWallet
+  ) => {
+    const from = rgbCounterpartyAddress(
+      receive.counterpartyScriptPubKeys,
+      this.getNetworkType(),
+      wallet.fundingAddress
+    )
+    await getRgbApiService().syncRgbReceiveTransfer({
+      wallet,
+      transferId: receive.transferId,
+      assetId: receive.assetId,
+      amount: receive.amount,
+      txid: receive.txid,
+      createdAt: receive.createdAt,
+      ...(from ? { from } : {}),
+    })
+  }
+
+  /** Refresh colored UTXO chain state without polling receive consignments or proxy endpoints. */
+  private syncRgbListState = () => this.rgbCoordinator.syncListState()
+
+  private syncRgbPendingTransfers = (service: LocalRgbService) =>
+    this.rgbCoordinator.syncPendingTransfers(service)
+
+  /** Exclude locally locked RGB UTXOs from the UI's spendable balance until a send completes. */
+  private getRgbPendingLockedAmounts = () => this.rgbCoordinator.getPendingLockedAmounts()
+
+  private applyRgbPendingLock<T extends { assetId?: string; spendable?: string | number }>(
+    balance: T,
+    lockedAmounts: Map<string, bigint>
+  ) {
+    const lockedAmount = balance.assetId ? lockedAmounts.get(balance.assetId) : undefined
+    if (!lockedAmount || balance.spendable === undefined) return balance
+
+    try {
+      const spendable = BigInt(balance.spendable)
+      return {
+        ...balance,
+        spendable: (spendable > lockedAmount ? spendable - lockedAmount : 0n).toString(),
+        lockedAmount: lockedAmount.toString(),
+      }
+    } catch {
+      return balance
+    }
+  }
+
+  private getLocalRgbService = async (): Promise<LocalRgbServiceContext> => {
+    const context = await this.rgbServiceRegistry.get()
+    await this.syncRgbIndexerOutbox(context.service, context.wallet)
+    return context
+  }
+
+  private getCurrentLocalRgbWallet = async (): Promise<LocalRgbWallet> => {
+    const wallet = await this.getCurrentRgbWalletRef()
+    if (!wallet.walletId || !wallet.network) throw new Error('RGB wallet context is incomplete')
+    return {
+      ...wallet,
+      walletId: wallet.walletId,
+      network: wallet.network as RgbNetwork,
+    }
+  }
+
+  private createLocalRgbService = (localWallet: LocalRgbWallet): LocalRgbService => {
+    return createRgbService({
+      storage: {
+        get: key => keyringService.getEncryptedStorageItem(RGB_ENCRYPTED_STORAGE_NAMESPACE, key),
+        set: (key, value) =>
+          keyringService.setEncryptedStorageItem(RGB_ENCRYPTED_STORAGE_NAMESPACE, key, value),
+        remove: key =>
+          keyringService.removeEncryptedStorageItem(RGB_ENCRYPTED_STORAGE_NAMESPACE, key),
+      },
+      stateSource: createRgbBackendAdapter({
+        api: getRgbApiService() as RgbBackendApi,
+        getNetworkType: () => this.getNetworkType(),
+        getInvoiceDestination: rgbInvoiceDestinationAddress,
+      }),
+      feeSource: {
+        getFeeFunding: async () => {
+          const account = preferenceService.getCurrentAccount()
+          if (!account) throw new Error('no current account')
+          const btcUtxos = await this.getBTCUtxos()
+          const feeUtxos = btcUtxos
+            .filter(utxo => !utxo.inscriptions?.length && !utxo.atomicals?.length)
+            .map(utxo => ({
+              outpoint: { txid: utxo.txid, vout: utxo.vout },
+              satoshis: utxo.satoshis,
+              scriptPubKey: utxo.scriptPk,
+              publicKey: account.pubkey,
+            }))
+          return {
+            utxos: feeUtxos,
+            changeScriptPubKey: bitcoin.address
+              .toOutputScript(account.address, toPsbtNetwork(this.getNetworkType()))
+              .toString('hex'),
+            changeDustLimit: decodeAddress(account.address).dust,
+          }
+        },
+      },
+      encoder: localNiaProtocolEncoder,
+      transport: createRgbProxyTransport(CHAINS_MAP[this.getChainType()]?.rgbProxyEndpoints || []),
+      broadcaster: { broadcast: rawTx => this.pushTx(rawTx) },
+    })
+  }
+
+  getRgbToSignData = async ({
+    psbt,
+    toSignInputs,
+    action,
+  }: RgbSignPsbtRequest & { action?: PsbtActionInfo }): Promise<ToSignData> => {
+    const parsedPsbt = await this.attachRgbPsbtDerivations(psbtFromString(psbt))
+    const resolvedToSignInputs = toSignInputs || (await this.getRgbToSignInputs(parsedPsbt))
+    if (resolvedToSignInputs.length === 0) {
+      throw new Error('No RGB PSBT inputs can be signed by this wallet')
+    }
+
+    return {
+      psbtHex: parsedPsbt.toHex(),
+      toSignInputs: resolvedToSignInputs,
+      autoFinalized: resolvedToSignInputs.length === parsedPsbt.inputCount,
+      action: action
+        ? action
+        : {
+            name: 'Sign RGB PSBT',
+            description: '',
+            type: PsbtActionType.CUSTOM,
+          },
+    }
+  }
+
+  /** Add only the current account's local RGB derivation to wallet-built PSBTs. */
+  private attachRgbPsbtDerivations = async (psbt: bitcoin.Psbt) => {
+    const funding = await this.getCurrentRgbFundingAccount()
+    const internalKey = Buffer.from(funding.publicKey, 'hex').subarray(1)
+    const expectedScript = bitcoin.payments.p2tr({
+      internalPubkey: internalKey,
+      network: toPsbtNetwork(this.getNetworkType()),
+    }).output
+    if (!expectedScript) throw new Error('Unable to derive RGB funding script')
+
+    psbt.data.inputs.forEach((input: any) => {
+      if (
+        !input.witnessUtxo ||
+        (input.tapInternalKey && !input.tapInternalKey.equals(internalKey)) ||
+        !input.witnessUtxo.script.equals(expectedScript)
+      )
+        return
+      // BIP-322 simple PSBTs carry only the witness output. Once the script
+      // has matched the currently derived RGB funding address, add the
+      // internal key required by bitcoinjs taproot signing.
+      input.tapInternalKey = internalKey
+      input.tapBip32Derivation = [
+        {
+          masterFingerprint: Buffer.from(funding.masterFingerprint, 'hex'),
+          path: funding.derivationPath,
+          pubkey: internalKey,
+          leafHashes: [],
+        },
+      ]
+    })
+    return psbt
+  }
+
+  private getRgbToSignInputs = async (psbt: bitcoin.Psbt): Promise<ToSignInput[]> => {
+    const account = preferenceService.getCurrentAccount()
+    if (!account) throw new Error('no current account')
+    assertCanCreateSigningRequest(account)
+
+    const keyring = await keyringService.getKeyringForAccount(account.pubkey, account.type)
+    if (!keyring?.getRgbFundingAccount) {
+      throw new Error('Current wallet does not support RGB PSBT signing')
+    }
+
+    const networkType = this.getNetworkType()
+    const funding = keyring.getRgbFundingAccount(networkType, account.index)
+
+    const toSignInputs: ToSignInput[] = []
+    psbt.data.inputs.forEach((input: any, index) => {
+      const isSigned =
+        input.finalScriptSig ||
+        input.finalScriptWitness ||
+        input.tapKeySig ||
+        input.partialSig ||
+        input.tapScriptSig
+      if (isSigned) return
+
+      const tapDerivation = input.tapBip32Derivation?.[0]
+      if (tapDerivation?.pubkey && this.isCurrentRgbDerivation(tapDerivation, funding)) {
+        const leafHashes = tapDerivation.leafHashes || []
+        const toSignInput: ToSignInput = {
+          index,
+          publicKey: Buffer.from(tapDerivation.pubkey).toString('hex'),
+          sighashTypes: input.sighashType ? [input.sighashType] : undefined,
+          useTweakedSigner: leafHashes.length === 0,
+        }
+        if (leafHashes[0]) {
+          toSignInput.tapLeafHashToSign = Buffer.from(leafHashes[0]).toString('hex')
+        }
+        toSignInputs.push(toSignInput)
+        return
+      }
+
+      const derivation = input.bip32Derivation?.[0]
+      if (derivation?.pubkey && this.isCurrentRgbDerivation(derivation, funding)) {
+        toSignInputs.push({
+          index,
+          publicKey: Buffer.from(derivation.pubkey).toString('hex'),
+          sighashTypes: input.sighashType ? [input.sighashType] : undefined,
+        })
+      }
+    })
+
+    return toSignInputs
+  }
+
+  private isCurrentRgbDerivation(
+    derivation: any,
+    funding: { publicKey: string; derivationPath: string; masterFingerprint: string }
+  ) {
+    const fingerprint = normalizeRgbDerivationHex(derivation?.masterFingerprint)
+    if (fingerprint !== funding.masterFingerprint.toLowerCase()) {
+      return false
+    }
+
+    const path = derivation?.path
+    if (
+      !path ||
+      normalizeRgbDerivationPath(path) !== normalizeRgbDerivationPath(funding.derivationPath)
+    ) {
+      return false
+    }
+
+    const pubkey = normalizeRgbDerivationHex(derivation.pubkey)
+    const compressed = funding.publicKey.toLowerCase()
+    return pubkey === compressed || pubkey === compressed.slice(2)
+  }
+
   createSendRunesPsbt = async ({
     to,
     runeid,
@@ -3491,17 +4633,12 @@ export class WalletController extends BaseController {
     addressType: AddressType,
     alianName?: string
   ) => {
-    let originKeyring: Keyring
     const networkType = this.getNetworkType()
     if (!canDeriveAddressFromPublicKey(data, addressType, networkType)) {
       throw new Error('Invalid Public Key')
     }
 
-    try {
-      originKeyring = await keyringService.importPublicKeyOnly(data, addressType as AddressType)
-    } catch (e) {
-      throw e
-    }
+    const originKeyring = await keyringService.importPublicKeyOnly(data, addressType as AddressType)
 
     const displayedKeyring = await keyringService.displayForKeyring(
       originKeyring,
