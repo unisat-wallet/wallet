@@ -121,7 +121,7 @@
 .rgb-issue-review-row > strong {
   overflow: hidden;
   max-width: 65%;
-  color: #fff;
+  color: rgba(255, 255, 255, 0.85);
   font-size: 14px;
   font-weight: 500;
   text-align: right;
@@ -129,9 +129,37 @@
   white-space: nowrap;
 }
 
-.rgb-issue-review-value-accent {
-  color: #f5b83d !important;
-  font-weight: 600 !important;
+.rgb-issue-review-row-copyable > span {
+  flex-shrink: 0;
+}
+
+.rgb-issue-review-copy {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  max-width: 70%;
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+  color: inherit;
+}
+
+.rgb-issue-review-copy > strong {
+  overflow: hidden;
+  min-width: 0;
+  color: rgba(255, 255, 255, 0.85);
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 22px;
+  text-align: right;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.rgb-issue-review-copy > span {
+  flex-shrink: 0;
 }
 
 .rgb-issue-review-value-pending {
@@ -286,15 +314,9 @@
 
 .rgb-issue-success-mark {
   display: flex;
-  width: 48px;
-  height: 48px;
   align-items: center;
   justify-content: center;
-  margin-bottom: 18px;
-  border: 1px solid rgba(245, 184, 61, 0.45);
-  border-radius: 50%;
-  background: rgba(245, 184, 61, 0.12);
-  color: #f5b83d;
+  margin-bottom: 8px;
 }
 
 .rgb-issue-eyebrow {
@@ -305,16 +327,17 @@
 }
 
 .rgb-issue-success-page h1 {
-  margin: 8px 0 3px;
+  margin: 8px 0 0;
+  max-width: 100%;
   color: #f6f6f7;
-  font-size: 30px;
-  line-height: 38px;
+  font-size: 24px;
+  line-height: 32px;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
-.rgb-issue-success-page > p {
-  margin: 0 0 24px;
-  color: #96969c;
-  font-size: 14px;
+.rgb-issue-success-page h1 + .rgb-issue-section {
+  margin-top: 21px;
 }
 
 .rgb-issue-result-card {

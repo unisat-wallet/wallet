@@ -30,6 +30,33 @@ describe('useRGBTransfersLogic', () => {
     await waitFor(() => expect(result.current.items[0]?.precision).toBe(2))
   })
 
+  it('merges transfer metadata and the canonical asset ID from asset details', async () => {
+    const hexAssetId = 'rgb:072cd658eb21c9683a226d0507ca2e9a995fe5bbfba2625380196c67f0a6719f'
+    const canonicalAssetId = 'rgb:ByzWWOsh-yWg6Im0-FB8oump-lf5bv7o-mJTgBls-Z~CmcZ8'
+    const { wrapper, wallet } = createHookTestHarness()
+    wallet.getRgbTransfers.mockResolvedValue({
+      list: [{ ...confirmingReceive, assetId: hexAssetId }],
+      total: 1,
+    })
+    wallet.getRGBAssetDetail.mockResolvedValue({
+      assetId: canonicalAssetId,
+      name: 'Received Token',
+      ticker: 'TOK',
+      precision: 2,
+    })
+
+    const { result } = renderHook(() => useRGBTransfersLogic(), { wrapper })
+
+    await waitFor(() => {
+      expect(result.current.items[0]).toMatchObject({
+        assetId: canonicalAssetId,
+        name: 'Received Token',
+        ticker: 'TOK',
+        precision: 2,
+      })
+    })
+  })
+
   it('does not notify for a broadcast that completed before the list was opened', async () => {
     const { wrapper, wallet } = createHookTestHarness()
     wallet.getRgbTransfers.mockResolvedValue({
@@ -45,13 +72,15 @@ describe('useRGBTransfersLogic', () => {
 
   it('queues a receive-confirmed notification after settlement', async () => {
     const { wrapper, wallet } = createHookTestHarness()
-    wallet.getRgbTransfers
-      .mockResolvedValueOnce({ list: [confirmingReceive], total: 1 })
-      .mockResolvedValueOnce({ list: [{ ...confirmingReceive, status: 'confirmed' }], total: 1 })
+    wallet.getRgbTransfers.mockResolvedValue({ list: [confirmingReceive], total: 1 })
 
     const { result } = renderHook(() => useRGBTransfersLogic(), { wrapper })
 
     await waitFor(() => expect(result.current.items[0]?.status).toBe('confirming'))
+    wallet.getRgbTransfers.mockResolvedValue({
+      list: [{ ...confirmingReceive, status: 'confirmed' }],
+      total: 1,
+    })
     await act(async () => {
       await result.current.onRefresh()
     })
@@ -87,7 +116,11 @@ describe('useRGBTransfersLogic', () => {
       await act(async () => {
         result.current.onLoadMore()
       })
-      await waitFor(() => expect(wallet.getRgbTransfers).toHaveBeenCalledTimes(page))
+      await waitFor(() =>
+        expect(
+          wallet.getRgbTransfers.mock.calls.filter((call: unknown[]) => call[0] === page).length
+        ).toBeGreaterThan(0)
+      )
     }
 
     expect(result.current.items).toHaveLength(101)

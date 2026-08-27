@@ -13,7 +13,6 @@ import {
   Row,
   Text
 } from '@/ui/components';
-import { BRC20Ticker } from '@/ui/components/BRC20Ticker';
 import { TabBar } from '@/ui/components/TabBar';
 import { colors } from '@/ui/theme/colors';
 import { fontSizes } from '@/ui/theme/font';
@@ -129,15 +128,24 @@ export default function RGBTokenScreen() {
       />
       {tokenSummary ? (
         <Content>
-          <Column justifyCenter itemsCenter>
+          <Column justifyCenter itemsCenter fullX>
             <RGBAssetIcon
-              iconInfo={iconInfo || { iconUrl: '', iconShortName: ticker.slice(0, 2).toUpperCase() }}
+              iconInfo={iconInfo || { iconUrl: '', iconShortName: (name || ticker).slice(0, 2).toUpperCase() }}
               ticker={ticker}
+              name={name}
               size={52}
             />
-            <Row justifyCenter itemsCenter>
-              <BRC20Ticker tick={ticker} displayName={name} preset="md" showOrigin color={'ticker_color2'} />
-            </Row>
+            <Column itemsCenter gap="xs" fullX px="lg" style={{ minWidth: 0 }}>
+              <Text
+                text={name}
+                size="sm"
+                color="ticker_color2"
+                textCenter
+                wrap
+                style={{ width: '100%' }}
+              />
+              <Text text={`(ticker: ${ticker})`} size="xs" color="textDim" textCenter />
+            </Column>
             <Column itemsCenter fullX justifyCenter>
               <Text text={displayBalance} preset="bold" textCenter size="xxl" wrap digital color="white" />
               {lockedAmount ? (

@@ -1,7 +1,8 @@
-import { CSSProperties, useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 
 import { Column, Icon, Row, Text } from '@/ui/components';
 import { AddressText } from '@/ui/components/AddressText';
+import { RgbAddressBadge } from '@/ui/components/RgbAddressBadge';
 import { colors } from '@/ui/theme/colors';
 import { numUtils } from '@unisat/base-utils';
 import {
@@ -15,17 +16,6 @@ import {
 import { useBTCUnit, useCurrentAddress, useI18n, useWallet } from '@unisat/wallet-state';
 import { AssetList } from './AssetList';
 import ContractSection from './ContractSection';
-
-const rgbAddressBadgeStyle: CSSProperties = {
-  display: 'flex',
-  alignItems: 'center',
-  justifyContent: 'center',
-  height: 18,
-  padding: '2px 4px',
-  borderRadius: 4,
-  backgroundColor: 'rgba(37,160,121,0.15)',
-  boxSizing: 'border-box'
-};
 
 export function InputItem(props: {
   index: number;
@@ -106,14 +96,7 @@ export function InputItem(props: {
             <Row itemsCenter style={{ gap: 4 }}>
               <AddressText address={itemInfo.address} color={highLightAddress ? 'ticker_color2' : 'textDim'} />
 
-              {isRgbAddress && (
-                <div style={rgbAddressBadgeStyle}>
-                  <Text
-                    text={t('rgb')}
-                    style={{ color: '#25a079', fontSize: 12, fontWeight: 500, lineHeight: 'normal' }}
-                  />
-                </div>
-              )}
+              {isRgbAddress && <RgbAddressBadge />}
 
               {isMyAddress && (
                 <Row style={{ padding: 2, backgroundColor: colors.bg2, borderRadius: 5 }}>

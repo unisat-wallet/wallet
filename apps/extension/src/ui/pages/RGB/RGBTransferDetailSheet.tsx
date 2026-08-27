@@ -1,12 +1,14 @@
 import { useState } from 'react';
 import { createPortal } from 'react-dom';
 
-import { Button, Checkbox, Column, Row, Text, Icon, CopyableAddress } from '@/ui/components';
+import { Button, Checkbox, Column, Row, Text, Icon, CopyableAddress, RGBAssetIcon } from '@/ui/components';
 import { BottomSheetHeader } from '@/ui/components/BottomSheetHeader';
 import { BottomModal } from '@/ui/components/BottomModal';
+import { getRgbAssetName } from '@/ui/components/RGBAssetIcon';
+import { RgbAddressBadge } from '@/ui/components/RgbAddressBadge';
 import { colors } from '@/ui/theme/colors';
-import { shortAddress } from '@/ui/utils';
 import {
+  getRgbTokenIconInfo,
   getRgbTokenPrecision,
   toRgbDisplayAmount,
   useI18n,
@@ -36,7 +38,7 @@ function getStatusLabel(status: string, t: (key: string) => string, type?: RgbTr
       return t('rgb_status_confirming');
     case 'waiting_receive':
     case 'waitingcounterparty':
-      return t('rgb_status_confirming');
+      return t('rgb_status_waiting_receive');
     case 'settled':
     case 'confirmed':
       return t('rgb_status_confirmed');
@@ -62,7 +64,7 @@ function getDescription(transfer: RgbTransferItem | undefined, t: (key: string) 
   if (transfer?.status === 'broadcasted') return t('rgb_transfer_broadcasted_description');
   if (transfer?.status === 'broadcast_failed') return t('rgb_transfer_broadcast_failed_description');
   if (transfer?.status === 'pending_accept') return t('rgb_transfer_pending_accept_description');
-  if (transfer?.status === 'confirming' || transfer?.status === 'waiting_receive') {
+  if (transfer?.status === 'confirming') {
     return t('rgb_transfer_confirming_description');
   }
   if (transfer?.status === 'canceled' || transfer?.status === 'cancelled') {
@@ -73,21 +75,11 @@ function getDescription(transfer: RgbTransferItem | undefined, t: (key: string) 
   return '';
 }
 
-function isPendingStatus(status: string) {
-  return !['settled', 'confirmed', 'rejected', 'failed', 'canceled', 'cancelled'].includes(
-    status.toLowerCase()
-  );
-}
-
-function isConfirmedStatus(status: string) {
-  return ['settled', 'confirmed'].includes(status.toLowerCase());
-}
-
 function getStatusColor(status: string) {
-  if (isConfirmedStatus(status)) return '#7CDB98';
-  if (['canceled', 'cancelled', 'rejected'].includes(status.toLowerCase())) return '#EE344C';
-  if (isPendingStatus(status)) return '#F4B62C';
-  return 'rgba(255,255,255,0.85)';
+  const value = status.toLowerCase();
+  if (['settled', 'confirmed'].includes(value)) return '#7CDB98';
+  if (['canceled', 'cancelled', 'rejected', 'failed', 'broadcast_failed'].includes(value)) return '#EE344C';
+  return '#F4B62C';
 }
 
 function formatDate(timestamp: number) {
@@ -201,12 +193,13 @@ export function RGBTransferDetailSheet({
   const [broadcastRetryLoading, setBroadcastRetryLoading] = useState(false);
 
   const status = transfer?.status || 'pending';
-  const assetLabel = transfer?.ticker || transfer?.name || 'RGB';
+  const ticker = transfer?.ticker || transfer?.name || 'RGB';
+  const assetName = transfer?.name || transfer?.ticker || 'RGB';
   const amountPrefix = transfer?.type === 'receive' ? '+ ' : transfer?.type === 'send' ? '- ' : '';
   const displayAmount = transfer?.amount
     ? toRgbDisplayAmount(transfer.amount, getRgbTokenPrecision(transfer))
     : '--';
-  const amountText = [amountPrefix + displayAmount, assetLabel].filter(Boolean).join(' ');
+  const amountText = amountPrefix + displayAmount;
   const description = getDescription(transfer, t);
   const canExplore =
     !!transfer?.txid &&
@@ -218,8 +211,7 @@ export function RGBTransferDetailSheet({
     transfer?.type === 'receive' && String(transfer?.status || '').toLowerCase() === 'pending_accept';
   const canRetryBroadcast =
     transfer?.type === 'send' && String(transfer?.status || '').toLowerCase() === 'broadcast_failed';
-  const assetIdDisplay =
-    transfer?.assetId?.replace(/^rgb:/i, '').slice(0, 12) || transfer?.assetId || '--';
+  const assetId = transfer?.assetId?.trim();
   const counterpartyAddress =
     transfer?.type === 'receive' ? transfer?.from?.trim() : transfer?.type === 'send' ? transfer?.to?.trim() : '';
   const counterpartyLabel = transfer?.type === 'receive' ? t('from') : transfer?.type === 'send' ? t('to') : '';
@@ -333,14 +325,13 @@ export function RGBTransferDetailSheet({
           <Checkbox
             checked={cancelAcknowledged}
             onChange={(event) => setCancelAcknowledged(event.target.checked)}
-            style={{ marginTop: 20, alignItems: 'flex-start' }}
+            style={{ marginTop: 20 }}
             data-testid="rgb-cancel-transfer-checkbox">
             <Text
               text={t('rgb_cancel_send_acknowledgement')}
-              color="white_muted2"
               size="sm"
               wrap
-              style={{ lineHeight: '20px' }}
+              style={{ lineHeight: '20px', color: 'rgba(255, 255, 255, 0.65)' }}
             />
           </Checkbox>
           <Row gap="md" fullX style={{ marginTop: 24 }}>
@@ -387,9 +378,24 @@ export function RGBTransferDetailSheet({
         />
 
         <Column fullX itemsCenter style={{ paddingLeft: 16, paddingRight: 16, gap: 24 }}>
-          <Row itemsCenter style={{ gap: 6 }}>
+          <Row itemsCenter justifyCenter style={{ gap: 8 }}>
+            <RGBAssetIcon
+              iconInfo={getRgbTokenIconInfo(transfer, ticker)}
+              ticker={ticker}
+              name={getRgbAssetName(transfer) || assetName}
+              size={32}
+            />
             <Text
               text={amountText}
+              style={{
+                fontSize: 18,
+                fontWeight: 500,
+                color: 'rgba(255,255,255,0.85)',
+                lineHeight: '1.4'
+              }}
+            />
+            <Text
+              text={assetName}
               style={{
                 fontSize: 18,
                 fontWeight: 500,
@@ -423,12 +429,35 @@ export function RGBTransferDetailSheet({
           ) : null}
 
           <Column fullX style={{ gap: 12 }}>
+            <DetailRow label={t('date')} value={formatDate(transfer?.timestamp || 0)} />
             <DetailRow
               label="Status"
               value={getStatusLabel(status, t, transfer?.type)}
               valueColor={getStatusColor(status)}
             />
-            <DetailRow label={t('date')} value={formatDate(transfer?.timestamp || 0)} />
+            <Row fullX justifyBetween itemsCenter style={{ minHeight: 32 }}>
+              <Text
+                text={t('asset_id')}
+                style={{
+                  fontSize: 14,
+                  fontWeight: 500,
+                  color: 'rgba(255,255,255,0.45)',
+                  flexShrink: 0
+                }}
+              />
+              {assetId ? (
+                <CopyableAddress address={assetId} copyPosition="after" len={10} color="ticker_color2" />
+              ) : (
+                <Text
+                  text="--"
+                  style={{
+                    fontSize: 14,
+                    fontWeight: 500,
+                    color: 'rgba(255,255,255,0.85)'
+                  }}
+                />
+              )}
+            </Row>
             {counterpartyLabel ? (
               <Row fullX justifyBetween itemsCenter style={{ minHeight: 32 }}>
                 <Text
@@ -440,7 +469,12 @@ export function RGBTransferDetailSheet({
                   }}
                 />
                 {counterpartyAddress ? (
-                  <CopyableAddress address={counterpartyAddress} />
+                  <CopyableAddress
+                    address={counterpartyAddress}
+                    copyPosition="after"
+                    color="ticker_color2"
+                    suffix={<RgbAddressBadge />}
+                  />
                 ) : (
                   <Text
                     text="--"
@@ -453,12 +487,23 @@ export function RGBTransferDetailSheet({
                 )}
               </Row>
             ) : null}
-            <DetailRow label={t('asset_id')} value={assetIdDisplay} />
             {status !== 'rejected' ? (
-              <DetailRow
-                label={t('rgb_transfer_id')}
-                value={shortAddress(transfer?.transferId || transferId || '', 10)}
-              />
+              <Row fullX justifyBetween itemsCenter style={{ minHeight: 32 }}>
+                <Text
+                  text={t('rgb_transfer_id')}
+                  style={{
+                    fontSize: 14,
+                    fontWeight: 500,
+                    color: 'rgba(255,255,255,0.45)'
+                  }}
+                />
+                <CopyableAddress
+                  address={transfer?.transferId || transferId || ''}
+                  copyPosition="after"
+                  len={10}
+                  color="ticker_color2"
+                />
+              </Row>
             ) : null}
           </Column>
 

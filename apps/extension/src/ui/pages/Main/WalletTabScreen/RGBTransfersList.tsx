@@ -1,10 +1,11 @@
 import { useEffect, useState } from 'react';
 
-import { Column, Icon, InfiniteList, Row, Text } from '@/ui/components';
-import type { IconTypes } from '@/ui/components/Icon';
+import { Column, InfiniteList, Row, Text, RGBAssetIcon } from '@/ui/components';
+import { getRgbAssetName } from '@/ui/components/RGBAssetIcon';
 import { colors } from '@/ui/theme/colors';
 import { shortAddress } from '@/ui/utils';
 import {
+  getRgbTokenIconInfo,
   getRgbTokenPrecision,
   toRgbDisplayAmount,
   useI18n,
@@ -19,20 +20,20 @@ type RGBTransfersListProps = {
   transfers: ReturnType<typeof useRGBTransfersLogic>;
 };
 
-function getTransferIcon(type: RgbTransferItem['type']): IconTypes {
-  if (type === 'send') return 'history_send';
-  if (type === 'receive') return 'history_receive';
-  return 'history_inscribe';
-}
-
 function getTransferAssetLabel(item?: RgbTransferItem) {
-  return item?.ticker || item?.name || 'RGB';
+  return item?.name || item?.ticker || 'RGB';
 }
 
 function formatTime(timestamp?: number) {
   if (!timestamp) return '';
   const date = new Date(timestamp > 1000000000000 ? timestamp : timestamp * 1000);
   return Number.isNaN(date.getTime()) ? '' : date.toLocaleString();
+}
+
+function transferDateKey(timestamp?: number) {
+  if (!timestamp) return '';
+  const date = new Date(timestamp > 1000000000000 ? timestamp : timestamp * 1000);
+  return Number.isNaN(date.getTime()) ? '' : date.toLocaleDateString();
 }
 
 function getCounterpartyLine(item: RgbTransferItem, t: (key: string) => string) {
@@ -74,7 +75,7 @@ function getStatusLabel(status: string, t: (key: string) => string, type?: RgbTr
       return t('rgb_status_confirming');
     case 'waiting_receive':
     case 'waitingcounterparty':
-      return t('rgb_status_confirming');
+      return t('rgb_status_waiting_receive');
     case 'settled':
     case 'confirmed':
       return t('rgb_status_confirmed');
@@ -132,62 +133,72 @@ export function RGBTransfersList({ transfers }: RGBTransfersListProps) {
         emptyPreset="assets"
         rowGap={0}
         renderItem={({ item }) => {
+          const itemIndex = items.indexOf(item);
+          const date = transferDateKey(item.timestamp);
+          const previousDate = itemIndex > 0 ? transferDateKey(items[itemIndex - 1]?.timestamp) : '';
+          const showDate = Boolean(date && date !== previousDate);
           const pending = isPending(item.status);
+          const assetLabel = getTransferAssetLabel(item);
+          const isReceive = item.type === 'receive';
+          const amountColor = isReceive ? 'rgba(124, 219, 152, 0.85)' : 'rgba(255, 255, 255, 0.85)';
+          const sign = item.type === 'issue' ? '' : isReceive ? '+' : '-';
           return (
-            <Row
-              fullX
-              justifyBetween
-              itemsCenter
-              onClick={() => setSelectedTransfer(item)}
-              style={{
-                borderBottomWidth: 1,
-                borderColor: colors.border2,
-                paddingTop: 12,
-                paddingBottom: 12
-              }}>
-              <Row itemsCenter>
-                <Icon icon={getTransferIcon(item.type)} size={32} />
-                <Column gap="xs">
-                  <Row itemsCenter>
-                    <Text text={getTransferTitle(item.type, t)} />
-                    {pending || ['canceled', 'cancelled', 'rejected'].includes(item.status.toLowerCase()) ? (
-                      <Row
-                        style={{
-                          backgroundColor: pending ? 'rgba(244, 182, 44, 0.15)' : 'rgba(238, 52, 76, 0.15)',
-                          borderRadius: 4
-                        }}
-                        px="sm"
-                        py="xs">
-                        <Text
-                          text={getStatusLabel(item.status, t, item.type)}
-                          size="xs"
+            <Column fullX gap="zero">
+              {showDate ? <Text text={date} color="textDim" size="sm" style={{ paddingTop: 12, paddingBottom: 4 }} /> : null}
+              <Row
+                fullX
+                justifyBetween
+                itemsCenter
+                onClick={() => setSelectedTransfer(item)}
+                style={{
+                  borderBottomWidth: 1,
+                  borderColor: colors.border2,
+                  paddingTop: 12,
+                  paddingBottom: 12
+                }}>
+                <Row itemsCenter gap="md">
+                  <RGBAssetIcon
+                    iconInfo={getRgbTokenIconInfo(item, assetLabel)}
+                    ticker={assetLabel}
+                    name={getRgbAssetName(item)}
+                    size={32}
+                  />
+                  <Column gap="xs">
+                    <Row itemsCenter>
+                      <Text text={getTransferTitle(item.type, t)} />
+                      {pending || ['canceled', 'cancelled', 'rejected'].includes(item.status.toLowerCase()) ? (
+                        <Row
                           style={{
-                            color: pending ? 'rgba(244, 182, 44, 0.85)' : '#EE344C'
+                            backgroundColor: pending ? 'rgba(244, 182, 44, 0.15)' : 'rgba(238, 52, 76, 0.15)',
+                            borderRadius: 4
                           }}
-                        />
-                      </Row>
-                    ) : null}
-                  </Row>
-                  <Text text={getCounterpartyLine(item, t)} preset="sub" />
-                  {formatTime(item.timestamp) ? (
+                          px="sm"
+                          py="xs">
+                          <Text
+                            text={getStatusLabel(item.status, t, item.type)}
+                            size="xs"
+                            style={{
+                              color: pending ? 'rgba(244, 182, 44, 0.85)' : '#EE344C'
+                            }}
+                          />
+                        </Row>
+                      ) : null}
+                    </Row>
+                    <Text text={getCounterpartyLine(item, t)} preset="sub" />
+                  </Column>
+                </Row>
+                <Column itemsEnd gap="zero">
+                  <Row gap="sm" itemsCenter justifyEnd>
+                    {sign ? <Text text={sign} style={{ fontSize: 14, lineHeight: '20px', color: amountColor }} /> : null}
                     <Text
-                      text={formatTime(item.timestamp)}
-                      size="xs"
-                      color="textDim"
-                      style={{ fontSize: 11 }}
+                      text={item.amount ? toRgbDisplayAmount(item.amount, getRgbTokenPrecision(item)) : '--'}
+                      style={{ fontSize: 14, lineHeight: '20px', color: amountColor }}
                     />
-                  ) : null}
+                    <Text text={assetLabel} style={{ fontSize: 14, lineHeight: '20px', color: amountColor }} />
+                  </Row>
                 </Column>
               </Row>
-              <Column itemsEnd gap="zero">
-                <Text
-                  text={[
-                    item.amount ? toRgbDisplayAmount(item.amount, getRgbTokenPrecision(item)) : '--',
-                    getTransferAssetLabel(item)
-                  ].join(' ')}
-                />
-              </Column>
-            </Row>
+            </Column>
           );
         }}
       />

@@ -68,4 +68,23 @@ describe('useRGBBalanceCardLogic', () => {
     expect(result.current.pendingBalanceStr).toBe('0.5')
     expect(result.current.lockedBalanceStr).toBe('10')
   })
+
+  it('uses the asset name for placeholder icon initials instead of the ticker', () => {
+    const { wrapper } = createHookTestHarness()
+    const { result } = renderHook(
+      () =>
+        useRGBBalanceCardLogic({
+          tokenBalance: {
+            assetId: 'rgb:asset',
+            name: 'RGBRGB',
+            ticker: '*',
+            balance: '0',
+            spendable: '0',
+          },
+        }),
+      { wrapper }
+    )
+
+    expect(result.current.iconInfo.iconShortName).toBe('RG')
+  })
 })

@@ -26,7 +26,7 @@ export function RGBTransferNotificationPanel({
   const amount = transfer.amount
     ? toRgbDisplayAmount(transfer.amount, getRgbTokenPrecision(transfer))
     : '--';
-  const asset = transfer.ticker || transfer.name || 'RGB';
+  const asset = transfer.name || transfer.ticker || 'RGB';
   const receiveConfirmed = notification.kind === 'receive_confirmed';
 
   return (

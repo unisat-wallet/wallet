@@ -216,7 +216,7 @@ export function TabBar(props: TabBarProps) {
 
   if (preset == 'style3') {
     return (
-      <Row gap="lg">
+      <Row gap="xl">
         {items.map((v) => {
           const isSelected = v.key === tabKey;
           return (

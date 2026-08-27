@@ -1,4 +1,5 @@
 import { Button, Column, Content, Footer, Header, Icon, Layout, Row, Text } from '@/ui/components';
+import { TxResultStatusMark } from '@/ui/components/TxResultStatusMark';
 import { spacing } from '@/ui/theme/spacing';
 import { useRGBSendCompleteScreenLogic } from '@unisat/wallet-state';
 
@@ -11,7 +12,7 @@ export default function RGBSendCompleteScreen() {
       <Content style={{ gap: spacing.small }}>
         <Column justifyCenter mt="xxl" gap="xl">
           <Row justifyCenter>
-            <Icon icon="success" size={50} style={{ alignSelf: 'center' }} />
+            <TxResultStatusMark pending={false} />
           </Row>
 
           <Text preset="title" text={t('rgb_sent')} textCenter />

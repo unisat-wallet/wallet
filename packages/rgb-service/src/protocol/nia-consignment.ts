@@ -1,6 +1,9 @@
 import { Transaction } from 'bitcoinjs-lib'
 import { RgbServiceError } from '../errors'
+import type { RgbContractMetadata } from '../types'
 import { transitionBundleId } from './bundle'
+import { unwrapRgbTransferConsignment } from './consignment'
+import { encodeRgbContractId, rgbContractIdHex } from './contract-id'
 import { verifyMpcMerkleProof } from './mpc'
 import { encodeNiaTransition, type NiaFungibleAssignment, type NiaOutpoint } from './nia'
 import { niaConsignmentTail } from './nia-contract'
@@ -11,6 +14,7 @@ import { StrictReader, StrictWriter } from './strict'
 const NIA_SCHEMA_ID = '45687051f4cca6e3f665fc75fe3e27b30080346789ad83aa0dc29e95a315e335'
 const NIA_ASSET_OWNER = 4000
 const NIA_TRANSFER = 10000
+const OPRET_PROOF_TAG = 2
 
 type DecodedNiaTransition = {
   opId: string
@@ -66,6 +70,7 @@ function network(value: number): NiaGenesis['network'] {
 function readNiaGenesis(reader: StrictReader): {
   encoded: EncodedNiaGenesis
   allocations: NiaGenesis['allocations']
+  metadata: RgbContractMetadata
 } {
   const start = reader.position
   if (reader.readU16() !== 0) throw new RgbServiceError('NIA Genesis version is unsupported')
@@ -137,7 +142,18 @@ function readNiaGenesis(reader: StrictReader): {
   })
   if (!same(encoded.strict, strict))
     throw new RgbServiceError('NIA Genesis strict encoding is unsupported')
-  return { encoded, allocations }
+  return {
+    encoded,
+    allocations,
+    metadata: {
+      ticker,
+      name,
+      precision,
+      schema: 'NIA',
+      issuedSupply: supply.toString(),
+      timestamp,
+    },
+  }
 }
 
 function readStrictBitcoinTransaction(reader: StrictReader): Transaction {
@@ -243,6 +259,9 @@ function readWitnessBundle(reader: StrictReader): DecodedNiaWitnessBundle {
   reader.readU16()
   reader.readFixedBytes(reader.readU8() * 32)
   const proof = reader.slice(proofStart)
+  if (reader.readU8() !== OPRET_PROOF_TAG) {
+    throw new RgbServiceError('RGB WitnessBundle proof type is unsupported')
+  }
   const inputs = reader.readU16()
   const bundleInputs = []
   for (let index = 0; index < inputs; index++) {
@@ -335,6 +354,7 @@ function reencodeWitnessBundle(
     .writeU8(1)
     .writeFixedBytes(bundle.witnessTxStrict, bundle.witnessTxStrict.length)
     .writeFixedBytes(bundle.proof, bundle.proof.length)
+    .writeU8(OPRET_PROOF_TAG)
     .writeU16(bundle.bundleInputs.length)
   for (const input of bundle.bundleInputs) {
     writer
@@ -510,6 +530,7 @@ function assertParentSealSpent(
 
 export interface DecodedNiaConsignment {
   assetId: string
+  metadata: RgbContractMetadata
   transfer: boolean
   genesis: EncodedNiaGenesis
   genesisAllocations: NiaGenesis['allocations']
@@ -521,7 +542,7 @@ export interface DecodedNiaConsignment {
 /** Require a complete, acyclic parent-state graph before crediting a decoded transfer. */
 export function validateNiaConsignmentParentState(consignment: DecodedNiaConsignment): void {
   validateTransitionGraph(
-    consignment.assetId.replace(/^rgb:/, ''),
+    rgbContractIdHex(consignment.assetId),
     consignment.genesisAllocations,
     consignment.witnessBundles,
     true
@@ -534,7 +555,7 @@ export function validateNiaConsignmentParentState(consignment: DecodedNiaConsign
  */
 export function validateNiaConsignmentParentSpends(consignment: DecodedNiaConsignment): void {
   validateTransitionGraph(
-    consignment.assetId.replace(/^rgb:/, ''),
+    rgbContractIdHex(consignment.assetId),
     consignment.genesisAllocations,
     consignment.witnessBundles,
     true,
@@ -544,7 +565,7 @@ export function validateNiaConsignmentParentSpends(consignment: DecodedNiaConsig
 
 /** Decode and strictly constrain the standard NIA consignment profile we emit locally. */
 export function decodeNiaConsignment(value: Uint8Array): DecodedNiaConsignment {
-  const reader = new StrictReader(value)
+  const reader = new StrictReader(unwrapRgbTransferConsignment(value))
   if (reader.readU8() !== 0) throw new RgbServiceError('RGB Consignment version is unsupported')
   const transferTag = reader.readU8()
   if (transferTag !== 0 && transferTag !== 1)
@@ -599,7 +620,8 @@ export function decodeNiaConsignment(value: Uint8Array): DecodedNiaConsignment {
     validateTransitionGraph(id, parsedGenesis.allocations, witnessBundles)
   }
   return {
-    assetId: `rgb:${id}`,
+    assetId: encodeRgbContractId(genesis.assetId),
+    metadata: parsedGenesis.metadata,
     transfer: transferTag === 1,
     genesis,
     genesisAllocations: parsedGenesis.allocations,

@@ -1,4 +1,5 @@
 import { Column, Icon, InfiniteList, Row, Text } from '@/ui/components';
+import { Empty } from '@/ui/components/Empty';
 import type { IconTypes } from '@/ui/components/Icon';
 import { colors } from '@/ui/theme/colors';
 import { shortAddress } from '@/ui/utils';
@@ -157,8 +158,8 @@ export function RGBTokenHistory(props: {
 
   if (!activityLoading && activityItems.length === 0) {
     return (
-      <Column style={{ minHeight: 150 }} itemsCenter justifyCenter>
-        <Text text={t('empty')} preset="sub" />
+      <Column fullX itemsCenter style={{ paddingTop: 24 }}>
+        <Empty text={t('empty')} preset="assets" />
       </Column>
     );
   }

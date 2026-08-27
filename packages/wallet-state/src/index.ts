@@ -63,6 +63,7 @@ export {
 export { useAsyncEffect } from './utils/ui-utils'
 export {
   isValidRgbDecimalAmount,
+  getRgbIconShortName,
   getRgbTokenPrecision,
   normalizeRgbAmountInput,
   toRgbAtomicAmount,

@@ -3,6 +3,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { useI18n, useNavigation, useTools, useWallet } from 'src/context'
 import { useFeeRateBar } from 'src/hooks'
 import {
+  getRgbIconShortName,
   getRgbTokenPrecision,
   isValidRgbDecimalAmount,
   toRgbAtomicAmount,
@@ -47,7 +48,7 @@ function isRgbAmountWithinSpendable(amount: string | undefined, spendable: strin
   return BigInt(amount) <= BigInt(spendable)
 }
 
-function getTokenIconInfo(tokenBalance: unknown, ticker: string) {
+function getTokenIconInfo(tokenBalance: unknown, name: string, ticker: string) {
   const record =
     tokenBalance && typeof tokenBalance === 'object' ? (tokenBalance as Record<string, any>) : {}
   const iconInfo =
@@ -55,11 +56,7 @@ function getTokenIconInfo(tokenBalance: unknown, ticker: string) {
       ? (record['iconInfo'] as Record<string, any>)
       : {}
   const iconUrl = typeof iconInfo['iconUrl'] === 'string' ? iconInfo['iconUrl'] : ''
-  const iconShortName =
-    typeof iconInfo['iconShortName'] === 'string' && iconInfo['iconShortName']
-      ? iconInfo['iconShortName']
-      : ticker.slice(0, 2).toUpperCase()
-  return { iconUrl, iconShortName }
+  return { iconUrl, iconShortName: getRgbIconShortName(name, ticker) }
 }
 
 function getRgbBeginTxid(value: unknown) {
@@ -125,7 +122,7 @@ export function useSendRGBScreenLogic() {
     invoiceReadyForAmount &&
     isAmountValid &&
     !isRgbAmountWithinSpendable(requestedAmount, rawSpendable)
-  const iconInfo = getTokenIconInfo(tokenBalance, ticker)
+  const iconInfo = getTokenIconInfo(tokenBalance, name, ticker)
   const displayInvoiceAmount = toRgbDisplayAmount(invoiceAmount, assetPrecision)
   const displayAmount = requiresAmount ? amount : displayInvoiceAmount
   const amountPlaceholder = requiresAmount ? '0' : invoice.trim() ? t('any_amount') : '0'

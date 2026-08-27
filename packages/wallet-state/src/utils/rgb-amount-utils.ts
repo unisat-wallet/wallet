@@ -20,6 +20,11 @@ export function getRgbTokenPrecision(value: unknown) {
   return Number.isInteger(precision) && precision >= 0 && precision <= 18 ? precision : 0
 }
 
+export function getRgbIconShortName(name?: string, ticker?: string) {
+  const source = (name || ticker || 'RGB').trim()
+  return Array.from(source).slice(0, 2).join('').toUpperCase() || 'RG'
+}
+
 export function normalizeRgbAmountInput(value: string, precision: number) {
   let nextValue = value.trim().replace(/,/g, '')
   if (!nextValue) return ''

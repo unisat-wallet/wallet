@@ -8,6 +8,7 @@ import type {
   RgbValidationHistory,
 } from '../types'
 import { completeRgbOpretPsbt } from './complete'
+import { normalizeRgbAssetId } from './contract-id'
 import { serializeNiaOpretWitnessBundle } from './consignment'
 import { verifyRevealedNiaAllocations } from './nia-allocation'
 import { decodeNiaConsignment } from './nia-consignment'
@@ -36,7 +37,7 @@ function bytes(value: string, name: string) {
 }
 
 function assetId(value: string) {
-  return value.replace(/^rgb:/, '').toLowerCase()
+  return normalizeRgbAssetId(value)
 }
 
 function randomU64() {
@@ -255,7 +256,7 @@ export const localNiaProtocolEncoder: RgbProtocolEncoder = {
     })
     const decoded = decodeNiaConsignment(consignment)
     if (
-      decoded.assetId !== input.pending.request.assetId ||
+      decoded.assetId !== assetId(input.pending.request.assetId) ||
       !decoded.transitions.some(transition => transition.opId === data['transitionId'])
     ) {
       throw new RgbServiceError('Locally encoded RGB Consignment did not round-trip')

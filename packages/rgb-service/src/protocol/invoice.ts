@@ -1,6 +1,7 @@
 import { sha256 } from '@noble/hashes/sha256'
 import { RgbServiceError } from '../errors'
 import type { RgbNetwork } from '../types'
+import { normalizeRgbAssetId } from './contract-id'
 
 export type RgbInvoiceRecipientType = 'blind' | 'witness'
 export type RgbWitnessAddressType = 'p2pkh' | 'p2sh' | 'p2wpkh' | 'p2wsh' | 'p2tr'
@@ -84,7 +85,7 @@ function decodeFast32Amount(value?: string) {
 
 function normalizeAssetId(value?: string) {
   if (!value || value === OMITTED) return undefined
-  return value.startsWith('rgb:') ? value : `rgb:${value}`
+  return normalizeRgbAssetId(value)
 }
 
 function invoiceNetwork(recipientId: string): RgbNetwork | undefined {

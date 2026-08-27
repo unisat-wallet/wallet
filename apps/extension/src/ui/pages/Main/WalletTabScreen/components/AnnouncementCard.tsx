@@ -3,7 +3,8 @@ import { shortDesc } from '@/ui/utils';
 import { AnnouncementLinkType } from '@unisat/wallet-shared';
 import { useAnnouncementCardLogic, useI18n } from '@unisat/wallet-state';
 
-const CARD_HEIGHT = 130;
+const CARD_HEIGHT = 148;
+const VIEW_DETAIL_GAP = 12;
 
 export function AnnouncementCard() {
   const { t } = useI18n();
@@ -76,9 +77,12 @@ export function AnnouncementCard() {
         </Row>
 
         {/* Title & description */}
-        <Column style={{ flex: 1, gap: 2 }}>
+        <Column style={{ flex: 1, gap: VIEW_DETAIL_GAP, minHeight: 0 }}>
           <Column
-            style={{ maxHeight: isLinkable(current) ? CARD_HEIGHT - 80 : '100%', overflow: 'hidden' }}
+            style={{
+              maxHeight: isLinkable(current) ? CARD_HEIGHT - 100 : '100%',
+              overflow: 'hidden'
+            }}
             overflowY
             gap={'xs'}>
             <Text text={current.title} size="xs" />
@@ -88,7 +92,7 @@ export function AnnouncementCard() {
           {isLinkable(current) && (
             <Card
               preset="style2"
-              style={{ height: 32, backgroundColor: 'rgba(255, 255, 255, 0.1)', marginTop: 'auto' }}
+              style={{ height: 32, backgroundColor: 'rgba(255, 255, 255, 0.1)', flexShrink: 0 }}
               fullX
               onClick={() => {
                 handleViewDetails();

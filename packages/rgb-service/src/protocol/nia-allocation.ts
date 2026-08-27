@@ -1,5 +1,6 @@
 import { RgbServiceError } from '../errors'
 import type { RgbUtxo } from '../types'
+import { normalizeRgbAssetId, rgbContractIdHex } from './contract-id'
 import type { DecodedNiaConsignment } from './nia-consignment'
 import { concealBlindSeal, type RgbBlindSeal } from './receive'
 
@@ -15,14 +16,14 @@ export function verifyRevealedNiaAllocations(input: {
   /** Locally encrypted blind receive seals. These are never sent to the API. */
   knownBlindSeals?: RgbBlindSeal[]
 }) {
-  const assetId = input.assetId.replace(/^rgb:/, '').toLowerCase()
-  const rootId = assetId
+  const assetId = normalizeRgbAssetId(input.assetId)
+  const rootId = rgbContractIdHex(assetId)
   const transitions = new Map<
     string,
     { assignment: any; txid: string; output?: { scriptPubKey: string } }
   >()
   for (const consignment of input.consignments) {
-    if (consignment.assetId.replace(/^rgb:/, '') !== assetId)
+    if (normalizeRgbAssetId(consignment.assetId) !== assetId)
       throw new RgbServiceError('RGB allocation history asset mismatch')
     for (const bundle of consignment.witnessBundles) {
       for (const transition of bundle.transitions) {
@@ -49,14 +50,14 @@ export function verifyRevealedNiaAllocations(input: {
   for (const utxo of input.utxos) {
     for (const allocation of utxo.allocations) {
       if (
-        allocation.assetId.replace(/^rgb:/, '') !== assetId ||
+        normalizeRgbAssetId(allocation.assetId) !== assetId ||
         !allocation.opId ||
         allocation.assignmentIndex === undefined
       )
         continue
       if (allocation.opId.replace(/^rgb:/, '').toLowerCase() === rootId) {
         const genesis = input.consignments.find(
-          consignment => consignment.assetId.replace(/^rgb:/, '') === rootId
+          consignment => rgbContractIdHex(consignment.assetId) === rootId
         )
         const expected = genesis?.genesisAllocations[allocation.assignmentIndex]
         if (

@@ -46,7 +46,7 @@ export function NotificationPanel({
           text={actionText}
           onClick={onAction}
           style={{ marginTop: 12, minHeight: 48 }}
-          textStyle={{ color: colors.black, fontWeight: 'normal' }}
+          textStyle={{ color: colors.white, fontWeight: 'normal' }}
         />
       </Column>
     </BottomModal>

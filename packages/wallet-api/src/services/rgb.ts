@@ -3,6 +3,7 @@
  */
 
 import type { BaseHttpClient } from '../client/http-client'
+import { normalizeRgbAssetId, normalizeRgbAssetRecord } from './rgb-contract-id'
 import type {
   RgbActivityItem,
   RgbAddressActivityQuery,
@@ -30,6 +31,7 @@ import type {
 
 export class RgbService {
   private authenticator: RgbRequestAuthenticator | undefined
+  private readonly rgbAssetDetailCache = new Map<string, Promise<RgbAssetDetail>>()
 
   constructor(private readonly httpClient: BaseHttpClient) {}
 
@@ -52,16 +54,21 @@ export class RgbService {
       }
     )
 
-    return this.normalizeListResponse<RgbBalance>(response)
+    const result = this.normalizeListResponse<RgbBalance>(response)
+    return {
+      ...result,
+      list: await Promise.all(result.list.map(item => this.enrichRgbAssetListItem(item))),
+    }
   }
 
   /**
    * Get address RGB asset balance
    */
   async getRgbAssetBalance(address: string, assetId: string): Promise<RgbBalance> {
-    return this.httpClient.get(
-      `/v5/rgb/address/${encodeURIComponent(address)}/assets/${encodeURIComponent(assetId)}`
+    const response = await this.httpClient.get(
+      `/v5/rgb/address/${encodeURIComponent(address)}/assets/${encodeURIComponent(normalizeRgbAssetId(assetId))}`
     )
+    return normalizeRgbAssetRecord(response)
   }
 
   /**
@@ -69,14 +76,51 @@ export class RgbService {
    * not transmit contract bytes, keys, descriptors, or wallet derivation data.
    */
   async syncRgbAssetMetadata(params: RgbAssetMetadataSyncRequest): Promise<void> {
-    await this.privatePost('/v5/rgb/assets/sync', params)
+    await this.privatePost('/v5/rgb/assets/sync', {
+      ...params,
+      asset: { ...params.asset, assetId: normalizeRgbAssetId(params.asset.assetId) },
+    })
   }
 
   /**
    * Get RGB asset detail
    */
   async getRgbAssetDetail(assetId: string): Promise<RgbAssetDetail> {
-    return this.httpClient.get(`/v5/rgb/assets/${encodeURIComponent(assetId)}`)
+    const response = await this.httpClient.get(
+      `/v5/rgb/assets/${encodeURIComponent(normalizeRgbAssetId(assetId))}`
+    )
+    return normalizeRgbAssetRecord(response)
+  }
+
+  private async enrichRgbAssetListItem(item: RgbBalance): Promise<RgbBalance> {
+    if (!needsRgbAssetMetadata(item) || !item.assetId) return item
+
+    try {
+      const detail = await this.getCachedRgbAssetDetail(item.assetId)
+      return {
+        ...item,
+        ...(detail.name ? { name: detail.name } : {}),
+        ...(detail.ticker ? { ticker: detail.ticker } : {}),
+        ...(detail.precision === undefined ? {} : { precision: detail.precision }),
+        ...(detail.schema === undefined ? {} : { schema: detail.schema }),
+        ...(detail.issuedSupply === undefined ? {} : { issuedSupply: detail.issuedSupply }),
+      }
+    } catch {
+      // The list remains usable when the optional metadata fallback is unavailable.
+      return item
+    }
+  }
+
+  private getCachedRgbAssetDetail(assetId: string): Promise<RgbAssetDetail> {
+    const cached = this.rgbAssetDetailCache.get(assetId)
+    if (cached) return cached
+
+    const request = this.getRgbAssetDetail(assetId).catch(error => {
+      this.rgbAssetDetailCache.delete(assetId)
+      throw error
+    })
+    this.rgbAssetDetailCache.set(assetId, request)
+    return request
   }
 
   /**
@@ -87,7 +131,7 @@ export class RgbService {
     { page, pageSize, address, type }: RgbAssetActivityQuery
   ): Promise<RgbPageResponse<RgbActivityItem>> {
     const response = await this.httpClient.get(
-      `/v5/rgb/assets/${encodeURIComponent(assetId)}/activity`,
+      `/v5/rgb/assets/${encodeURIComponent(normalizeRgbAssetId(assetId))}/activity`,
       {
         query: { page, pageSize, address, type },
       }
@@ -103,10 +147,11 @@ export class RgbService {
     address: string,
     { page, pageSize, assetId, type }: RgbAddressActivityQuery
   ): Promise<RgbPageResponse<RgbActivityItem>> {
+    const normalizedAssetId = assetId ? normalizeRgbAssetId(assetId) : undefined
     const response = await this.httpClient.get(
       `/v5/rgb/address/${encodeURIComponent(address)}/activity`,
       {
-        query: { page, pageSize, assetId, type },
+        query: { page, pageSize, assetId: normalizedAssetId, type },
       }
     )
 
@@ -118,11 +163,11 @@ export class RgbService {
    * Bitcoin transaction. This request intentionally contains no xpub.
    */
   async syncRgbUtxos(params: RgbUtxoSyncRequest): Promise<void> {
-    await this.privatePost('/v5/rgb/utxos/sync', params)
+    await this.privatePost('/v5/rgb/utxos/sync', normalizeUtxoSyncRequest(params))
   }
 
   async replaceRgbUtxos(params: RgbUtxoSyncRequest): Promise<void> {
-    await this.privatePost('/v5/rgb/utxos/replace', params)
+    await this.privatePost('/v5/rgb/utxos/replace', normalizeUtxoSyncRequest(params))
   }
 
   /**
@@ -132,7 +177,17 @@ export class RgbService {
   async getRgbWalletUtxoSnapshot(
     params: RgbWalletUtxoSnapshotRequest
   ): Promise<RgbWalletUtxoSnapshotResult> {
-    return this.privatePost('/v5/rgb/utxos/snapshot', params)
+    const response = await this.privatePost<RgbWalletUtxoSnapshotResult>('/v5/rgb/utxos/snapshot', params)
+    return {
+      ...response,
+      utxos: response.utxos.map(utxo => ({
+        ...utxo,
+        allocations: utxo.allocations.map(allocation => ({
+          ...allocation,
+          assetId: normalizeRgbAssetId(allocation.assetId),
+        })),
+      })),
+    }
   }
 
   async getRgbTransactionStatus(
@@ -150,11 +205,18 @@ export class RgbService {
   async getRgbConsignmentHistory(
     params: RgbConsignmentHistoryRequest
   ): Promise<RgbConsignmentHistoryResult> {
-    return this.privatePost('/v5/rgb/consignments/history', params)
+    const response = await this.privatePost<RgbConsignmentHistoryResult>(
+      '/v5/rgb/consignments/history',
+      { ...params, assetId: normalizeRgbAssetId(params.assetId) }
+    )
+    return { ...response, assetId: normalizeRgbAssetId(response.assetId) }
   }
 
   async publishRgbConsignment(params: RgbConsignmentPublishRequest): Promise<void> {
-    await this.privatePost('/v5/rgb/consignments/publish', params)
+    await this.privatePost('/v5/rgb/consignments/publish', {
+      ...params,
+      assetId: normalizeRgbAssetId(params.assetId),
+    })
   }
 
   /** Associate an opaque transport payload with a local RGB funding address. */
@@ -167,11 +229,20 @@ export class RgbService {
   }
 
   async syncRgbTransfer(params: RgbTransferSyncRequest): Promise<void> {
-    await this.privatePost('/v5/rgb/transfers/sync', params)
+    await this.privatePost('/v5/rgb/transfers/sync', {
+      ...params,
+      consignments: params.consignments.map(consignment => ({
+        ...consignment,
+        assetId: normalizeRgbAssetId(consignment.assetId),
+      })),
+    })
   }
 
   async syncRgbReceiveTransfer(params: RgbReceiveTransferSyncRequest): Promise<void> {
-    await this.privatePost('/v5/rgb/transfers/receive', params)
+    await this.privatePost('/v5/rgb/transfers/receive', {
+      ...params,
+      assetId: normalizeRgbAssetId(params.assetId),
+    })
   }
 
   private async privatePost<T>(path: string, body: unknown): Promise<T> {
@@ -186,7 +257,7 @@ export class RgbService {
     if (Array.isArray(response)) {
       return {
         total: response.length,
-        list: response,
+        list: response.map(item => normalizeRgbAssetRecord(item)),
       }
     }
 
@@ -200,7 +271,7 @@ export class RgbService {
 
     return {
       total,
-      list: Array.isArray(list) ? list : [],
+      list: Array.isArray(list) ? list.map(item => normalizeRgbAssetRecord(item)) : [],
     }
   }
 
@@ -216,4 +287,28 @@ export class RgbService {
 
     return response
   }
+}
+
+function normalizeUtxoSyncRequest(params: RgbUtxoSyncRequest): RgbUtxoSyncRequest {
+  return {
+    ...params,
+    outpoints: params.outpoints.map(outpoint => ({
+      ...outpoint,
+      allocations: outpoint.allocations.map(allocation => ({
+        ...allocation,
+        assetId: normalizeRgbAssetId(allocation.assetId),
+      })),
+    })),
+  }
+}
+
+function needsRgbAssetMetadata(item: RgbBalance): boolean {
+  const name = typeof item.name === 'string' ? item.name.trim() : ''
+  const ticker = typeof item.ticker === 'string' ? item.ticker.trim() : ''
+  return (
+    !name ||
+    !ticker ||
+    (name === 'RGB' && ticker === 'RGB') ||
+    item.precision === undefined
+  )
 }

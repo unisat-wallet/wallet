@@ -1,4 +1,5 @@
 import { Column, Icon, Row, Text, Tooltip } from '@/ui/components';
+import { Empty } from '@/ui/components/Empty';
 import { colors } from '@/ui/theme/colors';
 import { fontSizes } from '@/ui/theme/font';
 import { showLongNumber } from '@/ui/utils';
@@ -79,8 +80,8 @@ export function BRC20TokenHistory(props: { ticker: string; displayName?: string 
 
   if (isEmpty) {
     return (
-      <Column style={{ minHeight: 150 }} itemsCenter justifyCenter>
-        <Text text={t('empty')} preset="sub" />
+      <Column fullX itemsCenter style={{ paddingTop: 24 }}>
+        <Empty text={t('empty')} preset="assets" />
       </Column>
     );
   }

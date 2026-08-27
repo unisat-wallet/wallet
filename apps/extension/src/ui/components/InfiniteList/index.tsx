@@ -35,7 +35,7 @@ export function InfiniteList<T>({
   height,
   numColumns = 1,
   emptyText,
-  emptyPreset,
+  emptyPreset = 'assets',
   rowGap = 8
 }: InfiniteListProps<T>) {
   const { t } = useI18n();

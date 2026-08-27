@@ -1,6 +1,7 @@
 import { sha256 } from '@noble/hashes/sha256'
 import { RgbServiceError } from '../errors'
 import type { RgbNetwork } from '../types'
+import { normalizeRgbAssetId } from './contract-id'
 
 const BAID64_ALPHABET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789_~'
 const TAG_SECRET_SEAL = 'urn:lnp-bp:seals:secret#2024-02-03'
@@ -115,7 +116,7 @@ export function encodeBlindRgbInvoice(input: {
   if (input.amount !== undefined && !/^(0|[1-9][0-9]*)$/.test(input.amount))
     throw new RgbServiceError('RGB invoice amount is invalid')
   const recipientId = `${networkPrefix(input.network)}:${baid64WithChecksum('utxob', concealBlindSeal(input.seal))}`
-  const assetId = input.assetId?.replace(/^rgb:/, '') || '~'
+  const assetId = input.assetId ? normalizeRgbAssetId(input.assetId).replace(/^rgb:/, '') : '~'
   const query = new URLSearchParams()
   if (input.amount !== undefined) query.set('amount', input.amount)
   if (input.expirationTimestamp !== undefined)

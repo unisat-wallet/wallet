@@ -145,6 +145,57 @@ describe('RgbService', () => {
     expect(dependencies.stateSource.getClaimedConsignments).not.toHaveBeenCalled()
   })
 
+  it('queues metadata from a validated receive before the user accepts it', async () => {
+    const dependencies = createDependencies()
+    dependencies.transport.getConsignment = vi.fn().mockResolvedValue({
+      recipientId: 'recipient',
+      payload: 'received-consignment',
+      txid: 'c'.repeat(64),
+      endpoint: proxyEndpoint,
+    })
+    const service = new RgbService(dependencies)
+    await service.open(wallet)
+    ;(service as any).state.pendingReceives = [
+      {
+        invoice: rgbInvoice(),
+        recipientId: 'recipient',
+        assetId: 'rgb:asset',
+        amount: '60',
+        createdAt: 1,
+        seal: { txid: 'a'.repeat(64), vout: 0, blinding: 1n },
+      },
+    ]
+    const metadata = {
+      ticker: 'TOK',
+      name: 'Received Token',
+      precision: 2,
+      schema: 'NIA',
+      issuedSupply: '1000',
+    }
+    ;(service as any).validateIncomingConsignment = vi.fn().mockReturnValue({
+      decoded: { metadata },
+      assetId: 'rgb:ByzWWOsh-yWg6Im0-FB8oump-lf5bv7o-mJTgBls-Z~CmcZ8',
+      amount: '60',
+      txid: 'c'.repeat(64),
+      opId: 'd'.repeat(64),
+      assignmentIndex: 0,
+    })
+
+    await expect(service.processClaimedReceives({ includeClaimed: false })).resolves.toMatchObject({
+      received: 0,
+    })
+    expect(service.getPendingAssetMetadata()).toEqual([
+      {
+        assetId: 'rgb:ByzWWOsh-yWg6Im0-FB8oump-lf5bv7o-mJTgBls-Z~CmcZ8',
+        metadata,
+      },
+    ])
+
+    const reopened = new RgbService(dependencies)
+    await reopened.open(wallet)
+    expect(reopened.getPendingAssetMetadata()).toEqual(service.getPendingAssetMetadata())
+  })
+
   it('coalesces concurrent snapshot synchronizations', async () => {
     const dependencies = createDependencies()
     let releaseSnapshot: (() => void) | undefined

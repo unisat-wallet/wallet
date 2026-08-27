@@ -10,7 +10,7 @@ interface EmptyProps {
 }
 
 export function Empty(props: EmptyProps) {
-  const { text, preset = 'simple' } = props;
+  const { text, preset = 'assets' } = props;
   const { t } = useI18n();
   const content = text || t('no_data');
 

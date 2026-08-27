@@ -23,11 +23,12 @@ export function IssueReviewModal(props: {
   supply: string;
   precision: string;
   loading?: boolean;
+  error?: string;
   onClose: () => void;
   onConfirm: () => void;
   t: (key: string) => string;
 }) {
-  const { ticker, name, supply, precision, loading, onClose, onConfirm, t } = props;
+  const { ticker, name, supply, precision, loading, error, onClose, onConfirm, t } = props;
   const [visible, setVisible] = useState(false);
 
   useEffect(() => {
@@ -43,13 +44,14 @@ export function IssueReviewModal(props: {
   const overlayStyle: CSSProperties = {
     position: 'fixed',
     inset: 0,
-    zIndex: 1000,
+    zIndex: 10000,
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
     padding: 16,
     backgroundColor: 'rgba(0, 0, 0, 0.85)',
     opacity: visible ? 1 : 0,
+    pointerEvents: visible ? 'auto' : 'none',
     transition: 'opacity 0.2s ease'
   };
 
@@ -89,18 +91,32 @@ export function IssueReviewModal(props: {
           </div>
         </div>
 
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginBottom: 24 }}>
-          <ReviewRow label={t('ticker_label')} value={ticker} />
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginBottom: error ? 12 : 24 }}>
           <ReviewRow label={t('name_label')} value={name} />
+          <ReviewRow label={t('ticker_label')} value={ticker} />
           <ReviewRow label={t('total_supply')} value={supply} />
           <ReviewRow label={t('decimal_places_label')} value={precision} />
         </div>
+
+        {error ? (
+          <div className="rgb-issue-operation-error" style={{ margin: '0 0 16px' }}>
+            {error}
+          </div>
+        ) : null}
 
         <div style={{ display: 'flex', gap: 14, width: '100%' }}>
           <button className="rgb-issue-review-cancel-button" type="button" disabled={loading} onClick={handleClose}>
             {t('cancel')}
           </button>
-          <button className="rgb-issue-review-confirm-button" type="button" disabled={loading} onClick={onConfirm}>
+          <button
+            className="rgb-issue-review-confirm-button"
+            type="button"
+            disabled={loading}
+            onClick={(event) => {
+              event.preventDefault();
+              event.stopPropagation();
+              onConfirm();
+            }}>
             {loading ? <span className="rgb-issue-loading-dot" /> : null}
             {loading ? t('loading') : t('continue_to_sign')}
           </button>

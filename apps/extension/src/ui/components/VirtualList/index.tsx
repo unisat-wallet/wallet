@@ -168,7 +168,7 @@ export function VirtualList<T>({
   if (total === 0) {
     return (
       <Column style={{ minHeight: 150 }} itemsCenter justifyCenter>
-        <Empty text={emptyText} />
+        <Empty text={emptyText} preset="assets" />
       </Column>
     );
   }

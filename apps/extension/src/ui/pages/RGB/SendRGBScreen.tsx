@@ -1,3 +1,5 @@
+import { useCallback, useEffect, useRef } from 'react';
+
 import {
   Button,
   Column,
@@ -11,27 +13,38 @@ import {
   TransferAmountSection
 } from '@/ui/components';
 import { FeeRateBar } from '@/ui/components/FeeRateBar';
+import { sendInputContainerStyle } from '@/ui/components/TransferAmountCard';
 import { spacing } from '@/ui/theme/spacing';
 import { showLongNumber } from '@/ui/utils';
 import { SendRGBScreenStep, useSendRGBScreenLogic } from '@unisat/wallet-state';
 
 import { SignPsbt } from '../Approval/components';
-import { RGBDecodedInvoiceInfo } from './components/RGBDecodedInvoiceInfo';
 
-const textareaStyle = {
+const INVOICE_LINE_HEIGHT = 22;
+const INVOICE_MIN_HEIGHT = INVOICE_LINE_HEIGHT * 3;
+
+const invoiceBoxStyle = {
+  ...sendInputContainerStyle,
+  padding: '12px 16px'
+};
+
+const invoiceFieldStyle = {
   width: '100%',
   boxSizing: 'border-box' as const,
-  resize: 'vertical' as const,
-  height: 100,
-  minHeight: 100,
-  background: 'rgba(255,255,255,0.06)',
-  border: '1px solid rgba(255,255,255,0.14)',
-  borderRadius: 9,
+  display: 'block' as const,
+  resize: 'none' as const,
+  overflow: 'hidden' as const,
+  minHeight: INVOICE_MIN_HEIGHT,
+  background: 'transparent',
+  border: 'none',
   color: '#fff',
-  padding: '12px 12px',
+  padding: 0,
+  margin: 0,
   outline: 'none',
-  lineHeight: '21px',
-  fontSize: 14
+  lineHeight: `${INVOICE_LINE_HEIGHT}px`,
+  fontSize: 14,
+  overflowWrap: 'anywhere' as const,
+  wordBreak: 'break-all' as const
 };
 
 export default function SendRGBScreen() {
@@ -39,19 +52,14 @@ export default function SendRGBScreen() {
     step,
     t,
     ticker,
+    name,
     spendable,
     iconInfo,
-    assetId,
     invoice,
     onInvoiceChange,
     onAmountChange,
     onClickMaxAmount,
     requiresAmount,
-    decodedInvoice,
-    displayInvoiceAmount,
-    invoiceAssetId,
-    invoiceAssetMismatch,
-    invoiceInvalid,
     invoiceReadyForAmount,
     invoiceValidationMessage,
     displayAmount,
@@ -69,6 +77,18 @@ export default function SendRGBScreen() {
     onSignPsbtHandleConfirm
   } = useSendRGBScreenLogic();
 
+  const invoiceRef = useRef<HTMLTextAreaElement>(null);
+  const syncInvoiceHeight = useCallback(() => {
+    const el = invoiceRef.current;
+    if (!el) return;
+    el.style.height = 'auto';
+    el.style.height = `${Math.max(INVOICE_MIN_HEIGHT, el.scrollHeight)}px`;
+  }, []);
+
+  useEffect(() => {
+    syncInvoiceHeight();
+  }, [invoice, syncInvoiceHeight]);
+
   if (step === SendRGBScreenStep.SIGN_TX) {
     return (
       <SignPsbt
@@ -82,28 +102,35 @@ export default function SendRGBScreen() {
 
   return (
     <Layout>
-      <Header onBack={onClickBack} title={`${t('send')} ${ticker}`} />
+      <Header onBack={onClickBack} title={`${t('send')} ${name}`} />
       <Content>
         <Column style={{ paddingTop: 12, gap: spacing.extraLarge }}>
           <Row justifyCenter>
-            <RGBAssetIcon iconInfo={iconInfo} ticker={ticker} size={68} />
+            <RGBAssetIcon iconInfo={iconInfo} ticker={ticker} name={name} size={68} />
           </Row>
 
           <Column gap="md">
             <Row>
               <Text text={t('rgb_invoice')} />
             </Row>
-            <textarea
-              value={invoice}
-              onChange={(e) => {
-                onInvoiceChange(e.target.value);
-              }}
-              placeholder={t('paste_rgb_invoice')}
-              autoFocus
-              rows={5}
-              style={textareaStyle}
-              data-testid="send-rgb-invoice-input"
-            />
+            <div style={invoiceBoxStyle}>
+              <textarea
+                ref={invoiceRef}
+                value={invoice}
+                onChange={(e) => {
+                  onInvoiceChange(e.target.value);
+                  requestAnimationFrame(syncInvoiceHeight);
+                }}
+                placeholder={t('paste_rgb_invoice')}
+                autoFocus
+                rows={3}
+                spellCheck={false}
+                autoCorrect="off"
+                autoComplete="off"
+                style={invoiceFieldStyle}
+                data-testid="send-rgb-invoice-input"
+              />
+            </div>
             {invoiceValidationMessage ? <Text text={invoiceValidationMessage} size="xs" color="danger" wrap /> : null}
           </Column>
 
@@ -125,17 +152,6 @@ export default function SendRGBScreen() {
               {blockingSendMessage ? <Text text={blockingSendMessage} size="xs" color="danger" wrap /> : null}
             </TransferAmountSection>
           ) : null}
-
-          <RGBDecodedInvoiceInfo
-            invoice={invoice}
-            decodedInvoice={decodedInvoice}
-            ticker={ticker}
-            assetId={assetId}
-            invoiceAmount={displayInvoiceAmount}
-            invoiceAssetId={invoiceAssetId}
-            invoiceAssetMismatch={invoiceAssetMismatch}
-            invoiceInvalid={invoiceInvalid}
-          />
 
           <Column gap="sm">
             <FeeRateBar />

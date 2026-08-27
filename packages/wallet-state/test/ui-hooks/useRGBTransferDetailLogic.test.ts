@@ -100,4 +100,31 @@ describe('useRGBTransferDetailLogic', () => {
       expect.objectContaining({ kind: 'receive_confirmed' })
     )
   })
+
+  it('hydrates the transfer detail with canonical asset metadata', async () => {
+    const hexAssetId = 'rgb:072cd658eb21c9683a226d0507ca2e9a995fe5bbfba2625380196c67f0a6719f'
+    const canonicalAssetId = 'rgb:ByzWWOsh-yWg6Im0-FB8oump-lf5bv7o-mJTgBls-Z~CmcZ8'
+    const initialTransfer = { ...confirmingReceive, assetId: hexAssetId }
+    const { wrapper, wallet } = createHookTestHarness({
+      routeState: { transferId: 'recipient-id', initialTransfer },
+    })
+    wallet.getRgbTransfers.mockResolvedValue({ list: [initialTransfer], total: 1 })
+    wallet.getRGBAssetDetail.mockResolvedValue({
+      assetId: canonicalAssetId,
+      name: 'Received Token',
+      ticker: 'TOK',
+      precision: 2,
+    })
+
+    const { result } = renderHook(() => useRGBTransferDetailLogic(), { wrapper })
+
+    await waitFor(() => {
+      expect(result.current.transfer).toMatchObject({
+        assetId: canonicalAssetId,
+        name: 'Received Token',
+        ticker: 'TOK',
+        precision: 2,
+      })
+    })
+  })
 })

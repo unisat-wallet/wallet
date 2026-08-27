@@ -4,9 +4,13 @@ import { useWallet } from '../context'
 import { useCurrentAccount } from '../hooks/accounts'
 import { useCurrentKeyring } from '../hooks/keyrings'
 import { useChainType } from '../hooks/settings'
-import type { RgbTransferItem, RgbTransferNotification } from '../types'
+import type { RgbAssetDetail, RgbTransferItem, RgbTransferNotification } from '../types'
 import { useInfiniteList } from './useInfiniteList'
 import { getRgbTokenPrecision } from '../utils/rgb-amount-utils'
+import { mergeRgbTransferAssetMetadata } from '../utils/rgb-transfer-metadata'
+
+const rgbAssetDetailCache = new Map<string, RgbAssetDetail | undefined>()
+const rgbTransferListCache = new Map<string, { list: RgbTransferItem[]; total: number }>()
 
 function isInProgress(item: RgbTransferItem) {
   if (
@@ -29,28 +33,43 @@ export function useRGBTransfersLogic({ enabled = true }: { enabled?: boolean } =
   const currentKeyring = useCurrentKeyring()
   const currentAccount = useCurrentAccount()
   const chainType = useChainType()
+  const cacheKey = `${chainType}:${currentAccount?.key || ''}:${enabled ? '1' : '0'}`
+  const skipSyncRef = useRef(true)
+  const requestFullSyncRef = useRef(false)
+
   const fetchTransfers = useCallback(
     async (page: number, pageSize: number) => {
       if (!enabled) return Promise.resolve({ currentPage: page, pageSize, total: 0, list: [] })
-      const result = await wallet.getRgbTransfers(page, pageSize)
+      const skipSync = skipSyncRef.current
+      skipSyncRef.current = true
+      const result = await wallet.getRgbTransfers(page, pageSize, { skipSync })
+      if (skipSync && page === 1) requestFullSyncRef.current = true
       const assetIds = [...new Set(result.list.map(item => item.assetId).filter(Boolean))] as string[]
-      const precisionEntries = await Promise.all(
-        assetIds.map(async assetId => {
+      const missingAssetIds = assetIds.filter(assetId => !rgbAssetDetailCache.has(assetId))
+      await Promise.all(
+        missingAssetIds.map(async assetId => {
           try {
             const detail = await wallet.getRGBAssetDetail('', assetId)
-            return [assetId, getRgbTokenPrecision(detail)] as const
+            rgbAssetDetailCache.set(assetId, detail)
           } catch {
-            return [assetId, 0] as const
+            rgbAssetDetailCache.set(assetId, undefined)
           }
         })
       )
-      const precisions = new Map(precisionEntries)
       return {
         ...result,
-        list: result.list.map(item => ({
-          ...item,
-          precision: item.precision ?? precisions.get(item.assetId || ''),
-        })),
+        list: result.list.map(item => {
+          const detail = rgbAssetDetailCache.get(item.assetId || '')
+          const enriched = mergeRgbTransferAssetMetadata(item, detail)
+          const detailPrecision = detail ? getRgbTokenPrecision(detail) : undefined
+          return {
+            ...enriched,
+            precision:
+              detail?.precision !== undefined
+                ? detailPrecision
+                : enriched.precision ?? detailPrecision ?? 0,
+          }
+        }),
       }
     },
     [enabled, wallet]
@@ -66,10 +85,30 @@ export function useRGBTransfersLogic({ enabled = true }: { enabled?: boolean } =
     fetcher: fetchTransfers,
     dependencies: [chainType, currentKeyring?.key, currentAccount?.key, enabled],
   })
-  const hasInProgressTransfer = items.some(isInProgress)
+  const cached = rgbTransferListCache.get(cacheKey)
+  const visibleItems = loading && items.length === 0 && cached?.list.length ? cached.list : items
+  const visibleTotal = loading && items.length === 0 && cached ? cached.total : total
+  const hasInProgressTransfer = visibleItems.some(isInProgress)
   const previousStatusByTransfer = useRef(new Map<string, string>())
   const notifiedTransferEvents = useRef(new Set<string>())
   const [notifications, setNotifications] = useState<RgbTransferNotification[]>([])
+
+  useEffect(() => {
+    skipSyncRef.current = true
+    requestFullSyncRef.current = false
+  }, [cacheKey])
+
+  useEffect(() => {
+    if (loading) return
+    rgbTransferListCache.set(cacheKey, { list: items, total })
+  }, [cacheKey, items, loading, total])
+
+  useEffect(() => {
+    if (!enabled || loading || !requestFullSyncRef.current) return
+    requestFullSyncRef.current = false
+    skipSyncRef.current = false
+    onRefresh()
+  }, [enabled, items, loading, onRefresh])
 
   useEffect(() => {
     const currentStatusByTransfer = new Map<string, string>()
@@ -102,18 +141,21 @@ export function useRGBTransfersLogic({ enabled = true }: { enabled?: boolean } =
 
   useEffect(() => {
     if (!hasInProgressTransfer) return undefined
-    const intervalId = setInterval(onRefresh, 10_000)
+    const intervalId = setInterval(() => {
+      skipSyncRef.current = false
+      onRefresh()
+    }, 10_000)
     return () => clearInterval(intervalId)
   }, [hasInProgressTransfer, onRefresh])
 
   return {
-    items,
-    total,
+    items: visibleItems,
+    total: visibleTotal,
     loading,
     hasMore,
     onRefresh,
     onLoadMore,
-    pendingCount: items.filter(isInProgress).length,
+    pendingCount: visibleItems.filter(isInProgress).length,
     notification: notifications[0],
     dismissNotification: () => setNotifications(current => current.slice(1)),
   }

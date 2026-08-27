@@ -1,4 +1,9 @@
-import { encodeNiaContract, encodeNiaGenesis, type RgbNetwork } from '@unisat/rgb-service'
+import {
+  encodeNiaContract,
+  encodeNiaGenesis,
+  encodeRgbContractId,
+  type RgbNetwork,
+} from '@unisat/rgb-service'
 
 import type { LocalRgbServiceContext } from './RgbWalletCoordinator'
 
@@ -60,7 +65,7 @@ export class RgbIssueOperations {
         }
       }),
     })
-    const assetId = `rgb:${Buffer.from(genesis.assetId).toString('hex')}`
+    const assetId = encodeRgbContractId(genesis.assetId)
     const contract = encodeNiaContract(genesis)
     const issued = new Map(
       selectedFunding.map((utxo, index) => {

@@ -13,9 +13,12 @@ import {
   Row,
   Text
 } from '@/ui/components';
+import { getRgbAssetName } from '@/ui/components/RGBAssetIcon';
 import { BottomModal } from '@/ui/components/BottomModal';
+import { RunesTicker } from '@/ui/components/RunesTicker';
 import { colors } from '@/ui/theme/colors';
 import { typography } from '@/ui/theme/typography';
+import { shortAddress } from '@/ui/utils';
 import {
   ANY_RGB_ASSET,
   ANY_RGB_ASSET_ID,
@@ -234,6 +237,7 @@ export default function RGBReceiveScreen() {
     onClickBack
   } = useRGBReceiveScreenLogic();
   const assetDisplayTicker = assetId ? assetTicker : t('any_rgb_asset');
+  const assetDisplayName = assetId ? getRgbAssetName(selectedRgbItem) || assetTicker : t('any_rgb_asset');
   const invoiceAwaitingConfirmation = isRgbPendingInvoiceAwaitingConfirmation(selectedPendingInvoice);
 
   const getRgbPendingAmountTagText = (amount?: number | string, precision = 0) => {
@@ -248,16 +252,64 @@ export default function RGBReceiveScreen() {
     const ticker = getRgbTokenTicker(item);
     const iconInfo = getRgbTokenIconInfo(item, ticker);
 
-    return <RGBAssetIcon iconInfo={iconInfo} ticker={ticker} size={size} isAnyRgbAsset={isAnyRgbAsset} />;
+    return (
+      <RGBAssetIcon
+        iconInfo={iconInfo}
+        ticker={ticker}
+        name={getRgbAssetName(item)}
+        size={size}
+        isAnyRgbAsset={isAnyRgbAsset}
+      />
+    );
+  };
+
+  const renderLockedAssetHeader = () => {
+    if (!isAssetLocked) return null;
+
+    return (
+      <div
+        style={{
+          ...assetSelectorStyle,
+          height: 'auto',
+          minHeight: 48,
+          padding: '10px 16px',
+          cursor: 'default'
+        }}>
+        <Row gap="md" itemsCenter style={{ flex: 1, minWidth: 0 }}>
+          {renderAssetIcon(selectedRgbItem, 28)}
+          <Column gap="xs" style={{ minWidth: 0, flex: 1 }}>
+            <RunesTicker tick={assetDisplayName} truncate preset="sm" />
+            <Text text={`(ticker: ${assetTicker})`} size="xs" color="textDim" ellipsis />
+          </Column>
+        </Row>
+      </div>
+    );
   };
 
   const renderAssetSelector = () => {
     return (
       <Column gap="sm">
-        <div style={assetSelectorStyle} onClick={() => setAssetSelectorOpen(true)}>
-          <Row gap="md" itemsCenter>
-            {renderAssetIcon(selectedRgbItem)}
-            <Text text={assetDisplayTicker} color="white" size="sm" />
+        <div
+          style={{
+            ...assetSelectorStyle,
+            height: 'auto',
+            minHeight: 48,
+            padding: '10px 16px'
+          }}
+          onClick={() => setAssetSelectorOpen(true)}>
+          <Row gap="md" itemsCenter style={{ flex: 1, minWidth: 0 }}>
+            {renderAssetIcon(selectedRgbItem, 28)}
+            <Column gap="xs" style={{ minWidth: 0, flex: 1 }}>
+              <Text text={assetDisplayName} color="white" size="sm" ellipsis />
+              {assetId ? (
+                <Text
+                  text={shortAddress(assetId, 10)}
+                  size="xs"
+                  ellipsis
+                  style={{ color: 'rgba(255, 255, 255, 0.45)' }}
+                />
+              ) : null}
+            </Column>
           </Row>
           <Icon icon="down" size={14} />
         </div>
@@ -280,28 +332,40 @@ export default function RGBReceiveScreen() {
 
           <Row fullX style={{ borderTopWidth: 1, borderColor: colors.border }} mt="md" />
 
-          <Column gap="sm" mt="sm" mb="lg" fullX style={{ maxHeight: '50vh', overflowY: 'auto' }}>
+          <Column gap="md" mt="sm" mb="lg" fullX style={{ maxHeight: '50vh', overflowY: 'auto' }}>
             {[ANY_RGB_ASSET, ...rgbItems].map((item) => {
               const itemAssetId = getRgbAssetId(item);
-              const ticker = itemAssetId === ANY_RGB_ASSET_ID ? t('any_rgb_asset') : getRgbTokenTicker(item);
+              const isAnyRgbAsset = itemAssetId === ANY_RGB_ASSET_ID;
+              const displayName = isAnyRgbAsset ? t('any_rgb_asset') : getRgbAssetName(item) || getRgbTokenTicker(item);
               const selected = itemAssetId === (assetId || ANY_RGB_ASSET_ID);
               return (
                 <Row
-                  key={itemAssetId || ticker}
+                  key={itemAssetId || displayName}
                   itemsCenter
                   justifyBetween
+                  gap="md"
                   style={{
                     minHeight: 48,
-                    padding: '0 12px',
+                    padding: '8px 12px',
                     borderRadius: 10,
                     background: selected ? 'rgba(244,182,44,0.12)' : 'transparent',
                     cursor: 'pointer'
                   }}
                   onClick={() => onSelectAsset(item)}
                 >
-                  <Row gap="md" itemsCenter>
-                    {renderAssetIcon(item, 24)}
-                    <Text text={ticker} color="white" size="sm" />
+                  <Row gap="md" itemsCenter style={{ flex: 1, minWidth: 0 }}>
+                    {renderAssetIcon(item, 28)}
+                    <Column gap="xs" style={{ minWidth: 0, flex: 1 }}>
+                      <RunesTicker tick={displayName} truncate preset="sm" />
+                      {!isAnyRgbAsset && itemAssetId ? (
+                        <Text
+                          text={shortAddress(itemAssetId, 10)}
+                          size="xs"
+                          ellipsis
+                          style={{ color: 'rgba(255, 255, 255, 0.45)' }}
+                        />
+                      ) : null}
+                    </Column>
                   </Row>
                   {selected ? <Icon icon="checked" color="gold" size={20} /> : null}
                 </Row>
@@ -359,6 +423,7 @@ export default function RGBReceiveScreen() {
       <RGBAssetIcon
         iconInfo={getRgbTokenIconInfo(invoiceAsset, ticker)}
         ticker={ticker}
+        name={getRgbAssetName(invoiceAsset)}
         size={size}
         isAnyRgbAsset={isAnyRgbAsset}
       />
@@ -402,9 +467,10 @@ export default function RGBReceiveScreen() {
     const invoiceAsset = getPendingInvoiceAsset(item);
     const isAnyRgbAsset = !item.assetId;
     const ticker = isAnyRgbAsset ? t('any_rgb_asset') : getRgbTokenTicker(invoiceAsset);
+    const displayName = isAnyRgbAsset ? t('any_rgb_asset') : getRgbAssetName(invoiceAsset) || ticker;
 
     return renderAssetNameWithAmountTag(
-      ticker,
+      displayName,
       getRgbPendingAmountTagText(item.amount, getPendingInvoicePrecision(item))
     );
   };
@@ -414,9 +480,10 @@ export default function RGBReceiveScreen() {
       const invoiceAsset = getPendingInvoiceAsset(selectedPendingInvoice);
       const isAnyRgbAsset = !selectedPendingInvoice.assetId;
       const ticker = isAnyRgbAsset ? t('any_rgb_asset') : getRgbTokenTicker(invoiceAsset);
+      const displayName = isAnyRgbAsset ? t('any_rgb_asset') : getRgbAssetName(invoiceAsset) || ticker;
 
       return renderAssetNameWithAmountTag(
-        ticker,
+        displayName,
         getRgbPendingAmountTagText(
           selectedPendingInvoice.amount,
           getPendingInvoicePrecision(selectedPendingInvoice)
@@ -426,7 +493,7 @@ export default function RGBReceiveScreen() {
     }
 
     const invoiceAmount = isFixedMode && amount.trim() ? amount.trim() : t('any_amount');
-    return renderAssetNameWithAmountTag(assetDisplayTicker, invoiceAmount, { centered: true });
+    return renderAssetNameWithAmountTag(assetDisplayName, invoiceAmount, { centered: true });
   };
 
   const renderPendingPlaceholder = () => {
@@ -672,7 +739,7 @@ export default function RGBReceiveScreen() {
         <Column gap="lg">
           {renderPendingSection()}
 
-          {!isAssetLocked ? renderAssetSelector() : null}
+          {isAssetLocked ? renderLockedAssetHeader() : renderAssetSelector()}
 
           <Column gap="lg">
             {renderModeCard('any', t('any_amount'), t('accept_any_rgb_amount'))}

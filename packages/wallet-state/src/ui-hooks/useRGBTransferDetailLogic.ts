@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 
 import { useI18n, useNavigation, useTools, useWallet } from '../context'
 import type { RgbTransferItem, RgbTransferNotification } from '../types'
-import { getRgbTokenPrecision } from '../utils/rgb-amount-utils'
+import { mergeRgbTransferAssetMetadata } from '../utils/rgb-transfer-metadata'
 
 function isInProgress(transfer?: RgbTransferItem) {
   if (!transfer) return false
@@ -68,6 +68,7 @@ export function useRGBTransferDetailLogic() {
         if (!latest) return current
         return {
           ...latest,
+          assetId: current?.assetId ?? latest.assetId,
           ticker: latest.ticker || current?.ticker,
           name: latest.name || current?.name,
           from: latest.from || current?.from,
@@ -87,15 +88,15 @@ export function useRGBTransferDetailLogic() {
   }, [refresh])
 
   useEffect(() => {
-    if (!transfer?.assetId || transfer.precision !== undefined) return undefined
+    if (!transfer?.assetId) return undefined
 
     let canceled = false
     void Promise.resolve(wallet.getRGBAssetDetail('', transfer.assetId))
       .then(detail => {
-        if (canceled) return
+        if (canceled || !detail) return
         setTransfer(current =>
           current?.assetId === transfer.assetId
-            ? { ...current, precision: getRgbTokenPrecision(detail) }
+            ? mergeRgbTransferAssetMetadata(current, detail)
             : current
         )
       })

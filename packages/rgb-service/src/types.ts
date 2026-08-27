@@ -232,15 +232,22 @@ export interface RgbPendingIssue {
   assetId: string
   contract: string
   genesis: string
-  asset: {
-    ticker: string
-    name: string
-    precision: number
-    schema: string
-    issuedSupply: string
-    timestamp?: number
-  }
+  asset: RgbContractMetadata
   utxoSync: RgbPendingUtxoSync
+}
+
+export interface RgbContractMetadata {
+  ticker: string
+  name: string
+  precision: number
+  schema: string
+  issuedSupply: string
+  timestamp?: number
+}
+
+export interface RgbPendingAssetMetadata {
+  assetId: string
+  metadata: RgbContractMetadata
 }
 
 export interface RgbServiceState {
@@ -253,9 +260,14 @@ export interface RgbServiceState {
   pendingSendHistory?: RgbPendingSendHistory[]
   pendingUtxoSync?: RgbPendingUtxoSync
   pendingIssues?: RgbPendingIssue[]
+  /** Asset metadata learned from received consignments and waiting for indexing. */
+  pendingAssetMetadata?: RgbPendingAssetMetadata[]
   /** Validated blind seals retained locally for later ownership proofs when spending received assets. */
   receivedBlindSeals?: import('./protocol/receive').RgbBlindSeal[]
-  contracts?: Record<string, { consignment: string; genesis?: string; createdAt: number }>
+  contracts?: Record<
+    string,
+    { consignment: string; genesis?: string; metadata?: RgbContractMetadata; createdAt: number }
+  >
 }
 
 export interface RgbStorage {

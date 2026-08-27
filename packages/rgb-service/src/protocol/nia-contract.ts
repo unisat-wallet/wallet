@@ -1,6 +1,10 @@
 import { sha256 } from '@noble/hashes/sha256'
 import { RgbServiceError } from '../errors'
-import { serializeRgbTransferPrefix, type RgbTransferTerminal } from './consignment'
+import {
+  serializeRgbTransferPrefix,
+  wrapRgbTransferConsignment,
+  type RgbTransferTerminal,
+} from './consignment'
 import type { EncodedNiaGenesis } from './nia-genesis'
 
 const NIA_SCHEMA = [
@@ -138,7 +142,7 @@ export function encodeNiaTransferConsignment(input: {
   if (witnessBundles.some(bundle => !bundle.length))
     throw new RgbServiceError('RGB transfer history has an empty WitnessBundle')
   const count = witnessBundles.length
-  return concat(
+  const body = concat(
     serializeRgbTransferPrefix(input.terminals),
     input.genesis.strict,
     Uint8Array.from([
@@ -150,6 +154,7 @@ export function encodeNiaTransferConsignment(input: {
     ...witnessBundles,
     niaConsignmentTail()
   )
+  return wrapRgbTransferConsignment(body)
 }
 
 /** Stable byte-level fingerprint for regression vectors and transport IDs. */

@@ -3,7 +3,7 @@ import { TickPriceItem } from '@unisat/wallet-shared'
 import BigNumber from 'bignumber.js'
 import { useChain } from 'src/hooks'
 import type { RgbBalance } from 'src/types'
-import { getRgbTokenPrecision, toRgbDisplayAmount } from 'src/utils/rgb-amount-utils'
+import { getRgbIconShortName, getRgbTokenPrecision, toRgbDisplayAmount } from 'src/utils/rgb-amount-utils'
 
 export interface RGBBalanceCardProps {
   tokenBalance?: RgbBalance
@@ -33,13 +33,16 @@ export function useRGBBalanceCardLogic(props: RGBBalanceCardProps) {
     lockedBalance.lt(0.0001) && lockedBalance.gt(0)
       ? '<0.0001'
       : numUtils.showLongNumber(lockedBalance.toString())
-  const iconInfo =
+  const existingIcon =
     tokenBalance?.['iconInfo'] && typeof tokenBalance['iconInfo'] === 'object'
-      ? (tokenBalance['iconInfo'] as { iconUrl?: string; iconShortName?: string })
-      : {
-          iconUrl: typeof tokenBalance?.['iconUrl'] === 'string' ? tokenBalance['iconUrl'] : '',
-          iconShortName: ticker.slice(0, 2).toUpperCase(),
-        }
+      ? (tokenBalance['iconInfo'] as { iconUrl?: string })
+      : undefined
+  const iconInfo = {
+    iconUrl:
+      (typeof existingIcon?.iconUrl === 'string' && existingIcon.iconUrl) ||
+      (typeof tokenBalance?.['iconUrl'] === 'string' ? tokenBalance['iconUrl'] : ''),
+    iconShortName: getRgbIconShortName(name, ticker),
+  }
 
   const chain = useChain()
   const showPrice = chain.showPrice

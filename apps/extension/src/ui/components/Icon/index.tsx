@@ -55,6 +55,7 @@ export const svgRegistry = {
 
   // status
   success: '/images/icons/status/success.svg',
+  pending: '/images/icons/status/pending.svg',
   warning: '/images/icons/status/warning.svg',
   warning2: '/images/icons/status/warning2.svg',
   warn: '/images/icons/status/warn.svg',
@@ -175,6 +176,7 @@ export const svgRegistry = {
 
 const iconImgList: Array<IconTypes> = [
   'success',
+  'pending',
   'delete',
   'btc',
   'baby',

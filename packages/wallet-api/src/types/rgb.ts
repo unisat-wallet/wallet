@@ -307,6 +307,8 @@ export interface RgbAllocationSummaryResult {
   availableAllocationCount?: number
   freeAllocationCount?: number
   colorableUtxoCount?: number
+  pendingConfirmation?: boolean
+  pendingAllocationCount?: number
   [key: string]: any
 }
 

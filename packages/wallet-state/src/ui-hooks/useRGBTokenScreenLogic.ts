@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 
 import type { RgbActivityItem, RgbActivityType, RgbAssetDetail, RgbBalance } from '..'
 import { useI18n, useNavigation, useWallet } from '..'
+import { getRgbIconShortName } from '../utils/rgb-amount-utils'
 import { useInfiniteList } from './useInfiniteList'
 
 export enum RGBTokenScreenTabKey {
@@ -128,9 +129,10 @@ export function useRGBTokenScreenLogic() {
     resolvedTokenBalance?.ticker ||
     resolvedTokenBalance?.name ||
     'RGB'
+  const name = detail?.name || resolvedTokenBalance?.name || ticker
   const iconInfo = {
     iconUrl: detail?.['iconUrl'] || resolvedTokenBalance?.['iconUrl'] || '',
-    iconShortName: ticker.slice(0, 2).toUpperCase(),
+    iconShortName: getRgbIconShortName(name, ticker),
   }
 
   const transferBalance =

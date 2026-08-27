@@ -2,6 +2,7 @@ import { RgbServiceError } from '../errors'
 import { transitionBundleId, type RgbBundleInput } from './bundle'
 import { serializeStrictBitcoinTransaction } from './fascia'
 import { serializeMpcMerkleProof } from './mpc'
+import { rgbContractIdBytes } from './contract-id'
 import { StrictWriter } from './strict'
 
 function hex32(value: string, name: string) {
@@ -19,6 +20,32 @@ function concat(...parts: Uint8Array[]) {
     offset += part.length
   }
   return result
+}
+
+const RGB_CONSIGNMENT_MAGIC = Uint8Array.from([0x52, 0x47, 0x42, 0x00])
+const RGB_TRANSFER_CONSIGNMENT_HEADER = Uint8Array.from([
+  ...RGB_CONSIGNMENT_MAGIC,
+  0x54,
+  0x46,
+  0x52,
+])
+
+function hasPrefix(value: Uint8Array, prefix: Uint8Array) {
+  return value.length >= prefix.length && prefix.every((byte, index) => value[index] === byte)
+}
+
+/** Add the standard RGB Transfer consignment envelope around its strict body. */
+export function wrapRgbTransferConsignment(value: Uint8Array) {
+  return concat(RGB_TRANSFER_CONSIGNMENT_HEADER, value)
+}
+
+/** Accept both standard RGB Transfer consignments and legacy unwrapped bodies. */
+export function unwrapRgbTransferConsignment(value: Uint8Array) {
+  if (!hasPrefix(value, RGB_CONSIGNMENT_MAGIC)) return value
+  if (!hasPrefix(value, RGB_TRANSFER_CONSIGNMENT_HEADER)) {
+    throw new RgbServiceError('RGB Consignment type is unsupported')
+  }
+  return value.slice(RGB_TRANSFER_CONSIGNMENT_HEADER.length)
 }
 
 function compare(left: Uint8Array, right: Uint8Array) {
@@ -41,6 +68,9 @@ export interface NiaOpretWitnessBundle {
   bundleId: Uint8Array
 }
 
+// Anchor<MerkleProof, OpretProof> encodes the Opret proof variant as a tag.
+const OPRET_PROOF_TAG = 2
+
 /**
  * Strict-serialize a single-contract OpretFirst WitnessBundle. The anchor
  * proof is derived locally from the same MPC message committed into the PSBT.
@@ -58,7 +88,7 @@ export function serializeNiaOpretWitnessBundle(input: {
   if (!input.inputs.length || input.inputs.length > 0xffff) {
     throw new RgbServiceError('RGB WitnessBundle requires between one and 65535 inputs')
   }
-  const contractId = hex32(input.contractId, 'RGB contract ID')
+  const contractId = rgbContractIdBytes(input.contractId)
   const inputs = [...input.inputs].sort((left, right) =>
     compare(serializeOpout(left), serializeOpout(right))
   )
@@ -81,12 +111,13 @@ export function serializeNiaOpretWitnessBundle(input: {
     .writeFixedBytes(input.transition, input.transition.length)
 
   // PubWitness::Tx tag, Anchor<MerkleProof, OpretProof>, TransitionBundle.
-  // OpretProof is an empty strict tuple and contributes no bytes.
+  // OpretProof carries its variant tag even though its payload is empty.
   return {
     strict: concat(
       Uint8Array.from([1]),
       serializeStrictBitcoinTransaction(input.witnessTx),
       proof,
+      Uint8Array.from([OPRET_PROOF_TAG]),
       bundle.toBytes()
     ),
     bundleId,

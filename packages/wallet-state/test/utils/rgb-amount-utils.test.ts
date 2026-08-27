@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
 import {
+  getRgbIconShortName,
   isValidRgbDecimalAmount,
   normalizeRgbAmountInput,
   toRgbAtomicAmount,
@@ -26,5 +27,11 @@ describe('RGB amount utils', () => {
     expect(isValidRgbDecimalAmount('0.001', 2)).toBe(false)
     expect(isValidRgbDecimalAmount('1e3', 2)).toBe(false)
     expect(normalizeRgbAmountInput('000.50', 2)).toBe('0.50')
+  })
+
+  it('uses the asset name for placeholder icon initials instead of the ticker', () => {
+    expect(getRgbIconShortName('RGBRGB', '*')).toBe('RG')
+    expect(getRgbIconShortName('Test Token', 'ABCDEFG')).toBe('TE')
+    expect(getRgbIconShortName('', '*')).toBe('*')
   })
 })

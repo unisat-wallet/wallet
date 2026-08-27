@@ -3,6 +3,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { useI18n, useNavigation, useTools, useWallet } from 'src/context'
 import { useAccountBalance, useFeeRateBar } from 'src/hooks'
 import {
+  getRgbIconShortName,
   getRgbTokenPrecision,
   isValidRgbDecimalAmount,
   normalizeRgbAmountInput,
@@ -180,9 +181,10 @@ export const getRgbTokenIconInfo = (value: unknown, ticker: string) => {
     record?.['iconInfo'] && typeof record['iconInfo'] === 'object'
       ? (record['iconInfo'] as Record<string, unknown>)
       : {}
+  const tokenInfo = getTokenInfo(value)
+  const name = readStringPath(tokenInfo, ['name']) || readStringPath(record, ['name'])
   const iconUrl = readStringPath(iconInfo, ['iconUrl']) || readStringPath(record, ['iconUrl']) || ''
-  const iconShortName =
-    readStringPath(iconInfo, ['iconShortName']) || ticker.slice(0, 2).toUpperCase()
+  const iconShortName = getRgbIconShortName(name, ticker)
   return { iconUrl, iconShortName }
 }
 

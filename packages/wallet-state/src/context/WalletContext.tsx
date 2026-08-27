@@ -621,7 +621,8 @@ export interface WalletController {
 
   getRgbTransfers(
     currentPage: number,
-    pageSize: number
+    pageSize: number,
+    options?: { skipSync?: boolean }
   ): Promise<{ currentPage: number; pageSize: number; total: number; list: RgbTransferItem[] }>
 
   createRgbBlindReceive(params: {
@@ -709,6 +710,8 @@ export interface WalletController {
     availableAllocationCount?: number
     freeAllocationCount?: number
     colorableUtxoCount?: number
+    pendingConfirmation?: boolean
+    pendingAllocationCount?: number
     [key: string]: any
   }>
 

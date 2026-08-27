@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest'
 import {
   commitOpretRgbPsbt,
   decodeNiaConsignment,
+  encodeRgbContractId,
   decodeRgbInvoice,
   encodeNiaContract,
   encodeNiaGenesis,
@@ -34,7 +35,14 @@ describe('decodeNiaConsignment', () => {
     const decoded = decodeNiaConsignment(encodeNiaContract(encoded).strict)
 
     expect(decoded).toMatchObject({
-      assetId: `rgb:${Buffer.from(encoded.assetId).toString('hex')}`,
+      assetId: encodeRgbContractId(encoded.assetId),
+      metadata: {
+        ticker: 'PARSE',
+        name: 'Parse NIA',
+        precision: 0,
+        schema: 'NIA',
+        issuedSupply: '100',
+      },
       transfer: false,
       terminals: [],
       transitions: [],
@@ -114,6 +122,7 @@ describe('decodeNiaConsignment', () => {
         },
       ],
     })
+    expect(Buffer.from(consignment.subarray(0, 7)).toString('latin1')).toBe('RGB\0TFR')
     const decoded = decodeNiaConsignment(consignment)
 
     expect(decoded.transfer).toBe(true)

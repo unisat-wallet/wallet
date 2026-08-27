@@ -1,7 +1,8 @@
 import { Button, Card, Column, Content, CopyableAddress, Footer, Header, Icon, Layout, Row, Text } from '@/ui/components';
+import { RgbAddressBadge } from '@/ui/components/RgbAddressBadge';
+import { TxResultStatusMark } from '@/ui/components/TxResultStatusMark';
 import { colors } from '@/ui/theme/colors';
 import { spacing } from '@/ui/theme/spacing';
-import { shortAddress } from '@/ui/utils';
 import {
   getRgbTokenPrecision,
   toRgbDisplayAmount,
@@ -32,7 +33,7 @@ function getStatusLabel(status: string, t: (key: string) => string, type?: RgbTr
       return t('rgb_status_confirming');
     case 'waiting_receive':
     case 'waitingcounterparty':
-      return t('rgb_status_confirming');
+      return t('rgb_status_waiting_receive');
     case 'settled':
     case 'confirmed':
       return t('rgb_status_confirmed');
@@ -52,7 +53,7 @@ function getDescription(transfer: RgbTransferItem | undefined, t: (key: string) 
   if (transfer?.status === 'broadcasted') return t('rgb_transfer_broadcasted_description');
   if (transfer?.status === 'broadcast_failed') return t('rgb_transfer_broadcast_failed_description');
   if (transfer?.status === 'pending_accept') return t('rgb_transfer_pending_accept_description');
-  if (transfer?.status === 'confirming' || transfer?.status === 'waiting_receive') {
+  if (transfer?.status === 'confirming') {
     return t('rgb_transfer_confirming_description');
   }
   if (transfer?.status === 'canceled' || transfer?.status === 'cancelled') {
@@ -63,12 +64,12 @@ function getDescription(transfer: RgbTransferItem | undefined, t: (key: string) 
   return '';
 }
 
-function isCanceledStatus(status: string) {
-  return ['canceled', 'cancelled'].includes(status.toLowerCase());
-}
-
 function isConfirmedStatus(status: string) {
   return ['settled', 'confirmed'].includes(status.toLowerCase());
+}
+
+function isFailedStatus(status: string) {
+  return ['canceled', 'cancelled', 'rejected', 'broadcast_failed', 'failed'].includes(status.toLowerCase());
 }
 
 export default function RGBTransferDetailScreen() {
@@ -90,7 +91,7 @@ export default function RGBTransferDetailScreen() {
     t
   } = useRGBTransferDetailLogic();
   const status = transfer?.status || 'pending';
-  const assetLabel = transfer?.ticker || transfer?.name || 'RGB';
+  const assetName = transfer?.name || transfer?.ticker || 'RGB';
   const displayAmount = transfer?.amount
     ? toRgbDisplayAmount(transfer.amount, getRgbTokenPrecision(transfer))
     : '--';
@@ -99,24 +100,30 @@ export default function RGBTransferDetailScreen() {
   const canExplore =
     !!transfer?.txid &&
     !['waiting_ack', 'broadcasting', 'broadcast_failed', 'pending_accept', 'rejected'].includes(status);
-  const assetIdDisplay =
-    transfer?.assetId?.replace(/^rgb:/i, '').slice(0, 12) || transfer?.assetId || '--';
+  const assetId = transfer?.assetId?.trim();
   const counterpartyAddress =
     transfer?.type === 'receive' ? transfer?.from?.trim() : transfer?.type === 'send' ? transfer?.to?.trim() : '';
   const counterpartyLabel = transfer?.type === 'receive' ? t('from') : transfer?.type === 'send' ? t('to') : '';
+
+  const isConfirmed = isConfirmedStatus(status);
+  const isFailed = isFailedStatus(status);
 
   return (
     <Layout>
       <Header title={t('rgb_transfer_details')} onBack={onClickDone} />
       <Content style={{ gap: spacing.large, paddingLeft: 10, paddingRight: 10 }}>
         <Column mt="lg" itemsCenter gap="sm">
-          <Icon icon={transfer?.type === 'receive' ? 'history_receive' : 'history_send'} size={48} />
+          {isFailed ? (
+            <Icon icon={transfer?.type === 'receive' ? 'history_receive' : 'history_send'} size={48} />
+          ) : (
+            <TxResultStatusMark pending={!isConfirmed} />
+          )}
           <Text
             preset="title"
             text={statusLabel}
             textCenter
             style={{
-              color: isConfirmedStatus(status) ? '#7CDB98' : isCanceledStatus(status) ? '#EE344C' : undefined
+              color: isConfirmed ? '#7CDB98' : isFailed ? '#EE344C' : '#F4B62C'
             }}
           />
           {description ? <Text preset="sub" text={description} color="textDim" textCenter /> : null}
@@ -133,27 +140,45 @@ export default function RGBTransferDetailScreen() {
           }}>
           <Column fullX gap="lg">
             <Row justifyBetween itemsCenter>
+              <Text text={t('name_label')} color="textDim" />
+              <Text text={assetName} color="ticker_color2" ellipsis />
+            </Row>
+            <Row justifyBetween itemsCenter>
+              <Text text={t('asset_id')} color="textDim" style={{ flexShrink: 0 }} />
+              {assetId ? (
+                <CopyableAddress address={assetId} copyPosition="after" len={10} color="ticker_color2" />
+              ) : (
+                <Text text="--" color="ticker_color2" />
+              )}
+            </Row>
+            <Row justifyBetween itemsCenter>
               <Text text={t('amount')} color="textDim" />
-              <Text text={[displayAmount, assetLabel].filter(Boolean).join(' ')} />
+              <Text text={displayAmount} color="ticker_color2" />
             </Row>
             {counterpartyLabel ? (
               <Row justifyBetween itemsCenter>
                 <Text text={counterpartyLabel} color="textDim" />
                 {counterpartyAddress ? (
-                  <CopyableAddress address={counterpartyAddress} />
+                  <CopyableAddress
+                    address={counterpartyAddress}
+                    copyPosition="after"
+                    color="ticker_color2"
+                    suffix={<RgbAddressBadge />}
+                  />
                 ) : (
-                  <Text text="--" />
+                  <Text text="--" color="ticker_color2" />
                 )}
               </Row>
             ) : null}
-            <Row justifyBetween itemsCenter>
-              <Text text={t('asset_id')} color="textDim" />
-              <Text text={assetIdDisplay} ellipsis />
-            </Row>
             {status !== 'rejected' ? (
               <Row justifyBetween itemsCenter>
                 <Text text={t('rgb_transfer_id')} color="textDim" />
-                <Text text={shortAddress(transfer?.transferId || transferId, 10)} ellipsis />
+                <CopyableAddress
+                  address={transfer?.transferId || transferId}
+                  copyPosition="after"
+                  len={10}
+                  color="ticker_color2"
+                />
               </Row>
             ) : null}
           </Column>

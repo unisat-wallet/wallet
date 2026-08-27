@@ -11,6 +11,7 @@ export type RGBAssetIconInfo = {
 type RGBAssetIconProps = {
   iconInfo?: RGBAssetIconInfo;
   ticker?: string;
+  name?: string;
   size?: number;
   isAnyRgbAsset?: boolean;
   style?: CSSProperties;
@@ -32,16 +33,34 @@ const assetIconStyle = {
   overflow: 'hidden'
 };
 
+export function getRgbAssetName(value: unknown): string {
+  if (!value || typeof value !== 'object') return '';
+  const record = value as Record<string, unknown>;
+  const candidates = [record.tokenInfo, record.assetInfo, record.rgbInfo, record];
+  for (const candidate of candidates) {
+    if (!candidate || typeof candidate !== 'object') continue;
+    const name = (candidate as Record<string, unknown>).name;
+    if (typeof name === 'string' && name.trim()) return name;
+  }
+  return '';
+}
+
+export function getRgbPlaceholderLetters(name?: string, ticker?: string) {
+  const source = (name || ticker || 'RGB').trim();
+  return Array.from(source).slice(0, 2).join('').toUpperCase() || 'RG';
+}
+
 function resolveRgbAssetIconUrl(iconInfo?: RGBAssetIconInfo, ticker?: string) {
   if (iconInfo?.iconUrl) return iconInfo.iconUrl;
   if ((ticker || '').toUpperCase() === 'USDT') return USDT_LOGO;
   return '';
 }
 
-export function RGBAssetIcon({ iconInfo, ticker, size = 24, isAnyRgbAsset, style }: RGBAssetIconProps) {
+export function RGBAssetIcon({ iconInfo, ticker, name, size = 24, isAnyRgbAsset, style }: RGBAssetIconProps) {
   const iconUrl = resolveRgbAssetIconUrl(iconInfo, ticker);
   const showImage = !isAnyRgbAsset && !!iconUrl;
   const isUsdtLogo = iconUrl === USDT_LOGO;
+  const placeholderLetters = getRgbPlaceholderLetters(name, ticker);
 
   return (
     <div
@@ -52,10 +71,11 @@ export function RGBAssetIcon({ iconInfo, ticker, size = 24, isAnyRgbAsset, style
         fontSize: size <= 24 ? 10 : 12,
         background: showImage ? 'transparent' : assetIconStyle.background,
         overflow: isUsdtLogo ? 'visible' : 'hidden',
+        flexShrink: 0,
         ...style
       }}>
       {isAnyRgbAsset ? (
-        <Icon icon="rgb" size={18} />
+        <Icon icon="rgb" size={size} />
       ) : showImage ? (
         <Image
           src={iconUrl}
@@ -64,7 +84,7 @@ export function RGBAssetIcon({ iconInfo, ticker, size = 24, isAnyRgbAsset, style
           fallbackSrc="./images/icons/artifacts/unknown.png"
         />
       ) : (
-        iconInfo?.iconShortName || 'RGB'
+        placeholderLetters
       )}
     </div>
   );

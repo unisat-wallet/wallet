@@ -5,6 +5,7 @@ import {
   RgbTransferRejectedError,
 } from './errors'
 import { decodeRgbInvoice } from './protocol/invoice'
+import { normalizeRgbAssetId, rgbContractIdHex } from './protocol/contract-id'
 import {
   decodeNiaConsignment,
   niaConsignmentSpendableOutputScripts,
@@ -17,6 +18,7 @@ import type {
   RgbCompletedTransfer,
   RgbPreparedTransfer,
   RgbPendingIssue,
+  RgbPendingAssetMetadata,
   RgbPendingTransfer,
   RgbPendingUtxoSync,
   RgbServiceDependencies,
@@ -62,13 +64,14 @@ export class RgbService {
     const stored = await this.dependencies.storage.get<RgbServiceState>(storageKey)
     this.state =
       stored && stored.wallet.fundingAddress === wallet.fundingAddress
-        ? hydrateState(stored)
+        ? normalizeStateAssetIds(hydrateState(stored))
         : {
             version: 1,
             wallet,
             snapshot: { utxos: [], syncedAt: 0 },
             pending: {},
           }
+    this.hydrateStoredContractMetadata()
     await this.persist()
   }
 
@@ -92,7 +95,9 @@ export class RgbService {
     // A remote snapshot may still expose consumed outpoints. Finish durable
     // post-broadcast delivery first, or leave the locally updated snapshot intact.
     if (Object.keys(state.pending).length) await this.advancePendingTransfers()
-    state.snapshot = await this.dependencies.stateSource.getSnapshot(state.wallet)
+    state.snapshot = normalizeSnapshot(
+      await this.dependencies.stateSource.getSnapshot(state.wallet)
+    )
     await this.persist()
     return state.snapshot
   }
@@ -137,6 +142,7 @@ export class RgbService {
   async createBlindReceive(input: { assetId?: string; amount?: string; durationSeconds?: number }) {
     const state = this.requireState()
     if (!state.snapshot.syncedAt) await this.sync()
+    const assetId = input.assetId ? normalizeAssetId(input.assetId) : undefined
     if (input.amount !== undefined && !/^(0|[1-9][0-9]*)$/.test(input.amount)) {
       throw new RgbServiceError('RGB receive amount must be an unsigned integer')
     }
@@ -164,7 +170,7 @@ export class RgbService {
     const invoice = encodeBlindRgbInvoice({
       network: state.wallet.network,
       seal,
-      assetId: input.assetId,
+      assetId,
       amount: input.amount,
       expirationTimestamp,
       transportEndpoints,
@@ -174,7 +180,7 @@ export class RgbService {
     const pending = {
       invoice,
       recipientId,
-      assetId: input.assetId,
+      assetId,
       amount: input.amount,
       expirationTimestamp,
       createdAt: now,
@@ -219,10 +225,25 @@ export class RgbService {
 
   async markIssueSynced(assetId: string) {
     const state = this.requireState()
+    const normalized = normalizeAssetId(assetId)
     const pending = state.pendingIssues || []
-    const next = pending.filter(issue => issue.assetId !== assetId)
+    const next = pending.filter(issue => issue.assetId !== normalized)
     if (next.length === pending.length) return
     state.pendingIssues = next
+    await this.persist()
+  }
+
+  getPendingAssetMetadata() {
+    return this.requireState().pendingAssetMetadata || []
+  }
+
+  async markAssetMetadataSynced(assetId: string) {
+    const state = this.requireState()
+    const normalized = normalizeAssetId(assetId)
+    const pending = state.pendingAssetMetadata || []
+    const next = pending.filter(item => item.assetId !== normalized)
+    if (next.length === pending.length) return
+    state.pendingAssetMetadata = next
     await this.persist()
   }
 
@@ -236,7 +257,10 @@ export class RgbService {
         chainStatus: utxo.chainStatus || 'mempool',
       })
     }
-    const utxos = [...utxosByOutpoint.values()]
+    const utxos = normalizeSnapshot({
+      syncedAt: state.snapshot.syncedAt || this.now(),
+      utxos: [...utxosByOutpoint.values()],
+    }).utxos
     state.snapshot = {
       utxos,
       syncedAt: state.snapshot.syncedAt || this.now(),
@@ -254,22 +278,28 @@ export class RgbService {
     utxoSync: RgbPendingUtxoSync
   }) {
     const state = this.requireState()
+    const assetId = normalizeAssetId(input.assetId)
     const contracts = state.contracts || (state.contracts = {})
-    contracts[normalizeAssetId(input.assetId)] = {
+    contracts[assetId] = {
       consignment: Buffer.from(input.contract).toString('base64'),
       genesis: Buffer.from(input.genesis).toString('base64'),
+      metadata: input.asset,
       createdAt: this.now(),
     }
-    state.snapshot = { ...state.snapshot, utxos: input.utxoSync.outpoints }
+    const utxos = normalizeSnapshot({
+      syncedAt: state.snapshot.syncedAt,
+      utxos: input.utxoSync.outpoints,
+    }).utxos
+    state.snapshot = { ...state.snapshot, utxos }
     const pending = state.pendingIssues || (state.pendingIssues = [])
     const task: RgbPendingIssue = {
-      assetId: input.assetId,
+      assetId,
       contract: Buffer.from(input.contract).toString('base64'),
       genesis: Buffer.from(input.genesis).toString('base64'),
       asset: input.asset,
-      utxoSync: input.utxoSync,
+      utxoSync: { txid: input.utxoSync.txid, outpoints: utxos },
     }
-    const index = pending.findIndex(issue => issue.assetId === input.assetId)
+    const index = pending.findIndex(issue => issue.assetId === assetId)
     if (index >= 0) pending[index] = task
     else pending.push(task)
     await this.persist()
@@ -378,6 +408,9 @@ export class RgbService {
           continue
         }
         if (receive.rejectedConsignmentTxids?.includes(match.txid)) continue
+
+        const metadataChanged = this.queueAssetMetadata(match.assetId, match.decoded.metadata)
+        changed = metadataChanged || changed
 
         // Sender already signaled cancel on the proxy (ack=false).
         if (await this.isProxyAckRejected(receive, item.endpoint)) {
@@ -619,11 +652,14 @@ export class RgbService {
     }
     this.recordReceiveOutcome(receive, 'settled', validated.txid)
     const contracts = state.contracts || (state.contracts = {})
-    contracts[normalizeAssetId(validated.assetId)] = {
+    const assetId = normalizeAssetId(validated.assetId)
+    contracts[assetId] = {
       consignment: item.payload,
       genesis: Buffer.from(validated.decoded.genesis.strict).toString('base64'),
+      metadata: validated.decoded.metadata,
       createdAt: this.now(),
     }
+    this.queueAssetMetadata(assetId, validated.decoded.metadata)
     return true
   }
 
@@ -808,8 +844,8 @@ export class RgbService {
     if (invoice.amount && invoice.amount !== amount) {
       throw new RgbServiceError('RGB invoice amount does not match the requested amount')
     }
-    const resolvedRequest = { ...request, amount }
-    const selectedUtxos = this.selectUtxos(request.assetId, amount)
+    const resolvedRequest = { ...request, assetId: requestedAssetId, amount }
+    const selectedUtxos = this.selectUtxos(requestedAssetId, amount)
     const validationHistory = await this.dependencies.stateSource.getValidationHistory(
       state.wallet,
       {
@@ -844,7 +880,7 @@ export class RgbService {
       !validationHistory.consignments.some(item => item.payload === localContract)
     ) {
       validationHistory.consignments.unshift({
-        opId: requestedAssetId.replace(/^rgb:/, ''),
+        opId: contractOperationId(requestedAssetId),
         payload: localContract,
       })
     }
@@ -1142,7 +1178,9 @@ export class RgbService {
 
   private hasPendingIndexerSync() {
     const state = this.requireState()
-    return Boolean(state.pendingUtxoSync || state.pendingIssues?.length)
+    return Boolean(
+      state.pendingUtxoSync || state.pendingIssues?.length || state.pendingAssetMetadata?.length
+    )
   }
 
   private async persist() {
@@ -1152,6 +1190,40 @@ export class RgbService {
 
   private storageKey(wallet: RgbWalletRef) {
     return `${STORAGE_PREFIX}${wallet.network}:${wallet.fundingAddress}`
+  }
+
+  private queueAssetMetadata(assetId: string, metadata: RgbPendingAssetMetadata['metadata']) {
+    const state = this.requireState()
+    const normalized = normalizeAssetId(assetId)
+    const pending = state.pendingAssetMetadata || (state.pendingAssetMetadata = [])
+    const existing = pending.find(item => item.assetId === normalized)
+    if (existing) {
+      const changed = Object.keys(metadata).some(
+        key =>
+          existing.metadata[key as keyof typeof metadata] !== metadata[key as keyof typeof metadata]
+      )
+      if (changed) existing.metadata = metadata
+      return changed
+    }
+    pending.push({ assetId: normalized, metadata })
+    return true
+  }
+
+  /** Recover metadata from received consignments saved before metadata indexing existed. */
+  private hydrateStoredContractMetadata() {
+    const state = this.requireState()
+    for (const [assetId, contract] of Object.entries(state.contracts || {})) {
+      if (contract.metadata) continue
+      try {
+        const decoded = decodeNiaConsignment(
+          Uint8Array.from(Buffer.from(contract.consignment, 'base64'))
+        )
+        contract.metadata = decoded.metadata
+        this.queueAssetMetadata(assetId, decoded.metadata)
+      } catch {
+        // Locally stored contract placeholders may not be complete NIA consignments.
+      }
+    }
   }
 }
 
@@ -1202,5 +1274,48 @@ function randomU64() {
 }
 
 function normalizeAssetId(assetId: string) {
-  return assetId.startsWith('rgb:') ? assetId : `rgb:${assetId}`
+  return normalizeRgbAssetId(assetId)
+}
+
+function contractOperationId(assetId: string) {
+  try {
+    return rgbContractIdHex(assetId)
+  } catch {
+    // Lightweight test doubles may use a symbolic asset ID instead of a real ContractId.
+    return assetId.replace(/^rgb:/i, '').toLowerCase()
+  }
+}
+
+function normalizeSnapshot(snapshot: RgbWalletSnapshot): RgbWalletSnapshot {
+  return {
+    ...snapshot,
+    utxos: snapshot.utxos.map(utxo => ({
+      ...utxo,
+      allocations: utxo.allocations.map(allocation => ({
+        ...allocation,
+        assetId: normalizeAssetId(allocation.assetId),
+      })),
+    })),
+  }
+}
+
+function normalizeStateAssetIds(state: RgbServiceState): RgbServiceState {
+  state.snapshot = normalizeSnapshot(state.snapshot)
+  for (const pending of Object.values(state.pending)) {
+    pending.request.assetId = normalizeAssetId(pending.request.assetId)
+  }
+  state.pendingReceives?.forEach(receive => {
+    if (receive.assetId) receive.assetId = normalizeAssetId(receive.assetId)
+    if (receive.pendingAccept) receive.pendingAccept.assetId = normalizeAssetId(receive.pendingAccept.assetId)
+  })
+  state.pendingReceiveHistory?.forEach(item => (item.assetId = normalizeAssetId(item.assetId)))
+  state.pendingSendHistory?.forEach(item => (item.assetId = normalizeAssetId(item.assetId)))
+  state.pendingIssues?.forEach(item => (item.assetId = normalizeAssetId(item.assetId)))
+  state.pendingAssetMetadata?.forEach(item => (item.assetId = normalizeAssetId(item.assetId)))
+  if (state.contracts) {
+    state.contracts = Object.fromEntries(
+      Object.entries(state.contracts).map(([assetId, contract]) => [normalizeAssetId(assetId), contract])
+    )
+  }
+  return state
 }

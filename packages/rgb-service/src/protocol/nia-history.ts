@@ -1,5 +1,6 @@
 import { sha256 } from '@noble/hashes/sha256'
 import { RgbServiceError } from '../errors'
+import { normalizeRgbAssetId, rgbContractIdHex } from './contract-id'
 import {
   decodeNiaConsignment,
   revealNiaConsignmentBlindSeals,
@@ -18,10 +19,11 @@ function same(left: Uint8Array, right: Uint8Array): boolean {
 }
 
 function normalizeAssetId(value: string): string {
-  const normalized = value.replace(/^rgb:/, '').toLowerCase()
-  if (!/^[0-9a-f]{64}$/.test(normalized))
+  try {
+    return normalizeRgbAssetId(value)
+  } catch {
     throw new RgbServiceError('RGB history asset ID is invalid')
-  return `rgb:${normalized}`
+  }
 }
 
 function parsePayload(value: string): DecodedNiaConsignment {
@@ -106,7 +108,7 @@ export function mergeNiaConsignmentHistory(input: {
     witnessBundles: [...bundles.values()].map(bundle => bundle.witnessBundle),
   })
 
-  const rootId = assetId.slice(4)
+  const rootId = rgbContractIdHex(assetId)
   const required = input.requiredOpIds.map(value => value.replace(/^rgb:/, '').toLowerCase())
   if (required.some(value => !/^[0-9a-f]{64}$/.test(value)))
     throw new RgbServiceError('RGB history required operation ID is invalid')

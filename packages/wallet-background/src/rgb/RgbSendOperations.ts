@@ -16,6 +16,7 @@ type RgbSendOperationsDependencies = {
     psbt: string
     toSignInputs: ToSignInput[]
     amountDisplay: string
+    actionName: string
   }) => Promise<ToSignData>
   getActiveTransferId: (fundingAddress: string) => string | undefined
   setActiveTransferId: (fundingAddress: string, transferId: string) => void
@@ -59,6 +60,7 @@ export class RgbSendOperations {
       psbt: prepared.psbt,
       toSignInputs: prepared.toSignInputs,
       amountDisplay: getAmountDisplay(params),
+      actionName: `Send ${getAssetLabel(params)}`,
     })
     this.dependencies.setActiveTransferId(wallet.fundingAddress, prepared.id)
     return {
@@ -167,12 +169,17 @@ export class RgbSendOperations {
   }
 }
 
-function getAmountDisplay(params: RgbSendBeginParams): string {
-  const assetLabel =
-    [params.ticker, params.name]
+function getAssetLabel(params: RgbSendBeginParams): string {
+  return (
+    [params.name, params.ticker]
       .filter((value): value is string => typeof value === 'string')
       .map(value => value.trim())
       .find(value => value.length > 0) ?? 'RGB'
+  )
+}
+
+function getAmountDisplay(params: RgbSendBeginParams): string {
+  const assetLabel = getAssetLabel(params)
   let amount = params.amount === undefined || params.amount === '' ? '' : String(params.amount)
   if (!amount) {
     try {

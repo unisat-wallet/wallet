@@ -579,6 +579,7 @@ export class WalletController extends BaseController {
   })
   private readonly rgbIndexerOutbox = new RgbIndexerOutbox({
     syncIssue: (issue, wallet) => this.syncRgbIssueToIndexer(issue, wallet),
+    syncAssetMetadata: item => this.syncRgbAssetMetadataToIndexer(item),
     replaceUtxos: (sync, wallet) => this.replaceRgbUtxosInIndexer(sync, wallet),
     syncReceiveHistory: (receive, wallet) => this.syncRgbReceiveHistoryToIndexer(receive, wallet),
     warn: (message, error) => log.warn(message, error),
@@ -3251,8 +3252,8 @@ export class WalletController extends BaseController {
     return this.getAddressRgbActivity(address, currentPage, pageSize, assetId, type)
   }
 
-  getRgbTransfers = (currentPage: number, pageSize: number) =>
-    this.rgbTransferQuery.getTransfers(currentPage, pageSize)
+  getRgbTransfers = (currentPage: number, pageSize: number, options?: { skipSync?: boolean }) =>
+    this.rgbTransferQuery.getTransfers(currentPage, pageSize, options)
 
   getCurrentRgbWalletRef = async (): Promise<RgbWalletRef> => {
     const account = preferenceService.getCurrentAccount()
@@ -3402,8 +3403,7 @@ export class WalletController extends BaseController {
         description: '',
         details: [
           { label: 'UTXO Count', type: PsbtActionDetailType.TEXT, value: String(num) },
-          { label: 'Funding Address', type: PsbtActionDetailType.ADDRESS, value: funding.address },
-          { label: 'Fee Rate', type: PsbtActionDetailType.TEXT, value: String(feeRate) },
+          { label: 'RGB Address', type: PsbtActionDetailType.ADDRESS, value: funding.address },
         ],
         type: PsbtActionType.CUSTOM,
       },
@@ -3492,6 +3492,14 @@ export class WalletController extends BaseController {
       address: wallet.fundingAddress,
       txid: issue.utxoSync.txid,
       outpoints: toRgbIndexedUtxos(issue.utxoSync.outpoints),
+    })
+  }
+
+  private syncRgbAssetMetadataToIndexer = async (
+    item: import('@unisat/rgb-service').RgbPendingAssetMetadata
+  ) => {
+    await getRgbApiService().syncRgbAssetMetadata({
+      asset: { assetId: item.assetId, ...item.metadata },
     })
   }
 

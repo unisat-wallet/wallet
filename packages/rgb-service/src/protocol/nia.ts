@@ -1,6 +1,7 @@
 import { sha256 } from '@noble/hashes/sha256'
 import { RgbServiceError } from '../errors'
 import type { RgbAllocation } from '../types'
+import { rgbContractIdBytes } from './contract-id'
 import { StrictWriter } from './strict'
 
 const RGB_NIA_ASSET_OWNER = 4000
@@ -207,7 +208,7 @@ function serializeOpCommitment(
     .writeU16(0)
     .writeU64(input.nonce)
     .writeU8(1)
-    .writeFixedBytes(hexBytes(input.contractId, 'RGB contract ID'), 32)
+    .writeFixedBytes(rgbContractIdBytes(input.contractId), 32)
     .writeU16(RGB_NIA_TRANSFER)
     .writeFixedBytes(metadataHash, 32)
     .writeFixedBytes(globalsRoot, 32)
@@ -235,7 +236,7 @@ export function encodeNiaTransition(input: NiaTransition): EncodedNiaTransition 
   const writer = new StrictWriter()
   writer
     .writeU16(0)
-    .writeFixedBytes(hexBytes(input.contractId, 'RGB contract ID'), 32)
+    .writeFixedBytes(rgbContractIdBytes(input.contractId), 32)
     .writeU64(input.nonce)
     .writeU16(RGB_NIA_TRANSFER)
     .writeU8(0)

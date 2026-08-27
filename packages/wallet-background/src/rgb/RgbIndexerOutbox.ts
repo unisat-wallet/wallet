@@ -1,6 +1,7 @@
 import {
   RgbService,
   type RgbPendingIssue,
+  type RgbPendingAssetMetadata,
   type RgbPendingReceiveHistory,
   type RgbPendingUtxoSync,
   type RgbUtxo,
@@ -10,6 +11,7 @@ import type { LocalRgbWallet } from './RgbWalletCoordinator'
 
 type RgbIndexerOutboxDependencies = {
   syncIssue: (issue: RgbPendingIssue, wallet: LocalRgbWallet) => Promise<void>
+  syncAssetMetadata: (item: RgbPendingAssetMetadata, wallet: LocalRgbWallet) => Promise<void>
   replaceUtxos: (sync: RgbPendingUtxoSync, wallet: LocalRgbWallet) => Promise<void>
   syncReceiveHistory: (receive: RgbPendingReceiveHistory, wallet: LocalRgbWallet) => Promise<void>
   warn: (message: string, error: unknown) => void
@@ -21,6 +23,15 @@ export class RgbIndexerOutbox {
 
   async sync(service: RgbService, wallet: LocalRgbWallet): Promise<boolean> {
     let synced = true
+    for (const item of service.getPendingAssetMetadata?.() || []) {
+      try {
+        await this.dependencies.syncAssetMetadata(item, wallet)
+        await service.markAssetMetadataSynced(item.assetId)
+      } catch (error) {
+        synced = false
+        this.dependencies.warn('Failed to sync received RGB asset metadata', error)
+      }
+    }
     // Optional guards preserve compatibility with lightweight controller test doubles.
     for (const issue of service.getPendingIssues?.() || []) {
       try {

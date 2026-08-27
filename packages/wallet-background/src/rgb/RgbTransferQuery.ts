@@ -51,39 +51,51 @@ export class RgbTransferQuery {
   constructor(private readonly dependencies: RgbTransferQueryDependencies) {}
 
   // eslint-disable-next-line @typescript-eslint/explicit-function-return-type -- preserve the precise merged activity response.
-  async getTransfers(currentPage: number, pageSize: number) {
+  async getTransfers(
+    currentPage: number,
+    pageSize: number,
+    options?: { skipSync?: boolean }
+  ) {
     let context = await this.dependencies.getContext()
     let { service, wallet } = context
-    await this.dependencies.syncReceiveHistory(service, context)
-    if (service.getPendingTransfers().length) {
-      try {
-        await this.dependencies.syncPendingTransfers(service)
-      } catch (error) {
-        const hasRetryableBroadcast = service
-          .getPendingTransfers()
-          .some(transfer => !!transfer.delivery?.broadcastError)
-        const hasBroadcastedTransfer = service
-          .getPendingTransfers()
-          .some(transfer => !!transfer.broadcast)
-        if (
-          !(error instanceof RgbTransferAwaitingAckError) &&
-          !(error instanceof RgbTransferRejectedError) &&
-          !hasRetryableBroadcast &&
-          !hasBroadcastedTransfer
-        ) {
-          throw error
+    const activityPromise = this.dependencies.getRemoteActivity(
+      wallet.fundingAddress,
+      currentPage,
+      pageSize
+    )
+    if (!options?.skipSync) {
+      await this.dependencies.syncReceiveHistory(service, context)
+      if (service.getPendingTransfers().length) {
+        try {
+          await this.dependencies.syncPendingTransfers(service)
+        } catch (error) {
+          const hasRetryableBroadcast = service
+            .getPendingTransfers()
+            .some(transfer => !!transfer.delivery?.broadcastError)
+          const hasBroadcastedTransfer = service
+            .getPendingTransfers()
+            .some(transfer => !!transfer.broadcast)
+          if (
+            !(error instanceof RgbTransferAwaitingAckError) &&
+            !(error instanceof RgbTransferRejectedError) &&
+            !hasRetryableBroadcast &&
+            !hasBroadcastedTransfer
+          ) {
+            throw error
+          }
         }
       }
+      const hadPendingReceives = service.getPendingReceives().length > 0
+      if (hadPendingReceives) {
+        context = await this.dependencies.syncReceivedAllocations()
+        ;({ service, wallet } = context)
+        await this.dependencies.syncReceiveHistory(service, context)
+      }
     }
-    if (service.getPendingReceives().length) {
-      context = await this.dependencies.syncReceivedAllocations()
-      ;({ service, wallet } = context)
-    }
-    await this.dependencies.syncReceiveHistory(service, context)
 
     const networkType = this.dependencies.getNetworkType()
     const [activity, pendingTransfers] = await Promise.all([
-      this.dependencies.getRemoteActivity(wallet.fundingAddress, currentPage, pageSize),
+      activityPromise,
       Promise.resolve(service.getPendingTransfers()),
     ])
     const localSends = pendingTransfers.map(transfer => ({

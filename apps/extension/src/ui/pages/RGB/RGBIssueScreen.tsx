@@ -1,10 +1,9 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 
-import { Column, Content, Header, Layout, Text, Tooltip } from '@/ui/components';
+import { Column, Content, Header, Icon, Layout, Text, Tooltip } from '@/ui/components';
 import { FeeRateBar } from '@/ui/components/FeeRateBar';
+import LoadingPage from '@/ui/components/LoadingPage';
 import type { SignedData, SignPsbtParams, ToSignData } from '@unisat/wallet-shared';
-import { faCheck, faClock } from '@fortawesome/free-solid-svg-icons';
-import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import {
   useCurrentAccount,
   useFeeRateBar,
@@ -17,6 +16,8 @@ import {
   toRgbAtomicAmount
 } from '@unisat/wallet-state';
 
+import { copyToClipboard, shortAddress } from '@/ui/utils';
+
 import { SignPsbt } from '../Approval/components';
 import { IssueReviewModal } from './components/IssueReviewModal';
 import './RGBIssueScreen.less';
@@ -24,7 +25,13 @@ import './RGBIssueScreen.less';
 type RGBIssueScreenStep = 'issue' | 'sign_rgb_utxo';
 type IssueField = 'ticker' | 'name' | 'amount' | 'precision';
 type RgbIssueResult = { assetId: string; pendingConfirmation: boolean };
-type RgbAllocationSummary = { available?: boolean; availableAllocationCount?: number; freeAllocationCount?: number };
+type RgbAllocationSummary = {
+  available?: boolean;
+  availableAllocationCount?: number;
+  freeAllocationCount?: number;
+  pendingConfirmation?: boolean;
+  pendingAllocationCount?: number;
+};
 type IssueFormErrors = Partial<Record<IssueField, string>>;
 
 const TICKER_MAX_BYTES = 8;
@@ -41,8 +48,14 @@ const getErrorMessage = (error: unknown) => {
 };
 
 const getAvailableAllocationCount = (summary: RgbAllocationSummary) => {
-  const count = Number(summary.availableAllocationCount ?? summary.freeAllocationCount ?? 0);
-  return Number.isFinite(count) && count >= 0 ? count : summary.available ? 1 : 0;
+  const confirmed = Number(summary.availableAllocationCount ?? summary.freeAllocationCount ?? 0);
+  const pending = Number(summary.pendingAllocationCount ?? 0);
+  const confirmedCount = Number.isFinite(confirmed) && confirmed > 0 ? confirmed : 0;
+  const pendingCount = Number.isFinite(pending) && pending > 0 ? pending : 0;
+  const total = confirmedCount + pendingCount;
+  if (total > 0) return total;
+  if (summary.available || summary.pendingConfirmation) return 1;
+  return 0;
 };
 
 const getAssetId = (value: unknown) => {
@@ -53,13 +66,21 @@ const getAssetId = (value: unknown) => {
 
 const getFormErrors = (ticker: string, name: string, amount: string, precision: string): IssueFormErrors => {
   const errors: IssueFormErrors = {};
-  if (!ticker || new TextEncoder().encode(ticker).length > TICKER_MAX_BYTES)
-    errors.ticker = `Use up to ${TICKER_MAX_BYTES} characters`;
-  if (!name || new TextEncoder().encode(name).length > NAME_MAX_BYTES)
-    errors.name = `Use up to ${NAME_MAX_BYTES} characters`;
-  if (!/^\d+$/.test(precision) || Number(precision) > PRECISION_MAX) errors.precision = 'Enter a valid integer';
+  const tickerBytes = new TextEncoder().encode(ticker).length;
+  if (!ticker) errors.ticker = 'required';
+  else if (tickerBytes > TICKER_MAX_BYTES) errors.ticker = `Use up to ${TICKER_MAX_BYTES} characters`;
+  const nameBytes = new TextEncoder().encode(name).length;
+  if (!name) errors.name = 'required';
+  else if (nameBytes > NAME_MAX_BYTES) errors.name = `Use up to ${NAME_MAX_BYTES} characters`;
+  if (!precision) errors.precision = 'required';
+  else if (!/^\d+$/.test(precision)) errors.precision = 'Enter a valid integer';
+  else if (Number(precision) > PRECISION_MAX) {
+    errors.precision = `Enter an integer between 0 and ${PRECISION_MAX}`;
+  }
   const parsedPrecision = Number(precision);
-  if (
+  if (!amount) {
+    errors.amount = 'required';
+  } else if (
     !isValidRgbDecimalAmount(amount, parsedPrecision) ||
     !/[1-9]/.test(toRgbAtomicAmount(amount, parsedPrecision))
   ) {
@@ -68,12 +89,41 @@ const getFormErrors = (ticker: string, name: string, amount: string, precision: 
   return errors;
 };
 
+const getVisibleFieldError = (value: string, error?: string) =>
+  value.trim() && error && error !== 'required' ? error : undefined;
+
 const formatSupply = (amount: string, ticker: string) => {
   const [integerPart = '0', decimalPart = ''] = amount.split('.');
   const formattedInteger = integerPart.replace(/\B(?=(\d{3})+(?!\d))/g, ',');
   const formattedAmount = decimalPart ? `${formattedInteger}.${decimalPart}` : formattedInteger;
   return `${formattedAmount} ${ticker}`;
 };
+
+function IssueStatusMark({ pending }: { pending: boolean }) {
+  if (pending) {
+    return (
+      <svg width="100" height="100" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <circle cx="50" cy="50" r="50" fill="#EBB94C" fillOpacity="0.05" />
+        <circle cx="50.0011" cy="49.9991" r="39.0909" fill="#EBB94C" fillOpacity="0.06" />
+        <path
+          d="M50.275 23C44.8805 23 39.6072 24.5997 35.1218 27.5967C30.6365 30.5937 27.1406 34.8535 25.0762 39.8373C23.0118 44.8212 22.4717 50.3052 23.5241 55.5961C24.5765 60.8869 27.1742 65.7468 30.9887 69.5613C34.8031 73.3758 39.6631 75.9735 44.9539 77.0259C50.2447 78.0783 55.7288 77.5382 60.7127 75.4738C65.6965 73.4094 69.9563 69.9135 72.9533 65.4282C75.9503 60.9428 77.55 55.6695 77.55 50.275C77.55 46.6932 76.8445 43.1465 75.4738 39.8373C74.1031 36.5282 72.0941 33.5214 69.5613 30.9887C67.0286 28.4559 64.0219 26.4469 60.7127 25.0762C57.4035 23.7055 53.8568 23 50.275 23ZM57.9666 60.694C57.583 61.0771 57.0631 61.2923 56.521 61.2923C55.9789 61.2923 55.459 61.0771 55.0754 60.694L47.4657 53.0843C47.0819 52.7011 46.8661 52.1811 46.8656 51.6387V38.6695C46.8656 38.1269 47.0812 37.6066 47.4648 37.223C47.8484 36.8394 48.3687 36.6239 48.9113 36.6239C49.4538 36.6239 49.9741 36.8394 50.3577 37.223C50.7414 37.6066 50.9569 38.1269 50.9569 38.6695V50.7932L57.9666 57.8029C58.1579 57.9919 58.3098 58.217 58.4134 58.4651C58.5171 58.7133 58.5705 58.9795 58.5705 59.2485C58.5705 59.5174 58.5171 59.7837 58.4134 60.0318C58.3098 60.2799 58.1579 60.505 57.9666 60.694Z"
+          fill="#EBB94C"
+        />
+      </svg>
+    );
+  }
+
+  return (
+    <svg width="100" height="100" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <circle cx="50" cy="50" r="50" fill="#7CDB98" fillOpacity="0.05" />
+      <circle cx="50.0011" cy="49.9991" r="39.0909" fill="#7CDB98" fillOpacity="0.06" />
+      <path
+        d="M50.0032 22.7256C65.0652 22.7256 77.2759 34.9363 77.2759 49.9983C77.2759 65.0604 65.0652 77.271 50.0032 77.271C34.9412 77.271 22.7305 65.0604 22.7305 49.9983C22.7305 34.9363 34.9412 22.7256 50.0032 22.7256ZM61.6759 41.7326C61.4858 41.5428 61.2602 41.3923 61.012 41.2896C60.7637 41.187 60.4977 41.1342 60.229 41.1344C59.9604 41.1346 59.6944 41.1877 59.4463 41.2907C59.1982 41.3937 58.9728 41.5446 58.783 41.7347L46.6105 53.9256L41.2193 48.5569C40.834 48.1791 40.3149 47.9689 39.7752 47.9721C39.2355 47.9753 38.719 48.1917 38.3381 48.5741C37.9573 48.9565 37.743 49.4739 37.7419 50.0136C37.7409 50.5533 37.9531 51.0715 38.3325 51.4554L45.1712 58.266C45.5552 58.6485 46.0754 58.863 46.6175 58.8622C47.1595 58.8614 47.6791 58.6455 48.0621 58.262L61.678 44.6256C61.8678 44.4355 62.0183 44.2099 62.121 43.9616C62.2236 43.7134 62.2764 43.4473 62.2762 43.1787C62.276 42.91 62.2229 42.6441 62.1199 42.396C62.0169 42.1478 61.866 41.9224 61.6759 41.7326Z"
+        fill="#7CDB98"
+      />
+    </svg>
+  );
+}
 
 function FormField({
   label,
@@ -101,14 +151,16 @@ function FormField({
 function ReviewRow({
   label,
   value,
-  accent,
-  tone
+  tone,
+  copyable
 }: {
   label: string;
   value: string;
-  accent?: boolean;
   tone?: 'pending' | 'confirmed' | 'failed';
+  copyable?: boolean;
 }) {
+  const tools = useTools();
+  const { t } = useI18n();
   const toneClass =
     tone === 'pending'
       ? 'rgb-issue-review-value-pending'
@@ -118,10 +170,23 @@ function ReviewRow({
           ? 'rgb-issue-review-value-failed'
           : undefined;
 
+  const handleCopy = () => {
+    copyToClipboard(value).then(() => {
+      tools.toastSuccess(t('copied'));
+    });
+  };
+
   return (
-    <div className="rgb-issue-review-row">
+    <div className={`rgb-issue-review-row${copyable ? ' rgb-issue-review-row-copyable' : ''}`}>
       <span>{label}</span>
-      <strong className={accent ? 'rgb-issue-review-value-accent' : toneClass}>{value}</strong>
+      {copyable ? (
+        <button type="button" className="rgb-issue-review-copy" onClick={handleCopy}>
+          <strong>{shortAddress(value, 10)}</strong>
+          <Icon icon="copy" color="white_muted" size={14} />
+        </button>
+      ) : (
+        <strong className={toneClass}>{value}</strong>
+      )}
     </div>
   );
 }
@@ -143,11 +208,8 @@ export default function RGBIssueScreen() {
   const [step, setStep] = useState<RGBIssueScreenStep>('issue');
   const [utxoToSignData, setUtxoToSignData] = useState<ToSignData>();
   const [fundingAddress, setFundingAddress] = useState('');
-  const [availableAllocationCount, setAvailableAllocationCount] = useState(0);
   const [fundingTxid, setFundingTxid] = useState('');
   const [issueResult, setIssueResult] = useState<RgbIssueResult>();
-  const [touched, setTouched] = useState<Partial<Record<IssueField, boolean>>>({});
-  const [submitted, setSubmitted] = useState(false);
   const [reviewModalVisible, setReviewModalVisible] = useState(false);
 
   const formErrors = useMemo(
@@ -155,13 +217,16 @@ export default function RGBIssueScreen() {
     [amount, name, precision, ticker]
   );
   const isFormValid = Object.keys(formErrors).length === 0;
+  const nameError = getVisibleFieldError(name, formErrors.name);
+  const tickerError = getVisibleFieldError(ticker, formErrors.ticker);
+  const amountError = getVisibleFieldError(amount, formErrors.amount);
+  const precisionError = getVisibleFieldError(precision, formErrors.precision);
   const parsedPrecision = Number(precision);
   const assetPrecision =
     Number.isInteger(parsedPrecision) && parsedPrecision >= 0 && parsedPrecision <= PRECISION_MAX
       ? parsedPrecision
       : 0;
   const atomicSupply = toRgbAtomicAmount(amount.trim(), assetPrecision);
-  const hasFundingAllocation = availableAllocationCount > 0;
   const isFormLocked = loading;
   const canIssue = !isFormLocked && !fundingLoading && !!fundingAddress && isFormValid;
   const assetTicker = ticker.trim() || 'ASSET';
@@ -170,16 +235,13 @@ export default function RGBIssueScreen() {
   const refreshFundingState = useCallback(async () => {
     setFundingLoading(true);
     try {
-      const [funding, summary] = await Promise.all([
+      const [funding] = await Promise.all([
         wallet.getRgbFundingAddress(),
         wallet.getRgbAllocationSummary({ skipSync: false })
       ]);
-      const availableCount = getAvailableAllocationCount(summary as RgbAllocationSummary);
       setFundingAddress(funding.address);
-      setAvailableAllocationCount(availableCount);
     } catch (e: unknown) {
       setFundingAddress('');
-      setAvailableAllocationCount(0);
       setOperationError(getErrorMessage(e));
     } finally {
       setFundingLoading(false);
@@ -193,72 +255,84 @@ export default function RGBIssueScreen() {
     void refreshFundingState();
   }, [currentAccount?.key, refreshFundingState]);
 
-  const run = useCallback(async <T,>(action: () => Promise<T>, onSuccess: (value: T) => void) => {
+  const issueAsset = useCallback(async () => {
     setLoading(true);
     setOperationError('');
     try {
-      onSuccess(await action());
+      const value = await wallet.createRgbIssueNia({
+        ticker: ticker.trim(),
+        name: name.trim(),
+        precision: assetPrecision,
+        amounts: [atomicSupply]
+      });
+      const assetId = getAssetId(value);
+      if (!assetId) {
+        throw new Error('RGB issuance did not return an asset ID');
+      }
+      const result = value && typeof value === 'object' ? (value as { pendingConfirmation?: unknown }) : {};
+      setReviewModalVisible(false);
+      setIssueResult({
+        assetId,
+        pendingConfirmation: result.pendingConfirmation === true
+      });
+      void refreshFundingState();
+      return true;
     } catch (e: unknown) {
-      setOperationError(getErrorMessage(e));
+      const message = getErrorMessage(e);
+      setOperationError(message);
+      tools.toastError(message);
+      return false;
     } finally {
       setLoading(false);
     }
-  }, []);
-
-  const issueAsset = useCallback(() => {
-    void run(
-      () =>
-        wallet.createRgbIssueNia({
-          ticker: ticker.trim(),
-          name: name.trim(),
-          precision: assetPrecision,
-          amounts: [atomicSupply]
-        }),
-      (value) => {
-        const assetId = getAssetId(value);
-        if (!assetId) {
-          setOperationError('RGB issuance did not return an asset ID');
-          return;
-        }
-        const result = value && typeof value === 'object' ? (value as { pendingConfirmation?: unknown }) : {};
-        setReviewModalVisible(false);
-        setIssueResult({
-          assetId,
-          pendingConfirmation: result.pendingConfirmation === true
-        });
-        void refreshFundingState();
-      }
-    );
-  }, [assetPrecision, atomicSupply, name, refreshFundingState, run, ticker, wallet]);
+  }, [assetPrecision, atomicSupply, name, refreshFundingState, ticker, tools, wallet]);
 
   const startCreateRgbUtxo = useCallback(async () => {
     setFundingTxid('');
     setLoading(true);
     setOperationError('');
     try {
-      const beginResult = await wallet.createRgbUtxosBegin({ num: 1, ...(feeRate > 0 ? { feeRate } : {}) });
+      const beginResult = await wallet.createRgbUtxosBegin({
+        num: 1,
+        ...(feeRate > 0 ? { feeRate } : {})
+      });
       const toSignData = beginResult?.toSignData as ToSignData | undefined;
       if (!toSignData) throw new Error('RGB UTXO creation did not return signing data');
       setReviewModalVisible(false);
       setUtxoToSignData(toSignData);
       setStep('sign_rgb_utxo');
     } catch (e: unknown) {
-      setOperationError(getErrorMessage(e));
+      const message = getErrorMessage(e);
+      setOperationError(message);
+      tools.toastError(message);
     } finally {
       setLoading(false);
     }
-  }, [feeRate, wallet]);
+  }, [feeRate, tools, wallet]);
 
   const onDeploy = () => {
-    if (hasFundingAllocation) {
-      issueAsset();
-    } else {
-      void startCreateRgbUtxo();
-    }
+    void (async () => {
+      setLoading(true);
+      setOperationError('');
+      try {
+        const summary = await wallet.getRgbAllocationSummary({ skipSync: false });
+        const availableCount = getAvailableAllocationCount(summary as RgbAllocationSummary);
+        if (availableCount > 0) {
+          await issueAsset();
+          return;
+        }
+        await startCreateRgbUtxo();
+      } catch (e: unknown) {
+        const message = getErrorMessage(e);
+        setOperationError(message);
+        tools.toastError(message);
+      } finally {
+        setLoading(false);
+      }
+    })();
   };
 
   const onIssueAssetClick = () => {
-    setSubmitted(true);
     if (!isFormValid) return;
     setReviewModalVisible(true);
   };
@@ -278,27 +352,22 @@ export default function RGBIssueScreen() {
       if (!signedPsbt) throw new Error('RGB UTXO PSBT signing did not return psbtHex');
       const endResult = await wallet.createRgbUtxosEnd({ signedPsbt });
       setFundingTxid(typeof endResult?.txid === 'string' ? endResult.txid : '');
-      resetRgbUtxoSignStep();
-      issueAsset();
+      const issued = await issueAsset();
+      if (!issued) {
+        resetRgbUtxoSignStep();
+        return;
+      }
+      setUtxoToSignData(undefined);
+      setStep('issue');
     } catch (e: unknown) {
-      setOperationError(getErrorMessage(e));
+      const message = getErrorMessage(e);
+      setOperationError(message);
+      tools.toastError(message);
       resetRgbUtxoSignStep();
     } finally {
       tools.showLoading(false);
     }
   };
-
-  if (step === 'sign_rgb_utxo') {
-    const params: SignPsbtParams = { data: { toSignDatas: utxoToSignData ? [utxoToSignData] : [] } };
-    return (
-      <SignPsbt
-        header={<Header onBack={cancelRgbUtxoSignStep} />}
-        params={params}
-        handleCancel={cancelRgbUtxoSignStep}
-        handleConfirm={onSignRgbUtxoHandleConfirm}
-      />
-    );
-  }
 
   if (issueResult) {
     return (
@@ -307,20 +376,20 @@ export default function RGBIssueScreen() {
         <Content style={{ backgroundColor: '#070706', padding: '24px 16px 112px' }}>
           <main className="rgb-issue-page rgb-issue-success-page">
             <div className="rgb-issue-success-mark">
-              <FontAwesomeIcon icon={issueResult.pendingConfirmation ? faClock : faCheck} />
+              <IssueStatusMark pending={issueResult.pendingConfirmation} />
             </div>
             <span className="rgb-issue-eyebrow">
               {issueResult.pendingConfirmation ? 'ASSET ISSUED - UNCONFIRMED' : 'ASSET DEPLOYED'}
             </span>
-            <h1>{assetTicker}</h1>
-            <p>{name.trim()}</p>
+            <h1>{name.trim() || assetTicker}</h1>
             <section className="rgb-issue-section rgb-issue-result-card">
-              <ReviewRow label="Asset ID" value={issueResult.assetId} />
-              <ReviewRow label={t('total_supply')} value={displaySupply} accent />
+              <ReviewRow label={t('asset_id')} value={issueResult.assetId} copyable />
+              <ReviewRow label={t('ticker_label')} value={assetTicker} />
+              <ReviewRow label={t('total_supply')} value={displaySupply} />
               <ReviewRow label={t('decimal_places_label')} value={precision.trim()} />
               <ReviewRow
                 label="Status"
-                value={issueResult.pendingConfirmation ? 'Pending confirmation' : 'Confirmed'}
+                value={issueResult.pendingConfirmation ? t('unconfirmed') : t('rgb_status_confirmed')}
                 tone={issueResult.pendingConfirmation ? 'pending' : 'confirmed'}
               />
             </section>
@@ -335,6 +404,22 @@ export default function RGBIssueScreen() {
     );
   }
 
+  if (step === 'sign_rgb_utxo') {
+    const params: SignPsbtParams = { data: { toSignDatas: utxoToSignData ? [utxoToSignData] : [] } };
+    return (
+      <SignPsbt
+        header={<Header onBack={cancelRgbUtxoSignStep} />}
+        params={params}
+        handleCancel={cancelRgbUtxoSignStep}
+        handleConfirm={onSignRgbUtxoHandleConfirm}
+      />
+    );
+  }
+
+  if (loading) {
+    return <LoadingPage />;
+  }
+
   return (
     <Layout style={{ backgroundColor: '#070706' }}>
       <Header onBack={() => nav.goBack()} title={t('issue_rgb_asset')} />
@@ -347,12 +432,22 @@ export default function RGBIssueScreen() {
           />
 
           <Column gap="lg" fullX>
-            <FormField label={t('ticker_label')} error={submitted || touched.ticker ? formErrors.ticker : undefined}>
+            <FormField label={t('name_label')} error={nameError}>
               <input
-                className={`rgb-issue-input ${submitted || touched.ticker ? (formErrors.ticker ? 'rgb-issue-input-error' : '') : ''}`}
+                className={`rgb-issue-input ${nameError ? 'rgb-issue-input-error' : ''}`}
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                placeholder={t('asset_display_name')}
+                maxLength={NAME_MAX_BYTES}
+                disabled={isFormLocked}
+              />
+            </FormField>
+
+            <FormField label={t('ticker_label')} error={tickerError}>
+              <input
+                className={`rgb-issue-input ${tickerError ? 'rgb-issue-input-error' : ''}`}
                 value={ticker}
                 onChange={(e) => setTicker(e.target.value.toUpperCase())}
-                onBlur={() => setTouched((value) => ({ ...value, ticker: true }))}
                 placeholder={t('ticker_placeholder')}
                 maxLength={TICKER_MAX_BYTES}
                 autoCapitalize="characters"
@@ -360,26 +455,12 @@ export default function RGBIssueScreen() {
               />
             </FormField>
 
-            <FormField label={t('name_label')} error={submitted || touched.name ? formErrors.name : undefined}>
-              <input
-                className={`rgb-issue-input ${submitted || touched.name ? (formErrors.name ? 'rgb-issue-input-error' : '') : ''}`}
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                onBlur={() => setTouched((value) => ({ ...value, name: true }))}
-                placeholder={t('asset_display_name')}
-                maxLength={NAME_MAX_BYTES}
-                disabled={isFormLocked}
-              />
-            </FormField>
-
-            <FormField label={t('total_supply')} error={submitted || touched.amount ? formErrors.amount : undefined}>
-              <div
-                className={`rgb-issue-input-shell ${submitted || touched.amount ? (formErrors.amount ? 'rgb-issue-input-error' : '') : ''}`}>
+            <FormField label={t('total_supply')} error={amountError}>
+              <div className={`rgb-issue-input-shell ${amountError ? 'rgb-issue-input-error' : ''}`}>
                 <input
                   className="rgb-issue-input rgb-issue-supply-input"
                   value={amount}
                   onChange={(e) => setAmount(normalizeRgbAmountInput(e.target.value, assetPrecision))}
-                  onBlur={() => setTouched((value) => ({ ...value, amount: true }))}
                   inputMode="decimal"
                   placeholder={t('enter_total_supply')}
                   disabled={isFormLocked}
@@ -408,12 +489,14 @@ export default function RGBIssueScreen() {
                   </div>
                 </Tooltip>
               }
-              error={submitted || touched.precision ? formErrors.precision : undefined}>
+              error={precisionError}>
               <input
-                className={`rgb-issue-input ${submitted || touched.precision ? (formErrors.precision ? 'rgb-issue-input-error' : '') : ''}`}
+                className={`rgb-issue-input ${precisionError ? 'rgb-issue-input-error' : ''}`}
                 value={precision}
-                onChange={(e) => setPrecision(e.target.value.replace(/\D/g, '').slice(0, 2))}
-                onBlur={() => setTouched((value) => ({ ...value, precision: true }))}
+                onChange={(e) => {
+                  const digits = e.target.value.replace(/\D/g, '').slice(0, 2);
+                  setPrecision(digits.replace(/^0+(?=\d)/, ''));
+                }}
                 inputMode="numeric"
                 placeholder="0"
                 disabled={isFormLocked}
@@ -447,6 +530,7 @@ export default function RGBIssueScreen() {
           supply={displaySupply}
           precision={precision.trim()}
           loading={loading}
+          error={operationError}
           onClose={() => setReviewModalVisible(false)}
           onConfirm={onDeploy}
           t={t}

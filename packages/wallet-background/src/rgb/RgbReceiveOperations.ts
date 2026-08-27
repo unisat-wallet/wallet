@@ -85,15 +85,20 @@ export class RgbReceiveOperations {
     availableAllocationCount: number
     freeAllocationCount: number
     colorableUtxoCount: number
+    pendingConfirmation: boolean
+    pendingAllocationCount: number
   }> {
     const { service } = await this.dependencies.getContext()
     if (!params.skipSync) await service.sync()
     const free = service.getAvailableReceiveUtxos()
+    const pending = service.getPendingConfirmationReceiveUtxos?.() ?? []
     return {
       available: free.length > 0,
       availableAllocationCount: free.length,
       freeAllocationCount: free.length,
       colorableUtxoCount: free.length,
+      pendingConfirmation: pending.length > 0,
+      pendingAllocationCount: pending.length,
     }
   }
 }

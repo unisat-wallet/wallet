@@ -45,6 +45,10 @@ vi.mock('../src/services', () => ({
   },
   walletApiService: {
     setClientAddress: vi.fn(),
+    bitcoin: {
+      getAvailableUtxos: vi.fn().mockResolvedValue([]),
+      getBTCUtxos: vi.fn().mockResolvedValue([]),
+    },
   },
   sessionService: {
     broadcastEvent: vi.fn(),
@@ -349,6 +353,65 @@ describe('RGB wallet references', () => {
     expect(result).toMatchObject({ local: true, psbtHex: '70736274ff' })
   })
 
+  it('includes available BTC UTXOs when confirmed btc-utxo outputs cannot fund RGB', async () => {
+    const wallet = new WalletController()
+    const account = {
+      type: KeyringType.HdKeyring,
+      pubkey: validCompressedPubkey,
+      address: 'bc1qexample',
+      key: 'account-0',
+      flag: 0,
+      index: 0,
+    }
+    const keyring = {
+      getRgbFundingAccount: vi.fn().mockReturnValue({
+        address: 'bc1p0rgbfundingaddress',
+        publicKey: validCompressedPubkey,
+        derivationPath: "m/86'/827166'/0'/0/0",
+      }),
+    }
+    const psbt = { toHex: () => '70736274ff' }
+    const availableUtxo = {
+      txid: '11'.repeat(32),
+      vout: 1,
+      satoshis: 20_000,
+      scriptPk: '0014' + '11'.repeat(20),
+      addressType: AddressType.P2WPKH,
+      inscriptions: [],
+    }
+
+    vi.mocked(preferenceService.getCurrentAccount).mockReturnValue(account as any)
+    vi.mocked(keyringService.getKeyringForAccount).mockResolvedValue(keyring as any)
+    vi.mocked(walletApiService.bitcoin.getAvailableUtxos).mockResolvedValue([availableUtxo] as any)
+    vi.spyOn(wallet, 'getBTCUtxos').mockResolvedValue([
+      {
+        txid: '00'.repeat(32),
+        vout: 0,
+        satoshis: 200,
+        scriptPk: '0014' + '00'.repeat(20),
+        pubkey: validCompressedPubkey,
+        addressType: AddressType.P2WPKH,
+        inscriptions: [],
+      },
+    ] as any)
+    vi.spyOn(wallet, 'getToSignData').mockResolvedValue({ psbtHex: '70736274ff' } as any)
+    const sendSpy = vi.spyOn(txHelpers, 'sendBTC').mockResolvedValue({
+      psbt: psbt as any,
+      toSignInputs: [{ index: 0, publicKey: validCompressedPubkey }],
+    })
+
+    await wallet.createRgbUtxosBegin({ num: 1, feeRate: 1 })
+
+    expect(sendSpy).toHaveBeenCalledWith(
+      expect.objectContaining({
+        btcUtxos: expect.arrayContaining([
+          expect.objectContaining({ satoshis: 200 }),
+          expect.objectContaining({ satoshis: 20_000, txid: availableUtxo.txid }),
+        ]),
+      })
+    )
+  })
+
   it('persists broadcast RGB funding UTXOs before retrying indexer synchronization', async () => {
     const wallet = new WalletController()
     const fundingAddress = bitcoin.payments.p2wpkh({
@@ -580,6 +643,7 @@ describe('RGB wallet references', () => {
     const service = {
       sync: vi.fn(),
       getAvailableReceiveUtxos: vi.fn(() => []),
+      getPendingConfirmationReceiveUtxos: vi.fn(() => []),
     }
     vi.spyOn(wallet as any, 'getLocalRgbService').mockResolvedValue({
       service,
@@ -589,6 +653,26 @@ describe('RGB wallet references', () => {
     await wallet.getRgbAllocationSummary({ skipSync: true })
 
     expect(service.sync).not.toHaveBeenCalled()
+  })
+
+  it('counts mempool RGB funding UTXOs as pending allocations', async () => {
+    const wallet = new WalletController()
+    const service = {
+      sync: vi.fn(),
+      getAvailableReceiveUtxos: vi.fn(() => []),
+      getPendingConfirmationReceiveUtxos: vi.fn(() => [{ outpoint: { txid: 'aa', vout: 0 } }]),
+    }
+    vi.spyOn(wallet as any, 'getLocalRgbService').mockResolvedValue({
+      service,
+      wallet: { fundingAddress: 'bc1p-rgb-funding' },
+    })
+
+    await expect(wallet.getRgbAllocationSummary({ skipSync: true })).resolves.toMatchObject({
+      available: false,
+      availableAllocationCount: 0,
+      pendingConfirmation: true,
+      pendingAllocationCount: 1,
+    })
   })
 
   it('does not trigger an additional receive sync after acceptance', async () => {
@@ -889,6 +973,40 @@ describe('RGB wallet references', () => {
     expect(result.list).toMatchObject([
       { id: 'local-send:local-transfer', status: 'waiting_ack', amount: '10', local: true },
       { id: 'remote-transfer', status: 'settled', amount: undefined, timestamp: 50 },
+    ])
+  })
+
+  it('can list RGB transfers without waiting for pending-transfer sync', async () => {
+    const wallet = new WalletController()
+    const service = {
+      sync: vi.fn().mockResolvedValue(undefined),
+      syncPendingTransfers: vi.fn().mockResolvedValue(undefined),
+      getPendingTransfers: vi.fn(() => [
+        {
+          id: 'local-transfer',
+          createdAt: 100,
+          request: { assetId: 'rgb:asset', amount: '10' },
+          delivery: { completed: { txid: 'a'.repeat(64) } },
+        },
+      ]),
+      getPendingReceives: vi.fn(() => []),
+    }
+    vi.spyOn(wallet as any, 'getLocalRgbService').mockResolvedValue({
+      service,
+      wallet: { fundingAddress: 'bc1p-rgb-funding' },
+    })
+    vi.spyOn(wallet, 'getAddressRgbActivity').mockResolvedValue({
+      currentPage: 1,
+      pageSize: 20,
+      total: 0,
+      list: [],
+    })
+
+    const result = await wallet.getRgbTransfers(1, 20, { skipSync: true })
+
+    expect(service.syncPendingTransfers).not.toHaveBeenCalled()
+    expect(result.list).toMatchObject([
+      { id: 'local-send:local-transfer', status: 'waiting_ack', amount: '10', local: true },
     ])
   })
 
