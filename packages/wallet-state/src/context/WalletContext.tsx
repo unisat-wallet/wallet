@@ -649,6 +649,12 @@ export interface WalletController {
     [key: string]: any
   }>
 
+  getRgbRecoveryCheckpointStatus(): Promise<{
+    dirty: boolean
+    verified: boolean
+    lastError?: string
+  }>
+
   cancelRgbReceiveInvoice(params: { batchTransferIdx: number; skipSync?: boolean }): Promise<{
     changed: boolean
     [key: string]: any

@@ -171,12 +171,43 @@ type RgbControllerApiService = {
   }) => Promise<void>
   saveRgbRecoveryCheckpoint: (params: {
     wallet: RgbWalletRef
-    payload: string
+    payloadParts: string[]
+    expectedUpdatedAt?: number
     updatedAt: number
+  }) => Promise<{ saved: boolean; updatedAt: number }>
+  startRgbRecoveryCheckpointUpload: (params: {
+    wallet: RgbWalletRef
+    expectedUpdatedAt?: number
+    expectedRevision?: string
+    updatedAt: number
+    partCount: number
+    totalLength: number
+    checksum: string
+  }) => Promise<{ uploadId: string }>
+  uploadRgbRecoveryCheckpointPart: (params: {
+    wallet: RgbWalletRef
+    uploadId: string
+    index: number
+    payload: string
   }) => Promise<void>
+  completeRgbRecoveryCheckpointUpload: (params: {
+    wallet: RgbWalletRef
+    uploadId: string
+  }) => Promise<{ saved: boolean; updatedAt: number; revision?: string }>
+  getRgbRecoveryCheckpointUploadStatus: (params: {
+    wallet: RgbWalletRef
+    uploadId: string
+  }) => Promise<{
+    status: 'pending' | 'publishing' | 'completed'
+    saved?: boolean
+    updatedAt: number
+    revision?: string
+    receivedIndexes?: number[]
+  }>
   getRgbRecoveryCheckpoint: (params: { wallet: RgbWalletRef }) => Promise<{
     payload?: string
     updatedAt?: number
+    revision?: string
   }>
   getRgbAssetDetail: (assetId: string) => Promise<unknown>
   getRgbAssetActivity: (
@@ -476,6 +507,13 @@ type RgbSignPsbtRequest = {
 }
 
 const RGB_ENCRYPTED_STORAGE_NAMESPACE = 'rgb-service-v1'
+// Keep each JSON request safely below the common 1 MB reverse-proxy default.
+const RGB_RECOVERY_PAYLOAD_PART_SIZE = 900_000
+
+async function rgbRecoveryPayloadChecksum(payload: string) {
+  const digest = await globalThis.crypto.subtle.digest('SHA-256', new TextEncoder().encode(payload))
+  return Buffer.from(digest).toString('hex')
+}
 
 function rgbInvoiceDestinationAddress(invoice: string | undefined, networkType: NetworkType) {
   if (!invoice) return undefined
@@ -635,7 +673,8 @@ export class WalletController extends BaseController {
     warn: (message, error) => log.warn(message, error),
   })
   private readonly rgbRecoveryRestores = new Map<string, Promise<void>>()
-  private readonly rgbRecoveryBackups = new Map<string, Promise<void>>()
+  private readonly rgbRecoveryBackups = new Map<string, Promise<unknown>>()
+  private readonly rgbRecoveryVersions = new Map<string, { updatedAt?: number; revision?: string }>()
   private readonly rgbCoordinator = new RgbWalletCoordinator({
     getContext: () => this.getLocalRgbService(),
     syncIndexerOutbox: (service, wallet) => this.syncRgbIndexerOutbox(service, wallet),
@@ -3420,6 +3459,11 @@ export class WalletController extends BaseController {
 
   getRgbPendingReceiveInvoices = () => this.rgbReceiveOperations.getPendingReceiveInvoices()
 
+  getRgbRecoveryCheckpointStatus = async () => {
+    const { service } = await this.getLocalRgbService()
+    return service.getRecoveryCheckpointStatus()
+  }
+
   cancelRgbReceiveInvoice = async (params: Omit<RgbCancelReceiveInvoiceRequest, 'wallet'>) => {
     return this.rgbReceiveOperations.cancelReceiveInvoice(params.batchTransferIdx)
   }
@@ -3656,11 +3700,12 @@ export class WalletController extends BaseController {
 
   private restoreRgbRecoveryIfNeeded = async (context: LocalRgbServiceContext) => {
     const { service, wallet } = context
-    if (!service.needsRecoveryRestore?.()) return
     const key = `${wallet.network}:${wallet.fundingAddress}`
+    if (this.rgbRecoveryVersions.has(key)) return
     const active = this.rgbRecoveryRestores.get(key)
     if (active) return active
     const restore = (async () => {
+      let recoveryReady = false
       try {
         log.debug('RGB recovery: requesting checkpoint', { wallet: rgbRecoveryWalletTag(wallet) })
         const checkpoint = await getRgbApiService().getRgbRecoveryCheckpoint({ wallet })
@@ -3669,7 +3714,13 @@ export class WalletController extends BaseController {
           hasPayload: Boolean(checkpoint.payload),
           updatedAt: checkpoint.updatedAt,
         })
-        if (checkpoint.payload) {
+        const needsRestore = service.needsRecoveryRestore?.()
+        const localRevision = service.getRecoveryCheckpointRevision()
+        if (!needsRestore && localRevision !== checkpoint.revision) {
+          await service.markRecoveryConflict()
+          throw new Error('RGB recovery checkpoint has changed on another installation')
+        }
+        if (checkpoint.payload && needsRestore) {
           const state = await decryptRgbRecoveryCheckpoint(
             checkpoint.payload,
             await this.rgbRecoveryKey(wallet)
@@ -3688,10 +3739,34 @@ export class WalletController extends BaseController {
             throw new Error('RGB recovery checkpoint does not belong to this wallet')
           }
         }
+        // A successful read with no checkpoint is also authoritative: this is
+        // a new wallet and it is now safe to create its first checkpoint.
+        recoveryReady = true
+        this.rgbRecoveryVersions.set(key, {
+          ...(checkpoint.updatedAt === undefined ? {} : { updatedAt: checkpoint.updatedAt }),
+          ...(checkpoint.revision === undefined ? {} : { revision: checkpoint.revision }),
+        })
+        await service.setRecoveryCheckpointVersion(checkpoint.updatedAt)
+        await service.setRecoveryCheckpointRevision(checkpoint.revision)
       } catch (error) {
         log.warn('Failed to restore RGB recovery checkpoint', error)
-      } finally {
-        service.enableRecoveryBackup()
+        // Do not enable writes after an unreadable request. Otherwise a fresh
+        // local state can overwrite the only recoverable remote checkpoint as
+        // soon as the service mutates.
+        if (service.needsRecoveryRestore?.() || service.hasRecoveryConflict()) {
+          await service.disableRecoveryBackup()
+        }
+      }
+      if (recoveryReady) {
+        await service.enableRecoveryBackup()
+        const recoveryStatus = service.getRecoveryCheckpointStatus()
+        if (recoveryStatus.dirty || !recoveryStatus.verified) {
+          try {
+            await service.retryRecoveryCheckpoint()
+          } catch (error) {
+            log.warn('RGB recovery checkpoint retry failed', error)
+          }
+        }
         log.debug('RGB recovery: backup enabled', {
           wallet: rgbRecoveryWalletTag(wallet),
           ...rgbRecoveryServiceSummary(service),
@@ -3715,12 +3790,93 @@ export class WalletController extends BaseController {
       .catch(() => undefined)
       .then(async () => {
         const payload = await encryptRgbRecoveryCheckpoint(state, await this.rgbRecoveryKey(wallet))
-        await getRgbApiService().saveRgbRecoveryCheckpoint({
+        const checksum = await rgbRecoveryPayloadChecksum(payload)
+        const expected = this.rgbRecoveryVersions.get(key)
+        const updatedAt = Math.max(Date.now(), (expected?.updatedAt ?? -1) + 1)
+        const partCount = Math.ceil(payload.length / RGB_RECOVERY_PAYLOAD_PART_SIZE)
+        const api = getRgbApiService()
+        const { uploadId } = await api.startRgbRecoveryCheckpointUpload({
           wallet,
-          payload,
-          updatedAt: Date.now(),
+          partCount,
+          totalLength: payload.length,
+          checksum,
+          ...(expected?.updatedAt === undefined ? {} : { expectedUpdatedAt: expected.updatedAt }),
+          ...(expected?.revision === undefined ? {} : { expectedRevision: expected.revision }),
+          updatedAt,
         })
+        let receivedIndexes = new Set<number>()
+        for (let index = 0; index < partCount; index++) {
+          if (receivedIndexes.has(index)) continue
+          const payloadPart = payload.slice(
+            index * RGB_RECOVERY_PAYLOAD_PART_SIZE,
+            (index + 1) * RGB_RECOVERY_PAYLOAD_PART_SIZE
+          )
+          try {
+            await api.uploadRgbRecoveryCheckpointPart({ wallet, uploadId, index, payload: payloadPart })
+          } catch (error) {
+            const status = await api.getRgbRecoveryCheckpointUploadStatus({ wallet, uploadId }).catch(() => undefined)
+            if (!status || status.status !== 'pending') throw error
+            receivedIndexes = new Set(status.receivedIndexes || [])
+            if (!receivedIndexes.has(index)) throw error
+          }
+        }
+        let result: { saved: boolean; updatedAt: number; revision?: string } | undefined
+        try {
+          result = await api.completeRgbRecoveryCheckpointUpload({ wallet, uploadId })
+        } catch (error) {
+          let completionError = error
+          for (let attempt = 0; attempt < 7; attempt++) {
+            const status = await api.getRgbRecoveryCheckpointUploadStatus({ wallet, uploadId }).catch(() => undefined)
+            if (status?.status === 'completed') {
+              result = {
+                saved: status.saved === true,
+                updatedAt: status.updatedAt,
+                ...(status.revision ? { revision: status.revision } : {}),
+              }
+              break
+            }
+            // Do not mistake a timeout/concurrent complete for a failed
+            // checkpoint. The server holds a durable publishing lease and a
+            // later complete retry either resumes it or returns its terminal
+            // result.
+            if (status?.status !== 'publishing') throw completionError
+            await new Promise<void>(resolve => setTimeout(resolve, 5_000))
+            try {
+              result = await api.completeRgbRecoveryCheckpointUpload({ wallet, uploadId })
+              break
+            } catch (retryError) {
+              completionError = retryError
+            }
+          }
+          if (!result) throw completionError
+        }
+        if (!result) throw new Error('RGB recovery checkpoint completion did not return a result')
+        this.rgbRecoveryVersions.set(key, {
+          updatedAt: result.updatedAt,
+          ...(result.revision ? { revision: result.revision } : {}),
+        })
+        if (!result.saved) return result
+        let verified = false
+        try {
+          const readback = await api.getRgbRecoveryCheckpoint({ wallet })
+          if (
+            !readback.payload ||
+            readback.revision !== result.revision ||
+            readback.payload.length !== payload.length ||
+            (await rgbRecoveryPayloadChecksum(readback.payload)) !== checksum
+          ) {
+            throw new Error('RGB recovery checkpoint verification failed')
+          }
+          await decryptRgbRecoveryCheckpoint(readback.payload, await this.rgbRecoveryKey(wallet))
+          verified = true
+        } catch (error) {
+          // Completion already returned a durable server revision. Treat an
+          // unavailable read-back as a retryable verification warning, not a
+          // failed write that would fork local state from the new checkpoint.
+          log.warn('RGB recovery checkpoint read-back verification failed', error)
+        }
         log.debug('RGB recovery: checkpoint saved', diagnostic)
+        return { ...result, verified, checksum, totalLength: payload.length }
       })
     this.rgbRecoveryBackups.set(key, backup)
     void backup.catch(error => {
@@ -3732,6 +3888,9 @@ export class WalletController extends BaseController {
   private getLocalRgbService = async (): Promise<LocalRgbServiceContext> => {
     const context = await this.rgbServiceRegistry.get()
     await this.restoreRgbRecoveryIfNeeded(context)
+    if (!context.service.isRecoveryBackupEnabled()) {
+      throw new Error('RGB recovery service is unavailable; retry when the backend is reachable')
+    }
     await this.syncRgbIndexerOutbox(context.service, context.wallet)
     return context
   }

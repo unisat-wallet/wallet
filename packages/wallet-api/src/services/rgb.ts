@@ -28,6 +28,13 @@ import type {
   RgbRecoveryCheckpointReadRequest,
   RgbRecoveryCheckpointReadResult,
   RgbRecoveryCheckpointSaveRequest,
+  RgbRecoveryCheckpointSaveResult,
+  RgbRecoveryCheckpointUploadCompleteRequest,
+  RgbRecoveryCheckpointUploadPartRequest,
+  RgbRecoveryCheckpointUploadStartRequest,
+  RgbRecoveryCheckpointUploadStartResult,
+  RgbRecoveryCheckpointUploadStatusRequest,
+  RgbRecoveryCheckpointUploadStatusResult,
   RgbTransactionStatusRequest,
   RgbTransactionStatusResult,
 } from '../types'
@@ -85,14 +92,47 @@ export class RgbService {
     })
   }
 
-  async saveRgbRecoveryCheckpoint(params: RgbRecoveryCheckpointSaveRequest): Promise<void> {
-    await this.privatePost('/v5/rgb/recovery/checkpoint', params)
+  async saveRgbRecoveryCheckpoint(
+    params: RgbRecoveryCheckpointSaveRequest
+  ): Promise<RgbRecoveryCheckpointSaveResult> {
+    return this.privatePost('/v5/rgb/recovery/checkpoint', params)
   }
 
   async getRgbRecoveryCheckpoint(
     params: RgbRecoveryCheckpointReadRequest
   ): Promise<RgbRecoveryCheckpointReadResult> {
     return this.privatePost('/v5/rgb/recovery/checkpoint/read', params)
+  }
+
+  async startRgbRecoveryCheckpointUpload(
+    params: RgbRecoveryCheckpointUploadStartRequest
+  ): Promise<RgbRecoveryCheckpointUploadStartResult> {
+    return this.privatePost('/v5/rgb/recovery/checkpoint/uploads', params)
+  }
+
+  async uploadRgbRecoveryCheckpointPart(params: RgbRecoveryCheckpointUploadPartRequest): Promise<void> {
+    await this.privatePost(
+      `/v5/rgb/recovery/checkpoint/uploads/${encodeURIComponent(params.uploadId)}/parts/${params.index}`,
+      params
+    )
+  }
+
+  async completeRgbRecoveryCheckpointUpload(
+    params: RgbRecoveryCheckpointUploadCompleteRequest
+  ): Promise<RgbRecoveryCheckpointSaveResult> {
+    return this.privatePost(
+      `/v5/rgb/recovery/checkpoint/uploads/${encodeURIComponent(params.uploadId)}/complete`,
+      params
+    )
+  }
+
+  async getRgbRecoveryCheckpointUploadStatus(
+    params: RgbRecoveryCheckpointUploadStatusRequest
+  ): Promise<RgbRecoveryCheckpointUploadStatusResult> {
+    return this.privatePost(
+      `/v5/rgb/recovery/checkpoint/uploads/${encodeURIComponent(params.uploadId)}/status`,
+      params
+    )
   }
 
   /**

@@ -67,18 +67,22 @@ export class RgbService {
     const storageKey = this.storageKey(wallet)
     const stored = await this.dependencies.storage.get<RgbServiceState>(storageKey)
     this.openedFromStorage = Boolean(stored && stored.wallet.fundingAddress === wallet.fundingAddress)
-    this.recoveryBackupEnabled = this.openedFromStorage
+    this.recoveryBackupEnabled =
+      this.openedFromStorage && stored?.recoveryRemoteStateKnown !== false && !stored?.recoveryConflict
     this.state =
       stored && stored.wallet.fundingAddress === wallet.fundingAddress
         ? normalizeStateAssetIds(hydrateState(stored))
         : {
             version: 1,
             wallet,
+            recoveryRemoteStateKnown: false,
             snapshot: { utxos: [], syncedAt: 0 },
             pending: {},
-          }
+    }
     this.hydrateStoredContractMetadata()
-    await this.persist()
+    // A local open must never upload before the controller has authenticated a
+    // recovery read and obtained the checkpoint version used for CAS writes.
+    await this.dependencies.storage.set(storageKey, persistState(this.requireState()))
   }
 
   /** True when encrypted extension storage already contained this wallet's RGB state. */
@@ -86,9 +90,63 @@ export class RgbService {
     return this.openedFromStorage
   }
 
+  /** A fresh wallet must complete a remote checkpoint read before it can mutate RGB state. */
+  isRecoveryBackupEnabled() {
+    return this.recoveryBackupEnabled
+  }
+
+  getRecoveryCheckpointVersion() {
+    return this.requireState().recoveryCheckpointUpdatedAt
+  }
+
+  getRecoveryCheckpointRevision() {
+    return this.requireState().recoveryCheckpointRevision
+  }
+
+  hasRecoveryConflict() {
+    return this.requireState().recoveryConflict === true
+  }
+
+  getRecoveryCheckpointStatus() {
+    const checkpoint = this.requireState().recoveryCheckpoint
+    return {
+      dirty: checkpoint?.dirty === true,
+      verified: checkpoint?.verified === true,
+      ...(checkpoint?.lastError ? { lastError: checkpoint.lastError } : {}),
+    }
+  }
+
+  async retryRecoveryCheckpoint() {
+    const state = this.requireState()
+    if (!this.recoveryBackupEnabled || !this.dependencies.onStatePersisted) return false
+    if (!state.recoveryCheckpoint?.dirty && state.recoveryCheckpoint?.verified) return true
+    await this.persist({ waitForRecovery: true })
+    return this.requireState().recoveryCheckpoint?.verified === true
+  }
+
+  async setRecoveryCheckpointVersion(updatedAt: number | undefined) {
+    await this.recordRecoveryCheckpointVersion(updatedAt)
+  }
+
+  async setRecoveryCheckpointRevision(revision: string | undefined) {
+    if (revision === undefined) return
+    const state = this.requireState()
+    if (state.recoveryCheckpointRevision === revision) return
+    state.recoveryCheckpointRevision = revision
+    await this.dependencies.storage.set(this.storageKey(state.wallet), persistState(state))
+  }
+
+  async markRecoveryConflict() {
+    const state = this.requireState()
+    this.recoveryBackupEnabled = false
+    state.recoveryConflict = true
+    await this.dependencies.storage.set(this.storageKey(state.wallet), persistState(state))
+  }
+
   needsRecoveryRestore() {
     const state = this.requireState()
     return (
+      state.recoveryRemoteStateKnown !== true &&
       state.snapshot.syncedAt === 0 &&
       state.snapshot.utxos.length === 0 &&
       Object.keys(state.pending).length === 0 &&
@@ -98,25 +156,64 @@ export class RgbService {
     )
   }
 
-  /** Restore a client-encrypted checkpoint only when it belongs to the opened funding address. */
+  /**
+   * Restore only a checkpoint bound to the exact wallet context currently
+   * open.  The controller authenticates/decrypts the payload first; this is
+   * the second boundary which prevents a valid checkpoint for another
+   * network/account from being imported into this service.
+   *
+   * Keep the candidate out of `this.state` until its full JSON persistence
+   * succeeds.  Extension storage can fail (quota, locked keyring, etc.); in
+   * that case callers must retain the original live state unchanged.
+   */
   async restoreRecoveryState(recovery: unknown) {
     const current = this.requireState()
-    if (!isRgbServiceState(recovery) || recovery.wallet.fundingAddress !== current.wallet.fundingAddress)
+    if (!isRgbServiceState(recovery) || !sameRecoveryWallet(recovery.wallet, current.wallet))
       return false
     try {
-      this.state = normalizeStateAssetIds(hydrateState(recovery))
+      const restored = normalizeStateAssetIds(hydrateState(recovery))
+      validateRecoveredState(restored, current.wallet)
+      restored.recoveryRemoteStateKnown = true
+      // Checkpoint delivery metadata is installation-local and must never be
+      // accepted from a remote snapshot (including old snapshot formats).
+      delete restored.recoveryCheckpoint
+      await this.dependencies.storage.set(this.storageKey(restored.wallet), persistState(restored))
+      this.state = restored
       this.openedFromStorage = true
       this.recoveryBackupEnabled = true
-      await this.persist()
       return true
     } catch {
       return false
     }
   }
 
-  /** Enable future best-effort checkpoints after a fresh-wallet restore attempt. */
-  enableRecoveryBackup() {
+  /** Enable checkpoints only after a successful remote read (including an empty result). */
+  async enableRecoveryBackup() {
+    const state = this.requireState()
+    if (this.recoveryBackupEnabled && state.recoveryRemoteStateKnown === true) return
+    state.recoveryRemoteStateKnown = true
     this.recoveryBackupEnabled = true
+    await this.persist()
+  }
+
+  /**
+   * Preserve a failed-read marker locally. This prevents an empty fresh
+   * service from ever overwriting a checkpoint it has not successfully read.
+   */
+  async disableRecoveryBackup() {
+    const state = this.requireState()
+    this.recoveryBackupEnabled = false
+    if (state.recoveryRemoteStateKnown === false) return
+    state.recoveryRemoteStateKnown = false
+    await this.dependencies.storage.set(this.storageKey(state.wallet), persistState(state))
+  }
+
+  private async recordRecoveryCheckpointVersion(updatedAt: number | undefined) {
+    if (updatedAt === undefined) return
+    const state = this.requireState()
+    if (state.recoveryCheckpointUpdatedAt === updatedAt) return
+    state.recoveryCheckpointUpdatedAt = updatedAt
+    await this.dependencies.storage.set(this.storageKey(state.wallet), persistState(state))
   }
 
   async sync() {
@@ -234,8 +331,9 @@ export class RgbService {
       createdAt: now,
       seal,
     }
+    const rollback = snapshotState(state)
     receives.push(pending)
-    await this.persist({ waitForRecovery: true })
+    await this.persistWithRecoveryRollback(rollback)
     return pending
   }
 
@@ -315,7 +413,10 @@ export class RgbService {
       syncedAt: state.snapshot.syncedAt || this.now(),
     }
     state.pendingUtxoSync = { txid: input.txid, outpoints: utxos }
-    await this.persist()
+    // The Bitcoin transaction is already broadcast, so rolling this state
+    // back would lose the only local record of its RGB-capable outputs. Make
+    // the caller wait for recovery instead of reporting success early.
+    await this.persist({ waitForRecovery: true })
   }
 
   /** Persist a local issue and its allocation before contacting the indexer. */
@@ -327,6 +428,7 @@ export class RgbService {
     utxoSync: RgbPendingUtxoSync
   }) {
     const state = this.requireState()
+    const rollback = snapshotState(state)
     const assetId = normalizeAssetId(input.assetId)
     const contracts = state.contracts || (state.contracts = {})
     contracts[assetId] = {
@@ -351,7 +453,7 @@ export class RgbService {
     const index = pending.findIndex(issue => issue.assetId === assetId)
     if (index >= 0) pending[index] = task
     else pending.push(task)
-    await this.persist()
+    await this.persistWithRecoveryRollback(rollback)
   }
 
   getPendingSendHistory() {
@@ -414,6 +516,7 @@ export class RgbService {
     deferConfirmedSettlement = false,
   }: { includeClaimed?: boolean; deferConfirmedSettlement?: boolean } = {}) {
     const state = this.requireState()
+    const rollback = snapshotState(state)
     const getClaimed = this.dependencies.stateSource.getClaimedConsignments
     let received: Array<{ recipientId: string; payload: string }> = []
     if (includeClaimed) {
@@ -577,7 +680,11 @@ export class RgbService {
         throw error
       }
     }
-    if (changed) await this.persist()
+    if (changed) {
+      // Confirmed receives add the blind seal, consignment and contract that
+      // are needed to prove ownership and later spend the allocation.
+      await this.persistWithRecoveryRollback(rollback)
+    }
     return { received: count, snapshotRequired }
   }
 
@@ -919,13 +1026,14 @@ export class RgbService {
 
   async storeContract(assetId: string, consignment: Uint8Array, genesis?: Uint8Array) {
     const state = this.requireState()
+    const rollback = snapshotState(state)
     const contracts = state.contracts || (state.contracts = {})
     contracts[normalizeAssetId(assetId)] = {
       consignment: Buffer.from(consignment).toString('base64'),
       ...(genesis ? { genesis: Buffer.from(genesis).toString('base64') } : {}),
       createdAt: this.now(),
     }
-    await this.persist()
+    await this.persistWithRecoveryRollback(rollback)
   }
 
   getContractConsignment(assetId: string) {
@@ -1070,8 +1178,9 @@ export class RgbService {
       throw new RgbServiceError(`RGB transfer ${prepared.id} already exists`)
     }
 
+    const rollback = snapshotState(state)
     state.pending[prepared.id] = { prepared, request: resolvedRequest, createdAt: this.now() }
-    await this.persist({ waitForRecovery: true })
+    await this.persistWithRecoveryRollback(rollback)
     return prepared
   }
 
@@ -1099,8 +1208,9 @@ export class RgbService {
       const endpoints = decodeRgbInvoice(pending.request.invoice).transportEndpoints
       if (!endpoints.length)
         throw new RgbServiceError('RGB invoice has no proxy transport endpoint')
+      const rollback = snapshotState(state)
       pending.delivery = { completed, endpoints }
-      await this.persist({ waitForRecovery: true })
+      await this.persistWithRecoveryRollback(rollback)
     }
     return this.advancePendingDelivery(transferId, pending)
   }
@@ -1370,12 +1480,80 @@ export class RgbService {
 
   private async persist(options: { waitForRecovery?: boolean } = {}) {
     const state = this.requireState()
+    if (this.recoveryBackupEnabled && this.dependencies.onStatePersisted) {
+      state.recoveryCheckpoint = { ...state.recoveryCheckpoint, dirty: true, verified: false }
+    }
     const persisted = persistState(state)
     await this.dependencies.storage.set(this.storageKey(state.wallet), persisted)
     if (this.recoveryBackupEnabled && this.dependencies.onStatePersisted) {
-      const recovery = Promise.resolve(this.dependencies.onStatePersisted(persisted))
-      if (options.waitForRecovery) await recovery
-      else void recovery.catch(() => undefined)
+      const recovery = Promise.resolve(this.dependencies.onStatePersisted(recoverySnapshot(persisted)))
+      if (options.waitForRecovery) {
+        const result = await recovery
+        if (result && typeof result === 'object' && result.saved === false) {
+          await this.markRecoveryConflict()
+          throw new RgbServiceError('RGB recovery checkpoint conflicts with a newer remote state')
+        }
+        await this.recordRecoveryCheckpointVersion(
+          result && typeof result === 'object' ? result.updatedAt : undefined
+        )
+        await this.setRecoveryCheckpointRevision(
+          result && typeof result === 'object' ? result.revision : undefined
+        )
+        await this.recordRecoveryCheckpointResult(result)
+      } else {
+        void recovery
+          .then(async result => {
+            if (result && typeof result === 'object' && result.saved === false) {
+              await this.markRecoveryConflict()
+              return
+            }
+            await this.recordRecoveryCheckpointVersion(
+              result && typeof result === 'object' ? result.updatedAt : undefined
+            )
+            await this.setRecoveryCheckpointRevision(
+              result && typeof result === 'object' ? result.revision : undefined
+            )
+            await this.recordRecoveryCheckpointResult(result)
+          })
+          .catch(() => undefined)
+      }
+    }
+  }
+
+  private async recordRecoveryCheckpointResult(
+    result:
+      | void
+      | { verified?: boolean; checksum?: string; totalLength?: number; revision?: string }
+  ) {
+    const state = this.requireState()
+    const metadata = result && typeof result === 'object' ? result : undefined
+    state.recoveryCheckpoint = {
+      dirty: false,
+      verified: metadata?.verified === true,
+      ...(metadata?.checksum ? { checksum: metadata.checksum } : {}),
+      ...(metadata?.totalLength === undefined ? {} : { totalLength: metadata.totalLength }),
+      ...(metadata?.verified === true ? {} : { lastError: 'checkpoint read-back is pending verification' }),
+    }
+    await this.dependencies.storage.set(this.storageKey(state.wallet), persistState(state))
+  }
+
+  /**
+   * A user-visible operation is not committed until its recovery checkpoint
+   * succeeds. Restore both memory and encrypted storage when it fails, so a
+   * reported failure cannot leave an invisible invoice or locked send behind.
+   */
+  private async persistWithRecoveryRollback(rollback: RgbServiceState) {
+    try {
+      await this.persist({ waitForRecovery: true })
+    } catch (error) {
+      const recoveryConflict = this.hasRecoveryConflict()
+      this.state = rollback
+      if (recoveryConflict) {
+        rollback.recoveryConflict = true
+        this.recoveryBackupEnabled = false
+      }
+      await this.dependencies.storage.set(this.storageKey(rollback.wallet), persistState(rollback))
+      throw error
     }
   }
 
@@ -1430,6 +1608,17 @@ function persistState(state: RgbServiceState) {
   }
 }
 
+/** Delivery progress is local metadata, never part of the remotely encrypted checkpoint. */
+function recoverySnapshot(state: ReturnType<typeof persistState>) {
+  const { recoveryCheckpoint: _recoveryCheckpoint, ...snapshot } = state
+  return snapshot
+}
+
+/** JSON persistence is the state boundary; cloning it also preserves blind-seal u64 values. */
+function snapshotState(state: RgbServiceState): RgbServiceState {
+  return hydrateState(JSON.parse(JSON.stringify(persistState(state))))
+}
+
 function hydrateState(state: RgbServiceState) {
   return {
     ...state,
@@ -1457,6 +1646,48 @@ function isRgbServiceState(value: unknown): value is RgbServiceState {
     !!state.pending &&
     typeof state.pending === 'object'
   )
+}
+
+function sameRecoveryWallet(recovery: RgbWalletRef, current: RgbWalletRef) {
+  return (
+    recovery.fundingAddress === current.fundingAddress &&
+    recovery.network === current.network &&
+    recovery.walletId === current.walletId
+  )
+}
+
+/** Validate structural/identity invariants before an imported state becomes live. */
+function validateRecoveredState(state: RgbServiceState, currentWallet: RgbWalletRef) {
+  if (!sameRecoveryWallet(state.wallet, currentWallet)) {
+    throw new RgbServiceError('RGB recovery checkpoint does not belong to this wallet')
+  }
+  if (!Number.isSafeInteger(state.snapshot.syncedAt) || state.snapshot.syncedAt < 0) {
+    throw new RgbServiceError('RGB recovery checkpoint snapshot is invalid')
+  }
+  for (const utxo of state.snapshot.utxos) {
+    if (
+      !utxo ||
+      !/^[0-9a-f]{64}$/i.test(utxo.outpoint?.txid || '') ||
+      !Number.isInteger(utxo.outpoint?.vout) ||
+      utxo.outpoint.vout < 0 ||
+      !Number.isSafeInteger(utxo.satoshis) ||
+      utxo.satoshis < 0 ||
+      !Array.isArray(utxo.allocations)
+    ) {
+      throw new RgbServiceError('RGB recovery checkpoint contains an invalid UTXO')
+    }
+    for (const allocation of utxo.allocations) {
+      if (
+        !allocation ||
+        typeof allocation.amount !== 'string' ||
+        !/^(0|[1-9][0-9]*)$/.test(allocation.amount) ||
+        typeof allocation.settled !== 'boolean' ||
+        typeof allocation.spendable !== 'boolean'
+      ) {
+        throw new RgbServiceError('RGB recovery checkpoint contains an invalid allocation')
+      }
+    }
+  }
 }
 
 function hydrateBlindSeal(seal: import('./protocol/receive').RgbBlindSeal) {

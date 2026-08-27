@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest'
 import {
   decryptRgbRecoveryCheckpoint,
   encryptRgbRecoveryCheckpoint,
+  RGB_RECOVERY_MAX_PLAINTEXT_BYTES,
 } from '../src/rgb/RgbRecoveryCheckpoint'
 
 describe('RGB recovery checkpoint', () => {
@@ -14,5 +15,11 @@ describe('RGB recovery checkpoint', () => {
 
     await expect(decryptRgbRecoveryCheckpoint(payload, key)).resolves.toEqual(state)
     await expect(decryptRgbRecoveryCheckpoint(payload, '22'.repeat(32))).rejects.toThrow()
+  })
+
+  it('rejects a recovery state beyond the encrypted upload budget', async () => {
+    await expect(
+      encryptRgbRecoveryCheckpoint({ payload: 'x'.repeat(RGB_RECOVERY_MAX_PLAINTEXT_BYTES) }, key)
+    ).rejects.toThrow('too large')
   })
 })

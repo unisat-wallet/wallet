@@ -258,8 +258,59 @@ export interface RgbClaimedConsignmentsResult {
 /** Opaque ciphertext produced locally from the RGB service state. */
 export interface RgbRecoveryCheckpointSaveRequest {
   wallet: RgbWalletRef
-  payload: string
+  /** Legacy single-part ciphertext. New clients use payloadParts. */
+  payload?: string
+  /** Ordered ciphertext chunks. Splitting happens only after encryption. */
+  payloadParts?: string[]
+  /** Legacy version observed during the authenticated recovery read. */
+  expectedUpdatedAt?: number
+  /** Immutable server revision observed during the authenticated recovery read. */
+  expectedRevision?: string
   updatedAt: number
+}
+
+export interface RgbRecoveryCheckpointSaveResult {
+  /** False means the server already has a checkpoint with a newer timestamp. */
+  saved: boolean
+  updatedAt: number
+  revision?: string
+}
+
+export interface RgbRecoveryCheckpointUploadStartRequest {
+  wallet: RgbWalletRef
+  expectedUpdatedAt?: number
+  expectedRevision?: string
+  updatedAt: number
+  partCount: number
+  totalLength: number
+  checksum: string
+}
+
+export interface RgbRecoveryCheckpointUploadStartResult {
+  uploadId: string
+}
+
+export interface RgbRecoveryCheckpointUploadPartRequest {
+  wallet: RgbWalletRef
+  uploadId: string
+  index: number
+  payload: string
+}
+
+export interface RgbRecoveryCheckpointUploadCompleteRequest {
+  wallet: RgbWalletRef
+  uploadId: string
+}
+
+export interface RgbRecoveryCheckpointUploadStatusRequest {
+  wallet: RgbWalletRef
+  uploadId: string
+}
+
+export interface RgbRecoveryCheckpointUploadStatusResult extends RgbRecoveryCheckpointSaveResult {
+  /** `publishing` is a durable server-side lease and can be resumed by retrying complete. */
+  status: 'pending' | 'publishing' | 'completed'
+  receivedIndexes?: number[]
 }
 
 export interface RgbRecoveryCheckpointReadRequest {
@@ -269,6 +320,7 @@ export interface RgbRecoveryCheckpointReadRequest {
 export interface RgbRecoveryCheckpointReadResult {
   payload?: string
   updatedAt?: number
+  revision?: string
 }
 
 export interface RgbReceiveInvoiceRequest {

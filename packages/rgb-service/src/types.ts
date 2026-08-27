@@ -259,6 +259,27 @@ export interface RgbPendingAssetMetadata {
 export interface RgbServiceState {
   version: 1
   wallet: RgbWalletRef
+  /**
+   * False only when this installation could not read the remote checkpoint.
+   * Keeping the marker in encrypted local storage prevents a later restart
+   * from overwriting an unknown remote backup.
+   */
+  recoveryRemoteStateKnown?: boolean
+  /** Set when remote and local checkpoint revisions diverge; RGB writes stay blocked. */
+  recoveryConflict?: boolean
+  /** Version of the remote checkpoint from which this local state was restored/saved. */
+  recoveryCheckpointUpdatedAt?: number
+  recoveryCheckpointRevision?: string
+  /** Local-only checkpoint delivery state; intentionally excluded from the encrypted remote snapshot. */
+  recoveryCheckpoint?: {
+    dirty: boolean
+    verified: boolean
+    checksum?: string
+    totalLength?: number
+    uploadId?: string
+    uploadedIndexes?: number[]
+    lastError?: string
+  }
   snapshot: RgbWalletSnapshot
   pending: Record<string, RgbPendingTransfer>
   pendingReceives?: RgbPendingReceive[]
@@ -371,6 +392,26 @@ export interface RgbServiceDependencies {
    * Queues a recovery checkpoint after local state is durably encrypted at
    * rest. Critical state transitions may await its completion.
    */
-  onStatePersisted?: (state: unknown) => void | Promise<void>
+  onStatePersisted?: (state: unknown) =>
+    | void
+    | {
+        updatedAt?: number
+        revision?: string
+        saved?: boolean
+        verified?: boolean
+        checksum?: string
+        totalLength?: number
+      }
+    | Promise<
+        | void
+        | {
+            updatedAt?: number
+            revision?: string
+            saved?: boolean
+            verified?: boolean
+            checksum?: string
+            totalLength?: number
+          }
+      >
   now?: () => number
 }

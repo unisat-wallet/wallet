@@ -1,4 +1,6 @@
 const RECOVERY_ENVELOPE_VERSION = 1
+/** Leaves room for AES-GCM, base64 and the 48 MB encrypted upload ceiling. */
+export const RGB_RECOVERY_MAX_PLAINTEXT_BYTES = 32_000_000
 
 type RecoveryEnvelope = {
   version: number
@@ -27,7 +29,11 @@ async function recoveryKey(keyHex: string) {
 export async function encryptRgbRecoveryCheckpoint(state: unknown, keyHex: string) {
   const iv = new Uint8Array(12)
   globalThis.crypto.getRandomValues(iv)
-  const plaintext = new TextEncoder().encode(JSON.stringify(state))
+  const serialized = JSON.stringify(state)
+  const plaintext = new TextEncoder().encode(serialized)
+  if (plaintext.byteLength > RGB_RECOVERY_MAX_PLAINTEXT_BYTES) {
+    throw new Error('RGB recovery state is too large to back up safely')
+  }
   const ciphertext = await globalThis.crypto.subtle.encrypt(
     { name: 'AES-GCM', iv },
     await recoveryKey(keyHex),
