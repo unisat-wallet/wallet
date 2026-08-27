@@ -1556,6 +1556,44 @@ describe('RgbService', () => {
     expect(service.getPendingReceives()[0]).not.toHaveProperty('pendingAccept')
   })
 
+  it('keeps an Any Amount invoice unconstrained after rejecting a consignment', async () => {
+    const dependencies = createDependencies()
+    dependencies.transport.acknowledgeConsignment = vi.fn().mockResolvedValue(undefined)
+    dependencies.transport.getConsignment = vi.fn().mockResolvedValue({
+      recipientId: 'recipient',
+      payload: 'received-consignment',
+      txid: 'c'.repeat(64),
+      endpoint: proxyEndpoint,
+    })
+    const service = new RgbService(dependencies)
+    await service.open(wallet)
+    ;(service as any).state.pendingReceives = [
+      {
+        invoice: rgbInvoice(),
+        recipientId: 'recipient',
+        createdAt: 1,
+        seal: { txid: 'a'.repeat(64), vout: 0, blinding: 1n },
+      },
+    ]
+    ;(service as any).validateIncomingConsignment = vi.fn().mockReturnValue({
+      decoded: { metadata: { ticker: 'TOK', name: 'Token', precision: 2, schema: 'NIA', issuedSupply: '1000' } },
+      assetId: 'rgb:asset',
+      amount: '1000',
+      txid: 'c'.repeat(64),
+      opId: 'd'.repeat(64),
+      assignmentIndex: 0,
+    })
+    await service.processClaimedReceives({ includeClaimed: false })
+    await service.rejectReceive('recipient')
+
+    expect(service.getPendingReceives()).toEqual([
+      expect.objectContaining({ recipientId: 'recipient' }),
+    ])
+    expect(service.getPendingReceives()[0]).not.toHaveProperty('assetId')
+    expect(service.getPendingReceives()[0]).not.toHaveProperty('amount')
+    expect(service.getPendingReceives()[0]).not.toHaveProperty('pendingAccept')
+  })
+
   it('persists a signed transfer without broadcasting until the proxy returns an acknowledgement', async () => {
     const dependencies = createDependencies()
     vi.mocked(dependencies.transport.getAcknowledgement!).mockResolvedValueOnce(undefined)

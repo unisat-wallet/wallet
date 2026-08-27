@@ -671,8 +671,10 @@ export class RgbService {
             discoveredAt: receive.receivedConsignment?.receivedAt || this.now(),
             counterpartyScriptPubKeys: niaConsignmentSpendableOutputScripts(item.payload),
           }
-          if (!receive.assetId) receive.assetId = match.assetId
-          if (!receive.amount) receive.amount = match.amount
+          // `assetId` and `amount` are the invoice's original constraints.
+          // An Any Asset / Any Amount invoice must remain unconstrained after
+          // inspecting or rejecting a proposed consignment. The offered
+          // asset and amount live only in `pendingAccept` until ACK.
           if (receive.receivedConsignment && !receive.receivedConsignment.accepted) {
             delete receive.receivedConsignment
           }
