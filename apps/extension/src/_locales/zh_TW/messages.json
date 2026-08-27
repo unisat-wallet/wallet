@@ -2782,5 +2782,419 @@
   },
   "load_more_items": {
     "message": "再載入 {count} 筆"
+  },
+  "rgb": {
+    "message": "RGB"
+  },
+  "rgb_asset": {
+    "message": "RGB 資產"
+  },
+  "rgb_history": {
+    "message": "RGB 歷史紀錄"
+  },
+  "asset_id": {
+    "message": "資產 ID"
+  },
+  "precision_rgb": {
+    "message": "精度"
+  },
+  "issued_supply_rgb": {
+    "message": "已發行供應量"
+  },
+  "schema_rgb": {
+    "message": "Schema"
+  },
+  "protocol_data_unavailable": {
+    "message": "協議資料暫不可用"
+  },
+  "allow_sign_data_requests": {
+    "message": "允許簽署資料請求"
+  },
+  "cat": {
+    "message": "CAT"
+  },
+  "cat20_warning_nomerge": {
+    "message": "您至少需要 2 個 UTXO 才能合併"
+  },
+  "enable_sign_data_popover_warning": {
+    "message": "允許簽署資料請求可能使您容易受到釣魚攻擊。請務必檢查 URL，並在簽署包含程式碼的訊息時保持警惕。"
+  },
+  "enable_sign_data_popover_warning_2": {
+    "message": "如果您被要求開啟此設定，您可能正在遭受詐騙"
+  },
+  "enable_sign_data_warning": {
+    "message": "如果您啟用此設定，您可能會收到無法讀取的簽署請求。簽署您不理解的訊息，可能代表您同意交出您的資金和 NFT。您將面臨釣魚攻擊的風險。請關閉簽署資料 (signData) 功能以保護自己。"
+  },
+  "i_only_sign_what_i_understand": {
+    "message": "我只簽署我理解的內容"
+  },
+  "legacy_address_warning": {
+    "message": "不建議使用Legacy地址，因為它們可能會導致更高的交易費用或意外鎖定CAT20餘額。"
+  },
+  "legacy_address_warning_2": {
+    "message": "不建議將交易發送到Legacy地址，因為這可能導致CAT20被意外花費"
+  },
+  "legacy_address_warning_3": {
+    "message": "不建議使用Legacy地址，因為它們可能會導致更高的交易費用或意外鎖定CAT20餘額"
+  },
+  "legacy_address_warning_4": {
+    "message": "不建議將交易發送到Legacy地址，因為這可能導致CAT20被意外花費"
+  },
+  "merge_utxos_for_cat20_asset": {
+    "message": "合併 CAT20 資產的 UTXO"
+  },
+  "send_CAT721": {
+    "message": "發送 CAT721"
+  },
+  "send_cat20": {
+    "message": "發送 CAT20"
+  },
+  "send_cat20_is_not_supported_for_keystone_yet": {
+    "message": "Keystone 尚不支援發送 CAT20"
+  },
+  "send_cat721": {
+    "message": "發送 CAT721"
+  },
+  "sign_data_request": {
+    "message": "簽署資料請求"
+  },
+  "sign_data_requests": {
+    "message": "簽署資料請求"
+  },
+  "signdata_required_tip": {
+    "message": "您需要在「設定 -> 進階」中啟用「簽署資料請求」功能才能繼續。"
+  },
+  "understand_sign_data_warning": {
+    "message": "我了解如果啟用簽署資料請求，我可能會損失所有資金和 NFT。"
+  },
+  "you_are_signing_data": {
+    "message": "您正在簽署資料："
+  },
+  "receive_address": {
+    "message": "收款地址"
+  },
+  "use_this_address_to_receive": {
+    "message": "使用此地址在 $chain 接收 $unit"
+  },
+  "rgb_invoice": {
+    "message": "RGB 發票"
+  },
+  "paste_rgb_invoice": {
+    "message": "貼上 RGB 發票"
+  },
+  "enter_amount_greater_than_0": {
+    "message": "請輸入大於 0 的數量。"
+  },
+  "select_asset": {
+    "message": "選擇資產"
+  },
+  "loading_assets": {
+    "message": "正在載入資產..."
+  },
+  "use_this_invoice_to_receive": {
+    "message": "使用此發票接收 $ticker。"
+  },
+  "receiving_invoice": {
+    "message": "收款發票"
+  },
+  "releasing_invoice": {
+    "message": "正在釋放發票..."
+  },
+  "release_invoice": {
+    "message": "釋放發票"
+  },
+  "any_amount": {
+    "message": "任意數量"
+  },
+  "fixed_amount": {
+    "message": "固定數量"
+  },
+  "accept_any_rgb_amount": {
+    "message": "允許發送方指定數量。"
+  },
+  "set_exact_rgb_amount": {
+    "message": "為此發票設定精確數量。"
+  },
+  "pending_blind_invoices": {
+    "message": "待處理盲發票"
+  },
+  "waiting_counterparty": {
+    "message": "等待交易對手"
+  },
+  "loading_pending_invoices": {
+    "message": "正在載入待處理發票..."
+  },
+  "no_pending_blind_invoices": {
+    "message": "沒有待處理的盲發票。"
+  },
+  "creating": {
+    "message": "正在建立..."
+  },
+  "not_enough_btc_for_rgb_invoice": {
+    "message": "目前地址 BTC 不足，無法建立 RGB invoice。請切換至其他有足夠 BTC 的地址類型。"
+  },
+  "create_invoice": {
+    "message": "建立發票"
+  },
+  "rgb_sent": {
+    "message": "RGB 已送出"
+  },
+  "rgb_transfer_submitted": {
+    "message": "你的 RGB 轉帳已提交。"
+  },
+  "settled": {
+    "message": "已結算"
+  },
+  "activity": {
+    "message": "活動"
+  },
+  "issue": {
+    "message": "發行"
+  },
+  "receive_rgb": {
+    "message": "接收 RGB"
+  },
+  "send_usdt": {
+    "message": "發送 USDT"
+  },
+  "not_supported_in_this_wallet": {
+    "message": "此錢包不支援"
+  },
+  "switch_to_hd_wallet": {
+    "message": "切換至 HD Wallet"
+  },
+  "rgb_assets": {
+    "message": "RGB 資產"
+  },
+  "pending_rgb_invoices": {
+    "message": "待處理 RGB 發票"
+  },
+  "issue_asset": {
+    "message": "發行資產"
+  },
+  "issue_rgb_asset": {
+    "message": "發行 RGB 資產"
+  },
+  "issue_rgb_asset_desc": {
+    "message": "在 RGB 協議上發行新資產。"
+  },
+  "review_rgb_asset": {
+    "message": "確認 RGB 資產"
+  },
+  "continue_to_sign": {
+    "message": "繼續簽名"
+  },
+  "ticker_label": {
+    "message": "代號"
+  },
+  "name_label": {
+    "message": "名稱"
+  },
+  "decimal_places_label": {
+    "message": "小數位數"
+  },
+  "decimal_places_tooltip": {
+    "message": "小數位數定義了此資產的可分割程度。此設定在發行後無法更改。"
+  },
+  "ticker_placeholder": {
+    "message": "建議 3-6 個字符"
+  },
+  "asset_display_name": {
+    "message": "資產顯示名稱"
+  },
+  "enter_total_supply": {
+    "message": "輸入總供應量"
+  },
+  "rgb_send_transaction_unavailable": {
+    "message": "RGB 發送交易不可用"
+  },
+  "rgb_psbt_signing_missing_result": {
+    "message": "RGB PSBT 簽名未返回 psbtHex"
+  },
+  "asset": {
+    "message": "資產"
+  },
+  "type": {
+    "message": "類型"
+  },
+  "assignment": {
+    "message": "分配"
+  },
+  "endpoint": {
+    "message": "端點"
+  },
+  "issue_rgb20": {
+    "message": "發行 RGB20"
+  },
+  "issue_nia_asset": {
+    "message": "發行 NIA 資產"
+  },
+  "create_rgb_utxo_first": {
+    "message": "請先建立 RGB UTXO，然後再發行。"
+  },
+  "create_rgb_utxo": {
+    "message": "建立 RGB UTXO"
+  },
+  "decoded_invoice": {
+    "message": "已解碼發票"
+  },
+  "invalid_rgb_invoice": {
+    "message": "無效的 RGB 發票。"
+  },
+  "invoice_asset_mismatch": {
+    "message": "發票資產與此 RGB 代幣不符。"
+  },
+  "pending_invoices": {
+    "message": "待處理發票"
+  },
+  "view_all": {
+    "message": "查看全部"
+  },
+  "any_rgb_asset": {
+    "message": "任意 RGB 資產"
+  },
+  "release_invoice_confirm_title": {
+    "message": "釋放此發票？"
+  },
+  "release_invoice_confirm_description": {
+    "message": "這將釋放已預留的 UTXO。此發票將不再可用。"
+  },
+  "keep_invoice": {
+    "message": "保留發票"
+  },
+  "rgb_transfers": {
+    "message": "轉帳"
+  },
+  "rgb_status_signed": {
+    "message": "已簽署"
+  },
+  "rgb_status_waiting_ack": {
+    "message": "等待接受"
+  },
+  "rgb_amount_locking": {
+    "message": "鎖定中"
+  },
+  "rgb_locked_balance_hint": {
+    "message": "您有一筆待處理轉帳。查看轉帳"
+  },
+  "rgb_status_broadcasting": {
+    "message": "正在廣播"
+  },
+  "rgb_status_broadcasted": {
+    "message": "已廣播"
+  },
+  "rgb_status_broadcast_failed": {
+    "message": "廣播失敗"
+  },
+  "rgb_cancel_send_confirm_title": {
+    "message": "取消此轉帳？"
+  },
+  "rgb_cancel_send_confirm_description": {
+    "message": "寄送物已送達但尚未上鏈廣播。取消後此筆待處理轉帳將被丟棄。"
+  },
+  "rgb_cancel_send_acknowledgement": {
+    "message": "我已了解，取消後此筆待處理轉帳將永久丟棄。"
+  },
+  "rgb_cancel_send_success": {
+    "message": "已取消轉帳"
+  },
+  "rgb_cancel_send_failed": {
+    "message": "取消轉帳失敗"
+  },
+  "keep_transfer": {
+    "message": "保留轉帳"
+  },
+  "cancel_transfer": {
+    "message": "取消轉帳"
+  },
+  "rgb_status_confirming": {
+    "message": "等待確認"
+  },
+  "rgb_status_waiting_receive": {
+    "message": "等待確認"
+  },
+  "rgb_status_pending_accept": {
+    "message": "等待你的確認"
+  },
+  "rgb_status_confirmed": {
+    "message": "已確認"
+  },
+  "rgb_receive_confirmed_title": {
+    "message": "已收到轉帳"
+  },
+  "rgb_receive_confirmed_description": {
+    "message": "已收到 $1 $2，交易已確認。"
+  },
+  "rgb_transfer_broadcasted_title": {
+    "message": "交易已廣播"
+  },
+  "rgb_transfer_broadcasted_notification": {
+    "message": "接收方已接受 $1 $2，交易已廣播。"
+  },
+  "view_transfer": {
+    "message": "查看轉帳"
+  },
+  "rgb_status_canceled_by_sender": {
+    "message": "發送方已取消"
+  },
+  "rgb_status_canceled": {
+    "message": "已取消"
+  },
+  "rgb_transfer_canceled_description": {
+    "message": "此轉帳已在廣播前取消。"
+  },
+  "rgb_transfer_canceled_by_sender_description": {
+    "message": "發送方已取消此轉帳。"
+  },
+  "rgb_accept_transfer": {
+    "message": "接受"
+  },
+  "rgb_reject_transfer": {
+    "message": "拒絕"
+  },
+  "rgb_accept_transfer_success": {
+    "message": "已接受轉帳"
+  },
+  "rgb_reject_transfer_success": {
+    "message": "已拒絕轉帳"
+  },
+  "rgb_accept_transfer_failed": {
+    "message": "接受轉帳失敗"
+  },
+  "rgb_reject_transfer_failed": {
+    "message": "拒絕轉帳失敗"
+  },
+  "rgb_transfer_pending_accept_description": {
+    "message": "請查看此轉帳並選擇接受或拒絕。"
+  },
+  "rgb_transfer_details": {
+    "message": "轉帳詳情"
+  },
+  "rgb_transfer_id": {
+    "message": "轉帳 ID"
+  },
+  "rgb_transfer_waiting_ack_description": {
+    "message": "已送達 Consignment，正在等待接收方確認。"
+  },
+  "rgb_transfer_broadcasting_description": {
+    "message": "接收方已接受，正在廣播交易。"
+  },
+  "rgb_transfer_broadcasted_description": {
+    "message": "接收方已接受且交易已廣播，正在等待鏈上確認。"
+  },
+  "rgb_transfer_broadcast_failed_description": {
+    "message": "接收方已接受，但廣播交易失敗。請稍後重試。"
+  },
+  "rgb_transfer_broadcast_success": {
+    "message": "接收方已接受，交易已廣播。"
+  },
+  "rgb_retry_broadcast": {
+    "message": "重試廣播"
+  },
+  "rgb_retry_broadcast_failed": {
+    "message": "廣播交易失敗"
+  },
+  "rgb_transfer_confirming_description": {
+    "message": "已接受，等待鏈上確認。"
   }
 }

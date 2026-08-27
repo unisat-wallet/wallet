@@ -1,8 +1,9 @@
 import { InfiniteList } from '@/ui/components';
 import RunesBalanceCard from '@/ui/components/RunesBalanceCard';
-import { useRunesListLogic } from '@unisat/wallet-state';
+import { useI18n, useRunesListLogic } from '@unisat/wallet-state';
 
 export function RunesList() {
+  const { t } = useI18n();
   const { onRefresh, items, total, onLoadMore, onClickItem, loading, hasMore, priceMap } = useRunesListLogic();
 
   return (
@@ -24,6 +25,8 @@ export function RunesList() {
       onRefresh={onRefresh}
       hasMore={hasMore}
       loading={loading}
+      emptyText={t('assets_no_assets')}
+      emptyPreset="assets"
     />
   );
 }

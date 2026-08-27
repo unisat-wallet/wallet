@@ -1,8 +1,9 @@
 import { InfiniteList } from '@/ui/components';
 import BRC20BalanceCard from '@/ui/components/BRC20BalanceCard';
-import { useBRC20ListLogic } from '@unisat/wallet-state';
+import { useBRC20ListLogic, useI18n } from '@unisat/wallet-state';
 
 export function BRC20List() {
+  const { t } = useI18n();
   const { onRefresh, total, items, onLoadMore, onClickItem, loading, hasMore, priceMap } = useBRC20ListLogic();
 
   return (
@@ -17,6 +18,8 @@ export function BRC20List() {
       onRefresh={onRefresh}
       hasMore={hasMore}
       loading={loading}
+      emptyText={t('assets_no_assets')}
+      emptyPreset="assets"
     />
   );
 }

@@ -19,7 +19,6 @@ export function BRC20OutWalletBalance(props: BRC20OutWalletBalanceProps) {
         <Column
           key={item.key}
           fullX
-          gap="zero"
           style={{
             gap: 12
           }}>

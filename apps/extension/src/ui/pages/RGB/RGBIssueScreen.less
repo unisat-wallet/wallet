@@ -1,0 +1,329 @@
+.rgb-issue-page {
+  width: 100%;
+  max-width: 480px;
+  margin: 0 auto;
+  color: #f4f4f5;
+  font-family:
+    Inter,
+    -apple-system,
+    BlinkMacSystemFont,
+    'SF Pro Text',
+    sans-serif;
+}
+
+.rgb-issue-field {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.rgb-issue-label-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.rgb-issue-label {
+  color: rgba(255, 255, 255, 0.85);
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 24px;
+}
+
+.rgb-issue-input,
+.rgb-issue-input-shell {
+  width: 100%;
+  min-height: 48px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 8px;
+  background: #111;
+  box-sizing: border-box;
+  color: rgba(255, 255, 255, 0.85);
+  font-family: inherit;
+  font-size: 14px;
+  outline: none;
+  transition:
+    border-color 160ms ease,
+    box-shadow 160ms ease;
+}
+
+.rgb-issue-input {
+  padding: 15px 12px;
+}
+
+.rgb-issue-input::placeholder {
+  color: rgba(255, 255, 255, 0.45);
+}
+
+.rgb-issue-input:focus,
+.rgb-issue-input-shell:focus-within {
+  border-color: rgba(235, 185, 76, 0.65);
+}
+
+.rgb-issue-input:disabled {
+  cursor: not-allowed;
+  opacity: 0.58;
+}
+
+.rgb-issue-input-error {
+  border-color: #e86666 !important;
+}
+
+.rgb-issue-error {
+  color: #f07373;
+  font-size: 12px;
+  line-height: 16px;
+}
+
+.rgb-issue-input-shell {
+  display: flex;
+  align-items: center;
+  padding-right: 12px;
+}
+
+.rgb-issue-supply-input {
+  min-width: 0;
+  flex: 1;
+  border: 0;
+  background: transparent;
+  padding-right: 0;
+}
+
+.rgb-issue-supply-input:focus {
+  box-shadow: none;
+}
+
+.rgb-issue-input-shell > span {
+  color: rgba(235, 185, 76, 0.85);
+  font-size: 14px;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.rgb-issue-fee-section {
+  width: 100%;
+}
+
+.rgb-issue-review-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  min-height: 31px;
+}
+
+.rgb-issue-review-row > span {
+  color: rgba(255, 255, 255, 0.6);
+  font-size: 14px;
+  line-height: 22px;
+}
+
+.rgb-issue-review-row > strong {
+  overflow: hidden;
+  max-width: 65%;
+  color: #fff;
+  font-size: 14px;
+  font-weight: 500;
+  text-align: right;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.rgb-issue-review-value-accent {
+  color: #f5b83d !important;
+  font-weight: 600 !important;
+}
+
+.rgb-issue-review-value-pending {
+  color: #f4b62c !important;
+}
+
+.rgb-issue-review-value-confirmed {
+  color: #7cdb98 !important;
+}
+
+.rgb-issue-review-value-failed {
+  color: #ee344c !important;
+}
+
+.rgb-issue-review-modal-row {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.rgb-issue-review-modal-row > span {
+  color: rgba(255, 255, 255, 0.6);
+  font-size: 14px;
+  line-height: 22px;
+}
+
+.rgb-issue-review-modal-row > strong {
+  color: #fff;
+  font-size: 14px;
+  font-weight: 500;
+  text-align: right;
+}
+
+.rgb-issue-review-cancel-button,
+.rgb-issue-review-confirm-button {
+  display: flex;
+  height: 48px;
+  flex: 1;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 15px;
+  font-weight: 600;
+  line-height: 16px;
+}
+
+.rgb-issue-review-cancel-button {
+  border: 1px solid rgba(255, 255, 255, 0.45);
+  background: transparent;
+  color: #fff;
+}
+
+.rgb-issue-review-cancel-button:disabled,
+.rgb-issue-review-confirm-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.rgb-issue-review-confirm-button {
+  border: 0;
+  background: linear-gradient(127deg, #ebb94c 0%, #e97e00 100%);
+  color: #000;
+}
+
+.rgb-issue-section {
+  margin-bottom: 12px;
+  padding: 16px;
+  border: 1px solid #2a2a2e;
+  border-radius: 16px;
+  background: #161618;
+  box-sizing: border-box;
+}
+
+.rgb-issue-txid,
+.rgb-issue-operation-error {
+  margin: 16px 0 0;
+  padding: 12px 14px;
+  border: 1px solid #2a2a2e;
+  border-radius: 12px;
+  background: #121214;
+  color: #b9b9bf;
+  font-size: 12px;
+  line-height: 18px;
+  overflow-wrap: anywhere;
+}
+
+.rgb-issue-operation-error {
+  border-color: rgba(232, 102, 102, 0.45);
+  color: #f07373;
+}
+
+.rgb-issue-bottom-action {
+  position: fixed;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  z-index: 8;
+  padding: 18px 16px calc(16px + env(safe-area-inset-bottom));
+  background: linear-gradient(180deg, rgba(7, 7, 6, 0), #070706 28%);
+  box-sizing: border-box;
+}
+
+.rgb-issue-deploy-button {
+  display: flex;
+  width: 100%;
+  height: 48px;
+  align-items: center;
+  justify-content: center;
+  gap: 9px;
+  border: 0;
+  border-radius: 8px;
+  background: linear-gradient(151deg, #ebb94c 0%, #e97e00 100%);
+  color: #000;
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 15px;
+  font-weight: 600;
+  transition:
+    transform 120ms ease,
+    opacity 160ms ease;
+}
+
+.rgb-issue-deploy-button:active:not(:disabled) {
+  transform: scale(0.985);
+}
+
+.rgb-issue-deploy-button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.rgb-issue-loading-dot {
+  width: 14px;
+  height: 14px;
+  border: 2px solid rgba(0, 0, 0, 0.2);
+  border-top-color: #000;
+  border-radius: 50%;
+  animation: rgb-issue-spin 700ms linear infinite;
+}
+
+.rgb-issue-success-page {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+  text-align: center;
+}
+
+.rgb-issue-success-mark {
+  display: flex;
+  width: 48px;
+  height: 48px;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 18px;
+  border: 1px solid rgba(245, 184, 61, 0.45);
+  border-radius: 50%;
+  background: rgba(245, 184, 61, 0.12);
+  color: #f5b83d;
+}
+
+.rgb-issue-eyebrow {
+  color: #f5b83d;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+}
+
+.rgb-issue-success-page h1 {
+  margin: 8px 0 3px;
+  color: #f6f6f7;
+  font-size: 30px;
+  line-height: 38px;
+}
+
+.rgb-issue-success-page > p {
+  margin: 0 0 24px;
+  color: #96969c;
+  font-size: 14px;
+}
+
+.rgb-issue-result-card {
+  width: 100%;
+  text-align: left;
+}
+
+@keyframes rgb-issue-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}

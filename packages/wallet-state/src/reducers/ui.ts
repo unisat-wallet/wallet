@@ -8,6 +8,7 @@ import {
   MoreAssetTabKey,
   NavigationSource,
   OrdinalsAssetTabKey,
+  WalletView,
 } from '../types'
 
 export enum WallettopTabScreenTabKey {
@@ -53,6 +54,7 @@ export interface UIState {
   navigationSource: NavigationSource
   isBalanceHidden: boolean
   balanceDetailExpanded: boolean
+  walletView: WalletView
 
   walletTopTabScreen: {
     toptabKey: WallettopTabScreenTabKey
@@ -93,10 +95,31 @@ export const initialState: UIState = {
   navigationSource: NavigationSource.NORMAL,
   isBalanceHidden: false,
   balanceDetailExpanded: true,
+  walletView: WalletView.BITCOIN,
 
   walletTopTabScreen: {
     toptabKey: WallettopTabScreenTabKey.Ordinals,
   },
+}
+
+const LEGACY_ALKANES_COLLECTION_TAB_KEY = 1
+
+const normalizeMoreAssetTabKey = (
+  tabKey: MoreAssetTabKey | number | undefined
+): MoreAssetTabKey => {
+  if (tabKey === LEGACY_ALKANES_COLLECTION_TAB_KEY) {
+    return MoreAssetTabKey.ALKANES_COLLECTION
+  }
+
+  if (
+    tabKey === MoreAssetTabKey.ALKANES_TOKEN ||
+    tabKey === MoreAssetTabKey.ALKANES_COLLECTION ||
+    tabKey === MoreAssetTabKey.RGB_TOKEN_LIST
+  ) {
+    return tabKey
+  }
+
+  return MoreAssetTabKey.ALKANES_TOKEN
 }
 
 const slice: Slice<UIState> = createSlice({
@@ -129,9 +152,12 @@ const slice: Slice<UIState> = createSlice({
         state.alkanesAssetTabKey = payload.alkanesAssetTabKey
       }
       if (payload.moreAssetTabKey !== undefined) {
-        state.moreAssetTabKey = payload.moreAssetTabKey
+        state.moreAssetTabKey = normalizeMoreAssetTabKey(payload.moreAssetTabKey)
       }
       return state
+    },
+    setWalletView(state, action: { payload: WalletView }) {
+      state.walletView = action.payload
     },
     updateTxCreateScreen(
       state,
@@ -276,11 +302,18 @@ const slice: Slice<UIState> = createSlice({
       if (!state.alkanesAssetTabKey) {
         state.alkanesAssetTabKey = AlkanesAssetTabKey.TOKEN
       }
-      if (state.moreAssetTabKey === undefined) {
+      state.moreAssetTabKey = normalizeMoreAssetTabKey(state.moreAssetTabKey)
+      if (state.moreAssetTabKey === MoreAssetTabKey.RGB_TOKEN_LIST) {
         state.moreAssetTabKey = MoreAssetTabKey.ALKANES_TOKEN
       }
       if (state.assetTabKey === (4 as AssetTabKey)) {
         state.assetTabKey = AssetTabKey.MORE
+      }
+      if (state.assetTabKey === AssetTabKey.RGB) {
+        state.assetTabKey = AssetTabKey.ORDINALS
+      }
+      if (state.walletView !== WalletView.RGB && state.walletView !== WalletView.BITCOIN) {
+        state.walletView = WalletView.BITCOIN
       }
       if (!state.uiTxCreateScreen) {
         state.uiTxCreateScreen = initialState.uiTxCreateScreen

@@ -6,8 +6,8 @@ type Presets = keyof typeof $viewPresets;
 const $viewPresets = {
   main: {
     mainPartSize: 28,
-    subPartSize: 20,
-    unitPartSize: 20,
+    subPartSize: 18,
+    unitPartSize: 18,
     mainPartColor: '#000',
     subPartColor: 'rgba(0, 0, 0, 0.5)',
     unitPartColor: '#000',

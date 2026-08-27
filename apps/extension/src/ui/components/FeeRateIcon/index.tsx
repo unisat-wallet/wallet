@@ -54,15 +54,17 @@ export function FeeRateIcon() {
         backgroundColor: 'rgba(255,255,255,0.12)',
         height: 28,
         borderRadius: 8,
-        padding: '2px 4px',
-        gap: 2
+        padding: '0 6px',
+        gap: 4,
+        boxSizing: 'border-box'
       }}>
       <Row
+        itemsCenter
         onClick={() => {
           setFeeOptionVisible(true);
         }}>
-        <Icon icon="gas" />
-        <Text text={feeRate > 0 ? feeRate : '-'} size="xxs" color={color as any} />
+        <Icon icon="gas" size={14} />
+        <Text text={feeRate > 0 ? feeRate : '-'} size="xxs" color={color as any} style={{ lineHeight: '16px' }} />
       </Row>
 
       {feeOptionVisible ? (

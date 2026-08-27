@@ -1,10 +1,10 @@
 import { useCallback, useMemo } from 'react'
 
-import { CHAINS_MAP, Inscription } from '@unisat/wallet-shared'
+import { CHAINS_MAP, Inscription, KeyringType } from '@unisat/wallet-shared'
 import { AddressType, ChainType } from '@unisat/wallet-types'
 import { getAddressType } from '../utils/bitcoin-utils'
 
-import { AppState, AssetTabKey } from '..'
+import { AppState, AssetTabKey, useCurrentKeyring, WalletView } from '..'
 import { useCurrentAddress } from '../hooks/accounts'
 import { useAppDispatch, useAppSelector } from '../hooks/base'
 import { useChainType, useIconBaseUrl, useUnisatWebsite } from '../hooks/settings'
@@ -16,6 +16,11 @@ export function useUIState(): AppState['ui'] {
 export function useAssetTabKey() {
   const uiState = useUIState()
   return uiState.assetTabKey
+}
+
+export function useWalletView() {
+  const uiState = useUIState()
+  return uiState.walletView
 }
 
 export function useOrdinalsAssetTabKey() {
@@ -185,7 +190,13 @@ export const useThrottle = (callback, delay, lastCallRef) => {
   )
 }
 
-export function getSupportedAssets(chainType: ChainType, address: string) {
+export function getSupportedAssets(
+  chainType: ChainType,
+  address: string,
+  opts?: {
+    keyringType?: string
+  }
+) {
   const assetTabKeys: AssetTabKey[] = []
 
   const chain = CHAINS_MAP[chainType]
@@ -196,6 +207,9 @@ export function getSupportedAssets(chainType: ChainType, address: string) {
     ordinals: false,
     runes: false,
     alkanes: false,
+    rgb: false,
+    /** Chain supports showing the RGB USDT card (even when keyring cannot use RGB). */
+    rgbCard: false,
     brc20Prog: false,
   }
 
@@ -210,6 +224,19 @@ export function getSupportedAssets(chainType: ChainType, address: string) {
     assetTabKeys.push(AssetTabKey.MORE)
   }
 
+  const isRgbNetwork =
+    chainType === ChainType.BITCOIN_MAINNET ||
+    chainType === ChainType.BITCOIN_SIGNET ||
+    chainType === ChainType.BITCOIN_TESTNET4
+
+  if (isRgbNetwork) {
+    assets.rgbCard = true
+  }
+
+  if (isRgbNetwork && opts?.keyringType === KeyringType.HdKeyring) {
+    assets.rgb = true
+  }
+
   if (chainType === ChainType.BITCOIN_MAINNET || chainType === ChainType.BITCOIN_SIGNET) {
     assets.brc20Prog = true
   }
@@ -217,13 +244,16 @@ export function getSupportedAssets(chainType: ChainType, address: string) {
   return {
     assets,
     tabKeys: assetTabKeys,
-    key: chainType + address + assetTabKeys.join(','),
+    key: chainType + addressType + opts?.keyringType + assetTabKeys.join(','),
   }
 }
 export function useSupportedAssets() {
   const chainType = useChainType()
   const currentAddress = useCurrentAddress()
-  const supportedAssets = getSupportedAssets(chainType, currentAddress)
+  const currentKeyring = useCurrentKeyring()
+  const supportedAssets = getSupportedAssets(chainType, currentAddress, {
+    keyringType: currentKeyring?.type,
+  })
   return supportedAssets
 }
 

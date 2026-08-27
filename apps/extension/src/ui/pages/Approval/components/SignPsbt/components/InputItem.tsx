@@ -1,3 +1,5 @@
+import { CSSProperties, useEffect, useState } from 'react';
+
 import { Column, Icon, Row, Text } from '@/ui/components';
 import { AddressText } from '@/ui/components/AddressText';
 import { colors } from '@/ui/theme/colors';
@@ -10,9 +12,20 @@ import {
   TickPriceItem,
   ToSignData
 } from '@unisat/wallet-shared';
-import { useBTCUnit, useCurrentAddress, useI18n } from '@unisat/wallet-state';
+import { useBTCUnit, useCurrentAddress, useI18n, useWallet } from '@unisat/wallet-state';
 import { AssetList } from './AssetList';
 import ContractSection from './ContractSection';
+
+const rgbAddressBadgeStyle: CSSProperties = {
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  height: 18,
+  padding: '2px 4px',
+  borderRadius: 4,
+  backgroundColor: 'rgba(37,160,121,0.15)',
+  boxSizing: 'border-box'
+};
 
 export function InputItem(props: {
   index: number;
@@ -26,6 +39,8 @@ export function InputItem(props: {
 }) {
   const { index, inputInfo, outputInfo, decodedPsbt, toSignData } = props;
   const currentAddress = useCurrentAddress();
+  const wallet = useWallet();
+  const [rgbFundingAddress, setRgbFundingAddress] = useState('');
   const itemInfo = (inputInfo || outputInfo)!;
 
   const isToSign = inputInfo && toSignData!.toSignInputs.find((input) => input.index === index);
@@ -33,9 +48,25 @@ export function InputItem(props: {
   const runes = itemInfo.runes || [];
   const alkanes = itemInfo.alkanes || [];
   const isMyAddress = itemInfo.address === currentAddress;
+  const isRgbAddress = Boolean(rgbFundingAddress && itemInfo.address === rgbFundingAddress);
   const btcUnit = useBTCUnit();
   const { t } = useI18n();
-  const highLightAddress = isToSign || isMyAddress;
+  const highLightAddress = isToSign || isMyAddress || isRgbAddress;
+
+  useEffect(() => {
+    let cancelled = false;
+    wallet
+      .getRgbFundingAddress()
+      .then(({ address }) => {
+        if (!cancelled) setRgbFundingAddress(address || '');
+      })
+      .catch(() => {
+        if (!cancelled) setRgbFundingAddress('');
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [wallet]);
 
   const brc20Array: { tick: string; amt: string; inscriptionNumber: number; preview: string }[] = [];
   itemInfo.inscriptions.forEach((w) => {
@@ -72,8 +103,17 @@ export function InputItem(props: {
               />
             </Row>
 
-            <Row>
+            <Row itemsCenter style={{ gap: 4 }}>
               <AddressText address={itemInfo.address} color={highLightAddress ? 'ticker_color2' : 'textDim'} />
+
+              {isRgbAddress && (
+                <div style={rgbAddressBadgeStyle}>
+                  <Text
+                    text={t('rgb')}
+                    style={{ color: '#25a079', fontSize: 12, fontWeight: 500, lineHeight: 'normal' }}
+                  />
+                </div>
+              )}
 
               {isMyAddress && (
                 <Row style={{ padding: 2, backgroundColor: colors.bg2, borderRadius: 5 }}>

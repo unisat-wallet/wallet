@@ -7,6 +7,7 @@ import { Card } from './Card';
 import { Carousel } from './Carousel';
 import { Checkbox } from './Checkbox';
 import { Column } from './Column';
+import { CopyableAddress } from './CopyableAddress';
 import { Content } from './Content';
 import { Footer } from './Footer';
 import { Grid } from './Grid';
@@ -19,8 +20,12 @@ import { Inline } from './Inline';
 import { Input } from './Input';
 import { Layout } from './Layout';
 import { Logo } from './Logo';
+import { NotificationPanel } from './NotificationPanel';
 import { Progress } from './Progress';
+import { RGBAssetIcon } from './RGBAssetIcon';
 import { Radio, RadioGroup } from './Radio';
+import { ReceiveAssetTabs } from './ReceiveAssetTabs';
+import { ReceiveQRCodeCard } from './ReceiveQRCodeCard';
 import { Row } from './Row';
 import { ScrollableList } from './ScrollableList';
 import { Slider } from './Slider';
@@ -42,6 +47,7 @@ export {
   Carousel,
   Checkbox,
   Column,
+  CopyableAddress,
   Content,
   Footer,
   Grid,
@@ -55,9 +61,13 @@ export {
   Layout,
   Loading,
   Logo,
+  NotificationPanel,
   Progress,
   Radio,
   RadioGroup,
+  ReceiveAssetTabs,
+  ReceiveQRCodeCard,
+  RGBAssetIcon,
   Row,
   ScrollableList,
   Slider,

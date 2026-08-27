@@ -30,6 +30,8 @@ export function AlkanesCollectionList({ showHeader = false }: { showHeader?: boo
         onRefresh={onRefresh}
         hasMore={hasMore}
         loading={loading}
+        emptyText={t('assets_no_assets')}
+        emptyPreset="assets"
       />
     </Column>
   );

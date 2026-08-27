@@ -142,7 +142,7 @@ export default function SettingsTabScreen() {
             <BaseView style={{ position: 'relative', marginRight: 5 }}>
               <Icon
                 icon="language"
-                size={20}
+                size={22}
                 color="textDim"
                 onClick={() => {
                   nav.navigate('LanguageScreen');

@@ -22,8 +22,9 @@ export function SwitchNetworkBar() {
         backgroundColor: 'rgba(255,255,255,0.12)',
         height: 28,
         borderRadius: 8,
-        padding: '2px 4px',
-        gap: 2
+        padding: '0 6px',
+        gap: 4,
+        boxSizing: 'border-box'
       }}>
       <Row
         itemsCenter
@@ -31,8 +32,8 @@ export function SwitchNetworkBar() {
         onClick={() => {
           setSwitchChainModalVisible(true);
         }}>
-        <Image src={IMAGE_SOURCE_MAP[chain.icon]} size={22} style={{}} />
-        <Text text={chain.iconLabel} color="white" size="xs" />
+        <Image src={IMAGE_SOURCE_MAP[chain.icon]} size={16} style={{ display: 'block' }} />
+        <Text text={chain.iconLabel} color="white" size="xs" style={{ lineHeight: '16px' }} />
         <Icon icon="down" color="textDim" size={10} />
       </Row>
       {switchChainModalVisible && (

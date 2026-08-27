@@ -165,7 +165,7 @@ export default function BRC20TokenScreen() {
           </Column>
 
           {showSwapBalance || showProgBalance ? (
-            <Column mb="md" style={outWalletCardStyle}>
+            <Column mb="xl" style={outWalletCardStyle}>
               <BRC20OutWalletBalance items={outWalletBalanceItems} />
               {showSwapBalance ? (
                 <Row gap="sm">

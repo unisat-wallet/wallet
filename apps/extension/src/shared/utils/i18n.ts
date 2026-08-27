@@ -41,6 +41,8 @@ const processSubstitutions = (
       } else {
         Object.entries(substitutions).forEach(([key, substitution]) => {
           message = message.split(`{${key}}`).join(String(substitution));
+          const regex = new RegExp(`\\$${key}`, 'g');
+          message = message.replace(regex, String(substitution));
         });
       }
     }
@@ -83,6 +85,7 @@ class I18nService {
       });
 
     addResourceBundle('en');
+    await this.loadLocale(FALLBACK_LOCALE);
 
     i18n.on('languageChanged', function (lng: string) {
       addResourceBundle(lng);
@@ -118,9 +121,9 @@ class I18nService {
       return key;
     }
 
-    const translations = this.translations.get(this.currentLocale)!;
-    const translation = translations[key];
-    if (!translation && translation !== '') {
+    const translations = this.translations.get(this.currentLocale);
+    const translation = translations?.[key] ?? this.translations.get(FALLBACK_LOCALE)?.[key];
+    if (translation === undefined) {
       log.warn(`Translation for key "${key}" not found in locale "${this.currentLocale}"`);
       return key;
     }

@@ -13,8 +13,8 @@ import {
   AlkanesCollection,
   AlkanesInfo,
   Announcement,
-  AppInfo,
   AppExtra,
+  AppInfo,
   AppSummary,
   BRC20HistoryItem,
   BabylonAddressSummary,
@@ -54,6 +54,13 @@ import {
   WebsiteResult,
 } from '@unisat/wallet-shared'
 import { AddressType, ChainType, NetworkType } from '@unisat/wallet-types'
+import type {
+  RgbActivityItem,
+  RgbActivityType,
+  RgbAssetDetail,
+  RgbBalance,
+  RgbTransferItem,
+} from '../types'
 
 interface ContactBookItem {
   name: string
@@ -584,6 +591,148 @@ export interface WalletController {
     alkaneid: string,
     fetchAvailable: boolean
   ): Promise<AddressAlkanesTokenSummary>
+
+  getRGBList(
+    address: string,
+    currentPage: number,
+    pageSize: number,
+    options?: { skipSync?: boolean }
+  ): Promise<{ currentPage: number; pageSize: number; total: number; list: RgbBalance[] }>
+
+  getRGBAssetBalance(address: string, assetId: string): Promise<RgbBalance | undefined>
+
+  getRGBAssetDetail(address: string, assetId: string): Promise<RgbAssetDetail>
+
+  getRGBAssetActivity(
+    address: string,
+    assetId: string,
+    currentPage: number,
+    pageSize: number,
+    type?: RgbActivityType
+  ): Promise<{ currentPage: number; pageSize: number; total: number; list: RgbActivityItem[] }>
+
+  getAddressRgbActivity(
+    address: string,
+    currentPage: number,
+    pageSize: number,
+    assetId?: string,
+    type?: RgbActivityType
+  ): Promise<{ currentPage: number; pageSize: number; total: number; list: RgbActivityItem[] }>
+
+  getRgbTransfers(
+    currentPage: number,
+    pageSize: number
+  ): Promise<{ currentPage: number; pageSize: number; total: number; list: RgbTransferItem[] }>
+
+  createRgbBlindReceive(params: {
+    assetId?: string
+    amount?: number | string
+    durationSeconds?: number
+    skipSync?: boolean
+  }): Promise<any>
+
+  getRgbPendingReceiveInvoices(): Promise<{
+    list: Array<{
+      invoice: string
+      recipientId?: string
+      assetId?: string | null
+      amount?: number | string
+      status?: string
+      kind?: string
+      transferKind?: string
+      batchTransferIdx?: number
+      expirationTimestamp?: number
+      createdAt?: number
+      [key: string]: any
+    }>
+    [key: string]: any
+  }>
+
+  cancelRgbReceiveInvoice(params: { batchTransferIdx: number; skipSync?: boolean }): Promise<{
+    changed: boolean
+    [key: string]: any
+  }>
+
+  getRgbFundingAddress(): Promise<{ address: string }>
+
+  createRgbIssueNia(params: {
+    ticker: string
+    name: string
+    precision: number
+    amounts: Array<number | string>
+  }): Promise<any>
+
+  createRgbUtxosBegin(params: {
+    upTo?: boolean
+    num?: number
+    size?: number
+    feeRate?: number
+    skipSync?: boolean
+    dryRun?: boolean
+  }): Promise<any>
+
+  createRgbUtxosEnd(params: { signedPsbt: string }): Promise<any>
+
+  getRgbPendingVanillaTxs(): Promise<{
+    list: Array<{
+      txid: string
+      type?: string
+      [key: string]: any
+    }>
+    [key: string]: any
+  }>
+
+  abortRgbVanillaTx(params: { txid: string }): Promise<{
+    aborted: boolean
+    [key: string]: any
+  }>
+
+  retryRgbBroadcast(params: { transferId: string }): Promise<{
+    broadcast: boolean
+    status: 'confirming' | 'broadcast_failed' | 'waiting_ack' | 'not_retryable'
+    error?: string
+  }>
+
+  acceptRgbReceive(params: { recipientId: string }): Promise<{
+    accepted: boolean
+    status: 'accepted' | 'canceled'
+    [key: string]: any
+  }>
+
+  rejectRgbReceive(params: { recipientId: string }): Promise<{
+    rejected: boolean
+    [key: string]: any
+  }>
+
+  getRgbAllocationSummary(params?: { skipSync?: boolean }): Promise<{
+    available?: boolean
+    availableAllocationCount?: number
+    freeAllocationCount?: number
+    colorableUtxoCount?: number
+    [key: string]: any
+  }>
+
+  createRgbSendBegin(params: {
+    invoice: string
+    assetId: string
+    amount?: number | string
+    ticker?: string
+    name?: string
+    precision?: number
+    feeRate?: number
+    minConfirmations?: number
+    donation?: boolean
+    witnessData?: {
+      amountSat: number | string
+      blinding?: number | string | null
+    }
+  }): Promise<any>
+
+  createRgbSendEnd(params: {
+    signedPsbt: string
+    transferId?: string
+    skipSync?: boolean
+  }): Promise<any>
 
   createSendAlkanesPsbt(params: {
     to: string

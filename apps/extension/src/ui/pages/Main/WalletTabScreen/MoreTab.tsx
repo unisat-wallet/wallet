@@ -6,7 +6,6 @@ import { AlkanesList } from './AlkanesList';
 
 export function MoreTab() {
   const tabKey = useMoreAssetTabKey();
-
   return (
     <Column gap="md">
       {tabKey === MoreAssetTabKey.ALKANES_COLLECTION ? (

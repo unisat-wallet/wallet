@@ -19,6 +19,7 @@ export function useInfiniteList<T>({
 
   const pageRef = useRef(1)
   const loadingRef = useRef(false)
+  const dataRef = useRef<T[]>([])
 
   const setLoading = (v: boolean) => {
     loadingRef.current = v
@@ -39,12 +40,13 @@ export function useInfiniteList<T>({
       try {
         const pageToLoad = isRefresh ? 1 : pageRef.current
         const { list, total } = await fetcher(pageToLoad, pageSize)
+        const nextData = isRefresh ? list : [...dataRef.current, ...list]
 
         setTotal(total)
-        setData(prev => (isRefresh ? list : [...prev, ...list]))
+        dataRef.current = nextData
+        setData(nextData)
 
-        const loadedCount = (pageToLoad - 1) * pageSize + list.length
-        setHasMore(loadedCount < total)
+        setHasMore(nextData.length < total)
 
         const nextPage = isRefresh ? 2 : pageToLoad + 1
         pageRef.current = nextPage
@@ -66,6 +68,7 @@ export function useInfiniteList<T>({
 
   useEffect(() => {
     // reset
+    dataRef.current = []
     setData([])
     setPage(1)
     setHasMore(true)

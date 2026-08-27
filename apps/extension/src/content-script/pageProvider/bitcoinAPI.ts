@@ -13,8 +13,8 @@ import {
   RequestMethodSignMessageParams,
   RequestMethodSignMessagesParams
 } from '@unisat/wallet-shared';
-
 import { TxType } from '@unisat/wallet-shared';
+
 import { requestMethodKey } from './providerState';
 
 export class BitcoinAPIMethods {
@@ -192,7 +192,7 @@ export class BitcoinAPIMethods {
     });
   };
 
-  signPsbt = async (psbtHex: string, options?: any) => {
+  signPsbt = async (psbtHex: string, options?: { [key: string]: any }) => {
     return this.provider[requestMethodKey]({
       method: 'signPsbt',
       params: {
@@ -203,7 +203,7 @@ export class BitcoinAPIMethods {
     });
   };
 
-  signPsbts = async (psbtHexs: string[], options?: any[]) => {
+  signPsbts = async (psbtHexs: string[], options?: Array<{ [key: string]: any }>) => {
     return this.provider[requestMethodKey]({
       method: 'multiSignPsbt',
       params: {
@@ -264,4 +264,5 @@ export class BitcoinAPIMethods {
       params
     });
   };
+
 }

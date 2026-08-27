@@ -463,13 +463,13 @@ const config = (env) => {
       //   filename: 'popup.html',
       // }),
       new HtmlWebpackPlugin({
-        inject: true,
+        inject: false,
         template: paths.notificationHtml,
         chunks: ['ui'],
         filename: 'notification.html'
       }),
       new HtmlWebpackPlugin({
-        inject: true,
+        inject: false,
         template: paths.indexHtml,
         chunks: ['ui'],
         filename: 'index.html'

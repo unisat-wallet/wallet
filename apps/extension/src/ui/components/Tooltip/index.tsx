@@ -1,4 +1,5 @@
-import React, { useState, useRef, useEffect, ReactNode } from 'react';
+import React, { useState, useRef, useLayoutEffect, ReactNode } from 'react';
+import { createPortal } from 'react-dom';
 
 interface TooltipProps {
   title: ReactNode;
@@ -118,18 +119,20 @@ export function Tooltip({
     setPosition({ top, left });
   };
 
-  useEffect(() => {
-    if (visible) {
-      updatePosition();
-      const handleResize = () => updatePosition();
-      window.addEventListener('resize', handleResize);
-      window.addEventListener('scroll', handleResize);
-      return () => {
-        window.removeEventListener('resize', handleResize);
-        window.removeEventListener('scroll', handleResize);
-      };
-    }
-  }, [visible, placement]);
+  useLayoutEffect(() => {
+    if (!visible) return undefined;
+
+    updatePosition();
+    const frameId = window.requestAnimationFrame(updatePosition);
+    const handleResize = () => updatePosition();
+    window.addEventListener('resize', handleResize);
+    window.addEventListener('scroll', handleResize, true);
+    return () => {
+      window.cancelAnimationFrame(frameId);
+      window.removeEventListener('resize', handleResize);
+      window.removeEventListener('scroll', handleResize, true);
+    };
+  }, [visible, placement, title]);
 
   const handleMouseEnter = () => {
     if (!title) return;
@@ -142,7 +145,7 @@ export function Tooltip({
 
   const defaultTooltipStyle: React.CSSProperties = {
     position: 'fixed',
-    zIndex: 1000,
+    zIndex: 10000,
     pointerEvents: 'none',
     opacity: visible ? 1 : 0,
     transition: 'opacity 0.15s ease-in-out',
@@ -164,6 +167,13 @@ export function Tooltip({
     left: position.left
   };
 
+  const tooltipNode =
+    visible && title ? (
+      <div ref={tooltipRef} style={defaultTooltipStyle}>
+        {title}
+      </div>
+    ) : null;
+
   return (
     <>
       <div
@@ -178,16 +188,7 @@ export function Tooltip({
         }}>
         {children}
       </div>
-      {visible && !destroyTooltipOnHide && (
-        <div ref={tooltipRef} style={defaultTooltipStyle}>
-          {title}
-        </div>
-      )}
-      {visible && destroyTooltipOnHide && (
-        <div ref={tooltipRef} style={defaultTooltipStyle}>
-          {title}
-        </div>
-      )}
+      {tooltipNode && typeof document !== 'undefined' ? createPortal(tooltipNode, document.body) : tooltipNode}
     </>
   );
 }

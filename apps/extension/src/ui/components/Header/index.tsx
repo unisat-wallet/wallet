@@ -53,10 +53,10 @@ export function Header(props: HeaderProps) {
   if (type === 'style2' || type === 'home') {
     return (
       <HeaderContainer shotHeight={type === 'home' ? false : true}>
-        <Row>
+        <Row itemsCenter>
           <Column selfItemsCenter>{LeftComponent}</Column>
         </Row>
-        <Row>
+        <Row itemsCenter>
           <Column selfItemsCenter>{RightComponent}</Column>
         </Row>
       </HeaderContainer>

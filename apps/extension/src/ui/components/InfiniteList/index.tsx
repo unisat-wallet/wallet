@@ -17,6 +17,10 @@ interface InfiniteListProps<T> {
   height?: number | string;
   numColumns?: number;
   total: number;
+  emptyText?: string;
+  emptyPreset?: 'simple' | 'assets';
+  /** Vertical gap between rows. Use 0 for bordered history-style lists. */
+  rowGap?: number;
 }
 
 export function InfiniteList<T>({
@@ -29,7 +33,10 @@ export function InfiniteList<T>({
   hasMore,
   loading,
   height,
-  numColumns = 1
+  numColumns = 1,
+  emptyText,
+  emptyPreset,
+  rowGap = 8
 }: InfiniteListProps<T>) {
   const { t } = useI18n();
   const [pagination, setPagination] = useState({ currentPage: 1, pageSize: 20 });
@@ -60,9 +67,10 @@ export function InfiniteList<T>({
   }, [pageData, numColumns]);
 
   if (!loading && data.length === 0) {
+    const isAssetsEmpty = emptyPreset === 'assets';
     return (
-      <Column style={{ minHeight: 150 }} itemsCenter justifyCenter>
-        <Empty text={t('empty')} />
+      <Column itemsCenter justifyCenter={!isAssetsEmpty} style={isAssetsEmpty ? { paddingTop: 8 } : { minHeight: 150 }}>
+        <Empty text={emptyText || t('empty')} preset={emptyPreset} />
       </Column>
     );
   }
@@ -91,7 +99,7 @@ export function InfiniteList<T>({
               key={`row-${rowIndex}`}
               style={{
                 width: '100%',
-                marginBottom: '8px',
+                marginBottom: rowGap,
                 display: 'grid',
                 gridTemplateColumns: `repeat(${numColumns}, 1fr)`,
                 gap: '8px'

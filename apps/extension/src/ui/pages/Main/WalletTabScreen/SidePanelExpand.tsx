@@ -39,6 +39,8 @@ export function SidePanelExpand() {
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
+        width: 28,
+        height: 28,
         position: 'relative'
       }}>
       <Tooltip
@@ -52,11 +54,19 @@ export function SidePanelExpand() {
           onClick={toggleSidePanel}
           onMouseEnter={() => setIsHovered(true)}
           onMouseLeave={() => setIsHovered(false)}
-          style={{ display: 'inline-block', cursor: 'pointer' }}>
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            width: 28,
+            height: 28,
+            cursor: 'pointer'
+          }}>
           <Icon
             icon={isInSidePanel ? 'side-panel-logo-close' : 'side-panel-logo'}
             size={20}
             containerStyle={{
+              display: 'block',
               opacity: isHovered ? 1 : 0.65,
               color: isHovered ? '#ffffff' : 'inherit'
             }}

@@ -1,24 +1,22 @@
-import React, { type ReactNode } from 'react'
 import { configureStore } from '@reduxjs/toolkit'
-import { vi } from 'vitest'
-import { Provider } from 'react-redux'
 import { KeyringType } from '@unisat/wallet-shared'
 import { AddressType } from '@unisat/wallet-types'
+import React, { type ReactNode } from 'react'
+import { Provider } from 'react-redux'
+import { vi } from 'vitest'
 
-import accounts from '../../src/reducers/accounts'
-import browser from '../../src/reducers/browser'
-import discovery from '../../src/reducers/discovery'
-import global from '../../src/reducers/global'
-import keyrings from '../../src/reducers/keyrings'
-import settings from '../../src/reducers/settings'
-import transactions from '../../src/reducers/transactions'
-import ui from '../../src/reducers/ui'
-import { accountActions } from '../../src/reducers/accounts'
-import { keyringsActions } from '../../src/reducers/keyrings'
 import { ApprovalContext } from '../../src/context/ApprovalContext'
 import { NavigationContext, type NavigationContextType } from '../../src/context/NavigationContext'
 import { ToolsContext, type ToolsContextType } from '../../src/context/ToolsContext'
 import { WalletProvider } from '../../src/context/WalletContext'
+import accounts, { accountActions } from '../../src/reducers/accounts'
+import browser from '../../src/reducers/browser'
+import discovery from '../../src/reducers/discovery'
+import global from '../../src/reducers/global'
+import keyrings, { keyringsActions } from '../../src/reducers/keyrings'
+import settings from '../../src/reducers/settings'
+import transactions from '../../src/reducers/transactions'
+import ui from '../../src/reducers/ui'
 
 export function createTestStore() {
   const store = configureStore({
@@ -49,6 +47,17 @@ export function createTestStore() {
 
   store.dispatch(accountActions.setCurrent(currentAccount))
   store.dispatch(
+    accountActions.setBalanceV2({
+      address: currentAccount.address,
+      balance: {
+        availableBalance: 210000,
+        unavailableBalance: 0,
+        totalBalance: 210000,
+        chainType: 'BITCOIN_MAINNET' as any,
+      },
+    })
+  )
+  store.dispatch(
     keyringsActions.setCurrent({
       key: 'keyring-1',
       index: 0,
@@ -74,6 +83,12 @@ export function createWalletMock() {
 
   return {
     getEnableRBF: vi.fn().mockResolvedValue(false),
+    getAddressBalanceV2: vi.fn().mockResolvedValue({
+      availableBalance: 210000,
+      unavailableBalance: 0,
+      totalBalance: 210000,
+      chainType: 0,
+    }),
     setEnableRBF: vi.fn().mockResolvedValue(undefined),
     getBTCUtxos: vi.fn().mockResolvedValue([]),
     getAssetUtxosRunes: vi.fn().mockResolvedValue([]),
@@ -108,6 +123,23 @@ export function createWalletMock() {
     createSendMultipleInscriptionsPsbt: vi.fn(),
     createSplitInscriptionPsbt: vi.fn(),
     createSendRunesPsbt: vi.fn(),
+    getRGBAssetBalance: vi.fn(),
+    getRGBAssetDetail: vi.fn(),
+    getRGBAssetActivity: vi.fn(),
+    getRGBList: vi.fn().mockResolvedValue({ list: [], total: 0 }),
+    getRgbFundingAddress: vi.fn().mockResolvedValue({ address: 'bc1p-rgb-funding' }),
+    getRgbTransfers: vi.fn().mockResolvedValue({ list: [], total: 0 }),
+    createRgbBlindReceive: vi.fn().mockResolvedValue({ invoice: 'rgb:invoice' }),
+    getRgbPendingReceiveInvoices: vi.fn().mockResolvedValue({ list: [] }),
+    getRgbAllocationSummary: vi.fn().mockResolvedValue({ available: true }),
+    createRgbUtxosBegin: vi.fn(),
+    createRgbUtxosEnd: vi.fn(),
+    getRgbPendingVanillaTxs: vi.fn().mockResolvedValue({ list: [] }),
+    abortRgbVanillaTx: vi.fn(),
+    retryRgbBroadcast: vi.fn(),
+    acceptRgbReceive: vi.fn(),
+    rejectRgbReceive: vi.fn(),
+    cancelRgbReceiveInvoice: vi.fn(),
   }
 }
 

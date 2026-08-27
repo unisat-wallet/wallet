@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 
 import { Card, Column, Content, Footer, Header, Icon, Layout, Row, Text } from '@/ui/components';
 import AccountSelect from '@/ui/components/AccountSelect';
+import { spacingGap } from '@/ui/theme/spacing';
 import { FeeRateIcon } from '@/ui/components/FeeRateIcon';
 import LoadingPage from '@/ui/components/LoadingPage';
 import { NavTabBar } from '@/ui/components/NavTabBar';
@@ -28,6 +29,10 @@ import {
   useNavigation,
   useSupportedAssets,
   useVersionInfo,
+  useWalletView,
+  useRGBListLogic,
+  useRGBTransfersLogic,
+  WalletView,
   useWallet
 } from '@unisat/wallet-state';
 
@@ -36,10 +41,12 @@ import { SwitchChainModal } from '../../Settings/SwitchChainModal';
 import { MoreActionSheet } from './MoreActionSheet';
 import { MoreTab } from './MoreTab';
 import { OrdinalsTab } from './OrdinalsTab';
+import { RGBHomeTabs } from './RGBHomeTabs';
+import { RGBTransferNotificationPanel } from '../../RGB/components/RGBTransferNotificationPanel';
 import { RunesList } from './RunesList';
 import { SidePanelExpand } from './SidePanelExpand';
 import { AnnouncementCard } from './components/AnnouncementCard';
-import { BalanceCard } from './components/BalanceCard';
+import { BalanceCardCarousel } from './components/BalanceCardCarousel';
 import { HomeTips } from './components/HomeTips';
 import { WalletActions } from './components/WalletActions';
 
@@ -59,6 +66,7 @@ export default function WalletTabScreen() {
   const dispatch = useAppDispatch();
   const assetTabKey = useAssetTabKey();
   const moreAssetTabKey = useMoreAssetTabKey();
+  const walletView = useWalletView();
 
   const versionInfo = useVersionInfo();
 
@@ -66,6 +74,7 @@ export default function WalletTabScreen() {
   const [showVersionNotice, setShowVersionNotice] = useState<VersionDetail | null>(null);
 
   const nav = useNavigation();
+  const mainRouteState = nav.getRouteState<'MainScreen'>();
   const isUnlocked = useIsUnlocked();
 
   useEffect(() => {
@@ -123,6 +132,9 @@ export default function WalletTabScreen() {
   }, []);
 
   const supportedAssets = useSupportedAssets();
+  const isRgbView = walletView === WalletView.RGB && supportedAssets.assets.rgb;
+  const rgbList = useRGBListLogic({ autoRefresh: true, enabled: isRgbView });
+  const rgbTransfers = useRGBTransfersLogic({ enabled: isRgbView });
 
   const tabItems = useMemo(() => {
     const items: {
@@ -169,7 +181,53 @@ export default function WalletTabScreen() {
 
   const [switchChainModalVisible, setSwitchChainModalVisible] = useState(false);
   const [moreSheetOpen, setMoreSheetOpen] = useState(false);
+  const [rgbHomeTab, setRgbHomeTab] = useState<'assets' | 'transfers'>(mainRouteState?.rgbHomeTab || 'assets');
+
+  useEffect(() => {
+    if (mainRouteState?.rgbHomeTab) setRgbHomeTab(mainRouteState.rgbHomeTab);
+  }, [mainRouteState?.rgbHomeTab]);
   const [moreSheetSelection, setMoreSheetSelection] = useState<MoreAssetTabKey | undefined>(undefined);
+
+  const homeContent = (
+    <>
+      <AccountSelect />
+
+      <Column mt="md" gap="zero">
+        <Column gap="lg2">
+          <HomeTips />
+
+          <BalanceCardCarousel rgbList={rgbList} />
+          <WalletActions chain={chain} walletView={isRgbView ? WalletView.RGB : WalletView.BITCOIN} />
+
+          {!isRgbView ? <AnnouncementCard /> : null}
+        </Column>
+
+        <Column style={{ marginTop: spacingGap.lg2 }}>
+          {isRgbView ? (
+            <RGBHomeTabs initialTab={rgbHomeTab} transfers={rgbTransfers} list={rgbList} />
+          ) : (
+            <Tabs
+              defaultActiveKey={finalAssetTabKey as unknown as string}
+              activeKey={finalAssetTabKey as unknown as string}
+              items={tabItems as unknown as any[]}
+              onTabClick={(key) => {
+                if ((key as unknown as AssetTabKey) === AssetTabKey.MORE) {
+                  if (assetTabKey === AssetTabKey.MORE) {
+                    setMoreSheetSelection(moreAssetTabKey);
+                  } else {
+                    setMoreSheetSelection(undefined);
+                  }
+                  setMoreSheetOpen(true);
+                  return;
+                }
+                dispatch(uiActions.updateAssetTabScreen({ assetTabKey: key as unknown as AssetTabKey }));
+              }}
+            />
+          )}
+        </Column>
+      </Column>
+    </>
+  );
 
   if (!currentAccount.address) {
     return <LoadingPage />;
@@ -181,7 +239,7 @@ export default function WalletTabScreen() {
         LeftComponent={
           <Card
             preset="style2"
-            style={{ height: 28 }}
+            style={{ height: 28, padding: '0 8px' }}
             onClick={() => {
               navigate('SwitchKeyringScreen');
             }}
@@ -194,49 +252,38 @@ export default function WalletTabScreen() {
               }
               size="xxs"
               ellipsis
-              style={{ maxWidth: 100 }}
+              style={{ maxWidth: 100, lineHeight: '16px' }}
             />
           </Card>
         }
         RightComponent={
-          <Row>
+          <Row itemsCenter style={{ gap: 8 }}>
             <FeeRateIcon />
-            <SwitchNetworkBar />
+            {!isRgbView ? <SwitchNetworkBar /> : null}
             <SidePanelExpand />
           </Row>
         }
       />
 
       <Content>
-        <AccountSelect />
-
-        <Column gap="lg2" mt="md">
-          <HomeTips />
-
-          <BalanceCard />
-          <WalletActions chain={chain} />
-
-          <AnnouncementCard />
-
-          <Tabs
-            defaultActiveKey={finalAssetTabKey as unknown as string}
-            activeKey={finalAssetTabKey as unknown as string}
-            items={tabItems as unknown as any[]}
-            onTabClick={(key) => {
-              if ((key as unknown as AssetTabKey) === AssetTabKey.MORE) {
-                if (assetTabKey === AssetTabKey.MORE) {
-                  setMoreSheetSelection(moreAssetTabKey);
-                } else {
-                  setMoreSheetSelection(undefined);
-                }
-                setMoreSheetOpen(true);
-                return;
-              }
-              dispatch(uiActions.updateAssetTabScreen({ assetTabKey: key as unknown as AssetTabKey }));
+        {homeContent}
+        {isRgbView ? (
+          <RGBTransferNotificationPanel
+            notification={rgbTransfers.notification}
+            actionText={t('view_transfer')}
+            onClose={rgbTransfers.dismissNotification}
+            onAction={() => {
+              const notification = rgbTransfers.notification;
+              if (!notification) return;
+              rgbTransfers.dismissNotification();
+              nav.navigate('RGBTransferDetailScreen', {
+                transferId: notification.transfer.transferId || notification.transfer.id,
+                initialTransfer: notification.transfer
+              });
             }}
           />
-        </Column>
-        {moreSheetOpen ? (
+        ) : null}
+        {!isRgbView && moreSheetOpen ? (
           <MoreActionSheet
             currentSelection={moreSheetSelection}
             onClose={() => setMoreSheetOpen(false)}

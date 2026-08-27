@@ -1,8 +1,9 @@
 import { InfiniteList } from '@/ui/components';
 import InscriptionPreview from '@/ui/components/InscriptionPreview';
-import { useDevice, useInscriptionListLogic } from '@unisat/wallet-state';
+import { useDevice, useI18n, useInscriptionListLogic } from '@unisat/wallet-state';
 
 export function InscriptionList() {
+  const { t } = useI18n();
   const { onRefresh, items, total, onLoadMore, onClickItem, loading, hasMore } = useInscriptionListLogic();
 
   const device = useDevice();
@@ -27,6 +28,8 @@ export function InscriptionList() {
       onRefresh={onRefresh}
       hasMore={hasMore}
       loading={loading}
+      emptyText={t('assets_no_assets')}
+      emptyPreset="assets"
     />
   );
 }

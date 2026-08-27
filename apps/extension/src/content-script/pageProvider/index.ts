@@ -1,16 +1,12 @@
 // this script is injected into webpage's context
 import { EventEmitter } from 'events';
 
-import PushEventHandlers from './pushEventHandlers';
 import { BitcoinAPIMethods } from './bitcoinAPI';
 import { CosmosAPIMethods } from './cosmosAPI';
-import {
-  initializeProvider,
-  requestMethod,
-  requestPromiseCheckVisibility
-} from './providerCore';
+import { initializeProvider, requestMethod } from './providerCore';
 import { createProviderProxy, injectProviderToWindow } from './providerInjection';
 import { _unisatProviderPrivate, requestMethodKey } from './providerState';
+import PushEventHandlers from './pushEventHandlers';
 import { Interceptor } from './types';
 
 export { Interceptor };

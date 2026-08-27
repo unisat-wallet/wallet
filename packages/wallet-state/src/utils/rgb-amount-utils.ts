@@ -1,0 +1,44 @@
+export { toRgbDisplayAmount } from '@unisat/wallet-shared'
+
+export function isValidRgbDecimalAmount(value: string, precision: number) {
+  if (!value) return false
+  const decimalPattern = precision > 0 ? `(?:\\.\\d{0,${precision}})?` : ''
+  return new RegExp(`^(?:0|[1-9]\\d*)${decimalPattern}$`).test(value)
+}
+
+export function getRgbTokenPrecision(value: unknown) {
+  if (!value || typeof value !== 'object') return 0
+
+  const record = value as Record<string, unknown>
+  const candidates = [
+    record['precision'],
+    (record['tokenInfo'] as Record<string, unknown> | undefined)?.['precision'],
+    (record['assetInfo'] as Record<string, unknown> | undefined)?.['precision'],
+    (record['rgbInfo'] as Record<string, unknown> | undefined)?.['precision'],
+  ]
+  const precision = Number(candidates.find(candidate => candidate !== undefined))
+  return Number.isInteger(precision) && precision >= 0 && precision <= 18 ? precision : 0
+}
+
+export function normalizeRgbAmountInput(value: string, precision: number) {
+  let nextValue = value.trim().replace(/,/g, '')
+  if (!nextValue) return ''
+
+  nextValue = nextValue.replace(/[^\d.]/g, '')
+  const [integerPart = '', ...decimalParts] = nextValue.split('.')
+  const normalizedInteger = integerPart.replace(/^0+(?=\d)/, '') || '0'
+
+  if (precision === 0) return normalizedInteger
+  if (decimalParts.length === 0) return normalizedInteger
+
+  return `${normalizedInteger}.${decimalParts.join('').slice(0, precision)}`
+}
+
+export function toRgbAtomicAmount(value: string, precision: number) {
+  const [integerPart = '0', decimalPart = ''] = value.split('.')
+  if (precision === 0) return integerPart
+
+  const paddedDecimal = decimalPart.padEnd(precision, '0').slice(0, precision)
+  const atomicAmount = `${integerPart}${paddedDecimal}`.replace(/^0+(?=\d)/, '')
+  return atomicAmount || '0'
+}

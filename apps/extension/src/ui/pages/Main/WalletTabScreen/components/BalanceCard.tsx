@@ -39,11 +39,16 @@ export function BalanceCard() {
 
   return (
     <Column
+      fullX
       style={{
         background: 'linear-gradient(117deg, #ffda8d 1.38%, #bf630f 94.19%)',
         borderRadius: 16,
         padding: 8,
-        position: 'relative'
+        position: 'relative',
+        minHeight: isDetailExpanded ? 180 : 118,
+        height: '100%',
+        boxSizing: 'border-box',
+        justifyContent: 'space-between'
       }}
       onClick={() => {
         handleExpandToggle();
@@ -52,17 +57,19 @@ export function BalanceCard() {
         <Image src={backgroundImage} size={64} style={{ position: 'absolute', top: 0, right: 0 }} />
         <Row itemsCenter>
           <Text size="sm" text={t('total_balance')} style={{ color: 'rgba(0,0,0,0.55)' }} />
-          <Row itemsCenter gap="sm">
-            <Row
-              style={{ padding: 6, margin: -6 }}
-              onClick={(event) => {
-                stopCardToggle(event);
-                handleHiddenToggle();
-              }}>
-              <Icon color={'black_muted'} icon={isBalanceHidden ? 'balance-eyes-closed' : 'balance-eyes'} size={20} />
+          <div data-card-action="true">
+            <Row itemsCenter gap="sm">
+              <Row
+                style={{ padding: 6, margin: -6, cursor: 'pointer' }}
+                onClick={(event) => {
+                  stopCardToggle(event);
+                  handleHiddenToggle();
+                }}>
+                <Icon color={'black_muted'} icon={isBalanceHidden ? 'balance-eyes-closed' : 'balance-eyes'} size={20} />
+              </Row>
+              <RefreshButton onClick={refreshBalance as any} hideText />
             </Row>
-            <RefreshButton onClick={refreshBalance as any} hideText />
-          </Row>
+          </div>
         </Row>
 
         <Row itemsCenter>
@@ -83,7 +90,8 @@ export function BalanceCard() {
             backgroundColor: '#F1CC9F',
             borderRadius: 16,
             gap: 8,
-            alignItems: 'flex-start'
+            alignItems: 'center',
+            marginTop: 'auto'
           }}>
           <Column style={{ flex: 1, minWidth: 0, alignItems: 'flex-start' }} gap="xs">
             <Row itemsCenter gap="xs" style={{ height: 20 }}>
@@ -135,14 +143,25 @@ export function BalanceCard() {
                 fontSize: fontSizes.sm,
                 marginTop: 5
               }}>
-              <Icon
-                style={{ cursor: 'pointer', flexShrink: 0, alignSelf: 'center' }}
-                icon={'unlock'}
-                size={28}
-                onClick={() => {
-                  handleUnlock();
-                }}
-              />
+              <div
+                data-card-action="true"
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  flexShrink: 0,
+                  alignSelf: 'center'
+                }}>
+                <Icon
+                  style={{ cursor: 'pointer', display: 'block' }}
+                  icon={'unlock'}
+                  size={28}
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    handleUnlock();
+                  }}
+                />
+              </div>
             </Tooltip>
           ) : null}
         </Row>

@@ -13,6 +13,7 @@ import {
 } from '@unisat/wallet-shared'
 import { ChainType } from '@unisat/wallet-types'
 import React, { useContext } from 'react'
+import type { RgbBalance, RgbTransferItem } from '../types'
 
 export type RouteParamList = {
   WelcomeScreen: undefined
@@ -25,7 +26,9 @@ export type RouteParamList = {
     fromColdWallet?: boolean
   }
 
-  MainScreen: undefined
+  MainScreen: {
+    rgbHomeTab?: 'assets' | 'transfers'
+  } | undefined
 
   // tabs
   WalletTabScreen: undefined
@@ -181,6 +184,31 @@ export type RouteParamList = {
     alkanesInfo: AlkanesInfo
   }
 
+  // RGB
+  RGBIssueScreen: undefined
+  RGBHistoryScreen: undefined
+  RGBReceiveScreen: {
+    assetId?: string
+    tokenBalance?: RgbBalance
+    initialStep?: 'create_invoice' | 'pending_invoices' | 'sign_rgb_utxo'
+  }
+  RGBTokenScreen: {
+    assetId: string
+    tokenBalance?: RgbBalance
+  }
+  SendRGBScreen: {
+    assetId: string
+    tokenBalance?: RgbBalance
+  }
+  RGBSendCompleteScreen: {
+    assetId: string
+    tokenBalance?: RgbBalance
+    txid?: string
+  }
+  RGBTransferDetailScreen: {
+    transferId: string
+    initialTransfer?: RgbTransferItem
+  }
   // Babylon
   BabylonTxConfirmScreen: {
     txInfo: BabylonTxInfo
@@ -202,8 +230,8 @@ export type RouteParamList = {
 
 export type RouteTypes = keyof RouteParamList
 
-type NavigateArgs<T extends RouteTypes> = RouteParamList[T] extends undefined
-  ? [screenName: T]
+type NavigateArgs<T extends RouteTypes> = undefined extends RouteParamList[T]
+  ? [screenName: T, params?: Exclude<RouteParamList[T], undefined>]
   : [screenName: T, params: RouteParamList[T]]
 
 export interface NavigationContextType {

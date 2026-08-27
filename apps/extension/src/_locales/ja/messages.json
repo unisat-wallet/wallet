@@ -2779,5 +2779,360 @@
   },
   "load_more_items": {
     "message": "さらに{count}件読み込む"
-  }
+  },
+  "allow_sign_data_requests": {
+    "message": "signDataリクエストを許可する"
+  },
+  "cat": {
+    "message": "CAT"
+  },
+  "cat20_warning_nomerge": {
+    "message": "マージするには少なくとも2つのUTXOが必要です"
+  },
+  "enable_sign_data_popover_warning": {
+    "message": "signDataリクエストを許可すると、フィッシング攻撃に対して脆弱になる可能性があります。常にURLを確認し、コードを含むメッセージに署名する際は注意してください。"
+  },
+  "enable_sign_data_popover_warning_2": {
+    "message": "この設定をオンにするように求められた場合、詐欺に遭っている可能性があります。"
+  },
+  "enable_sign_data_warning": {
+    "message": "この設定を有効にすると、読み取れない署名リクエストを受け取る可能性があります。理解できないメッセージに署名すると、資金やNFTを渡すことに同意してしまう可能性があります。フィッシング攻撃のリスクにさらされます。signDataをオフにして自身を保護してください。"
+  },
+  "i_only_sign_what_i_understand": {
+    "message": "理解したものにのみ署名します"
+  },
+  "legacy_address_warning": {
+    "message": "レガシーアドレスを使用することは、高いトランザクション手数料や意図しないCAT20バランスのロックアップを招く可能性があります。"
+  },
+  "legacy_address_warning_2": {
+    "message": "レガシーアドレスへのトランザクションは、意図しないCAT20バランスの支出を招く可能性があります。"
+  },
+  "legacy_address_warning_3": {
+    "message": "レガシーアドレスを使用することは、高いトランザクション手数料や意図しないCAT20バランスのロックアップを招く可能性があります。"
+  },
+  "legacy_address_warning_4": {
+    "message": "レガシーアドレスへのトランザクションは、意図しないCAT20バランスの支出を招く可能性があります。"
+  },
+  "merge_utxos_for_cat20_asset": {
+    "message": "CAT20アセットのUTXOをマージ"
+  },
+  "send_CAT721": {
+    "message": "CAT721を送信"
+  },
+  "send_cat20": {
+    "message": "CAT20を送信"
+  },
+  "send_cat20_is_not_supported_for_keystone_yet": {
+    "message": "CAT20の送信はまだKeystoneでサポートされていません"
+  },
+  "send_cat721": {
+    "message": "CAT721を送信"
+  },
+  "sign_data_request": {
+    "message": "データ署名リクエスト"
+  },
+  "sign_data_requests": {
+    "message": "signDataリクエスト"
+  },
+  "signdata_required_tip": {
+    "message": "続行するには、設定 -> 詳細設定でsignDataリクエスト機能を有効にする必要があります。"
+  },
+  "understand_sign_data_warning": {
+    "message": "signDataリクエストを有効にすると、すべての資金とNFTを失う可能性があることを理解しています。"
+  },
+  "you_are_signing_data": {
+    "message": "署名するデータ:"
+  },
+  "receive_address": {
+    "message": "受取アドレス"
+  },
+  "use_this_address_to_receive": {
+    "message": "このアドレスで $chain の $unit を受け取ります"
+  },
+  "rgb_invoice": {
+    "message": "RGB インボイス"
+  },
+  "paste_rgb_invoice": {
+    "message": "RGB インボイスを貼り付け"
+  },
+  "enter_amount_greater_than_0": {
+    "message": "0 より大きい数量を入力してください。"
+  },
+  "select_asset": {
+    "message": "資産を選択"
+  },
+  "loading_assets": {
+    "message": "資産を読み込み中..."
+  },
+  "use_this_invoice_to_receive": {
+    "message": "このインボイスで $ticker を受け取ります。"
+  },
+  "receiving_invoice": {
+    "message": "受取インボイス"
+  },
+  "releasing_invoice": {
+    "message": "インボイスを解放中..."
+  },
+  "release_invoice": {
+    "message": "インボイスを解放"
+  },
+  "any_amount": {
+    "message": "任意の数量"
+  },
+  "fixed_amount": {
+    "message": "固定数量"
+  },
+  "accept_any_rgb_amount": {
+    "message": "送信者が数量を指定できるようにします。"
+  },
+  "set_exact_rgb_amount": {
+    "message": "このインボイスの正確な数量を設定します。"
+  },
+  "pending_blind_invoices": {
+    "message": "保留中の blind インボイス"
+  },
+  "waiting_counterparty": {
+    "message": "相手方を待機中"
+  },
+  "loading_pending_invoices": {
+    "message": "保留中のインボイスを読み込み中..."
+  },
+  "no_pending_blind_invoices": {
+    "message": "保留中の blind インボイスはありません。"
+  },
+  "creating": {
+    "message": "作成中..."
+  },
+  "not_enough_btc_for_rgb_invoice": {
+    "message": "選択中のアドレスの BTC が不足しているため、RGB invoice を作成できません。アドレスタイプを切り替えてください。"
+  },
+  "create_invoice": {
+    "message": "インボイスを作成"
+  },
+  "rgb_sent": {
+    "message": "RGB を送信しました"
+  },
+  "rgb_transfer_submitted": {
+    "message": "RGB 送金が送信されました。"
+  },
+  "settled": {
+    "message": "確定済み"
+  },
+  "activity": {
+    "message": "アクティビティ"
+  },
+  "issue": {
+    "message": "発行"
+  },
+  "receive_rgb": {
+    "message": "RGBを受け取る"
+  },
+  "send_usdt": {
+    "message": "USDTを送る"
+  },
+  "not_supported_in_this_wallet": {
+    "message": "このウォレットでは非対応です"
+  },
+  "switch_to_hd_wallet": {
+    "message": "HDウォレットに切り替え"
+  },
+  "rgb_assets": {
+    "message": "RGB資産"
+  },
+  "pending_rgb_invoices": {
+    "message": "保留中のRGBインボイス"
+  },
+  "issue_asset": {
+    "message": "資産を発行"
+  },
+  "issue_rgb_asset": {
+    "message": "RGB資産を発行"
+  },
+  "issue_rgb_asset_desc": {
+    "message": "RGBプロトコル上で新しい資産を発行します。"
+  },
+  "review_rgb_asset": {
+    "message": "RGB資産を確認"
+  },
+  "continue_to_sign": {
+    "message": "署名に進む"
+  },
+  "ticker_label": {
+    "message": "ティッカー"
+  },
+  "name_label": {
+    "message": "名前"
+  },
+  "decimal_places_label": {
+    "message": "小数点以下桁数"
+  },
+  "decimal_places_tooltip": {
+    "message": "小数点以下桁数は、この資産の分割可能性を定義します。発行後は変更できません。"
+  },
+  "ticker_placeholder": {
+    "message": "3〜6文字を推奨"
+  },
+  "asset_display_name": {
+    "message": "資産表示名"
+  },
+  "enter_total_supply": {
+    "message": "総供給量を入力"
+  },
+  "rgb_send_transaction_unavailable": {
+    "message": "RGB 送金トランザクションは利用できません"
+  },
+  "rgb_psbt_signing_missing_result": {
+    "message": "RGB PSBT 署名で psbtHex が返されませんでした"
+  },
+  "rgb": {
+    "message": "RGB"
+  },
+  "rgb_asset": {
+    "message": "RGB 資産"
+  },
+  "rgb_history": {
+    "message": "RGB 履歴"
+  },
+  "asset_id": {
+    "message": "資産 ID"
+  },
+  "precision_rgb": {
+    "message": "精度"
+  },
+  "issued_supply_rgb": {
+    "message": "発行済み供給量"
+  },
+  "schema_rgb": {
+    "message": "スキーマ"
+  },
+  "protocol_data_unavailable": {
+    "message": "プロトコルデータを利用できません"
+  },
+  "asset": {
+    "message": "資産"
+  },
+  "type": {
+    "message": "種類"
+  },
+  "assignment": {
+    "message": "割り当て"
+  },
+  "endpoint": {
+    "message": "エンドポイント"
+  },
+  "issue_rgb20": {
+    "message": "RGB20 を発行"
+  },
+  "issue_nia_asset": {
+    "message": "NIA 資産を発行"
+  },
+  "create_rgb_utxo_first": {
+    "message": "先に RGB UTXO を作成してから、もう一度発行してください。"
+  },
+  "create_rgb_utxo": {
+    "message": "RGB UTXO を作成"
+  },
+  "decoded_invoice": {
+    "message": "デコード済みインボイス"
+  },
+  "invalid_rgb_invoice": {
+    "message": "無効な RGB インボイスです。"
+  },
+  "invoice_asset_mismatch": {
+    "message": "インボイスの資産がこの RGB トークンと一致しません。"
+  },
+  "pending_invoices": {
+    "message": "保留中のインボイス"
+  },
+  "view_all": {
+    "message": "すべて表示"
+  },
+  "any_rgb_asset": {
+    "message": "任意の RGB 資産"
+  },
+  "release_invoice_confirm_title": {
+    "message": "このインボイスを解放しますか？"
+  },
+  "release_invoice_confirm_description": {
+    "message": "予約済みの UTXO が解放されます。このインボイスは利用できなくなります。"
+  },
+  "keep_invoice": {
+    "message": "インボイスを保持"
+  },
+  "rgb_transfers": {
+    "message": "送受信"
+  },
+  "rgb_status_signed": {
+    "message": "署名済み"
+  },
+  "rgb_status_waiting_ack": {
+    "message": "受信者の確認待ち"
+  },
+  "rgb_amount_locking": {
+    "message": "ロック中"
+  },
+  "rgb_locked_balance_hint": {
+    "message": "保留中の送金があります。送金を表示"
+  },
+  "rgb_status_confirming": {
+    "message": "トランザクション確認待ち"
+  },
+  "rgb_status_waiting_receive": {
+    "message": "送信者のトランザクション送信待ち"
+  },
+  "rgb_transfer_details": {
+    "message": "送受信の詳細"
+  },
+  "rgb_transfer_id": {
+    "message": "送受信 ID"
+  },
+  "rgb_transfer_waiting_ack_description": {
+    "message": "Consignment は送信済みです。受信者の確認を待っています。"
+  },
+  "rgb_transfer_confirming_description": {
+    "message": "送受信は受け付けられ、Bitcoin の確認待ちです。"
+  },
+  "rgb_status_broadcasting": { "message": "ブロードキャスト中" },
+  "rgb_status_broadcasted": { "message": "ブロードキャスト済み" },
+  "rgb_status_broadcast_failed": { "message": "ブロードキャストに失敗しました" },
+  "rgb_cancel_send_confirm_title": { "message": "この送金をキャンセルしますか？" },
+  "rgb_cancel_send_confirm_description": {
+    "message": "Consignment は配信済みですが、まだブロードキャストされていません。キャンセルするとこの保留中の送金は破棄されます。"
+  },
+  "rgb_cancel_send_acknowledgement": {
+    "message": "キャンセルすると、この保留中の送金が完全に破棄されることを理解しました。"
+  },
+  "rgb_cancel_send_success": { "message": "送金をキャンセルしました" },
+  "rgb_cancel_send_failed": { "message": "送金をキャンセルできませんでした" },
+  "rgb_status_pending_accept": { "message": "あなたの承認待ち" },
+  "rgb_status_confirmed": { "message": "確認済み" },
+  "rgb_receive_confirmed_title": { "message": "支払いを受け取りました" },
+  "rgb_receive_confirmed_description": { "message": "$1 $2 を受け取りました。トランザクションが確認されました。" },
+  "rgb_transfer_broadcasted_title": { "message": "トランザクションをブロードキャストしました" },
+  "rgb_transfer_broadcasted_notification": {
+    "message": "受信者が $1 $2 を承認しました。トランザクションをブロードキャストしました。"
+  },
+  "rgb_status_canceled_by_sender": { "message": "送信者がキャンセルしました" },
+  "rgb_status_canceled": { "message": "キャンセル済み" },
+  "rgb_transfer_canceled_description": { "message": "この送金はブロードキャスト前にキャンセルされました。" },
+  "rgb_transfer_canceled_by_sender_description": { "message": "送信者がこの送金をキャンセルしました。" },
+  "rgb_accept_transfer": { "message": "承認" },
+  "rgb_reject_transfer": { "message": "拒否" },
+  "rgb_accept_transfer_success": { "message": "送金を承認しました" },
+  "rgb_reject_transfer_success": { "message": "送金を拒否しました" },
+  "rgb_accept_transfer_failed": { "message": "送金を承認できませんでした" },
+  "rgb_reject_transfer_failed": { "message": "送金を拒否できませんでした" },
+  "rgb_transfer_pending_accept_description": { "message": "この送金を確認し、承認または拒否してください。" },
+  "rgb_transfer_broadcasting_description": {
+    "message": "受信者が承認しました。トランザクションをブロードキャストしています。"
+  },
+  "rgb_transfer_broadcasted_description": {
+    "message": "受信者が承認し、トランザクションをブロードキャストしました。チェーン上の確認を待っています。"
+  },
+  "rgb_transfer_broadcast_failed_description": {
+    "message": "受信者は承認しましたが、ブロードキャストに失敗しました。準備ができたら再試行してください。"
+  },
+  "rgb_transfer_broadcast_success": { "message": "受信者が承認しました。トランザクションをブロードキャストしました。" },
+  "rgb_retry_broadcast": { "message": "ブロードキャストを再試行" },
+  "rgb_retry_broadcast_failed": { "message": "トランザクションをブロードキャストできませんでした" }
 }

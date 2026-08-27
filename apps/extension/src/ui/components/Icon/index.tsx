@@ -51,6 +51,7 @@ export const svgRegistry = {
   search: '/images/icons/action/search.svg',
   filter: '/images/icons/action/filter.svg',
   add_liquidity: '/images/icons/action/add_liquidity.svg',
+  issue: '/images/icons/action/issue.svg',
 
   // status
   success: '/images/icons/status/success.svg',
@@ -115,6 +116,8 @@ export const svgRegistry = {
   unisat: '/images/icons/protocol/unisat.svg',
   gas: '/images/icons/protocol/gas.svg',
   alkanes: '/images/icons/protocol/alkanes.svg',
+  rgb: '/images/icons/protocol/rgb.png',
+  usdt: '/images/icons/protocol/usdt.svg',
 
   // tx
   utxo: '/images/icons/tx/utxo.svg',
@@ -128,6 +131,7 @@ export const svgRegistry = {
   psbt_output: '/images/icons/tx/psbt_output.svg',
   psbt_opreturn: '/images/icons/tx/psbt_opreturn.svg',
   'brc20-single-step': '/images/icons/tx/brc20-single-step.svg',
+  invoice: '/images/icons/tx/invoice.svg',
 
   // swap
   swap_swap: '/images/icons/swap/swap_swap.svg',
@@ -236,7 +240,10 @@ const iconImgList: Array<IconTypes> = [
   'emptyBox',
   'mint_action',
   'trade',
-  'warning2'
+  'warning2',
+  'rgb',
+  'usdt',
+  'issue'
 ];
 
 export type IconTypes = keyof typeof svgRegistry;
@@ -316,7 +323,7 @@ export function Icon(props: IconProps) {
         style={Object.assign({}, $containerStyleOverride, {
           width: size || fontSizes.icon,
           height: size || fontSizes.icon,
-          cursor: onClick ? 'pointer' : 'default'
+          cursor: onClick ? 'pointer' : 'inherit'
         })}
       />
     );

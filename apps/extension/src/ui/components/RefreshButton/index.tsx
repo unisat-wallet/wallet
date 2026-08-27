@@ -31,11 +31,12 @@ export function RefreshButton({
   const { t } = useI18n();
 
   return (
-    <Row
-      mx={hideText ? 'zero' : 'md'}
-      itemsCenter
-      onClick={(e) => {
-        e.stopPropagation();
+    <div data-card-action="true">
+      <Row
+        mx={hideText ? 'zero' : 'md'}
+        itemsCenter
+        onClick={(e) => {
+          e.stopPropagation();
         if (disabled) {
           return;
         }
@@ -55,5 +56,6 @@ export function RefreshButton({
         <Text text={disabled ? `${leftTime} ${t('secs')}` : t('refresh')} color="black_muted" size="sm" textCenter />
       )}
     </Row>
+    </div>
   );
 }

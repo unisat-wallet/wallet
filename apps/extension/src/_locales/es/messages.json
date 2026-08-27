@@ -2770,5 +2770,356 @@
   },
   "load_more_items": {
     "message": "Cargar {count} mas"
-  }
+  },
+  "allow_sign_data_requests": {
+    "message": "Permitir solicitudes signData"
+  },
+  "cat": {
+    "message": "CAT"
+  },
+  "cat20_warning_nomerge": {
+    "message": "Necesitas al menos 2 UTXOs para fusionar"
+  },
+  "enable_sign_data_popover_warning": {
+    "message": "Permitir solicitudes signData puede hacerte vulnerable a ataques de phishing. Siempre revisa la URL y ten cuidado al firmar mensajes que contengan código."
+  },
+  "enable_sign_data_popover_warning_2": {
+    "message": "Si te han pedido que actives esta configuración, podrías estar siendo víctima de una estafa"
+  },
+  "enable_sign_data_warning": {
+    "message": "Si habilitas esta configuración, podrías recibir solicitudes de firma que no son legibles. Al firmar un mensaje que no entiendes, podrías estar aceptando entregar tus fondos y NFTs. Estás en riesgo de ataques de phishing. Protégete desactivando signData."
+  },
+  "i_only_sign_what_i_understand": {
+    "message": "Solo firmo lo que entiendo"
+  },
+  "legacy_address_warning": {
+    "message": "No se recomienda usar direcciones heredadas, ya que pueden provocar tarifas de transacción más altas o el bloqueo no intencionado de saldos CAT20."
+  },
+  "legacy_address_warning_2": {
+    "message": "No se recomienda enviar transacciones a direcciones heredadas, ya que esto puede resultar en el gasto no intencionado de saldos CAT20."
+  },
+  "legacy_address_warning_3": {
+    "message": "No se recomienda usar direcciones heredadas, ya que pueden provocar tarifas de transacción más altas o el bloqueo no intencionado de saldos CAT20."
+  },
+  "legacy_address_warning_4": {
+    "message": "No se recomienda enviar transacciones a direcciones heredadas, ya que esto puede resultar en el gasto no intencionado de saldos CAT20."
+  },
+  "merge_utxos_for_cat20_asset": {
+    "message": "Fusionar UTXOs para Activo CAT20"
+  },
+  "send_CAT721": {
+    "message": "Enviar CAT721"
+  },
+  "send_cat20": {
+    "message": "Enviar CAT20"
+  },
+  "send_cat20_is_not_supported_for_keystone_yet": {
+    "message": "El envío de CAT20 aún no es compatible con Keystone"
+  },
+  "send_cat721": {
+    "message": "Enviar CAT721"
+  },
+  "sign_data_request": {
+    "message": "Solicitud de Firma de Datos"
+  },
+  "sign_data_requests": {
+    "message": "Solicitudes signData"
+  },
+  "signdata_required_tip": {
+    "message": "Necesitas habilitar la función de solicitud signData en Ajustes -> Avanzado para continuar."
+  },
+  "understand_sign_data_warning": {
+    "message": "Entiendo que puedo perder todos mis fondos y NFTs si habilito las solicitudes signData."
+  },
+  "you_are_signing_data": {
+    "message": "Estás firmando datos:"
+  },
+  "receive_address": {
+    "message": "Dirección de recepción"
+  },
+  "use_this_address_to_receive": {
+    "message": "Usa esta dirección para recibir $unit en $chain"
+  },
+  "rgb_invoice": {
+    "message": "Factura RGB"
+  },
+  "paste_rgb_invoice": {
+    "message": "Pega la factura RGB"
+  },
+  "enter_amount_greater_than_0": {
+    "message": "Introduce un importe mayor que 0."
+  },
+  "select_asset": {
+    "message": "Seleccionar activo"
+  },
+  "loading_assets": {
+    "message": "Cargando activos..."
+  },
+  "use_this_invoice_to_receive": {
+    "message": "Usa esta factura para recibir $ticker."
+  },
+  "receiving_invoice": {
+    "message": "Factura de recepción"
+  },
+  "releasing_invoice": {
+    "message": "Liberando factura..."
+  },
+  "release_invoice": {
+    "message": "Liberar factura"
+  },
+  "any_amount": {
+    "message": "Cualquier importe"
+  },
+  "fixed_amount": {
+    "message": "Importe fijo"
+  },
+  "accept_any_rgb_amount": {
+    "message": "Permite que el remitente especifique el importe."
+  },
+  "set_exact_rgb_amount": {
+    "message": "Define el importe exacto para esta factura."
+  },
+  "pending_blind_invoices": {
+    "message": "Facturas blind pendientes"
+  },
+  "waiting_counterparty": {
+    "message": "Esperando contraparte"
+  },
+  "loading_pending_invoices": {
+    "message": "Cargando facturas pendientes..."
+  },
+  "no_pending_blind_invoices": {
+    "message": "No hay facturas blind pendientes."
+  },
+  "creating": {
+    "message": "Creando..."
+  },
+  "not_enough_btc_for_rgb_invoice": {
+    "message": "No hay suficiente BTC en la dirección seleccionada para crear una factura RGB. Cambia el tipo de dirección para continuar."
+  },
+  "create_invoice": {
+    "message": "Crear factura"
+  },
+  "rgb_sent": {
+    "message": "RGB enviado"
+  },
+  "rgb_transfer_submitted": {
+    "message": "Tu transferencia RGB se ha enviado."
+  },
+  "settled": {
+    "message": "Liquidado"
+  },
+  "activity": {
+    "message": "Actividad"
+  },
+  "issue": {
+    "message": "Emitir"
+  },
+  "receive_rgb": {
+    "message": "Recibir RGB"
+  },
+  "send_usdt": {
+    "message": "Enviar USDT"
+  },
+  "not_supported_in_this_wallet": {
+    "message": "Not supported in this wallet"
+  },
+  "switch_to_hd_wallet": {
+    "message": "Switch to HD Wallet"
+  },
+  "rgb_assets": {
+    "message": "Activos RGB"
+  },
+  "pending_rgb_invoices": {
+    "message": "Facturas RGB pendientes"
+  },
+  "issue_asset": {
+    "message": "Emitir activo"
+  },
+  "issue_rgb_asset": {
+    "message": "Emitir activo RGB"
+  },
+  "issue_rgb_asset_desc": {
+    "message": "Emitir un nuevo activo en el protocolo RGB."
+  },
+  "review_rgb_asset": {
+    "message": "Revisar activo RGB"
+  },
+  "continue_to_sign": {
+    "message": "Continuar para firmar"
+  },
+  "ticker_label": {
+    "message": "Ticker"
+  },
+  "name_label": {
+    "message": "Nombre"
+  },
+  "decimal_places_label": {
+    "message": "Decimales"
+  },
+  "decimal_places_tooltip": {
+    "message": "Los decimales definen la divisibilidad de este activo. Esta configuración no se puede cambiar después de la emisión."
+  },
+  "ticker_placeholder": {
+    "message": "Se recomiendan 3-6 caracteres"
+  },
+  "asset_display_name": {
+    "message": "Nombre para mostrar del activo"
+  },
+  "enter_total_supply": {
+    "message": "Ingrese el suministro total"
+  },
+  "rgb_send_transaction_unavailable": {
+    "message": "La transacción de envío RGB no está disponible"
+  },
+  "rgb_psbt_signing_missing_result": {
+    "message": "La firma PSBT de RGB no devolvió psbtHex"
+  },
+  "rgb": {
+    "message": "RGB"
+  },
+  "rgb_asset": {
+    "message": "Activo RGB"
+  },
+  "rgb_history": {
+    "message": "Historial RGB"
+  },
+  "asset_id": {
+    "message": "ID de activo"
+  },
+  "precision_rgb": {
+    "message": "Precisión"
+  },
+  "issued_supply_rgb": {
+    "message": "Suministro emitido"
+  },
+  "schema_rgb": {
+    "message": "Esquema"
+  },
+  "protocol_data_unavailable": {
+    "message": "Datos del protocolo no disponibles"
+  },
+  "asset": {
+    "message": "Activo"
+  },
+  "type": {
+    "message": "Tipo"
+  },
+  "assignment": {
+    "message": "Asignación"
+  },
+  "endpoint": {
+    "message": "Endpoint"
+  },
+  "issue_rgb20": {
+    "message": "Emitir RGB20"
+  },
+  "issue_nia_asset": {
+    "message": "Emitir activo NIA"
+  },
+  "create_rgb_utxo_first": {
+    "message": "Crea primero un UTXO RGB y luego vuelve a emitir."
+  },
+  "create_rgb_utxo": {
+    "message": "Crear UTXO RGB"
+  },
+  "decoded_invoice": {
+    "message": "Factura decodificada"
+  },
+  "invalid_rgb_invoice": {
+    "message": "Factura RGB no válida."
+  },
+  "invoice_asset_mismatch": {
+    "message": "El activo de la factura no coincide con este token RGB."
+  },
+  "pending_invoices": {
+    "message": "Facturas pendientes"
+  },
+  "view_all": {
+    "message": "Ver todo"
+  },
+  "any_rgb_asset": {
+    "message": "Cualquier activo RGB"
+  },
+  "release_invoice_confirm_title": {
+    "message": "¿Liberar esta factura?"
+  },
+  "release_invoice_confirm_description": {
+    "message": "Esto liberará el UTXO reservado. La factura ya no estará disponible."
+  },
+  "keep_invoice": {
+    "message": "Conservar factura"
+  },
+  "rgb_transfers": {
+    "message": "Transferencias"
+  },
+  "rgb_status_signed": {
+    "message": "Firmado"
+  },
+  "rgb_status_waiting_ack": {
+    "message": "Esperando confirmacion del receptor"
+  },
+  "rgb_amount_locking": {
+    "message": "Bloqueado"
+  },
+  "rgb_locked_balance_hint": {
+    "message": "Tienes una transferencia pendiente. Ver transferencias"
+  },
+  "rgb_status_confirming": {
+    "message": "Esperando confirmacion de la transaccion"
+  },
+  "rgb_status_waiting_receive": {
+    "message": "Esperando que el remitente transmita la transaccion"
+  },
+  "rgb_transfer_details": {
+    "message": "Detalles de la transferencia"
+  },
+  "rgb_transfer_id": {
+    "message": "ID de transferencia"
+  },
+  "rgb_transfer_waiting_ack_description": {
+    "message": "El consignment fue entregado. Esperando la confirmacion del receptor."
+  },
+  "rgb_transfer_confirming_description": {
+    "message": "La transferencia fue aceptada y espera confirmacion de Bitcoin."
+  },
+  "rgb_status_broadcasting": { "message": "Transmitiendo" },
+  "rgb_status_broadcasted": { "message": "Transmitida" },
+  "rgb_status_broadcast_failed": { "message": "Error al transmitir" },
+  "rgb_cancel_send_confirm_title": { "message": "¿Cancelar esta transferencia?" },
+  "rgb_cancel_send_confirm_description": {
+    "message": "El consignment se entregó, pero aún no se transmitió. Al cancelar se descartará este envío pendiente."
+  },
+  "rgb_cancel_send_acknowledgement": {
+    "message": "Entiendo que cancelar descarta permanentemente esta transferencia pendiente."
+  },
+  "rgb_cancel_send_success": { "message": "Transferencia cancelada" },
+  "rgb_cancel_send_failed": { "message": "No se pudo cancelar la transferencia" },
+  "rgb_status_pending_accept": { "message": "Esperando tu aceptación" },
+  "rgb_status_confirmed": { "message": "Confirmada" },
+  "rgb_receive_confirmed_title": { "message": "Pago recibido" },
+  "rgb_receive_confirmed_description": { "message": "Recibidos $1 $2. Transacción confirmada." },
+  "rgb_transfer_broadcasted_title": { "message": "Transacción transmitida" },
+  "rgb_transfer_broadcasted_notification": { "message": "El destinatario aceptó $1 $2. La transacción se transmitió." },
+  "rgb_status_canceled_by_sender": { "message": "Cancelada por el remitente" },
+  "rgb_status_canceled": { "message": "Cancelada" },
+  "rgb_transfer_canceled_description": { "message": "Esta transferencia se canceló antes de transmitirse." },
+  "rgb_transfer_canceled_by_sender_description": { "message": "El remitente canceló esta transferencia." },
+  "rgb_accept_transfer": { "message": "Aceptar" },
+  "rgb_reject_transfer": { "message": "Rechazar" },
+  "rgb_accept_transfer_success": { "message": "Transferencia aceptada" },
+  "rgb_reject_transfer_success": { "message": "Transferencia rechazada" },
+  "rgb_accept_transfer_failed": { "message": "No se pudo aceptar la transferencia" },
+  "rgb_reject_transfer_failed": { "message": "No se pudo rechazar la transferencia" },
+  "rgb_transfer_pending_accept_description": { "message": "Revisa esta transferencia y acéptala o recházala." },
+  "rgb_transfer_broadcasting_description": { "message": "El destinatario aceptó. Transmitiendo la transacción." },
+  "rgb_transfer_broadcasted_description": {
+    "message": "El destinatario aceptó y la transacción se transmitió. Esperando confirmación en cadena."
+  },
+  "rgb_transfer_broadcast_failed_description": {
+    "message": "El destinatario aceptó, pero la transmisión falló. Inténtalo de nuevo cuando estés listo."
+  },
+  "rgb_transfer_broadcast_success": { "message": "El destinatario aceptó. Transacción transmitida." },
+  "rgb_retry_broadcast": { "message": "Reintentar transmisión" },
+  "rgb_retry_broadcast_failed": { "message": "No se pudo transmitir la transacción" }
 }

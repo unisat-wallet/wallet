@@ -51,4 +51,20 @@ export * from './reducers'
 export * from './types'
 export * from './ui-hooks'
 export { uiEventBus } from './utils/eventBus'
+export {
+  decodeRgbInvoice,
+  decodeRgbInvoiceAmountState,
+  getRgbInvoiceAmount,
+  getRgbInvoiceAssetId,
+  type DecodedRgbInvoice,
+  type RgbInvoiceAssignmentKind,
+  type RgbInvoiceType,
+} from './utils/rgb-invoice-utils'
 export { useAsyncEffect } from './utils/ui-utils'
+export {
+  isValidRgbDecimalAmount,
+  getRgbTokenPrecision,
+  normalizeRgbAmountInput,
+  toRgbAtomicAmount,
+  toRgbDisplayAmount,
+} from './utils/rgb-amount-utils'

@@ -1,0 +1,103 @@
+import { act, renderHook, waitFor } from '@testing-library/react'
+import { describe, expect, it } from 'vitest'
+
+import { useRGBTransferDetailLogic } from '../../src/ui-hooks/useRGBTransferDetailLogic'
+import { createHookTestHarness } from './testHelpers'
+
+const pendingReceive = {
+  id: 'local-receive:recipient-id',
+  transferId: 'recipient-id',
+  assetId: 'rgb:asset-id',
+  type: 'receive' as const,
+  amount: '10',
+  timestamp: Date.now(),
+  status: 'pending_accept',
+  local: true,
+}
+
+const failedSend = {
+  id: 'local-send:transfer-id',
+  transferId: 'transfer-id',
+  assetId: 'rgb:asset-id',
+  type: 'send' as const,
+  amount: '10',
+  timestamp: Date.now(),
+  status: 'broadcast_failed',
+  local: true,
+}
+
+const confirmingReceive = {
+  ...pendingReceive,
+  txid: 'a'.repeat(64),
+  status: 'confirming',
+}
+
+describe('useRGBTransferDetailLogic', () => {
+  it('accepts a pending receive using its recipient ID', async () => {
+    const { wrapper, wallet } = createHookTestHarness({
+      routeState: { transferId: 'recipient-id', initialTransfer: pendingReceive },
+    })
+    wallet.acceptRgbReceive.mockResolvedValue({ accepted: true, status: 'accepted' })
+
+    const { result } = renderHook(() => useRGBTransferDetailLogic(), { wrapper })
+
+    await waitFor(() => expect(result.current.canAcceptReceive).toBe(true))
+    await act(async () => {
+      await result.current.onAcceptReceive()
+    })
+
+    expect(wallet.acceptRgbReceive).toHaveBeenCalledWith({ recipientId: 'recipient-id' })
+    expect(result.current.transfer?.status).toBe('confirming')
+  })
+
+  it('rejects a pending receive using its recipient ID', async () => {
+    const { wrapper, wallet } = createHookTestHarness({
+      routeState: { transferId: 'recipient-id', initialTransfer: pendingReceive },
+    })
+    wallet.rejectRgbReceive.mockResolvedValue({ rejected: true })
+
+    const { result } = renderHook(() => useRGBTransferDetailLogic(), { wrapper })
+
+    await waitFor(() => expect(result.current.canAcceptReceive).toBe(true))
+    await act(async () => {
+      await result.current.onRejectReceive()
+    })
+
+    expect(wallet.rejectRgbReceive).toHaveBeenCalledWith({ recipientId: 'recipient-id' })
+    expect(result.current.transfer?.status).toBe('rejected')
+  })
+
+  it('retries a failed send broadcast using the persisted transfer ID', async () => {
+    const { wrapper, wallet } = createHookTestHarness({
+      routeState: { transferId: 'transfer-id', initialTransfer: failedSend },
+    })
+    wallet.retryRgbBroadcast.mockResolvedValue({ broadcast: true, status: 'confirming' })
+
+    const { result } = renderHook(() => useRGBTransferDetailLogic(), { wrapper })
+
+    await waitFor(() => expect(result.current.canRetryBroadcast).toBe(true))
+    await act(async () => {
+      await result.current.onRetryBroadcast()
+    })
+
+    expect(wallet.retryRgbBroadcast).toHaveBeenCalledWith({ transferId: 'transfer-id' })
+    expect(result.current.transfer?.status).toBe('broadcasted')
+  })
+
+  it('creates a receive-confirmed notification after on-chain settlement', async () => {
+    const { wrapper, wallet } = createHookTestHarness({
+      routeState: { transferId: 'recipient-id', initialTransfer: confirmingReceive },
+    })
+    wallet.getRgbTransfers.mockResolvedValue({
+      list: [{ ...confirmingReceive, status: 'confirmed' }],
+      total: 1,
+    })
+
+    const { result } = renderHook(() => useRGBTransferDetailLogic(), { wrapper })
+
+    await waitFor(() => expect(result.current.transfer?.status).toBe('confirmed'))
+    expect(result.current.notification).toEqual(
+      expect.objectContaining({ kind: 'receive_confirmed' })
+    )
+  })
+})

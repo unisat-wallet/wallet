@@ -16,6 +16,7 @@ import { Content, Icon } from '../components';
 import { ErrorBoundary } from '../components/ErrorBoundary';
 import { ApprovalProvider } from '../providers/ApprovalProvider';
 import { NavigationProvider } from '../providers/NavigationProvider';
+import { IS_DEVELOPMENT } from '../utils';
 import AddKeyringScreen from './Account/AddKeyringScreen';
 import CreateAccountScreen from './Account/CreateAccountScreen';
 import CreateColdWalletScreen from './Account/CreateColdWalletScreen';
@@ -52,6 +53,13 @@ import OrdinalsInscriptionScreen from './Ordinals/OrdinalsInscriptionScreen';
 import SendOrdinalsInscriptionScreen from './Ordinals/SendOrdinalsInscriptionScreen';
 import SplitOrdinalsInscriptionScreen from './Ordinals/SplitOrdinalsInscriptionScreen';
 import PhishingScreen from './Phishing/PhishingScreen';
+import RGBHistoryScreen from './RGB/RGBHistoryScreen';
+import RGBIssueScreen from './RGB/RGBIssueScreen';
+import RGBReceiveScreen from './RGB/RGBReceiveScreen';
+import RGBSendCompleteScreen from './RGB/RGBSendCompleteScreen';
+import RGBTransferDetailScreen from './RGB/RGBTransferDetailScreen';
+import RGBTokenScreen from './RGB/RGBTokenScreen';
+import SendRGBScreen from './RGB/SendRGBScreen';
 import RunesTokenScreen from './Runes/RunesTokenScreen';
 import SendRunesScreen from './Runes/SendRunesScreen';
 import AboutUsScreen from './Settings/AboutUsScreen';
@@ -78,8 +86,6 @@ import TxCreateScreen from './Wallet/TxCreateScreen';
 import TxFailScreen from './Wallet/TxFailScreen';
 import TxSuccessScreen from './Wallet/TxSuccessScreen';
 import './index.module.less';
-
-const isDevelopment = process.env.NODE_ENV === 'development';
 
 export const routes = {
   BoostScreen: {
@@ -285,6 +291,36 @@ export const routes = {
     element: <RunesTokenScreen />
   },
 
+  RGBReceiveScreen: {
+    path: '/rgb/receive',
+    element: <RGBReceiveScreen />
+  },
+  RGBTokenScreen: {
+    path: '/rgb/token',
+    element: <RGBTokenScreen />
+  },
+  SendRGBScreen: {
+    path: '/rgb/send',
+    element: <SendRGBScreen />
+  },
+  RGBSendCompleteScreen: {
+    path: '/rgb/send/complete',
+    element: <RGBSendCompleteScreen />
+  },
+  RGBTransferDetailScreen: {
+    path: '/rgb/transfer',
+    element: <RGBTransferDetailScreen />
+  },
+
+  RGBIssueScreen: {
+    path: '/rgb/issue',
+    element: <RGBIssueScreen />
+  },
+  RGBHistoryScreen: {
+    path: '/rgb/history',
+    element: <RGBHistoryScreen />
+  },
+
   BabylonStakingScreen: {
     path: '/babylon/staking',
     element: <BabylonStakingScreen />
@@ -336,7 +372,7 @@ export const routes = {
   }
 };
 
-if (isDevelopment) {
+if (IS_DEVELOPMENT) {
   routes['TestScreen'] = {
     path: '/test',
     element: <TestScreen />
@@ -512,8 +548,7 @@ const Main = () => {
           height: '00vh',
           overflowY: 'auto',
           overflowX: 'hidden'
-        }}
-      >
+        }}>
         <Content justifyCenter itemsCenter>
           <Icon>
             <LoadingOutlined />

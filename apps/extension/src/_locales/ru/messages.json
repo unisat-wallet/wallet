@@ -2779,5 +2779,354 @@
   },
   "load_more_items": {
     "message": "Загрузить еще {count}"
-  }
+  },
+  "allow_sign_data_requests": {
+    "message": "Разрешить запросы signData"
+  },
+  "cat": {
+    "message": "CAT"
+  },
+  "cat20_warning_nomerge": {
+    "message": "Для объединения необходимо как минимум 2 UTXO"
+  },
+  "enable_sign_data_popover_warning": {
+    "message": "Разрешение запросов signData может сделать вас уязвимым для фишинговых атак. Всегда проверяйте URL и будьте осторожны при подписании сообщений, содержащих код."
+  },
+  "enable_sign_data_popover_warning_2": {
+    "message": "Если вас попросили включить эту настройку, возможно, вас пытаются обмануть"
+  },
+  "enable_sign_data_warning": {
+    "message": "Если вы включите эту настройку, вы можете получать запросы подписи, которые не читаемы. Подписывая сообщение, которое вы не понимаете, вы можете согласиться на передачу ваших средств и NFT. Вы подвергаетесь риску фишинговых атак. Защитите себя, отключив signData."
+  },
+  "i_only_sign_what_i_understand": {
+    "message": "Я подписываю только то, что понимаю"
+  },
+  "legacy_address_warning": {
+    "message": "Не рекомендуется использовать legacy адреса, так как это может привести к более высоким комиссиям за транзакции или непреднамеренной блокировке балансов CAT20."
+  },
+  "legacy_address_warning_2": {
+    "message": "Не рекомендуется отправлять транзакции на legacy адреса, так как это может привести к непреднамеренной трате балансов CAT20."
+  },
+  "legacy_address_warning_3": {
+    "message": "Не рекомендуется использовать legacy адреса, так как они могут привести к более высоким комиссиям за транзакции или непреднамеренной блокировке балансов CAT20."
+  },
+  "legacy_address_warning_4": {
+    "message": "Не рекомендуется отправлять транзакции на legacy адреса, так как это может привести к непреднамеренной трате балансов CAT20."
+  },
+  "merge_utxos_for_cat20_asset": {
+    "message": "Объединить UTXO для актива CAT20"
+  },
+  "send_CAT721": {
+    "message": "Отправить CAT721"
+  },
+  "send_cat20": {
+    "message": "Отправить CAT20"
+  },
+  "send_cat20_is_not_supported_for_keystone_yet": {
+    "message": "Отправка CAT20 пока не поддерживается для Keystone"
+  },
+  "send_cat721": {
+    "message": "Отправить CAT721"
+  },
+  "sign_data_request": {
+    "message": "Запрос подписи данных"
+  },
+  "sign_data_requests": {
+    "message": "Запросы signData"
+  },
+  "signdata_required_tip": {
+    "message": "Вам необходимо включить функцию запроса подписи данных (signData) в Настройки -> Расширенные, чтобы продолжить."
+  },
+  "understand_sign_data_warning": {
+    "message": "Я понимаю, что могу потерять все свои средства и NFT, если включу запросы signData."
+  },
+  "you_are_signing_data": {
+    "message": "Вы подписываете данные:"
+  },
+  "receive_address": {
+    "message": "Адрес получения"
+  },
+  "use_this_address_to_receive": {
+    "message": "Используйте этот адрес для получения $unit в $chain"
+  },
+  "rgb_invoice": {
+    "message": "RGB-инвойс"
+  },
+  "paste_rgb_invoice": {
+    "message": "Вставьте RGB-инвойс"
+  },
+  "enter_amount_greater_than_0": {
+    "message": "Введите сумму больше 0."
+  },
+  "select_asset": {
+    "message": "Выберите актив"
+  },
+  "loading_assets": {
+    "message": "Загрузка активов..."
+  },
+  "use_this_invoice_to_receive": {
+    "message": "Используйте этот инвойс для получения $ticker."
+  },
+  "receiving_invoice": {
+    "message": "Инвойс для получения"
+  },
+  "releasing_invoice": {
+    "message": "Освобождение инвойса..."
+  },
+  "release_invoice": {
+    "message": "Освободить инвойс"
+  },
+  "any_amount": {
+    "message": "Любая сумма"
+  },
+  "fixed_amount": {
+    "message": "Фиксированная сумма"
+  },
+  "accept_any_rgb_amount": {
+    "message": "Разрешить отправителю указать сумму."
+  },
+  "set_exact_rgb_amount": {
+    "message": "Задайте точную сумму для этого инвойса."
+  },
+  "pending_blind_invoices": {
+    "message": "Ожидающие blind-инвойсы"
+  },
+  "waiting_counterparty": {
+    "message": "Ожидание контрагента"
+  },
+  "loading_pending_invoices": {
+    "message": "Загрузка ожидающих инвойсов..."
+  },
+  "no_pending_blind_invoices": {
+    "message": "Нет ожидающих blind-инвойсов."
+  },
+  "creating": {
+    "message": "Создание..."
+  },
+  "not_enough_btc_for_rgb_invoice": {
+    "message": "Недостаточно BTC на выбранном адресе для создания RGB-инвойса. Переключите тип адреса, чтобы продолжить."
+  },
+  "create_invoice": {
+    "message": "Создать инвойс"
+  },
+  "rgb_sent": {
+    "message": "RGB отправлен"
+  },
+  "rgb_transfer_submitted": {
+    "message": "Ваш RGB-перевод отправлен."
+  },
+  "settled": {
+    "message": "Подтверждено"
+  },
+  "activity": {
+    "message": "Активность"
+  },
+  "issue": {
+    "message": "Выпуск"
+  },
+  "receive_rgb": {
+    "message": "Получить RGB"
+  },
+  "send_usdt": {
+    "message": "Отправить USDT"
+  },
+  "not_supported_in_this_wallet": {
+    "message": "Не поддерживается в этом кошельке"
+  },
+  "switch_to_hd_wallet": {
+    "message": "Перейти на HD-кошелёк"
+  },
+  "rgb_assets": {
+    "message": "RGB активы"
+  },
+  "pending_rgb_invoices": {
+    "message": "Ожидающие RGB счета"
+  },
+  "issue_asset": {
+    "message": "Выпустить актив"
+  },
+  "issue_rgb_asset": {
+    "message": "Выпустить RGB актив"
+  },
+  "issue_rgb_asset_desc": {
+    "message": "Выпустить новый актив в протоколе RGB."
+  },
+  "review_rgb_asset": {
+    "message": "Проверить RGB актив"
+  },
+  "continue_to_sign": {
+    "message": "Продолжить подписание"
+  },
+  "ticker_label": {
+    "message": "Тикер"
+  },
+  "name_label": {
+    "message": "Название"
+  },
+  "decimal_places_label": {
+    "message": "Десятичные знаки"
+  },
+  "decimal_places_tooltip": {
+    "message": "Десятичные знаки определяют делимость этого актива. Эту настройку нельзя изменить после выпуска."
+  },
+  "ticker_placeholder": {
+    "message": "Рекомендуется 3-6 символов"
+  },
+  "asset_display_name": {
+    "message": "Отображаемое имя актива"
+  },
+  "enter_total_supply": {
+    "message": "Введите общее предложение"
+  },
+  "rgb_send_transaction_unavailable": {
+    "message": "Транзакция отправки RGB недоступна"
+  },
+  "rgb_psbt_signing_missing_result": {
+    "message": "Подписание RGB PSBT не вернуло psbtHex"
+  },
+  "rgb": {
+    "message": "RGB"
+  },
+  "rgb_asset": {
+    "message": "RGB-актив"
+  },
+  "rgb_history": {
+    "message": "История RGB"
+  },
+  "asset_id": {
+    "message": "ID актива"
+  },
+  "precision_rgb": {
+    "message": "Точность"
+  },
+  "issued_supply_rgb": {
+    "message": "Выпущенное предложение"
+  },
+  "schema_rgb": {
+    "message": "Схема"
+  },
+  "protocol_data_unavailable": {
+    "message": "Данные протокола недоступны"
+  },
+  "asset": {
+    "message": "Актив"
+  },
+  "type": {
+    "message": "Тип"
+  },
+  "assignment": {
+    "message": "Назначение"
+  },
+  "endpoint": {
+    "message": "Endpoint"
+  },
+  "issue_rgb20": {
+    "message": "Выпустить RGB20"
+  },
+  "issue_nia_asset": {
+    "message": "Выпустить актив NIA"
+  },
+  "create_rgb_utxo_first": {
+    "message": "Сначала создайте RGB UTXO, затем повторите выпуск."
+  },
+  "create_rgb_utxo": {
+    "message": "Создать RGB UTXO"
+  },
+  "decoded_invoice": {
+    "message": "Декодированный инвойс"
+  },
+  "invalid_rgb_invoice": {
+    "message": "Недействительный RGB-инвойс."
+  },
+  "invoice_asset_mismatch": {
+    "message": "Актив в инвойсе не соответствует этому RGB-токену."
+  },
+  "pending_invoices": {
+    "message": "Ожидающие инвойсы"
+  },
+  "view_all": {
+    "message": "Показать все"
+  },
+  "any_rgb_asset": {
+    "message": "Любой RGB-актив"
+  },
+  "release_invoice_confirm_title": {
+    "message": "Освободить этот инвойс?"
+  },
+  "release_invoice_confirm_description": {
+    "message": "Это освободит зарезервированный UTXO. Инвойс больше не будет доступен."
+  },
+  "keep_invoice": {
+    "message": "Оставить инвойс"
+  },
+  "rgb_transfers": {
+    "message": "Переводы"
+  },
+  "rgb_status_signed": {
+    "message": "Подписано"
+  },
+  "rgb_status_waiting_ack": {
+    "message": "Ожидание подтверждения получателя"
+  },
+  "rgb_amount_locking": {
+    "message": "Заблокировано"
+  },
+  "rgb_locked_balance_hint": {
+    "message": "У вас есть ожидающий перевод. Открыть переводы"
+  },
+  "rgb_status_confirming": {
+    "message": "Ожидание подтверждения транзакции"
+  },
+  "rgb_status_waiting_receive": {
+    "message": "Ожидание публикации транзакции отправителем"
+  },
+  "rgb_transfer_details": {
+    "message": "Сведения о переводе"
+  },
+  "rgb_transfer_id": {
+    "message": "ID перевода"
+  },
+  "rgb_transfer_waiting_ack_description": {
+    "message": "Consignment доставлен. Ожидается подтверждение получателя."
+  },
+  "rgb_transfer_confirming_description": {
+    "message": "Перевод принят и ожидает подтверждения Bitcoin."
+  },
+  "rgb_status_broadcasting": { "message": "Отправка в сеть" },
+  "rgb_status_broadcasted": { "message": "Отправлено в сеть" },
+  "rgb_status_broadcast_failed": { "message": "Не удалось отправить в сеть" },
+  "rgb_cancel_send_confirm_title": { "message": "Отменить этот перевод?" },
+  "rgb_cancel_send_confirm_description": {
+    "message": "Consignment доставлен, но транзакция ещё не отправлена в сеть. Отмена удалит этот ожидающий перевод."
+  },
+  "rgb_cancel_send_acknowledgement": { "message": "Я понимаю, что отмена навсегда удалит этот ожидающий перевод." },
+  "rgb_cancel_send_success": { "message": "Перевод отменён" },
+  "rgb_cancel_send_failed": { "message": "Не удалось отменить перевод" },
+  "rgb_status_pending_accept": { "message": "Ожидается ваше подтверждение" },
+  "rgb_status_confirmed": { "message": "Подтверждено" },
+  "rgb_receive_confirmed_title": { "message": "Платёж получен" },
+  "rgb_receive_confirmed_description": { "message": "Получено $1 $2. Транзакция подтверждена." },
+  "rgb_transfer_broadcasted_title": { "message": "Транзакция отправлена в сеть" },
+  "rgb_transfer_broadcasted_notification": { "message": "Получатель принял $1 $2. Транзакция отправлена в сеть." },
+  "rgb_status_canceled_by_sender": { "message": "Отменено отправителем" },
+  "rgb_status_canceled": { "message": "Отменено" },
+  "rgb_transfer_canceled_description": { "message": "Этот перевод был отменён до отправки в сеть." },
+  "rgb_transfer_canceled_by_sender_description": { "message": "Отправитель отменил этот перевод." },
+  "rgb_accept_transfer": { "message": "Принять" },
+  "rgb_reject_transfer": { "message": "Отклонить" },
+  "rgb_accept_transfer_success": { "message": "Перевод принят" },
+  "rgb_reject_transfer_success": { "message": "Перевод отклонён" },
+  "rgb_accept_transfer_failed": { "message": "Не удалось принять перевод" },
+  "rgb_reject_transfer_failed": { "message": "Не удалось отклонить перевод" },
+  "rgb_transfer_pending_accept_description": { "message": "Проверьте этот перевод и примите или отклоните его." },
+  "rgb_transfer_broadcasting_description": { "message": "Получатель принял перевод. Транзакция отправляется в сеть." },
+  "rgb_transfer_broadcasted_description": {
+    "message": "Получатель принял перевод, и транзакция отправлена в сеть. Ожидание подтверждения в блокчейне."
+  },
+  "rgb_transfer_broadcast_failed_description": {
+    "message": "Получатель принял перевод, но отправка в сеть не удалась. Повторите попытку позже."
+  },
+  "rgb_transfer_broadcast_success": { "message": "Получатель принял перевод. Транзакция отправлена в сеть." },
+  "rgb_retry_broadcast": { "message": "Повторить отправку" },
+  "rgb_retry_broadcast_failed": { "message": "Не удалось отправить транзакцию в сеть" }
 }
