@@ -359,7 +359,18 @@ export class RgbService {
   }
 
   getPendingReceiveHistory() {
-    return this.requireState().pendingReceiveHistory || []
+    const state = this.requireState()
+    const receives = state.pendingReceives || []
+    return (state.pendingReceiveHistory || []).map(item => {
+      if (item.assetId && item.amount) return item
+      const recipientId = item.transferId.replace(/^receive:/, '')
+      const receive = receives.find(candidate => candidate.recipientId === recipientId)
+      const assetId =
+        receive?.receivedConsignment?.assetId ?? receive?.pendingAccept?.assetId ?? receive?.assetId
+      const amount =
+        receive?.receivedConsignment?.amount ?? receive?.pendingAccept?.amount ?? receive?.amount
+      return { ...item, ...(assetId ? { assetId } : {}), ...(amount ? { amount } : {}) }
+    })
   }
 
   getPendingUtxoSync() {
@@ -926,10 +937,19 @@ export class RgbService {
     const state = this.requireState()
     const pendingReceiveHistory = state.pendingReceiveHistory || (state.pendingReceiveHistory = [])
     const transferId = `receive:${receive.recipientId}`
+    // Any Asset / Any Amount invoices intentionally omit these constraints.
+    // After acceptance pendingAccept is removed, so use the durable receipt
+    // which records the values actually offered by the sender.
+    const assetId =
+      receive.receivedConsignment?.assetId ?? receive.pendingAccept?.assetId ?? receive.assetId
+    const amount =
+      receive.receivedConsignment?.amount ?? receive.pendingAccept?.amount ?? receive.amount
     const existing = pendingReceiveHistory.find(item => item.transferId === transferId)
     if (existing) {
       existing.status = status
       existing.txid = txid || existing.txid
+      if (assetId) existing.assetId = assetId
+      if (amount) existing.amount = amount
       existing.counterpartyScriptPubKeys =
         existing.counterpartyScriptPubKeys ||
         receive.pendingAccept?.counterpartyScriptPubKeys ||
@@ -938,8 +958,8 @@ export class RgbService {
     }
     pendingReceiveHistory.push({
       transferId,
-      assetId: receive.assetId || receive.pendingAccept?.assetId || '',
-      amount: receive.amount || receive.pendingAccept?.amount || '',
+      assetId: assetId || '',
+      amount: amount || '',
       txid,
       createdAt:
         receive.receivedConsignment?.receivedAt ||
@@ -1773,6 +1793,8 @@ function normalizeStateAssetIds(state: RgbServiceState): RgbServiceState {
   state.pendingReceives?.forEach(receive => {
     if (receive.assetId) receive.assetId = normalizeAssetId(receive.assetId)
     if (receive.pendingAccept) receive.pendingAccept.assetId = normalizeAssetId(receive.pendingAccept.assetId)
+    if (receive.receivedConsignment?.assetId)
+      receive.receivedConsignment.assetId = normalizeAssetId(receive.receivedConsignment.assetId)
   })
   state.pendingReceiveHistory?.forEach(item => (item.assetId = normalizeAssetId(item.assetId)))
   state.pendingSendHistory?.forEach(item => (item.assetId = normalizeAssetId(item.assetId)))

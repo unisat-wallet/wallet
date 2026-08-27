@@ -992,6 +992,37 @@ describe('RgbService', () => {
     })
   })
 
+  it('records the actual asset and amount for an accepted Any Asset invoice', async () => {
+    const dependencies = createDependencies()
+    const service = new RgbService(dependencies)
+    await service.open(wallet)
+    const receive = {
+      invoice: rgbInvoice(),
+      recipientId: 'any-asset-recipient',
+      createdAt: 1,
+      seal: { txid: 'a'.repeat(64), vout: 0, blinding: 1n },
+      receivedConsignment: {
+        txid: 'c'.repeat(64),
+        receivedAt: 2,
+        assetId: 'rgb:received-asset',
+        amount: '125',
+        accepted: true,
+      },
+    }
+    ;(service as any).state.pendingReceives = [receive]
+    ;(service as any).recordReceiveOutcome(receive, 'settled', 'c'.repeat(64))
+
+    expect(service.getPendingReceiveHistory()).toEqual([
+      expect.objectContaining({ assetId: 'rgb:received-asset', amount: '125' }),
+    ])
+    ;(service as any).state.pendingReceiveHistory[0].assetId = ''
+    ;(service as any).state.pendingReceiveHistory[0].amount = ''
+
+    expect(service.getPendingReceiveHistory()).toEqual([
+      expect.objectContaining({ assetId: 'rgb:received-asset', amount: '125' }),
+    ])
+  })
+
   it('settles an accepted receive from its persisted consignment when the proxy is unavailable', async () => {
     const dependencies = createDependencies()
     dependencies.transport.getConsignment = vi.fn()
