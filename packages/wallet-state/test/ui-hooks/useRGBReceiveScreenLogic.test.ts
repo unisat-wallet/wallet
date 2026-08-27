@@ -2,10 +2,25 @@ import { act, renderHook, waitFor } from '@testing-library/react'
 import { describe, expect, it } from 'vitest'
 
 import { accountActions } from '../../src/reducers/accounts'
-import { useRGBReceiveScreenLogic } from '../../src/ui-hooks/useRGBReceiveScreenLogic'
+import {
+  isCancelableRgbPendingInvoice,
+  useRGBReceiveScreenLogic,
+} from '../../src/ui-hooks/useRGBReceiveScreenLogic'
 import { createHookTestHarness } from './testHelpers'
 
 describe('useRGBReceiveScreenLogic', () => {
+  it('does not offer release for an accepted receipt awaiting settlement', () => {
+    expect(
+      isCancelableRgbPendingInvoice({
+        invoice: 'rgb:invoice',
+        kind: 'ReceiveBlind',
+        status: 'WaitingCounterparty',
+        batchTransferIdx: 0,
+        canCancel: false,
+      })
+    ).toBe(false)
+  })
+
   it('only shows a fixed amount error after the user enters an invalid amount', async () => {
     const assetId = 'rgb:test-asset'
     const { wrapper } = createHookTestHarness({

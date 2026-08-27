@@ -54,6 +54,8 @@ export class RgbService {
   private syncInFlight?: Promise<RgbWalletSnapshot>
   private pendingTransferSyncInFlight?: Promise<void>
   private prepareSendInFlight?: Promise<void>
+  /** Serialize mutation of each durable send state machine. */
+  private readonly pendingTransferOperations = new Map<string, Promise<void>>()
   private openedFromStorage = false
   private recoveryBackupEnabled = false
 
@@ -162,22 +164,26 @@ export class RgbService {
 
   private async advancePendingTransfers() {
     const state = this.requireState()
-    for (const [transferId, pending] of Object.entries(state.pending)) {
-      try {
-        if (pending.broadcast) await this.syncBroadcastedTransfer(transferId, pending)
-        else if (pending.delivery) await this.advancePendingDelivery(transferId, pending)
-      } catch (error) {
-        // A delivery awaiting its recipient is a durable local state, not a
-        // wallet-wide sync failure. A rejection has already removed its
-        // pending transfer and recorded history, so later work can continue too.
-        if (
-          error instanceof RgbTransferAwaitingAckError ||
-          error instanceof RgbTransferRejectedError
-        ) {
-          continue
+    for (const transferId of Object.keys(state.pending)) {
+      await this.runPendingTransferOperation(transferId, async () => {
+        const pending = state.pending[transferId]
+        if (!pending) return
+        try {
+          if (pending.broadcast) await this.syncBroadcastedTransfer(transferId, pending)
+          else if (pending.delivery) await this.advancePendingDelivery(transferId, pending)
+        } catch (error) {
+          // A delivery awaiting its recipient is a durable local state, not a
+          // wallet-wide sync failure. A rejection has already removed its
+          // pending transfer and recorded history, so later work can continue too.
+          if (
+            error instanceof RgbTransferAwaitingAckError ||
+            error instanceof RgbTransferRejectedError
+          ) {
+            return
+          }
+          throw error
         }
-        throw error
-      }
+      })
     }
   }
 
@@ -242,7 +248,8 @@ export class RgbService {
       item =>
         !item.expirationTimestamp ||
         item.expirationTimestamp > now ||
-        item.receivedConsignment?.accepted === true
+        item.receivedConsignment?.accepted === true ||
+        item.receivedConsignment?.acknowledgementPending === true
     )
   }
 
@@ -424,6 +431,26 @@ export class RgbService {
       endpoint?: string
     }> = [...received, ...proxyReceived]
     const pending = state.pendingReceives || []
+    // Once ACK intent is durable, the consignment itself is a local receipt.
+    // Prefer it over refetching from transport so proxy cleanup or an
+    // extension restart cannot prevent acknowledgement or chain settlement.
+    const localReceipts = pending.flatMap(receive => {
+      const receipt = receive.receivedConsignment
+      return (receipt?.accepted || receipt?.acknowledgementPending) && receipt.payload
+        ? [
+            {
+              recipientId: receive.recipientId,
+              payload: receipt.payload,
+              txid: receipt.txid,
+              endpoint: receipt.endpoint,
+            },
+          ]
+        : []
+    })
+    const receivedByRecipient = new Map(
+      [...receivedItems, ...localReceipts].map(item => [item.recipientId, item])
+    )
+    const itemsToProcess = [...receivedByRecipient.values()]
     let count = 0
     let changed = false
     let snapshotRequired = false
@@ -439,7 +466,7 @@ export class RgbService {
       changed = true
     }
 
-    for (const item of receivedItems) {
+    for (const item of itemsToProcess) {
       const receiveIndex = pending.findIndex(receive => receive.recipientId === item.recipientId)
       if (receiveIndex < 0) continue
       const receive = pending[receiveIndex]!
@@ -454,8 +481,46 @@ export class RgbService {
         const metadataChanged = this.queueAssetMetadata(match.assetId, match.decoded.metadata)
         changed = metadataChanged || changed
 
-        // Sender already signaled cancel on the proxy (ack=false).
-        if (await this.isProxyAckRejected(receive, item.endpoint)) {
+        // The proxy may have accepted ACK immediately before an extension
+        // shutdown. Reconcile that durable local intent before treating any
+        // missing proxy payload as sender cancellation.
+        if (receive.receivedConsignment?.acknowledgementPending) {
+          const acknowledgement = await this.getProxyAcknowledgement(receive, item.endpoint)
+          if (acknowledgement === true) {
+            receive.receivedConsignment.accepted = true
+            delete receive.receivedConsignment.acknowledgementPending
+            delete receive.pendingAccept
+            changed = true
+          } else if (acknowledgement === undefined) {
+            // The durable intent makes ACK retries safe. A request failure is
+            // not evidence of sender cancellation, so leave the receipt for
+            // the next polling cycle without sending a compensating NACK.
+            try {
+              await this.acknowledgeProxyConsignment(item, true)
+            } catch {
+              continue
+            }
+            receive.receivedConsignment.accepted = true
+            delete receive.receivedConsignment.acknowledgementPending
+            delete receive.pendingAccept
+            changed = true
+          } else {
+            this.recordReceiveOutcome(receive, 'canceled', match.txid)
+            pending.splice(receiveIndex, 1)
+            changed = true
+            continue
+          }
+        }
+
+        // Sender cancellation only applies before acceptance. Once the user
+        // ACKs, the sender may have broadcast already, so the local receipt
+        // must be retained until chain settlement even if the proxy later
+        // reports ack=false.
+        if (
+          !receive.receivedConsignment?.accepted &&
+          !receive.receivedConsignment?.acknowledgementPending &&
+          (await this.isProxyAckRejected(receive, item.endpoint))
+        ) {
           this.recordReceiveOutcome(receive, 'canceled', match.txid)
           pending.splice(receiveIndex, 1)
           changed = true
@@ -523,7 +588,10 @@ export class RgbService {
     if (!receive?.pendingAccept) {
       throw new RgbServiceError(`RGB receive ${recipientId} is not awaiting acceptance`)
     }
-    if (await this.isReceiveCanceledBySender(receive)) {
+    if (
+      !receive.receivedConsignment?.acknowledgementPending &&
+      (await this.isReceiveCanceledBySender(receive))
+    ) {
       this.recordReceiveOutcome(receive, 'canceled', receive.pendingAccept.txid)
       state.pendingReceives = pending.filter(item => item.recipientId !== recipientId)
       await this.persist()
@@ -536,13 +604,40 @@ export class RgbService {
       txid: receive.pendingAccept.txid,
       endpoint: receive.pendingAccept.endpoint,
     }
-    await this.acknowledgeProxyConsignment(item, true)
-    receive.receivedConsignment = {
-      txid: receive.pendingAccept.txid,
-      receivedAt: this.now(),
-      accepted: true,
-      counterpartyScriptPubKeys: receive.pendingAccept.counterpartyScriptPubKeys,
+    const acknowledgementWasPending = receive.receivedConsignment?.acknowledgementPending === true
+    if (!acknowledgementWasPending) {
+      // Persist the local receipt before ACK. If the extension stops after
+      // the proxy accepts it, recovery can reconcile ACK=true without losing
+      // the payload needed for settlement.
+      receive.receivedConsignment = {
+        txid: receive.pendingAccept.txid,
+        receivedAt: this.now(),
+        acknowledgementPending: true,
+        payload: receive.pendingAccept.payload,
+        endpoint: receive.pendingAccept.endpoint,
+        counterpartyScriptPubKeys: receive.pendingAccept.counterpartyScriptPubKeys,
+      }
+      await this.persist({ waitForRecovery: true })
     }
+    if (acknowledgementWasPending) {
+      const acknowledgement = await this.getProxyAcknowledgement(receive, item.endpoint)
+      if (acknowledgement === true) {
+        receive.receivedConsignment!.accepted = true
+        delete receive.receivedConsignment!.acknowledgementPending
+        delete receive.pendingAccept
+        await this.persist({ waitForRecovery: true })
+        return { accepted: true, status: 'accepted' as const }
+      }
+      if (acknowledgement === false) {
+        this.recordReceiveOutcome(receive, 'canceled', receive.pendingAccept.txid)
+        state.pendingReceives = pending.filter(item => item.recipientId !== recipientId)
+        await this.persist()
+        return { accepted: false, status: 'canceled' as const }
+      }
+    }
+    await this.acknowledgeProxyConsignment(item, true)
+    receive.receivedConsignment!.accepted = true
+    delete receive.receivedConsignment!.acknowledgementPending
     delete receive.pendingAccept
     await this.persist({ waitForRecovery: true })
 
@@ -561,8 +656,13 @@ export class RgbService {
     if (!pendingAccept && !receive.receivedConsignment) {
       throw new RgbServiceError(`RGB receive ${recipientId} is not awaiting acceptance`)
     }
-    // After accept, rejection is no longer available — transfer is already ACKed.
-    if (receive.receivedConsignment && !pendingAccept) {
+    // Once ACK intent is durable, the proxy may already have accepted it and
+    // allowed the sender to broadcast. Rejecting or releasing it would discard
+    // the receipt required for settlement.
+    if (
+      receive.receivedConsignment?.accepted ||
+      receive.receivedConsignment?.acknowledgementPending
+    ) {
       throw new RgbServiceError(`RGB receive ${recipientId} was already accepted`)
     }
 
@@ -806,7 +906,12 @@ export class RgbService {
     // Acceptance ACKs the consignment and allows the sender to broadcast. The
     // local record is then the durable receipt needed to settle the allocation,
     // so it cannot be released as an unused invoice.
-    if (receives[index]!.receivedConsignment?.accepted) return { cancelled: false }
+    if (
+      receives[index]!.receivedConsignment?.accepted ||
+      receives[index]!.receivedConsignment?.acknowledgementPending
+    ) {
+      return { cancelled: false }
+    }
     receives.splice(index, 1)
     await this.persist()
     return { cancelled: true }
@@ -971,6 +1076,15 @@ export class RgbService {
   }
 
   async completeSend(transferId: string, signedPsbt: string): Promise<RgbCompletedTransfer> {
+    return this.runPendingTransferOperation(transferId, () =>
+      this.completeSendOnce(transferId, signedPsbt)
+    )
+  }
+
+  private async completeSendOnce(
+    transferId: string,
+    signedPsbt: string
+  ): Promise<RgbCompletedTransfer> {
     const state = this.requireState()
     const pending = state.pending[transferId]
     if (!pending) throw new RgbServiceError(`RGB transfer ${transferId} does not exist`)
@@ -992,12 +1106,19 @@ export class RgbService {
   }
 
   async abortSend(transferId: string) {
+    return this.runPendingTransferOperation(transferId, () => this.abortSendOnce(transferId))
+  }
+
+  private async abortSendOnce(transferId: string) {
     const state = this.requireState()
     const pending = state.pending[transferId]
     if (!pending) return { aborted: false }
     // Allow cancel until the Bitcoin transaction is broadcast. Consignment
     // delivery alone is still off-chain and can be discarded by the sender.
-    if (pending.broadcast) return { aborted: false }
+    // An acknowledged consignment is committed to the receiver and is about
+    // to be broadcast. It is no longer safe to signal cancellation, including
+    // while the broadcast request itself is in flight.
+    if (pending.broadcast || pending.delivery?.acknowledgedAt) return { aborted: false }
 
     // Best-effort cancel signal: post ACK=false on the proxy so the receiver
     // can surface "Canceled by sender" instead of waiting forever.
@@ -1154,11 +1275,18 @@ export class RgbService {
     if (!getConsignment) return []
     return (
       await Promise.all(
-        this.getPendingReceives().map(async receive => {
-          const endpoints = decodeRgbInvoice(receive.invoice).transportEndpoints
-          if (!endpoints.length) return undefined
-          return getConsignment({ recipientId: receive.recipientId, endpoints })
-        })
+        this.getPendingReceives()
+          .filter(
+            receive =>
+              (!receive.receivedConsignment?.accepted &&
+                !receive.receivedConsignment?.acknowledgementPending) ||
+              !receive.receivedConsignment.payload
+          )
+          .map(async receive => {
+            const endpoints = decodeRgbInvoice(receive.invoice).transportEndpoints
+            if (!endpoints.length) return undefined
+            return getConsignment({ recipientId: receive.recipientId, endpoints })
+          })
       )
     ).filter((item): item is NonNullable<typeof item> => !!item)
   }
@@ -1173,6 +1301,22 @@ export class RgbService {
       endpoints: [item.endpoint],
       acknowledged,
     })
+  }
+
+  private runPendingTransferOperation<T>(transferId: string, operation: () => Promise<T>) {
+    const previous = this.pendingTransferOperations.get(transferId) || Promise.resolve()
+    const current = previous.catch(() => undefined).then(operation)
+    const settled = current.then(
+      () => undefined,
+      () => undefined
+    )
+    this.pendingTransferOperations.set(transferId, settled)
+    void settled.then(() => {
+      if (this.pendingTransferOperations.get(transferId) === settled) {
+        this.pendingTransferOperations.delete(transferId)
+      }
+    })
+    return current
   }
 
   private selectUtxos(assetId: string, amount: string) {

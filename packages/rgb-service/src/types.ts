@@ -187,12 +187,18 @@ export interface RgbPendingReceive {
   }
   /** Recently rejected consignments, retained so delayed proxy responses are ignored. */
   rejectedConsignmentTxids?: string[]
-  /** Set only after the receiver explicitly accepts the consignment. */
+  /** Local receipt retained while acknowledgement and settlement are finalized. */
   receivedConsignment?: {
     txid: string
     receivedAt: number
     /** True only after acceptReceive(); missing on older auto-accepted state. */
     accepted?: boolean
+    /** ACK intent was durably recorded before the proxy acknowledgement request. */
+    acknowledgementPending?: boolean
+    /** Validated payload retained so settlement survives proxy cleanup or restart. */
+    payload?: string
+    /** Proxy endpoint which supplied the validated payload. */
+    endpoint?: string
     /** Set when the sender's Bitcoin transaction is visible in the chain source. */
     broadcastDetectedAt?: number
     counterpartyScriptPubKeys?: string[]

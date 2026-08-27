@@ -24,6 +24,7 @@ export type RgbPendingReceiveInvoice = {
   status?: string
   kind?: string
   transferKind?: string
+  canCancel?: boolean
   batchTransferIdx?: number
   expirationTimestamp?: number
   createdAt?: number
@@ -43,6 +44,10 @@ type RgbPendingReceiveInvoicesResult = {
   [key: string]: unknown
 }
 
+type RgbCancelReceiveInvoiceResult = {
+  changed: boolean
+}
+
 type RgbAllocationWallet = {
   getRgbAllocationSummary(params?: { skipSync?: boolean }): Promise<RgbAllocationSummary>
 }
@@ -58,7 +63,7 @@ type RgbReceiveWallet = {
   cancelRgbReceiveInvoice(params: {
     batchTransferIdx: number
     skipSync?: boolean
-  }): Promise<unknown>
+  }): Promise<RgbCancelReceiveInvoiceResult>
 }
 
 type RGBReceiveRouteState = {
@@ -252,6 +257,7 @@ export const isCancelableRgbPendingInvoice = (item?: RgbPendingReceiveInvoice) =
   const status = String(item.status || '').toLowerCase()
   return (
     type === 'receiveblind' &&
+    item.canCancel !== false &&
     ['waitingconfirmations', 'waitingcounterparty'].includes(status) &&
     getRgbBatchTransferIdx(item) !== undefined
   )
@@ -619,12 +625,16 @@ export function useRGBReceiveScreenLogic() {
     setCancelLoading(true)
     setError('')
     try {
-      await rgbWallet.cancelRgbReceiveInvoice({
+      const result = await rgbWallet.cancelRgbReceiveInvoice({
         batchTransferIdx,
         skipSync: false,
       })
       await loadPendingInvoices()
       await rgbWallet.getRgbAllocationSummary({ skipSync: false })
+      // The service can refuse a stale release request after a consignment is
+      // accepted. Keep the refreshed selection visible instead of presenting
+      // that as a successful invoice removal.
+      if (!result.changed) return
       setInvoice('')
       setSelectedPendingInvoice(undefined)
       setStep('pending_invoices')

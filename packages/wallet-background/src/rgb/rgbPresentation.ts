@@ -19,9 +19,10 @@ export function toPublicRgbPendingReceiveInvoice(
     invoice: string
     recipientId: string
     assetId?: string
-    amount?: string
-    expirationTimestamp?: number
-    createdAt?: number
+  amount?: string
+  expirationTimestamp?: number
+  createdAt?: number
+  receivedConsignment?: { accepted?: boolean; acknowledgementPending?: boolean }
   },
   batchTransferIdx?: number,
   status: 'WaitingConfirmations' | 'WaitingCounterparty' = 'WaitingCounterparty'
@@ -37,6 +38,9 @@ export function toPublicRgbPendingReceiveInvoice(
     ...(item.createdAt === undefined ? {} : { createdAt: item.createdAt }),
     kind: 'ReceiveBlind',
     status,
+    canCancel:
+      item.receivedConsignment?.accepted !== true &&
+      item.receivedConsignment?.acknowledgementPending !== true,
     ...(batchTransferIdx === undefined ? {} : { batchTransferIdx }),
   }
 }

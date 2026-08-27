@@ -133,7 +133,36 @@ export class RgbTransferQuery {
       to: this.dependencies.getInvoiceDestination(send.invoice, networkType),
     }))
     const localReceives = service.getPendingReceives().flatMap(receive => {
-      const awaitingAccept = !!receive.pendingAccept && !receive.receivedConsignment?.accepted
+      const receivedConsignment = receive.receivedConsignment
+      const acknowledgementPending =
+        (receivedConsignment as { acknowledgementPending?: boolean } | undefined)
+          ?.acknowledgementPending === true
+      // ACK intent is durable and cannot be rejected. Show it as waiting for
+      // the sender rather than exposing the pending-accept actions again.
+      if (receivedConsignment && acknowledgementPending) {
+        return [
+          {
+            id: `local-receive:${receive.recipientId}`,
+            transferId: receive.recipientId,
+            assetId: receive.pendingAccept?.assetId ?? receive.assetId,
+            type: 'receive' as const,
+            amount: receive.pendingAccept?.amount || receive.amount,
+            txid: receivedConsignment.txid,
+            timestamp: receivedConsignment.receivedAt,
+            status: 'waiting_receive',
+            local: true,
+            from: this.dependencies.getCounterpartyAddress(
+              receive.pendingAccept?.counterpartyScriptPubKeys?.length
+                ? receive.pendingAccept.counterpartyScriptPubKeys
+                : receivedConsignment.counterpartyScriptPubKeys,
+              networkType,
+              wallet.fundingAddress
+            ),
+            to: wallet.fundingAddress,
+          },
+        ]
+      }
+      const awaitingAccept = !!receive.pendingAccept && !receivedConsignment?.accepted
       if (awaitingAccept && receive.pendingAccept) {
         return [
           {
@@ -158,7 +187,6 @@ export class RgbTransferQuery {
           },
         ]
       }
-      const receivedConsignment = receive.receivedConsignment
       if (!receivedConsignment?.accepted) {
         if (!receivedConsignment) return []
         return [

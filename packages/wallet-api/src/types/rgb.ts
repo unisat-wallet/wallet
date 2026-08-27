@@ -291,6 +291,8 @@ export interface RgbPendingReceiveInvoice {
   status?: string
   kind?: string
   transferKind?: string
+  /** False once the receiver has accepted a consignment awaiting settlement. */
+  canCancel?: boolean
   batchTransferIdx?: number
   expirationTimestamp?: number
   createdAt?: number

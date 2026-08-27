@@ -233,7 +233,27 @@ describe('RGB wallet references', () => {
       batchTransferIdx: 0,
       kind: 'ReceiveBlind',
       status: 'WaitingCounterparty',
+      canCancel: true,
     })
+  })
+
+  it('marks accepted receipts as not releasable without exposing their blind seal', () => {
+    const result = toPublicRgbPendingReceiveInvoice(
+      {
+        invoice: 'rgb:invoice',
+        recipientId: 'recipient-id',
+        seal: {
+          txid: '11'.repeat(32),
+          vout: 0,
+          blinding: 1n,
+        },
+        receivedConsignment: { accepted: true },
+      },
+      0
+    )
+
+    expect(result).toMatchObject({ canCancel: false, batchTransferIdx: 0 })
+    expect(result).not.toHaveProperty('seal')
   })
 
   it('marks invoices backed by unconfirmed funding UTXOs as waiting for confirmation', () => {
@@ -1204,6 +1224,24 @@ describe('RGB wallet references', () => {
           },
         },
         {
+          recipientId: 'ack-intent',
+          assetId: 'rgb:asset',
+          amount: '6',
+          createdAt: 94,
+          pendingAccept: {
+            payload: 'consignment',
+            txid: 'a'.repeat(64),
+            assetId: 'rgb:asset',
+            amount: '6',
+            discoveredAt: 94,
+          },
+          receivedConsignment: {
+            txid: 'a'.repeat(64),
+            receivedAt: 94,
+            acknowledgementPending: true,
+          },
+        },
+        {
           recipientId: 'received-consignment',
           assetId: 'rgb:asset',
           amount: '3',
@@ -1260,6 +1298,11 @@ describe('RGB wallet references', () => {
         id: 'local-receive:pending-accept',
         status: 'pending_accept',
         amount: '5',
+      }),
+      expect.objectContaining({
+        id: 'local-receive:ack-intent',
+        status: 'waiting_receive',
+        amount: '6',
       }),
       expect.objectContaining({
         id: 'local-receive:accepted-unbroadcast',

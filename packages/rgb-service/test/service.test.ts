@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
 import type {
+  RgbCompletedTransfer,
   RgbServiceDependencies,
   RgbValidationHistory,
   RgbWalletRef,
@@ -754,6 +755,327 @@ describe('RgbService', () => {
     expect(dependencies.transport.getAcknowledgement).toHaveBeenCalledTimes(1)
     expect(dependencies.transport.acknowledgeConsignment).toHaveBeenCalledTimes(1)
     expect(processClaimedReceives).not.toHaveBeenCalled()
+    expect((service as any).state.pendingReceives[0].receivedConsignment).toMatchObject({
+      accepted: true,
+      payload: 'consignment',
+      endpoint: proxyEndpoint,
+    })
+  })
+
+  it('settles an accepted receive from its persisted consignment when the proxy is unavailable', async () => {
+    const dependencies = createDependencies()
+    dependencies.transport.getConsignment = vi.fn()
+    const service = new RgbService(dependencies)
+    await service.open(wallet)
+    ;(service as any).state.pendingReceives = [
+      {
+        invoice: rgbInvoice(),
+        recipientId: 'recipient',
+        assetId: 'rgb:asset',
+        amount: '60',
+        createdAt: 1,
+        seal: { txid: 'a'.repeat(64), vout: 0, blinding: 1n },
+        receivedConsignment: {
+          txid: 'c'.repeat(64),
+          receivedAt: 1,
+          accepted: true,
+          payload: 'consignment',
+          endpoint: proxyEndpoint,
+        },
+      },
+    ]
+    ;(service as any).validateIncomingConsignment = vi.fn().mockReturnValue({
+      assetId: 'rgb:asset',
+      amount: '60',
+      txid: 'c'.repeat(64),
+      decoded: {
+        metadata: {
+          ticker: 'TOK',
+          name: 'Token',
+          precision: 0,
+          schema: 'NIA',
+          issuedSupply: '60',
+        },
+      },
+    })
+    const advanceAcceptedReceive = vi
+      .spyOn(service as any, 'advanceAcceptedReceive')
+      .mockResolvedValue(false)
+
+    await service.processClaimedReceives({ includeClaimed: false })
+
+    expect(dependencies.transport.getConsignment).not.toHaveBeenCalled()
+    expect(advanceAcceptedReceive).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ payload: 'consignment' }),
+      expect.anything(),
+      false
+    )
+  })
+
+  it('reconciles a persisted ACK intent after restart without requiring the proxy payload', async () => {
+    const dependencies = createDependencies()
+    dependencies.transport.getConsignment = vi.fn()
+    dependencies.transport.getAcknowledgement = vi.fn().mockResolvedValue(true)
+    const service = new RgbService(dependencies)
+    await service.open(wallet)
+    ;(service as any).state.pendingReceives = [
+      {
+        invoice: rgbInvoice(),
+        recipientId: 'recipient',
+        assetId: 'rgb:asset',
+        amount: '60',
+        createdAt: 1,
+        seal: { txid: 'a'.repeat(64), vout: 0, blinding: 1n },
+        pendingAccept: {
+          payload: 'consignment',
+          txid: 'c'.repeat(64),
+          endpoint: proxyEndpoint,
+          assetId: 'rgb:asset',
+          amount: '60',
+          discoveredAt: 1,
+        },
+        receivedConsignment: {
+          txid: 'c'.repeat(64),
+          receivedAt: 1,
+          acknowledgementPending: true,
+          payload: 'consignment',
+          endpoint: proxyEndpoint,
+        },
+      },
+    ]
+    ;(service as any).validateIncomingConsignment = vi.fn().mockReturnValue({
+      assetId: 'rgb:asset',
+      amount: '60',
+      txid: 'c'.repeat(64),
+      decoded: {
+        metadata: {
+          ticker: 'TOK',
+          name: 'Token',
+          precision: 0,
+          schema: 'NIA',
+          issuedSupply: '60',
+        },
+      },
+    })
+    const advanceAcceptedReceive = vi
+      .spyOn(service as any, 'advanceAcceptedReceive')
+      .mockResolvedValue(false)
+
+    await service.processClaimedReceives({ includeClaimed: false })
+
+    const receipt = (service as any).state.pendingReceives[0].receivedConsignment
+    expect(dependencies.transport.getConsignment).not.toHaveBeenCalled()
+    expect(receipt).toMatchObject({ accepted: true, payload: 'consignment' })
+    expect(receipt).not.toHaveProperty('acknowledgementPending')
+    expect((service as any).state.pendingReceives[0]).not.toHaveProperty('pendingAccept')
+    expect(advanceAcceptedReceive).toHaveBeenCalled()
+  })
+
+  it('retries a persisted ACK intent when the proxy acknowledgement is unavailable', async () => {
+    const dependencies = createDependencies()
+    dependencies.transport.getConsignment = vi.fn()
+    dependencies.transport.getAcknowledgement = vi.fn().mockResolvedValue(undefined)
+    dependencies.transport.acknowledgeConsignment = vi.fn().mockResolvedValue(undefined)
+    const service = new RgbService(dependencies)
+    await service.open(wallet)
+    ;(service as any).state.pendingReceives = [
+      {
+        invoice: rgbInvoice(),
+        recipientId: 'recipient',
+        assetId: 'rgb:asset',
+        amount: '60',
+        createdAt: 1,
+        seal: { txid: 'a'.repeat(64), vout: 0, blinding: 1n },
+        pendingAccept: {
+          payload: 'consignment',
+          txid: 'c'.repeat(64),
+          endpoint: proxyEndpoint,
+          assetId: 'rgb:asset',
+          amount: '60',
+          discoveredAt: 1,
+        },
+        receivedConsignment: {
+          txid: 'c'.repeat(64),
+          receivedAt: 1,
+          acknowledgementPending: true,
+          payload: 'consignment',
+          endpoint: proxyEndpoint,
+        },
+      },
+    ]
+    ;(service as any).validateIncomingConsignment = vi.fn().mockReturnValue({
+      assetId: 'rgb:asset',
+      amount: '60',
+      txid: 'c'.repeat(64),
+      decoded: {
+        metadata: {
+          ticker: 'TOK',
+          name: 'Token',
+          precision: 0,
+          schema: 'NIA',
+          issuedSupply: '60',
+        },
+      },
+    })
+    const advanceAcceptedReceive = vi
+      .spyOn(service as any, 'advanceAcceptedReceive')
+      .mockResolvedValue(false)
+
+    await service.processClaimedReceives({ includeClaimed: false })
+
+    expect(dependencies.transport.acknowledgeConsignment).toHaveBeenCalledWith({
+      recipientId: 'recipient',
+      endpoints: [proxyEndpoint],
+      acknowledged: true,
+    })
+    expect((service as any).state.pendingReceives[0].receivedConsignment).toMatchObject({
+      accepted: true,
+      payload: 'consignment',
+    })
+    expect((service as any).state.pendingReceives[0].receivedConsignment).not.toHaveProperty(
+      'acknowledgementPending'
+    )
+    expect(advanceAcceptedReceive).toHaveBeenCalled()
+  })
+
+  it('keeps ACK intent when retrying the proxy acknowledgement fails', async () => {
+    const dependencies = createDependencies()
+    dependencies.transport.getConsignment = vi.fn()
+    dependencies.transport.getAcknowledgement = vi.fn().mockResolvedValue(undefined)
+    dependencies.transport.acknowledgeConsignment = vi.fn().mockRejectedValue(new Error('proxy unavailable'))
+    const service = new RgbService(dependencies)
+    await service.open(wallet)
+    ;(service as any).state.pendingReceives = [
+      {
+        invoice: rgbInvoice(),
+        recipientId: 'recipient',
+        assetId: 'rgb:asset',
+        amount: '60',
+        createdAt: 1,
+        seal: { txid: 'a'.repeat(64), vout: 0, blinding: 1n },
+        pendingAccept: {
+          payload: 'consignment',
+          txid: 'c'.repeat(64),
+          endpoint: proxyEndpoint,
+          assetId: 'rgb:asset',
+          amount: '60',
+          discoveredAt: 1,
+        },
+        receivedConsignment: {
+          txid: 'c'.repeat(64),
+          receivedAt: 1,
+          acknowledgementPending: true,
+          payload: 'consignment',
+          endpoint: proxyEndpoint,
+        },
+      },
+    ]
+    ;(service as any).validateIncomingConsignment = vi.fn().mockReturnValue({
+      assetId: 'rgb:asset',
+      amount: '60',
+      txid: 'c'.repeat(64),
+      decoded: {
+        metadata: {
+          ticker: 'TOK',
+          name: 'Token',
+          precision: 0,
+          schema: 'NIA',
+          issuedSupply: '60',
+        },
+      },
+    })
+
+    await service.processClaimedReceives({ includeClaimed: false })
+
+    expect((service as any).state.pendingReceives[0].receivedConsignment).toMatchObject({
+      acknowledgementPending: true,
+      payload: 'consignment',
+    })
+    expect((service as any).state.pendingReceives[0]).toHaveProperty('pendingAccept')
+  })
+
+  it('persists receive ACK intent before acknowledging the proxy', async () => {
+    const dependencies = createDependencies()
+    let persistedAckIntent = false
+    const stored = new Map<string, unknown>()
+    dependencies.storage = {
+      get: async <T>(key: string) => stored.get(key) as T | undefined,
+      set: async <T>(key: string, value: T) => {
+        const receives = (value as any).pendingReceives || []
+        persistedAckIntent = receives.some(
+          (receive: any) => receive.receivedConsignment?.acknowledgementPending === true
+        )
+        stored.set(key, value)
+      },
+      remove: async key => void stored.delete(key),
+    }
+    dependencies.transport.acknowledgeConsignment = vi.fn().mockImplementation(async () => {
+      expect(persistedAckIntent).toBe(true)
+    })
+    const service = new RgbService(dependencies)
+    await service.open(wallet)
+    ;(service as any).state.pendingReceives = [
+      {
+        invoice: rgbInvoice(),
+        recipientId: 'recipient',
+        assetId: 'rgb:asset',
+        amount: '60',
+        createdAt: 1,
+        seal: { txid: 'a'.repeat(64), vout: 0, blinding: 1n },
+        pendingAccept: {
+          payload: 'consignment',
+          txid: 'c'.repeat(64),
+          endpoint: proxyEndpoint,
+          assetId: 'rgb:asset',
+          amount: '60',
+          discoveredAt: 1,
+        },
+      },
+    ]
+
+    await expect(service.acceptReceive('recipient')).resolves.toEqual({ accepted: true, status: 'accepted' })
+  })
+
+  it('does not reject or cancel a receive once ACK intent is durable', async () => {
+    const dependencies = createDependencies()
+    dependencies.transport.acknowledgeConsignment = vi.fn()
+    const service = new RgbService(dependencies)
+    await service.open(wallet)
+    ;(service as any).state.pendingReceives = [
+      {
+        invoice: rgbInvoice(),
+        recipientId: 'recipient',
+        assetId: 'rgb:asset',
+        amount: '60',
+        createdAt: 1,
+        seal: { txid: 'a'.repeat(64), vout: 0, blinding: 1n },
+        pendingAccept: {
+          payload: 'consignment',
+          txid: 'c'.repeat(64),
+          endpoint: proxyEndpoint,
+          assetId: 'rgb:asset',
+          amount: '60',
+          discoveredAt: 1,
+        },
+        receivedConsignment: {
+          txid: 'c'.repeat(64),
+          receivedAt: 1,
+          acknowledgementPending: true,
+          payload: 'consignment',
+          endpoint: proxyEndpoint,
+        },
+      },
+    ]
+
+    await expect(service.rejectReceive('recipient')).rejects.toThrow('was already accepted')
+    await expect(service.cancelBlindReceive('recipient')).resolves.toEqual({ cancelled: false })
+    expect(dependencies.transport.acknowledgeConsignment).not.toHaveBeenCalledWith(
+      expect.objectContaining({ acknowledged: false })
+    )
+    expect(service.getPendingReceives()).toEqual([
+      expect.objectContaining({ recipientId: 'recipient' }),
+    ])
   })
 
   it('keeps an accepted receive available after its invoice expires so it can settle', async () => {
@@ -837,6 +1159,137 @@ describe('RgbService', () => {
     expect(service.getPendingReceives()).toEqual([
       expect.objectContaining({ recipientId: 'recipient' }),
     ])
+  })
+
+  it('keeps an accepted receive when the proxy later reports sender cancellation', async () => {
+    const dependencies = createDependencies()
+    dependencies.transport.getConsignment = vi.fn().mockResolvedValue({
+      recipientId: 'recipient',
+      payload: 'consignment',
+      txid: 'c'.repeat(64),
+      endpoint: proxyEndpoint,
+    })
+    dependencies.transport.getAcknowledgement = vi.fn().mockResolvedValue(false)
+    const service = new RgbService(dependencies)
+    await service.open(wallet)
+    ;(service as any).state.pendingReceives = [
+      {
+        invoice: rgbInvoice(),
+        recipientId: 'recipient',
+        assetId: 'rgb:asset',
+        amount: '60',
+        createdAt: 1,
+        seal: { txid: 'a'.repeat(64), vout: 0, blinding: 1n },
+        receivedConsignment: {
+          txid: 'c'.repeat(64),
+          receivedAt: 1,
+          accepted: true,
+        },
+      },
+    ]
+    ;(service as any).validateIncomingConsignment = vi.fn().mockReturnValue({
+      assetId: 'rgb:asset',
+      amount: '60',
+      txid: 'c'.repeat(64),
+      decoded: {
+        metadata: {
+          ticker: 'TOK',
+          name: 'Token',
+          precision: 0,
+          schema: 'NIA',
+          issuedSupply: '60',
+        },
+      },
+    })
+    const advanceAcceptedReceive = vi
+      .spyOn(service as any, 'advanceAcceptedReceive')
+      .mockResolvedValue(false)
+
+    await service.processClaimedReceives({ includeClaimed: false })
+
+    expect(service.getPendingReceives()).toEqual([
+      expect.objectContaining({ recipientId: 'recipient' }),
+    ])
+    expect(advanceAcceptedReceive).toHaveBeenCalled()
+  })
+
+  it('does not abort a send once the recipient acknowledgement starts broadcasting', async () => {
+    const dependencies = createDependencies()
+    let resolveBroadcast: ((txid: string) => void) | undefined
+    const broadcastStarted = new Promise<void>(markBroadcastStarted => {
+      dependencies.broadcaster.broadcast = vi.fn(
+        () =>
+          new Promise<string>(resolve => {
+            resolveBroadcast = resolve
+            markBroadcastStarted()
+          })
+      )
+    })
+    const service = new RgbService(dependencies)
+    await service.open(wallet)
+    await service.sync()
+    await service.prepareSend({
+      assetId: 'rgb:asset',
+      amount: '60',
+      invoice: rgbInvoice(),
+      feeRate: 2,
+    })
+
+    const completing = service.completeSend('transfer-1', 'signed-psbt')
+    await broadcastStarted
+
+    const aborting = service.abortSend('transfer-1')
+    expect(service.getPendingTransfers()).toEqual([
+      expect.objectContaining({ id: 'transfer-1', delivery: expect.any(Object) }),
+    ])
+    resolveBroadcast?.('c'.repeat(64))
+    await completing
+    await expect(aborting).resolves.toEqual({ aborted: false })
+  })
+
+  it('serializes cancellation behind an in-flight send completion', async () => {
+    const dependencies = createDependencies()
+    let finishEncoding: (() => void) | undefined
+    const encodingStarted = new Promise<void>(resolve => {
+      vi.mocked(dependencies.encoder.completeTransfer).mockImplementation(
+        () =>
+          new Promise<RgbCompletedTransfer>(resolveEncoding => {
+            finishEncoding = () => {
+              resolveEncoding({
+                txid: 'c'.repeat(64),
+                rawTx: '02000000000000000000',
+                consignments: [
+                  {
+                    recipientId: 'recipient',
+                    payload: 'consignment',
+                    assetId: 'rgb:asset',
+                    opIds: ['d'.repeat(64)],
+                  },
+                ],
+              })
+            }
+            resolve()
+          })
+      )
+    })
+    const service = new RgbService(dependencies)
+    await service.open(wallet)
+    await service.sync()
+    await service.prepareSend({
+      assetId: 'rgb:asset',
+      amount: '60',
+      invoice: rgbInvoice(),
+      feeRate: 2,
+    })
+
+    const completing = service.completeSend('transfer-1', 'signed-psbt')
+    await encodingStarted
+    const aborting = service.abortSend('transfer-1')
+    finishEncoding?.()
+
+    await completing
+    await expect(aborting).resolves.toEqual({ aborted: false })
+    expect(dependencies.broadcaster.broadcast).toHaveBeenCalledTimes(1)
   })
 
   it('keeps a rejected receive invoice available for reuse', async () => {
