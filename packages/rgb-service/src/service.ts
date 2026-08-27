@@ -658,6 +658,7 @@ export class RgbService {
             changed = true
             continue
           }
+          const broadcastDetectedAt = receive.receivedConsignment.broadcastDetectedAt
           const settled = await this.advanceAcceptedReceive(
             receive,
             item,
@@ -673,7 +674,7 @@ export class RgbService {
             pending.splice(receiveIndex, 1)
             count++
             changed = true
-          } else if (receive.receivedConsignment.broadcastDetectedAt) {
+          } else if (!broadcastDetectedAt && receive.receivedConsignment.broadcastDetectedAt) {
             changed = true
           }
           continue
