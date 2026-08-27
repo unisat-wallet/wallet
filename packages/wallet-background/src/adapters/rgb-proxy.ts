@@ -19,8 +19,7 @@ function normalizeEndpoints(endpoints: string[]) {
 
 function toHttpEndpoint(endpoint: string) {
   if (endpoint.startsWith('rpcs://')) return `https://${endpoint.slice('rpcs://'.length)}`
-  if (endpoint.startsWith('rpc://')) return `http://${endpoint.slice('rpc://'.length)}`
-  if (endpoint.startsWith('https://') || endpoint.startsWith('http://')) return endpoint
+  if (endpoint.startsWith('https://')) return endpoint
   throw new Error(`Unsupported RGB proxy endpoint: ${endpoint}`)
 }
 

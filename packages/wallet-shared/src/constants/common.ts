@@ -214,6 +214,8 @@ export type TypeChain = {
   unit: string
   networkType: NetworkType
   endpoints: string[]
+  /** Enables RGB on this chain when it contains at least one proxy endpoint. */
+  rgbProxyEndpoints?: string[]
   mempoolSpaceUrl: string
   unisatUrl: string
   ordinalsUrl: string
@@ -252,6 +254,7 @@ const PROD_CHAINS_MAP: { [key: string]: TypeChain } = {
     enableBrc20Prog: true,
     iconBaseUrl: 'https://static.unisat.space/icon',
     enableLowFeeMode: true,
+    rgbProxyEndpoints: ['rpcs://wallet-api.unisat.space/_/rgb/json-rpc'],
     svg: 'bitcoin-mainnet',
   },
   [ChainType.BITCOIN_TESTNET]: {

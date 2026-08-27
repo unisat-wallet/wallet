@@ -619,6 +619,32 @@ describe('bitcoin-hd-keyring', () => {
     })
   })
 
+  describe('deriveRgbRecoveryKey', () => {
+    it('uses an internal hardened branch distinct from provider derivation', async () => {
+      const keyring = new HdKeyring({ mnemonic: sampleMnemonic, activeIndexes: [0] })
+      const funding = keyring.getRgbFundingAccount(NetworkType.MAINNET)
+      const context = 'deadbeef'
+
+      const recoveryKey = await keyring.deriveRgbRecoveryKey(
+        funding.publicKey,
+        'bitcoin-mainnet',
+        context
+      )
+      const publicKey = await keyring.deriveContextHash(
+        funding.publicKey,
+        'unisat-rgb-recovery-v2',
+        'bitcoin-mainnet',
+        context
+      )
+
+      expect(recoveryKey).toMatch(/^[0-9a-f]{64}$/)
+      expect(recoveryKey).not.toBe(publicKey)
+      await expect(
+        keyring.deriveRgbRecoveryKey(funding.publicKey, 'bitcoin-mainnet', context)
+      ).resolves.toBe(recoveryKey)
+    })
+  })
+
   describe('support xpriv', () => {
     it('xpriv', async () => {
       const sampleXpriv =

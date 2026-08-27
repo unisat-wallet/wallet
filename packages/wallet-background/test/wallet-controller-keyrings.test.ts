@@ -4,6 +4,7 @@ import { KeyringType } from '@unisat/keyring-service/types'
 import { RgbTransferAwaitingAckError, RgbTransferRejectedError } from '@unisat/rgb-service'
 import * as txHelpers from '@unisat/tx-helpers'
 import { bitcoin, scriptPkToAddress } from '@unisat/wallet-bitcoin'
+import { CHAINS_MAP } from '@unisat/wallet-shared'
 import { AddressType, ChainType, NetworkType } from '@unisat/wallet-types'
 import log from 'loglevel'
 import {
@@ -165,17 +166,30 @@ describe('WalletController keyring recovery', () => {
 })
 
 describe('chainTypeToRgbNetwork', () => {
-  it('keeps testnet4 distinct from testnet for RGB resolvers', () => {
+  it('maps Bitcoin mainnet', () => {
     expect(chainTypeToRgbNetwork(ChainType.BITCOIN_MAINNET)).toBe('mainnet')
-    expect(chainTypeToRgbNetwork(ChainType.BITCOIN_TESTNET)).toBe('testnet')
-    expect(chainTypeToRgbNetwork(ChainType.BITCOIN_TESTNET4)).toBe('testnet4')
-    expect(chainTypeToRgbNetwork(ChainType.BITCOIN_SIGNET)).toBe('signet')
   })
 
-  it('rejects non-Bitcoin chains for RGB wallet refs', () => {
-    expect(() => chainTypeToRgbNetwork(ChainType.FRACTAL_BITCOIN_MAINNET)).toThrow(
-      'not supported by RGB'
-    )
+  it.each([
+    ChainType.BITCOIN_TESTNET,
+    ChainType.BITCOIN_TESTNET4,
+    ChainType.BITCOIN_SIGNET,
+    ChainType.FRACTAL_BITCOIN_MAINNET,
+    ChainType.FRACTAL_BITCOIN_TESTNET,
+  ])('rejects disabled chain %s', chainType => {
+    expect(() => chainTypeToRgbNetwork(chainType)).toThrow('RGB is not enabled for wallet chain')
+  })
+
+  it('enables a supported test chain when its RGB proxy endpoint is configured', () => {
+    const chain = CHAINS_MAP[ChainType.BITCOIN_TESTNET]!
+    const previousEndpoints = chain.rgbProxyEndpoints
+    chain.rgbProxyEndpoints = ['rpcs://rgb-testnet.example/json-rpc']
+
+    try {
+      expect(chainTypeToRgbNetwork(ChainType.BITCOIN_TESTNET)).toBe('testnet')
+    } finally {
+      chain.rgbProxyEndpoints = previousEndpoints
+    }
   })
 })
 
@@ -318,6 +332,45 @@ describe('RGB wallet references', () => {
     expect(keyring.getRgbFundingAccount).toHaveBeenCalledWith(NetworkType.MAINNET, 2)
     expect(firstRef).not.toHaveProperty('xpubVan')
     expect(firstRef).not.toHaveProperty('xpubCol')
+  })
+
+  it('derives RGB recovery encryption keys through the internal keyring capability', async () => {
+    const wallet = new WalletController()
+    const account = {
+      type: KeyringType.HdKeyring,
+      pubkey: validCompressedPubkey,
+      address: 'bc1qexample',
+      key: 'account-0',
+      flag: 0,
+      index: 0,
+    }
+    const deriveRgbRecoveryKey = vi.fn().mockResolvedValue('11'.repeat(32))
+    const keyring = {
+      getRgbFundingAccount: vi.fn().mockReturnValue({
+        address: 'bc1p0rgbfundingaddress',
+        publicKey: validCompressedPubkey,
+        derivationPath: "m/86'/827166'/0'/0/0",
+        masterFingerprint: 'a1b2c3d4',
+      }),
+      deriveRgbRecoveryKey,
+    }
+    vi.mocked(preferenceService.getCurrentAccount).mockReturnValue(account as any)
+    vi.mocked(keyringService.getKeyringForAccount).mockResolvedValue(keyring as any)
+    const publicDerivation = vi.spyOn(wallet, 'deriveContextHash')
+
+    await expect(
+      (wallet as any).rgbRecoveryKey({
+        network: 'mainnet',
+        fundingAddress: 'bc1p0rgbfundingaddress',
+      })
+    ).resolves.toBe('11'.repeat(32))
+
+    expect(deriveRgbRecoveryKey).toHaveBeenCalledWith(
+      validCompressedPubkey,
+      'bitcoin-mainnet',
+      expect.stringMatching(/^[0-9a-f]{64}$/)
+    )
+    expect(publicDerivation).not.toHaveBeenCalled()
   })
 
   it('constructs RGB funding UTXO PSBTs locally', async () => {

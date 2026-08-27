@@ -78,4 +78,21 @@ describe('RGB proxy transport', () => {
       expect.objectContaining({ body: expect.stringContaining('ack.post') })
     )
   })
+
+  it.each(['rpc://proxy.example', 'http://proxy.example'])('rejects insecure endpoint %s', async insecureEndpoint => {
+    const transport = createRgbProxyTransport([insecureEndpoint])
+    const consignment = {
+      recipientId,
+      payload: Buffer.from('consignment').toString('base64'),
+      assetId: 'rgb:asset',
+      opIds: ['a'.repeat(64)],
+      txid: 'b'.repeat(64),
+      endpoints: [insecureEndpoint],
+    }
+
+    await expect(transport.publishConsignment(consignment)).rejects.toThrow(
+      `Unsupported RGB proxy endpoint: ${insecureEndpoint}`
+    )
+    expect(fetchMock).not.toHaveBeenCalled()
+  })
 })

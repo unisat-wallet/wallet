@@ -514,6 +514,9 @@ function rgbConsignmentOutputScripts(payload?: string) {
 const RGB_FUNDING_UTXO_DUST = 330
 
 export const chainTypeToRgbNetwork = (chainType: ChainType): string => {
+  const enabled = CHAINS_MAP[chainType]?.rgbProxyEndpoints?.some(endpoint => endpoint.trim())
+  if (!enabled) throw new Error(`RGB is not enabled for wallet chain "${chainType}"`)
+
   switch (chainType) {
     case ChainType.BITCOIN_MAINNET:
       return 'mainnet'
@@ -3163,6 +3166,7 @@ export class WalletController extends BaseController {
   }
 
   getRgbAssetList = async (address: string, currentPage: number, pageSize: number) => {
+    this.assertRgbEnabled()
     const { total, list } = await getRgbApiService().getRgbAssetList(address, currentPage, pageSize)
     return {
       currentPage,
@@ -3195,6 +3199,7 @@ export class WalletController extends BaseController {
   }
 
   getRgbAssetBalance = async (address: string, assetId: string) => {
+    this.assertRgbEnabled()
     return getRgbApiService().getRgbAssetBalance(address, assetId)
   }
 
@@ -3205,6 +3210,7 @@ export class WalletController extends BaseController {
   }
 
   getRgbAssetDetail = async (assetId: string) => {
+    this.assertRgbEnabled()
     return getRgbApiService().getRgbAssetDetail(assetId)
   }
 
@@ -3219,6 +3225,7 @@ export class WalletController extends BaseController {
     address?: string,
     type?: RgbActivityType
   ) => {
+    this.assertRgbEnabled()
     const page = currentPage
     const params: {
       page: number
@@ -3270,6 +3277,7 @@ export class WalletController extends BaseController {
     assetId?: string,
     type?: RgbActivityType
   ) => {
+    this.assertRgbEnabled()
     const page = currentPage
     const params: {
       page: number
@@ -3303,8 +3311,18 @@ export class WalletController extends BaseController {
     return this.getAddressRgbActivity(address, currentPage, pageSize, assetId, type)
   }
 
-  getRgbTransfers = (currentPage: number, pageSize: number, options?: { skipSync?: boolean }) =>
-    this.rgbTransferQuery.getTransfers(currentPage, pageSize, options)
+  getRgbTransfers = async (
+    currentPage: number,
+    pageSize: number,
+    options?: { skipSync?: boolean }
+  ) => {
+    this.assertRgbEnabled()
+    return this.rgbTransferQuery.getTransfers(currentPage, pageSize, options)
+  }
+
+  private assertRgbEnabled = () => {
+    chainTypeToRgbNetwork(this.getChainType())
+  }
 
   getCurrentRgbWalletRef = async (): Promise<RgbWalletRef> => {
     const account = preferenceService.getCurrentAccount()
@@ -3339,6 +3357,7 @@ export class WalletController extends BaseController {
     path: string
     body: unknown
   }) => {
+    this.assertRgbEnabled()
     const account = preferenceService.getCurrentAccount()
     if (!account) throw new Error('no current account')
     assertCanCreateSigningRequest(account)
@@ -3382,6 +3401,7 @@ export class WalletController extends BaseController {
     derivationPath: string
     masterFingerprint: string
   }> => {
+    this.assertRgbEnabled()
     const account = preferenceService.getCurrentAccount()
     if (!account) throw new Error('no current account')
     assertCanCreateSigningRequest(account)
@@ -3618,9 +3638,20 @@ export class WalletController extends BaseController {
 
   private rgbRecoveryKey = async (wallet: LocalRgbWallet) => {
     const context = bitcoin.crypto
-      .sha256(Buffer.from(`unisat-rgb-recovery-v1:${wallet.network}:${wallet.fundingAddress}`))
+      .sha256(Buffer.from(`unisat-rgb-recovery-v2:${wallet.network}:${wallet.fundingAddress}`))
       .toString('hex')
-    return this.deriveContextHash('unisat-rgb-recovery-v1', context)
+    const account = preferenceService.getCurrentAccount()
+    if (!account) throw new Error('no current account')
+    const keyring = await keyringService.getKeyringForAccount(account.pubkey, account.type)
+    if (!keyring?.getRgbFundingAccount || !keyring.deriveRgbRecoveryKey) {
+      throw new Error('Current wallet does not support RGB recovery encryption')
+    }
+    const funding = keyring.getRgbFundingAccount(this.getNetworkType(), account.index)
+    return keyring.deriveRgbRecoveryKey(
+      funding.publicKey,
+      chainTypeToCanonicalNetwork(this.getChainType()),
+      context
+    )
   }
 
   private restoreRgbRecoveryIfNeeded = async (context: LocalRgbServiceContext) => {

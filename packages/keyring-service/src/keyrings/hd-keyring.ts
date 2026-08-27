@@ -20,6 +20,9 @@ import { SimpleKeyring } from './simple-keyring'
 const hdPathString = "m/44'/0'/0'/0"
 // BIP-32 path for deriveContextHash IKM. Purpose index = trunc31_be(SHA-256("derive-context-hash")).
 const DERIVE_CONTEXT_HASH_PATH = "m/73681862'"
+// Dedicated hardened branch for RGB recovery encryption. This is intentionally
+// distinct from the provider-exposed deriveContextHash branch.
+const RGB_RECOVERY_KEY_PATH = "m/827166'/1'"
 const RGB_MAINNET_COIN_TYPE = 827166
 const RGB_TESTNET_COIN_TYPE = 827167
 const type = 'HD Key Tree'
@@ -536,6 +539,37 @@ export class HdKeyring extends SimpleKeyring {
       if (child.privateKey) {
         child.privateKey.fill(0)
       }
+    }
+  }
+
+  /**
+   * Derive the RGB recovery checkpoint encryption key from an internal-only
+   * hardened branch. Unlike deriveContextHash, this capability is never
+   * exposed through the provider RPC surface.
+   */
+  async deriveRgbRecoveryKey(
+    publicKey: string,
+    canonicalNetworkName: string,
+    context: string
+  ): Promise<string> {
+    const contextBytes = parseHexContext(context)
+    const pubkeyBytes = Uint8Array.from(Buffer.from(publicKey, 'hex'))
+    if (!this.hdWallet) {
+      throw new Error('deriveRgbRecoveryKey requires a mnemonic or xpriv-based keyring')
+    }
+    const child = this.hdWallet.derive(RGB_RECOVERY_KEY_PATH)
+    const privKeyBytes = new Uint8Array(child.privateKey)
+    try {
+      return deriveContextHash(
+        privKeyBytes,
+        'unisat-rgb-recovery-v2',
+        canonicalNetworkName,
+        pubkeyBytes,
+        contextBytes
+      )
+    } finally {
+      privKeyBytes.fill(0)
+      if (child.privateKey) child.privateKey.fill(0)
     }
   }
 

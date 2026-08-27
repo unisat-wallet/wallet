@@ -224,10 +224,7 @@ export function getSupportedAssets(
     assetTabKeys.push(AssetTabKey.MORE)
   }
 
-  const isRgbNetwork =
-    chainType === ChainType.BITCOIN_MAINNET ||
-    chainType === ChainType.BITCOIN_SIGNET ||
-    chainType === ChainType.BITCOIN_TESTNET4
+  const isRgbNetwork = Boolean(chain.rgbProxyEndpoints?.some(endpoint => endpoint.trim()))
 
   if (isRgbNetwork) {
     assets.rgbCard = true

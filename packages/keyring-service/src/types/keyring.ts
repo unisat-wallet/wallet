@@ -60,6 +60,12 @@ export interface Keyring {
     canonicalNetworkName: string,
     context: string
   ): Promise<string>
+  /** Internal-only RGB recovery encryption key derivation. Never expose this to providers. */
+  deriveRgbRecoveryKey?(
+    publicKey: string,
+    canonicalNetworkName: string,
+    context: string
+  ): Promise<string>
 
   // Keystone specific methods
   genSignPsbtUr?(psbtHex: string): Promise<{ type: string; cbor: string }>
