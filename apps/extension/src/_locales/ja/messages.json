@@ -3038,6 +3038,9 @@
   "invalid_rgb_invoice": {
     "message": "無効な RGB インボイスです。"
   },
+  "rgb_invoice_unavailable": {
+    "message": "この RGB インボイスは利用できません。受取人に新しいインボイスを作成してもらってください。"
+  },
   "invoice_asset_mismatch": {
     "message": "インボイスの資産がこの RGB トークンと一致しません。"
   },

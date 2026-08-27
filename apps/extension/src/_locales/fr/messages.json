@@ -3038,6 +3038,9 @@
   "invalid_rgb_invoice": {
     "message": "Facture RGB invalide."
   },
+  "rgb_invoice_unavailable": {
+    "message": "Cette facture RGB n’est pas disponible. Demandez au destinataire de créer une nouvelle facture."
+  },
   "invoice_asset_mismatch": {
     "message": "L’actif de la facture ne correspond pas à ce token RGB."
   },

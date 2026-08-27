@@ -36,3 +36,15 @@ export class RgbTransferRejectedError extends RgbServiceError {
     super(`RGB transfer ${transferId} was rejected by the recipient`)
   }
 }
+
+/** The proxy has already bound this invoice recipient ID to another consignment. */
+export class RgbInvoiceUnavailableError extends RgbServiceError {
+  readonly code = 'RGB_INVOICE_UNAVAILABLE'
+
+  constructor() {
+    // This code survives extension RPC error serialization; the UI translates
+    // it using the active locale before displaying it to the user.
+    super('RGB_INVOICE_UNAVAILABLE')
+    this.name = 'RgbInvoiceUnavailableError'
+  }
+}

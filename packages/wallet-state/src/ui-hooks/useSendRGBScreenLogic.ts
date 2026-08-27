@@ -22,6 +22,18 @@ const BLOCKING_RGB_SEND_STATUSES = new Set([
   'broadcasting',
   'broadcast_failed',
 ])
+const RGB_INVOICE_UNAVAILABLE_ERROR_CODE = 'RGB_INVOICE_UNAVAILABLE'
+
+function getSendErrorMessage(error: unknown, fallback: string, invoiceUnavailableMessage: string) {
+  const record = error && typeof error === 'object' ? (error as Record<string, unknown>) : undefined
+  if (
+    record?.['code'] === RGB_INVOICE_UNAVAILABLE_ERROR_CODE ||
+    record?.['message'] === RGB_INVOICE_UNAVAILABLE_ERROR_CODE
+  ) {
+    return invoiceUnavailableMessage
+  }
+  return error instanceof Error && error.message ? error.message : fallback
+}
 
 function getBlockingRgbSendStatus(
   transfers: {
@@ -271,7 +283,13 @@ export function useSendRGBScreenLogic() {
       })
       transferData.current = {}
     } catch (e) {
-      nav.navigate('TxFailScreen', { error: (e as any).message })
+      nav.navigate('TxFailScreen', {
+        error: getSendErrorMessage(
+          e,
+          t('rgb_send_transaction_unavailable'),
+          t('rgb_invoice_unavailable')
+        ),
+      })
     } finally {
       tools.showLoading(false)
     }

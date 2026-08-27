@@ -3044,6 +3044,9 @@
   "invalid_rgb_invoice": {
     "message": "Invalid RGB invoice."
   },
+  "rgb_invoice_unavailable": {
+    "message": "This RGB invoice is unavailable. Ask the recipient to create a new invoice."
+  },
   "invoice_asset_mismatch": {
     "message": "Invoice asset does not match this RGB token."
   },

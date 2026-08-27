@@ -1,4 +1,5 @@
 import {
+  RgbInvoiceUnavailableError,
   RgbInsufficientBalanceError,
   RgbServiceError,
   RgbTransferAwaitingAckError,
@@ -1328,7 +1329,15 @@ export class RgbService {
       endpoints: delivery.endpoints,
     }))
     for (const consignment of consignments) {
-      await this.dependencies.transport.publishConsignment(consignment)
+      try {
+        await this.dependencies.transport.publishConsignment(consignment)
+      } catch (error) {
+        // RGB proxy storage binds a recipient ID to its first uploaded file.
+        // A different consignment for that invoice cannot overwrite it, which
+        // means the recipient must issue a new blinded invoice.
+        if (isInvoiceUnavailableUploadError(error)) throw new RgbInvoiceUnavailableError()
+        throw error
+      }
     }
     if (!delivery.publishedAt) {
       delivery.publishedAt = this.now()
@@ -1709,6 +1718,11 @@ function randomU64() {
     throw new RgbServiceError('Secure random generation is unavailable')
   globalThis.crypto.getRandomValues(bytes)
   return bytes.reduce((value, byte, index) => value | (BigInt(byte) << BigInt(index * 8)), 0n)
+}
+
+function isInvoiceUnavailableUploadError(error: unknown) {
+  const message = error instanceof Error ? error.message : String(error)
+  return message.toLowerCase().includes('cannot change uploaded file')
 }
 
 function normalizeAssetId(assetId: string) {

@@ -1638,6 +1638,28 @@ describe('RgbService', () => {
     expect(service.getPendingTransfers()).toEqual([])
   })
 
+  it('explains when a proxy rejects an invoice that was already used', async () => {
+    const dependencies = createDependencies()
+    dependencies.transport.publishConsignment = vi
+      .fn()
+      .mockRejectedValue(new Error('RGB proxy consignment.post failed: Cannot change uploaded file'))
+    const service = new RgbService(dependencies)
+    await service.open(wallet)
+    await service.sync()
+    await service.prepareSend({
+      assetId: 'rgb:asset',
+      amount: '60',
+      invoice: rgbInvoice(),
+      feeRate: 2,
+    })
+
+    await expect(service.completeSend('transfer-1', 'signed-psbt')).rejects.toMatchObject({
+      name: 'RgbInvoiceUnavailableError',
+      code: 'RGB_INVOICE_UNAVAILABLE',
+    })
+    expect(dependencies.broadcaster.broadcast).not.toHaveBeenCalled()
+  })
+
   it('continues syncing while a signed transfer awaits recipient acknowledgement', async () => {
     const dependencies = createDependencies()
     vi.mocked(dependencies.transport.getAcknowledgement!).mockResolvedValue(undefined)

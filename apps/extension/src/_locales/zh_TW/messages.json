@@ -3041,6 +3041,9 @@
   "invalid_rgb_invoice": {
     "message": "無效的 RGB 發票。"
   },
+  "rgb_invoice_unavailable": {
+    "message": "此 RGB 發票無法使用，請收款方建立新的發票。"
+  },
   "invoice_asset_mismatch": {
     "message": "發票資產與此 RGB 代幣不符。"
   },

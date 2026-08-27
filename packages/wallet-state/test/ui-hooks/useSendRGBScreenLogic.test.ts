@@ -177,4 +177,34 @@ describe('useSendRGBScreenLogic', () => {
     expect(wallet.createRgbSendBegin).not.toHaveBeenCalled()
     expect(result.current.error).toBe(result.current.blockingSendMessage)
   })
+
+  it('localizes an invoice-unavailable error returned after signing', async () => {
+    const assetId = 'rgb:test-asset'
+    const invoice = 'rgb:test-asset/~/~/bc:utxob:test?endpoints=rpc://proxy'
+    const { wrapper, wallet, navigation } = createHookTestHarness({
+      routeState: {
+        assetId,
+        tokenBalance: { assetId, ticker: 'RGB', precision: 8, spendable: '1000000000' },
+      },
+    })
+    wallet.createRgbSendBegin = vi.fn().mockResolvedValue({
+      txid: 'transfer-1',
+      toSignData: {},
+    })
+    wallet.createRgbSendEnd = vi.fn().mockRejectedValue(new Error('RGB_INVOICE_UNAVAILABLE'))
+    const { result } = renderHook(() => useSendRGBScreenLogic(), { wrapper })
+
+    act(() => {
+      result.current.onInvoiceChange(invoice)
+      result.current.onAmountChange('1')
+    })
+    await act(async () => {
+      await result.current.onClickNext()
+      await result.current.onSignPsbtHandleConfirm([{ psbtHex: 'signed-psbt' }] as any)
+    })
+
+    expect(navigation.navigate).toHaveBeenCalledWith('TxFailScreen', {
+      error: 'rgb_invoice_unavailable',
+    })
+  })
 })
