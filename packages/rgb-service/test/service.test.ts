@@ -1422,7 +1422,7 @@ describe('RgbService', () => {
     ])
   })
 
-  it('keeps an accepted receive when the proxy later reports sender cancellation', async () => {
+  it('releases an accepted receive when the sender reports a terminal cancellation', async () => {
     const dependencies = createDependencies()
     dependencies.transport.getConsignment = vi.fn().mockResolvedValue({
       recipientId: 'recipient',
@@ -1462,16 +1462,15 @@ describe('RgbService', () => {
         },
       },
     })
-    const advanceAcceptedReceive = vi
-      .spyOn(service as any, 'advanceAcceptedReceive')
-      .mockResolvedValue(false)
+    const advanceAcceptedReceive = vi.spyOn(service as any, 'advanceAcceptedReceive')
 
     await service.processClaimedReceives({ includeClaimed: false })
 
-    expect(service.getPendingReceives()).toEqual([
-      expect.objectContaining({ recipientId: 'recipient' }),
+    expect(service.getPendingReceives()).toEqual([])
+    expect(service.getPendingReceiveHistory()).toEqual([
+      expect.objectContaining({ status: 'canceled', txid: 'c'.repeat(64) }),
     ])
-    expect(advanceAcceptedReceive).toHaveBeenCalled()
+    expect(advanceAcceptedReceive).not.toHaveBeenCalled()
   })
 
   it('discards a staged receive invoice when the sender cancels before ACK', async () => {
@@ -1802,6 +1801,68 @@ describe('RgbService', () => {
 
     expect(dependencies.broadcaster.broadcast).toHaveBeenCalledTimes(2)
     expect(reopened.getPendingTransfers()).toEqual([])
+  })
+
+  it('releases a transfer and notifies the receiver when its transaction is terminally replaced', async () => {
+    const dependencies = createDependencies()
+    dependencies.transport.acknowledgeConsignment = vi.fn().mockResolvedValue(undefined)
+    dependencies.broadcaster.broadcast = vi
+      .fn()
+      .mockRejectedValue(new Error('bad-txns-inputs-missingorspent'))
+    dependencies.stateSource.getTransactionStatus = vi.fn().mockResolvedValue({
+      status: 'replaced',
+      confirmations: 0,
+    })
+    const service = new RgbService(dependencies)
+    await service.open(wallet)
+    await service.sync()
+    await service.prepareSend({
+      assetId: 'rgb:asset',
+      amount: '60',
+      invoice: rgbInvoice(),
+      feeRate: 2,
+    })
+
+    await expect(service.completeSend('transfer-1', 'signed-psbt')).rejects.toThrow(
+      'was canceled because its inputs were spent'
+    )
+
+    expect(service.getPendingTransfers()).toEqual([])
+    expect(dependencies.stateSource.getTransactionStatus).not.toHaveBeenCalled()
+    expect(service.getPendingSendHistory()).toEqual([
+      expect.objectContaining({ transferId: 'transfer-1', status: 'canceled' }),
+    ])
+    expect(dependencies.transport.acknowledgeConsignment).toHaveBeenCalledWith({
+      recipientId: 'recipient',
+      endpoints: [proxyEndpoint],
+      acknowledged: false,
+    })
+  })
+
+  it('releases an accepted receive when the sender posts a terminal cancellation', async () => {
+    const dependencies = createDependencies()
+    dependencies.transport.getAcknowledgement = vi.fn().mockResolvedValue(false)
+    const service = new RgbService(dependencies)
+    await service.open(wallet)
+    const receive = {
+      invoice: rgbInvoice(),
+      recipientId: 'recipient',
+      assetId: 'rgb:asset',
+      amount: '60',
+      createdAt: 1,
+      seal: { txid: 'a'.repeat(64), vout: 0, blinding: 1n },
+      receivedConsignment: {
+        txid: 'c'.repeat(64),
+        receivedAt: 1,
+        accepted: true,
+        payload: 'consignment',
+        endpoint: proxyEndpoint,
+      },
+    }
+
+    await expect((service as any).isAcceptedReceiveTerminallyCanceled(receive, proxyEndpoint)).resolves.toBe(
+      true
+    )
   })
 
   it('allows the sender to abort a delivered transfer before it is broadcast', async () => {

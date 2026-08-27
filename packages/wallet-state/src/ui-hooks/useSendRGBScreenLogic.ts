@@ -276,7 +276,9 @@ export function useSendRGBScreenLogic() {
                 ? 'broadcast_failed'
                 : endResult?.status === 'rejected'
                   ? 'rejected'
-                  : 'broadcasted',
+                  : endResult?.status === 'canceled'
+                    ? 'canceled'
+                    : 'broadcasted',
           local: true,
           to: decodedInvoice.beneficiaryAddress,
         },

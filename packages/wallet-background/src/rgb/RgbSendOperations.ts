@@ -1,5 +1,6 @@
 import {
   RgbTransferAwaitingAckError,
+  RgbTransferCanceledError,
   RgbTransferRejectedError,
   decodeRgbInvoice,
 } from '@unisat/rgb-service'
@@ -98,6 +99,9 @@ export class RgbSendOperations {
       if (error instanceof RgbTransferRejectedError) {
         return { transferId, txid: error.txid, status: 'rejected' as const }
       }
+      if (error instanceof RgbTransferCanceledError) {
+        return { transferId, txid: error.txid, status: 'canceled' as const }
+      }
       if (transfer?.delivery?.broadcastError) {
         return {
           transferId,
@@ -121,6 +125,9 @@ export class RgbSendOperations {
     try {
       await service.sync()
     } catch (error) {
+      if (error instanceof RgbTransferCanceledError) {
+        return { broadcast: false, status: 'canceled' as const, error: error.message }
+      }
       const latest = service.getPendingTransfers().find(item => item.id === transferId)
       if (latest?.broadcast) return { broadcast: true, status: 'confirming' as const }
       if (latest?.delivery?.broadcastError) {
@@ -135,7 +142,17 @@ export class RgbSendOperations {
       }
       throw error
     }
-    return { broadcast: true, status: 'confirming' as const }
+    const latest = service.getPendingTransfers().find(item => item.id === transferId)
+    if (latest?.broadcast) return { broadcast: true, status: 'confirming' as const }
+    if (latest?.delivery?.broadcastError) {
+      return {
+        broadcast: false,
+        status: 'broadcast_failed' as const,
+        error: latest.delivery.broadcastError,
+      }
+    }
+    if (latest?.delivery) return { broadcast: false, status: 'waiting_ack' as const }
+    return { broadcast: false, status: 'canceled' as const }
   }
 
   async abortVanillaTx(txid: string) {

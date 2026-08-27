@@ -37,6 +37,16 @@ export class RgbTransferRejectedError extends RgbServiceError {
   }
 }
 
+/** A signed transfer cannot be broadcast because its inputs were replaced or spent. */
+export class RgbTransferCanceledError extends RgbServiceError {
+  constructor(
+    readonly transferId: string,
+    readonly txid?: string
+  ) {
+    super(`RGB transfer ${transferId} was canceled because its inputs were spent`)
+  }
+}
+
 /** The proxy has already bound this invoice recipient ID to another consignment. */
 export class RgbInvoiceUnavailableError extends RgbServiceError {
   readonly code = 'RGB_INVOICE_UNAVAILABLE'

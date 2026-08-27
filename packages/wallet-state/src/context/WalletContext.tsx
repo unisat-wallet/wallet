@@ -696,7 +696,7 @@ export interface WalletController {
 
   retryRgbBroadcast(params: { transferId: string }): Promise<{
     broadcast: boolean
-    status: 'confirming' | 'broadcast_failed' | 'waiting_ack' | 'not_retryable'
+    status: 'confirming' | 'broadcast_failed' | 'waiting_ack' | 'not_retryable' | 'canceled'
     error?: string
   }>
 

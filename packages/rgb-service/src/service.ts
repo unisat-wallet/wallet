@@ -3,6 +3,7 @@ import {
   RgbInsufficientBalanceError,
   RgbServiceError,
   RgbTransferAwaitingAckError,
+  RgbTransferCanceledError,
   RgbTransferRejectedError,
 } from './errors'
 import { decodeRgbInvoice } from './protocol/invoice'
@@ -278,7 +279,8 @@ export class RgbService {
           // pending transfer and recorded history, so later work can continue too.
           if (
             error instanceof RgbTransferAwaitingAckError ||
-            error instanceof RgbTransferRejectedError
+            error instanceof RgbTransferRejectedError ||
+            error instanceof RgbTransferCanceledError
           ) {
             return
           }
@@ -650,6 +652,12 @@ export class RgbService {
 
         // Already accepted by the user: advance chain confirmation / settlement.
         if (receive.receivedConsignment?.accepted) {
+          if (await this.isAcceptedReceiveTerminallyCanceled(receive, item.endpoint)) {
+            this.recordReceiveOutcome(receive, 'canceled', match.txid)
+            pending.splice(receiveIndex, 1)
+            changed = true
+            continue
+          }
           const settled = await this.advanceAcceptedReceive(
             receive,
             item,
@@ -1006,6 +1014,18 @@ export class RgbService {
     } catch {
       return false
     }
+  }
+
+  /**
+   * A sender cannot normally cancel after receiving ACK=true. We post ACK=false
+   * at that point only after a terminal input-spent failure, so it is a durable
+   * cancellation signal for the accepted invoice as well.
+   */
+  private async isAcceptedReceiveTerminallyCanceled(
+    receive: import('./types').RgbPendingReceive,
+    endpoint?: string
+  ) {
+    return this.isProxyAckRejected(receive, endpoint)
   }
 
   private async isProxyAckRejected(
@@ -1402,6 +1422,10 @@ export class RgbService {
     } catch (error) {
       delivery.broadcastError = error instanceof Error ? error.message : String(error)
       await this.persist({ waitForRecovery: true })
+      if (await this.isBroadcastTerminallyFailed(delivery.completed.txid, error)) {
+        await this.cancelTerminalBroadcastFailure(transferId, pending)
+        throw new RgbTransferCanceledError(transferId, delivery.completed.txid)
+      }
       throw error
     }
     if (broadcastTxid !== delivery.completed.txid) {
@@ -1412,6 +1436,54 @@ export class RgbService {
     delete pending.delivery
     await this.persist({ waitForRecovery: true })
     return this.syncBroadcastedTransfer(transferId, pending)
+  }
+
+  private async isBroadcastTerminallyFailed(txid: string, error: unknown) {
+    if (isSpentInputBroadcastError(error)) return true
+    const getTransactionStatus = this.dependencies.stateSource.getTransactionStatus
+    if (!getTransactionStatus) return false
+    try {
+      const chain = await getTransactionStatus(this.requireState().wallet, txid)
+      return isTerminallyReplacedTransaction(chain.status)
+    } catch {
+      return false
+    }
+  }
+
+  private async cancelTerminalBroadcastFailure(transferId: string, pending: RgbPendingTransfer) {
+    const state = this.requireState()
+    const delivery = pending.delivery
+    if (!delivery) return
+    // A terminal chain result makes it safe to supersede the earlier ACK and
+    // lets the receiver release its accepted, but now impossible, invoice.
+    if (this.dependencies.transport.acknowledgeConsignment) {
+      for (const consignment of delivery.completed.consignments) {
+        try {
+          await this.dependencies.transport.acknowledgeConsignment({
+            recipientId: consignment.recipientId,
+            endpoints: delivery.endpoints,
+            acknowledged: false,
+          })
+        } catch {
+          // The local lock must still be released; the proxy state will be
+          // retried by the receiver only once its chain status is terminal.
+        }
+      }
+    }
+    const history = state.pendingSendHistory || (state.pendingSendHistory = [])
+    if (!history.some(item => item.transferId === transferId)) {
+      history.push({
+        transferId,
+        assetId: pending.request.assetId,
+        amount: pending.request.amount,
+        txid: delivery.completed.txid,
+        invoice: pending.request.invoice,
+        createdAt: pending.createdAt,
+        status: 'canceled',
+      })
+    }
+    delete state.pending[transferId]
+    await this.persist({ waitForRecovery: true })
   }
 
   private async getProxyConsignments() {
@@ -1739,6 +1811,20 @@ function sameBlindSeal(
   right: import('./protocol/receive').RgbBlindSeal
 ) {
   return left.txid === right.txid && left.vout === right.vout && left.blinding === right.blinding
+}
+
+function isTerminallyReplacedTransaction(status: 'mempool' | 'confirmed' | 'pending_spend' | 'spent' | 'replaced' | 'unknown') {
+  return status === 'spent' || status === 'replaced'
+}
+
+/** Bitcoin Core rejects this only when at least one transaction input is no longer spendable. */
+function isSpentInputBroadcastError(error: unknown) {
+  const message = (error instanceof Error ? error.message : String(error)).toLowerCase()
+  return (
+    message.includes('bad-txns-inputs-missingorspent') ||
+    message.includes('bad-txns-inputs-spent') ||
+    message.includes('inputs-missingorspent')
+  )
 }
 
 function randomU64() {
