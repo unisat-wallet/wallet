@@ -2981,6 +2981,24 @@
   "rgb_send_transaction_unavailable": {
     "message": "La transaction d’envoi RGB est indisponible"
   },
+  "rgb_fee_pool_insufficient_btc": {
+    "message": "BTC insuffisant pour les frais de transaction RGB. Il faut au moins $required sats ; le portefeuille contient $available sats. Ajoutez $missing sats et réessayez."
+  },
+  "rgb_fee_pool_insufficient_btc_generic": {
+    "message": "BTC insuffisant pour payer les frais de transaction RGB."
+  },
+  "rgb_fee_pool_title": {
+    "message": "Configurer le pool de frais RGB"
+  },
+  "rgb_fee_pool_explanation": {
+    "message": "Pour envoyer des RGB, votre portefeuille doit créer $count UTXO de frais réutilisables. Ces fonds restent dans le pool pour les futurs transferts RGB ; ils ne constituent pas les frais de ce transfert."
+  },
+  "rgb_fee_pool_reusable_funds": {
+    "message": "Pool de frais réutilisable"
+  },
+  "rgb_fee_pool_add_at_least": {
+    "message": "Ajouter au moins"
+  },
   "rgb_psbt_signing_missing_result": {
     "message": "La signature PSBT RGB n’a pas renvoyé psbtHex"
   },

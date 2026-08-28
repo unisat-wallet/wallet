@@ -2981,6 +2981,24 @@
   "rgb_send_transaction_unavailable": {
     "message": "RGB 送金トランザクションは利用できません"
   },
+  "rgb_fee_pool_insufficient_btc": {
+    "message": "RGB 取引手数料用の BTC が不足しています。少なくとも $required sats 必要ですが、ウォレットには $available sats あります。$missing sats を追加して再試行してください。"
+  },
+  "rgb_fee_pool_insufficient_btc_generic": {
+    "message": "RGB 取引手数料用の BTC が不足しています。"
+  },
+  "rgb_fee_pool_title": {
+    "message": "RGB 手数料プールを設定"
+  },
+  "rgb_fee_pool_explanation": {
+    "message": "RGB を送信するには、ウォレットで再利用可能な手数料 UTXO を $count 個作成する必要があります。これらの資金は今後の RGB 送金用にプールに残り、今回の送金手数料として使われるものではありません。"
+  },
+  "rgb_fee_pool_reusable_funds": {
+    "message": "再利用可能な手数料プール"
+  },
+  "rgb_fee_pool_add_at_least": {
+    "message": "少なくとも追加"
+  },
   "rgb_psbt_signing_missing_result": {
     "message": "RGB PSBT 署名で psbtHex が返されませんでした"
   },

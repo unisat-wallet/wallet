@@ -552,6 +552,76 @@ function rgbConsignmentOutputScripts(payload?: string) {
 const RGB_FUNDING_UTXO_DUST = 330
 const RGB_FEE_POOL_UTXO_SATS = 10_000
 const RGB_FEE_POOL_TARGET_UTXOS = 3
+/** Covers a top-up transaction with several pool outputs and a change output. */
+const RGB_FEE_POOL_TOP_UP_ESTIMATED_VBYTES = 500
+export const RGB_FEE_POOL_INSUFFICIENT_BTC = 'RGB_FEE_POOL_INSUFFICIENT_BTC'
+
+type RgbFeePoolInsufficientBtcError = Error & {
+  code: typeof RGB_FEE_POOL_INSUFFICIENT_BTC
+  data: {
+    requiredSatoshis: number
+    availableSatoshis: number
+    missingSatoshis: number
+    topUpSatoshis: number
+    estimatedFeeSatoshis: number
+    feePoolUtxoCount: number
+  }
+}
+
+function rgbFeePoolInsufficientBtcError(input: {
+  requiredSatoshis: number
+  availableSatoshis: number
+  topUpSatoshis: number
+  estimatedFeeSatoshis: number
+  feePoolUtxoCount: number
+}): RgbFeePoolInsufficientBtcError {
+  const error = new Error('Insufficient BTC to fund the RGB fee pool') as RgbFeePoolInsufficientBtcError
+  error.code = RGB_FEE_POOL_INSUFFICIENT_BTC
+  error.data = {
+    ...input,
+    missingSatoshis: Math.max(0, input.requiredSatoshis - input.availableSatoshis),
+  }
+  return error
+}
+
+function isSafeRgbFeePoolFundingUtxo(utxo: UnspentOutput): boolean {
+  const record = utxo as UnspentOutput & {
+    runes?: unknown[]
+    alkanes?: unknown[]
+    atomicals?: unknown[]
+  }
+  return (
+    !record.inscriptions?.length &&
+    !record.runes?.length &&
+    !record.alkanes?.length &&
+    !record.atomicals?.length
+  )
+}
+
+export function planRgbFeePoolTopUp(input: {
+  targetCount: number
+  minimumSatoshis: number
+  availableSatoshis: number
+  feeRate: number
+}) {
+  const estimatedFeeSatoshis = Math.ceil(input.feeRate * RGB_FEE_POOL_TOP_UP_ESTIMATED_VBYTES)
+  const affordableCount = Math.max(
+    0,
+    Math.floor((input.availableSatoshis - estimatedFeeSatoshis) / input.minimumSatoshis)
+  )
+  const count = Math.min(input.targetCount, affordableCount)
+  // When no output can be funded, describe the minimum viable one-UTXO pool
+  // in the user-facing funding requirement.
+  const requiredCount = Math.max(1, count)
+  const topUpSatoshis = requiredCount * input.minimumSatoshis
+  return {
+    count,
+    requiredSatoshis: topUpSatoshis + estimatedFeeSatoshis,
+    topUpSatoshis,
+    estimatedFeeSatoshis,
+    feePoolUtxoCount: requiredCount,
+  }
+}
 
 export const chainTypeToRgbNetwork = (chainType: ChainType): string => {
   const enabled = CHAINS_MAP[chainType]?.rgbProxyEndpoints?.some(endpoint => endpoint.trim())
@@ -3543,11 +3613,28 @@ export class WalletController extends BaseController {
     const feeSummary = params.feeRate ? undefined : await this.getFeeSummary()
     const feeRate = params.feeRate ?? feeSummary?.list[0]?.feeRate
     if (!feeRate || feeRate <= 0) throw new Error('Invalid RGB fee-pool top-up fee rate')
-    const count = Math.max(1, RGB_FEE_POOL_TARGET_UTXOS - status.availableCount)
+    const targetCount = Math.max(1, RGB_FEE_POOL_TARGET_UTXOS - status.availableCount)
     const btcUtxos = await this.getBTCUtxos()
-    if (!btcUtxos.length) throw new Error('Insufficient balance.')
+    const safeBtcUtxos = btcUtxos.filter(isSafeRgbFeePoolFundingUtxo)
+    const availableSatoshis = safeBtcUtxos.reduce((total, utxo) => total + utxo.satoshis, 0)
+    const plan = planRgbFeePoolTopUp({
+      targetCount,
+      minimumSatoshis: status.minimumSatoshis,
+      availableSatoshis,
+      feeRate,
+    })
+    if (plan.count === 0) {
+      throw rgbFeePoolInsufficientBtcError({
+        requiredSatoshis: plan.requiredSatoshis,
+        availableSatoshis,
+        topUpSatoshis: plan.topUpSatoshis,
+        estimatedFeeSatoshis: plan.estimatedFeeSatoshis,
+        feePoolUtxoCount: plan.feePoolUtxoCount,
+      })
+    }
+    const { count } = plan
     const { psbt, toSignInputs } = await txHelpers.sendBTC({
-      btcUtxos,
+      btcUtxos: safeBtcUtxos,
       tos: Array.from({ length: count }, () => ({ address: status.address, satoshis: status.minimumSatoshis })),
       networkType: this.getNetworkType(),
       changeAddress: account.address,

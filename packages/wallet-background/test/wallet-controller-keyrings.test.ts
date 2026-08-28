@@ -11,6 +11,7 @@ import {
   WalletController,
   canDeriveAddressFromPublicKey,
   chainTypeToRgbNetwork,
+  planRgbFeePoolTopUp,
   toPublicRgbPendingReceiveInvoice,
 } from '../src/controllers/wallet'
 import { keyringService, preferenceService, walletApiService } from '../src/services'
@@ -189,6 +190,38 @@ describe('chainTypeToRgbNetwork', () => {
     } finally {
       chain.rgbProxyEndpoints = previousEndpoints
     }
+  })
+})
+
+describe('planRgbFeePoolTopUp', () => {
+  it('creates as many fee-pool UTXOs as the available BTC can fund', () => {
+    expect(
+      planRgbFeePoolTopUp({
+        targetCount: 3,
+        minimumSatoshis: 10_000,
+        availableSatoshis: 20_500,
+        feeRate: 1,
+      })
+    ).toMatchObject({
+      count: 2,
+      topUpSatoshis: 20_000,
+      estimatedFeeSatoshis: 500,
+    })
+  })
+
+  it('reports the requirement for one UTXO when none can be funded', () => {
+    expect(
+      planRgbFeePoolTopUp({
+        targetCount: 3,
+        minimumSatoshis: 10_000,
+        availableSatoshis: 10_499,
+        feeRate: 1,
+      })
+    ).toMatchObject({
+      count: 0,
+      feePoolUtxoCount: 1,
+      requiredSatoshis: 10_500,
+    })
   })
 })
 

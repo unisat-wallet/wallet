@@ -1,10 +1,76 @@
 import { act, renderHook, waitFor } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
 
-import { useSendRGBScreenLogic } from '../../src/ui-hooks/useSendRGBScreenLogic'
+import { getSendErrorMessage, useSendRGBScreenLogic } from '../../src/ui-hooks/useSendRGBScreenLogic'
 import { createHookTestHarness } from './testHelpers'
 
 describe('useSendRGBScreenLogic', () => {
+  it('shows the required, available, and missing BTC for an RGB fee-pool top-up', () => {
+    const t = vi.fn((key: string, substitutions?: Record<string, string>) =>
+      `${key}:${substitutions?.required}:${substitutions?.available}:${substitutions?.missing}`
+    )
+
+    expect(
+      getSendErrorMessage(
+        {
+          code: 'RGB_FEE_POOL_INSUFFICIENT_BTC',
+          data: {
+            requiredSatoshis: 30_500,
+            availableSatoshis: 10_000,
+            missingSatoshis: 20_500,
+            topUpSatoshis: 30_000,
+            estimatedFeeSatoshis: 500,
+            feePoolUtxoCount: 3,
+          },
+        },
+        'fallback',
+        'invoice unavailable',
+        t
+      )
+    ).toBe('rgb_fee_pool_insufficient_btc:30500:10000:20500')
+  })
+
+  it('opens the fee-pool explanation when funding BTC is insufficient', async () => {
+    const assetId = 'rgb:test-asset'
+    const invoice = 'rgb:test-asset/~/~/bc:utxob:test?endpoints=rpc://proxy'
+    const { wrapper, wallet } = createHookTestHarness({
+      routeState: {
+        assetId,
+        tokenBalance: { assetId, ticker: 'RGB', precision: 8, spendable: '150000000' },
+      },
+    })
+    wallet.getRgbFeePoolStatus = vi.fn().mockResolvedValue({ ready: false })
+    wallet.createRgbFeePoolTopUpBegin = vi.fn().mockRejectedValue({
+      code: 'RGB_FEE_POOL_INSUFFICIENT_BTC',
+      data: {
+        requiredSatoshis: 30_500,
+        availableSatoshis: 10_000,
+        missingSatoshis: 20_500,
+        topUpSatoshis: 30_000,
+        estimatedFeeSatoshis: 500,
+        feePoolUtxoCount: 3,
+      },
+    })
+    const { result } = renderHook(() => useSendRGBScreenLogic(), { wrapper })
+
+    act(() => {
+      result.current.onInvoiceChange(invoice)
+      result.current.onAmountChange('1')
+    })
+    await act(async () => {
+      await result.current.onClickNext()
+    })
+
+    expect(result.current.error).toBe('')
+    expect(result.current.feePoolRequirement).toMatchObject({
+      topUpSatoshis: 30_000,
+      estimatedFeeSatoshis: 500,
+      availableSatoshis: 10_000,
+      missingSatoshis: 20_500,
+      feePoolUtxoCount: 3,
+    })
+  })
+
   it('converts valid decimal amounts to atomic units for invoices without a fixed amount', async () => {
     const assetId = 'rgb:test-asset'
     const invoice = 'rgb:test-asset/~/~/bc:utxob:test?endpoints=rpc://proxy'

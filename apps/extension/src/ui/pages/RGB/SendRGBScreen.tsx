@@ -19,6 +19,7 @@ import { showLongNumber } from '@/ui/utils';
 import { SendRGBScreenStep, useSendRGBScreenLogic } from '@unisat/wallet-state';
 
 import { SignPsbt } from '../Approval/components';
+import { RGBFeePoolInfoModal } from './components/RGBFeePoolInfoModal';
 
 const INVOICE_LINE_HEIGHT = 22;
 const INVOICE_MIN_HEIGHT = INVOICE_LINE_HEIGHT * 3;
@@ -68,6 +69,8 @@ export default function SendRGBScreen() {
     amountInvalidVisible,
     blockingSendMessage,
     error,
+    feePoolRequirement,
+    dismissFeePoolRequirement,
     disabled,
     onClickBack,
     onClickNext,
@@ -168,6 +171,13 @@ export default function SendRGBScreen() {
           />
         </Column>
       </Content>
+      {feePoolRequirement ? (
+        <RGBFeePoolInfoModal
+          requirement={feePoolRequirement}
+          onClose={dismissFeePoolRequirement}
+          t={t}
+        />
+      ) : null}
     </Layout>
   );
 }

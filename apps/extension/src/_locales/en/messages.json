@@ -3011,6 +3011,24 @@
   "rgb_send_transaction_unavailable": {
     "message": "RGB send transaction is unavailable"
   },
+  "rgb_fee_pool_insufficient_btc": {
+    "message": "Insufficient BTC for RGB transaction fees. Need at least $required sats; wallet has $available sats. Add $missing sats and try again."
+  },
+  "rgb_fee_pool_insufficient_btc_generic": {
+    "message": "Insufficient BTC to fund RGB transaction fees."
+  },
+  "rgb_fee_pool_title": {
+    "message": "Set up RGB fee pool"
+  },
+  "rgb_fee_pool_explanation": {
+    "message": "To send RGB, your wallet needs to create $count reusable fee UTXOs. These funds remain in the pool for future RGB transfers; they are not the fee for this transfer."
+  },
+  "rgb_fee_pool_reusable_funds": {
+    "message": "Reusable fee pool"
+  },
+  "rgb_fee_pool_add_at_least": {
+    "message": "Add at least"
+  },
   "rgb_psbt_signing_missing_result": {
     "message": "RGB PSBT signing did not return psbtHex"
   },

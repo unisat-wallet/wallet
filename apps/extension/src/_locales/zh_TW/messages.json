@@ -3008,6 +3008,24 @@
   "rgb_send_transaction_unavailable": {
     "message": "RGB 發送交易不可用"
   },
+  "rgb_fee_pool_insufficient_btc": {
+    "message": "RGB 交易手續費的 BTC 不足。至少需要 $required sats；錢包目前有 $available sats。請再存入 $missing sats 後重試。"
+  },
+  "rgb_fee_pool_insufficient_btc_generic": {
+    "message": "BTC 不足，無法支付 RGB 交易手續費。"
+  },
+  "rgb_fee_pool_title": {
+    "message": "建立 RGB 手續費資金池"
+  },
+  "rgb_fee_pool_explanation": {
+    "message": "發送 RGB 前，錢包需要建立 $count 個可重複使用的手續費 UTXO。這些資金會保留在資金池中供後續 RGB 轉帳使用，並非本次轉帳所花費的手續費。"
+  },
+  "rgb_fee_pool_reusable_funds": {
+    "message": "可重複使用的手續費資金池"
+  },
+  "rgb_fee_pool_add_at_least": {
+    "message": "至少再存入"
+  },
   "rgb_psbt_signing_missing_result": {
     "message": "RGB PSBT 簽名未返回 psbtHex"
   },

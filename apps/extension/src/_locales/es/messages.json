@@ -2972,6 +2972,24 @@
   "rgb_send_transaction_unavailable": {
     "message": "La transacción de envío RGB no está disponible"
   },
+  "rgb_fee_pool_insufficient_btc": {
+    "message": "BTC insuficiente para las comisiones de la transacción RGB. Se necesitan al menos $required sats; la cartera tiene $available sats. Agrega $missing sats e inténtalo de nuevo."
+  },
+  "rgb_fee_pool_insufficient_btc_generic": {
+    "message": "BTC insuficiente para pagar las comisiones de la transacción RGB."
+  },
+  "rgb_fee_pool_title": {
+    "message": "Configurar el fondo de comisiones RGB"
+  },
+  "rgb_fee_pool_explanation": {
+    "message": "Para enviar RGB, tu cartera debe crear $count UTXO de comisiones reutilizables. Estos fondos permanecen en el fondo para futuras transferencias RGB; no son la comisión de esta transferencia."
+  },
+  "rgb_fee_pool_reusable_funds": {
+    "message": "Fondo de comisiones reutilizable"
+  },
+  "rgb_fee_pool_add_at_least": {
+    "message": "Agregar al menos"
+  },
   "rgb_psbt_signing_missing_result": {
     "message": "La firma PSBT de RGB no devolvió psbtHex"
   },

@@ -2981,6 +2981,24 @@
   "rgb_send_transaction_unavailable": {
     "message": "Транзакция отправки RGB недоступна"
   },
+  "rgb_fee_pool_insufficient_btc": {
+    "message": "Недостаточно BTC для комиссии RGB-транзакции. Требуется не менее $required sats, в кошельке $available sats. Пополните кошелек на $missing sats и повторите попытку."
+  },
+  "rgb_fee_pool_insufficient_btc_generic": {
+    "message": "Недостаточно BTC для оплаты комиссии RGB-транзакции."
+  },
+  "rgb_fee_pool_title": {
+    "message": "Настроить пул комиссий RGB"
+  },
+  "rgb_fee_pool_explanation": {
+    "message": "Для отправки RGB кошельку нужно создать $count повторно используемых UTXO для комиссий. Эти средства останутся в пуле для будущих RGB-переводов и не являются комиссией этой транзакции."
+  },
+  "rgb_fee_pool_reusable_funds": {
+    "message": "Повторно используемый пул комиссий"
+  },
+  "rgb_fee_pool_add_at_least": {
+    "message": "Пополнить как минимум на"
+  },
   "rgb_psbt_signing_missing_result": {
     "message": "Подписание RGB PSBT не вернуло psbtHex"
   },

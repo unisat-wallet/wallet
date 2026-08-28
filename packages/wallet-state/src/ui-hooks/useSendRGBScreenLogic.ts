@@ -23,14 +23,74 @@ const BLOCKING_RGB_SEND_STATUSES = new Set([
   'broadcast_failed',
 ])
 const RGB_INVOICE_UNAVAILABLE_ERROR_CODE = 'RGB_INVOICE_UNAVAILABLE'
+const RGB_FEE_POOL_INSUFFICIENT_BTC_ERROR_CODE = 'RGB_FEE_POOL_INSUFFICIENT_BTC'
 
-function getSendErrorMessage(error: unknown, fallback: string, invoiceUnavailableMessage: string) {
+export type RgbFeePoolRequirement = {
+  requiredSatoshis: number
+  availableSatoshis: number
+  missingSatoshis: number
+  topUpSatoshis: number
+  estimatedFeeSatoshis: number
+  feePoolUtxoCount: number
+}
+
+function getRgbFeePoolRequirement(error: unknown): RgbFeePoolRequirement | undefined {
+  const record = error && typeof error === 'object' ? (error as Record<string, unknown>) : undefined
+  if (record?.['code'] !== RGB_FEE_POOL_INSUFFICIENT_BTC_ERROR_CODE) return undefined
+  const data =
+    record['data'] && typeof record['data'] === 'object'
+      ? (record['data'] as Record<string, unknown>)
+      : undefined
+  const values = [
+    'requiredSatoshis',
+    'availableSatoshis',
+    'missingSatoshis',
+    'topUpSatoshis',
+    'estimatedFeeSatoshis',
+    'feePoolUtxoCount',
+  ].map(key => Number(data?.[key]))
+  if (!values.every(value => Number.isSafeInteger(value) && value >= 0)) return undefined
+  const [
+    requiredSatoshis,
+    availableSatoshis,
+    missingSatoshis,
+    topUpSatoshis,
+    estimatedFeeSatoshis,
+    feePoolUtxoCount,
+  ] = values
+  return {
+    requiredSatoshis,
+    availableSatoshis,
+    missingSatoshis,
+    topUpSatoshis,
+    estimatedFeeSatoshis,
+    feePoolUtxoCount,
+  }
+}
+
+export function getSendErrorMessage(
+  error: unknown,
+  fallback: string,
+  invoiceUnavailableMessage: string,
+  t: (key: string, substitutions?: Record<string, string>) => string
+): string {
   const record = error && typeof error === 'object' ? (error as Record<string, unknown>) : undefined
   if (
     record?.['code'] === RGB_INVOICE_UNAVAILABLE_ERROR_CODE ||
     record?.['message'] === RGB_INVOICE_UNAVAILABLE_ERROR_CODE
   ) {
     return invoiceUnavailableMessage
+  }
+  if (record?.['code'] === RGB_FEE_POOL_INSUFFICIENT_BTC_ERROR_CODE) {
+    const requirement = getRgbFeePoolRequirement(error)
+    if (requirement) {
+      return t('rgb_fee_pool_insufficient_btc', {
+        required: String(requirement.requiredSatoshis),
+        available: String(requirement.availableSatoshis),
+        missing: String(requirement.missingSatoshis),
+      })
+    }
+    return t('rgb_fee_pool_insufficient_btc_generic')
   }
   return error instanceof Error && error.message ? error.message : fallback
 }
@@ -95,6 +155,7 @@ export function useSendRGBScreenLogic() {
   const [invoice, setInvoice] = useState('')
   const [amount, setAmount] = useState('')
   const [error, setError] = useState('')
+  const [feePoolRequirement, setFeePoolRequirement] = useState<RgbFeePoolRequirement>()
   const [step, setStep] = useState(SendRGBScreenStep.CREATE_TX)
   const [, setSignRequestVersion] = useState(0)
   const [blockingSendStatus, setBlockingSendStatus] = useState<string>()
@@ -222,6 +283,7 @@ export function useSendRGBScreenLogic() {
 
   const onClickNext = async () => {
     setError('')
+    setFeePoolRequirement(undefined)
     tools.showLoading(true)
     try {
       const transfers = await wallet.getRgbTransfers(1, 50)
@@ -251,7 +313,19 @@ export function useSendRGBScreenLogic() {
       }
       await prepareRgbSend()
     } catch (e) {
-      setError((e as any).message)
+      const requirement = getRgbFeePoolRequirement(e)
+      if (requirement) {
+        setFeePoolRequirement(requirement)
+        return
+      }
+      setError(
+        getSendErrorMessage(
+          e,
+          t('rgb_send_transaction_unavailable'),
+          t('rgb_invoice_unavailable'),
+          t
+        )
+      )
     } finally {
       tools.showLoading(false)
     }
@@ -318,7 +392,8 @@ export function useSendRGBScreenLogic() {
         error: getSendErrorMessage(
           e,
           t('rgb_send_transaction_unavailable'),
-          t('rgb_invoice_unavailable')
+          t('rgb_invoice_unavailable'),
+          t
         ),
       })
     } finally {
@@ -382,6 +457,8 @@ export function useSendRGBScreenLogic() {
     blockingSendMessage,
     feeRate,
     error,
+    feePoolRequirement,
+    dismissFeePoolRequirement: () => setFeePoolRequirement(undefined),
     disabled,
     onClickBack,
     onClickNext,
