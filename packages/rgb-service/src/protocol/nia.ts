@@ -229,9 +229,10 @@ export function encodeNiaTransition(input: NiaTransition): EncodedNiaTransition 
   const inputs = [...input.inputs].sort((left, right) =>
     compareBytes(serializeOpout(left), serializeOpout(right))
   )
-  const assignments = [...input.assignments].sort((left, right) =>
-    compareBytes(secretSeal(left.seal), secretSeal(right.seal))
-  )
+  // `Assignments` is a typed vector in RGB. Unlike inputs (an ordered set),
+  // its item order determines the assignment index referenced by descendant
+  // transitions, so it must be retained exactly as supplied.
+  const assignments = input.assignments
 
   const writer = new StrictWriter()
   writer

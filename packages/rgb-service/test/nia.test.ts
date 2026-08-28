@@ -55,4 +55,22 @@ describe('encodeNiaTransition', () => {
       .join('')
     expect(toHex(encoded.strict)).toContain(wireTxid)
   })
+
+  it('preserves NIA assignment order and indices', () => {
+    const encoded = encodeNiaTransition({
+      contractId: '11'.repeat(32),
+      nonce: 1n,
+      inputs: [{ opId: '22'.repeat(32), assignmentIndex: 0 }],
+      assignments: [
+        { amount: 7n, seal: { txid: null, vout: 1, blinding: 1n } },
+        { amount: 11n, seal: { txid: null, vout: 2, blinding: 2n } },
+      ],
+    })
+
+    expect(
+      toHex(encoded.strict).endsWith(
+        '000100000001000000000000000807000000000000000000020000000200000000000000080b0000000000000000'
+      )
+    ).toBe(true)
+  })
 })

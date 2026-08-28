@@ -235,12 +235,8 @@ function readTransition(reader: StrictReader): DecodedNiaTransition {
     inputs: transitionInputs,
     assignments: transitionAssignments,
   })
-  // External RGB wallets may serialize semantically unordered transition
-  // collections in a different (but commitment-equivalent) strict order.
-  // Do not require the bytes to match our encoder: readWitnessBundle still
-  // verifies the supplied Transition ID against the canonical operation
-  // commitment, and later validates its MPC anchor, parent states, blind seal,
-  // asset and amount. Those are the security boundaries for a receive.
+  if (!same(encoded.strict, strict))
+    throw new RgbServiceError('NIA transition strict encoding is unsupported')
   return {
     contractId,
     nonce,
