@@ -103,6 +103,32 @@ function createDependencies(): RgbServiceDependencies {
 }
 
 describe('RgbService', () => {
+  it('excludes active blind-invoice seals from NIA issuance funding UTXOs', async () => {
+    const dependencies = createDependencies()
+    const fundingUtxos = Array.from({ length: 5 }, (_, vout) => ({
+      outpoint: { txid: String(vout + 1).repeat(64), vout },
+      satoshis: 330,
+      scriptPubKey: `5120${String(vout + 1).repeat(64)}`,
+      publicKey: `02${String(vout + 1).repeat(64)}`,
+      chainStatus: 'confirmed' as const,
+      allocations: [],
+    }))
+    vi.mocked(dependencies.stateSource.getSnapshot).mockResolvedValue({
+      syncedAt: 1,
+      utxos: fundingUtxos,
+    })
+    const service = new RgbService(dependencies)
+    await service.open(wallet)
+    await service.sync()
+
+    const receive = await service.createBlindReceive({ assetId: 'rgb:asset', amount: '1' })
+    const issueFunding = service.getAvailableIssueUtxos()
+
+    expect(receive.seal).toMatchObject(fundingUtxos[0]!.outpoint)
+    expect(issueFunding).toHaveLength(4)
+    expect(issueFunding.map(utxo => utxo.outpoint)).not.toContainEqual(receive.seal)
+  })
+
   it('persists locally broadcast funding UTXOs until the indexer replacement succeeds', async () => {
     const dependencies = createDependencies()
     const service = new RgbService(dependencies)

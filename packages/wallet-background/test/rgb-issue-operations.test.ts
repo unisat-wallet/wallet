@@ -1,0 +1,63 @@
+import { describe, expect, it, vi } from 'vitest'
+
+import { RgbIssueOperations } from '../src/rgb/RgbIssueOperations'
+
+const wallet = {
+  walletId: 'rgb-wallet-1',
+  fundingAddress: 'bc1p-rgb-funding',
+  network: 'mainnet' as const,
+}
+
+function fundingUtxo(txid: string, vout: number) {
+  return {
+    outpoint: { txid, vout },
+    satoshis: 330,
+    scriptPubKey: `5120${'11'.repeat(32)}`,
+    publicKey: `02${'22'.repeat(32)}`,
+    chainStatus: 'confirmed' as const,
+    allocations: [],
+  }
+}
+
+describe('RgbIssueOperations', () => {
+  it('uses only issue funding UTXOs that the service has excluded from active invoice reservations', async () => {
+    const invoiceReserved = fundingUtxo('a'.repeat(64), 0)
+    const issueFunding = fundingUtxo('b'.repeat(64), 1)
+    const service = {
+      sync: vi.fn(),
+      getSnapshot: vi.fn().mockReturnValue({
+        syncedAt: 1,
+        utxos: [invoiceReserved, issueFunding],
+      }),
+      getAvailableIssueUtxos: vi.fn().mockReturnValue([issueFunding]),
+      queueIssue: vi.fn(),
+    }
+    const operation = new RgbIssueOperations({
+      getContext: vi.fn().mockResolvedValue({ service, wallet }),
+      syncIndexerOutbox: vi.fn().mockResolvedValue(true),
+      now: () => 1_700_000_000_000,
+    })
+
+    await operation.issueNia({
+      ticker: 'TOK',
+      name: 'Token',
+      precision: 0,
+      amounts: ['1'],
+    })
+
+    expect(service.getAvailableIssueUtxos).toHaveBeenCalledOnce()
+    expect(service.queueIssue).toHaveBeenCalledWith(
+      expect.objectContaining({
+        utxoSync: expect.objectContaining({
+          outpoints: expect.arrayContaining([
+            expect.objectContaining({
+              outpoint: issueFunding.outpoint,
+              allocations: [expect.objectContaining({ amount: '1' })],
+            }),
+            expect.objectContaining({ outpoint: invoiceReserved.outpoint, allocations: [] }),
+          ]),
+        }),
+      })
+    )
+  })
+})

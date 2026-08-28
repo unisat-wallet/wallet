@@ -37,11 +37,7 @@ export class RgbIssueOperations {
     const snapshot = service.getSnapshot()
     const amounts = params.amounts.map(value => toPositiveAtomicAmount(value))
     if (!amounts.length) throw new Error('RGB issuance requires at least one allocation')
-    const funding = snapshot.utxos.filter(
-      utxo =>
-        (utxo.chainStatus === 'confirmed' || utxo.chainStatus === 'mempool') &&
-        utxo.allocations.length === 0
-    )
+    const funding = service.getAvailableIssueUtxos()
     if (funding.length < amounts.length) throw new Error('Not enough unallocated RGB funding UTXOs')
 
     const selectedFunding = funding.slice(0, amounts.length)

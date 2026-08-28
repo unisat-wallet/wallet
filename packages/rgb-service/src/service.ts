@@ -531,16 +531,34 @@ export class RgbService {
     return this.getUnallocatedReceiveUtxos('mempool')
   }
 
-  private getUnallocatedReceiveUtxos(chainStatus: RgbUtxo['chainStatus']) {
-    const state = this.requireState()
-    const reserved = new Set(
-      this.getPendingReceives().map(receive => `${receive.seal.txid}:${receive.seal.vout}`)
+  /**
+   * Funding UTXOs for a new NIA Genesis must not consume a blind seal that is
+   * still advertised by an active receive invoice. A blind invoice reserves
+   * its outpoint even though it has no RGB allocation yet.
+   */
+  getAvailableIssueUtxos() {
+    const reserved = this.getPendingReceiveOutpoints()
+    return this.requireState().snapshot.utxos.filter(
+      utxo =>
+        (utxo.chainStatus === 'confirmed' || utxo.chainStatus === 'mempool') &&
+        utxo.allocations.length === 0 &&
+        !reserved.has(outpointKey(utxo))
     )
-    return state.snapshot.utxos.filter(
+  }
+
+  private getUnallocatedReceiveUtxos(chainStatus: RgbUtxo['chainStatus']) {
+    const reserved = this.getPendingReceiveOutpoints()
+    return this.requireState().snapshot.utxos.filter(
       utxo =>
         utxo.chainStatus === chainStatus &&
         utxo.allocations.length === 0 &&
         !reserved.has(outpointKey(utxo))
+    )
+  }
+
+  private getPendingReceiveOutpoints() {
+    return new Set(
+      this.getPendingReceives().map(receive => `${receive.seal.txid}:${receive.seal.vout}`)
     )
   }
 
