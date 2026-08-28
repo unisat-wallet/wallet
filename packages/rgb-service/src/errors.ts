@@ -44,6 +44,7 @@ export class RgbTransferCanceledError extends RgbServiceError {
     readonly txid?: string
   ) {
     super(`RGB transfer ${transferId} was canceled because its inputs were spent`)
+    this.name = 'RgbTransferCanceledError'
   }
 }
 

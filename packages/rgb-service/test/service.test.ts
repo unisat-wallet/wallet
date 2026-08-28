@@ -2023,6 +2023,88 @@ describe('RgbService', () => {
     expect(reopened.getPendingTransfers()).toEqual([])
   })
 
+  it('releases the transfer when the signed fee is below the relay floor', async () => {
+    const dependencies = createDependencies()
+    dependencies.transport.acknowledgeConsignment = vi.fn().mockResolvedValue(undefined)
+    vi.mocked(dependencies.broadcaster.broadcast).mockRejectedValue(
+      new Error('Error: min relay fee not met, 23 < 26')
+    )
+    const service = new RgbService(dependencies)
+    await service.open(wallet)
+    await service.sync()
+    await service.prepareSend({
+      assetId: 'rgb:asset',
+      amount: '60',
+      invoice: rgbInvoice(),
+      feeRate: 2,
+    })
+
+    await expect(service.completeSend('transfer-1', 'signed-psbt')).rejects.toMatchObject({
+      name: 'RgbTransferCanceledError',
+    })
+    expect(service.getPendingTransfers()).toEqual([])
+    expect(dependencies.transport.acknowledgeConsignment).toHaveBeenCalledWith(
+      expect.objectContaining({ recipientId: 'recipient', acknowledged: false })
+    )
+    expect(service.getPendingSendHistory()).toEqual([
+      expect.objectContaining({ transferId: 'transfer-1', status: 'canceled' }),
+    ])
+  })
+
+  it('treats a broadcast exception as successful when the txid is in the mempool', async () => {
+    const dependencies = createDependencies()
+    vi.mocked(dependencies.broadcaster.broadcast).mockRejectedValue(new Error('broadcast request timed out'))
+    dependencies.stateSource.getTransactionStatus = vi.fn().mockResolvedValue({
+      status: 'mempool',
+      confirmations: 0,
+    })
+    const service = new RgbService(dependencies)
+    await service.open(wallet)
+    await service.sync()
+    await service.prepareSend({
+      assetId: 'rgb:asset',
+      amount: '60',
+      invoice: rgbInvoice(),
+      feeRate: 2,
+    })
+
+    await expect(service.completeSend('transfer-1', 'signed-psbt')).resolves.toMatchObject({
+      txid: 'c'.repeat(64),
+    })
+    expect(dependencies.stateSource.getTransactionStatus).toHaveBeenCalledWith(
+      wallet,
+      'c'.repeat(64)
+    )
+    expect(service.getPendingTransfers()).toEqual([])
+  })
+
+  it('releases a transfer when a failed broadcast txid is not found on-chain', async () => {
+    const dependencies = createDependencies()
+    dependencies.transport.acknowledgeConsignment = vi.fn().mockResolvedValue(undefined)
+    vi.mocked(dependencies.broadcaster.broadcast).mockRejectedValue(new Error('broadcast unavailable'))
+    dependencies.stateSource.getTransactionStatus = vi.fn().mockResolvedValue({
+      status: 'unknown',
+      confirmations: 0,
+    })
+    const service = new RgbService(dependencies)
+    await service.open(wallet)
+    await service.sync()
+    await service.prepareSend({
+      assetId: 'rgb:asset',
+      amount: '60',
+      invoice: rgbInvoice(),
+      feeRate: 2,
+    })
+
+    await expect(service.completeSend('transfer-1', 'signed-psbt')).rejects.toMatchObject({
+      name: 'RgbTransferCanceledError',
+    })
+    expect(service.getPendingTransfers()).toEqual([])
+    expect(dependencies.transport.acknowledgeConsignment).toHaveBeenCalledWith(
+      expect.objectContaining({ recipientId: 'recipient', acknowledged: false })
+    )
+  })
+
   it('releases a transfer and notifies the receiver when its transaction is terminally replaced', async () => {
     const dependencies = createDependencies()
     dependencies.transport.acknowledgeConsignment = vi.fn().mockResolvedValue(undefined)
@@ -2048,7 +2130,10 @@ describe('RgbService', () => {
     )
 
     expect(service.getPendingTransfers()).toEqual([])
-    expect(dependencies.stateSource.getTransactionStatus).not.toHaveBeenCalled()
+    expect(dependencies.stateSource.getTransactionStatus).toHaveBeenCalledWith(
+      wallet,
+      'c'.repeat(64)
+    )
     expect(service.getPendingSendHistory()).toEqual([
       expect.objectContaining({ transferId: 'transfer-1', status: 'canceled' }),
     ])

@@ -1544,7 +1544,9 @@ export class RgbService {
     } catch (error) {
       delivery.broadcastError = error instanceof Error ? error.message : String(error)
       await this.persist({ waitForRecovery: true })
-      if (await this.isBroadcastTerminallyFailed(delivery.completed.txid, error)) {
+      const recovery = await this.reconcileFailedBroadcast(transferId, pending, error)
+      if (recovery === 'broadcasted') return this.syncBroadcastedTransfer(transferId, pending)
+      if (recovery === 'canceled') {
         await this.cancelTerminalBroadcastFailure(transferId, pending)
         throw new RgbTransferCanceledError(transferId, delivery.completed.txid)
       }
@@ -1560,16 +1562,50 @@ export class RgbService {
     return this.syncBroadcastedTransfer(transferId, pending)
   }
 
-  private async isBroadcastTerminallyFailed(txid: string, error: unknown) {
-    if (isSpentInputBroadcastError(error)) return true
+  /**
+   * A broadcaster may time out after a node already accepted the transaction.
+   * Always reconcile the actual txid before retaining a lock or canceling it.
+   */
+  private async reconcileFailedBroadcast(
+    transferId: string,
+    pending: RgbPendingTransfer,
+    error: unknown
+  ): Promise<'broadcasted' | 'canceled' | 'unknown'> {
+    const state = this.requireState()
+    const delivery = pending.delivery
+    if (!delivery) return 'unknown'
     const getTransactionStatus = this.dependencies.stateSource.getTransactionStatus
-    if (!getTransactionStatus) return false
-    try {
-      const chain = await getTransactionStatus(this.requireState().wallet, txid)
-      return isTerminallyReplacedTransaction(chain.status)
-    } catch {
-      return false
+    if (getTransactionStatus) {
+      try {
+        const chain = await getTransactionStatus(state.wallet, delivery.completed.txid)
+        if (chain.status === 'mempool' || chain.status === 'confirmed') {
+          this.applyFundingUpdate(delivery.completed)
+          pending.broadcast = { completed: delivery.completed, broadcastAt: this.now() }
+          delete pending.delivery
+          await this.persist({ waitForRecovery: true })
+          return 'broadcasted'
+        }
+        // The status endpoint explicitly looked up this txid. Any non-chain
+        // state means this exact signed transaction was not accepted and can
+        // never be made valid by retrying the same bytes.
+        if (
+          chain.status === 'unknown' ||
+          chain.status === 'pending_spend' ||
+          isTerminallyReplacedTransaction(chain.status)
+        ) {
+          return 'canceled'
+        }
+      } catch {
+        // Preserve the lock only when status itself is unavailable. The
+        // previous broadcast outcome is then genuinely ambiguous.
+        return 'unknown'
+      }
     }
+    // Fallback for deployments that do not expose transaction status yet.
+    // These errors are deterministic local-node rejections.
+    return isSpentInputBroadcastError(error) || isBelowRelayFeeBroadcastError(error)
+      ? 'canceled'
+      : 'unknown'
   }
 
   private async cancelTerminalBroadcastFailure(transferId: string, pending: RgbPendingTransfer) {
@@ -1960,6 +1996,16 @@ function isSpentInputBroadcastError(error: unknown) {
     message.includes('bad-txns-inputs-missingorspent') ||
     message.includes('bad-txns-inputs-spent') ||
     message.includes('inputs-missingorspent')
+  )
+}
+
+/** Bitcoin Core policy rejection for a transaction whose signed fee is below the relay floor. */
+function isBelowRelayFeeBroadcastError(error: unknown) {
+  const message = (error instanceof Error ? error.message : String(error)).toLowerCase()
+  return (
+    message.includes('min relay fee not met') ||
+    message.includes('min relay feerate not met') ||
+    message.includes('mempool min fee not met')
   )
 }
 
