@@ -103,6 +103,23 @@ function createDependencies(): RgbServiceDependencies {
 }
 
 describe('RgbService', () => {
+  it('does not release an invoice after a consignment is awaiting acceptance', async () => {
+    const dependencies = createDependencies()
+    const service = new RgbService(dependencies)
+    await service.open(wallet)
+    ;(service as any).state.pendingReceives = [
+      {
+        invoice: 'rgb:invoice',
+        recipientId: 'recipient-id',
+        seal: { txid: 'a'.repeat(64), vout: 0, blinding: 1n },
+        pendingAccept: { payload: 'consignment', txid: 'b'.repeat(64), endpoint: proxyEndpoint },
+      },
+    ]
+
+    await expect(service.cancelBlindReceive('recipient-id')).resolves.toEqual({ cancelled: false })
+    expect(service.getPendingReceives()).toHaveLength(1)
+  })
+
   it('excludes active blind-invoice seals from NIA issuance funding UTXOs', async () => {
     const dependencies = createDependencies()
     const fundingUtxos = Array.from({ length: 5 }, (_, vout) => ({

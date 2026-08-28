@@ -22,11 +22,13 @@ export function toPublicRgbPendingReceiveInvoice(
   amount?: string
   expirationTimestamp?: number
   createdAt?: number
+  pendingAccept?: unknown
   receivedConsignment?: { accepted?: boolean; acknowledgementPending?: boolean }
   },
   batchTransferIdx?: number,
   status: 'WaitingConfirmations' | 'WaitingCounterparty' = 'WaitingCounterparty'
 ): RgbPendingReceiveInvoice {
+  const awaitingAcceptance = item.pendingAccept !== undefined
   return {
     invoice: item.invoice,
     recipientId: item.recipientId,
@@ -37,8 +39,9 @@ export function toPublicRgbPendingReceiveInvoice(
       : { expirationTimestamp: item.expirationTimestamp }),
     ...(item.createdAt === undefined ? {} : { createdAt: item.createdAt }),
     kind: 'ReceiveBlind',
-    status,
+    status: awaitingAcceptance ? 'PendingAccept' : status,
     canCancel:
+      !awaitingAcceptance &&
       item.receivedConsignment?.accepted !== true &&
       item.receivedConsignment?.acknowledgementPending !== true,
     ...(batchTransferIdx === undefined ? {} : { batchTransferIdx }),

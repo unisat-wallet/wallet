@@ -5,6 +5,7 @@ import { accountActions } from '../../src/reducers/accounts'
 import {
   ANY_RGB_ASSET,
   isCancelableRgbPendingInvoice,
+  isRgbPendingInvoiceAwaitingAcceptance,
   useRGBReceiveScreenLogic,
 } from '../../src/ui-hooks/useRGBReceiveScreenLogic'
 import { createHookTestHarness } from './testHelpers'
@@ -20,6 +21,46 @@ describe('useRGBReceiveScreenLogic', () => {
         canCancel: false,
       })
     ).toBe(false)
+  })
+
+  it('does not offer release for an invoice awaiting receipt acceptance', () => {
+    const invoice = {
+      invoice: 'rgb:invoice',
+      kind: 'ReceiveBlind',
+      status: 'PendingAccept',
+      batchTransferIdx: 0,
+      canCancel: false,
+    }
+
+    expect(isRgbPendingInvoiceAwaitingAcceptance(invoice)).toBe(true)
+    expect(isCancelableRgbPendingInvoice(invoice)).toBe(false)
+  })
+
+  it('opens transfer details when selecting an invoice awaiting receipt acceptance', async () => {
+    const { wrapper, navigation } = createHookTestHarness()
+    const { result } = renderHook(() => useRGBReceiveScreenLogic(), { wrapper })
+
+    await act(async () => {
+      result.current.onSelectPendingInvoice({
+        invoice: 'rgb:invoice',
+        recipientId: 'recipient-id',
+        assetId: 'rgb:asset',
+        amount: '42',
+        createdAt: 123,
+        status: 'PendingAccept',
+      })
+    })
+
+    expect(navigation.navigate).toHaveBeenCalledWith(
+      'RGBTransferDetailScreen',
+      expect.objectContaining({
+        transferId: 'recipient-id',
+        initialTransfer: expect.objectContaining({
+          status: 'pending_accept',
+          type: 'receive',
+        }),
+      })
+    )
   })
 
   it('only shows a fixed amount error after the user enters an invalid amount', async () => {

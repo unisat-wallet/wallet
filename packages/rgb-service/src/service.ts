@@ -1097,7 +1097,8 @@ export class RgbService {
     // so it cannot be released as an unused invoice.
     if (
       receives[index]!.receivedConsignment?.accepted ||
-      receives[index]!.receivedConsignment?.acknowledgementPending
+      receives[index]!.receivedConsignment?.acknowledgementPending ||
+      receives[index]!.pendingAccept
     ) {
       return { cancelled: false }
     }

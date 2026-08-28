@@ -276,6 +276,10 @@ export const isRgbPendingInvoiceAwaitingConfirmation = (item?: RgbPendingReceive
   return String(item?.status || '').toLowerCase() === 'waitingconfirmations'
 }
 
+export const isRgbPendingInvoiceAwaitingAcceptance = (item?: RgbPendingReceiveInvoice) => {
+  return String(item?.status || '').toLowerCase() === 'pendingaccept'
+}
+
 export function useRGBReceiveScreenLogic() {
   const nav = useNavigation()
   const wallet = useWallet()
@@ -616,6 +620,22 @@ export function useRGBReceiveScreenLogic() {
   }
 
   const onSelectPendingInvoice = (item: RgbPendingReceiveInvoice) => {
+    if (isRgbPendingInvoiceAwaitingAcceptance(item) && item.recipientId) {
+      nav.navigate('RGBTransferDetailScreen', {
+        transferId: item.recipientId,
+        initialTransfer: {
+          id: `local-receive:${item.recipientId}`,
+          transferId: item.recipientId,
+          ...(item.assetId ? { assetId: item.assetId } : {}),
+          type: 'receive',
+          ...(item.amount === undefined ? {} : { amount: String(item.amount) }),
+          timestamp: item.createdAt || Date.now(),
+          status: 'pending_accept',
+          local: true,
+        },
+      })
+      return
+    }
     setError('')
     setInvoiceLabel(
       formatRgbPendingAmount(item.amount, assetTicker, t('any_amount'), assetPrecision)

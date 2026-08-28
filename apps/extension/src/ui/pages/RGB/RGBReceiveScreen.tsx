@@ -28,6 +28,7 @@ import {
   getRgbTokenPrecision,
   getRgbTokenTicker,
   isCancelableRgbPendingInvoice,
+  isRgbPendingInvoiceAwaitingAcceptance,
   isRgbPendingInvoiceAwaitingConfirmation,
   toRgbDisplayAmount,
   useI18n,
@@ -541,6 +542,8 @@ export default function RGBReceiveScreen() {
   const renderPendingInvoiceListItem = (item: (typeof pendingInvoices)[number], index: number) => {
     const itemKey = item.recipientId || item.invoice || String(index);
     const timeText = formatRgbPendingTime(item.createdAt || item.expirationTimestamp);
+    const awaitingAcceptance = isRgbPendingInvoiceAwaitingAcceptance(item);
+    const awaitingConfirmation = isRgbPendingInvoiceAwaitingConfirmation(item);
 
     return (
       <Row
@@ -555,17 +558,19 @@ export default function RGBReceiveScreen() {
           <Column gap="xs" style={{ minWidth: 0 }}>
             {renderPendingInvoiceTitle(item)}
             {timeText ? <Text text={timeText} color="white_muted" size="xs" /> : null}
-            {isRgbPendingInvoiceAwaitingConfirmation(item) ? (
+            {awaitingAcceptance ? (
+              <Text text={t('rgb_status_pending_accept')} color="gold" size="xs" />
+            ) : awaitingConfirmation ? (
               <Text text={`${t('unavailable')} - ${t('transaction_unconfirmed')}`} color="gold" size="xs" />
             ) : null}
           </Column>
         </Row>
 
         <div
-          style={{ ...pendingCopyButtonStyle, opacity: isRgbPendingInvoiceAwaitingConfirmation(item) ? 0.45 : 1 }}
+          style={{ ...pendingCopyButtonStyle, opacity: awaitingConfirmation || awaitingAcceptance ? 0.45 : 1 }}
           onClick={(e) => {
             e.stopPropagation();
-            if (!isRgbPendingInvoiceAwaitingConfirmation(item)) onCopyPendingInvoice(item);
+            if (!awaitingConfirmation && !awaitingAcceptance) onCopyPendingInvoice(item);
           }}
         >
           <Icon icon="copy" color="white_muted" size={14} />

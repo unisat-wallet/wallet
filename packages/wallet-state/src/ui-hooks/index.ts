@@ -51,6 +51,7 @@ export {
   formatRgbPendingAmount,
   formatRgbPendingAmountTag,
   formatRgbPendingTime,
+  isRgbPendingInvoiceAwaitingAcceptance,
   isRgbPendingInvoiceAwaitingConfirmation,
   getRgbAssetId,
   getRgbTokenIconInfo,
