@@ -1456,7 +1456,16 @@ export class RgbService {
         // RGB proxy storage binds a recipient ID to its first uploaded file.
         // A different consignment for that invoice cannot overwrite it, which
         // means the recipient must issue a new blinded invoice.
-        if (isInvoiceUnavailableUploadError(error)) throw new RgbInvoiceUnavailableError()
+        if (isInvoiceUnavailableUploadError(error)) {
+          // This consignment was never accepted by the proxy and its Bitcoin
+          // transaction was never broadcast. Drop the local prepared state so
+          // its colored and fee-pool inputs are immediately reusable. Do not
+          // send ACK=false: this recipient ID belongs to another sender's
+          // transfer, which must not be canceled by this failed attempt.
+          delete state.pending[transferId]
+          await this.persist()
+          throw new RgbInvoiceUnavailableError()
+        }
         throw error
       }
     }

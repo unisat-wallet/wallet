@@ -1889,6 +1889,7 @@ describe('RgbService', () => {
       code: 'RGB_INVOICE_UNAVAILABLE',
     })
     expect(dependencies.broadcaster.broadcast).not.toHaveBeenCalled()
+    expect(service.getPendingTransfers()).toEqual([])
   })
 
   it('continues syncing while a signed transfer awaits recipient acknowledgement', async () => {
