@@ -550,7 +550,7 @@ function rgbConsignmentOutputScripts(payload?: string) {
   }
 }
 const RGB_FUNDING_UTXO_DUST = 330
-const RGB_FEE_POOL_UTXO_SATS = 10_000
+const RGB_FEE_POOL_UTXO_SATS = 3_000
 const RGB_FEE_POOL_TARGET_UTXOS = 3
 /** Covers a top-up transaction with several pool outputs and a change output. */
 const RGB_FEE_POOL_TOP_UP_ESTIMATED_VBYTES = 500
