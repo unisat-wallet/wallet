@@ -37,6 +37,11 @@ export type RgbFeePoolRequirement = {
   feePoolUtxoCount: number
 }
 
+export type RgbFeePoolTopUp = {
+  count: number
+  amount: number
+}
+
 function getRgbFeePoolRequirement(error: unknown): RgbFeePoolRequirement | undefined {
   const record = error && typeof error === 'object' ? (error as Record<string, unknown>) : undefined
   if (record?.['code'] !== RGB_FEE_POOL_INSUFFICIENT_BTC_ERROR_CODE) return undefined
@@ -172,11 +177,14 @@ export function useSendRGBScreenLogic() {
   const [blockingSendStatus, setBlockingSendStatus] = useState<string>()
   const [invoiceAvailability, setInvoiceAvailability] = useState<InvoiceAvailability>('idle')
   const [invoiceAvailabilityError, setInvoiceAvailabilityError] = useState('')
+  const [feePoolTopUp, setFeePoolTopUp] = useState<RgbFeePoolTopUp>()
   const transferData = useRef<{
     toSignData?: any
     beginResult?: any
     pendingVanillaTxid?: string
     feePoolTopUp?: boolean
+    feePoolTopUpCount?: number
+    feePoolTopUpAmount?: number
   }>({})
 
   const ticker = tokenBalance?.ticker || 'RGB'
@@ -383,7 +391,12 @@ export function useSendRGBScreenLogic() {
       if (!feePool.ready) {
         const topUp = await wallet.createRgbFeePoolTopUpBegin({ feeRate })
         if (!topUp?.toSignData) throw new Error(t('rgb_send_transaction_unavailable'))
-        transferData.current = { toSignData: topUp.toSignData, feePoolTopUp: true }
+        transferData.current = {
+          toSignData: topUp.toSignData,
+          feePoolTopUp: true,
+          feePoolTopUpCount: Number(topUp.count) || 0,
+          feePoolTopUpAmount: Number(topUp.amount) || 0,
+        }
         setSignRequestVersion(version => version + 1)
         setStep(SendRGBScreenStep.SIGN_TX)
         return
@@ -423,6 +436,10 @@ export function useSendRGBScreenLogic() {
       }
       if (transferData.current.feePoolTopUp) {
         await wallet.createRgbFeePoolTopUpEnd({ signedPsbt })
+        setFeePoolTopUp({
+          count: transferData.current.feePoolTopUpCount || 0,
+          amount: transferData.current.feePoolTopUpAmount || 0,
+        })
         transferData.current = {}
         setStep(SendRGBScreenStep.FEE_POOL_COMPLETED)
         return
@@ -558,6 +575,7 @@ export function useSendRGBScreenLogic() {
     signRequestVersion,
     error,
     feePoolRequirement,
+    feePoolTopUp,
     dismissFeePoolRequirement: () => setFeePoolRequirement(undefined),
     disabled,
     onClickBack,

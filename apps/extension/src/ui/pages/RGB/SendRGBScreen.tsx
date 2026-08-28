@@ -2,9 +2,12 @@ import { useCallback, useEffect, useRef } from 'react';
 
 import {
   Button,
+  Card,
   Column,
   Content,
+  Footer,
   Header,
+  Icon,
   Layout,
   RGBAssetIcon,
   Row,
@@ -48,6 +51,36 @@ const invoiceFieldStyle = {
   wordBreak: 'break-all' as const
 };
 
+const feePoolSuccessMarkStyle = {
+  width: 72,
+  height: 72,
+  borderRadius: '50%',
+  background: 'rgba(123,224,152,0.16)',
+  border: '1px solid rgba(123,224,152,0.32)',
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  boxSizing: 'border-box' as const
+};
+
+const feePoolSummaryStyle = {
+  padding: 16,
+  borderRadius: 14,
+  background: 'linear-gradient(145deg, rgba(244,182,44,0.16), rgba(255,255,255,0.06))',
+  border: '1px solid rgba(244,182,44,0.24)'
+};
+
+const feePoolInfoIconStyle = {
+  width: 32,
+  height: 32,
+  minWidth: 32,
+  borderRadius: 8,
+  background: 'rgba(255,255,255,0.09)',
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'center'
+};
+
 export default function SendRGBScreen() {
   const {
     step,
@@ -70,6 +103,7 @@ export default function SendRGBScreen() {
     blockingSendMessage,
     error,
     feePoolRequirement,
+    feePoolTopUp,
     dismissFeePoolRequirement,
     disabled,
     onClickBack,
@@ -107,18 +141,55 @@ export default function SendRGBScreen() {
   }
 
   if (step === SendRGBScreenStep.FEE_POOL_COMPLETED) {
+    const topUpCount = feePoolTopUp?.count || 0;
+    const topUpAmount = feePoolTopUp?.amount || 0;
     return (
       <Layout>
-        <Header onBack={onClickBack} />
-        <Content>
-          <Column gap="xl" style={{ paddingTop: 40 }}>
-            <Column gap="md" itemsCenter>
+        <Header onBack={onClickBack} title={t('rgb_fee_pool_title')} />
+        <Content style={{ padding: '32px 16px 16px' }}>
+          <Column gap="xl" fullX>
+            <Column gap="md" itemsCenter style={{ padding: '8px 12px 0' }}>
+              <div style={feePoolSuccessMarkStyle}>
+                <Icon icon="success" color="success" size={34} />
+              </div>
               <Text text={t('rgb_fee_pool_ready_title')} color="white" size="lg" textCenter />
               <Text text={t('rgb_fee_pool_ready_description')} color="white_muted2" size="sm" textCenter wrap />
             </Column>
-            <Button preset="primary" text={t('rgb_fee_pool_continue')} onClick={onContinueAfterFeePoolTopUp} />
+
+            <Card style={feePoolSummaryStyle}>
+              <Column fullX gap="md">
+                <Row full justifyBetween itemsCenter>
+                  <Row gap="sm" itemsCenter>
+                    <div style={feePoolInfoIconStyle}>
+                      <Icon icon="btc" color="gold" size={18} />
+                    </div>
+                    <Text text={t('rgb_fee_pool_reusable_funds')} color="white" preset="bold" size="sm" />
+                  </Row>
+                  <Text text={t('success')} color="success" size="xs" />
+                </Row>
+                {topUpCount > 0 && topUpAmount > 0 ? (
+                  <Row full justifyBetween itemsEnd>
+                    <Column gap="xs">
+                      <Text text={`${topUpCount} UTXO${topUpCount === 1 ? '' : 's'}`} color="white" size="xl" />
+                      <Text text={t('rgb_fee_pool_add_at_least')} color="textDim" size="xs" />
+                    </Column>
+                    <Text text={`${topUpAmount.toLocaleString()} sats`} color="gold" preset="bold" size="sm" />
+                  </Row>
+                ) : null}
+              </Column>
+            </Card>
+
+            <Row gap="md" itemsCenter style={{ padding: '0 8px' }}>
+              <div style={feePoolInfoIconStyle}>
+                <Icon icon="moreInfo" color="textDim" size={18} />
+              </div>
+              <Text text={t('rgb_fee_pool_explanation', { count: topUpCount || 1 })} color="textDim" size="xs" wrap />
+            </Row>
           </Column>
         </Content>
+        <Footer>
+          <Button preset="primary" text={t('rgb_fee_pool_continue')} onClick={onContinueAfterFeePoolTopUp} />
+        </Footer>
       </Layout>
     );
   }
