@@ -143,16 +143,25 @@ const getRecordPayload = (value: unknown): Record<string, unknown> | undefined =
   return record
 }
 
-const hasAvailableRgbAllocation = (summary: unknown) => {
+/**
+ * Mempool funding outputs are safe to reserve for another blind invoice: the
+ * service excludes outputs that are already reserved, and keeps the invoice
+ * unavailable until the funding transaction confirms. Treat them as reusable
+ * here so one five-output funding transaction serves five invoices.
+ */
+const hasReusableRgbAllocation = (summary: unknown) => {
   const value = getRecordPayload(summary)
   if (!value) return false
 
-  if (typeof value['available'] === 'boolean') return value['available']
+  if (value['available'] === true) return true
 
   const availableAllocationCount = Number(
     value['availableAllocationCount'] ?? value['freeAllocationCount'] ?? 0
   )
-  return Number.isFinite(availableAllocationCount) && availableAllocationCount > 0
+  if (Number.isFinite(availableAllocationCount) && availableAllocationCount > 0) return true
+
+  const pendingAllocationCount = Number(value['pendingAllocationCount'] ?? 0)
+  return Number.isFinite(pendingAllocationCount) && pendingAllocationCount > 0
 }
 
 const hasPendingRgbAllocationConfirmation = (summary: unknown) => {
@@ -417,7 +426,7 @@ export function useRGBReceiveScreenLogic() {
         const summary = await rgbWallet.getRgbAllocationSummary({ skipSync: true })
         if (cancelled) return
 
-        if (hasAvailableRgbAllocation(summary) || hasPendingRgbAllocationConfirmation(summary)) {
+        if (hasReusableRgbAllocation(summary) || hasPendingRgbAllocationConfirmation(summary)) {
           setInsufficientBtcForInvoice(false)
           return
         }
@@ -497,7 +506,7 @@ export function useRGBReceiveScreenLogic() {
   const ensureRgbAllocation = async () => {
     setLoadingText('Checking RGB UTXO...')
     const summary = await rgbWallet.getRgbAllocationSummary({ skipSync: false })
-    if (hasAvailableRgbAllocation(summary)) {
+    if (hasReusableRgbAllocation(summary)) {
       return true
     }
 
@@ -531,7 +540,7 @@ export function useRGBReceiveScreenLogic() {
         }
         setLoadingText('Checking RGB UTXO...')
         const summary = await rgbWallet.getRgbAllocationSummary({ skipSync: false })
-        if (hasAvailableRgbAllocation(summary)) {
+        if (hasReusableRgbAllocation(summary)) {
           setError(getErrorMessage(invoiceError))
           return
         }

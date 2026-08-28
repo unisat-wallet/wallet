@@ -324,6 +324,26 @@ describe('useRGBReceiveScreenLogic', () => {
     })
   })
 
+  it('reuses an unreserved mempool RGB UTXO for the next invoice', async () => {
+    const { wrapper, wallet } = createHookTestHarness()
+    wallet.getRgbAllocationSummary.mockResolvedValue({
+      available: false,
+      availableAllocationCount: 0,
+      pendingConfirmation: true,
+      pendingAllocationCount: 4,
+    })
+    wallet.createRgbBlindReceive.mockResolvedValue({ invoice: 'rgb:invoice' })
+
+    const { result } = renderHook(() => useRGBReceiveScreenLogic(), { wrapper })
+
+    await act(async () => {
+      await result.current.onCreateInvoice()
+    })
+
+    expect(wallet.createRgbBlindReceive).toHaveBeenCalled()
+    expect(wallet.createRgbUtxosBegin).not.toHaveBeenCalled()
+  })
+
   it('flags insufficient BTC when creating an invoice needs a new RGB UTXO', async () => {
     const { wrapper, wallet, store } = createHookTestHarness()
     wallet.getRgbAllocationSummary.mockResolvedValue({ available: false })

@@ -293,7 +293,9 @@ export default function RGBIssueScreen() {
     setOperationError('');
     try {
       const beginResult = await wallet.createRgbUtxosBegin({
-        num: 1,
+        // The issuance consumes one funding UTXO; retain the other four for
+        // subsequent invoices or issuances without another split transaction.
+        num: 5,
         ...(feeRate > 0 ? { feeRate } : {})
       });
       const toSignData = beginResult?.toSignData as ToSignData | undefined;
