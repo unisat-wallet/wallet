@@ -96,6 +96,7 @@ export function useSendRGBScreenLogic() {
   const [amount, setAmount] = useState('')
   const [error, setError] = useState('')
   const [step, setStep] = useState(SendRGBScreenStep.CREATE_TX)
+  const [, setSignRequestVersion] = useState(0)
   const [blockingSendStatus, setBlockingSendStatus] = useState<string>()
   const transferData = useRef<{
     toSignData?: any
@@ -212,6 +213,10 @@ export function useSendRGBScreenLogic() {
       toSignData,
       pendingVanillaTxid: getRgbBeginTxid(beginResult),
     }
+    // Fee-pool funding leaves the UI on SIGN_TX. Its completion replaces the
+    // signing request with the RGB transfer PSBT, so changing the ref alone
+    // would leave SignPsbt rendering the old funding transaction.
+    setSignRequestVersion(version => version + 1)
     setStep(SendRGBScreenStep.SIGN_TX)
   }
 

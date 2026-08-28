@@ -166,6 +166,7 @@ describe('useSendRGBScreenLogic', () => {
 
     expect(wallet.createRgbFeePoolTopUpEnd).toHaveBeenCalledWith({ signedPsbt: 'signed-top-up' })
     expect(wallet.createRgbSendBegin).toHaveBeenCalledWith(expect.objectContaining({ amount: '100000000' }))
+    expect(result.current.signPsbtParams.data.toSignDatas[0]?.psbtHex).toBe('rgb-send')
   })
 
   it('blocks a new send while the same asset is awaiting recipient acknowledgement', async () => {
