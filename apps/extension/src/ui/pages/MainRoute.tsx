@@ -76,6 +76,8 @@ import ExportPrivateKeyScreen from './Settings/ExportPrivateKeyScreen';
 import LanguageScreen from './Settings/LanguageScreen';
 import NetworkTypeScreen from './Settings/NetworkTypeScreen';
 import NotificationListScreen from './Settings/NotificationListScreen';
+import RgbUtxoInspectionScreen from './Settings/RgbUtxoInspectionScreen';
+import RgbFeePoolInspectionScreen from './Settings/RgbFeePoolInspectionScreen';
 import UpgradeNoticeScreen from './Settings/UpgradeNoticeScreen';
 import CosmosSignDemo from './Test/CosmosSignDemo';
 import TestScreen from './Test/TestScreen';
@@ -191,6 +193,14 @@ export const routes = {
   AdvancedScreen: {
     path: '/settings/advanced',
     element: <AdvancedScreen />
+  },
+  RgbUtxoInspectionScreen: {
+    path: '/settings/rgb-utxos',
+    element: <RgbUtxoInspectionScreen />
+  },
+  RgbFeePoolInspectionScreen: {
+    path: '/settings/rgb-fee-pool',
+    element: <RgbFeePoolInspectionScreen />
   },
   LanguageScreen: {
     path: '/settings/language',

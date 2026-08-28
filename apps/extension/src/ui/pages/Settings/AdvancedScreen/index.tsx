@@ -5,6 +5,7 @@ import LoadingPage from '@/ui/components/LoadingPage';
 import { useI18n } from '@unisat/wallet-state';
 
 import { LanguageCard } from './Language';
+import { RgbCard } from './RgbCard';
 import { SecurityCard } from './SecurityCard';
 
 export default function AdvancedScreen() {
@@ -29,10 +30,12 @@ export default function AdvancedScreen() {
         }}
         title={t('advanced')}
       />
-      <Content>
+      <Content style={{ paddingTop: 16 }}>
         <LanguageCard />
 
         <SecurityCard />
+
+        <RgbCard />
       </Content>
     </Layout>
   );

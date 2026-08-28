@@ -260,6 +260,27 @@ describe('useRGBReceiveScreenLogic', () => {
     clearIntervalSpy.mockRestore()
   })
 
+  it('polls pending invoices from the invoice list even when none is selected', async () => {
+    const setIntervalSpy = vi.spyOn(global, 'setInterval')
+    const waitingInvoice = {
+      invoice: 'rgb:invoice',
+      recipientId: 'recipient-id',
+      status: 'WaitingConfirmations',
+    }
+    const { wrapper, wallet } = createHookTestHarness({
+      routeState: { initialStep: 'pending_invoices' },
+    })
+    wallet.getRgbPendingReceiveInvoices.mockResolvedValue({ list: [waitingInvoice] })
+
+    renderHook(() => useRGBReceiveScreenLogic(), { wrapper })
+
+    await waitFor(() => {
+      expect(setIntervalSpy).toHaveBeenCalledWith(expect.any(Function), 10_000)
+    })
+
+    setIntervalSpy.mockRestore()
+  })
+
   it('does not allow decimals when RGB asset precision is zero', async () => {
     const assetId = 'rgb:integer-asset'
     const tokenBalance = {

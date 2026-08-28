@@ -584,12 +584,13 @@ function rgbFeePoolInsufficientBtcError(input: {
   return error
 }
 
-function isSafeRgbFeePoolFundingUtxo(utxo: UnspentOutput): boolean {
-  const record = utxo as UnspentOutput & {
-    runes?: unknown[]
-    alkanes?: unknown[]
-    atomicals?: unknown[]
-  }
+function isSafeRgbFeePoolFundingUtxo(utxo: {
+  inscriptions?: unknown[]
+  runes?: unknown[]
+  alkanes?: unknown[]
+  atomicals?: unknown[]
+}): boolean {
+  const record = utxo
   return (
     !record.inscriptions?.length &&
     !record.runes?.length &&
@@ -3565,6 +3566,13 @@ export class WalletController extends BaseController {
     return service.getRecoveryCheckpointStatus()
   }
 
+  /** Wallet-only RGB UTXO diagnostic view. Never exposed through the dApp provider. */
+  getRgbUtxoInspection = async (params: { forceSync?: boolean } = {}) => {
+    const { service } = await this.getLocalRgbService()
+    if (params.forceSync) await service.sync()
+    return service.getUtxoInspection()
+  }
+
   cancelRgbReceiveInvoice = async (params: Omit<RgbCancelReceiveInvoiceRequest, 'wallet'>) => {
     return this.rgbReceiveOperations.cancelReceiveInvoice(params.batchTransferIdx)
   }
@@ -3574,7 +3582,7 @@ export class WalletController extends BaseController {
     return { address }
   }
 
-  getRgbFeePoolStatus = async (params: { feeRate?: number } = {}) => {
+  getRgbFeePoolInspection = async (params: { feeRate?: number } = {}) => {
     const { service } = await this.getLocalRgbService()
     const feeAccount = await this.getCurrentRgbFeeAccount()
     const remoteUtxos = await walletApiService.bitcoin.getBTCUtxos(feeAccount.address)
@@ -3586,23 +3594,110 @@ export class WalletController extends BaseController {
     )
     const local = service.getPendingFeePoolUtxos()
     const all = new Map(
-      remoteUtxos.map(utxo => [`${utxo.txid}:${utxo.vout}`, { satoshis: utxo.satoshis }])
+      remoteUtxos.map(utxo => [
+        `${utxo.txid}:${utxo.vout}`,
+        { txid: utxo.txid, vout: utxo.vout, satoshis: utxo.satoshis, pending: false },
+      ])
     )
     local.forEach(utxo => {
       const key = `${utxo.outpoint.txid}:${utxo.outpoint.vout}`
-      if (!all.has(key)) all.set(key, { satoshis: utxo.satoshis })
+      if (!all.has(key)) {
+        all.set(key, {
+          txid: utxo.outpoint.txid,
+          vout: utxo.outpoint.vout,
+          satoshis: utxo.satoshis,
+          pending: true,
+        })
+      }
     })
     const minimumSatoshis = Math.max(RGB_FEE_POOL_UTXO_SATS, Math.ceil((params.feeRate || 1) * 500 * 2))
-    const available = [...all.entries()].filter(
-      ([key, utxo]) => !locked.has(key) && utxo.satoshis >= minimumSatoshis
-    )
+    const utxos = [...all.entries()]
+      .map(([key, utxo]) => ({
+        ...utxo,
+        locked: locked.has(key),
+        available: !locked.has(key) && utxo.satoshis >= minimumSatoshis,
+      }))
+      .sort((a, b) => a.txid.localeCompare(b.txid) || a.vout - b.vout)
+    const availableCount = utxos.filter(utxo => utxo.available).length
     return {
       address: feeAccount.address,
       minimumSatoshis,
-      availableCount: available.length,
+      availableCount,
       targetCount: RGB_FEE_POOL_TARGET_UTXOS,
-      ready: available.length > 0,
+      ready: availableCount > 0,
+      utxos,
     }
+  }
+
+  getRgbFeePoolStatus = async (params: { feeRate?: number } = {}) => {
+    const { address, minimumSatoshis, availableCount, targetCount, ready } =
+      await this.getRgbFeePoolInspection(params)
+    return { address, minimumSatoshis, availableCount, targetCount, ready }
+  }
+
+  /** Build a wallet-only transaction that returns unlocked Fee Pool BTC to the current account. */
+  createRgbFeePoolWithdrawBegin = async (params: { feeRate?: number } = {}) => {
+    const account = preferenceService.getCurrentAccount()
+    if (!account) throw new Error('no current account')
+    assertCanCreateSigningRequest(account)
+
+    const [{ service }, feeAccount] = await Promise.all([
+      this.getLocalRgbService(),
+      this.getCurrentRgbFeeAccount(),
+    ])
+    const locked = new Set(
+      service
+        .getPendingTransfers()
+        .flatMap(transfer => transfer.prepared.feeOutpoints || [])
+        .map(outpoint => `${outpoint.txid}:${outpoint.vout}`)
+    )
+    const remoteUtxos = await walletApiService.bitcoin.getBTCUtxos(feeAccount.address)
+    const feeUtxos = remoteUtxos
+      .filter(utxo => !locked.has(`${utxo.txid}:${utxo.vout}`))
+      .filter(isSafeRgbFeePoolFundingUtxo)
+      .map(utxo => ({
+        ...utxo,
+        pubkey: feeAccount.publicKey,
+        addressType: AddressType.P2TR,
+      }))
+    if (!feeUtxos.length) throw new Error('No unlocked RGB fee pool UTXOs are available to withdraw')
+
+    const feeRate = params.feeRate ?? (await this.getFeeSummary()).list[1]?.feeRate
+    if (!feeRate || feeRate <= 0) throw new Error('Invalid RGB fee-pool withdrawal fee rate')
+    const { psbt } = await txHelpers.sendAllBTC({
+      btcUtxos: feeUtxos,
+      toAddress: account.address,
+      networkType: this.getNetworkType(),
+      feeRate,
+      enableRBF: true,
+    })
+    const amount = psbt.txOutputs[0]?.value
+    const toSignData = await this.getRgbToSignData({
+      psbt: psbt.toHex(),
+      action: {
+        name: 'Withdraw RGB Fee Pool',
+        description: '',
+        details: [
+          { label: 'To', type: PsbtActionDetailType.ADDRESS, value: account.address },
+          { label: 'Amount', type: PsbtActionDetailType.TEXT, value: `${amount || 0} sats` },
+        ],
+        type: PsbtActionType.CUSTOM,
+      },
+    })
+    return { toSignData, amount }
+  }
+
+  createRgbFeePoolWithdrawEnd = async (params: { signedPsbt: string }) => {
+    const signedPsbt = psbtFromString(params.signedPsbt)
+    const transaction = signedPsbt.extractTransaction(true)
+    const spentOutpoints = transaction.ins.map(input => ({
+      txid: Buffer.from(input.hash).reverse().toString('hex'),
+      vout: input.index,
+    }))
+    const txid = await this.pushTx(transaction.toHex())
+    const { service } = await this.getLocalRgbService()
+    await service.removeFeePoolUtxos(spentOutpoints)
+    return { txid }
   }
 
   createRgbFeePoolTopUpBegin = async (params: { feeRate?: number } = {}) => {

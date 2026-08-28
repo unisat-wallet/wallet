@@ -2786,6 +2786,36 @@
   "rgb": {
     "message": "RGB"
   },
+  "rgb_advanced": {
+    "message": "RGB 進階設定"
+  },
+  "rgb_advanced_desc": {
+    "message": "UTXO 狀態與診斷"
+  },
+  "rgb_utxo_status": {
+    "message": "RGB UTXO 狀態"
+  },
+  "rgb_utxo_summary": {
+    "message": "UTXO 摘要"
+  },
+  "rgb_utxo_summary_counts": {
+    "message": "{utxos} 個 UTXO · {assets} 個含資產 · {invoices} 個已保留給發票"
+  },
+  "rgb_utxo_invoice_reserved": {
+    "message": "已保留給發票"
+  },
+  "rgb_utxo_has_assets": {
+    "message": "含有資產"
+  },
+  "rgb_utxo_available": {
+    "message": "可用"
+  },
+  "rgb_utxo_chain_status": {
+    "message": "{status} · {confirmations} 個確認 · {sats} sats"
+  },
+  "rgb_utxo_empty": {
+    "message": "找不到 RGB UTXO"
+  },
   "rgb_asset": {
     "message": "RGB 資產"
   },
@@ -3015,7 +3045,10 @@
     "message": "BTC 不足，無法支付 RGB 交易手續費。"
   },
   "rgb_fee_pool_title": {
-    "message": "建立 RGB 手續費資金池"
+    "message": "RGB 手續費資金池"
+  },
+  "rgb_fee_pool_withdraw": {
+    "message": "提回 BTC 錢包"
   },
   "rgb_fee_pool_explanation": {
     "message": "發送 RGB 前，錢包需要建立 $count 個可重複使用的手續費 UTXO。這些資金會保留在資金池中供後續 RGB 轉帳使用，並非本次轉帳所花費的手續費。"

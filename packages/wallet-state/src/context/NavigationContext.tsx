@@ -93,6 +93,8 @@ export type RouteParamList = {
   ConnectedSitesScreen: undefined
   AddressTypeScreen: undefined
   AdvancedScreen: undefined
+  RgbUtxoInspectionScreen: undefined
+  RgbFeePoolInspectionScreen: undefined
   ContactsScreen: {
     returnWithNetwork?: ChainType
     lastEditedContactAddress?: string

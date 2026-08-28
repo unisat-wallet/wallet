@@ -2988,7 +2988,10 @@
     "message": "Недостаточно BTC для оплаты комиссии RGB-транзакции."
   },
   "rgb_fee_pool_title": {
-    "message": "Настроить пул комиссий RGB"
+    "message": "Пул комиссий RGB"
+  },
+  "rgb_fee_pool_withdraw": {
+    "message": "Вывести в BTC-кошелёк"
   },
   "rgb_fee_pool_explanation": {
     "message": "Для отправки RGB кошельку нужно создать $count повторно используемых UTXO для комиссий. Эти средства останутся в пуле для будущих RGB-переводов и не являются комиссией этой транзакции."
@@ -3004,6 +3007,36 @@
   },
   "rgb": {
     "message": "RGB"
+  },
+  "rgb_advanced": {
+    "message": "Расширенные настройки RGB"
+  },
+  "rgb_advanced_desc": {
+    "message": "Статус и диагностика UTXO"
+  },
+  "rgb_utxo_status": {
+    "message": "Статус UTXO RGB"
+  },
+  "rgb_utxo_summary": {
+    "message": "Сводка UTXO"
+  },
+  "rgb_utxo_summary_counts": {
+    "message": "UTXO: {utxos} · с активами: {assets} · зарезервировано для инвойсов: {invoices}"
+  },
+  "rgb_utxo_invoice_reserved": {
+    "message": "Зарезервировано для инвойса"
+  },
+  "rgb_utxo_has_assets": {
+    "message": "Содержит активы"
+  },
+  "rgb_utxo_available": {
+    "message": "Доступно"
+  },
+  "rgb_utxo_chain_status": {
+    "message": "{status} · подтверждений: {confirmations} · {sats} sats"
+  },
+  "rgb_utxo_empty": {
+    "message": "UTXO RGB не найдены"
   },
   "rgb_asset": {
     "message": "RGB-актив"

@@ -24,6 +24,7 @@ import type {
   RgbPendingAssetMetadata,
   RgbPendingTransfer,
   RgbPendingUtxoSync,
+  RgbOutpoint,
   RgbServiceDependencies,
   RgbServiceState,
   RgbTransferRequest,
@@ -1133,8 +1134,41 @@ export class RgbService {
     return this.requireState().snapshot
   }
 
+  /**
+   * Diagnostic view for wallet-owned RGB UTXOs. Pending invoices reserve a
+   * blind seal locally, so that reservation is not present in the indexer
+   * snapshot and must be returned separately for the wallet UI.
+   */
+  getUtxoInspection() {
+    const state = this.requireState()
+    return {
+      snapshot: state.snapshot,
+      invoiceReservations: (state.pendingReceives || []).map(receive => ({
+        recipientId: receive.recipientId,
+        assetId: receive.assetId,
+        amount: receive.amount,
+        expirationTimestamp: receive.expirationTimestamp,
+        createdAt: receive.createdAt,
+        txid: receive.seal.txid,
+        vout: receive.seal.vout,
+      })),
+    }
+  }
+
   getPendingFeePoolUtxos() {
     return this.requireState().pendingFeePoolUtxos || []
+  }
+
+  /** Remove locally retained fee-pool outputs once a wallet-only withdrawal spends them. */
+  async removeFeePoolUtxos(outpoints: RgbOutpoint[]) {
+    const state = this.requireState()
+    const spent = new Set(outpoints.map(outpoint => `${outpoint.txid}:${outpoint.vout}`))
+    const pending = state.pendingFeePoolUtxos || []
+    const next = pending.filter(utxo => !spent.has(`${utxo.outpoint.txid}:${utxo.outpoint.vout}`))
+    if (next.length === pending.length) return
+    const rollback = snapshotState(state)
+    state.pendingFeePoolUtxos = next
+    await this.persistWithRecoveryRollback(rollback)
   }
 
   async queueFeePoolUtxos(utxos: RgbFeePoolUtxo[]) {

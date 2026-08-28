@@ -120,9 +120,13 @@ export class RgbWalletCoordinator {
     // covers invoices created while the recovery endpoint was unavailable.
     await service.claimPendingReceives?.()
     await this.dependencies.syncIndexerOutbox(service, wallet)
-    // A pending receipt only needs the chain status of its expected tx. Avoid
-    // refreshing the full UTXO snapshot on every polling pass; a confirmed
-    // receipt below explicitly requests one before settlement.
+    // Invoice availability depends on its funding UTXO being confirmed. This
+    // operation is already rate-limited by RECEIVE_POLL_INTERVAL, so force a
+    // fresh snapshot for unresolved invoices instead of leaving their local
+    // chainStatus at mempool forever.
+    if (this.hasUnconfirmedInvoiceFunding(service)) {
+      await this.syncSnapshot(service, wallet, 0)
+    }
     let processed = await service.processClaimedReceives({
       includeClaimed: false,
       deferConfirmedSettlement: true,
@@ -134,6 +138,21 @@ export class RgbWalletCoordinator {
     if (processed.received) await this.dependencies.syncIndexerOutbox(service, wallet)
     await this.dependencies.syncReceiveHistory(service, wallet)
     return context
+  }
+
+  private hasUnconfirmedInvoiceFunding(service: RgbService): boolean {
+    // Lightweight controller tests and compatibility hosts may not implement
+    // receive tracking. They have no invoice funding state to refresh.
+    const pendingReceives = service.getPendingReceives?.() || []
+    if (!pendingReceives.length) return false
+    const snapshot = service.getSnapshot()
+    return pendingReceives.some(receive => {
+      const funding = snapshot.utxos.find(
+        utxo =>
+          utxo.outpoint.txid === receive.seal.txid && utxo.outpoint.vout === receive.seal.vout
+      )
+      return funding?.chainStatus !== 'confirmed'
+    })
   }
 
   private async syncSnapshot(

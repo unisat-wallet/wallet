@@ -458,6 +458,100 @@ describe('RGB wallet references', () => {
     expect(result).toMatchObject({ local: true, psbtHex: '70736274ff' })
   })
 
+  it('builds a withdrawal that spends only unlocked RGB Fee Pool UTXOs', async () => {
+    const wallet = new WalletController()
+    const account = {
+      type: KeyringType.HdKeyring,
+      pubkey: validCompressedPubkey,
+      address: 'bc1qexample',
+      key: 'account-0',
+      flag: 0,
+      index: 0,
+    }
+    const service = {
+      getPendingTransfers: vi.fn(() => [
+        { prepared: { feeOutpoints: [{ txid: 'a'.repeat(64), vout: 0 }] } },
+      ]),
+    }
+    const sendAllSpy = vi.spyOn(txHelpers, 'sendAllBTC').mockResolvedValue({
+      psbt: { txOutputs: [{ value: 9_000 }], toHex: () => '70736274ff' } as any,
+      toSignInputs: [],
+    })
+
+    vi.mocked(preferenceService.getCurrentAccount).mockReturnValue(account as any)
+    vi.spyOn(wallet as any, 'getLocalRgbService').mockResolvedValue({ service })
+    vi.spyOn(wallet as any, 'getCurrentRgbFeeAccount').mockResolvedValue({
+      address: 'bc1pfeepool',
+      publicKey: validCompressedPubkey,
+    })
+    vi.mocked(walletApiService.bitcoin.getBTCUtxos).mockResolvedValue([
+      {
+        txid: 'a'.repeat(64),
+        vout: 0,
+        satoshis: 10_000,
+        scriptPk: '5120' + '00'.repeat(32),
+        inscriptions: [],
+        atomicals: [],
+        runes: [],
+      },
+      {
+        txid: 'b'.repeat(64),
+        vout: 1,
+        satoshis: 10_000,
+        scriptPk: '5120' + '11'.repeat(32),
+        inscriptions: [],
+        atomicals: [],
+        runes: [],
+      },
+    ] as any)
+    vi.spyOn(wallet, 'getFeeSummary').mockResolvedValue({ list: [{ feeRate: 2 }, { feeRate: 3 }] } as any)
+    vi.spyOn(wallet, 'getRgbToSignData').mockResolvedValue({ psbtHex: '70736274ff' } as any)
+
+    await expect(wallet.createRgbFeePoolWithdrawBegin({ feeRate: 2 })).resolves.toMatchObject({
+      amount: 9_000,
+      toSignData: { psbtHex: '70736274ff' },
+    })
+    expect(sendAllSpy).toHaveBeenCalledWith(
+      expect.objectContaining({
+        toAddress: account.address,
+        feeRate: 2,
+        btcUtxos: [expect.objectContaining({ txid: 'b'.repeat(64), vout: 1 })],
+      })
+    )
+  })
+
+  it('removes locally retained Fee Pool UTXOs after a withdrawal is broadcast', async () => {
+    const wallet = new WalletController()
+    const feeAddress = bitcoin.payments.p2tr({
+      internalPubkey: Buffer.from(validCompressedPubkey, 'hex').subarray(1),
+      network: bitcoin.networks.bitcoin,
+    }).address!
+    const signedPsbt = new bitcoin.Psbt({ network: bitcoin.networks.bitcoin })
+      .addInput({
+        hash: 'c'.repeat(64),
+        index: 2,
+        witnessUtxo: {
+          script: bitcoin.address.toOutputScript(feeAddress, bitcoin.networks.bitcoin),
+          value: 10_000,
+        },
+      })
+      .addOutput({ address: feeAddress, value: 9_000 })
+    signedPsbt.updateInput(0, {
+      finalScriptWitness: Buffer.concat([
+        Buffer.from([2, 1, 0, 33]),
+        Buffer.from(validCompressedPubkey, 'hex'),
+      ]),
+    })
+    const service = { removeFeePoolUtxos: vi.fn().mockResolvedValue(undefined) }
+    vi.spyOn(wallet as any, 'getLocalRgbService').mockResolvedValue({ service })
+    vi.spyOn(wallet, 'pushTx').mockResolvedValue('d'.repeat(64))
+
+    await expect(wallet.createRgbFeePoolWithdrawEnd({ signedPsbt: signedPsbt.toBase64() })).resolves.toEqual({
+      txid: 'd'.repeat(64),
+    })
+    expect(service.removeFeePoolUtxos).toHaveBeenCalledWith([{ txid: 'c'.repeat(64), vout: 2 }])
+  })
+
   it('persists broadcast RGB funding UTXOs before retrying indexer synchronization', async () => {
     const wallet = new WalletController()
     const fundingAddress = bitcoin.payments.p2wpkh({
@@ -657,19 +751,22 @@ describe('RGB wallet references', () => {
 
   it('refreshes the funding UTXO snapshot before reporting a pending invoice status', async () => {
     const wallet = new WalletController()
+    let confirmed = false
     const pendingReceive = {
       invoice: 'rgb:invoice',
       recipientId: 'recipient-id',
       seal: { txid: '11'.repeat(32), vout: 0, blinding: 1n },
     }
     const service = {
-      sync: vi.fn().mockResolvedValue(undefined),
+      sync: vi.fn(async () => {
+        confirmed = true
+      }),
       getPendingReceives: vi.fn(() => [pendingReceive]),
       getSnapshot: vi.fn(() => ({
         utxos: [
           {
             outpoint: { txid: pendingReceive.seal.txid, vout: pendingReceive.seal.vout },
-            chainStatus: 'confirmed',
+            chainStatus: confirmed ? 'confirmed' : 'mempool',
           },
         ],
       })),
@@ -1363,6 +1460,7 @@ describe('RGB wallet references', () => {
     const service = {
       sync: vi.fn(),
       getSnapshot: vi.fn(() => snapshot),
+      getAvailableIssueUtxos: vi.fn(() => snapshot.utxos),
       queueIssue: vi.fn(async (issue: any) => pendingIssues.push(issue)),
       getPendingIssues: vi.fn(() => pendingIssues),
       markIssueSynced: vi.fn(async (assetId: string) => {

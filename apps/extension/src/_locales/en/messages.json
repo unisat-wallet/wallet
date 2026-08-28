@@ -2789,6 +2789,36 @@
   "rgb": {
     "message": "RGB"
   },
+  "rgb_advanced": {
+    "message": "RGB Advanced"
+  },
+  "rgb_advanced_desc": {
+    "message": "UTXO status & diagnostics"
+  },
+  "rgb_utxo_status": {
+    "message": "RGB UTXO Status"
+  },
+  "rgb_utxo_summary": {
+    "message": "UTXO Summary"
+  },
+  "rgb_utxo_summary_counts": {
+    "message": "{utxos} UTXOs · {assets} with assets · {invoices} reserved for invoices"
+  },
+  "rgb_utxo_invoice_reserved": {
+    "message": "Invoice reserved"
+  },
+  "rgb_utxo_has_assets": {
+    "message": "Contains assets"
+  },
+  "rgb_utxo_available": {
+    "message": "Available"
+  },
+  "rgb_utxo_chain_status": {
+    "message": "{status} · {confirmations} confirmations · {sats} sats"
+  },
+  "rgb_utxo_empty": {
+    "message": "No RGB UTXOs found"
+  },
   "rgb_asset": {
     "message": "RGB Asset"
   },
@@ -3018,7 +3048,10 @@
     "message": "Insufficient BTC to fund RGB transaction fees."
   },
   "rgb_fee_pool_title": {
-    "message": "Set up RGB fee pool"
+    "message": "RGB Fee Pool"
+  },
+  "rgb_fee_pool_withdraw": {
+    "message": "Withdraw to BTC wallet"
   },
   "rgb_fee_pool_explanation": {
     "message": "To send RGB, your wallet needs to create $count reusable fee UTXOs. These funds remain in the pool for future RGB transfers; they are not the fee for this transfer."

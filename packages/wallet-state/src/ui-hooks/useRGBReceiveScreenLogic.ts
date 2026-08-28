@@ -407,15 +407,16 @@ export function useRGBReceiveScreenLogic() {
     void loadPendingInvoices()
   }, [loadPendingInvoices])
 
-  const selectedPendingInvoiceStatus = String(selectedPendingInvoice?.status || '').toLowerCase()
-  const selectedPendingInvoiceKey = selectedPendingInvoice?.recipientId || selectedPendingInvoice?.invoice
+  const hasPendingInvoiceAwaitingConfirmation =
+    isRgbPendingInvoiceAwaitingConfirmation(selectedPendingInvoice) ||
+    pendingInvoices.some(isRgbPendingInvoiceAwaitingConfirmation)
 
   useEffect(() => {
-    if (selectedPendingInvoiceStatus !== 'waitingconfirmations') return undefined
+    if (!hasPendingInvoiceAwaitingConfirmation) return undefined
 
     const intervalId = setInterval(() => void loadPendingInvoices(), 10_000)
     return () => clearInterval(intervalId)
-  }, [loadPendingInvoices, selectedPendingInvoiceKey, selectedPendingInvoiceStatus])
+  }, [hasPendingInvoiceAwaitingConfirmation, loadPendingInvoices])
 
   useEffect(() => {
     if (step !== 'create_invoice') return undefined

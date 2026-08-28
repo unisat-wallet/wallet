@@ -103,6 +103,37 @@ function createDependencies(): RgbServiceDependencies {
 }
 
 describe('RgbService', () => {
+  it('includes local pending invoice reservations in the UTXO inspection view', async () => {
+    const dependencies = createDependencies()
+    const service = new RgbService(dependencies)
+    await service.open(wallet)
+    ;(service as any).state.pendingReceives = [
+      {
+        invoice: 'rgb:invoice',
+        recipientId: 'recipient-id',
+        assetId: 'rgb:asset',
+        amount: '50',
+        createdAt: 123,
+        seal: { txid: 'a'.repeat(64), vout: 0, blinding: 1n },
+      },
+    ]
+
+    expect(service.getUtxoInspection()).toEqual({
+      snapshot: service.getSnapshot(),
+      invoiceReservations: [
+        {
+          recipientId: 'recipient-id',
+          assetId: 'rgb:asset',
+          amount: '50',
+          expirationTimestamp: undefined,
+          createdAt: 123,
+          txid: 'a'.repeat(64),
+          vout: 0,
+        },
+      ],
+    })
+  })
+
   it('does not release an invoice after a consignment is awaiting acceptance', async () => {
     const dependencies = createDependencies()
     const service = new RgbService(dependencies)

@@ -655,6 +655,33 @@ export interface WalletController {
     lastError?: string
   }>
 
+  getRgbUtxoInspection(params?: { forceSync?: boolean }): Promise<{
+    snapshot: {
+      syncedAt: number
+      utxos: Array<{
+        outpoint: { txid: string; vout: number }
+        satoshis: number
+        chainStatus?: 'mempool' | 'confirmed' | 'pending_spend' | 'spent' | 'replaced' | 'unknown'
+        confirmations?: number
+        allocations: Array<{
+          assetId: string
+          amount: string
+          settled: boolean
+          spendable: boolean
+        }>
+      }>
+    }
+    invoiceReservations: Array<{
+      recipientId: string
+      assetId?: string
+      amount?: string
+      expirationTimestamp?: number
+      createdAt: number
+      txid: string
+      vout: number
+    }>
+  }>
+
   cancelRgbReceiveInvoice(params: { batchTransferIdx: number; skipSync?: boolean }): Promise<{
     changed: boolean
     [key: string]: any
@@ -744,6 +771,29 @@ export interface WalletController {
     minimumSatoshis: number
     address: string
   }>
+
+  getRgbFeePoolInspection(params?: { feeRate?: number }): Promise<{
+    ready: boolean
+    availableCount: number
+    targetCount: number
+    minimumSatoshis: number
+    address: string
+    utxos: Array<{
+      txid: string
+      vout: number
+      satoshis: number
+      pending: boolean
+      locked: boolean
+      available: boolean
+    }>
+  }>
+
+  createRgbFeePoolWithdrawBegin(params?: { feeRate?: number }): Promise<{
+    toSignData: ToSignData
+    amount?: number
+  }>
+
+  createRgbFeePoolWithdrawEnd(params: { signedPsbt: string }): Promise<{ txid: string }>
 
   createRgbFeePoolTopUpBegin(params?: { feeRate?: number }): Promise<any>
 
