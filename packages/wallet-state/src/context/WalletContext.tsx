@@ -632,6 +632,8 @@ export interface WalletController {
     skipSync?: boolean
   }): Promise<any>
 
+  checkRgbInvoiceAvailability(params: { invoice: string }): Promise<{ available: true }>
+
   getRgbPendingReceiveInvoices(): Promise<{
     list: Array<{
       invoice: string

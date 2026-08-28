@@ -103,6 +103,17 @@ function createDependencies(): RgbServiceDependencies {
 }
 
 describe('RgbService', () => {
+  it('rejects an invoice whose transport recipient ID is already occupied', async () => {
+    const dependencies = createDependencies()
+    dependencies.transport.checkConsignmentAvailability = vi.fn().mockResolvedValue(false)
+    const service = new RgbService(dependencies)
+    await service.open(wallet)
+
+    await expect(service.checkInvoiceAvailability(rgbInvoice())).rejects.toMatchObject({
+      code: 'RGB_INVOICE_UNAVAILABLE',
+    })
+  })
+
   it('includes local pending invoice reservations in the UTXO inspection view', async () => {
     const dependencies = createDependencies()
     const service = new RgbService(dependencies)

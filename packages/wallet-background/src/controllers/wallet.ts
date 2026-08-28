@@ -3559,6 +3559,12 @@ export class WalletController extends BaseController {
     return this.rgbReceiveOperations.createBlindReceive(params)
   }
 
+  /** Wallet-only, read-only transport preflight used before presenting an RGB send signature. */
+  checkRgbInvoiceAvailability = async (params: { invoice: string }) => {
+    const { service } = await this.getLocalRgbService()
+    return service.checkInvoiceAvailability(params.invoice)
+  }
+
   getRgbPendingReceiveInvoices = () => this.rgbReceiveOperations.getPendingReceiveInvoices()
 
   getRgbRecoveryCheckpointStatus = async () => {

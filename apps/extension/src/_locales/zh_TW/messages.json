@@ -3104,6 +3104,12 @@
   "rgb_invoice_unavailable": {
     "message": "此 RGB 發票無法使用，請收款方建立新的發票。"
   },
+  "rgb_invoice_checking": {
+    "message": "正在檢查 RGB 發票是否可用…"
+  },
+  "rgb_invoice_transport_unreachable": {
+    "message": "無法檢查 RGB 發票的傳輸端點。"
+  },
   "invoice_asset_mismatch": {
     "message": "發票資產與此 RGB 代幣不符。"
   },

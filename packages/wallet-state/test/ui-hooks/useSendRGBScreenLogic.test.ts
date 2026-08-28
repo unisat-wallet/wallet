@@ -9,6 +9,26 @@ import {
 import { createHookTestHarness } from './testHelpers'
 
 describe('useSendRGBScreenLogic', () => {
+  it('blocks signing when the pasted RGB invoice recipient ID is unavailable', async () => {
+    const assetId = 'rgb:test-asset'
+    const invoice = 'rgb:test-asset/~/~/bc:utxob:test?amount=1&endpoints=rpc://proxy'
+    const { wrapper, wallet } = createHookTestHarness({
+      routeState: {
+        assetId,
+        tokenBalance: { assetId, ticker: 'RGB', precision: 8, spendable: '150000000' },
+      },
+    })
+    wallet.checkRgbInvoiceAvailability = vi.fn().mockRejectedValue({ code: 'RGB_INVOICE_UNAVAILABLE' })
+    wallet.createRgbSendBegin = vi.fn()
+    const { result } = renderHook(() => useSendRGBScreenLogic(), { wrapper })
+
+    act(() => result.current.onInvoiceChange(invoice))
+    await act(async () => result.current.onClickNext())
+
+    expect(wallet.createRgbSendBegin).not.toHaveBeenCalled()
+    expect(result.current.invoiceValidationMessage).toBe('rgb_invoice_unavailable')
+  })
+
   it('shows the required, available, and missing BTC for an RGB fee-pool top-up', () => {
     const t = vi.fn((key: string, substitutions?: Record<string, string>) =>
       `${key}:${substitutions?.required}:${substitutions?.available}:${substitutions?.missing}`

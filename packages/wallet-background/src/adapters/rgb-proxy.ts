@@ -10,6 +10,7 @@ type JsonRpcResponse<T> = {
 }
 
 const NOT_FOUND_CODES = new Set([-302, -400])
+const RGB_PROXY_REQUEST_TIMEOUT_MS = 10_000
 
 function normalizeEndpoints(endpoints: string[]) {
   return endpoints
@@ -18,9 +19,34 @@ function normalizeEndpoints(endpoints: string[]) {
 }
 
 function toHttpEndpoint(endpoint: string) {
-  if (endpoint.startsWith('rpcs://')) return `https://${endpoint.slice('rpcs://'.length)}`
-  if (endpoint.startsWith('https://')) return endpoint
-  throw new Error(`Unsupported RGB proxy endpoint: ${endpoint}`)
+  const value = endpoint.startsWith('rpcs://')
+    ? `https://${endpoint.slice('rpcs://'.length)}`
+    : endpoint
+  let url: URL
+  try {
+    url = new URL(value)
+  } catch {
+    throw new Error(`Unsupported RGB proxy endpoint: ${endpoint}`)
+  }
+  const hostname = url.hostname.toLowerCase()
+  const isIpLiteral =
+    /^(?:\d{1,3}\.){3}\d{1,3}$/.test(hostname) ||
+    hostname.startsWith('[') ||
+    hostname.includes(':')
+  if (
+    url.protocol !== 'https:' ||
+    url.username ||
+    url.password ||
+    hostname === 'localhost' ||
+    hostname.endsWith('.localhost') ||
+    isIpLiteral
+  ) {
+    throw new Error(`Unsupported RGB proxy endpoint: ${endpoint}`)
+  }
+  // Query strings and fragments are not part of an RGB proxy endpoint and
+  // would otherwise make endpoint normalization ambiguous.
+  if (url.search || url.hash) throw new Error(`Unsupported RGB proxy endpoint: ${endpoint}`)
+  return `${url.origin}${url.pathname === '/' ? '' : url.pathname}`
 }
 
 function rpcId() {
@@ -39,12 +65,22 @@ async function readRpcResponse<T>(response: Response): Promise<JsonRpcResponse<T
 }
 
 async function postJson<T>(endpoint: string, method: string, params: Record<string, unknown>) {
-  const response = await fetch(toHttpEndpoint(endpoint), {
+  const response = await fetchWithTimeout(toHttpEndpoint(endpoint), {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ jsonrpc: '2.0', id: rpcId(), method, params }),
   })
   return readRpcResponse<T>(response)
+}
+
+async function fetchWithTimeout(input: RequestInfo | URL, init: RequestInit) {
+  const controller = new AbortController()
+  const timeout = setTimeout(() => controller.abort(), RGB_PROXY_REQUEST_TIMEOUT_MS)
+  try {
+    return await fetch(input, { ...init, signal: controller.signal })
+  } finally {
+    clearTimeout(timeout)
+  }
 }
 
 function base64ToBytes(value: string) {
@@ -64,7 +100,7 @@ async function postConsignment(endpoint: string, consignment: RgbTransportConsig
     new Blob([base64ToBytes(consignment.payload)], { type: 'application/octet-stream' }),
     'consignment.rgb'
   )
-  const response = await fetch(toHttpEndpoint(endpoint), { method: 'POST', body: form })
+  const response = await fetchWithTimeout(toHttpEndpoint(endpoint), { method: 'POST', body: form })
   const body = await readRpcResponse<boolean>(response)
   if (body.error)
     throw new Error(`RGB proxy consignment.post failed: ${body.error.message || body.error.code}`)
@@ -148,6 +184,36 @@ export function createRgbProxyTransport(proxyEndpoints: string[] = []): RgbTrans
         }
       }
       return undefined
+    },
+
+    checkConsignmentAvailability: async ({ recipientId, endpoints: invoiceEndpoints }) => {
+      let occupiedEndpoints = 0
+      let lastError: unknown
+      for (const endpoint of invoiceEndpoints) {
+        try {
+          const body = await postJson<{ consignment?: string; txid?: string } | null>(
+            endpoint,
+            'consignment.get',
+            { recipient_id: recipientId }
+          )
+          if (body.error) {
+            if (NOT_FOUND_CODES.has(body.error.code || 0)) return true
+            throw new Error(
+              `RGB proxy consignment.get failed: ${body.error.message || body.error.code}`
+            )
+          }
+          // A present consignment means this endpoint cannot accept another
+          // upload for the same blinded recipient ID. `null` is treated as an
+          // empty endpoint for proxy implementations that use JSON-RPC null
+          // instead of a not-found error.
+          if (!body.result?.consignment) return true
+          occupiedEndpoints += 1
+        } catch (error) {
+          lastError = error
+        }
+      }
+      if (occupiedEndpoints === invoiceEndpoints.length) return false
+      throw lastError || new Error('Unable to check RGB invoice transport endpoint')
     },
 
     acknowledgeConsignment: async ({ recipientId, endpoints, acknowledged }) => {

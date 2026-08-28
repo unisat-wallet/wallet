@@ -1,5 +1,5 @@
 import { SignPsbtParams, SignedData } from '@unisat/wallet-shared'
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useI18n, useNavigation, useTools, useWallet } from 'src/context'
 import { useFeeRateBar } from 'src/hooks'
 import {
@@ -25,6 +25,8 @@ const BLOCKING_RGB_SEND_STATUSES = new Set([
 ])
 const RGB_INVOICE_UNAVAILABLE_ERROR_CODE = 'RGB_INVOICE_UNAVAILABLE'
 const RGB_FEE_POOL_INSUFFICIENT_BTC_ERROR_CODE = 'RGB_FEE_POOL_INSUFFICIENT_BTC'
+
+type InvoiceAvailability = 'idle' | 'checking' | 'available' | 'unavailable' | 'error'
 
 export type RgbFeePoolRequirement = {
   requiredSatoshis: number
@@ -146,6 +148,14 @@ function getRgbBeginTxid(value: unknown) {
   return ''
 }
 
+function isRgbInvoiceUnavailable(error: unknown) {
+  const record = error && typeof error === 'object' ? (error as Record<string, unknown>) : undefined
+  return (
+    record?.['code'] === RGB_INVOICE_UNAVAILABLE_ERROR_CODE ||
+    record?.['message'] === RGB_INVOICE_UNAVAILABLE_ERROR_CODE
+  )
+}
+
 export function useSendRGBScreenLogic() {
   const nav = useNavigation()
   const wallet = useWallet()
@@ -160,6 +170,8 @@ export function useSendRGBScreenLogic() {
   const [step, setStep] = useState(SendRGBScreenStep.CREATE_TX)
   const [signRequestVersion, setSignRequestVersion] = useState(0)
   const [blockingSendStatus, setBlockingSendStatus] = useState<string>()
+  const [invoiceAvailability, setInvoiceAvailability] = useState<InvoiceAvailability>('idle')
+  const [invoiceAvailabilityError, setInvoiceAvailabilityError] = useState('')
   const transferData = useRef<{
     toSignData?: any
     beginResult?: any
@@ -181,12 +193,21 @@ export function useSendRGBScreenLogic() {
     invoice.trim().length > 0 &&
     decodedInvoice.valid &&
     hasTransportEndpoint &&
-    !invoiceAssetMismatch
+    !invoiceAssetMismatch &&
+    invoiceAvailability !== 'checking' &&
+    invoiceAvailability !== 'unavailable' &&
+    invoiceAvailability !== 'error'
   const invoiceValidationMessage = invoiceInvalid
     ? t('invalid_rgb_invoice')
     : invoiceAssetMismatch
       ? t('invoice_asset_mismatch')
-      : ''
+      : invoiceAvailability === 'checking'
+        ? t('rgb_invoice_checking')
+        : invoiceAvailability === 'unavailable'
+          ? t('rgb_invoice_unavailable')
+          : invoiceAvailability === 'error'
+            ? invoiceAvailabilityError || t('rgb_invoice_transport_unreachable')
+            : ''
   const requiresAmount = invoice.trim().length > 0 && decodedInvoice.needsAmount
   const amountInput = amount.trim()
   const assetPrecision = getRgbTokenPrecision(tokenBalance)
@@ -229,6 +250,55 @@ export function useSendRGBScreenLogic() {
     }
   }, [assetId, wallet])
 
+  const checkInvoiceAvailability = useCallback(async () => {
+    if (typeof wallet.checkRgbInvoiceAvailability !== 'function') return
+    setInvoiceAvailability('checking')
+    setInvoiceAvailabilityError('')
+    try {
+      await wallet.checkRgbInvoiceAvailability({ invoice: decodedInvoice.submissionInvoice })
+      setInvoiceAvailability('available')
+    } catch (error) {
+      if (isRgbInvoiceUnavailable(error)) {
+        setInvoiceAvailability('unavailable')
+        throw error
+      }
+      setInvoiceAvailability('error')
+      setInvoiceAvailabilityError(error instanceof Error ? error.message : String(error))
+      throw error
+    }
+  }, [decodedInvoice.submissionInvoice, wallet])
+
+  useEffect(() => {
+    if (!decodedInvoice.valid || !hasTransportEndpoint || invoiceAssetMismatch) {
+      setInvoiceAvailability('idle')
+      setInvoiceAvailabilityError('')
+      return undefined
+    }
+    let canceled = false
+    const timer = setTimeout(() => {
+      setInvoiceAvailability('checking')
+      setInvoiceAvailabilityError('')
+      void wallet
+        .checkRgbInvoiceAvailability({ invoice: decodedInvoice.submissionInvoice })
+        .then(() => {
+          if (!canceled) setInvoiceAvailability('available')
+        })
+        .catch(error => {
+          if (canceled) return
+          if (isRgbInvoiceUnavailable(error)) {
+            setInvoiceAvailability('unavailable')
+            return
+          }
+          setInvoiceAvailability('error')
+          setInvoiceAvailabilityError(error instanceof Error ? error.message : String(error))
+        })
+    }, 400)
+    return () => {
+      canceled = true
+      clearTimeout(timer)
+    }
+  }, [decodedInvoice.submissionInvoice, decodedInvoice.valid, hasTransportEndpoint, invoiceAssetMismatch, wallet])
+
   const disabled = useMemo(() => {
     return (
       !invoiceReadyForAmount ||
@@ -237,7 +307,7 @@ export function useSendRGBScreenLogic() {
       insufficientBalance ||
       !!blockingSendStatus
     )
-  }, [invoiceReadyForAmount, feeRate, isAmountValid, insufficientBalance, blockingSendStatus])
+  }, [invoiceReadyForAmount, feeRate, isAmountValid, insufficientBalance, blockingSendStatus, invoiceAvailability])
 
   const onClickBack = () => {
     nav.goBack()
@@ -246,6 +316,8 @@ export function useSendRGBScreenLogic() {
   const onInvoiceChange = (value: string) => {
     setInvoice(value)
     setAmount('')
+    setInvoiceAvailability('idle')
+    setInvoiceAvailabilityError('')
   }
 
   const onAmountChange = (value: string) => {
@@ -300,6 +372,9 @@ export function useSendRGBScreenLogic() {
       if (!decodedInvoice.valid || !hasTransportEndpoint || invoiceAssetMismatch) {
         throw new Error(invoiceValidationMessage || t('invalid_rgb_invoice'))
       }
+      // Always run one final, read-only probe before creating a PSBT: a
+      // recipient ID can be occupied after the debounce check completed.
+      await checkInvoiceAvailability()
       // Keep compatibility with lightweight wallet implementations while the
       // background service rolls out the dedicated fee-pool RPCs.
       const feePool = wallet.getRgbFeePoolStatus
@@ -473,6 +548,7 @@ export function useSendRGBScreenLogic() {
     invoiceInvalid,
     invoiceReadyForAmount,
     invoiceValidationMessage,
+    invoiceAvailability,
     displayAmount,
     amountPlaceholder,
     amountMuted,

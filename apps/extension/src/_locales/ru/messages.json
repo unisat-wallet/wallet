@@ -3101,6 +3101,12 @@
   "rgb_invoice_unavailable": {
     "message": "Этот RGB-инвойс недоступен. Попросите получателя создать новый инвойс."
   },
+  "rgb_invoice_checking": {
+    "message": "Проверка доступности RGB-инвойса…"
+  },
+  "rgb_invoice_transport_unreachable": {
+    "message": "Не удалось проверить транспортный endpoint RGB-инвойса."
+  },
   "invoice_asset_mismatch": {
     "message": "Актив в инвойсе не соответствует этому RGB-токену."
   },

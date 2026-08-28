@@ -3101,6 +3101,12 @@
   "rgb_invoice_unavailable": {
     "message": "この RGB インボイスは利用できません。受取人に新しいインボイスを作成してもらってください。"
   },
+  "rgb_invoice_checking": {
+    "message": "RGB インボイスの利用可否を確認しています…"
+  },
+  "rgb_invoice_transport_unreachable": {
+    "message": "RGB インボイスのトランスポートエンドポイントを確認できません。"
+  },
   "invoice_asset_mismatch": {
     "message": "インボイスの資産がこの RGB トークンと一致しません。"
   },

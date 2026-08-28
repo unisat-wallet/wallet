@@ -3107,6 +3107,12 @@
   "rgb_invoice_unavailable": {
     "message": "This RGB invoice is unavailable. Ask the recipient to create a new invoice."
   },
+  "rgb_invoice_checking": {
+    "message": "Checking RGB invoice availability…"
+  },
+  "rgb_invoice_transport_unreachable": {
+    "message": "Unable to check the RGB invoice transport endpoint."
+  },
   "invoice_asset_mismatch": {
     "message": "Invoice asset does not match this RGB token."
   },

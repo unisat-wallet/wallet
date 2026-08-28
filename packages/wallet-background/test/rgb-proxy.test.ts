@@ -11,6 +11,12 @@ function rpcResponse(result: unknown) {
   })
 }
 
+function rpcError(code: number, message: string) {
+  return new Response(JSON.stringify({ jsonrpc: '2.0', id: '1', error: { code, message } }), {
+    headers: { 'Content-Type': 'application/json' },
+  })
+}
+
 describe('RGB proxy transport', () => {
   const fetchMock = vi.fn()
 
@@ -79,6 +85,44 @@ describe('RGB proxy transport', () => {
     )
   })
 
+  it('checks invoice availability without uploading a consignment', async () => {
+    fetchMock
+      .mockResolvedValueOnce(
+        rpcResponse({ consignment: Buffer.from('existing').toString('base64'), txid: 'c'.repeat(64) })
+      )
+      .mockResolvedValueOnce(rpcError(-302, 'not found'))
+    const transport = createRgbProxyTransport([endpoint])
+
+    await expect(
+      transport.checkConsignmentAvailability?.({
+        recipientId,
+        endpoints: [endpoint, 'rpcs://backup.example'],
+      })
+    ).resolves.toBe(true)
+    expect(fetchMock).toHaveBeenCalledTimes(2)
+    expect(fetchMock.mock.calls.every(([, options]) => String(options?.body).includes('consignment.get'))).toBe(
+      true
+    )
+  })
+
+  it('marks an invoice unavailable when every endpoint already has a consignment', async () => {
+    fetchMock
+      .mockResolvedValueOnce(
+        rpcResponse({ consignment: Buffer.from('existing').toString('base64'), txid: 'c'.repeat(64) })
+      )
+      .mockResolvedValueOnce(
+        rpcResponse({ consignment: Buffer.from('existing').toString('base64'), txid: 'c'.repeat(64) })
+      )
+    const transport = createRgbProxyTransport([endpoint])
+
+    await expect(
+      transport.checkConsignmentAvailability?.({
+        recipientId,
+        endpoints: [endpoint, 'rpcs://backup.example'],
+      })
+    ).resolves.toBe(false)
+  })
+
   it.each(['rpc://proxy.example', 'http://proxy.example'])('rejects insecure endpoint %s', async insecureEndpoint => {
     const transport = createRgbProxyTransport([insecureEndpoint])
     const consignment = {
@@ -92,6 +136,24 @@ describe('RGB proxy transport', () => {
 
     await expect(transport.publishConsignment(consignment)).rejects.toThrow(
       `Unsupported RGB proxy endpoint: ${insecureEndpoint}`
+    )
+    expect(fetchMock).not.toHaveBeenCalled()
+  })
+
+  it.each(['rpcs://127.0.0.1:3000', 'https://[::1]', 'https://localhost'])
+  ('rejects local or IP-literal endpoint %s', async unsafeEndpoint => {
+    const transport = createRgbProxyTransport([unsafeEndpoint])
+    const consignment = {
+      recipientId,
+      payload: Buffer.from('consignment').toString('base64'),
+      assetId: 'rgb:asset',
+      opIds: ['a'.repeat(64)],
+      txid: 'b'.repeat(64),
+      endpoints: [unsafeEndpoint],
+    }
+
+    await expect(transport.publishConsignment(consignment)).rejects.toThrow(
+      `Unsupported RGB proxy endpoint: ${unsafeEndpoint}`
     )
     expect(fetchMock).not.toHaveBeenCalled()
   })

@@ -1190,6 +1190,29 @@ export class RgbService {
     return Object.entries(this.requireState().pending).map(([id, pending]) => ({ id, ...pending }))
   }
 
+  /**
+   * Read-only invoice transport preflight. This prevents signing for a blind
+   * recipient ID that a proxy has already bound to another consignment.
+   */
+  async checkInvoiceAvailability(invoiceText: string) {
+    const invoice = decodeRgbInvoice(invoiceText)
+    if (invoice.network && invoice.network !== this.requireState().wallet.network) {
+      throw new RgbServiceError('RGB invoice network does not match the current wallet')
+    }
+    if (invoice.expirationTimestamp && invoice.expirationTimestamp <= Math.floor(this.now() / 1000)) {
+      throw new RgbServiceError('RGB invoice has expired')
+    }
+    if (!invoice.transportEndpoints.length) {
+      throw new RgbServiceError('RGB invoice has no proxy transport endpoint')
+    }
+    const available = await this.dependencies.transport.checkConsignmentAvailability?.({
+      recipientId: invoice.recipientId,
+      endpoints: invoice.transportEndpoints,
+    })
+    if (available === false) throw new RgbInvoiceUnavailableError()
+    return { available: true }
+  }
+
   async prepareSend(request: RgbTransferRequest) {
     const previous = this.prepareSendInFlight
     let release = () => undefined

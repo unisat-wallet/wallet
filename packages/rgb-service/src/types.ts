@@ -361,6 +361,11 @@ export interface RgbTransport {
     recipientId: string
     endpoints: string[]
   }): Promise<RgbReceivedConsignment | undefined>
+  /** Read-only check that at least one invoice endpoint has no consignment for this recipient ID. */
+  checkConsignmentAvailability?(input: {
+    recipientId: string
+    endpoints: string[]
+  }): Promise<boolean>
   acknowledgeConsignment?(input: {
     recipientId: string
     endpoints: string[]

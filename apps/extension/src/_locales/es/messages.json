@@ -3092,6 +3092,12 @@
   "rgb_invoice_unavailable": {
     "message": "Esta factura RGB no está disponible. Pide al destinatario que cree una nueva factura."
   },
+  "rgb_invoice_checking": {
+    "message": "Comprobando la disponibilidad de la factura RGB…"
+  },
+  "rgb_invoice_transport_unreachable": {
+    "message": "No se puede comprobar el endpoint de transporte de la factura RGB."
+  },
   "invoice_asset_mismatch": {
     "message": "El activo de la factura no coincide con este token RGB."
   },
