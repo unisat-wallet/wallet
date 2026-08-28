@@ -474,7 +474,8 @@ export function useRGBReceiveScreenLogic() {
     setLoadingText('Preparing RGB UTXO...')
     const beginResult = await wallet.createRgbUtxosBegin({
       upTo: true,
-      num: 1,
+      // One funding transaction amortizes several future blind invoices.
+      num: 5,
       feeRate,
     })
     const beginResultRecord =

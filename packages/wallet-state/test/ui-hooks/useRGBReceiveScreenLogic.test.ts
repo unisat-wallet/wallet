@@ -378,7 +378,7 @@ describe('useRGBReceiveScreenLogic', () => {
     })
 
     expect(wallet.createRgbUtxosBegin).toHaveBeenCalledWith(
-      expect.objectContaining({ num: 1, upTo: true })
+      expect.objectContaining({ num: 5, upTo: true })
     )
     expect(result.current.error).toBe('')
   })
