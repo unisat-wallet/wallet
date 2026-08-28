@@ -177,7 +177,7 @@ export default function SendRGBScreen() {
           ) : null}
 
           <Column gap="sm">
-            <FeeRateBar />
+            <FeeRateBar disableLowFeeMode />
           </Column>
 
           {error ? <Text text={error} color="error" wrap /> : null}

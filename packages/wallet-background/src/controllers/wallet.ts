@@ -3610,7 +3610,9 @@ export class WalletController extends BaseController {
         })
       }
     })
-    const minimumSatoshis = Math.max(RGB_FEE_POOL_UTXO_SATS, Math.ceil((params.feeRate || 1) * 500 * 2))
+    // Keep fee-pool outputs at the configured pool unit. RGB PSBT building
+    // combines multiple pool UTXOs when a higher relay-safe fee is required.
+    const minimumSatoshis = RGB_FEE_POOL_UTXO_SATS
     const utxos = [...all.entries()]
       .map(([key, utxo]) => ({
         ...utxo,

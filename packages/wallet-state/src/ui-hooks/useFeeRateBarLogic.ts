@@ -147,7 +147,13 @@ function buildPlaceholderFeeOptions(
   return list
 }
 
-export function useFeeRateBarLogic({ readonly }: { readonly?: boolean }) {
+export function useFeeRateBarLogic({
+  readonly,
+  disableLowFeeMode = false,
+}: {
+  readonly?: boolean
+  disableLowFeeMode?: boolean
+}) {
   const wallet = useWallet()
   const [feeOptions, setFeeOptions] = useState<FeeOption[]>([])
   const feeRateBarState = useFeeRateBar()
@@ -162,7 +168,8 @@ export function useFeeRateBarLogic({ readonly }: { readonly?: boolean }) {
 
   const [showLowFeeModeTipsPopover, setShowLowFeeModeTipsPopover] = useState(false)
 
-  const supportLowFeeMode = chain.enableLowFeeMode ?? false
+  const supportLowFeeMode = (chain.enableLowFeeMode ?? false) && !disableLowFeeMode
+  const minimumFeeRate = supportLowFeeMode ? 0.1 : 1
 
   const placeholderFeeOptions = useMemo(
     () =>
@@ -170,9 +177,9 @@ export function useFeeRateBarLogic({ readonly }: { readonly?: boolean }) {
         supportLowFeeMode,
         readonly,
         t,
-        feeRate > 0 ? feeRate : DEFAULT_FEE_RATE
+        feeRate > 0 ? Math.max(feeRate, minimumFeeRate) : DEFAULT_FEE_RATE
       ),
-    [supportLowFeeMode, readonly, t, feeRate]
+    [supportLowFeeMode, readonly, t, feeRate, minimumFeeRate]
   )
 
   const hasLoadedFeeOptions = feeOptions.length > 0
@@ -198,13 +205,19 @@ export function useFeeRateBarLogic({ readonly }: { readonly?: boolean }) {
       }
     }
 
-    const translatedList = formatFeeRateTextKey(feeSummary.list, isFractal, supportLowFeeMode, t)
+    const normalizedList = supportLowFeeMode
+      ? feeSummary.list
+      : feeSummary.list.map((option) => ({
+          ...option,
+          feeRate: Math.max(option.feeRate, minimumFeeRate),
+        }))
+    const translatedList = formatFeeRateTextKey(normalizedList, isFractal, supportLowFeeMode, t)
     const options = readonly
       ? translatedList
       : [...translatedList, { type: FeeRateType.CUSTOM, title: t('custom'), feeRate: 0 }]
 
     setFeeOptions(options)
-  }, [wallet, isFractal, t, supportLowFeeMode, readonly])
+  }, [wallet, isFractal, t, supportLowFeeMode, readonly, minimumFeeRate])
 
   // Memoize default value to avoid repeated calculations
   const defaultFeeRate = useMemo(
@@ -220,6 +233,14 @@ export function useFeeRateBarLogic({ readonly }: { readonly?: boolean }) {
       val = resolvedFeeOptions[feeOptionIndex]?.feeRate ?? defaultFeeRate
     }
 
+    if (val < minimumFeeRate) {
+      updateFeeRateBar({
+        feeRate: minimumFeeRate,
+        ...(feeOptionIndex === FeeRateType.CUSTOM ? { feeRateInputVal: minimumFeeRate.toString() } : {}),
+      })
+      return
+    }
+
     if (val.toString() == feeRate.toString()) {
       return
     }
@@ -229,7 +250,7 @@ export function useFeeRateBarLogic({ readonly }: { readonly?: boolean }) {
     }
 
     updateFeeRateBar({ feeRate: val })
-  }, [resolvedFeeOptions, feeOptionIndex, feeRateInputVal, defaultFeeRate, feeRate])
+  }, [resolvedFeeOptions, feeOptionIndex, feeRateInputVal, defaultFeeRate, feeRate, minimumFeeRate])
 
   const adjustFeeRateInput = useCallback(
     (inputVal: string) => {
@@ -266,9 +287,9 @@ export function useFeeRateBarLogic({ readonly }: { readonly?: boolean }) {
         return
       }
 
-      // Allow intermediate input like "0" or "0." for typing "0.1"
+      // Low-fee mode permits typing 0.1; otherwise keep the input relay-safe.
       if (inputVal === '0' || inputVal.endsWith('.')) {
-        updateFeeRateBar({ feeRateInputVal: inputVal })
+        updateFeeRateBar({ feeRateInputVal: supportLowFeeMode ? inputVal : '1' })
         return
       }
 
@@ -277,10 +298,8 @@ export function useFeeRateBarLogic({ readonly }: { readonly?: boolean }) {
         updateFeeRateBar({ feeRateInputVal: defaultFeeRate.toString() })
       } else if (val > MAX_FEE_RATE) {
         updateFeeRateBar({ feeRateInputVal: MAX_FEE_RATE.toString() })
-      } else if (val < 1 && supportLowFeeMode == false) {
-        updateFeeRateBar({ feeRateInputVal: '1' })
-      } else if (val < 0.1) {
-        updateFeeRateBar({ feeRateInputVal: '0.1' })
+      } else if (val < minimumFeeRate) {
+        updateFeeRateBar({ feeRateInputVal: minimumFeeRate.toString() })
       } else {
         updateFeeRateBar({ feeRateInputVal: inputVal })
       }
@@ -292,6 +311,7 @@ export function useFeeRateBarLogic({ readonly }: { readonly?: boolean }) {
       resolvedFeeOptions,
       hasLoadedFeeOptions,
       supportLowFeeMode,
+      minimumFeeRate,
     ]
   )
 
