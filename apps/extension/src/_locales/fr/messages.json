@@ -3002,6 +3002,15 @@
   "rgb_fee_pool_add_at_least": {
     "message": "Ajouter au moins"
   },
+  "rgb_fee_pool_ready_title": {
+    "message": "Le pool de frais RGB est prêt"
+  },
+  "rgb_fee_pool_ready_description": {
+    "message": "Votre UTXO de frais RGB réutilisable a été créé. Continuez pour vérifier et signer séparément le transfert RGB."
+  },
+  "rgb_fee_pool_continue": {
+    "message": "Continuer vers le transfert RGB"
+  },
   "rgb_psbt_signing_missing_result": {
     "message": "La signature PSBT RGB n’a pas renvoyé psbtHex"
   },

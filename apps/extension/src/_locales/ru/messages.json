@@ -3002,6 +3002,15 @@
   "rgb_fee_pool_add_at_least": {
     "message": "Пополнить как минимум на"
   },
+  "rgb_fee_pool_ready_title": {
+    "message": "Пул комиссий RGB готов"
+  },
+  "rgb_fee_pool_ready_description": {
+    "message": "Создан повторно используемый UTXO для комиссий RGB. Продолжите, чтобы отдельно проверить и подписать RGB-перевод."
+  },
+  "rgb_fee_pool_continue": {
+    "message": "Продолжить RGB-перевод"
+  },
   "rgb_psbt_signing_missing_result": {
     "message": "Подписание RGB PSBT не вернуло psbtHex"
   },

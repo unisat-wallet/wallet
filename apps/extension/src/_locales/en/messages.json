@@ -3062,6 +3062,15 @@
   "rgb_fee_pool_add_at_least": {
     "message": "Add at least"
   },
+  "rgb_fee_pool_ready_title": {
+    "message": "RGB fee pool is ready"
+  },
+  "rgb_fee_pool_ready_description": {
+    "message": "Your reusable RGB fee UTXO has been created. Continue to review and sign the RGB transfer separately."
+  },
+  "rgb_fee_pool_continue": {
+    "message": "Continue to RGB transfer"
+  },
   "rgb_psbt_signing_missing_result": {
     "message": "RGB PSBT signing did not return psbtHex"
   },

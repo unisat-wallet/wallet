@@ -74,10 +74,12 @@ export default function SendRGBScreen() {
     disabled,
     onClickBack,
     onClickNext,
+    signRequestVersion,
     signPsbtParams,
     onSignPsbtHandleBack,
     onSignPsbtHandleCancel,
-    onSignPsbtHandleConfirm
+    onSignPsbtHandleConfirm,
+    onContinueAfterFeePoolTopUp
   } = useSendRGBScreenLogic();
 
   const invoiceRef = useRef<HTMLTextAreaElement>(null);
@@ -95,11 +97,29 @@ export default function SendRGBScreen() {
   if (step === SendRGBScreenStep.SIGN_TX) {
     return (
       <SignPsbt
+        key={`rgb-sign-${signRequestVersion}`}
         header={<Header onBack={onSignPsbtHandleBack} />}
         params={signPsbtParams}
         handleCancel={onSignPsbtHandleCancel}
         handleConfirm={onSignPsbtHandleConfirm}
       />
+    );
+  }
+
+  if (step === SendRGBScreenStep.FEE_POOL_COMPLETED) {
+    return (
+      <Layout>
+        <Header onBack={onClickBack} />
+        <Content>
+          <Column gap="xl" style={{ paddingTop: 40 }}>
+            <Column gap="md" itemsCenter>
+              <Text text={t('rgb_fee_pool_ready_title')} color="white" size="lg" textCenter />
+              <Text text={t('rgb_fee_pool_ready_description')} color="white_muted2" size="sm" textCenter wrap />
+            </Column>
+            <Button preset="primary" text={t('rgb_fee_pool_continue')} onClick={onContinueAfterFeePoolTopUp} />
+          </Column>
+        </Content>
+      </Layout>
     );
   }
 

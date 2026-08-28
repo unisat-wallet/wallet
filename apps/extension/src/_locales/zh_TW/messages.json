@@ -3059,6 +3059,15 @@
   "rgb_fee_pool_add_at_least": {
     "message": "至少再存入"
   },
+  "rgb_fee_pool_ready_title": {
+    "message": "RGB 手續費資金池已就緒"
+  },
+  "rgb_fee_pool_ready_description": {
+    "message": "已建立可重複使用的 RGB 手續費 UTXO。請繼續單獨檢視並簽名 RGB 轉帳。"
+  },
+  "rgb_fee_pool_continue": {
+    "message": "繼續 RGB 轉帳"
+  },
   "rgb_psbt_signing_missing_result": {
     "message": "RGB PSBT 簽名未返回 psbtHex"
   },

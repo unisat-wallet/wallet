@@ -2993,6 +2993,15 @@
   "rgb_fee_pool_add_at_least": {
     "message": "Agregar al menos"
   },
+  "rgb_fee_pool_ready_title": {
+    "message": "El fondo de comisiones RGB está listo"
+  },
+  "rgb_fee_pool_ready_description": {
+    "message": "Se creó tu UTXO reutilizable para comisiones RGB. Continúa para revisar y firmar la transferencia RGB por separado."
+  },
+  "rgb_fee_pool_continue": {
+    "message": "Continuar con la transferencia RGB"
+  },
   "rgb_psbt_signing_missing_result": {
     "message": "La firma PSBT de RGB no devolvió psbtHex"
   },

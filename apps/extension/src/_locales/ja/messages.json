@@ -3002,6 +3002,15 @@
   "rgb_fee_pool_add_at_least": {
     "message": "少なくとも追加"
   },
+  "rgb_fee_pool_ready_title": {
+    "message": "RGB 手数料プールの準備ができました"
+  },
+  "rgb_fee_pool_ready_description": {
+    "message": "再利用可能な RGB 手数料 UTXO が作成されました。続けて RGB 送金を個別に確認し、署名してください。"
+  },
+  "rgb_fee_pool_continue": {
+    "message": "RGB 送金を続ける"
+  },
   "rgb_psbt_signing_missing_result": {
     "message": "RGB PSBT 署名で psbtHex が返されませんでした"
   },

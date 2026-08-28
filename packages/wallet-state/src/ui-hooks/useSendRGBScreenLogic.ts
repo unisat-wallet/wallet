@@ -14,6 +14,7 @@ import { decodeRgbInvoice } from 'src/utils/rgb-invoice-utils'
 export enum SendRGBScreenStep {
   CREATE_TX,
   SIGN_TX,
+  FEE_POOL_COMPLETED,
 }
 
 const BLOCKING_RGB_SEND_STATUSES = new Set([
@@ -157,7 +158,7 @@ export function useSendRGBScreenLogic() {
   const [error, setError] = useState('')
   const [feePoolRequirement, setFeePoolRequirement] = useState<RgbFeePoolRequirement>()
   const [step, setStep] = useState(SendRGBScreenStep.CREATE_TX)
-  const [, setSignRequestVersion] = useState(0)
+  const [signRequestVersion, setSignRequestVersion] = useState(0)
   const [blockingSendStatus, setBlockingSendStatus] = useState<string>()
   const transferData = useRef<{
     toSignData?: any
@@ -308,6 +309,7 @@ export function useSendRGBScreenLogic() {
         const topUp = await wallet.createRgbFeePoolTopUpBegin({ feeRate })
         if (!topUp?.toSignData) throw new Error(t('rgb_send_transaction_unavailable'))
         transferData.current = { toSignData: topUp.toSignData, feePoolTopUp: true }
+        setSignRequestVersion(version => version + 1)
         setStep(SendRGBScreenStep.SIGN_TX)
         return
       }
@@ -346,7 +348,8 @@ export function useSendRGBScreenLogic() {
       }
       if (transferData.current.feePoolTopUp) {
         await wallet.createRgbFeePoolTopUpEnd({ signedPsbt })
-        await prepareRgbSend()
+        transferData.current = {}
+        setStep(SendRGBScreenStep.FEE_POOL_COMPLETED)
         return
       }
       const endResult = await wallet.createRgbSendEnd({
@@ -423,6 +426,26 @@ export function useSendRGBScreenLogic() {
     setStep(SendRGBScreenStep.CREATE_TX)
   }
 
+  const onContinueAfterFeePoolTopUp = async () => {
+    tools.showLoading(true)
+    setError('')
+    try {
+      await prepareRgbSend()
+    } catch (e) {
+      setStep(SendRGBScreenStep.CREATE_TX)
+      setError(
+        getSendErrorMessage(
+          e,
+          t('rgb_send_transaction_unavailable'),
+          t('rgb_invoice_unavailable'),
+          t
+        )
+      )
+    } finally {
+      tools.showLoading(false)
+    }
+  }
+
   return {
     step,
     t,
@@ -456,6 +479,7 @@ export function useSendRGBScreenLogic() {
     amountInvalidVisible,
     blockingSendMessage,
     feeRate,
+    signRequestVersion,
     error,
     feePoolRequirement,
     dismissFeePoolRequirement: () => setFeePoolRequirement(undefined),
@@ -466,5 +490,6 @@ export function useSendRGBScreenLogic() {
     onSignPsbtHandleConfirm,
     onSignPsbtHandleCancel,
     onSignPsbtHandleBack,
+    onContinueAfterFeePoolTopUp,
   }
 }

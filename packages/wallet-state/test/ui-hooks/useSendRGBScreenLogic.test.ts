@@ -1,7 +1,11 @@
 import { act, renderHook, waitFor } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
 
-import { getSendErrorMessage, useSendRGBScreenLogic } from '../../src/ui-hooks/useSendRGBScreenLogic'
+import {
+  getSendErrorMessage,
+  SendRGBScreenStep,
+  useSendRGBScreenLogic,
+} from '../../src/ui-hooks/useSendRGBScreenLogic'
 import { createHookTestHarness } from './testHelpers'
 
 describe('useSendRGBScreenLogic', () => {
@@ -231,8 +235,16 @@ describe('useSendRGBScreenLogic', () => {
     })
 
     expect(wallet.createRgbFeePoolTopUpEnd).toHaveBeenCalledWith({ signedPsbt: 'signed-top-up' })
+    expect(result.current.step).toBe(SendRGBScreenStep.FEE_POOL_COMPLETED)
+    expect(wallet.createRgbSendBegin).not.toHaveBeenCalled()
+
+    await act(async () => {
+      await result.current.onContinueAfterFeePoolTopUp()
+    })
+
     expect(wallet.createRgbSendBegin).toHaveBeenCalledWith(expect.objectContaining({ amount: '100000000' }))
     expect(result.current.signPsbtParams.data.toSignDatas[0]?.psbtHex).toBe('rgb-send')
+    expect(result.current.step).toBe(SendRGBScreenStep.SIGN_TX)
   })
 
   it('blocks a new send while the same asset is awaiting recipient acknowledgement', async () => {
