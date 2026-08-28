@@ -737,6 +737,18 @@ export interface WalletController {
     }
   }): Promise<any>
 
+  getRgbFeePoolStatus(params?: { feeRate?: number }): Promise<{
+    ready: boolean
+    availableCount: number
+    targetCount: number
+    minimumSatoshis: number
+    address: string
+  }>
+
+  createRgbFeePoolTopUpBegin(params?: { feeRate?: number }): Promise<any>
+
+  createRgbFeePoolTopUpEnd(params: { signedPsbt: string }): Promise<any>
+
   createRgbSendEnd(params: {
     signedPsbt: string
     transferId?: string

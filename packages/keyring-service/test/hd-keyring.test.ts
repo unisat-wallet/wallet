@@ -345,6 +345,7 @@ describe('bitcoin-hd-keyring', () => {
       const mainnet = keyring.getRgbFundingAccount(NetworkType.MAINNET)
       const testnet = keyring.getRgbFundingAccount(NetworkType.TESTNET)
       const mainnetAccount1 = keyring.getRgbFundingAccount(NetworkType.MAINNET, 1)
+      const mainnetFee = keyring.getRgbFeeAccount(NetworkType.MAINNET)
 
       expect(mainnet.address).toMatch(/^bc1p/)
       expect(testnet.address).toMatch(/^tb1p/)
@@ -353,6 +354,8 @@ describe('bitcoin-hd-keyring', () => {
       expect(testnet.derivationPath).toBe("m/86'/827167'/0'/0/0")
       expect(mainnetAccount1.derivationPath).toBe("m/86'/827166'/1'/0/0")
       expect(mainnetAccount1.address).not.toBe(mainnet.address)
+      expect(mainnetFee.address).not.toBe(mainnet.address)
+      expect(mainnetFee.derivationPath).toContain("/1/0")
     })
   })
 

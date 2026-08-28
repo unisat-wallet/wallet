@@ -550,6 +550,8 @@ function rgbConsignmentOutputScripts(payload?: string) {
   }
 }
 const RGB_FUNDING_UTXO_DUST = 330
+const RGB_FEE_POOL_UTXO_SATS = 10_000
+const RGB_FEE_POOL_TARGET_UTXOS = 3
 
 export const chainTypeToRgbNetwork = (chainType: ChainType): string => {
   const enabled = CHAINS_MAP[chainType]?.rgbProxyEndpoints?.some(endpoint => endpoint.trim())
@@ -3453,6 +3455,25 @@ export class WalletController extends BaseController {
     return keyring.getRgbFundingAccount(this.getNetworkType(), account.index)
   }
 
+  private getCurrentRgbFeeAccount = async (): Promise<{
+    address: string
+    publicKey: string
+    derivationPath: string
+    masterFingerprint: string
+  }> => {
+    this.assertRgbEnabled()
+    const account = preferenceService.getCurrentAccount()
+    if (!account) throw new Error('no current account')
+    assertCanCreateSigningRequest(account)
+
+    const keyring = await keyringService.getKeyringForAccount(account.pubkey, account.type)
+    if (!keyring?.getRgbFeeAccount) {
+      throw new Error('Current wallet does not support RGB fee accounts')
+    }
+
+    return keyring.getRgbFeeAccount(this.getNetworkType(), account.index)
+  }
+
   createRgbBlindReceive = async (params: Omit<RgbReceiveInvoiceRequest, 'wallet'>) => {
     return this.rgbReceiveOperations.createBlindReceive(params)
   }
@@ -3471,6 +3492,93 @@ export class WalletController extends BaseController {
   getRgbFundingAddress = async () => {
     const { address } = await this.getCurrentRgbFundingAccount()
     return { address }
+  }
+
+  getRgbFeePoolStatus = async (params: { feeRate?: number } = {}) => {
+    const { service } = await this.getLocalRgbService()
+    const feeAccount = await this.getCurrentRgbFeeAccount()
+    const remoteUtxos = await walletApiService.bitcoin.getBTCUtxos(feeAccount.address)
+    const locked = new Set(
+      service
+        .getPendingTransfers()
+        .flatMap(transfer => transfer.prepared.feeOutpoints || [])
+        .map(outpoint => `${outpoint.txid}:${outpoint.vout}`)
+    )
+    const local = service.getPendingFeePoolUtxos()
+    const all = new Map(
+      remoteUtxos.map(utxo => [`${utxo.txid}:${utxo.vout}`, { satoshis: utxo.satoshis }])
+    )
+    local.forEach(utxo => {
+      const key = `${utxo.outpoint.txid}:${utxo.outpoint.vout}`
+      if (!all.has(key)) all.set(key, { satoshis: utxo.satoshis })
+    })
+    const minimumSatoshis = Math.max(RGB_FEE_POOL_UTXO_SATS, Math.ceil((params.feeRate || 1) * 500 * 2))
+    const available = [...all.entries()].filter(
+      ([key, utxo]) => !locked.has(key) && utxo.satoshis >= minimumSatoshis
+    )
+    return {
+      address: feeAccount.address,
+      minimumSatoshis,
+      availableCount: available.length,
+      targetCount: RGB_FEE_POOL_TARGET_UTXOS,
+      ready: available.length > 0,
+    }
+  }
+
+  createRgbFeePoolTopUpBegin = async (params: { feeRate?: number } = {}) => {
+    const account = preferenceService.getCurrentAccount()
+    if (!account) throw new Error('no current account')
+    assertCanCreateSigningRequest(account)
+    const status = await this.getRgbFeePoolStatus(params)
+    const feeSummary = params.feeRate ? undefined : await this.getFeeSummary()
+    const feeRate = params.feeRate ?? feeSummary?.list[0]?.feeRate
+    if (!feeRate || feeRate <= 0) throw new Error('Invalid RGB fee-pool top-up fee rate')
+    const count = Math.max(1, RGB_FEE_POOL_TARGET_UTXOS - status.availableCount)
+    const btcUtxos = await this.getBTCUtxos()
+    if (!btcUtxos.length) throw new Error('Insufficient balance.')
+    const { psbt, toSignInputs } = await txHelpers.sendBTC({
+      btcUtxos,
+      tos: Array.from({ length: count }, () => ({ address: status.address, satoshis: status.minimumSatoshis })),
+      networkType: this.getNetworkType(),
+      changeAddress: account.address,
+      feeRate,
+      enableRBF: true,
+    })
+    const toSignData = await this.getToSignData({
+      psbtHex: psbt.toHex(),
+      options: { toSignInputs: toSignInputs as any, autoFinalized: true },
+      action: {
+        name: 'Fund RGB Fee Pool',
+        description: '',
+        details: [
+          { label: 'RGB Fee UTXOs', type: PsbtActionDetailType.TEXT, value: String(count) },
+          { label: 'RGB Fee Address', type: PsbtActionDetailType.ADDRESS, value: status.address },
+        ],
+        type: PsbtActionType.CUSTOM,
+      },
+    })
+    return { psbtHex: toSignData.psbtHex, toSignData, count, amount: status.minimumSatoshis }
+  }
+
+  createRgbFeePoolTopUpEnd = async (params: { signedPsbt: string }) => {
+    const signedPsbt = psbtFromString(params.signedPsbt)
+    const transaction = signedPsbt.extractTransaction(true)
+    const feeAccount = await this.getCurrentRgbFeeAccount()
+    const txid = await this.pushTx(transaction.toHex())
+    const utxos = transaction.outs
+      .map((output, vout) => ({ output, vout }))
+      .filter(({ output }) => scriptPkToAddress(output.script, this.getNetworkType()) === feeAccount.address)
+      .map(({ output, vout }) => ({
+        outpoint: { txid, vout },
+        satoshis: Number(output.value),
+        scriptPubKey: output.script.toString('hex'),
+        publicKey: feeAccount.publicKey,
+        createdAt: Date.now(),
+      }))
+    if (!utxos.length) throw new Error('RGB fee-pool top-up has no fee outputs')
+    const { service } = await this.getLocalRgbService()
+    await service.queueFeePoolUtxos(utxos)
+    return { txid, utxos }
   }
 
   createRgbIssueNia = (params: Omit<RgbIssueNiaRequest, 'wallet'>) =>
@@ -3906,7 +4014,8 @@ export class WalletController extends BaseController {
   }
 
   private createLocalRgbService = (localWallet: LocalRgbWallet): LocalRgbService => {
-    return createRgbService({
+    let service: LocalRgbService | undefined
+    service = createRgbService({
       storage: {
         get: key => keyringService.getEncryptedStorageItem(RGB_ENCRYPTED_STORAGE_NAMESPACE, key),
         set: (key, value) =>
@@ -3921,23 +4030,32 @@ export class WalletController extends BaseController {
       }),
       feeSource: {
         getFeeFunding: async () => {
-          const account = preferenceService.getCurrentAccount()
-          if (!account) throw new Error('no current account')
-          const btcUtxos = await this.getBTCUtxos()
-          const feeUtxos = btcUtxos
-            .filter(utxo => !utxo.inscriptions?.length && !utxo.atomicals?.length)
-            .map(utxo => ({
-              outpoint: { txid: utxo.txid, vout: utxo.vout },
-              satoshis: utxo.satoshis,
-              scriptPubKey: utxo.scriptPk,
-              publicKey: account.pubkey,
-            }))
+          const feeAccount = await this.getCurrentRgbFeeAccount()
+          const remoteUtxos = await walletApiService.bitcoin.getBTCUtxos(feeAccount.address)
+          const pendingUtxos = service?.getPendingFeePoolUtxos() || []
+          const feeUtxosByOutpoint = new Map(
+            remoteUtxos
+              .filter(utxo => !utxo.inscriptions?.length && !utxo.atomicals?.length)
+              .map(utxo => [
+                `${utxo.txid}:${utxo.vout}`,
+                {
+                  outpoint: { txid: utxo.txid, vout: utxo.vout },
+                  satoshis: utxo.satoshis,
+                  scriptPubKey: utxo.scriptPk,
+                  publicKey: feeAccount.publicKey,
+                },
+              ])
+          )
+          pendingUtxos.forEach(utxo => {
+            const key = `${utxo.outpoint.txid}:${utxo.outpoint.vout}`
+            if (!feeUtxosByOutpoint.has(key)) feeUtxosByOutpoint.set(key, utxo)
+          })
           return {
-            utxos: feeUtxos,
+            utxos: [...feeUtxosByOutpoint.values()],
             changeScriptPubKey: bitcoin.address
-              .toOutputScript(account.address, toPsbtNetwork(this.getNetworkType()))
+              .toOutputScript(feeAccount.address, toPsbtNetwork(this.getNetworkType()))
               .toString('hex'),
-            changeDustLimit: decodeAddress(account.address).dust,
+            changeDustLimit: decodeAddress(feeAccount.address).dust,
           }
         },
       },
@@ -3946,6 +4064,7 @@ export class WalletController extends BaseController {
       broadcaster: { broadcast: rawTx => this.pushTx(rawTx) },
       onStatePersisted: state => this.queueRgbRecoveryCheckpoint(localWallet, state),
     })
+    return service
   }
 
   getRgbToSignData = async ({
@@ -3975,34 +4094,33 @@ export class WalletController extends BaseController {
 
   /** Add only the current account's local RGB derivation to wallet-built PSBTs. */
   private attachRgbPsbtDerivations = async (psbt: bitcoin.Psbt) => {
-    const funding = await this.getCurrentRgbFundingAccount()
-    const internalKey = Buffer.from(funding.publicKey, 'hex').subarray(1)
-    const expectedScript = bitcoin.payments.p2tr({
-      internalPubkey: internalKey,
-      network: toPsbtNetwork(this.getNetworkType()),
-    }).output
-    if (!expectedScript) throw new Error('Unable to derive RGB funding script')
+    const accounts = await Promise.all([this.getCurrentRgbFundingAccount(), this.getCurrentRgbFeeAccount()])
+    for (const account of accounts) {
+      const internalKey = Buffer.from(account.publicKey, 'hex').subarray(1)
+      const expectedScript = bitcoin.payments.p2tr({
+        internalPubkey: internalKey,
+        network: toPsbtNetwork(this.getNetworkType()),
+      }).output
+      if (!expectedScript) throw new Error('Unable to derive RGB signing script')
 
-    psbt.data.inputs.forEach((input: any) => {
-      if (
-        !input.witnessUtxo ||
-        (input.tapInternalKey && !input.tapInternalKey.equals(internalKey)) ||
-        !input.witnessUtxo.script.equals(expectedScript)
-      )
-        return
-      // BIP-322 simple PSBTs carry only the witness output. Once the script
-      // has matched the currently derived RGB funding address, add the
-      // internal key required by bitcoinjs taproot signing.
-      input.tapInternalKey = internalKey
-      input.tapBip32Derivation = [
-        {
-          masterFingerprint: Buffer.from(funding.masterFingerprint, 'hex'),
-          path: funding.derivationPath,
-          pubkey: internalKey,
-          leafHashes: [],
-        },
-      ]
-    })
+      psbt.data.inputs.forEach((input: any) => {
+        if (
+          !input.witnessUtxo ||
+          (input.tapInternalKey && !input.tapInternalKey.equals(internalKey)) ||
+          !input.witnessUtxo.script.equals(expectedScript)
+        )
+          return
+        input.tapInternalKey = internalKey
+        input.tapBip32Derivation = [
+          {
+            masterFingerprint: Buffer.from(account.masterFingerprint, 'hex'),
+            path: account.derivationPath,
+            pubkey: internalKey,
+            leafHashes: [],
+          },
+        ]
+      })
+    }
     return psbt
   }
 
@@ -4012,12 +4130,15 @@ export class WalletController extends BaseController {
     assertCanCreateSigningRequest(account)
 
     const keyring = await keyringService.getKeyringForAccount(account.pubkey, account.type)
-    if (!keyring?.getRgbFundingAccount) {
+    if (!keyring?.getRgbFundingAccount || !keyring.getRgbFeeAccount) {
       throw new Error('Current wallet does not support RGB PSBT signing')
     }
 
     const networkType = this.getNetworkType()
-    const funding = keyring.getRgbFundingAccount(networkType, account.index)
+    const rgbAccounts = [
+      keyring.getRgbFundingAccount(networkType, account.index),
+      keyring.getRgbFeeAccount(networkType, account.index),
+    ]
 
     const toSignInputs: ToSignInput[] = []
     psbt.data.inputs.forEach((input: any, index) => {
@@ -4030,7 +4151,7 @@ export class WalletController extends BaseController {
       if (isSigned) return
 
       const tapDerivation = input.tapBip32Derivation?.[0]
-      if (tapDerivation?.pubkey && this.isCurrentRgbDerivation(tapDerivation, funding)) {
+      if (tapDerivation?.pubkey && rgbAccounts.some(item => this.isCurrentRgbDerivation(tapDerivation, item))) {
         const leafHashes = tapDerivation.leafHashes || []
         const toSignInput: ToSignInput = {
           index,
@@ -4046,7 +4167,7 @@ export class WalletController extends BaseController {
       }
 
       const derivation = input.bip32Derivation?.[0]
-      if (derivation?.pubkey && this.isCurrentRgbDerivation(derivation, funding)) {
+      if (derivation?.pubkey && rgbAccounts.some(item => this.isCurrentRgbDerivation(derivation, item))) {
         toSignInputs.push({
           index,
           publicKey: Buffer.from(derivation.pubkey).toString('hex'),

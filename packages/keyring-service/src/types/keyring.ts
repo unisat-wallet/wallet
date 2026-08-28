@@ -54,6 +54,13 @@ export interface Keyring {
     derivationPath: string
     masterFingerprint: string
   }
+  /** Dedicated internal address for RGB miner-fee UTXOs. */
+  getRgbFeeAccount?(networkType: NetworkType, accountIndex?: number): {
+    address: string
+    publicKey: string
+    derivationPath: string
+    masterFingerprint: string
+  }
   deriveContextHash?(
     publicKey: string,
     appName: string,

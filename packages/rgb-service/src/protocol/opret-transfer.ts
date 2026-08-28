@@ -1,6 +1,6 @@
 import { Psbt } from 'bitcoinjs-lib'
 import { RgbFundingOutputRequiredError, RgbServiceError } from '../errors'
-import type { RgbFeeFunding, RgbNetwork, RgbUtxo } from '../types'
+import type { RgbFeeFunding, RgbNetwork, RgbOutpoint, RgbUtxo } from '../types'
 import { createRgbOpretPsbt } from './bitcoin'
 import { transitionBundleId } from './bundle'
 import { serializeOpretFascia } from './fascia'
@@ -35,6 +35,7 @@ export interface PreparedNiaOpretTransfer {
   fascia: Uint8Array
   fee: number
   feeInputCount: number
+  feeOutpoints: RgbOutpoint[]
 }
 
 function hex(value: Uint8Array) {
@@ -169,5 +170,6 @@ export function prepareNiaOpretTransfer(input: NiaOpretTransferRequest): Prepare
     fascia,
     fee: bitcoin.fee,
     feeInputCount: bitcoin.feeInputCount,
+    feeOutpoints: bitcoin.feeOutpoints,
   }
 }

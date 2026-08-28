@@ -18,6 +18,7 @@ import { concealBlindSeal, encodeBlindRgbInvoice } from './protocol/receive'
 import { planFungibleTransition } from './protocol/transition'
 import type {
   RgbCompletedTransfer,
+  RgbFeePoolUtxo,
   RgbPreparedTransfer,
   RgbPendingIssue,
   RgbPendingAssetMetadata,
@@ -1097,6 +1098,24 @@ export class RgbService {
     return this.requireState().snapshot
   }
 
+  getPendingFeePoolUtxos() {
+    return this.requireState().pendingFeePoolUtxos || []
+  }
+
+  async queueFeePoolUtxos(utxos: RgbFeePoolUtxo[]) {
+    const state = this.requireState()
+    const rollback = snapshotState(state)
+    const pending = state.pendingFeePoolUtxos || (state.pendingFeePoolUtxos = [])
+    for (const utxo of utxos) {
+      const index = pending.findIndex(
+        item => item.outpoint.txid === utxo.outpoint.txid && item.outpoint.vout === utxo.outpoint.vout
+      )
+      if (index >= 0) pending[index] = utxo
+      else pending.push(utxo)
+    }
+    await this.persistWithRecoveryRollback(rollback)
+  }
+
   /** Pending sends survive a background restart until completed or explicitly aborted. */
   getPendingTransfers() {
     return Object.entries(this.requireState().pending).map(([id, pending]) => ({ id, ...pending }))
@@ -1190,6 +1209,19 @@ export class RgbService {
     if (localGenesis) validationHistory.localGenesis = localGenesis
     validationHistory.knownBlindSeals = this.getKnownBlindSeals()
     const feeFunding = await this.dependencies.feeSource?.getFeeFunding(state.wallet)
+    const reservedFeeOutpoints = new Set(
+      Object.values(state.pending).flatMap(pending =>
+        (pending.prepared.feeOutpoints || []).map(outpoint => `${outpoint.txid}:${outpoint.vout}`)
+      )
+    )
+    const availableFeeFunding = feeFunding
+      ? {
+          ...feeFunding,
+          utxos: feeFunding.utxos.filter(
+            utxo => !reservedFeeOutpoints.has(`${utxo.outpoint.txid}:${utxo.outpoint.vout}`)
+          ),
+        }
+      : undefined
     const intent = {
       assetId: requestedAssetId,
       amount,
@@ -1207,7 +1239,7 @@ export class RgbService {
       request: resolvedRequest,
       intent,
       selectedUtxos,
-      ...(feeFunding === undefined ? {} : { feeFunding }),
+      ...(availableFeeFunding === undefined ? {} : { feeFunding: availableFeeFunding }),
       validationHistory,
     })
 
@@ -1326,6 +1358,17 @@ export class RgbService {
       state.snapshot.utxos.push(update.createdUtxo)
     }
     state.snapshot.syncedAt = this.now()
+    const pending = Object.values(state.pending).find(
+      item => item.delivery?.completed === completed
+    )
+    if (pending?.prepared.feeOutpoints?.length) {
+      const spent = new Set(
+        pending.prepared.feeOutpoints.map(outpoint => `${outpoint.txid}:${outpoint.vout}`)
+      )
+      state.pendingFeePoolUtxos = (state.pendingFeePoolUtxos || []).filter(
+        utxo => !spent.has(`${utxo.outpoint.txid}:${utxo.outpoint.vout}`)
+      )
+    }
   }
 
   private async syncBroadcastedTransfer(transferId: string, pending: RgbPendingTransfer) {

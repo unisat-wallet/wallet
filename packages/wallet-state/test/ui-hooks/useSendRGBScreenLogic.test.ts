@@ -134,6 +134,40 @@ describe('useSendRGBScreenLogic', () => {
     )
   })
 
+  it('funds the RGB fee pool before preparing a send when no fee UTXO is available', async () => {
+    const assetId = 'rgb:test-asset'
+    const invoice = 'rgb:test-asset/~/~/bc:utxob:test?endpoints=rpc://proxy'
+    const { wrapper, wallet } = createHookTestHarness({
+      routeState: {
+        assetId,
+        tokenBalance: { assetId, ticker: 'RGB', precision: 8, spendable: '150000000' },
+      },
+    })
+    wallet.getRgbFeePoolStatus = vi.fn().mockResolvedValue({ ready: false })
+    wallet.createRgbFeePoolTopUpBegin = vi.fn().mockResolvedValue({ toSignData: { psbtHex: 'top-up' } })
+    wallet.createRgbFeePoolTopUpEnd = vi.fn().mockResolvedValue({ txid: 'fee-pool-tx' })
+    wallet.createRgbSendBegin = vi.fn().mockResolvedValue({ toSignData: { psbtHex: 'rgb-send' } })
+    const { result } = renderHook(() => useSendRGBScreenLogic(), { wrapper })
+
+    act(() => {
+      result.current.onInvoiceChange(invoice)
+      result.current.onAmountChange('1')
+    })
+    await act(async () => {
+      await result.current.onClickNext()
+    })
+
+    expect(wallet.createRgbFeePoolTopUpBegin).toHaveBeenCalled()
+    expect(wallet.createRgbSendBegin).not.toHaveBeenCalled()
+
+    await act(async () => {
+      await result.current.onSignPsbtHandleConfirm([{ psbtHex: 'signed-top-up' }] as any)
+    })
+
+    expect(wallet.createRgbFeePoolTopUpEnd).toHaveBeenCalledWith({ signedPsbt: 'signed-top-up' })
+    expect(wallet.createRgbSendBegin).toHaveBeenCalledWith(expect.objectContaining({ amount: '100000000' }))
+  })
+
   it('blocks a new send while the same asset is awaiting recipient acknowledgement', async () => {
     const assetId = 'rgb:test-asset'
     const invoice = 'rgb:test-asset/~/~/bc:utxob:test?endpoints=rpc://proxy'

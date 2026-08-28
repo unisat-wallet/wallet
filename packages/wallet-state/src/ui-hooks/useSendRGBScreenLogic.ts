@@ -97,9 +97,12 @@ export function useSendRGBScreenLogic() {
   const [error, setError] = useState('')
   const [step, setStep] = useState(SendRGBScreenStep.CREATE_TX)
   const [blockingSendStatus, setBlockingSendStatus] = useState<string>()
-  const transferData = useRef<{ toSignData?: any; beginResult?: any; pendingVanillaTxid?: string }>(
-    {}
-  )
+  const transferData = useRef<{
+    toSignData?: any
+    beginResult?: any
+    pendingVanillaTxid?: string
+    feePoolTopUp?: boolean
+  }>({})
 
   const ticker = tokenBalance?.ticker || 'RGB'
   const name = tokenBalance?.name || ticker
@@ -190,6 +193,28 @@ export function useSendRGBScreenLogic() {
     setAmount(spendable)
   }
 
+  const prepareRgbSend = async () => {
+    const beginResult = await wallet.createRgbSendBegin({
+      invoice: decodedInvoice.submissionInvoice,
+      assetId: invoiceAssetId || assetId,
+      amount: requiresAmount ? normalizedAmount : undefined,
+      ticker,
+      name,
+      precision: assetPrecision,
+      feeRate,
+    })
+    const toSignData = beginResult?.toSignData
+    if (!toSignData) {
+      throw new Error(t('rgb_send_transaction_unavailable'))
+    }
+    transferData.current = {
+      beginResult,
+      toSignData,
+      pendingVanillaTxid: getRgbBeginTxid(beginResult),
+    }
+    setStep(SendRGBScreenStep.SIGN_TX)
+  }
+
   const onClickNext = async () => {
     setError('')
     tools.showLoading(true)
@@ -207,25 +232,19 @@ export function useSendRGBScreenLogic() {
       if (!decodedInvoice.valid || !hasTransportEndpoint || invoiceAssetMismatch) {
         throw new Error(invoiceValidationMessage || t('invalid_rgb_invoice'))
       }
-      const beginResult = await wallet.createRgbSendBegin({
-        invoice: decodedInvoice.submissionInvoice,
-        assetId: invoiceAssetId || assetId,
-        amount: requiresAmount ? normalizedAmount : undefined,
-        ticker,
-        name,
-        precision: assetPrecision,
-        feeRate,
-      })
-      const toSignData = beginResult?.toSignData
-      if (!toSignData) {
-        throw new Error(t('rgb_send_transaction_unavailable'))
+      // Keep compatibility with lightweight wallet implementations while the
+      // background service rolls out the dedicated fee-pool RPCs.
+      const feePool = wallet.getRgbFeePoolStatus
+        ? await wallet.getRgbFeePoolStatus({ feeRate })
+        : { ready: true }
+      if (!feePool.ready) {
+        const topUp = await wallet.createRgbFeePoolTopUpBegin({ feeRate })
+        if (!topUp?.toSignData) throw new Error(t('rgb_send_transaction_unavailable'))
+        transferData.current = { toSignData: topUp.toSignData, feePoolTopUp: true }
+        setStep(SendRGBScreenStep.SIGN_TX)
+        return
       }
-      transferData.current = {
-        beginResult,
-        toSignData,
-        pendingVanillaTxid: getRgbBeginTxid(beginResult),
-      }
-      setStep(SendRGBScreenStep.SIGN_TX)
+      await prepareRgbSend()
     } catch (e) {
       setError((e as any).message)
     } finally {
@@ -245,6 +264,11 @@ export function useSendRGBScreenLogic() {
       const signedPsbt = signedDatas[0]?.psbtHex
       if (!signedPsbt) {
         throw new Error(t('rgb_psbt_signing_missing_result'))
+      }
+      if (transferData.current.feePoolTopUp) {
+        await wallet.createRgbFeePoolTopUpEnd({ signedPsbt })
+        await prepareRgbSend()
+        return
       }
       const endResult = await wallet.createRgbSendEnd({
         signedPsbt,

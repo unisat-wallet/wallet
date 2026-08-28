@@ -23,6 +23,7 @@ export interface RgbOpretPsbt {
   changeVout?: number
   fee: number
   feeInputCount: number
+  feeOutpoints: RgbFeeUtxo['outpoint'][]
 }
 
 function scriptBytes(value: string, name: string) {
@@ -217,5 +218,6 @@ export function createRgbOpretPsbt(input: RgbOpretPsbtRequest): RgbOpretPsbt {
     changeVout,
     fee,
     feeInputCount: selectedFeeUtxos.length,
+    feeOutpoints: selectedFeeUtxos.map(utxo => utxo.outpoint),
   }
 }

@@ -387,6 +387,50 @@ describe('RgbService', () => {
     expect(service.getPendingTransfers()).toHaveLength(1)
   })
 
+  it('reserves a fee-pool input while its RGB transfer is pending', async () => {
+    const dependencies = createDependencies()
+    const feeUtxos = [
+      {
+        outpoint: { txid: 'e'.repeat(64), vout: 0 },
+        satoshis: 10_000,
+        scriptPubKey: '5120' + '44'.repeat(32),
+        publicKey: '02' + '44'.repeat(32),
+      },
+      {
+        outpoint: { txid: 'f'.repeat(64), vout: 0 },
+        satoshis: 10_000,
+        scriptPubKey: '5120' + '55'.repeat(32),
+        publicKey: '02' + '55'.repeat(32),
+      },
+    ]
+    dependencies.feeSource = {
+      getFeeFunding: vi.fn().mockResolvedValue({
+        utxos: feeUtxos,
+        changeScriptPubKey: '5120' + '66'.repeat(32),
+        changeDustLimit: 330,
+      }),
+    }
+    let nextId = 0
+    const feeFunding = vi.mocked(dependencies.encoder.prepareTransfer).mockImplementation(async input => {
+      nextId++
+      return {
+        id: `transfer-${nextId}`,
+        psbt: 'cHNidP8=',
+        toSignInputs: [],
+        lockedOutpoints: [input.selectedUtxos[0]!.outpoint],
+        feeOutpoints: [input.feeFunding!.utxos[0]!.outpoint],
+      }
+    })
+    const service = new RgbService(dependencies)
+    await service.open(wallet)
+    await service.sync()
+
+    await service.prepareSend({ assetId: 'rgb:asset', amount: '40', invoice: rgbInvoice(40), feeRate: 2 })
+    await service.prepareSend({ assetId: 'rgb:asset', amount: '60', invoice: rgbInvoice(60), feeRate: 2 })
+
+    expect(feeFunding.mock.calls[1]![0].feeFunding?.utxos).toEqual([feeUtxos[1]])
+  })
+
   it('persists an issuance outbox and retains its local allocation until indexed', async () => {
     const dependencies = createDependencies()
     const service = new RgbService(dependencies)

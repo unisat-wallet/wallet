@@ -42,6 +42,7 @@ describe('createRgbOpretPsbt', () => {
     expect(psbt.txOutputs[1]!.script.toString('hex')).toBe(utxo.scriptPubKey)
     expect(psbt.txOutputs[1]!.value).toBe(utxo.satoshis)
     expect(psbt.data.inputs[0]!.tapInternalKey!.toString('hex')).toBe('22'.repeat(32))
+    expect(built.feeOutpoints).toEqual([feeFunding.utxos[0]!.outpoint])
   })
 
   it('uses the witness beneficiary script and reserves its output index', () => {

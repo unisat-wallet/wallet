@@ -43,6 +43,11 @@ export interface RgbFeeUtxo {
   publicKey: string
 }
 
+/** Locally known unconfirmed output created by an RGB fee-pool top-up. */
+export interface RgbFeePoolUtxo extends RgbFeeUtxo {
+  createdAt: number
+}
+
 export interface RgbFeeFunding {
   utxos: RgbFeeUtxo[]
   changeScriptPubKey: string
@@ -103,6 +108,8 @@ export interface RgbPreparedTransfer {
   psbt: string
   toSignInputs: RgbToSignInput[]
   lockedOutpoints: RgbOutpoint[]
+  /** Ordinary BTC fee-pool inputs held until this RGB transfer reaches a terminal state. */
+  feeOutpoints?: RgbOutpoint[]
   metadata?: Record<string, string>
 }
 
@@ -293,6 +300,8 @@ export interface RgbServiceState {
   pendingIssues?: RgbPendingIssue[]
   /** Asset metadata learned from received consignments and waiting for indexing. */
   pendingAssetMetadata?: RgbPendingAssetMetadata[]
+  /** Unconfirmed fee-pool outputs retained until the address indexer exposes them. */
+  pendingFeePoolUtxos?: RgbFeePoolUtxo[]
   /** Validated blind seals retained locally for later ownership proofs when spending received assets. */
   receivedBlindSeals?: import('./protocol/receive').RgbBlindSeal[]
   contracts?: Record<

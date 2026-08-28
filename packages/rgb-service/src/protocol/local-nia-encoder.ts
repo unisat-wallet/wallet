@@ -172,6 +172,9 @@ export const localNiaProtocolEncoder: RgbProtocolEncoder = {
       changeBlinding,
       ...(input.feeFunding === undefined ? {} : { feeFunding: input.feeFunding }),
     })
+    const feeUtxosByOutpoint = new Map(
+      input.feeFunding?.utxos.map(utxo => [`${utxo.outpoint.txid}:${utxo.outpoint.vout}`, utxo]) || []
+    )
     return {
       id: hex(prepared.transitionId),
       psbt: prepared.psbtHex,
@@ -181,12 +184,13 @@ export const localNiaProtocolEncoder: RgbProtocolEncoder = {
           publicKey: utxo.publicKey,
           useTweakedSigner: true,
         })),
-        ...(input.feeFunding?.utxos.slice(0, prepared.feeInputCount).map((utxo, index) => ({
+        ...prepared.feeOutpoints.map((outpoint, index) => ({
           index: input.selectedUtxos.length + index,
-          publicKey: utxo.publicKey,
-        })) || []),
+          publicKey: feeUtxosByOutpoint.get(`${outpoint.txid}:${outpoint.vout}`)!.publicKey,
+        })),
       ],
       lockedOutpoints: input.selectedUtxos.map(utxo => utxo.outpoint),
+      feeOutpoints: prepared.feeOutpoints,
       metadata: {
         preparedPsbt: prepared.psbtHex,
         hostVout: String(prepared.hostVout),

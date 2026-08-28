@@ -244,6 +244,14 @@ export class HdKeyring extends SimpleKeyring {
   }
 
   getRgbFundingAccount(networkType: NetworkType, accountIndex = 0) {
+    return this.getRgbAccount(networkType, accountIndex, 0)
+  }
+
+  getRgbFeeAccount(networkType: NetworkType, accountIndex = 0) {
+    return this.getRgbAccount(networkType, accountIndex, 1)
+  }
+
+  private getRgbAccount(networkType: NetworkType, accountIndex: number, keychain: 0 | 1) {
     if (!this.hdWallet?.privateKey) {
       throw new Error('RGB funding account requires an unlocked HD wallet')
     }
@@ -253,7 +261,7 @@ export class HdKeyring extends SimpleKeyring {
 
     const rgbCoinType =
       networkType === NetworkType.MAINNET ? RGB_MAINNET_COIN_TYPE : RGB_TESTNET_COIN_TYPE
-    const derivationPath = `m/86'/${rgbCoinType}'/${accountIndex}'/0/0`
+    const derivationPath = `m/86'/${rgbCoinType}'/${accountIndex}'/${keychain}/0`
     const child = this.hdWallet.derive(derivationPath)
     const publicKey = Buffer.from(child.publicKey).toString('hex')
     const address = publicKeyToAddress(publicKey, AddressType.P2TR, networkType)
