@@ -14,7 +14,7 @@ type RgbWalletCoordinatorDependencies = {
 }
 
 const LIST_SNAPSHOT_SYNC_INTERVAL = 60_000
-const RECEIVE_SNAPSHOT_SYNC_INTERVAL = 2_000
+const RECEIVE_POLL_INTERVAL = 10_000
 
 /** Owns per-funding-wallet RGB polling, snapshot synchronization, and local locks. */
 export class RgbWalletCoordinator {
@@ -51,7 +51,7 @@ export class RgbWalletCoordinator {
     const key = walletKey(context.wallet)
     const activePolling = this.receivePolling.get(key)
     if (activePolling) return activePolling
-    if ((this.receivePollingAt.get(key) ?? 0) + RECEIVE_SNAPSHOT_SYNC_INTERVAL > Date.now()) {
+    if ((this.receivePollingAt.get(key) ?? 0) + RECEIVE_POLL_INTERVAL > Date.now()) {
       return context
     }
 
@@ -120,7 +120,9 @@ export class RgbWalletCoordinator {
     // covers invoices created while the recovery endpoint was unavailable.
     await service.claimPendingReceives?.()
     await this.dependencies.syncIndexerOutbox(service, wallet)
-    await this.syncSnapshot(service, wallet, RECEIVE_SNAPSHOT_SYNC_INTERVAL)
+    // A pending receipt only needs the chain status of its expected tx. Avoid
+    // refreshing the full UTXO snapshot on every polling pass; a confirmed
+    // receipt below explicitly requests one before settlement.
     let processed = await service.processClaimedReceives({
       includeClaimed: false,
       deferConfirmedSettlement: true,

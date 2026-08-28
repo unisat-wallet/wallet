@@ -281,6 +281,57 @@ describe('RgbService', () => {
     expect(reopened.getPendingAssetMetadata()).toEqual(service.getPendingAssetMetadata())
   })
 
+  it('does not requeue indexed metadata while polling the same pending receive', async () => {
+    const dependencies = createDependencies()
+    const service = new RgbService(dependencies)
+    await service.open(wallet)
+    ;(service as any).state.pendingReceives = [
+      {
+        invoice: rgbInvoice(),
+        recipientId: 'recipient',
+        createdAt: 1,
+        seal: { txid: 'a'.repeat(64), vout: 0, blinding: 1n },
+        pendingAccept: {
+          payload: 'consignment',
+          txid: 'c'.repeat(64),
+          endpoint: proxyEndpoint,
+          assetId: 'rgb:asset',
+          amount: '60',
+          discoveredAt: 1,
+        },
+      },
+    ]
+    ;(service as any).state.pendingAssetMetadata = [
+      {
+        assetId: 'rgb:asset',
+        metadata: { ticker: 'TOK', name: 'Token', precision: 0, schema: 'NIA', issuedSupply: '60' },
+      },
+    ]
+
+    await service.markAssetMetadataSynced('rgb:asset')
+
+    expect((service as any).state.pendingReceives[0]).toMatchObject({ assetMetadataIndexed: true })
+    expect(service.getPendingAssetMetadata()).toEqual([])
+    dependencies.transport.getConsignment = vi.fn().mockResolvedValue({
+      recipientId: 'recipient',
+      payload: 'consignment',
+      txid: 'c'.repeat(64),
+      endpoint: proxyEndpoint,
+    })
+    ;(service as any).validateIncomingConsignment = vi.fn().mockReturnValue({
+      assetId: 'rgb:asset',
+      amount: '60',
+      txid: 'c'.repeat(64),
+      decoded: {
+        metadata: { ticker: 'TOK', name: 'Token', precision: 0, schema: 'NIA', issuedSupply: '60' },
+      },
+    })
+
+    await service.processClaimedReceives({ includeClaimed: false })
+
+    expect(service.getPendingAssetMetadata()).toEqual([])
+  })
+
   it('coalesces concurrent snapshot synchronizations', async () => {
     const dependencies = createDependencies()
     let releaseSnapshot: (() => void) | undefined
@@ -636,8 +687,15 @@ describe('RgbService', () => {
     await checkpointStartedPromise
 
     expect(dependencies.onStatePersisted).toHaveBeenCalledWith(
-      expect.objectContaining({ pendingReceives: [expect.objectContaining({ assetId: 'rgb:asset' })] })
+      expect.objectContaining({ pendingReceives: [expect.objectContaining({ assetId: 'rgb:asset' })] }),
+      { reason: 'state_change' }
     )
+    const checkpointState = vi.mocked(dependencies.onStatePersisted).mock.calls.at(-1)?.[0] as Record<
+      string,
+      unknown
+    >
+    expect(checkpointState).not.toHaveProperty('recoveryCheckpointUpdatedAt')
+    expect(checkpointState).not.toHaveProperty('recoveryCheckpointRevision')
     expect(completed).toBe(false)
     finishCheckpoint?.()
     await expect(creating).resolves.toMatchObject({ assetId: 'rgb:asset' })

@@ -175,6 +175,8 @@ export interface RgbPendingReceive {
   recipientId: string
   assetId?: string
   amount?: string
+  /** The validated asset metadata has already been delivered to the indexer. */
+  assetMetadataIndexed?: boolean
   expirationTimestamp?: number
   createdAt: number
   seal: import('./protocol/receive').RgbBlindSeal
@@ -405,7 +407,10 @@ export interface RgbServiceDependencies {
    * Queues a recovery checkpoint after local state is durably encrypted at
    * rest. Critical state transitions may await its completion.
    */
-  onStatePersisted?: (state: unknown) =>
+  onStatePersisted?: (
+    state: unknown,
+    context: { reason: 'state_change' | 'retry_dirty' | 'retry_unverified' }
+  ) =>
     | void
     | {
         updatedAt?: number

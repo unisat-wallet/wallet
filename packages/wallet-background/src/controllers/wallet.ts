@@ -631,6 +631,12 @@ function rgbRecoveryStateSummary(state: unknown) {
     ? Object.values(record['pending'] as Record<string, unknown>)
     : []
   const pendingReceives = Array.isArray(record['pendingReceives']) ? record['pendingReceives'] : []
+  const pendingAssetMetadata = Array.isArray(record['pendingAssetMetadata'])
+    ? record['pendingAssetMetadata']
+    : []
+  const pendingReceiveHistory = Array.isArray(record['pendingReceiveHistory'])
+    ? record['pendingReceiveHistory']
+    : []
   const snapshot = record['snapshot'] && typeof record['snapshot'] === 'object'
     ? (record['snapshot'] as Record<string, unknown>)
     : {}
@@ -640,6 +646,8 @@ function rgbRecoveryStateSummary(state: unknown) {
     deliveredTransfers: pending.filter(item => item && typeof item === 'object' && 'delivery' in item).length,
     broadcastTransfers: pending.filter(item => item && typeof item === 'object' && 'broadcast' in item).length,
     pendingReceives: pendingReceives.length,
+    pendingAssetMetadata: pendingAssetMetadata.length,
+    pendingReceiveHistory: pendingReceiveHistory.length,
     snapshotUtxos: Array.isArray(snapshot['utxos']) ? snapshot['utxos'].length : 0,
   }
 }
@@ -677,6 +685,8 @@ export class WalletController extends BaseController {
   private readonly rgbRecoveryRestores = new Map<string, Promise<void>>()
   private readonly rgbRecoveryBackups = new Map<string, Promise<unknown>>()
   private readonly rgbRecoveryVersions = new Map<string, { updatedAt?: number; revision?: string }>()
+  /** Last content successfully round-tripped to recovery for each funding wallet. */
+  private readonly rgbRecoveryVerifiedFingerprints = new Map<string, string>()
   private readonly rgbCoordinator = new RgbWalletCoordinator({
     getContext: () => this.getLocalRgbService(),
     syncIndexerOutbox: (service, wallet) => this.syncRgbIndexerOutbox(service, wallet),
@@ -3889,14 +3899,33 @@ export class WalletController extends BaseController {
     }
   }
 
-  private queueRgbRecoveryCheckpoint = (wallet: LocalRgbWallet, state: unknown) => {
+  private queueRgbRecoveryCheckpoint = (
+    wallet: LocalRgbWallet,
+    state: unknown,
+    context: { reason: 'state_change' | 'retry_dirty' | 'retry_unverified' }
+  ) => {
     const key = `${wallet.network}:${wallet.fundingAddress}`
-    const diagnostic = { wallet: rgbRecoveryWalletTag(wallet), ...rgbRecoveryStateSummary(state) }
+    const diagnostic = {
+      wallet: rgbRecoveryWalletTag(wallet),
+      reason: context.reason,
+      fingerprint: bitcoin.crypto.sha256(Buffer.from(stableRgbJson(state))).toString('hex').slice(0, 16),
+      ...rgbRecoveryStateSummary(state),
+    }
     log.debug('RGB recovery: checkpoint queued', diagnostic)
     const previous = this.rgbRecoveryBackups.get(key) || Promise.resolve()
     const backup = previous
       .catch(() => undefined)
       .then(async () => {
+        const verifiedFingerprint = this.rgbRecoveryVerifiedFingerprints.get(key)
+        if (verifiedFingerprint === diagnostic.fingerprint) {
+          const version = this.rgbRecoveryVersions.get(key)
+          return {
+            saved: true,
+            ...(version?.updatedAt === undefined ? {} : { updatedAt: version.updatedAt }),
+            ...(version?.revision ? { revision: version.revision } : {}),
+            verified: true,
+          }
+        }
         const payload = await encryptRgbRecoveryCheckpoint(state, await this.rgbRecoveryKey(wallet))
         const checksum = await rgbRecoveryPayloadChecksum(payload)
         const expected = this.rgbRecoveryVersions.get(key)
@@ -3965,11 +3994,12 @@ export class WalletController extends BaseController {
         })
         if (!result.saved) return result
         let verified = false
+        let verifiedRevision = result.revision
         try {
           const readback = await api.getRgbRecoveryCheckpoint({ wallet })
           if (
             !readback.payload ||
-            readback.revision !== result.revision ||
+            (result.revision !== undefined && readback.revision !== result.revision) ||
             readback.payload.length !== payload.length ||
             (await rgbRecoveryPayloadChecksum(readback.payload)) !== checksum
           ) {
@@ -3977,6 +4007,12 @@ export class WalletController extends BaseController {
           }
           await decryptRgbRecoveryCheckpoint(readback.payload, await this.rgbRecoveryKey(wallet))
           verified = true
+          verifiedRevision ||= readback.revision
+          this.rgbRecoveryVerifiedFingerprints.set(key, diagnostic.fingerprint)
+          this.rgbRecoveryVersions.set(key, {
+            updatedAt: result.updatedAt,
+            ...(verifiedRevision ? { revision: verifiedRevision } : {}),
+          })
         } catch (error) {
           // Completion already returned a durable server revision. Treat an
           // unavailable read-back as a retryable verification warning, not a
@@ -3984,7 +4020,13 @@ export class WalletController extends BaseController {
           log.warn('RGB recovery checkpoint read-back verification failed', error)
         }
         log.debug('RGB recovery: checkpoint saved', diagnostic)
-        return { ...result, verified, checksum, totalLength: payload.length }
+        return {
+          ...result,
+          ...(verifiedRevision ? { revision: verifiedRevision } : {}),
+          verified,
+          checksum,
+          totalLength: payload.length,
+        }
       })
     this.rgbRecoveryBackups.set(key, backup)
     void backup.catch(error => {
@@ -4062,7 +4104,7 @@ export class WalletController extends BaseController {
       encoder: localNiaProtocolEncoder,
       transport: createRgbProxyTransport(CHAINS_MAP[this.getChainType()]?.rgbProxyEndpoints || []),
       broadcaster: { broadcast: rawTx => this.pushTx(rawTx) },
-      onStatePersisted: state => this.queueRgbRecoveryCheckpoint(localWallet, state),
+      onStatePersisted: (state, context) => this.queueRgbRecoveryCheckpoint(localWallet, state, context),
     })
     return service
   }

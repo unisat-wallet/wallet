@@ -410,7 +410,19 @@ export class RgbService {
     const normalized = normalizeAssetId(assetId)
     const pending = state.pendingAssetMetadata || []
     const next = pending.filter(item => item.assetId !== normalized)
-    if (next.length === pending.length) return
+    let markedReceive = false
+    for (const receive of state.pendingReceives || []) {
+      const receivedAssetId = receive.receivedConsignment?.assetId
+      const pendingAssetId = receive.pendingAccept?.assetId
+      if (
+        !receive.assetMetadataIndexed &&
+        (pendingAssetId === normalized || receivedAssetId === normalized)
+      ) {
+        receive.assetMetadataIndexed = true
+        markedReceive = true
+      }
+    }
+    if (next.length === pending.length && !markedReceive) return
     state.pendingAssetMetadata = next
     await this.persist()
   }
@@ -602,7 +614,9 @@ export class RgbService {
         }
         if (receive.rejectedConsignmentTxids?.includes(match.txid)) continue
 
-        const metadataChanged = this.queueAssetMetadata(match.assetId, match.decoded.metadata)
+        const metadataChanged = receive.assetMetadataIndexed
+          ? false
+          : this.queueAssetMetadata(match.assetId, match.decoded.metadata)
         changed = metadataChanged || changed
 
         // The proxy may have accepted ACK immediately before an extension
@@ -935,7 +949,9 @@ export class RgbService {
       metadata: validated.decoded.metadata,
       createdAt: this.now(),
     }
-    this.queueAssetMetadata(assetId, validated.decoded.metadata)
+    if (!receive.assetMetadataIndexed) {
+      this.queueAssetMetadata(assetId, validated.decoded.metadata)
+    }
     return true
   }
 
@@ -1642,7 +1658,14 @@ export class RgbService {
     const persisted = persistState(state)
     await this.dependencies.storage.set(this.storageKey(state.wallet), persisted)
     if (shouldQueueRecovery) {
-      const recovery = Promise.resolve(this.dependencies.onStatePersisted(recoverySnapshot(persisted)))
+      const reason = !options.skipRecovery
+        ? 'state_change'
+        : state.recoveryCheckpoint?.dirty
+          ? 'retry_dirty'
+          : 'retry_unverified'
+      const recovery = Promise.resolve(
+        this.dependencies.onStatePersisted(recoverySnapshot(persisted), { reason })
+      )
       if (options.waitForRecovery) {
         const result = await recovery
         if (result && typeof result === 'object' && result.saved === false) {
@@ -1764,9 +1787,16 @@ function persistState(state: RgbServiceState) {
   }
 }
 
-/** Delivery progress is local metadata, never part of the remotely encrypted checkpoint. */
+/** Delivery progress and recovery cursors are local metadata, never part of the remote checkpoint. */
 function recoverySnapshot(state: ReturnType<typeof persistState>) {
-  const { recoveryCheckpoint: _recoveryCheckpoint, ...snapshot } = state
+  const {
+    recoveryCheckpoint: _recoveryCheckpoint,
+    recoveryCheckpointUpdatedAt: _recoveryCheckpointUpdatedAt,
+    recoveryCheckpointRevision: _recoveryCheckpointRevision,
+    recoveryRemoteStateKnown: _recoveryRemoteStateKnown,
+    recoveryConflict: _recoveryConflict,
+    ...snapshot
+  } = state
   return snapshot
 }
 

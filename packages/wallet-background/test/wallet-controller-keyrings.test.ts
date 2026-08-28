@@ -918,7 +918,7 @@ describe('RGB wallet references', () => {
     })
   })
 
-  it('refreshes the RGB snapshot before and after receive confirmation is detected', async () => {
+  it('refreshes the RGB snapshot only after receive confirmation is detected', async () => {
     const wallet = new WalletController()
     const service = {
       sync: vi.fn().mockResolvedValue(undefined),
@@ -937,7 +937,7 @@ describe('RGB wallet references', () => {
 
     await (wallet as any).syncRgbReceivedAllocations()
 
-    expect(service.sync).toHaveBeenCalledTimes(2)
+    expect(service.sync).toHaveBeenCalledTimes(1)
     expect(service.processClaimedReceives).toHaveBeenNthCalledWith(1, {
       includeClaimed: false,
       deferConfirmedSettlement: true,
