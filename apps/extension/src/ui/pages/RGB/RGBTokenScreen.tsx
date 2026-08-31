@@ -26,9 +26,11 @@ import {
 
 import { RGBTokenDetail } from './components/RGBTokenDetail';
 import { RGBTokenHistory } from './components/RGBTokenHistory';
+import { useRgbWriteLeaseGuard } from './components/useRgbWriteLeaseGuard';
 
 export default function RGBTokenScreen() {
   const nav = useNavigation();
+  const { requestWrite, writeLeaseModal } = useRgbWriteLeaseGuard();
   const {
     tokenSummary,
     loading,
@@ -189,7 +191,7 @@ export default function RGBTokenScreen() {
               text={t('receive')}
               preset="brc20-action"
               icon="receive"
-              onClick={onClickReceive}
+              onClick={() => void requestWrite(onClickReceive)}
               full
               data-testid="rgb-receive-button"
             />
@@ -198,7 +200,7 @@ export default function RGBTokenScreen() {
               text={t('send')}
               preset="brc20-action"
               icon="send"
-              onClick={onClickSend}
+              onClick={() => void requestWrite(onClickSend)}
               disabled={!enableTransfer}
               full
               data-testid="rgb-send-button"
@@ -206,6 +208,7 @@ export default function RGBTokenScreen() {
           </Row>
         </Column>
       </Footer>
+      {writeLeaseModal}
     </Layout>
   );
 }

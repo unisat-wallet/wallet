@@ -23,6 +23,7 @@ import { SendRGBScreenStep, useSendRGBScreenLogic } from '@unisat/wallet-state';
 
 import { SignPsbt } from '../Approval/components';
 import { RGBFeePoolInfoModal } from './components/RGBFeePoolInfoModal';
+import { useRgbWriteLeaseGuard } from './components/useRgbWriteLeaseGuard';
 
 const INVOICE_LINE_HEIGHT = 22;
 const INVOICE_MIN_HEIGHT = INVOICE_LINE_HEIGHT * 3;
@@ -82,6 +83,7 @@ const feePoolInfoIconStyle = {
 };
 
 export default function SendRGBScreen() {
+  const { requestWrite, writeLeaseModal } = useRgbWriteLeaseGuard();
   const {
     step,
     t,
@@ -257,7 +259,7 @@ export default function SendRGBScreen() {
             disabled={disabled}
             preset="primary"
             text={t('next')}
-            onClick={onClickNext}
+            onClick={() => void requestWrite(onClickNext)}
             data-testid="send-rgb-next-button"
           />
         </Column>
@@ -269,6 +271,7 @@ export default function SendRGBScreen() {
           t={t}
         />
       ) : null}
+      {writeLeaseModal}
     </Layout>
   );
 }

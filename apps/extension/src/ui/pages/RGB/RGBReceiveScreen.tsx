@@ -37,6 +37,7 @@ import {
 } from '@unisat/wallet-state';
 
 import { SignPsbt } from '../Approval/components';
+import { useRgbWriteLeaseGuard } from './components/useRgbWriteLeaseGuard';
 
 const GOLD = '#F4B62C';
 
@@ -192,6 +193,7 @@ const confirmModalStyle = {
 
 export default function RGBReceiveScreen() {
   const { t } = useI18n();
+  const { requestWrite, writeLeaseModal } = useRgbWriteLeaseGuard();
   const [releaseConfirmVisible, setReleaseConfirmVisible] = useState(false);
   const {
     step,
@@ -797,11 +799,12 @@ export default function RGBReceiveScreen() {
             text={loading ? loadingText || t('creating') : t('create_invoice')}
             preset="primary"
             disabled={loading || !isAmountValid || insufficientBtcForInvoice}
-            onClick={onCreateInvoice}
+            onClick={() => void requestWrite(onCreateInvoice)}
           />
         </Column>
       </Footer>
       {!isAssetLocked ? renderAssetSelectorSheet() : null}
+      {writeLeaseModal}
     </Layout>
   );
 }

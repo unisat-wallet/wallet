@@ -20,6 +20,7 @@ import { copyToClipboard, shortAddress } from '@/ui/utils';
 
 import { SignPsbt } from '../Approval/components';
 import { IssueReviewModal } from './components/IssueReviewModal';
+import { useRgbWriteLeaseGuard } from './components/useRgbWriteLeaseGuard';
 import './RGBIssueScreen.less';
 
 type RGBIssueScreenStep = 'issue' | 'sign_rgb_utxo';
@@ -197,6 +198,7 @@ export default function RGBIssueScreen() {
   const tools = useTools();
   const { t } = useI18n();
   const currentAccount = useCurrentAccount();
+  const { requestWrite, writeLeaseModal } = useRgbWriteLeaseGuard();
   const { feeRate } = useFeeRateBar();
   const [ticker, setTicker] = useState('');
   const [name, setName] = useState('');
@@ -534,10 +536,11 @@ export default function RGBIssueScreen() {
           loading={loading}
           error={operationError}
           onClose={() => setReviewModalVisible(false)}
-          onConfirm={onDeploy}
+          onConfirm={() => void requestWrite(onDeploy)}
           t={t}
         />
       ) : null}
+      {writeLeaseModal}
     </Layout>
   );
 }
