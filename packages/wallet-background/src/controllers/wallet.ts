@@ -343,6 +343,7 @@ type RgbControllerApiService = {
     wallet: RgbWalletRef & { network: string }
     deviceId: string
     checkpointRevision?: string
+    takeover?: boolean
   }) => Promise<{ leaseId: string; fencingToken: number; expiresAt: number }>
   renewRgbWriteLease: (params: {
     wallet: RgbWalletRef & { network: string }
@@ -350,6 +351,16 @@ type RgbControllerApiService = {
     leaseId: string
     fencingToken: number
   }) => Promise<{ leaseId: string; fencingToken: number; expiresAt: number }>
+  releaseRgbWriteLease: (params: {
+    wallet: RgbWalletRef & { network: string }
+    deviceId: string
+    leaseId: string
+    fencingToken: number
+  }) => Promise<{ released: boolean }>
+  getRgbWriteLeaseStatus: (params: {
+    wallet: RgbWalletRef & { network: string }
+    lease?: RgbControllerWriteLeaseCredential
+  }) => Promise<{ available: boolean; heldByCaller: boolean; expiresAt?: number }>
   verifyRgbUtxos: (params: {
     wallet: RgbWalletRef & { network: string }
     deviceId: string
@@ -880,6 +891,7 @@ export class WalletController extends BaseController {
       this.createRgbRequestAuthorization(request)
     )
     keyringService.on?.('lock', () => {
+      void this.releaseAllRgbWriteLeases()
       this.rgbServiceRegistry.clear()
       this.rgbCoordinator.clear()
       this.rgbRecoveryRestores.clear()
@@ -3649,6 +3661,37 @@ export class WalletController extends BaseController {
     return service.getRecoveryCheckpointStatus()
   }
 
+  /** Indicates whether this device may mutate RGB state; no other-device identity is exposed. */
+  getRgbWriteLeaseStatus = async () => {
+    const context = await this.getLocalRgbReadService()
+    const key = this.rgbWriteLeaseKey(context.wallet)
+    const lease = this.getRgbWriteLeaseCredential(context.wallet)
+    const status = await getRgbApiService().getRgbWriteLeaseStatus({
+      wallet: context.wallet,
+      ...(lease ? { lease } : {}),
+    })
+    if (lease && !status.heldByCaller) this.rgbWriteLeases.delete(key)
+    return {
+      mode: status.heldByCaller ? 'writer' as const : status.available ? 'available' as const : 'readonly' as const,
+      ...(status.expiresAt === undefined ? {} : { expiresAt: status.expiresAt }),
+    }
+  }
+
+  /** User-confirmed activation. takeover fences the previously active device immediately. */
+  activateRgbWriteLease = async (params: { takeover?: boolean } = {}) => {
+    const context = await this.getLocalRgbService()
+    await this.ensureRgbWriteLease(context, { takeover: params.takeover === true })
+    const lease = this.getRgbActiveWriteLease(context.wallet)
+    if (!lease) throw new Error('RGB write lease is unavailable')
+    return { active: true, expiresAt: lease.expiresAt }
+  }
+
+  /** Release the current device's lease to make a deliberate device handoff immediate. */
+  releaseRgbWriteLease = async () => {
+    const context = await this.getLocalRgbReadService()
+    return this.releaseRgbWriteLeaseForWallet(context.wallet)
+  }
+
   /** Wallet-only RGB UTXO diagnostic view. Never exposed through the dApp provider. */
   getRgbUtxoInspection = async (params: { forceSync?: boolean } = {}) => {
     const { service } = await this.getLocalRgbService()
@@ -4435,7 +4478,10 @@ export class WalletController extends BaseController {
   }
 
   /** Acquire/refresh the server-enforced single-writer lease before preparing a send. */
-  private async ensureRgbWriteLease(context: LocalRgbServiceContext): Promise<void> {
+  private async ensureRgbWriteLease(
+    context: LocalRgbServiceContext,
+    options: { takeover?: boolean } = {}
+  ): Promise<void> {
     const key = this.rgbWriteLeaseKey(context.wallet)
     const existing = this.rgbWriteLeases.get(key)
     // Reserve enough time for the preflight and local encoder; a later phase
@@ -4460,6 +4506,7 @@ export class WalletController extends BaseController {
         ...(context.service.getRecoveryCheckpointRevision?.()
           ? { checkpointRevision: context.service.getRecoveryCheckpointRevision?.() }
           : {}),
+        ...(options.takeover ? { takeover: true } : {}),
       })
     } catch (error) {
       // A newer device may have committed after this device's restore read.
@@ -4472,6 +4519,43 @@ export class WalletController extends BaseController {
       throw error
     }
     this.rgbWriteLeases.set(key, { deviceId, ...lease })
+  }
+
+  private async releaseRgbWriteLeaseForWallet(wallet: LocalRgbWallet): Promise<{ released: boolean }> {
+    const key = this.rgbWriteLeaseKey(wallet)
+    const lease = this.getRgbActiveWriteLease(wallet)
+    if (!lease) return { released: false }
+    const result = await getRgbApiService().releaseRgbWriteLease({
+      wallet,
+      deviceId: lease.deviceId,
+      leaseId: lease.leaseId,
+      fencingToken: lease.fencingToken,
+    })
+    this.rgbWriteLeases.delete(key)
+    return result
+  }
+
+  /** Lock is best-effort: a network failure falls back to the short server TTL. */
+  private async releaseAllRgbWriteLeases(): Promise<void> {
+    const leases = [...this.rgbWriteLeases.entries()]
+    await Promise.all(leases.map(async ([key, lease]) => {
+      const separator = key.indexOf(':')
+      if (separator < 1) return
+      const wallet = {
+        network: key.slice(0, separator) as RgbNetwork,
+        fundingAddress: key.slice(separator + 1),
+      } as LocalRgbWallet
+      try {
+        await getRgbApiService().releaseRgbWriteLease({
+          wallet,
+          deviceId: lease.deviceId,
+          leaseId: lease.leaseId,
+          fencingToken: lease.fencingToken,
+        })
+      } catch (error) {
+        log.debug('Failed to release RGB write lease while locking', error)
+      }
+    }))
   }
 
   /** A lease failure makes this installation read-only; local state remains available. */

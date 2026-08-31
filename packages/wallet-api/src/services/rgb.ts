@@ -43,6 +43,8 @@ import type {
   RgbWriteLeaseAcquireRequest,
   RgbWriteLeaseReleaseRequest,
   RgbWriteLeaseRenewRequest,
+  RgbWriteLeaseStatus,
+  RgbWriteLeaseStatusRequest,
 } from '../types'
 
 export class RgbService {
@@ -239,6 +241,10 @@ export class RgbService {
 
   async releaseRgbWriteLease(params: RgbWriteLeaseReleaseRequest): Promise<{ released: boolean }> {
     return this.privatePost('/v5/rgb/lease/release', params)
+  }
+
+  async getRgbWriteLeaseStatus(params: RgbWriteLeaseStatusRequest): Promise<RgbWriteLeaseStatus> {
+    return this.privatePost('/v5/rgb/lease/status', params)
   }
 
   async verifyRgbUtxos(params: RgbUtxoVerifyRequest): Promise<RgbUtxoVerifyResult> {

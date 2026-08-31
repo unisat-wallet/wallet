@@ -191,6 +191,18 @@ export interface RgbWriteLeaseRenewRequest {
 
 export interface RgbWriteLeaseReleaseRequest extends RgbWriteLeaseRenewRequest {}
 
+/** Read-only lease availability; holder identity is intentionally never returned. */
+export interface RgbWriteLeaseStatusRequest {
+  wallet: RgbWalletRef & { network: string }
+  lease?: RgbWriteLeaseCredential
+}
+
+export interface RgbWriteLeaseStatus {
+  available: boolean
+  heldByCaller: boolean
+  expiresAt?: number
+}
+
 /** Fencing credential attached to a write while the lease migration is enabled. */
 export interface RgbWriteLeaseCredential {
   deviceId: string

@@ -63,7 +63,11 @@ export {
   type RGBReceiveScreenStep,
 } from './useRGBReceiveScreenLogic'
 export { RGBTokenScreenTabKey, useRGBTokenScreenLogic } from './useRGBTokenScreenLogic'
-export { SendRGBScreenStep, useSendRGBScreenLogic } from './useSendRGBScreenLogic'
+export {
+  SendRGBScreenStep,
+  useSendRGBScreenLogic,
+  type RgbFeePoolRequirement,
+} from './useSendRGBScreenLogic'
 export { useRGBSendCompleteScreenLogic } from './useRGBSendCompleteScreenLogic'
 export { useRGBBalanceCardLogic, type RGBBalanceCardProps } from './useRGBBalanceCardLogic'
 export { useRGBUsdtBalanceCardLogic } from './useRGBUsdtBalanceCardLogic'

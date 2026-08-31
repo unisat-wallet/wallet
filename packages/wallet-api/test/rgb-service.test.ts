@@ -119,6 +119,23 @@ describe('RgbService', () => {
     )
   })
 
+  it('reads lease status without requesting another device identity', async () => {
+    const httpClient = { post: vi.fn().mockResolvedValue({ available: false, heldByCaller: false, expiresAt: 2 }), get: vi.fn() }
+    const service = new RgbService(httpClient as any)
+    service.setRequestAuthenticator(vi.fn().mockResolvedValue({
+      fundingAddress: 'bc1p-funding', nonce: 'a'.repeat(32), expiresAt: 1, signature: 'signature',
+    }))
+    const wallet = { fundingAddress: 'bc1p-funding', network: 'mainnet' as const }
+
+    await expect(service.getRgbWriteLeaseStatus({ wallet })).resolves.toEqual({
+      available: false, heldByCaller: false, expiresAt: 2,
+    })
+    expect(httpClient.post).toHaveBeenCalledWith('/v5/rgb/lease/status', {
+      wallet,
+      auth: expect.objectContaining({ fundingAddress: wallet.fundingAddress }),
+    })
+  })
+
   it('sends a confirmed receive activity through the authenticated API', async () => {
     const httpClient = {
       post: vi.fn().mockResolvedValue(undefined),

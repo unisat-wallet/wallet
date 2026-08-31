@@ -657,6 +657,18 @@ export interface WalletController {
     lastError?: string
   }>
 
+  getRgbWriteLeaseStatus(): Promise<{
+    mode: 'writer' | 'available' | 'readonly'
+    expiresAt?: number
+  }>
+
+  activateRgbWriteLease(params?: { takeover?: boolean }): Promise<{
+    active: true
+    expiresAt: number
+  }>
+
+  releaseRgbWriteLease(): Promise<{ released: boolean }>
+
   getRgbUtxoInspection(params?: { forceSync?: boolean }): Promise<{
     snapshot: {
       syncedAt: number

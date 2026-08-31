@@ -906,6 +906,68 @@ describe('RGB wallet references', () => {
     expect(service.markReceiveHistorySynced).toHaveBeenCalledWith('receive:invoice-1')
   })
 
+  it('reports a remote RGB writer as read-only without exposing its identity', async () => {
+    const wallet = new WalletController()
+    const getRgbWriteLeaseStatus = vi.fn().mockResolvedValue({
+      available: false,
+      heldByCaller: false,
+      expiresAt: 1_800_000_000_000,
+    })
+    ;(walletApiService as any).rgb = { getRgbWriteLeaseStatus }
+    const walletRef = { walletId: 'wallet-1', fundingAddress: 'bc1p-rgb-funding', network: 'mainnet' }
+    vi.spyOn(wallet as any, 'getLocalRgbReadService').mockResolvedValue({ service: {}, wallet: walletRef })
+
+    await expect(wallet.getRgbWriteLeaseStatus()).resolves.toEqual({
+      mode: 'readonly',
+      expiresAt: 1_800_000_000_000,
+    })
+    expect(getRgbWriteLeaseStatus).toHaveBeenCalledWith({ wallet: walletRef })
+  })
+
+  it('releases the local RGB writer lease for an explicit device handoff', async () => {
+    const wallet = new WalletController()
+    const releaseRgbWriteLease = vi.fn().mockResolvedValue({ released: true })
+    ;(walletApiService as any).rgb = { releaseRgbWriteLease }
+    const walletRef = { walletId: 'wallet-1', fundingAddress: 'bc1p-rgb-funding', network: 'mainnet' }
+    vi.spyOn(wallet as any, 'getLocalRgbReadService').mockResolvedValue({ service: {}, wallet: walletRef })
+    ;(wallet as any).rgbWriteLeases.set('mainnet:bc1p-rgb-funding', {
+      deviceId: 'device_abcdefghijklmnop',
+      leaseId: 'a'.repeat(24),
+      fencingToken: 1,
+      expiresAt: Date.now() + 60_000,
+    })
+
+    await expect(wallet.releaseRgbWriteLease()).resolves.toEqual({ released: true })
+    expect(releaseRgbWriteLease).toHaveBeenCalledWith({
+      wallet: walletRef,
+      deviceId: 'device_abcdefghijklmnop',
+      leaseId: 'a'.repeat(24),
+      fencingToken: 1,
+    })
+    expect((wallet as any).rgbWriteLeases.size).toEqual(0)
+  })
+
+  it('only takes over RGB writing through the explicit activation action', async () => {
+    const wallet = new WalletController()
+    const walletRef = { walletId: 'wallet-1', fundingAddress: 'bc1p-rgb-funding', network: 'mainnet' }
+    const context = { service: {}, wallet: walletRef }
+    vi.spyOn(wallet as any, 'getLocalRgbService').mockResolvedValue(context)
+    const ensure = vi.spyOn(wallet as any, 'ensureRgbWriteLease').mockImplementation(async () => {
+      ;(wallet as any).rgbWriteLeases.set('mainnet:bc1p-rgb-funding', {
+        deviceId: 'device_abcdefghijklmnop',
+        leaseId: 'a'.repeat(24),
+        fencingToken: 1,
+        expiresAt: 1_800_000_000_000,
+      })
+    })
+
+    await expect(wallet.activateRgbWriteLease({ takeover: true })).resolves.toEqual({
+      active: true,
+      expiresAt: 1_800_000_000_000,
+    })
+    expect(ensure).toHaveBeenCalledWith(context, { takeover: true })
+  })
+
   it('retries a durable received-allocation UTXO replacement after a backend failure', async () => {
     const wallet = new WalletController()
     let pendingUtxoSync: any = {
