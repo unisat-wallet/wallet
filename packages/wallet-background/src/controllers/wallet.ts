@@ -829,7 +829,7 @@ export class WalletController extends BaseController {
     getReadContext: () => this.getLocalRgbReadService(),
     syncIndexerOutbox: (service, wallet) => this.syncRgbIndexerOutbox(service, wallet),
     syncReceiveHistory: (service, wallet) => this.syncRgbReceiveHistory(service, wallet),
-    tryEnsureWriteLease: context => this.tryEnsureRgbWriteLease(context),
+    tryEnsureWriteLease: (context, options) => this.tryEnsureRgbWriteLease(context, options),
   })
   private readonly rgbTransferQuery = new RgbTransferQuery({
     getContext: () => this.getLocalRgbService(),
@@ -859,7 +859,7 @@ export class WalletController extends BaseController {
   })
   private readonly rgbSendOperations = new RgbSendOperations({
     getContext: () => this.getLocalRgbService(),
-    ensureWriteLease: context => this.ensureRgbWriteLease(context),
+    ensureWriteLease: (context, options) => this.ensureRgbWriteLease(context, options),
     getFeeRate: async () => (await this.getFeeSummary()).list[1]?.feeRate,
     getToSignData: ({ psbt, toSignInputs, amountDisplay, actionName }) =>
       this.getRgbToSignData({
@@ -3645,6 +3645,8 @@ export class WalletController extends BaseController {
   }
 
   createRgbBlindReceive = async (params: Omit<RgbReceiveInvoiceRequest, 'wallet'>) => {
+    const context = await this.getLocalRgbService()
+    await this.ensureRgbWriteLease(context)
     return this.rgbReceiveOperations.createBlindReceive(params)
   }
 
@@ -3769,10 +3771,12 @@ export class WalletController extends BaseController {
     if (!account) throw new Error('no current account')
     assertCanCreateSigningRequest(account)
 
-    const [{ service }, feeAccount] = await Promise.all([
+    const [context, feeAccount] = await Promise.all([
       this.getLocalRgbService(),
       this.getCurrentRgbFeeAccount(),
     ])
+    await this.ensureRgbWriteLease(context)
+    const { service } = context
     const locked = new Set(
       service
         .getPendingTransfers()
@@ -3822,8 +3826,9 @@ export class WalletController extends BaseController {
       txid: Buffer.from(input.hash).reverse().toString('hex'),
       vout: input.index,
     }))
+    const { service, wallet } = await this.getLocalRgbService()
+    await this.ensureRgbWriteLease({ service, wallet }, { forceRenew: true })
     const txid = await this.pushTx(transaction.toHex())
-    const { service } = await this.getLocalRgbService()
     await service.removeFeePoolUtxos(spentOutpoints)
     return { txid }
   }
@@ -3832,6 +3837,8 @@ export class WalletController extends BaseController {
     const account = preferenceService.getCurrentAccount()
     if (!account) throw new Error('no current account')
     assertCanCreateSigningRequest(account)
+    const context = await this.getLocalRgbService()
+    await this.ensureRgbWriteLease(context)
     const status = await this.getRgbFeePoolStatus(params)
     const feeSummary = params.feeRate ? undefined : await this.getFeeSummary()
     const feeRate = params.feeRate ?? feeSummary?.list[0]?.feeRate
@@ -3884,6 +3891,8 @@ export class WalletController extends BaseController {
     const signedPsbt = psbtFromString(params.signedPsbt)
     const transaction = signedPsbt.extractTransaction(true)
     const feeAccount = await this.getCurrentRgbFeeAccount()
+    const { service, wallet } = await this.getLocalRgbService()
+    await this.ensureRgbWriteLease({ service, wallet }, { forceRenew: true })
     const txid = await this.pushTx(transaction.toHex())
     const utxos = transaction.outs
       .map((output, vout) => ({ output, vout }))
@@ -3896,7 +3905,6 @@ export class WalletController extends BaseController {
         createdAt: Date.now(),
       }))
     if (!utxos.length) throw new Error('RGB fee-pool top-up has no fee outputs')
-    const { service } = await this.getLocalRgbService()
     await service.queueFeePoolUtxos(utxos)
     return { txid, utxos }
   }
@@ -4000,11 +4008,17 @@ export class WalletController extends BaseController {
   abortRgbVanillaTx = (params: Omit<RgbAbortVanillaTxRequest, 'wallet'>) =>
     this.rgbSendOperations.abortVanillaTx(params.txid)
 
-  acceptRgbReceive = (params: { recipientId: string }) =>
-    this.rgbReceiveOperations.acceptReceive(params.recipientId)
+  acceptRgbReceive = async (params: { recipientId: string }) => {
+    const context = await this.getLocalRgbService()
+    await this.ensureRgbWriteLease(context, { forceRenew: true })
+    return this.rgbReceiveOperations.acceptReceive(params.recipientId)
+  }
 
-  rejectRgbReceive = (params: { recipientId: string }) =>
-    this.rgbReceiveOperations.rejectReceive(params.recipientId)
+  rejectRgbReceive = async (params: { recipientId: string }) => {
+    const context = await this.getLocalRgbService()
+    await this.ensureRgbWriteLease(context, { forceRenew: true })
+    return this.rgbReceiveOperations.rejectReceive(params.recipientId)
+  }
 
   getRgbAllocationSummary = (params: Omit<RgbAllocationSummaryRequest, 'wallet'> = {}) =>
     this.rgbReceiveOperations.getAllocationSummary(params)
@@ -4014,6 +4028,56 @@ export class WalletController extends BaseController {
 
   createRgbSendEnd = (params: Omit<RgbSendEndRequest, 'wallet'>) =>
     this.rgbSendOperations.complete(params)
+
+  /** Provider-facing signing data bound to a locally prepared RGB payment. */
+  getRgbPaymentSigningData = async (params: { transferId: string }) => {
+    const { service } = await this.getLocalRgbService()
+    const pending = service.getPendingTransfers().find(transfer => transfer.id === params.transferId)
+    if (!pending || pending.delivery || pending.broadcast) {
+      throw new Error('RGB payment is not awaiting a signature')
+    }
+    return this.getRgbToSignData({
+      psbt: pending.prepared.psbt,
+      toSignInputs: pending.prepared.toSignInputs,
+      action: {
+        name: 'Send RGB',
+        description: '',
+        type: PsbtActionType.CUSTOM,
+      },
+    })
+  }
+
+  /** Read-only local status for a dApp-created RGB payment. */
+  getRgbPaymentStatus = async (params: { transferId: string }) => {
+    const { service } = await this.getLocalRgbReadService()
+    const pending = service.getPendingTransfers().find(transfer => transfer.id === params.transferId)
+    if (pending) {
+      return {
+        transferId: pending.id,
+        assetId: pending.request.assetId,
+        amount: pending.request.amount,
+        txid: pending.delivery?.completed.txid ?? pending.broadcast?.completed.txid,
+        status: pending.delivery?.broadcastError
+          ? 'broadcast_failed'
+          : pending.delivery?.acknowledgedAt
+            ? 'broadcasting'
+            : pending.delivery
+              ? 'waiting_ack'
+              : pending.broadcast
+                ? 'broadcasted'
+                : 'prepared',
+      }
+    }
+    const history = service.getPendingSendHistory().find(item => item.transferId === params.transferId)
+    if (!history) return { transferId: params.transferId, status: 'unknown' as const }
+    return {
+      transferId: history.transferId,
+      assetId: history.assetId,
+      amount: history.amount,
+      txid: history.txid,
+      status: history.status,
+    }
+  }
 
   retryRgbBroadcast = (params: { transferId: string }) =>
     this.rgbSendOperations.retryBroadcast(params.transferId)

@@ -12,7 +12,10 @@ import type { LocalRgbServiceContext } from './RgbWalletCoordinator'
 
 type RgbSendOperationsDependencies = {
   getContext: () => Promise<LocalRgbServiceContext>
-  ensureWriteLease?: (context: LocalRgbServiceContext) => Promise<void>
+  ensureWriteLease?: (
+    context: LocalRgbServiceContext,
+    options?: { forceRenew?: boolean }
+  ) => Promise<void>
   getFeeRate: () => Promise<number | undefined>
   getToSignData: (params: {
     psbt: string
@@ -76,7 +79,9 @@ export class RgbSendOperations {
 
   async complete(params: { signedPsbt: string; transferId?: string }) {
     const { service, wallet } = await this.dependencies.getContext()
-    await this.dependencies.ensureWriteLease?.({ service, wallet })
+    // A signer may be open long enough for another device to take over. Do
+    // not complete delivery or broadcast using a locally cached lease.
+    await this.dependencies.ensureWriteLease?.({ service, wallet }, { forceRenew: true })
     const pending = service.getPendingTransfers()
     const transferId =
       params.transferId ??
@@ -121,7 +126,9 @@ export class RgbSendOperations {
 
   async retryBroadcast(transferId: string) {
     const { service, wallet } = await this.dependencies.getContext()
-    await this.dependencies.ensureWriteLease?.({ service, wallet })
+    // Retrying can broadcast a previously prepared transaction, so it needs
+    // the same authoritative lease check as signed completion.
+    await this.dependencies.ensureWriteLease?.({ service, wallet }, { forceRenew: true })
     const transfer = service.getPendingTransfers().find(item => item.id === transferId)
     if (!transfer?.delivery?.broadcastError) {
       return { broadcast: false, status: 'not_retryable' as const }

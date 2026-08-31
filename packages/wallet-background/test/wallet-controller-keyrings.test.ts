@@ -504,7 +504,9 @@ describe('RGB wallet references', () => {
     })
 
     vi.mocked(preferenceService.getCurrentAccount).mockReturnValue(account as any)
-    vi.spyOn(wallet as any, 'getLocalRgbService').mockResolvedValue({ service })
+    const localWallet = { fundingAddress: 'bc1p-rgb-funding', network: 'mainnet', walletId: 'rgb-wallet' }
+    vi.spyOn(wallet as any, 'getLocalRgbService').mockResolvedValue({ service, wallet: localWallet })
+    const ensureLease = vi.spyOn(wallet as any, 'ensureRgbWriteLease').mockResolvedValue(undefined)
     vi.spyOn(wallet as any, 'getCurrentRgbFeeAccount').mockResolvedValue({
       address: 'bc1pfeepool',
       publicKey: validCompressedPubkey,
@@ -543,6 +545,7 @@ describe('RGB wallet references', () => {
         btcUtxos: [expect.objectContaining({ txid: 'b'.repeat(64), vout: 1 })],
       })
     )
+    expect(ensureLease).toHaveBeenCalledWith({ service, wallet: localWallet })
   })
 
   it('removes locally retained Fee Pool UTXOs after a withdrawal is broadcast', async () => {
@@ -568,12 +571,16 @@ describe('RGB wallet references', () => {
       ]),
     })
     const service = { removeFeePoolUtxos: vi.fn().mockResolvedValue(undefined) }
-    vi.spyOn(wallet as any, 'getLocalRgbService').mockResolvedValue({ service })
-    vi.spyOn(wallet, 'pushTx').mockResolvedValue('d'.repeat(64))
+    const localWallet = { fundingAddress: feeAddress, network: 'mainnet', walletId: 'rgb-wallet' }
+    vi.spyOn(wallet as any, 'getLocalRgbService').mockResolvedValue({ service, wallet: localWallet })
+    const ensureLease = vi.spyOn(wallet as any, 'ensureRgbWriteLease').mockResolvedValue(undefined)
+    const pushTx = vi.spyOn(wallet, 'pushTx').mockResolvedValue('d'.repeat(64))
 
     await expect(wallet.createRgbFeePoolWithdrawEnd({ signedPsbt: signedPsbt.toBase64() })).resolves.toEqual({
       txid: 'd'.repeat(64),
     })
+    expect(ensureLease).toHaveBeenCalledWith({ service, wallet: localWallet }, { forceRenew: true })
+    expect(ensureLease.mock.invocationCallOrder[0]).toBeLessThan(pushTx.mock.invocationCallOrder[0])
     expect(service.removeFeePoolUtxos).toHaveBeenCalledWith([{ txid: 'c'.repeat(64), vout: 2 }])
   })
 
@@ -677,10 +684,14 @@ describe('RGB wallet references', () => {
     const wallet = new WalletController()
     const service = { getPendingTransfers: vi.fn(() => [{ id: 'persisted-rgb-transfer' }]), completeSend: vi.fn().mockResolvedValue({ txid: 'aa'.repeat(32) }) }
     vi.spyOn(wallet as any, 'getLocalRgbService').mockResolvedValue({ service, wallet: { fundingAddress: 'bc1p-rgb-funding' } })
-    vi.spyOn(wallet as any, 'ensureRgbWriteLease').mockResolvedValue(undefined)
+    const ensureLease = vi.spyOn(wallet as any, 'ensureRgbWriteLease').mockResolvedValue(undefined)
 
     const signedPsbt = new bitcoin.Psbt().toBase64()
     await expect(wallet.createRgbSendEnd({ signedPsbt })).resolves.toEqual({ txid: 'aa'.repeat(32) })
+    expect(ensureLease).toHaveBeenCalledWith(
+      expect.anything(),
+      { forceRenew: true }
+    )
     expect(service.completeSend).toHaveBeenCalledWith('persisted-rgb-transfer', signedPsbt)
   })
 
@@ -802,13 +813,37 @@ describe('RGB wallet references', () => {
       service,
       wallet: { fundingAddress: 'bc1p-rgb-funding' },
     })
-    vi.spyOn(wallet as any, 'ensureRgbWriteLease').mockResolvedValue(undefined)
+    const ensureLease = vi.spyOn(wallet as any, 'ensureRgbWriteLease').mockResolvedValue(undefined)
 
     await expect(wallet.retryRgbBroadcast({ transferId: 'pending-rgb-transfer' })).resolves.toEqual({
       broadcast: true,
       status: 'confirming',
     })
+    expect(ensureLease).toHaveBeenCalledWith(
+      expect.anything(),
+      { forceRenew: true }
+    )
     expect(service.sync).toHaveBeenCalledTimes(1)
+  })
+
+  it('does not process pending RGB receives when another device owns the writer lease', async () => {
+    const wallet = new WalletController()
+    const service = {
+      claimPendingReceives: vi.fn(),
+      processClaimedReceives: vi.fn(),
+      getPendingReceives: vi.fn(() => [{ recipientId: 'pending-receive' }]),
+    }
+    vi.spyOn(wallet as any, 'getLocalRgbService').mockResolvedValue({
+      service,
+      wallet: { fundingAddress: 'bc1p-rgb-funding', network: 'mainnet', walletId: 'rgb-wallet' },
+    })
+    const ensureLease = vi.spyOn(wallet as any, 'tryEnsureRgbWriteLease').mockResolvedValue(false)
+
+    await (wallet as any).syncRgbReceivedAllocations()
+
+    expect(ensureLease).toHaveBeenCalledWith(expect.anything(), { forceRenew: true })
+    expect(service.claimPendingReceives).not.toHaveBeenCalled()
+    expect(service.processClaimedReceives).not.toHaveBeenCalled()
   })
 
   it('does not poll RGB receive infrastructure when there are no pending invoices', async () => {
@@ -848,6 +883,9 @@ describe('RGB wallet references', () => {
       service,
       wallet: { fundingAddress: 'bc1p-rgb-funding', network: 'mainnet' },
     })
+    vi.spyOn(wallet as any, 'tryEnsureRgbWriteLease').mockResolvedValue(true)
+    vi.spyOn(wallet as any, 'syncRgbIndexerOutbox').mockResolvedValue(false)
+    vi.spyOn(wallet as any, 'syncRgbReceiveHistory').mockResolvedValue(undefined)
 
     await expect(wallet.getRgbPendingReceiveInvoices()).resolves.toMatchObject({
       list: [{ invoice: 'rgb:invoice', status: 'WaitingCounterparty' }],
@@ -1226,6 +1264,9 @@ describe('RGB wallet references', () => {
     vi.spyOn(wallet as any, 'getLocalRgbService').mockResolvedValue({ service, wallet: walletRef })
     vi.spyOn(wallet, 'getRgbFundingAddress').mockResolvedValue({ address: walletRef.fundingAddress })
     vi.spyOn(wallet, 'getRgbAssetList').mockResolvedValue({ currentPage: 1, pageSize: 20, total: 0, list: [] })
+    vi.spyOn(wallet as any, 'tryEnsureRgbWriteLease').mockResolvedValue(true)
+    vi.spyOn(wallet as any, 'syncRgbIndexerOutbox').mockResolvedValue(false)
+    vi.spyOn(wallet as any, 'syncRgbReceiveHistory').mockResolvedValue(undefined)
 
     await wallet.getRGBList('', 1, 20)
     await (wallet as any).syncRgbReceivedAllocations()
@@ -1254,6 +1295,9 @@ describe('RGB wallet references', () => {
       fundingAddress: 'bc1p-rgb-funding',
     }
     vi.spyOn(wallet as any, 'getLocalRgbService').mockResolvedValue({ service, wallet: walletRef })
+    vi.spyOn(wallet as any, 'tryEnsureRgbWriteLease').mockResolvedValue(true)
+    vi.spyOn(wallet as any, 'syncRgbIndexerOutbox').mockResolvedValue(false)
+    vi.spyOn(wallet as any, 'syncRgbReceiveHistory').mockResolvedValue(undefined)
 
     await (wallet as any).syncRgbReceivedAllocations()
 
