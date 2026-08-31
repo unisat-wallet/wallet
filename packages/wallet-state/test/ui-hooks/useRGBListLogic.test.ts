@@ -1,9 +1,11 @@
 import { act, renderHook, waitFor } from '@testing-library/react'
+import { BUS_METHODS } from '@unisat/wallet-shared'
 import { describe, expect, it, vi } from 'vitest'
 
 import { useRGBListLogic } from '../../src/ui-hooks/useRGBListLogic'
 import { uiActions } from '../../src/reducers/ui'
 import { WalletView } from '../../src/types/ui'
+import { uiEventBus } from '../../src/utils/eventBus'
 import { createHookTestHarness } from './testHelpers'
 
 describe('useRGBListLogic', () => {
@@ -66,5 +68,24 @@ describe('useRGBListLogic', () => {
     })
 
     setIntervalSpy.mockRestore()
+  })
+
+  it('refreshes the visible RGB asset list after the background reports a change', async () => {
+    const { store, wrapper, wallet } = createHookTestHarness()
+    store.dispatch(uiActions.setWalletView(WalletView.RGB))
+
+    renderHook(() => useRGBListLogic(), { wrapper })
+
+    await waitFor(() => {
+      expect(wallet.getRGBList).toHaveBeenCalledTimes(1)
+    })
+
+    act(() => {
+      uiEventBus.emit(BUS_METHODS.RGB_ASSETS_CHANGED)
+    })
+
+    await waitFor(() => {
+      expect(wallet.getRGBList).toHaveBeenCalledTimes(2)
+    })
   })
 })

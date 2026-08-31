@@ -437,7 +437,7 @@ describe('RgbService', () => {
     await expect(Promise.all(synchronizations)).resolves.toEqual([snapshot, snapshot, snapshot])
   })
 
-  it('does not checkpoint when a snapshot refresh only advances syncedAt', async () => {
+  it('does not checkpoint when a snapshot refresh only advances syncedAt or returns an unverified empty replica', async () => {
     const dependencies = createDependencies()
     const checkpoint = vi.fn().mockResolvedValue({ verified: true })
     dependencies.onStatePersisted = checkpoint
@@ -464,7 +464,73 @@ describe('RgbService', () => {
     })
     await service.sync()
 
-    expect(checkpoint).toHaveBeenCalledTimes(2)
+    // A wiped/rebuilding indexer must not erase the durable local allocations
+    // until their spent status is independently confirmed.
+    expect(service.getSnapshot().syncedAt).toBe(2)
+    expect(service.getSnapshot().utxos).toHaveLength(2)
+    expect(checkpoint).toHaveBeenCalledTimes(1)
+  })
+
+  it('clears local allocations for an empty snapshot after every local UTXO is confirmed terminal', async () => {
+    const dependencies = createDependencies()
+    dependencies.stateSource.getTransactionStatus = vi.fn().mockResolvedValue({
+      status: 'spent',
+      confirmations: 1,
+    })
+    const service = new RgbService(dependencies)
+    await service.open(wallet)
+    await service.sync()
+
+    vi.mocked(dependencies.stateSource.getSnapshot).mockResolvedValueOnce({
+      syncedAt: 2,
+      utxos: [],
+    })
+    await service.sync()
+
+    expect(dependencies.stateSource.getTransactionStatus).toHaveBeenCalledTimes(2)
+    expect(service.getSnapshot()).toEqual({ syncedAt: 2, utxos: [] })
+  })
+
+  it('derives asset list, balance, and detail from local allocations and contract metadata', async () => {
+    const dependencies = createDependencies()
+    const service = new RgbService(dependencies)
+    await service.open(wallet)
+    await service.sync()
+    ;(service as any).state.contracts = {
+      'rgb:asset': {
+        consignment: 'local-consignment',
+        createdAt: 1,
+        metadata: {
+          ticker: 'TOK',
+          name: 'Local token',
+          precision: 8,
+          schema: 'NIA',
+          issuedSupply: '100',
+        },
+      },
+    }
+
+    expect(service.getLocalAssetList(1, 20)).toEqual({
+      total: 1,
+      list: [
+        expect.objectContaining({
+          assetId: 'rgb:asset',
+          balance: '100',
+          settled: '100',
+          spendable: '100',
+          pending: '0',
+          ticker: 'TOK',
+          name: 'Local token',
+          precision: 8,
+        }),
+      ],
+    })
+    expect(service.getLocalAssetBalance('rgb:asset')).toMatchObject({ balance: '100' })
+    expect(service.getLocalAssetDetail('rgb:asset')).toMatchObject({
+      assetId: 'rgb:asset',
+      name: 'Local token',
+      issuedSupply: '100',
+    })
   })
 
   it('rejects an endpoint-less invoice before locking RGB allocations', async () => {

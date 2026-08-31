@@ -9,6 +9,8 @@ export type LocalRgbServiceContext = {
 
 type RgbWalletCoordinatorDependencies = {
   getContext: () => Promise<LocalRgbServiceContext>
+  /** Read-only local context; available even while recovery/index APIs are down. */
+  getReadContext?: () => Promise<LocalRgbServiceContext>
   syncIndexerOutbox: (service: RgbService, wallet: LocalRgbWallet) => Promise<boolean>
   syncReceiveHistory: (service: RgbService, wallet: LocalRgbWallet) => Promise<void>
 }
@@ -85,7 +87,9 @@ export class RgbWalletCoordinator {
   }
 
   async getPendingLockedAmounts(): Promise<Map<string, bigint>> {
-    const { service } = await this.dependencies.getContext()
+    const { service } = await (
+      this.dependencies.getReadContext?.() ?? this.dependencies.getContext()
+    )
     const snapshot = service.getSnapshot?.()
     if (!snapshot) return new Map<string, bigint>()
     const lockedAmounts = new Map<string, bigint>()

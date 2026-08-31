@@ -21,6 +21,8 @@ import { planFungibleTransition } from './protocol/transition'
 import type {
   RgbCompletedTransfer,
   RgbFeePoolUtxo,
+  RgbLocalAssetBalance,
+  RgbLocalAssetDetail,
   RgbPreparedTransfer,
   RgbPendingIssue,
   RgbPendingAssetMetadata,
@@ -247,7 +249,21 @@ export class RgbService {
     // A remote snapshot may still expose consumed outpoints. Finish durable
     // post-broadcast delivery first, or leave the locally updated snapshot intact.
     if (Object.keys(state.pending).length) await this.advancePendingTransfers()
-    const snapshot = normalizeSnapshot(await this.dependencies.stateSource.getSnapshot(state.wallet))
+    const snapshot = normalizeSnapshot(
+      await this.dependencies.stateSource.getSnapshot(state.wallet)
+    )
+    // The indexer is an eventually-consistent replica of wallet-owned state.
+    // Before accepting an empty response, confirm that every locally retained
+    // UTXO is terminal. This preserves state while an indexer is rebuilding,
+    // but lets an authoritative empty snapshot remove externally spent RGB
+    // allocations instead of retaining a phantom balance forever.
+    if (
+      snapshot.utxos.length === 0 &&
+      state.snapshot.utxos.length > 0 &&
+      !(await this.areLocalSnapshotUtxosTerminal())
+    ) {
+      return state.snapshot
+    }
     // Indexers commonly advance syncedAt on every response even if neither
     // UTXOs nor allocations changed. Keep that local freshness marker, but
     // do not turn polling into a full encrypted checkpoint upload.
@@ -255,6 +271,30 @@ export class RgbService {
     state.snapshot = snapshot
     await this.persist({ skipRecovery: !checkpointSnapshotChanged })
     return state.snapshot
+  }
+
+  private async areLocalSnapshotUtxosTerminal() {
+    const state = this.requireState()
+    const getTransactionStatus = this.dependencies.stateSource.getTransactionStatus
+    if (!getTransactionStatus) return false
+
+    const txids = [
+      ...new Set(
+        state.snapshot.utxos
+          .filter(utxo => utxo.chainStatus !== 'spent' && utxo.chainStatus !== 'replaced')
+          .map(utxo => utxo.outpoint.txid)
+      ),
+    ]
+    try {
+      const statuses = await Promise.all(
+        txids.map(txid => getTransactionStatus(state.wallet, txid))
+      )
+      return statuses.every(status => status.status === 'spent' || status.status === 'replaced')
+    } catch {
+      // A failed status lookup is indistinguishable from an indexer outage;
+      // retain local allocations until a later authoritative confirmation.
+      return false
+    }
   }
 
   /** Advance sender ACK/broadcast state without fetching the full UTXO snapshot. */
@@ -1228,6 +1268,94 @@ export class RgbService {
 
   getSnapshot() {
     return this.requireState().snapshot
+  }
+
+  /**
+   * Derive the asset list solely from durable wallet state. This deliberately
+   * avoids the indexer asset/list endpoints: local allocations and locally
+   * validated contract metadata are the wallet's source of truth.
+   */
+  getLocalAssetList(page = 1, pageSize = 20) {
+    const list = this.getLocalAssetBalances()
+    const safePage = Number.isSafeInteger(page) && page > 0 ? page : 1
+    const safePageSize = Number.isSafeInteger(pageSize) && pageSize > 0 ? pageSize : 20
+    const offset = (safePage - 1) * safePageSize
+    return {
+      total: list.length,
+      list: list.slice(offset, offset + safePageSize),
+    }
+  }
+
+  /** Return a local balance for an asset currently represented in the snapshot. */
+  getLocalAssetBalance(assetId: string): RgbLocalAssetBalance | undefined {
+    const normalized = normalizeAssetId(assetId)
+    return this.getLocalAssetBalances().find(asset => asset.assetId === normalized)
+  }
+
+  /**
+   * Detail views are also local: contract metadata is learned from the
+   * validated consignment and the balance comes from the local snapshot.
+   */
+  getLocalAssetDetail(assetId: string): RgbLocalAssetDetail {
+    const normalized = normalizeAssetId(assetId)
+    return this.getLocalAssetBalance(normalized) || this.getEmptyLocalAssetBalance(normalized)
+  }
+
+  private getLocalAssetBalances(): RgbLocalAssetBalance[] {
+    const state = this.requireState()
+    const amounts = new Map<string, { settled: bigint; spendable: bigint; pending: bigint }>()
+    for (const utxo of state.snapshot.utxos) {
+      if (
+        utxo.chainStatus === 'spent' ||
+        utxo.chainStatus === 'replaced' ||
+        utxo.chainStatus === 'pending_spend'
+      ) {
+        continue
+      }
+      for (const allocation of utxo.allocations) {
+        const current = amounts.get(allocation.assetId) || {
+          settled: 0n,
+          spendable: 0n,
+          pending: 0n,
+        }
+        const amount = BigInt(allocation.amount)
+        if (allocation.settled) current.settled += amount
+        else current.pending += amount
+        if (allocation.settled && allocation.spendable) current.spendable += amount
+        amounts.set(allocation.assetId, current)
+      }
+    }
+    return [...amounts.entries()]
+      .map(([assetId, amount]) => this.getEmptyLocalAssetBalance(assetId, amount))
+      .sort((left, right) => left.assetId.localeCompare(right.assetId))
+  }
+
+  private getEmptyLocalAssetBalance(
+    assetId: string,
+    amount: { settled: bigint; spendable: bigint; pending: bigint } = {
+      settled: 0n,
+      spendable: 0n,
+      pending: 0n,
+    }
+  ): RgbLocalAssetDetail {
+    const metadata = this.requireState().contracts?.[assetId]?.metadata
+    return {
+      assetId,
+      balance: amount.settled.toString(),
+      settled: amount.settled.toString(),
+      spendable: amount.spendable.toString(),
+      pending: amount.pending.toString(),
+      ...(metadata
+        ? {
+            ticker: metadata.ticker,
+            name: metadata.name,
+            precision: metadata.precision,
+            schema: metadata.schema,
+            issuedSupply: metadata.issuedSupply,
+            ...(metadata.timestamp === undefined ? {} : { timestamp: metadata.timestamp }),
+          }
+        : {}),
+    }
   }
 
   /**

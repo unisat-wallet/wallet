@@ -1,8 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 
-import {
-  useNavigation,
-} from '../context/NavigationContext'
+import { BUS_METHODS } from '@unisat/wallet-shared'
+import { useNavigation } from '../context/NavigationContext'
 import { useWallet } from '../context/WalletContext'
 import { useWallTabFocusRefresh } from '../hooks/global'
 import { useCurrentKeyring } from '../hooks/keyrings'
@@ -12,6 +11,7 @@ import { getSupportedAssets, useWalletView } from '../hooks/ui'
 import type { RgbBalance } from '../types'
 import { WalletView } from '../types/ui'
 import { useInfiniteList } from './useInfiniteList'
+import { uiEventBus } from '../utils/eventBus'
 
 export function useRGBListLogic(
   { autoRefresh = false, enabled = true }: { autoRefresh?: boolean; enabled?: boolean } = {}
@@ -107,6 +107,19 @@ export function useRGBListLogic(
 
     return () => clearInterval(intervalId)
   }, [autoRefresh, enabled, isFocus, isRgbSupported, onRefresh, refreshFundingAddress])
+
+  useEffect(() => {
+    const handleRgbAssetsChanged = () => {
+      if (!enabled || !isFocus || !isRgbSupported) return
+      refreshFundingAddress()
+      onRefresh()
+    }
+
+    uiEventBus.addEventListener(BUS_METHODS.RGB_ASSETS_CHANGED, handleRgbAssetsChanged)
+    return () => {
+      uiEventBus.removeEventListener(BUS_METHODS.RGB_ASSETS_CHANGED, handleRgbAssetsChanged)
+    }
+  }, [enabled, isFocus, isRgbSupported, onRefresh, refreshFundingAddress])
 
   const onClickItem = (item: RgbBalance) => {
     const assetId = item.assetId

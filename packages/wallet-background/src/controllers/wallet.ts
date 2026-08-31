@@ -760,6 +760,7 @@ export class WalletController extends BaseController {
   private readonly rgbRecoveryVerifiedFingerprints = new Map<string, string>()
   private readonly rgbCoordinator = new RgbWalletCoordinator({
     getContext: () => this.getLocalRgbService(),
+    getReadContext: () => this.getLocalRgbReadService(),
     syncIndexerOutbox: (service, wallet) => this.syncRgbIndexerOutbox(service, wallet),
     syncReceiveHistory: (service, wallet) => this.syncRgbReceiveHistory(service, wallet),
   })
@@ -3287,9 +3288,10 @@ export class WalletController extends BaseController {
     return tokenSummary
   }
 
-  getRgbAssetList = async (address: string, currentPage: number, pageSize: number) => {
+  getRgbAssetList = async (_address: string, currentPage: number, pageSize: number) => {
     this.assertRgbEnabled()
-    const { total, list } = await getRgbApiService().getRgbAssetList(address, currentPage, pageSize)
+    const { service } = await this.getLocalRgbReadService()
+    const { total, list } = service.getLocalAssetList(currentPage, pageSize)
     return {
       currentPage,
       pageSize,
@@ -3309,10 +3311,15 @@ export class WalletController extends BaseController {
     options?: { skipSync?: boolean }
   ) => {
     const { address } = await this.getRgbFundingAddress()
-    if (!options?.skipSync) {
-      await this.syncRgbListState()
-    }
     const result = await this.getRgbAssetList(address, currentPage, pageSize)
+    if (!options?.skipSync) {
+      // Rendering must not depend on the indexer replica. Refresh its chain
+      // observations in the background, so recovery or indexer timeouts do
+      // not delay the encrypted local view.
+      void this.syncRgbListState(result).catch(error => {
+        log.warn('Failed to refresh RGB indexer snapshot while loading local assets', error)
+      })
+    }
     const lockedAmounts = await this.getRgbPendingLockedAmounts()
     return {
       ...result,
@@ -3320,24 +3327,34 @@ export class WalletController extends BaseController {
     }
   }
 
-  getRgbAssetBalance = async (address: string, assetId: string) => {
+  getRgbAssetBalance = async (_address: string, assetId: string) => {
     this.assertRgbEnabled()
-    return getRgbApiService().getRgbAssetBalance(address, assetId)
+    const { service } = await this.getLocalRgbReadService()
+    return service.getLocalAssetBalance(assetId)
   }
 
   getRGBAssetBalance = async (_address: string, assetId: string) => {
     const { address } = await this.getRgbFundingAddress()
     const balance = await this.getRgbAssetBalance(address, assetId)
-    return this.applyRgbPendingLock(balance, await this.getRgbPendingLockedAmounts())
+    return balance
+      ? this.applyRgbPendingLock(balance, await this.getRgbPendingLockedAmounts())
+      : undefined
   }
 
   getRgbAssetDetail = async (assetId: string) => {
     this.assertRgbEnabled()
-    return getRgbApiService().getRgbAssetDetail(assetId)
+    const { service } = await this.getLocalRgbReadService()
+    return service.getLocalAssetDetail(assetId)
   }
 
   getRGBAssetDetail = async (_address: string, assetId: string) => {
-    return this.getRgbAssetDetail(assetId)
+    const detail = await this.getRgbAssetDetail(assetId)
+    // Local RGB details keep balance fields flat, while the wallet UI's
+    // RgbAssetDetail contract expects a nested balance object.
+    return {
+      ...detail,
+      balance: { ...detail },
+    }
   }
 
   getRgbAssetActivity = async (
@@ -3958,7 +3975,29 @@ export class WalletController extends BaseController {
   }
 
   /** Refresh colored UTXO chain state without polling receive consignments or proxy endpoints. */
-  private syncRgbListState = () => this.rgbCoordinator.syncListState()
+  private syncRgbListState = async (previousList?: {
+    currentPage: number
+    pageSize: number
+    total: number
+    list: unknown
+  }) => {
+    await this.rgbCoordinator.syncListState()
+    if (!previousList) return
+
+    const currentList = await this.getRgbAssetList(
+      '',
+      previousList.currentPage,
+      previousList.pageSize
+    )
+    const previous = stableRgbJson({ total: previousList.total, list: previousList.list })
+    const current = stableRgbJson({ total: currentList.total, list: currentList.list })
+    if (previous === current) return
+
+    bgEventBus.emit(BUS_EVENTS.broadcastToUI, {
+      method: BUS_METHODS.RGB_ASSETS_CHANGED,
+      params: {},
+    })
+  }
 
   private syncRgbPendingTransfers = async (service: LocalRgbService) => {
     log.debug('RGB recovery: advancing restored pending transfers', rgbRecoveryServiceSummary(service))
@@ -4225,8 +4264,22 @@ export class WalletController extends BaseController {
     return backup
   }
 
+  /** Open encrypted local RGB state for read-only UI queries. */
+  private getLocalRgbReadService = async (): Promise<LocalRgbServiceContext> => {
+    const context = await this.rgbServiceRegistry.get()
+    // Recovery authenticates remote state before enabling writes, but must
+    // never hold up a local list, balance, or detail response.
+    void this.restoreRgbRecoveryIfNeeded(context).catch(error => {
+      log.warn('Failed to start RGB recovery checkpoint restore', error)
+    })
+    return context
+  }
+
+  /** Open RGB state for operations that may mutate it or write to the backend. */
   private getLocalRgbService = async (): Promise<LocalRgbServiceContext> => {
     const context = await this.rgbServiceRegistry.get()
+    // Unlike UI reads, mutations must wait until recovery has established the
+    // checkpoint revision used for safe writes.
     await this.restoreRgbRecoveryIfNeeded(context)
     if (!context.service.isRecoveryBackupEnabled()) {
       throw new Error('RGB recovery service is unavailable; retry when the backend is reachable')

@@ -4,7 +4,7 @@ import { KeyringType } from '@unisat/keyring-service/types'
 import { RgbTransferAwaitingAckError, RgbTransferRejectedError } from '@unisat/rgb-service'
 import * as txHelpers from '@unisat/tx-helpers'
 import { bitcoin, scriptPkToAddress } from '@unisat/wallet-bitcoin'
-import { CHAINS_MAP } from '@unisat/wallet-shared'
+import { BUS_EVENTS, BUS_METHODS, CHAINS_MAP } from '@unisat/wallet-shared'
 import { AddressType, ChainType, NetworkType } from '@unisat/wallet-types'
 import log from 'loglevel'
 import {
@@ -15,6 +15,7 @@ import {
   toPublicRgbPendingReceiveInvoice,
 } from '../src/controllers/wallet'
 import { keyringService, preferenceService, walletApiService } from '../src/services'
+import { bgEventBus } from '../src/utils/eventBus'
 
 vi.mock('@unisat/babylon-service', () => ({
   COSMOS_CHAINS_MAP: {},
@@ -245,9 +246,10 @@ describe('RGB wallet references', () => {
       network: 'mainnet',
       fundingAddress: 'bc1p-rgb-funding',
     })
+    vi.spyOn(wallet as any, 'restoreRgbRecoveryIfNeeded').mockResolvedValue(undefined)
 
-    const first = (wallet as any).getLocalRgbService()
-    const second = (wallet as any).getLocalRgbService()
+    const first = (wallet as any).getLocalRgbReadService()
+    const second = (wallet as any).getLocalRgbReadService()
     await storageStarted
     expect(getEncryptedStorageItem).toHaveBeenCalledTimes(1)
     resolveStorage!(undefined)
@@ -255,6 +257,29 @@ describe('RGB wallet references', () => {
 
     expect(firstContext.service).toBe(secondContext.service)
     expect(getEncryptedStorageItem).toHaveBeenCalledTimes(1)
+  })
+
+  it('returns the local RGB read service without waiting for recovery', async () => {
+    const wallet = new WalletController()
+    let releaseRecovery: (() => void) | undefined
+    const recovery = new Promise<void>(resolve => (releaseRecovery = resolve))
+    vi.spyOn(wallet as any, 'restoreRgbRecoveryIfNeeded').mockReturnValue(recovery)
+
+    ;(keyringService as any).getEncryptedStorageItem = vi.fn().mockResolvedValue(undefined)
+    ;(keyringService as any).setEncryptedStorageItem = vi.fn().mockResolvedValue(undefined)
+    ;(keyringService as any).removeEncryptedStorageItem = vi.fn().mockResolvedValue(undefined)
+    vi.spyOn(wallet, 'getCurrentRgbWalletRef').mockResolvedValue({
+      walletId: 'rgb-wallet',
+      network: 'mainnet',
+      fundingAddress: 'bc1p-rgb-funding',
+    })
+
+    await expect((wallet as any).getLocalRgbReadService()).resolves.toEqual(
+      expect.objectContaining({ service: expect.anything() })
+    )
+    expect((wallet as any).restoreRgbRecoveryIfNeeded).toHaveBeenCalledTimes(1)
+    releaseRecovery!()
+    await recovery
   })
 
   it('does not expose local blind-seal bigint values through wallet responses', () => {
@@ -978,6 +1003,36 @@ describe('RGB wallet references', () => {
     expect(getAssetList).toHaveBeenCalledWith('bc1p-rgb-funding', 1, 20)
   })
 
+  it('reads RGB asset list, balance, and detail from the local RGB service', async () => {
+    const wallet = new WalletController()
+    const service = {
+      getLocalAssetList: vi.fn(() => ({
+        total: 1,
+        list: [{ assetId: 'rgb:asset', balance: '10', spendable: '10' }],
+      })),
+      getLocalAssetBalance: vi.fn(() => ({ assetId: 'rgb:asset', balance: '10' })),
+      getLocalAssetDetail: vi.fn(() => ({ assetId: 'rgb:asset', name: 'Local token' })),
+    }
+    vi.spyOn(wallet as any, 'getLocalRgbReadService').mockResolvedValue({ service })
+
+    await expect(wallet.getRgbAssetList('bc1p-rgb-funding', 1, 20)).resolves.toMatchObject({
+      total: 1,
+      list: [{ assetId: 'rgb:asset', balance: '10' }],
+    })
+    await expect(wallet.getRgbAssetBalance('bc1p-rgb-funding', 'rgb:asset')).resolves.toMatchObject({
+      assetId: 'rgb:asset',
+      balance: '10',
+    })
+    await expect(wallet.getRgbAssetDetail('rgb:asset')).resolves.toMatchObject({
+      assetId: 'rgb:asset',
+      name: 'Local token',
+    })
+
+    expect(service.getLocalAssetList).toHaveBeenCalledWith(1, 20)
+    expect(service.getLocalAssetBalance).toHaveBeenCalledWith('rgb:asset')
+    expect(service.getLocalAssetDetail).toHaveBeenCalledWith('rgb:asset')
+  })
+
   it('skips RGB allocation sync when loading the asset list for the Bitcoin home view', async () => {
     const wallet = new WalletController()
     const service = {
@@ -1018,6 +1073,31 @@ describe('RGB wallet references', () => {
     await Promise.all([wallet.getRGBList('', 1, 20), wallet.getRGBList('', 1, 20)])
 
     expect(service.sync).toHaveBeenCalledTimes(1)
+  })
+
+  it('notifies the UI only when a background RGB list sync changes the local assets', async () => {
+    const wallet = new WalletController()
+    vi.spyOn((wallet as any).rgbCoordinator, 'syncListState').mockResolvedValue(undefined)
+    const getAssetList = vi.spyOn(wallet, 'getRgbAssetList')
+    const emit = vi.spyOn(bgEventBus, 'emit')
+    const initialList = { currentPage: 1, pageSize: 20, total: 0, list: [] }
+
+    getAssetList.mockResolvedValueOnce(initialList)
+    await (wallet as any).syncRgbListState(initialList)
+    expect(emit).not.toHaveBeenCalled()
+
+    getAssetList.mockResolvedValueOnce({
+      currentPage: 1,
+      pageSize: 20,
+      total: 1,
+      list: [{ assetId: 'rgb:asset', balance: '10', spendable: '10' }],
+    })
+    await (wallet as any).syncRgbListState(initialList)
+
+    expect(emit).toHaveBeenCalledWith(BUS_EVENTS.broadcastToUI, {
+      method: BUS_METHODS.RGB_ASSETS_CHANGED,
+      params: {},
+    })
   })
 
   it('shares a snapshot refresh across sequential RGB list and receive polling', async () => {
@@ -1217,6 +1297,7 @@ describe('RGB wallet references', () => {
       })),
     }
     vi.spyOn(wallet as any, 'getLocalRgbService').mockResolvedValue({ service })
+    vi.spyOn(wallet as any, 'getLocalRgbReadService').mockResolvedValue({ service })
     vi.spyOn(wallet, 'getRgbFundingAddress').mockResolvedValue({ address: 'bc1p-rgb-funding' })
     vi.spyOn(wallet, 'getRgbAssetList').mockResolvedValue({
       currentPage: 1,

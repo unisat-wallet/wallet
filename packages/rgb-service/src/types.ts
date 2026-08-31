@@ -59,6 +59,29 @@ export interface RgbWalletSnapshot {
   syncedAt: number
 }
 
+/**
+ * Wallet-facing RGB balance derived from the encrypted local snapshot. The
+ * indexer is a replica and must not be needed to render this value.
+ */
+export interface RgbLocalAssetBalance {
+  assetId: string
+  /** Settled amount; retained as `balance` for the existing wallet UI. */
+  balance: string
+  settled: string
+  spendable: string
+  /** Allocations that are known locally but are not settled/spendable yet. */
+  pending: string
+  ticker?: string
+  name?: string
+  precision?: number
+  schema?: string
+  issuedSupply?: string
+  timestamp?: number
+}
+
+/** Local contract metadata together with the wallet's locally derived balance. */
+export interface RgbLocalAssetDetail extends RgbLocalAssetBalance {}
+
 export interface RgbTransferRequest {
   assetId: string
   /** Optional only when the RGB invoice fixes the transfer amount. */
