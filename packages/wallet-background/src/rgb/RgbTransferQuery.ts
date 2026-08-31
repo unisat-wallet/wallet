@@ -25,7 +25,7 @@ export type RgbRemoteActivity = {
 type RgbTransferQueryDependencies = {
   getContext: () => Promise<LocalRgbServiceContext>
   syncReceiveHistory: (service: RgbService, context: LocalRgbServiceContext) => Promise<void>
-  syncPendingTransfers: (service: RgbService) => Promise<void>
+  syncPendingTransfers: (service: RgbService, context: LocalRgbServiceContext) => Promise<void>
   syncReceivedAllocations: () => Promise<LocalRgbServiceContext>
   getRemoteActivity: (
     address: string,
@@ -67,7 +67,7 @@ export class RgbTransferQuery {
       await this.dependencies.syncReceiveHistory(service, context)
       if (service.getPendingTransfers().length) {
         try {
-          await this.dependencies.syncPendingTransfers(service)
+          await this.dependencies.syncPendingTransfers(service, context)
         } catch (error) {
           const hasRetryableBroadcast = service
             .getPendingTransfers()

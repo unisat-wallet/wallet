@@ -834,7 +834,7 @@ export class WalletController extends BaseController {
   private readonly rgbTransferQuery = new RgbTransferQuery({
     getContext: () => this.getLocalRgbService(),
     syncReceiveHistory: (service, context) => this.syncRgbReceiveHistory(service, context.wallet),
-    syncPendingTransfers: service => this.syncRgbPendingTransfers(service),
+    syncPendingTransfers: (service, context) => this.syncRgbPendingTransfers(service, context),
     syncReceivedAllocations: () => this.syncRgbReceivedAllocations(),
     getRemoteActivity: async (address, currentPage, pageSize) => {
       const result = await this.getAddressRgbActivity(address, currentPage, pageSize)
@@ -3960,6 +3960,10 @@ export class WalletController extends BaseController {
     const transaction = signedPsbt.extractTransaction(true)
     const funding = await this.getCurrentRgbFundingAccount()
     const { service, wallet } = await this.getLocalRgbService()
+    // The user may have spent time in an external signer. Renew immediately
+    // before broadcast so a device that was fenced during signing cannot
+    // publish this funding transaction.
+    await this.ensureRgbWriteLease({ service, wallet }, { forceRenew: true })
     const txid = await this.pushTx(transaction.toHex())
     const outpoints = transaction.outs
       .map((output, vout) => ({ output, vout }))
@@ -4120,7 +4124,14 @@ export class WalletController extends BaseController {
     })
   }
 
-  private syncRgbPendingTransfers = async (service: LocalRgbService) => {
+  private syncRgbPendingTransfers = async (
+    service: LocalRgbService,
+    context: LocalRgbServiceContext
+  ) => {
+    // Transfer polling can deliver and broadcast a pending send. Revalidate
+    // against the server on every such side-effecting attempt; a cached lease
+    // may have been fenced by an explicit takeover on another device.
+    if (!(await this.tryEnsureRgbWriteLease(context, { forceRenew: true }))) return
     log.debug('RGB recovery: advancing restored pending transfers', rgbRecoveryServiceSummary(service))
     await this.rgbCoordinator.syncPendingTransfers(service)
     log.debug('RGB recovery: pending transfer advancement completed', rgbRecoveryServiceSummary(service))
@@ -4480,13 +4491,13 @@ export class WalletController extends BaseController {
   /** Acquire/refresh the server-enforced single-writer lease before preparing a send. */
   private async ensureRgbWriteLease(
     context: LocalRgbServiceContext,
-    options: { takeover?: boolean } = {}
+    options: { takeover?: boolean; forceRenew?: boolean } = {}
   ): Promise<void> {
     const key = this.rgbWriteLeaseKey(context.wallet)
     const existing = this.rgbWriteLeases.get(key)
     // Reserve enough time for the preflight and local encoder; a later phase
     // renews this lease while a hardware signer is awaiting user confirmation.
-    if (existing && existing.expiresAt > Date.now() + 30_000) return
+    if (!options.forceRenew && existing && existing.expiresAt > Date.now() + 30_000) return
     const deviceId = await this.getRgbDeviceId()
     if (existing && existing.expiresAt > Date.now()) {
       const renewed = await getRgbApiService().renewRgbWriteLease({
@@ -4559,12 +4570,15 @@ export class WalletController extends BaseController {
   }
 
   /** A lease failure makes this installation read-only; local state remains available. */
-  private async tryEnsureRgbWriteLease(context: LocalRgbServiceContext): Promise<boolean> {
+  private async tryEnsureRgbWriteLease(
+    context: LocalRgbServiceContext,
+    options: { forceRenew?: boolean } = {}
+  ): Promise<boolean> {
     // Production LocalRgbWallets always have a network. Retain the existing
     // no-lease behavior for compatibility hosts that only expose an address.
     if (!context.wallet.network) return true
     try {
-      await this.ensureRgbWriteLease(context)
+      await this.ensureRgbWriteLease(context, options)
       return true
     } catch (error) {
       log.debug('RGB index write deferred because another device holds the lease', error)

@@ -602,12 +602,13 @@ describe('RGB wallet references', () => {
     const service = { queueUtxoSync: vi.fn().mockResolvedValue(undefined) }
     const localWallet = { fundingAddress, network: 'mainnet', walletId: 'rgb-wallet' }
     const syncOutbox = vi.spyOn(wallet as any, 'syncRgbIndexerOutbox').mockResolvedValue(false)
+    const ensureLease = vi.spyOn(wallet as any, 'ensureRgbWriteLease').mockResolvedValue(undefined)
     vi.spyOn(wallet as any, 'getLocalRgbService').mockResolvedValue({ service, wallet: localWallet })
     vi.spyOn(wallet as any, 'getCurrentRgbFundingAccount').mockResolvedValue({
       address: fundingAddress,
       publicKey: validCompressedPubkey,
     })
-    vi.spyOn(wallet, 'pushTx').mockResolvedValue('e'.repeat(64))
+    const pushTx = vi.spyOn(wallet, 'pushTx').mockResolvedValue('e'.repeat(64))
 
     await expect(wallet.createRgbUtxosEnd({ signedPsbt: signedPsbt.toBase64() })).resolves.toMatchObject({
       txid: 'e'.repeat(64),
@@ -626,9 +627,50 @@ describe('RGB wallet references', () => {
       ],
     })
     expect(syncOutbox).toHaveBeenCalledWith(service, localWallet)
+    expect(ensureLease).toHaveBeenCalledWith({ service, wallet: localWallet }, { forceRenew: true })
+    expect(ensureLease.mock.invocationCallOrder[0]).toBeLessThan(pushTx.mock.invocationCallOrder[0])
     expect(service.queueUtxoSync.mock.invocationCallOrder[0]).toBeLessThan(
       syncOutbox.mock.invocationCallOrder[0]
     )
+  })
+
+  it('does not broadcast RGB funding UTXOs after the writer lease is fenced', async () => {
+    const wallet = new WalletController()
+    const fundingAddress = bitcoin.payments.p2wpkh({
+      hash: Buffer.alloc(20, 1),
+      network: bitcoin.networks.bitcoin,
+    }).address!
+    const signedPsbt = new bitcoin.Psbt({ network: bitcoin.networks.bitcoin })
+      .addInput({
+        hash: 'a'.repeat(64),
+        index: 0,
+        witnessUtxo: {
+          script: bitcoin.address.toOutputScript(fundingAddress, bitcoin.networks.bitcoin),
+          value: 1_000,
+        },
+      })
+      .addOutput({ address: fundingAddress, value: 330 })
+    signedPsbt.updateInput(0, {
+      finalScriptWitness: Buffer.concat([
+        Buffer.from([2, 1, 0, 33]),
+        Buffer.from(validCompressedPubkey, 'hex'),
+      ]),
+    })
+    const service = { queueUtxoSync: vi.fn().mockResolvedValue(undefined) }
+    const localWallet = { fundingAddress, network: 'mainnet', walletId: 'rgb-wallet' }
+    vi.spyOn(wallet as any, 'getLocalRgbService').mockResolvedValue({ service, wallet: localWallet })
+    vi.spyOn(wallet as any, 'getCurrentRgbFundingAccount').mockResolvedValue({
+      address: fundingAddress,
+      publicKey: validCompressedPubkey,
+    })
+    vi.spyOn(wallet as any, 'ensureRgbWriteLease').mockRejectedValue(new Error('RGB write lease is unavailable'))
+    const pushTx = vi.spyOn(wallet, 'pushTx').mockResolvedValue('e'.repeat(64))
+
+    await expect(wallet.createRgbUtxosEnd({ signedPsbt: signedPsbt.toBase64() })).rejects.toThrow(
+      'RGB write lease is unavailable'
+    )
+    expect(pushTx).not.toHaveBeenCalled()
+    expect(service.queueUtxoSync).not.toHaveBeenCalled()
   })
 
   it('completes the sole persisted RGB transfer after a background restart', async () => {
@@ -1267,6 +1309,23 @@ describe('RGB wallet references', () => {
       { id: 'local-send:local-transfer', status: 'waiting_ack', amount: '10', local: true },
       { id: 'remote-transfer', status: 'settled', amount: undefined, timestamp: 50 },
     ])
+  })
+
+  it('does not advance pending RGB transfers when this device cannot renew the writer lease', async () => {
+    const wallet = new WalletController()
+    const service = { syncPendingTransfers: vi.fn().mockResolvedValue(undefined) }
+    const context = {
+      service,
+      wallet: { fundingAddress: 'bc1p-rgb-funding', network: 'mainnet', walletId: 'rgb-wallet' },
+    }
+    const ensureLease = vi
+      .spyOn(wallet as any, 'tryEnsureRgbWriteLease')
+      .mockResolvedValue(false)
+
+    await (wallet as any).syncRgbPendingTransfers(service, context)
+
+    expect(ensureLease).toHaveBeenCalledWith(context, { forceRenew: true })
+    expect(service.syncPendingTransfers).not.toHaveBeenCalled()
   })
 
   it('can list RGB transfers without waiting for pending-transfer sync', async () => {
