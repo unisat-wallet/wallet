@@ -308,7 +308,19 @@ export interface RgbServiceState {
   receivedBlindSeals?: import('./protocol/receive').RgbBlindSeal[]
   contracts?: Record<
     string,
-    { consignment: string; genesis?: string; metadata?: RgbContractMetadata; createdAt: number }
+    {
+      /** Backwards-compatible latest contract/consignment payload. */
+      consignment: string
+      genesis?: string
+      metadata?: RgbContractMetadata
+      createdAt: number
+      /**
+       * Canonical, locally complete spend history. Its single Consignment
+       * contains each required WitnessBundle once, including all live branches.
+       * This is wallet state, never a backend cache.
+       */
+      history?: { payload: string; opIds: string[]; updatedAt: number }
+    }
   >
 }
 

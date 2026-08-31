@@ -1095,6 +1095,47 @@ describe('RgbService', () => {
     )
   })
 
+  it('uses a recovered complete local history without asking the backend', async () => {
+    const dependencies = createDependencies()
+    const service = new RgbService(dependencies)
+    await service.open(wallet)
+    await service.sync()
+    ;(service as any).state.contracts = {
+      'rgb:asset': {
+        consignment: 'Y29tcGxldGUtbG9jYWwtaGlzdG9yeQ==',
+        createdAt: 1,
+        history: {
+          payload: 'Y29tcGxldGUtbG9jYWwtaGlzdG9yeQ==',
+          opIds: ['c'.repeat(64), 'd'.repeat(64)],
+          updatedAt: 1,
+        },
+      },
+    }
+    await (service as any).persist()
+    const checkpoint = JSON.parse(JSON.stringify((service as any).state))
+
+    const reopened = new RgbService(dependencies)
+    await reopened.open(wallet)
+    await expect(reopened.restoreRecoveryState(checkpoint)).resolves.toBe(true)
+    vi.mocked(dependencies.stateSource.getValidationHistory).mockRejectedValue(
+      new Error('backend is offline')
+    )
+    vi.mocked(dependencies.stateSource.getValidationHistory).mockClear()
+
+    await expect(
+      reopened.prepareSend({ assetId: 'rgb:asset', amount: '100', invoice: rgbInvoice(100), feeRate: 2 })
+    ).resolves.toMatchObject({ id: 'transfer-1' })
+
+    expect(dependencies.stateSource.getValidationHistory).not.toHaveBeenCalled()
+    expect(dependencies.encoder.prepareTransfer).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        validationHistory: expect.objectContaining({
+          consignments: [{ opId: 'asset', payload: 'Y29tcGxldGUtbG9jYWwtaGlzdG9yeQ==' }],
+        }),
+      })
+    )
+  })
+
   it('publishes and receives acknowledgement before broadcasting the completed transfer', async () => {
     const dependencies = createDependencies()
     const service = new RgbService(dependencies)
@@ -2072,6 +2113,7 @@ describe('RgbService', () => {
     const service = new RgbService(dependencies)
     await service.open(wallet)
     await service.sync()
+    const retainCompletedLocalHistory = vi.spyOn(service as any, 'retainCompletedLocalHistory')
     await service.prepareSend({
       assetId: 'rgb:asset',
       amount: '60',
@@ -2085,6 +2127,9 @@ describe('RgbService', () => {
     expect(dependencies.stateSource.getTransactionStatus).toHaveBeenCalledWith(
       wallet,
       'c'.repeat(64)
+    )
+    expect(retainCompletedLocalHistory).toHaveBeenCalledWith(
+      expect.objectContaining({ txid: 'c'.repeat(64) })
     )
     expect(service.getPendingTransfers()).toEqual([])
   })
