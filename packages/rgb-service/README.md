@@ -72,3 +72,24 @@ Until that local history source and the strict Consignment encoder are wired,
 the background safety gate must remain enabled. The local modules can build
 and verify the committed PSBT, but they must not publish or broadcast it as an
 RGB transfer.
+
+## Synthetic round-trip stress test
+
+An RGB transfer embeds its ancestor witness bundles in the next Consignment.
+Consequently, repeatedly moving one asset A -> B -> A makes the newest
+Consignment grow approximately linearly with the transfer count, while the
+total encoding and validation work across the run is approximately quadratic.
+
+Run the local history stress test without a proxy, broadcaster, real key, or
+testnet fee:
+
+```sh
+RGB_STRESS_ROUNDS=100 pnpm --filter @unisat/rgb-service test:roundtrip-stress
+RGB_STRESS_ROUNDS=1000 RGB_STRESS_LOG_EVERY=100 pnpm --filter @unisat/rgb-service test:roundtrip-stress
+```
+
+The test uses blind invoices pointed at alternating, synthetic Taproot funding
+UTXOs. It validates the complete Consignment history each round and prints JSON
+metrics for Consignment bytes, history bundle count, per-step latency, and
+total serialized bytes. It is a local protocol/load test only: it does not
+test two real keyrings, proxy ACKs, Bitcoin confirmation, or backend indexing.
