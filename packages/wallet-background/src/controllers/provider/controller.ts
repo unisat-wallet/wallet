@@ -140,6 +140,19 @@ function getToSignDatas(toSignDatas?: ToSignData[]) {
   return toSignDatas
 }
 
+/**
+ * Prepared payments are private to the connected dApp that created them. The
+ * transfer itself remains in durable RGB state; this association prevents a
+ * different origin from operating on a guessed ID through the provider API.
+ */
+const rgbPaymentOrigins = new Map<string, string>()
+
+function assertRgbPaymentOrigin(transferId: string, origin: string) {
+  if (rgbPaymentOrigins.get(transferId) !== origin) {
+    throw new Error('RGB payment is not available to this site')
+  }
+}
+
 export async function getPsbtToSignData(psbt: string, options?: { [key: string]: any }) {
   const psbtHex = formatPsbtHex(psbt)
   return wallet.getToSignData({ psbtHex, ...(options ? { options } : {}) })
@@ -594,6 +607,139 @@ class ProviderController extends BaseController {
     const tx = psbt.extractTransaction(true)
     const rawtx = tx.toHex()
     return await wallet.pushTx(rawtx)
+  }
+
+  @Reflect.metadata('SAFE', true)
+  getRgbAssets = async ({
+    data: {
+      params: { page = 1, pageSize = 50 },
+    },
+  }) => {
+    return wallet.getRGBList('', page, pageSize, { skipSync: true })
+  }
+
+  @Reflect.metadata('APPROVAL', ['RgbReceive'])
+  createRgbReceiveInvoice = async ({
+    data: { params },
+  }: {
+    data: { params: { assetId?: string; amount?: string; durationSeconds?: number } }
+  }) => {
+    return wallet.createRgbBlindReceive({
+      ...(params.assetId === undefined ? {} : { assetId: params.assetId }),
+      ...(params.amount === undefined ? {} : { amount: params.amount }),
+      ...(params.durationSeconds === undefined ? {} : { durationSeconds: params.durationSeconds }),
+    })
+  }
+
+  @Reflect.metadata('SAFE', true)
+  getRgbPendingReceives = async () => wallet.getRgbPendingReceiveInvoices()
+
+  @Reflect.metadata('APPROVAL', [
+    'RgbReceiveAccept',
+    async req => {
+      const params = req.data.params as { recipientId: string; receive?: unknown }
+      if (!params.recipientId) throw new Error('recipientId is required')
+      const { list } = await wallet.getRgbPendingReceiveInvoices()
+      const receive = list.find(item => item.recipientId === params.recipientId)
+      if (!receive) throw new Error('RGB receive is not awaiting acceptance')
+      params.receive = receive
+    },
+  ])
+  acceptRgbReceive = async ({ data: { params } }: { data: { params: { recipientId: string } } }) => {
+    return wallet.acceptRgbReceive({ recipientId: params.recipientId })
+  }
+
+  @Reflect.metadata('APPROVAL', [
+    'RgbReceiveReject',
+    async req => {
+      const params = req.data.params as { recipientId: string; receive?: unknown }
+      if (!params.recipientId) throw new Error('recipientId is required')
+      const { list } = await wallet.getRgbPendingReceiveInvoices()
+      const receive = list.find(item => item.recipientId === params.recipientId)
+      if (!receive) throw new Error('RGB receive is not available')
+      params.receive = receive
+    },
+  ])
+  rejectRgbReceive = async ({ data: { params } }: { data: { params: { recipientId: string } } }) => {
+    return wallet.rejectRgbReceive({ recipientId: params.recipientId })
+  }
+
+  @Reflect.metadata('APPROVAL', ['RgbPayment'])
+  prepareRgbPayment = async ({
+    data: { params },
+    session: { origin },
+  }: {
+    data: { params: { invoice: string; assetId: string; amount?: string; feeRate?: number } }
+    session: { origin: string }
+  }) => {
+    if (!params.invoice) throw new Error('invoice is required')
+    if (!params.assetId) throw new Error('assetId is required')
+    const prepared = await wallet.createRgbSendBegin({
+      invoice: params.invoice,
+      assetId: params.assetId,
+      ...(params.amount === undefined ? {} : { amount: params.amount }),
+      ...(params.feeRate === undefined ? {} : { feeRate: params.feeRate }),
+    })
+    rgbPaymentOrigins.set(prepared.id, origin)
+    return prepared
+  }
+
+  @Reflect.metadata('APPROVAL', [
+    'SignPsbt',
+    async req => {
+      const params = req.data.params as { transferId: string; toSignDatas?: unknown[] }
+      if (!params.transferId) throw new Error('transferId is required')
+      const origin = req.session?.origin
+      if (!origin) throw new Error('missing request origin')
+      assertRgbPaymentOrigin(params.transferId, origin)
+      params.toSignDatas = [await wallet.getRgbPaymentSigningData({ transferId: params.transferId })]
+    },
+  ])
+  signRgbPayment = async ({
+    data: { params },
+    session: { origin },
+    approvalRes,
+  }: {
+    data: { params: { transferId: string; toSignDatas?: any[] } }
+    session: { origin: string }
+    approvalRes: SignPsbtResult
+  }) => {
+    assertRgbPaymentOrigin(params.transferId, origin)
+    const account = await wallet.getCurrentAccount()
+    const toSignData = getToSignDatas(params.toSignDatas)[0]!
+    const signedPsbt = approvalRes[0]?.psbtHex
+    if (!signedPsbt) throw new Error('RGB payment signing did not return a PSBT')
+    assertReadonlySignedPsbt(account, toSignData, signedPsbt)
+    return wallet.createRgbSendEnd({
+      transferId: params.transferId,
+      signedPsbt,
+    })
+  }
+
+  @Reflect.metadata('APPROVAL', ['RgbPaymentCancel'])
+  cancelRgbPayment = async ({
+    data: { params },
+    session: { origin },
+  }: {
+    data: { params: { transferId: string } }
+    session: { origin: string }
+  }) => {
+    if (!params.transferId) throw new Error('transferId is required')
+    assertRgbPaymentOrigin(params.transferId, origin)
+    return wallet.abortRgbVanillaTx({ txid: params.transferId })
+  }
+
+  @Reflect.metadata('SAFE', true)
+  getRgbPaymentStatus = async ({
+    data: { params },
+    session: { origin },
+  }: {
+    data: { params: { transferId: string } }
+    session: { origin: string }
+  }) => {
+    if (!params.transferId) throw new Error('transferId is required')
+    assertRgbPaymentOrigin(params.transferId, origin)
+    return wallet.getRgbPaymentStatus({ transferId: params.transferId })
   }
 
   @Reflect.metadata('APPROVAL', [

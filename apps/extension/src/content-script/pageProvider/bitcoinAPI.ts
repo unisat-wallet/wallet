@@ -265,4 +265,40 @@ export class BitcoinAPIMethods {
     });
   };
 
+  getRgbAssets = async (page = 1, pageSize = 50) => {
+    return this.provider[requestMethodKey]({ method: 'getRgbAssets', params: { page, pageSize } });
+  };
+
+  createRgbReceiveInvoice = async (params: { assetId?: string; amount?: string; durationSeconds?: number }) => {
+    return this.provider[requestMethodKey]({ method: 'createRgbReceiveInvoice', params });
+  };
+
+  getRgbPendingReceives = async () => {
+    return this.provider[requestMethodKey]({ method: 'getRgbPendingReceives' });
+  };
+
+  acceptRgbReceive = async (recipientId: string) => {
+    return this.provider[requestMethodKey]({ method: 'acceptRgbReceive', params: { recipientId } });
+  };
+
+  rejectRgbReceive = async (recipientId: string) => {
+    return this.provider[requestMethodKey]({ method: 'rejectRgbReceive', params: { recipientId } });
+  };
+
+  prepareRgbPayment = async (params: { invoice: string; assetId: string; amount?: string; feeRate?: number }) => {
+    return this.provider[requestMethodKey]({ method: 'prepareRgbPayment', params });
+  };
+
+  signRgbPayment = async (transferId: string) => {
+    return this.provider[requestMethodKey]({ method: 'signRgbPayment', params: { transferId } });
+  };
+
+  cancelRgbPayment = async (transferId: string) => {
+    return this.provider[requestMethodKey]({ method: 'cancelRgbPayment', params: { transferId } });
+  };
+
+  getRgbPaymentStatus = async (transferId: string) => {
+    return this.provider[requestMethodKey]({ method: 'getRgbPaymentStatus', params: { transferId } });
+  };
+
 }

@@ -80,6 +80,17 @@ export class UnisatProvider extends EventEmitter {
   getVersion = async () => this.bitcoinAPI.getVersion();
   deriveContextHash = async (appName: string, context: string) => this.bitcoinAPI.deriveContextHash(appName, context);
   getBitcoinUtxos = async (cursor = 0, size = 20) => this.bitcoinAPI.getBitcoinUtxos(cursor, size);
+  getRgbAssets = async (page = 1, pageSize = 50) => this.bitcoinAPI.getRgbAssets(page, pageSize);
+  createRgbReceiveInvoice = async (params: { assetId?: string; amount?: string; durationSeconds?: number }) =>
+    this.bitcoinAPI.createRgbReceiveInvoice(params);
+  getRgbPendingReceives = async () => this.bitcoinAPI.getRgbPendingReceives();
+  acceptRgbReceive = async (recipientId: string) => this.bitcoinAPI.acceptRgbReceive(recipientId);
+  rejectRgbReceive = async (recipientId: string) => this.bitcoinAPI.rejectRgbReceive(recipientId);
+  prepareRgbPayment = async (params: { invoice: string; assetId: string; amount?: string; feeRate?: number }) =>
+    this.bitcoinAPI.prepareRgbPayment(params);
+  signRgbPayment = async (transferId: string) => this.bitcoinAPI.signRgbPayment(transferId);
+  cancelRgbPayment = async (transferId: string) => this.bitcoinAPI.cancelRgbPayment(transferId);
+  getRgbPaymentStatus = async (transferId: string) => this.bitcoinAPI.getRgbPaymentStatus(transferId);
 }
 
 declare global {

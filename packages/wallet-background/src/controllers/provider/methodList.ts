@@ -47,6 +47,38 @@ export type ProviderMethodList = {
     appName: string
     context: string
   }
+  /** Experimental RGB dApp API. Interfaces may change before public release. */
+  getRgbAssets: {
+    page?: number
+    pageSize?: number
+  }
+  createRgbReceiveInvoice: {
+    assetId?: string
+    amount?: string
+    durationSeconds?: number
+  }
+  getRgbPendingReceives: undefined
+  acceptRgbReceive: {
+    recipientId: string
+  }
+  rejectRgbReceive: {
+    recipientId: string
+  }
+  prepareRgbPayment: {
+    invoice: string
+    assetId: string
+    amount?: string
+    feeRate?: number
+  }
+  signRgbPayment: {
+    transferId: string
+  }
+  cancelRgbPayment: {
+    transferId: string
+  }
+  getRgbPaymentStatus: {
+    transferId: string
+  }
 }
 
 export type ProviderMethods = keyof ProviderMethodList

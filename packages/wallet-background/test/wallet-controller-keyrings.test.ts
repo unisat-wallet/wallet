@@ -737,11 +737,9 @@ describe('RGB wallet references', () => {
     const getRgbToSignData = vi
       .spyOn(wallet, 'getRgbToSignData')
       .mockResolvedValue({ psbtHex: '00', toSignInputs: [] } as any)
-    vi.spyOn(wallet as any, 'getLocalRgbService').mockResolvedValue({
-      service,
-      wallet: { fundingAddress: 'bc1p-rgb-funding' },
-    })
-    vi.spyOn(wallet as any, 'ensureRgbWriteLease').mockResolvedValue(undefined)
+    const localWallet = { fundingAddress: 'bc1p-rgb-funding', network: 'mainnet', walletId: 'rgb-wallet' }
+    vi.spyOn(wallet as any, 'getLocalRgbService').mockResolvedValue({ service, wallet: localWallet })
+    const ensureLease = vi.spyOn(wallet as any, 'ensureRgbWriteLease').mockResolvedValue(undefined)
 
     await wallet.createRgbSendBegin({
       invoice: 'rgb:asset/schema/~/bc:utxob:recipient?amount=8888888888&endpoints=rpc://proxy',
@@ -753,6 +751,12 @@ describe('RGB wallet references', () => {
       feeRate: 2,
     })
 
+    expect(ensureLease).toHaveBeenNthCalledWith(
+      1,
+      { service, wallet: localWallet },
+      { forceRenew: true }
+    )
+
     expect(getRgbToSignData).toHaveBeenCalledWith(
       expect.objectContaining({
         action: expect.objectContaining({
@@ -761,6 +765,27 @@ describe('RGB wallet references', () => {
         }),
       })
     )
+  })
+
+  it('revalidates the lease before RGB mutations that can follow an approval', async () => {
+    const wallet = new WalletController()
+    const context = {
+      service: { getPendingReceives: vi.fn(() => []) },
+      wallet: { fundingAddress: 'bc1p-rgb-funding', network: 'mainnet', walletId: 'rgb-wallet' },
+    }
+    vi.spyOn(wallet as any, 'getLocalRgbService').mockResolvedValue(context)
+    const ensureLease = vi.spyOn(wallet as any, 'ensureRgbWriteLease').mockResolvedValue(undefined)
+    vi.spyOn((wallet as any).rgbReceiveOperations, 'createBlindReceive').mockResolvedValue({})
+    vi.spyOn((wallet as any).rgbReceiveOperations, 'cancelReceiveInvoice').mockResolvedValue({ changed: false })
+    vi.spyOn((wallet as any).rgbSendOperations, 'abortVanillaTx').mockResolvedValue({ aborted: false })
+
+    await wallet.createRgbBlindReceive({})
+    await wallet.cancelRgbReceiveInvoice({ batchTransferIdx: 0 })
+    await wallet.abortRgbVanillaTx({ txid: 'pending-transfer' })
+
+    expect(ensureLease).toHaveBeenNthCalledWith(1, context, { forceRenew: true })
+    expect(ensureLease).toHaveBeenNthCalledWith(2, context, { forceRenew: true })
+    expect(ensureLease).toHaveBeenNthCalledWith(3, context, { forceRenew: true })
   })
 
   it('returns a rejected transfer result without retaining a pending send', async () => {

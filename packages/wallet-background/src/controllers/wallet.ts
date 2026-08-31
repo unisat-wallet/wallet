@@ -3646,7 +3646,9 @@ export class WalletController extends BaseController {
 
   createRgbBlindReceive = async (params: Omit<RgbReceiveInvoiceRequest, 'wallet'>) => {
     const context = await this.getLocalRgbService()
-    await this.ensureRgbWriteLease(context)
+    // This may run only after a dApp approval has been held open. Do not let
+    // a cached pre-approval lease create durable receive state after handoff.
+    await this.ensureRgbWriteLease(context, { forceRenew: true })
     return this.rgbReceiveOperations.createBlindReceive(params)
   }
 
@@ -3702,6 +3704,8 @@ export class WalletController extends BaseController {
   }
 
   cancelRgbReceiveInvoice = async (params: Omit<RgbCancelReceiveInvoiceRequest, 'wallet'>) => {
+    const context = await this.getLocalRgbService()
+    await this.ensureRgbWriteLease(context, { forceRenew: true })
     return this.rgbReceiveOperations.cancelReceiveInvoice(params.batchTransferIdx)
   }
 
@@ -4005,8 +4009,11 @@ export class WalletController extends BaseController {
 
   getRgbPendingVanillaTxs = () => this.rgbSendOperations.getPendingVanillaTxs()
 
-  abortRgbVanillaTx = (params: Omit<RgbAbortVanillaTxRequest, 'wallet'>) =>
-    this.rgbSendOperations.abortVanillaTx(params.txid)
+  abortRgbVanillaTx = async (params: Omit<RgbAbortVanillaTxRequest, 'wallet'>) => {
+    const context = await this.getLocalRgbService()
+    await this.ensureRgbWriteLease(context, { forceRenew: true })
+    return this.rgbSendOperations.abortVanillaTx(params.txid)
+  }
 
   acceptRgbReceive = async (params: { recipientId: string }) => {
     const context = await this.getLocalRgbService()
@@ -4023,8 +4030,11 @@ export class WalletController extends BaseController {
   getRgbAllocationSummary = (params: Omit<RgbAllocationSummaryRequest, 'wallet'> = {}) =>
     this.rgbReceiveOperations.getAllocationSummary(params)
 
-  createRgbSendBegin = (params: Omit<RgbSendBeginRequest, 'wallet'>) =>
-    this.rgbSendOperations.begin(params)
+  createRgbSendBegin = async (params: Omit<RgbSendBeginRequest, 'wallet'>) => {
+    const context = await this.getLocalRgbService()
+    await this.ensureRgbWriteLease(context, { forceRenew: true })
+    return this.rgbSendOperations.begin(params)
+  }
 
   createRgbSendEnd = (params: Omit<RgbSendEndRequest, 'wallet'>) =>
     this.rgbSendOperations.complete(params)
