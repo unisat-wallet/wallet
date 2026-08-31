@@ -9,6 +9,7 @@ import {
 
 type RgbReceiveOperationsDependencies = {
   getContext: () => Promise<LocalRgbServiceContext>
+  ensureWriteLease?: (context: LocalRgbServiceContext) => Promise<void>
   syncReceivedAllocations: () => Promise<LocalRgbServiceContext>
 }
 
@@ -24,7 +25,9 @@ export class RgbReceiveOperations {
   constructor(private readonly dependencies: RgbReceiveOperationsDependencies) {}
 
   async createBlindReceive(params: RgbBlindReceiveParams): Promise<RgbPendingReceiveInvoice> {
-    const { service } = await this.dependencies.getContext()
+    const context = await this.dependencies.getContext()
+    const { service } = context
+    await this.dependencies.ensureWriteLease?.(context)
     if (!params.skipSync) await service.sync()
     const receive = await service.createBlindReceive({
       ...(params.assetId === undefined ? {} : { assetId: params.assetId }),
@@ -62,9 +65,11 @@ export class RgbReceiveOperations {
   }
 
   async cancelReceiveInvoice(batchTransferIdx: number): Promise<{ changed: boolean }> {
-    const { service } = await this.dependencies.getContext()
+    const context = await this.dependencies.getContext()
+    const { service } = context
     const pending = service.getPendingReceives()[batchTransferIdx]
     if (!pending) return { changed: false }
+    await this.dependencies.ensureWriteLease?.(context)
     const result = await service.cancelBlindReceive(pending.recipientId)
     return { changed: result.cancelled }
   }
@@ -72,14 +77,18 @@ export class RgbReceiveOperations {
   async acceptReceive(
     recipientId: string
   ): Promise<Awaited<ReturnType<RgbService['acceptReceive']>>> {
-    const { service } = await this.dependencies.getContext()
+    const context = await this.dependencies.getContext()
+    const { service } = context
+    await this.dependencies.ensureWriteLease?.(context)
     return service.acceptReceive(recipientId)
   }
 
   async rejectReceive(
     recipientId: string
   ): Promise<Awaited<ReturnType<RgbService['rejectReceive']>>> {
-    const { service } = await this.dependencies.getContext()
+    const context = await this.dependencies.getContext()
+    const { service } = context
+    await this.dependencies.ensureWriteLease?.(context)
     return service.rejectReceive(recipientId)
   }
 

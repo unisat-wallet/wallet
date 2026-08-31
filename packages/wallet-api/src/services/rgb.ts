@@ -37,6 +37,12 @@ import type {
   RgbRecoveryCheckpointUploadStatusResult,
   RgbTransactionStatusRequest,
   RgbTransactionStatusResult,
+  RgbUtxoVerifyRequest,
+  RgbUtxoVerifyResult,
+  RgbWriteLease,
+  RgbWriteLeaseAcquireRequest,
+  RgbWriteLeaseReleaseRequest,
+  RgbWriteLeaseRenewRequest,
 } from '../types'
 
 export class RgbService {
@@ -221,6 +227,22 @@ export class RgbService {
 
   async replaceRgbUtxos(params: RgbUtxoSyncRequest): Promise<void> {
     await this.privatePost('/v5/rgb/utxos/replace', normalizeUtxoSyncRequest(params))
+  }
+
+  async acquireRgbWriteLease(params: RgbWriteLeaseAcquireRequest): Promise<RgbWriteLease> {
+    return this.privatePost('/v5/rgb/lease/acquire', params)
+  }
+
+  async renewRgbWriteLease(params: RgbWriteLeaseRenewRequest): Promise<RgbWriteLease> {
+    return this.privatePost('/v5/rgb/lease/renew', params)
+  }
+
+  async releaseRgbWriteLease(params: RgbWriteLeaseReleaseRequest): Promise<{ released: boolean }> {
+    return this.privatePost('/v5/rgb/lease/release', params)
+  }
+
+  async verifyRgbUtxos(params: RgbUtxoVerifyRequest): Promise<RgbUtxoVerifyResult> {
+    return this.privatePost('/v5/rgb/utxos/verify', params)
   }
 
   /**

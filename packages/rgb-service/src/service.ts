@@ -120,6 +120,27 @@ export class RgbService {
     return this.requireState().recoveryConflict === true
   }
 
+  /**
+   * An older device may replace its state with a newer encrypted checkpoint
+   * only when it has no local work that would need a merge. The backend cannot
+   * decrypt/merge RGB state, so callers must surface a conflict otherwise.
+   */
+  canFastForwardRecoveryState() {
+    const state = this.requireState()
+    return (
+      !state.recoveryConflict &&
+      !state.recoveryCheckpoint?.dirty &&
+      Object.keys(state.pending).length === 0 &&
+      (state.pendingReceives?.length || 0) === 0 &&
+      (state.pendingReceiveHistory?.length || 0) === 0 &&
+      (state.pendingSendHistory?.length || 0) === 0 &&
+      !state.pendingUtxoSync &&
+      (state.pendingIssues?.length || 0) === 0 &&
+      (state.pendingAssetMetadata?.length || 0) === 0 &&
+      (state.pendingFeePoolUtxos?.length || 0) === 0
+    )
+  }
+
   getRecoveryCheckpointStatus() {
     const checkpoint = this.requireState().recoveryCheckpoint
     return {
@@ -1483,6 +1504,7 @@ export class RgbService {
     }
     const resolvedRequest = { ...request, assetId: requestedAssetId, amount }
     const selectedUtxos = this.selectUtxos(requestedAssetId, amount)
+    await this.verifySelectedUtxos(state.wallet, selectedUtxos)
     const allocations = selectedUtxos.flatMap(utxo =>
       utxo.allocations
         .filter(allocation => allocation.assetId === requestedAssetId)
@@ -2016,6 +2038,21 @@ export class RgbService {
       if (total >= required) return selected
     }
     throw new RgbInsufficientBalanceError(assetId, amount)
+  }
+
+  private async verifySelectedUtxos(wallet: RgbWalletRef, selectedUtxos: RgbUtxo[]) {
+    const verifyUtxos = this.dependencies.stateSource.verifyUtxos
+    if (!verifyUtxos) return
+    const verified = await verifyUtxos(wallet, selectedUtxos)
+    const statuses = new Map(
+      verified.map(item => [`${item.outpoint.txid}:${item.outpoint.vout}`, item.status])
+    )
+    const unavailable = selectedUtxos.find(
+      utxo => statuses.get(outpointKey(utxo)) !== 'confirmed'
+    )
+    if (unavailable) {
+      throw new RgbServiceError('Selected RGB allocation is no longer confirmed and spendable')
+    }
   }
 
   private requireState() {

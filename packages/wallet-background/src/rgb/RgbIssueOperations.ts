@@ -9,6 +9,7 @@ import type { LocalRgbServiceContext } from './RgbWalletCoordinator'
 
 type RgbIssueOperationsDependencies = {
   getContext: () => Promise<LocalRgbServiceContext>
+  ensureWriteLease?: (context: LocalRgbServiceContext) => Promise<void>
   syncIndexerOutbox: (context: LocalRgbServiceContext) => Promise<boolean>
   now: () => number
 }
@@ -33,6 +34,7 @@ export class RgbIssueOperations {
   }> {
     const context = await this.dependencies.getContext()
     const { service, wallet } = context
+    await this.dependencies.ensureWriteLease?.(context)
     await service.sync()
     const snapshot = service.getSnapshot()
     const amounts = params.amounts.map(value => toPositiveAtomicAmount(value))

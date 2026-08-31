@@ -111,6 +111,9 @@ export type RgbRequestAuthenticator = (request: {
 
 export interface RgbUtxoSyncRequest {
   address: string
+  /** Present on current clients so index writes are fenced by the wallet lease. */
+  wallet?: RgbWalletRef & { network: string }
+  lease?: RgbWriteLeaseCredential
   txid: string
   outpoints: Array<{
     txid: string
@@ -125,6 +128,9 @@ export interface RgbUtxoSyncRequest {
 /** Public metadata sync for a locally issued or locally validated asset. */
 export interface RgbAssetMetadataSyncRequest {
   asset: RgbAssetMetadata
+  /** Metadata remains public, but a supplied wallet lease fences its index write. */
+  wallet?: RgbWalletRef & { network: string }
+  lease?: RgbWriteLeaseCredential
 }
 
 /** Address-scoped colored UTXOs used by the local RGB transaction builder. */
@@ -159,6 +165,53 @@ export interface RgbWalletUtxo {
 export interface RgbWalletUtxoSnapshotResult {
   utxos: RgbWalletUtxo[]
   syncedAt: number
+}
+
+/** Single-writer lease for RGB mutations on one wallet installation. */
+export interface RgbWriteLease {
+  leaseId: string
+  fencingToken: number
+  expiresAt: number
+  checkpointRevision?: string
+}
+
+export interface RgbWriteLeaseAcquireRequest {
+  wallet: RgbWalletRef & { network: string }
+  deviceId: string
+  checkpointRevision?: string
+  takeover?: boolean
+}
+
+export interface RgbWriteLeaseRenewRequest {
+  wallet: RgbWalletRef & { network: string }
+  deviceId: string
+  leaseId: string
+  fencingToken: number
+}
+
+export interface RgbWriteLeaseReleaseRequest extends RgbWriteLeaseRenewRequest {}
+
+/** Fencing credential attached to a write while the lease migration is enabled. */
+export interface RgbWriteLeaseCredential {
+  deviceId: string
+  leaseId: string
+  fencingToken: number
+}
+
+export interface RgbUtxoVerifyRequest extends RgbWriteLeaseRenewRequest {
+  outpoints: Array<{ txid: string; vout: number; satoshis: number; scriptPk: string }>
+}
+
+export interface RgbVerifiedUtxo {
+  txid: string
+  vout: number
+  status: 'mempool' | 'confirmed' | 'spent' | 'replaced' | 'unknown'
+  confirmations: number
+  confirmationHeight?: number
+}
+
+export interface RgbUtxoVerifyResult {
+  outpoints: RgbVerifiedUtxo[]
 }
 
 export interface RgbTransactionStatusRequest {
@@ -199,6 +252,7 @@ export interface RgbConsignmentHistoryResult {
 /** Post-broadcast index update. No key material or transaction construction is sent to the API. */
 export interface RgbTransferSyncRequest {
   wallet: RgbWalletRef
+  lease?: RgbWriteLeaseCredential
   transferId: string
   txid: string
   /** Exact RGB amount resolved from the local invoice before signing. */
@@ -221,6 +275,7 @@ export interface RgbTransferSyncRequest {
 /** Index a confirmed RGB transfer received by the local funding address. */
 export interface RgbReceiveTransferSyncRequest {
   wallet: RgbWalletRef
+  lease?: RgbWriteLeaseCredential
   transferId: string
   assetId: string
   amount: string
@@ -233,6 +288,7 @@ export interface RgbReceiveTransferSyncRequest {
 /** Transport endpoint for a locally-created consignment. */
 export interface RgbConsignmentPublishRequest {
   wallet: RgbWalletRef
+  lease?: RgbWriteLeaseCredential
   recipientId: string
   payload: string
   assetId: string
@@ -243,6 +299,7 @@ export interface RgbConsignmentPublishRequest {
 /** Claim opaque consignments addressed to a locally generated recipient ID. */
 export interface RgbConsignmentClaimRequest {
   wallet: RgbWalletRef
+  lease?: RgbWriteLeaseCredential
   recipientId: string
 }
 
@@ -258,6 +315,7 @@ export interface RgbClaimedConsignmentsResult {
 /** Opaque ciphertext produced locally from the RGB service state. */
 export interface RgbRecoveryCheckpointSaveRequest {
   wallet: RgbWalletRef
+  lease?: RgbWriteLeaseCredential
   /** Legacy single-part ciphertext. New clients use payloadParts. */
   payload?: string
   /** Ordered ciphertext chunks. Splitting happens only after encryption. */
@@ -278,6 +336,7 @@ export interface RgbRecoveryCheckpointSaveResult {
 
 export interface RgbRecoveryCheckpointUploadStartRequest {
   wallet: RgbWalletRef
+  lease?: RgbWriteLeaseCredential
   expectedUpdatedAt?: number
   expectedRevision?: string
   updatedAt: number
@@ -292,6 +351,7 @@ export interface RgbRecoveryCheckpointUploadStartResult {
 
 export interface RgbRecoveryCheckpointUploadPartRequest {
   wallet: RgbWalletRef
+  lease?: RgbWriteLeaseCredential
   uploadId: string
   index: number
   payload: string
@@ -299,6 +359,7 @@ export interface RgbRecoveryCheckpointUploadPartRequest {
 
 export interface RgbRecoveryCheckpointUploadCompleteRequest {
   wallet: RgbWalletRef
+  lease?: RgbWriteLeaseCredential
   uploadId: string
 }
 

@@ -19,7 +19,8 @@ describe('RgbService', () => {
     )
 
     await service.syncRgbTransfer({
-      wallet: { fundingAddress: 'bc1p-funding' },
+      wallet: { fundingAddress: 'bc1p-funding', network: 'mainnet' },
+      lease: { deviceId: 'device_abcdefghijklmnop', leaseId: 'a'.repeat(24), fencingToken: 1 },
       transferId: 'transfer-1',
       txid: 'b'.repeat(64),
       amount: '60',
@@ -30,7 +31,8 @@ describe('RgbService', () => {
     })
 
     expect(httpClient.post).toHaveBeenCalledWith('/v5/rgb/transfers/sync', {
-      wallet: { fundingAddress: 'bc1p-funding' },
+      wallet: { fundingAddress: 'bc1p-funding', network: 'mainnet' },
+      lease: { deviceId: 'device_abcdefghijklmnop', leaseId: 'a'.repeat(24), fencingToken: 1 },
       transferId: 'transfer-1',
       txid: 'b'.repeat(64),
       amount: '60',
@@ -40,6 +42,81 @@ describe('RgbService', () => {
       consignments: [],
       auth: expect.objectContaining({ fundingAddress: 'bc1p-funding' }),
     })
+  })
+
+  it('attaches the current lease to an address-index UTXO replacement', async () => {
+    const httpClient = { post: vi.fn().mockResolvedValue(undefined), get: vi.fn() }
+    const service = new RgbService(httpClient as any)
+    service.setRequestAuthenticator(vi.fn().mockResolvedValue({
+      fundingAddress: 'bc1p-funding', nonce: 'a'.repeat(32), expiresAt: 1, signature: 'signature',
+    }))
+    const wallet = { fundingAddress: 'bc1p-funding', network: 'mainnet' as const }
+    const lease = { deviceId: 'device_abcdefghijklmnop', leaseId: 'a'.repeat(24), fencingToken: 1 }
+
+    await service.replaceRgbUtxos({
+      address: wallet.fundingAddress,
+      wallet,
+      lease,
+      txid: 'b'.repeat(64),
+      outpoints: [],
+    })
+
+    expect(httpClient.post).toHaveBeenCalledWith('/v5/rgb/utxos/replace', {
+      address: wallet.fundingAddress,
+      wallet,
+      lease,
+      txid: 'b'.repeat(64),
+      outpoints: [],
+      auth: expect.objectContaining({ fundingAddress: wallet.fundingAddress }),
+    })
+  })
+
+  it('authenticates RGB lease acquisition and outpoint verification', async () => {
+    const httpClient = {
+      post: vi
+        .fn()
+        .mockResolvedValueOnce({ leaseId: 'a'.repeat(24), fencingToken: 1, expiresAt: 2 })
+        .mockResolvedValueOnce({
+          outpoints: [{ txid: 'b'.repeat(64), vout: 0, status: 'confirmed', confirmations: 1 }],
+        }),
+      get: vi.fn(),
+    }
+    const service = new RgbService(httpClient as any)
+    service.setRequestAuthenticator(
+      vi.fn().mockResolvedValue({
+        fundingAddress: 'bc1p-funding',
+        nonce: 'a'.repeat(32),
+        expiresAt: 1,
+        signature: 'signature',
+      })
+    )
+    const wallet = { fundingAddress: 'bc1p-funding', network: 'mainnet' }
+    const deviceId = 'device_abcdefghijklmnop'
+
+    await expect(service.acquireRgbWriteLease({ wallet, deviceId })).resolves.toMatchObject({
+      leaseId: 'a'.repeat(24),
+      fencingToken: 1,
+    })
+    await expect(
+      service.verifyRgbUtxos({
+        wallet,
+        deviceId,
+        leaseId: 'a'.repeat(24),
+        fencingToken: 1,
+        outpoints: [{ txid: 'b'.repeat(64), vout: 0, satoshis: 330, scriptPk: '5120' + '11'.repeat(32) }],
+      })
+    ).resolves.toMatchObject({ outpoints: [{ status: 'confirmed' }] })
+
+    expect(httpClient.post).toHaveBeenNthCalledWith(
+      1,
+      '/v5/rgb/lease/acquire',
+      expect.objectContaining({ wallet, deviceId, auth: expect.any(Object) })
+    )
+    expect(httpClient.post).toHaveBeenNthCalledWith(
+      2,
+      '/v5/rgb/utxos/verify',
+      expect.objectContaining({ wallet, deviceId, fencingToken: 1, auth: expect.any(Object) })
+    )
   })
 
   it('sends a confirmed receive activity through the authenticated API', async () => {

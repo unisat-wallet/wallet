@@ -13,6 +13,8 @@ type RgbWalletCoordinatorDependencies = {
   getReadContext?: () => Promise<LocalRgbServiceContext>
   syncIndexerOutbox: (service: RgbService, wallet: LocalRgbWallet) => Promise<boolean>
   syncReceiveHistory: (service: RgbService, wallet: LocalRgbWallet) => Promise<void>
+  /** A secondary device remains readable, but must not publish index mutations. */
+  tryEnsureWriteLease?: (context: LocalRgbServiceContext) => Promise<boolean>
 }
 
 const LIST_SNAPSHOT_SYNC_INTERVAL = 60_000
@@ -120,10 +122,13 @@ export class RgbWalletCoordinator {
     context: LocalRgbServiceContext
   ): Promise<LocalRgbServiceContext> {
     const { service, wallet } = context
+    const canWrite = await this.dependencies.tryEnsureWriteLease?.(context) ?? true
     // Claims are durable recipient-to-address bindings. Retrying them here
     // covers invoices created while the recovery endpoint was unavailable.
-    await service.claimPendingReceives?.()
-    await this.dependencies.syncIndexerOutbox(service, wallet)
+    if (canWrite) {
+      await service.claimPendingReceives?.()
+      await this.dependencies.syncIndexerOutbox(service, wallet)
+    }
     // Invoice availability depends on its funding UTXO being confirmed. This
     // operation is already rate-limited by RECEIVE_POLL_INTERVAL, so force a
     // fresh snapshot for unresolved invoices instead of leaving their local
@@ -139,8 +144,8 @@ export class RgbWalletCoordinator {
       await this.syncSnapshot(service, wallet, 0)
       processed = await service.processClaimedReceives({ includeClaimed: false })
     }
-    if (processed.received) await this.dependencies.syncIndexerOutbox(service, wallet)
-    await this.dependencies.syncReceiveHistory(service, wallet)
+    if (canWrite && processed.received) await this.dependencies.syncIndexerOutbox(service, wallet)
+    if (canWrite) await this.dependencies.syncReceiveHistory(service, wallet)
     return context
   }
 

@@ -277,6 +277,23 @@ describe('RgbService', () => {
     ).resolves.toBe(false)
   })
 
+  it('allows recovery fast-forward only when no local RGB work is pending', async () => {
+    const dependencies = createDependencies()
+    const service = new RgbService(dependencies)
+    await service.open(wallet)
+
+    expect(service.canFastForwardRecoveryState()).toBe(true)
+    ;(service as any).state.pending = {
+      transfer: { request: {}, prepared: {}, createdAt: 1 },
+    }
+    expect(service.canFastForwardRecoveryState()).toBe(false)
+    ;(service as any).state.pending = {}
+    ;(service as any).state.pendingAssetMetadata = [
+      { assetId: 'rgb:asset', metadata: { ticker: 'TOK', name: 'Token', precision: 0, schema: 'NIA', issuedSupply: '1' } },
+    ]
+    expect(service.canFastForwardRecoveryState()).toBe(false)
+  })
+
   it('leaves the live state untouched when atomic recovery persistence fails', async () => {
     const dependencies = createDependencies()
     const service = new RgbService(dependencies)
@@ -550,6 +567,25 @@ describe('RgbService', () => {
 
     expect(dependencies.encoder.prepareTransfer).not.toHaveBeenCalled()
     expect(service.getPendingTransfers()).toEqual([])
+  })
+
+  it('refuses to prepare a transfer when a selected outpoint is no longer confirmed', async () => {
+    const dependencies = createDependencies()
+    dependencies.stateSource.verifyUtxos = vi.fn().mockResolvedValue([
+      {
+        outpoint: { txid: 'a'.repeat(64), vout: 0 },
+        status: 'spent',
+        confirmations: 0,
+      },
+    ])
+    const service = new RgbService(dependencies)
+    await service.open(wallet)
+    await service.sync()
+
+    await expect(
+      service.prepareSend({ assetId: 'rgb:asset', amount: '40', invoice: rgbInvoice(40), feeRate: 2 })
+    ).rejects.toThrow('Selected RGB allocation is no longer confirmed and spendable')
+    expect(dependencies.encoder.prepareTransfer).not.toHaveBeenCalled()
   })
 
   it('serializes concurrent send preparation before selecting RGB allocations', async () => {

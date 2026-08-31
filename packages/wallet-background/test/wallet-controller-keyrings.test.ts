@@ -635,6 +635,7 @@ describe('RGB wallet references', () => {
     const wallet = new WalletController()
     const service = { getPendingTransfers: vi.fn(() => [{ id: 'persisted-rgb-transfer' }]), completeSend: vi.fn().mockResolvedValue({ txid: 'aa'.repeat(32) }) }
     vi.spyOn(wallet as any, 'getLocalRgbService').mockResolvedValue({ service, wallet: { fundingAddress: 'bc1p-rgb-funding' } })
+    vi.spyOn(wallet as any, 'ensureRgbWriteLease').mockResolvedValue(undefined)
 
     const signedPsbt = new bitcoin.Psbt().toBase64()
     await expect(wallet.createRgbSendEnd({ signedPsbt })).resolves.toEqual({ txid: 'aa'.repeat(32) })
@@ -658,6 +659,7 @@ describe('RGB wallet references', () => {
       service,
       wallet: { fundingAddress: 'bc1p-rgb-funding' },
     })
+    vi.spyOn(wallet as any, 'ensureRgbWriteLease').mockResolvedValue(undefined)
 
     const signedPsbt = new bitcoin.Psbt().toBase64()
     await expect(
@@ -686,6 +688,7 @@ describe('RGB wallet references', () => {
       service,
       wallet: { fundingAddress: 'bc1p-rgb-funding' },
     })
+    vi.spyOn(wallet as any, 'ensureRgbWriteLease').mockResolvedValue(undefined)
 
     await wallet.createRgbSendBegin({
       invoice: 'rgb:asset/schema/~/bc:utxob:recipient?amount=8888888888&endpoints=rpc://proxy',
@@ -726,6 +729,7 @@ describe('RGB wallet references', () => {
       service,
       wallet: { fundingAddress: 'bc1p-rgb-funding' },
     })
+    vi.spyOn(wallet as any, 'ensureRgbWriteLease').mockResolvedValue(undefined)
 
     const signedPsbt = new bitcoin.Psbt().toBase64()
     await expect(
@@ -756,6 +760,7 @@ describe('RGB wallet references', () => {
       service,
       wallet: { fundingAddress: 'bc1p-rgb-funding' },
     })
+    vi.spyOn(wallet as any, 'ensureRgbWriteLease').mockResolvedValue(undefined)
 
     await expect(wallet.retryRgbBroadcast({ transferId: 'pending-rgb-transfer' })).resolves.toEqual({
       broadcast: true,
@@ -854,6 +859,7 @@ describe('RGB wallet references', () => {
       service,
       wallet: { fundingAddress: 'bc1p-rgb-funding' },
     })
+    vi.spyOn(wallet as any, 'ensureRgbWriteLease').mockResolvedValue(undefined)
     const syncRgbReceivedAllocations = vi.spyOn(wallet as any, 'syncRgbReceivedAllocations')
 
     await expect(wallet.acceptRgbReceive({ recipientId: 'recipient-id' })).resolves.toEqual({
@@ -1557,6 +1563,7 @@ describe('RGB wallet references', () => {
       service,
       wallet: { fundingAddress: 'bc1p-rgb-funding', network: 'mainnet' },
     })
+    vi.spyOn(wallet as any, 'ensureRgbWriteLease').mockResolvedValue(undefined)
 
     const result = await wallet.createRgbIssueNia({
       ticker: 'RGB',

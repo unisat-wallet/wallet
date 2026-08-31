@@ -383,6 +383,18 @@ export interface RgbStateSource {
     status: 'mempool' | 'confirmed' | 'pending_spend' | 'spent' | 'replaced' | 'unknown'
     confirmations: number
   }>
+  /** Verify locally selected Bitcoin outpoints before an RGB transfer is encoded. */
+  verifyUtxos?(
+    wallet: RgbWalletRef,
+    outpoints: Array<Pick<RgbUtxo, 'outpoint' | 'satoshis' | 'scriptPubKey'>>
+  ): Promise<
+    Array<{
+      outpoint: RgbOutpoint
+      status: 'mempool' | 'confirmed' | 'pending_spend' | 'spent' | 'replaced' | 'unknown'
+      confirmations: number
+      confirmationHeight?: number
+    }>
+  >
 }
 
 /** Network transport only. It must not construct a transaction or receive an xpub. */

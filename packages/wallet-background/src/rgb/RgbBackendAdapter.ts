@@ -26,6 +26,12 @@ type RgbIndexedUtxo = {
   }>
 }
 
+export type RgbActiveWriteLease = {
+  deviceId: string
+  leaseId: string
+  fencingToken: number
+}
+
 export type RgbBackendApi = {
   getRgbWalletUtxoSnapshot: (params: {
     wallet: RgbWalletRef
@@ -44,6 +50,7 @@ export type RgbBackendApi = {
   }) => Promise<RgbValidationHistory>
   syncRgbTransfer: (params: {
     wallet: RgbWalletRef
+    lease?: RgbActiveWriteLease
     transferId: string
     txid: string
     amount: string
@@ -60,11 +67,14 @@ export type RgbBackendApi = {
   }) => Promise<void>
   replaceRgbUtxos: (params: {
     address: string
+    wallet?: RgbWalletRef & { network: string }
+    lease?: RgbActiveWriteLease
     txid: string
     outpoints: RgbIndexedUtxo[]
   }) => Promise<void>
   claimRgbConsignments: (params: {
     wallet: RgbWalletRef
+    lease?: RgbActiveWriteLease
     recipientId: string
   }) => Promise<{ claimed: number }>
   getClaimedRgbConsignments: (params: {
@@ -77,6 +87,21 @@ export type RgbBackendApi = {
     status: 'mempool' | 'confirmed' | 'pending_spend' | 'spent' | 'replaced' | 'unknown'
     confirmations: number
   }>
+  verifyRgbUtxos: (params: {
+    wallet: RgbWalletRef & { network: string }
+    deviceId: string
+    leaseId: string
+    fencingToken: number
+    outpoints: Array<{ txid: string; vout: number; satoshis: number; scriptPk: string }>
+  }) => Promise<{
+    outpoints: Array<{
+      txid: string
+      vout: number
+      status: 'mempool' | 'confirmed' | 'spent' | 'replaced' | 'unknown'
+      confirmations: number
+      confirmationHeight?: number
+    }>
+  }>
 }
 
 type RgbBackendAdapterDependencies = {
@@ -86,6 +111,7 @@ type RgbBackendAdapterDependencies = {
     invoice: string | undefined,
     networkType: NetworkType
   ) => string | undefined
+  getActiveWriteLease: (wallet: RgbWalletRef) => RgbActiveWriteLease | undefined
 }
 
 /** Adapts the address indexer and RGB backend APIs to RgbService's state source port. */
@@ -116,8 +142,10 @@ export function createRgbBackendAdapter(
       }),
     syncBroadcast: async (wallet, transferId, transfer, snapshot, metadata) => {
       const to = dependencies.getInvoiceDestination(metadata.invoice, dependencies.getNetworkType())
+      const lease = dependencies.getActiveWriteLease(wallet)
       await api.syncRgbTransfer({
         wallet,
+        ...(lease ? { lease } : {}),
         transferId,
         txid: transfer.txid,
         amount: metadata.amount,
@@ -131,12 +159,19 @@ export function createRgbBackendAdapter(
       })
       await api.replaceRgbUtxos({
         address: wallet.fundingAddress,
+        ...(wallet.network ? { wallet: wallet as RgbWalletRef & { network: string } } : {}),
+        ...(lease ? { lease } : {}),
         txid: transfer.txid,
         outpoints: snapshot.utxos.map(toIndexedUtxo),
       })
     },
     claimConsignments: async (wallet, recipientId) => {
-      const result = await api.claimRgbConsignments({ wallet, recipientId })
+      const lease = dependencies.getActiveWriteLease(wallet)
+      const result = await api.claimRgbConsignments({
+        wallet,
+        ...(lease ? { lease } : {}),
+        recipientId,
+      })
       return result.claimed
     },
     getClaimedConsignments: async wallet => {
@@ -144,6 +179,31 @@ export function createRgbBackendAdapter(
       return result.consignments
     },
     getTransactionStatus: (wallet, txid) => api.getRgbTransactionStatus(txid, { wallet }),
+    verifyUtxos: async (wallet, outpoints) => {
+      const lease = dependencies.getActiveWriteLease(wallet)
+      if (!lease) throw new Error('RGB write lease is unavailable')
+      if (!wallet.network) throw new Error('RGB write lease wallet network is unavailable')
+      const result = await api.verifyRgbUtxos({
+        wallet: wallet as RgbWalletRef & { network: string },
+        deviceId: lease.deviceId,
+        leaseId: lease.leaseId,
+        fencingToken: lease.fencingToken,
+        outpoints: outpoints.map(utxo => ({
+          txid: utxo.outpoint.txid,
+          vout: utxo.outpoint.vout,
+          satoshis: utxo.satoshis,
+          scriptPk: utxo.scriptPubKey,
+        })),
+      })
+      return result.outpoints.map(outpoint => ({
+        outpoint: { txid: outpoint.txid, vout: outpoint.vout },
+        status: outpoint.status,
+        confirmations: outpoint.confirmations,
+        ...(outpoint.confirmationHeight === undefined
+          ? {}
+          : { confirmationHeight: outpoint.confirmationHeight }),
+      }))
+    },
   }
 }
 

@@ -12,6 +12,7 @@ import type { LocalRgbServiceContext } from './RgbWalletCoordinator'
 
 type RgbSendOperationsDependencies = {
   getContext: () => Promise<LocalRgbServiceContext>
+  ensureWriteLease?: (context: LocalRgbServiceContext) => Promise<void>
   getFeeRate: () => Promise<number | undefined>
   getToSignData: (params: {
     psbt: string
@@ -43,6 +44,7 @@ export class RgbSendOperations {
 
   async begin(params: RgbSendBeginParams) {
     const { service, wallet } = await this.dependencies.getContext()
+    await this.dependencies.ensureWriteLease?.({ service, wallet })
     const feeRate = params.feeRate ?? (await this.dependencies.getFeeRate())
     if (!feeRate || feeRate <= 0) throw new Error('Invalid RGB transaction fee rate')
 
@@ -74,6 +76,7 @@ export class RgbSendOperations {
 
   async complete(params: { signedPsbt: string; transferId?: string }) {
     const { service, wallet } = await this.dependencies.getContext()
+    await this.dependencies.ensureWriteLease?.({ service, wallet })
     const pending = service.getPendingTransfers()
     const transferId =
       params.transferId ??
@@ -117,7 +120,8 @@ export class RgbSendOperations {
   }
 
   async retryBroadcast(transferId: string) {
-    const { service } = await this.dependencies.getContext()
+    const { service, wallet } = await this.dependencies.getContext()
+    await this.dependencies.ensureWriteLease?.({ service, wallet })
     const transfer = service.getPendingTransfers().find(item => item.id === transferId)
     if (!transfer?.delivery?.broadcastError) {
       return { broadcast: false, status: 'not_retryable' as const }
@@ -152,11 +156,14 @@ export class RgbSendOperations {
       }
     }
     if (latest?.delivery) return { broadcast: false, status: 'waiting_ack' as const }
-    return { broadcast: false, status: 'canceled' as const }
+    // A successful sync may compact the locally persisted pending transfer
+    // immediately after broadcast. It is confirming, not a user cancellation.
+    return { broadcast: true, status: 'confirming' as const }
   }
 
   async abortVanillaTx(txid: string) {
     const { service, wallet } = await this.dependencies.getContext()
+    await this.dependencies.ensureWriteLease?.({ service, wallet })
     const requestedId = String(txid).replace(/^local-send:/, '')
     const match = service
       .getPendingTransfers()

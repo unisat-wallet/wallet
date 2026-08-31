@@ -151,6 +151,18 @@ type RgbControllerBalance = {
   [key: string]: unknown
 }
 
+type RgbControllerWriteLease = {
+  deviceId: string
+  leaseId: string
+  fencingToken: number
+  expiresAt: number
+}
+
+type RgbControllerWriteLeaseCredential = Pick<
+  RgbControllerWriteLease,
+  'deviceId' | 'leaseId' | 'fencingToken'
+>
+
 type RgbControllerApiService = {
   getRgbAssetList: (
     address: string,
@@ -159,6 +171,8 @@ type RgbControllerApiService = {
   ) => Promise<RgbControllerPageResponse<RgbControllerBalance>>
   getRgbAssetBalance: (address: string, assetId: string) => Promise<RgbControllerBalance>
   syncRgbAssetMetadata: (params: {
+    wallet?: RgbWalletRef & { network: string }
+    lease?: RgbControllerWriteLeaseCredential
     asset: {
       assetId: string
       ticker: string
@@ -171,12 +185,14 @@ type RgbControllerApiService = {
   }) => Promise<void>
   saveRgbRecoveryCheckpoint: (params: {
     wallet: RgbWalletRef
+    lease?: RgbControllerWriteLeaseCredential
     payloadParts: string[]
     expectedUpdatedAt?: number
     updatedAt: number
   }) => Promise<{ saved: boolean; updatedAt: number }>
   startRgbRecoveryCheckpointUpload: (params: {
     wallet: RgbWalletRef
+    lease?: RgbControllerWriteLeaseCredential
     expectedUpdatedAt?: number
     expectedRevision?: string
     updatedAt: number
@@ -186,12 +202,14 @@ type RgbControllerApiService = {
   }) => Promise<{ uploadId: string }>
   uploadRgbRecoveryCheckpointPart: (params: {
     wallet: RgbWalletRef
+    lease?: RgbControllerWriteLeaseCredential
     uploadId: string
     index: number
     payload: string
   }) => Promise<void>
   completeRgbRecoveryCheckpointUpload: (params: {
     wallet: RgbWalletRef
+    lease?: RgbControllerWriteLeaseCredential
     uploadId: string
   }) => Promise<{ saved: boolean; updatedAt: number; revision?: string }>
   getRgbRecoveryCheckpointUploadStatus: (params: {
@@ -244,6 +262,8 @@ type RgbControllerApiService = {
   ) => Promise<RgbAllocationSummaryResult>
   syncRgbUtxos: (params: {
     address: string
+    wallet?: RgbWalletRef & { network: string }
+    lease?: RgbControllerWriteLeaseCredential
     txid: string
     outpoints: Array<{
       txid: string
@@ -267,6 +287,8 @@ type RgbControllerApiService = {
   }) => Promise<void>
   replaceRgbUtxos: (params: {
     address: string
+    wallet?: RgbWalletRef & { network: string }
+    lease?: RgbControllerWriteLeaseCredential
     txid: string
     outpoints: Array<{
       txid: string
@@ -317,6 +339,32 @@ type RgbControllerApiService = {
     status: 'mempool' | 'confirmed' | 'pending_spend' | 'spent' | 'replaced' | 'unknown'
     confirmations: number
   }>
+  acquireRgbWriteLease: (params: {
+    wallet: RgbWalletRef & { network: string }
+    deviceId: string
+    checkpointRevision?: string
+  }) => Promise<{ leaseId: string; fencingToken: number; expiresAt: number }>
+  renewRgbWriteLease: (params: {
+    wallet: RgbWalletRef & { network: string }
+    deviceId: string
+    leaseId: string
+    fencingToken: number
+  }) => Promise<{ leaseId: string; fencingToken: number; expiresAt: number }>
+  verifyRgbUtxos: (params: {
+    wallet: RgbWalletRef & { network: string }
+    deviceId: string
+    leaseId: string
+    fencingToken: number
+    outpoints: Array<{ txid: string; vout: number; satoshis: number; scriptPk: string }>
+  }) => Promise<{
+    outpoints: Array<{
+      txid: string
+      vout: number
+      status: 'mempool' | 'confirmed' | 'spent' | 'replaced' | 'unknown'
+      confirmations: number
+      confirmationHeight?: number
+    }>
+  }>
   getRgbConsignmentHistory: (params: {
     wallet: RgbWalletRef
     assetId: string
@@ -333,6 +381,7 @@ type RgbControllerApiService = {
   }>
   publishRgbConsignment: (params: {
     wallet: RgbWalletRef
+    lease?: RgbControllerWriteLeaseCredential
     recipientId: string
     payload: string
     assetId: string
@@ -341,6 +390,7 @@ type RgbControllerApiService = {
   }) => Promise<void>
   claimRgbConsignments: (params: {
     wallet: RgbWalletRef
+    lease?: RgbControllerWriteLeaseCredential
     recipientId: string
   }) => Promise<{ claimed: number }>
   getClaimedRgbConsignments: (params: {
@@ -348,6 +398,7 @@ type RgbControllerApiService = {
   }) => Promise<{ consignments: Array<{ recipientId: string; payload: string }> }>
   syncRgbTransfer: (params: {
     wallet: RgbWalletRef
+    lease?: RgbControllerWriteLeaseCredential
     transferId: string
     txid: string
     amount: string
@@ -363,6 +414,7 @@ type RgbControllerApiService = {
   }) => Promise<void>
   syncRgbReceiveTransfer: (params: {
     wallet: RgbWalletRef
+    lease?: RgbControllerWriteLeaseCredential
     transferId: string
     assetId: string
     amount: string
@@ -373,6 +425,8 @@ type RgbControllerApiService = {
 }
 
 const getRgbApiService = () => (walletApiService as unknown as { rgb: RgbControllerApiService }).rgb
+
+const RGB_DEVICE_ID_STORAGE_KEY = 'rgb-device-id:v1'
 
 type RgbWalletRef = {
   walletId?: string
@@ -748,7 +802,7 @@ export class WalletController extends BaseController {
   })
   private readonly rgbIndexerOutbox = new RgbIndexerOutbox({
     syncIssue: (issue, wallet) => this.syncRgbIssueToIndexer(issue, wallet),
-    syncAssetMetadata: item => this.syncRgbAssetMetadataToIndexer(item),
+    syncAssetMetadata: (item, wallet) => this.syncRgbAssetMetadataToIndexer(item, wallet),
     replaceUtxos: (sync, wallet) => this.replaceRgbUtxosInIndexer(sync, wallet),
     syncReceiveHistory: (receive, wallet) => this.syncRgbReceiveHistoryToIndexer(receive, wallet),
     warn: (message, error) => log.warn(message, error),
@@ -756,6 +810,7 @@ export class WalletController extends BaseController {
   private readonly rgbRecoveryRestores = new Map<string, Promise<void>>()
   private readonly rgbRecoveryBackups = new Map<string, Promise<unknown>>()
   private readonly rgbRecoveryVersions = new Map<string, { updatedAt?: number; revision?: string }>()
+  private readonly rgbWriteLeases = new Map<string, RgbControllerWriteLease>()
   /** Last content successfully round-tripped to recovery for each funding wallet. */
   private readonly rgbRecoveryVerifiedFingerprints = new Map<string, string>()
   private readonly rgbCoordinator = new RgbWalletCoordinator({
@@ -763,6 +818,7 @@ export class WalletController extends BaseController {
     getReadContext: () => this.getLocalRgbReadService(),
     syncIndexerOutbox: (service, wallet) => this.syncRgbIndexerOutbox(service, wallet),
     syncReceiveHistory: (service, wallet) => this.syncRgbReceiveHistory(service, wallet),
+    tryEnsureWriteLease: context => this.tryEnsureRgbWriteLease(context),
   })
   private readonly rgbTransferQuery = new RgbTransferQuery({
     getContext: () => this.getLocalRgbService(),
@@ -781,15 +837,18 @@ export class WalletController extends BaseController {
   })
   private readonly rgbReceiveOperations = new RgbReceiveOperations({
     getContext: () => this.getLocalRgbService(),
+    ensureWriteLease: context => this.ensureRgbWriteLease(context),
     syncReceivedAllocations: () => this.syncRgbReceivedAllocations(),
   })
   private readonly rgbIssueOperations = new RgbIssueOperations({
     getContext: () => this.getLocalRgbService(),
+    ensureWriteLease: context => this.ensureRgbWriteLease(context),
     syncIndexerOutbox: context => this.syncRgbIndexerOutbox(context.service, context.wallet),
     now: () => Date.now(),
   })
   private readonly rgbSendOperations = new RgbSendOperations({
     getContext: () => this.getLocalRgbService(),
+    ensureWriteLease: context => this.ensureRgbWriteLease(context),
     getFeeRate: async () => (await this.getFeeSummary()).list[1]?.feeRate,
     getToSignData: ({ psbt, toSignInputs, amountDisplay, actionName }) =>
       this.getRgbToSignData({
@@ -825,6 +884,7 @@ export class WalletController extends BaseController {
       this.rgbCoordinator.clear()
       this.rgbRecoveryRestores.clear()
       this.rgbRecoveryBackups.clear()
+      this.rgbWriteLeases.clear()
     })
   }
 
@@ -3914,31 +3974,44 @@ export class WalletController extends BaseController {
   private syncRgbReceivedAllocations = () => this.rgbCoordinator.syncReceivedAllocations()
 
   /** Deliver confirmed receive history through a durable, idempotent local outbox. */
-  private syncRgbReceiveHistory = (service: LocalRgbService, wallet: LocalRgbWallet) =>
-    this.rgbIndexerOutbox.syncReceiveHistory(service, wallet)
+  private syncRgbReceiveHistory = async (service: LocalRgbService, wallet: LocalRgbWallet) => {
+    if (!(await this.tryEnsureRgbWriteLease({ service, wallet }))) return
+    await this.rgbIndexerOutbox.syncReceiveHistory(service, wallet)
+  }
 
   /** Retry durable local RGB allocations before allowing a remote snapshot to replace them. */
-  private syncRgbIndexerOutbox = (service: LocalRgbService, wallet: LocalRgbWallet) =>
-    this.rgbIndexerOutbox.sync(service, wallet)
+  private syncRgbIndexerOutbox = async (service: LocalRgbService, wallet: LocalRgbWallet) => {
+    if (!(await this.tryEnsureRgbWriteLease({ service, wallet }))) return false
+    return this.rgbIndexerOutbox.sync(service, wallet)
+  }
 
   private syncRgbIssueToIndexer = async (
     issue: import('@unisat/rgb-service').RgbPendingIssue,
     wallet: LocalRgbWallet
   ) => {
+    const lease = this.getRgbWriteLeaseCredential(wallet)
     await getRgbApiService().syncRgbAssetMetadata({
+      wallet,
+      ...(lease ? { lease } : {}),
       asset: { assetId: issue.assetId, ...issue.asset },
     })
     await getRgbApiService().syncRgbUtxos({
       address: wallet.fundingAddress,
+      wallet,
+      ...(lease ? { lease } : {}),
       txid: issue.utxoSync.txid,
       outpoints: toRgbIndexedUtxos(issue.utxoSync.outpoints),
     })
   }
 
   private syncRgbAssetMetadataToIndexer = async (
-    item: import('@unisat/rgb-service').RgbPendingAssetMetadata
+    item: import('@unisat/rgb-service').RgbPendingAssetMetadata,
+    wallet: LocalRgbWallet
   ) => {
+    const lease = this.getRgbWriteLeaseCredential(wallet)
     await getRgbApiService().syncRgbAssetMetadata({
+      wallet,
+      ...(lease ? { lease } : {}),
       asset: { assetId: item.assetId, ...item.metadata },
     })
   }
@@ -3947,8 +4020,11 @@ export class WalletController extends BaseController {
     sync: import('@unisat/rgb-service').RgbPendingUtxoSync,
     wallet: LocalRgbWallet
   ) => {
+    const lease = this.getRgbWriteLeaseCredential(wallet)
     await getRgbApiService().replaceRgbUtxos({
       address: wallet.fundingAddress,
+      wallet,
+      ...(lease ? { lease } : {}),
       txid: sync.txid,
       outpoints: toRgbIndexedUtxos(sync.outpoints),
     })
@@ -3963,8 +4039,10 @@ export class WalletController extends BaseController {
       this.getNetworkType(),
       wallet.fundingAddress
     )
+    const lease = this.getRgbWriteLeaseCredential(wallet)
     await getRgbApiService().syncRgbReceiveTransfer({
       wallet,
+      ...(lease ? { lease } : {}),
       transferId: receive.transferId,
       assetId: receive.assetId,
       amount: receive.amount,
@@ -4063,11 +4141,16 @@ export class WalletController extends BaseController {
         })
         const needsRestore = service.needsRecoveryRestore?.()
         const localRevision = service.getRecoveryCheckpointRevision()
-        if (!needsRestore && localRevision !== checkpoint.revision) {
+        const shouldFastForward =
+          !needsRestore &&
+          localRevision !== checkpoint.revision &&
+          Boolean(checkpoint.payload) &&
+          service.canFastForwardRecoveryState?.() === true
+        if (!needsRestore && localRevision !== checkpoint.revision && !shouldFastForward) {
           await service.markRecoveryConflict()
           throw new Error('RGB recovery checkpoint has changed on another installation')
         }
-        if (checkpoint.payload && needsRestore) {
+        if (checkpoint.payload && (needsRestore || shouldFastForward)) {
           const state = await decryptRgbRecoveryCheckpoint(
             checkpoint.payload,
             await this.rgbRecoveryKey(wallet)
@@ -4084,6 +4167,11 @@ export class WalletController extends BaseController {
           })
           if (!restored) {
             throw new Error('RGB recovery checkpoint does not belong to this wallet')
+          }
+          if (shouldFastForward) {
+            log.debug('RGB recovery: clean local state fast-forwarded to newer checkpoint', {
+              wallet: rgbRecoveryWalletTag(wallet),
+            })
           }
         }
         // A successful read with no checkpoint is also authoritative: this is
@@ -4161,8 +4249,17 @@ export class WalletController extends BaseController {
         const updatedAt = Math.max(Date.now(), (expected?.updatedAt ?? -1) + 1)
         const partCount = Math.ceil(payload.length / RGB_RECOVERY_PAYLOAD_PART_SIZE)
         const api = getRgbApiService()
+        const activeLease = this.getRgbActiveWriteLease(wallet)
+        const lease = activeLease
+          ? {
+              deviceId: activeLease.deviceId,
+              leaseId: activeLease.leaseId,
+              fencingToken: activeLease.fencingToken,
+            }
+          : undefined
         const { uploadId } = await api.startRgbRecoveryCheckpointUpload({
           wallet,
+          ...(lease ? { lease } : {}),
           partCount,
           totalLength: payload.length,
           checksum,
@@ -4178,7 +4275,13 @@ export class WalletController extends BaseController {
             (index + 1) * RGB_RECOVERY_PAYLOAD_PART_SIZE
           )
           try {
-            await api.uploadRgbRecoveryCheckpointPart({ wallet, uploadId, index, payload: payloadPart })
+            await api.uploadRgbRecoveryCheckpointPart({
+              wallet,
+              ...(lease ? { lease } : {}),
+              uploadId,
+              index,
+              payload: payloadPart,
+            })
           } catch (error) {
             const status = await api.getRgbRecoveryCheckpointUploadStatus({ wallet, uploadId }).catch(() => undefined)
             if (!status || status.status !== 'pending') throw error
@@ -4188,7 +4291,11 @@ export class WalletController extends BaseController {
         }
         let result: { saved: boolean; updatedAt: number; revision?: string } | undefined
         try {
-          result = await api.completeRgbRecoveryCheckpointUpload({ wallet, uploadId })
+          result = await api.completeRgbRecoveryCheckpointUpload({
+            wallet,
+            ...(lease ? { lease } : {}),
+            uploadId,
+          })
         } catch (error) {
           let completionError = error
           for (let attempt = 0; attempt < 7; attempt++) {
@@ -4208,7 +4315,11 @@ export class WalletController extends BaseController {
             if (status?.status !== 'publishing') throw completionError
             await new Promise<void>(resolve => setTimeout(resolve, 5_000))
             try {
-              result = await api.completeRgbRecoveryCheckpointUpload({ wallet, uploadId })
+              result = await api.completeRgbRecoveryCheckpointUpload({
+                wallet,
+                ...(lease ? { lease } : {}),
+                uploadId,
+              })
               break
             } catch (retryError) {
               completionError = retryError
@@ -4284,8 +4395,97 @@ export class WalletController extends BaseController {
     if (!context.service.isRecoveryBackupEnabled()) {
       throw new Error('RGB recovery service is unavailable; retry when the backend is reachable')
     }
-    await this.syncRgbIndexerOutbox(context.service, context.wallet)
     return context
+  }
+
+  private rgbWriteLeaseKey(wallet: Pick<LocalRgbWallet, 'network' | 'fundingAddress'>) {
+    return `${wallet.network}:${wallet.fundingAddress}`
+  }
+
+  private getRgbActiveWriteLease(wallet: RgbWalletRef): RgbControllerWriteLease | undefined {
+    if (!wallet.network) return undefined
+    const lease = this.rgbWriteLeases.get(`${wallet.network}:${wallet.fundingAddress}`)
+    return lease && lease.expiresAt > Date.now() ? lease : undefined
+  }
+
+  private getRgbWriteLeaseCredential(wallet: RgbWalletRef): RgbControllerWriteLeaseCredential | undefined {
+    const lease = this.getRgbActiveWriteLease(wallet)
+    return lease
+      ? {
+          deviceId: lease.deviceId,
+          leaseId: lease.leaseId,
+          fencingToken: lease.fencingToken,
+        }
+      : undefined
+  }
+
+  private async getRgbDeviceId() {
+    const existing = await keyringService.getEncryptedStorageItem<string>(
+      RGB_ENCRYPTED_STORAGE_NAMESPACE,
+      RGB_DEVICE_ID_STORAGE_KEY
+    )
+    if (typeof existing === 'string' && /^[A-Za-z0-9_-]{16,128}$/.test(existing)) return existing
+    const deviceId = globalThis.crypto.randomUUID().replace(/-/g, '')
+    await keyringService.setEncryptedStorageItem(
+      RGB_ENCRYPTED_STORAGE_NAMESPACE,
+      RGB_DEVICE_ID_STORAGE_KEY,
+      deviceId
+    )
+    return deviceId
+  }
+
+  /** Acquire/refresh the server-enforced single-writer lease before preparing a send. */
+  private async ensureRgbWriteLease(context: LocalRgbServiceContext): Promise<void> {
+    const key = this.rgbWriteLeaseKey(context.wallet)
+    const existing = this.rgbWriteLeases.get(key)
+    // Reserve enough time for the preflight and local encoder; a later phase
+    // renews this lease while a hardware signer is awaiting user confirmation.
+    if (existing && existing.expiresAt > Date.now() + 30_000) return
+    const deviceId = await this.getRgbDeviceId()
+    if (existing && existing.expiresAt > Date.now()) {
+      const renewed = await getRgbApiService().renewRgbWriteLease({
+        wallet: context.wallet,
+        deviceId: existing.deviceId,
+        leaseId: existing.leaseId,
+        fencingToken: existing.fencingToken,
+      })
+      this.rgbWriteLeases.set(key, { deviceId: existing.deviceId, ...renewed })
+      return
+    }
+    let lease: { leaseId: string; fencingToken: number; expiresAt: number }
+    try {
+      lease = await getRgbApiService().acquireRgbWriteLease({
+        wallet: context.wallet,
+        deviceId,
+        ...(context.service.getRecoveryCheckpointRevision?.()
+          ? { checkpointRevision: context.service.getRecoveryCheckpointRevision?.() }
+          : {}),
+      })
+    } catch (error) {
+      // A newer device may have committed after this device's restore read.
+      // Drop the cached read so the next explicit operation re-reads and,
+      // when clean, fast-forwards to that checkpoint rather than writing stale
+      // state under a newly acquired lease.
+      if (String(error).includes('checkpoint revision is stale')) {
+        this.rgbRecoveryVersions.delete(key)
+      }
+      throw error
+    }
+    this.rgbWriteLeases.set(key, { deviceId, ...lease })
+  }
+
+  /** A lease failure makes this installation read-only; local state remains available. */
+  private async tryEnsureRgbWriteLease(context: LocalRgbServiceContext): Promise<boolean> {
+    // Production LocalRgbWallets always have a network. Retain the existing
+    // no-lease behavior for compatibility hosts that only expose an address.
+    if (!context.wallet.network) return true
+    try {
+      await this.ensureRgbWriteLease(context)
+      return true
+    } catch (error) {
+      log.debug('RGB index write deferred because another device holds the lease', error)
+      return false
+    }
   }
 
   private getCurrentLocalRgbWallet = async (): Promise<LocalRgbWallet> => {
@@ -4312,6 +4512,7 @@ export class WalletController extends BaseController {
         api: getRgbApiService() as RgbBackendApi,
         getNetworkType: () => this.getNetworkType(),
         getInvoiceDestination: rgbInvoiceDestinationAddress,
+        getActiveWriteLease: wallet => this.getRgbActiveWriteLease(wallet),
       }),
       feeSource: {
         getFeeFunding: async () => {
