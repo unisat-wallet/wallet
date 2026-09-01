@@ -294,6 +294,27 @@ describe('RgbService', () => {
     expect(service.canFastForwardRecoveryState()).toBe(false)
   })
 
+  it('recognizes an identical remote checkpoint despite local recovery metadata', async () => {
+    const dependencies = createDependencies()
+    const service = new RgbService(dependencies)
+    await service.open(wallet)
+    const recovery = {
+      version: 1 as const,
+      wallet,
+      snapshot: { syncedAt: 1, utxos: [] },
+      pending: {
+        transfer: { request: { assetId: 'rgb:asset' }, prepared: {}, createdAt: 1 },
+      },
+    }
+
+    await expect(service.restoreRecoveryState(recovery)).resolves.toBe(true)
+    await service.setRecoveryCheckpointRevision('a'.repeat(24))
+    expect(service.matchesRecoveryState(recovery)).toBe(true)
+    expect(
+      service.matchesRecoveryState({ ...recovery, pending: { ...recovery.pending, other: recovery.pending.transfer } })
+    ).toBe(false)
+  })
+
   it('leaves the live state untouched when atomic recovery persistence fails', async () => {
     const dependencies = createDependencies()
     const service = new RgbService(dependencies)

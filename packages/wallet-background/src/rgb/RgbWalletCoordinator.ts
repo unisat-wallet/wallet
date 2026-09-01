@@ -75,9 +75,25 @@ export class RgbWalletCoordinator {
   }
 
   async syncListState(): Promise<void> {
-    const { service, wallet } = await this.dependencies.getContext()
+    const context = await this.dependencies.getContext()
+    const { service, wallet } = context
     const snapshot = service.getSnapshot()
     if (!snapshot.utxos.some(utxo => utxo.allocations.length > 0)) return
+    const key = walletKey(wallet)
+    // Avoid a lease round-trip when this is only a render-triggered call that
+    // is already covered by an in-flight or recently completed list refresh.
+    if (
+      this.snapshotSyncing.has(key) ||
+      (this.snapshotSyncAt.get(key) ?? 0) + LIST_SNAPSHOT_SYNC_INTERVAL > Date.now()
+    ) {
+      return
+    }
+    // Snapshot refresh can persist changed local state and enqueue a recovery
+    // checkpoint. Acquire or renew before it runs; after a background restart
+    // there is no in-memory lease to attach to that checkpoint.
+    const canWrite =
+      (await this.dependencies.tryEnsureWriteLease?.(context, { forceRenew: true })) ?? true
+    if (!canWrite) return
 
     try {
       await this.syncSnapshot(service, wallet, LIST_SNAPSHOT_SYNC_INTERVAL)

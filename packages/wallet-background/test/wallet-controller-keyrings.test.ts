@@ -16,6 +16,7 @@ import {
 } from '../src/controllers/wallet'
 import { keyringService, preferenceService, walletApiService } from '../src/services'
 import { bgEventBus } from '../src/utils/eventBus'
+import { encryptRgbRecoveryCheckpoint } from '../src/rgb/RgbRecoveryCheckpoint'
 
 vi.mock('@unisat/babylon-service', () => ({
   COSMOS_CHAINS_MAP: {},
@@ -280,6 +281,49 @@ describe('RGB wallet references', () => {
     expect((wallet as any).restoreRgbRecoveryIfNeeded).toHaveBeenCalledTimes(1)
     releaseRecovery!()
     await recovery
+  })
+
+  it('adopts a newer recovery revision when the decrypted checkpoint matches local state', async () => {
+    const wallet = new WalletController()
+    const walletRef = {
+      walletId: 'rgb-wallet',
+      network: 'mainnet',
+      fundingAddress: 'bc1p-rgb-funding',
+    }
+    const recoveryState = {
+      version: 1,
+      wallet: walletRef,
+      snapshot: { syncedAt: 1, utxos: [] },
+      pending: { transfer: { request: { assetId: 'rgb:asset' }, prepared: {}, createdAt: 1 } },
+    }
+    const recoveryKey = '11'.repeat(32)
+    const payload = await encryptRgbRecoveryCheckpoint(recoveryState, recoveryKey)
+    const service = {
+      needsRecoveryRestore: vi.fn(() => false),
+      getRecoveryCheckpointRevision: vi.fn(() => 'a'.repeat(24)),
+      canFastForwardRecoveryState: vi.fn(() => false),
+      matchesRecoveryState: vi.fn(() => true),
+      markRecoveryConflict: vi.fn(),
+      setRecoveryCheckpointVersion: vi.fn(),
+      setRecoveryCheckpointRevision: vi.fn(),
+      enableRecoveryBackup: vi.fn(),
+      getRecoveryCheckpointStatus: vi.fn(() => ({ dirty: false, verified: true })),
+    }
+    ;(walletApiService as any).rgb = {
+      getRgbRecoveryCheckpoint: vi.fn().mockResolvedValue({
+        payload,
+        updatedAt: 2,
+        revision: 'b'.repeat(24),
+      }),
+    }
+    vi.spyOn(wallet as any, 'rgbRecoveryKey').mockResolvedValue(recoveryKey)
+
+    await (wallet as any).restoreRgbRecoveryIfNeeded({ service, wallet: walletRef })
+
+    expect(service.matchesRecoveryState).toHaveBeenCalledWith(recoveryState)
+    expect(service.markRecoveryConflict).not.toHaveBeenCalled()
+    expect(service.setRecoveryCheckpointVersion).toHaveBeenCalledWith(2)
+    expect(service.setRecoveryCheckpointRevision).toHaveBeenCalledWith('b'.repeat(24))
   })
 
   it('does not expose local blind-seal bigint values through wallet responses', () => {
@@ -1240,12 +1284,33 @@ describe('RGB wallet references', () => {
       service,
       wallet: { network: 'mainnet', fundingAddress: 'bc1p-rgb-funding' },
     })
+    const ensureLease = vi.spyOn(wallet as any, 'tryEnsureRgbWriteLease').mockResolvedValue(true)
     vi.spyOn(wallet, 'getRgbFundingAddress').mockResolvedValue({ address: 'bc1p-rgb-funding' })
     vi.spyOn(wallet, 'getRgbAssetList').mockResolvedValue({ currentPage: 1, pageSize: 20, total: 0, list: [] })
 
     await Promise.all([wallet.getRGBList('', 1, 20), wallet.getRGBList('', 1, 20)])
 
     expect(service.sync).toHaveBeenCalledTimes(1)
+    expect(ensureLease).toHaveBeenCalledWith(expect.anything(), { forceRenew: true })
+  })
+
+  it('keeps the RGB asset list read-only when no writer lease is available', async () => {
+    const wallet = new WalletController()
+    const service = {
+      sync: vi.fn(),
+      getSnapshot: vi.fn(() => ({ utxos: [{ allocations: [{ assetId: 'rgb:asset' }] }] })),
+    }
+    const context = {
+      service,
+      wallet: { network: 'mainnet', fundingAddress: 'bc1p-rgb-funding', walletId: 'rgb-wallet' },
+    }
+    vi.spyOn(wallet as any, 'getLocalRgbService').mockResolvedValue(context)
+    const ensureLease = vi.spyOn(wallet as any, 'tryEnsureRgbWriteLease').mockResolvedValue(false)
+
+    await (wallet as any).rgbCoordinator.syncListState()
+
+    expect(ensureLease).toHaveBeenCalledWith(context, { forceRenew: true })
+    expect(service.sync).not.toHaveBeenCalled()
   })
 
   it('notifies the UI only when a background RGB list sync changes the local assets', async () => {

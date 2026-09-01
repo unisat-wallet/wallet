@@ -141,6 +141,29 @@ export class RgbService {
     )
   }
 
+  /**
+   * Check whether a decrypted remote checkpoint contains exactly the durable
+   * RGB state already held locally, ignoring installation-local recovery
+   * delivery metadata. This heals the restart window where the remote upload
+   * completed but its new revision was not yet written to extension storage.
+   */
+  matchesRecoveryState(recovery: unknown) {
+    const current = this.requireState()
+    if (!isRgbServiceState(recovery) || !sameRecoveryWallet(recovery.wallet, current.wallet)) {
+      return false
+    }
+    try {
+      const candidate = normalizeStateAssetIds(hydrateState(recovery))
+      validateRecoveredState(candidate, current.wallet)
+      return (
+        stableRecoveryJson(recoverySnapshot(persistState(current))) ===
+        stableRecoveryJson(recoverySnapshot(persistState(candidate)))
+      )
+    } catch {
+      return false
+    }
+  }
+
   getRecoveryCheckpointStatus() {
     const checkpoint = this.requireState().recoveryCheckpoint
     return {
@@ -2220,6 +2243,17 @@ function recoverySnapshot(state: ReturnType<typeof persistState>) {
     ...snapshot
   } = state
   return snapshot
+}
+
+/** Compare checkpoint data without relying on object insertion order. */
+function stableRecoveryJson(value: unknown): string {
+  if (value === null || typeof value !== 'object') return JSON.stringify(value) ?? 'undefined'
+  if (Array.isArray(value)) return `[${value.map(stableRecoveryJson).join(',')}]`
+  const record = value as Record<string, unknown>
+  return `{${Object.keys(record)
+    .sort()
+    .map(key => `${JSON.stringify(key)}:${stableRecoveryJson(record[key])}`)
+    .join(',')}}`
 }
 
 /** JSON persistence is the state boundary; cloning it also preserves blind-seal u64 values. */

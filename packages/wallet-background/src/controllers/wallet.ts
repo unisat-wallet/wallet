@@ -4269,20 +4269,48 @@ export class WalletController extends BaseController {
         })
         const needsRestore = service.needsRecoveryRestore?.()
         const localRevision = service.getRecoveryCheckpointRevision()
+        const revisionChanged = localRevision !== checkpoint.revision
         const shouldFastForward =
           !needsRestore &&
-          localRevision !== checkpoint.revision &&
+          revisionChanged &&
           Boolean(checkpoint.payload) &&
           service.canFastForwardRecoveryState?.() === true
-        if (!needsRestore && localRevision !== checkpoint.revision && !shouldFastForward) {
-          await service.markRecoveryConflict()
-          throw new Error('RGB recovery checkpoint has changed on another installation')
-        }
-        if (checkpoint.payload && (needsRestore || shouldFastForward)) {
-          const state = await decryptRgbRecoveryCheckpoint(
-            checkpoint.payload,
+        let decryptedCheckpoint: unknown
+        const decryptCheckpoint = async () => {
+          if (decryptedCheckpoint !== undefined) return decryptedCheckpoint
+          decryptedCheckpoint = await decryptRgbRecoveryCheckpoint(
+            checkpoint.payload!,
             await this.rgbRecoveryKey(wallet)
           )
+          return decryptedCheckpoint
+        }
+        if (!needsRestore && revisionChanged && !shouldFastForward) {
+          const matchesRemoteCheckpoint =
+            Boolean(checkpoint.payload) &&
+            service.matchesRecoveryState?.(await decryptCheckpoint()) === true
+          if (matchesRemoteCheckpoint) {
+            // The async checkpoint upload may have completed immediately
+            // before a service-worker restart, leaving only its revision
+            // unwritten locally. Its decrypted state proves this is not a
+            // second-device conflict, so adopt the new revision below.
+            log.debug('RGB recovery: local state matches newer checkpoint; adopting revision', {
+              wallet: rgbRecoveryWalletTag(wallet),
+              localRevisionKnown: localRevision !== undefined,
+              remoteRevisionKnown: checkpoint.revision !== undefined,
+            })
+          } else {
+            log.warn('RGB recovery: checkpoint revision conflicts with local state', {
+              wallet: rgbRecoveryWalletTag(wallet),
+              localRevisionKnown: localRevision !== undefined,
+              remoteRevisionKnown: checkpoint.revision !== undefined,
+              needsRestore,
+            })
+            await service.markRecoveryConflict()
+            throw new Error('RGB recovery checkpoint has changed on another installation')
+          }
+        }
+        if (checkpoint.payload && (needsRestore || shouldFastForward)) {
+          const state = await decryptCheckpoint()
           log.debug('RGB recovery: checkpoint decrypted', {
             wallet: rgbRecoveryWalletTag(wallet),
             ...rgbRecoveryStateSummary(state),
