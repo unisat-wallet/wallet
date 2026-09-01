@@ -681,7 +681,7 @@ export default function RGBReceiveScreen() {
             <ReceiveQRCodeCard
               title={renderInvoiceTitle()}
               description={
-                t('use_this_invoice_to_receive', { ticker: assetDisplayTicker })
+                t('use_this_invoice_to_receive', { ticker: assetDisplayName })
               }
               value={invoice}
               valueLabel={t('receiving_invoice')}
