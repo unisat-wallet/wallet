@@ -201,21 +201,16 @@ export function useSendRGBScreenLogic() {
     invoice.trim().length > 0 &&
     decodedInvoice.valid &&
     hasTransportEndpoint &&
-    !invoiceAssetMismatch &&
-    invoiceAvailability !== 'checking' &&
-    invoiceAvailability !== 'unavailable' &&
-    invoiceAvailability !== 'error'
+    !invoiceAssetMismatch
   const invoiceValidationMessage = invoiceInvalid
     ? t('invalid_rgb_invoice')
     : invoiceAssetMismatch
       ? t('invoice_asset_mismatch')
-      : invoiceAvailability === 'checking'
-        ? t('rgb_invoice_checking')
-        : invoiceAvailability === 'unavailable'
-          ? t('rgb_invoice_unavailable')
-          : invoiceAvailability === 'error'
-            ? invoiceAvailabilityError || t('rgb_invoice_transport_unreachable')
-            : ''
+      : invoiceAvailability === 'unavailable'
+        ? t('rgb_invoice_unavailable')
+        : invoiceAvailability === 'error'
+          ? invoiceAvailabilityError || t('rgb_invoice_transport_unreachable')
+          : ''
   const requiresAmount = invoice.trim().length > 0 && decodedInvoice.needsAmount
   const amountInput = amount.trim()
   const assetPrecision = getRgbTokenPrecision(tokenBalance)
@@ -310,6 +305,9 @@ export function useSendRGBScreenLogic() {
   const disabled = useMemo(() => {
     return (
       !invoiceReadyForAmount ||
+      invoiceAvailability === 'checking' ||
+      invoiceAvailability === 'unavailable' ||
+      invoiceAvailability === 'error' ||
       feeRate <= 0 ||
       !isAmountValid ||
       insufficientBalance ||

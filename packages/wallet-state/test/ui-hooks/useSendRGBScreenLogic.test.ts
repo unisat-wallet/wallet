@@ -9,6 +9,33 @@ import {
 import { createHookTestHarness } from './testHelpers'
 
 describe('useSendRGBScreenLogic', () => {
+  it('checks a pasted RGB invoice silently while keeping Next disabled', async () => {
+    vi.useFakeTimers()
+    const assetId = 'rgb:test-asset'
+    const invoice = 'rgb:test-asset/~/~/bc:utxob:test?amount=1&endpoints=rpc://proxy'
+    const { wrapper, wallet } = createHookTestHarness({
+      routeState: {
+        assetId,
+        tokenBalance: { assetId, ticker: 'RGB', precision: 8, spendable: '150000000' },
+      },
+    })
+    wallet.checkRgbInvoiceAvailability = vi.fn(() => new Promise<void>(() => undefined))
+    const { result, unmount } = renderHook(() => useSendRGBScreenLogic(), { wrapper })
+
+    act(() => result.current.onInvoiceChange(invoice))
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(400)
+    })
+
+    expect(result.current.invoiceAvailability).toBe('checking')
+    expect(result.current.invoiceValidationMessage).toBe('')
+    expect(result.current.invoiceReadyForAmount).toBe(true)
+    expect(result.current.disabled).toBe(true)
+
+    unmount()
+    vi.useRealTimers()
+  })
+
   it('blocks signing when the pasted RGB invoice recipient ID is unavailable', async () => {
     const assetId = 'rgb:test-asset'
     const invoice = 'rgb:test-asset/~/~/bc:utxob:test?amount=1&endpoints=rpc://proxy'
