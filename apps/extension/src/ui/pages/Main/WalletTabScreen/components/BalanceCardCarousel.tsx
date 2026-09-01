@@ -591,6 +591,25 @@ export function BalanceCardCarousel({ rgbList }: { rgbList: ReturnType<typeof us
     snapStride
   );
 
+  // Network changes can toggle this component between the single BTC card
+  // and the carousel. Keep these hooks above that conditional render so the
+  // hook order remains stable across the transition.
+  const handlePeekCardClickCapture = useCallback(
+    (index: number) => (event: React.MouseEvent) => {
+      // Active card keeps expand/collapse; peek card switches like a swipe.
+      if (index === activeIndex) return;
+      if (suppressClickRef.current) return;
+      event.preventDefault();
+      event.stopPropagation();
+      setActiveIndex(index);
+    },
+    [activeIndex, setActiveIndex, suppressClickRef]
+  );
+
+  const onSwitchWallet = useCallback(() => {
+    navigate('SwitchKeyringScreen');
+  }, [navigate]);
+
   useEffect(() => {
     if (!isRgbFullySupported && walletView === WalletView.RGB) {
       dispatch(uiActions.setWalletView(WalletView.BITCOIN));
@@ -609,22 +628,6 @@ export function BalanceCardCarousel({ rgbList }: { rgbList: ReturnType<typeof us
 
   const snapOffset = activeIndex === 0 ? 0 : snapStride;
   const translateX = containerWidth > 0 ? -(snapOffset - dragOffset) : 0;
-
-  const handlePeekCardClickCapture = useCallback(
-    (index: number) => (event: React.MouseEvent) => {
-      // Active card keeps expand/collapse; peek card switches like a swipe.
-      if (index === activeIndex) return;
-      if (suppressClickRef.current) return;
-      event.preventDefault();
-      event.stopPropagation();
-      setActiveIndex(index);
-    },
-    [activeIndex, setActiveIndex, suppressClickRef]
-  );
-
-  const onSwitchWallet = useCallback(() => {
-    navigate('SwitchKeyringScreen');
-  }, [navigate]);
 
   return (
     <div ref={containerRef} style={carouselContainerStyle}>
