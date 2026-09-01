@@ -7,6 +7,8 @@ import {
 
 import type { LocalRgbServiceContext } from './RgbWalletCoordinator'
 
+const MAX_RGB_ISSUED_SUPPLY = 0xffff_ffff_ffff_ffffn
+
 type RgbIssueOperationsDependencies = {
   getContext: () => Promise<LocalRgbServiceContext>
   ensureWriteLease?: (context: LocalRgbServiceContext) => Promise<void>
@@ -39,6 +41,9 @@ export class RgbIssueOperations {
     const snapshot = service.getSnapshot()
     const amounts = params.amounts.map(value => toPositiveAtomicAmount(value))
     if (!amounts.length) throw new Error('RGB issuance requires at least one allocation')
+    if (amounts.reduce((total, amount) => total + amount, 0n) > MAX_RGB_ISSUED_SUPPLY) {
+      throw new Error('RGB issuance total supply exceeds the maximum u64 value')
+    }
     const funding = service.getAvailableIssueUtxos()
     if (funding.length < amounts.length) throw new Error('Not enough unallocated RGB funding UTXOs')
 

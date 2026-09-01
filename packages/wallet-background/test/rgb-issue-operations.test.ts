@@ -20,6 +20,31 @@ function fundingUtxo(txid: string, vout: number) {
 }
 
 describe('RgbIssueOperations', () => {
+  it('rejects an issuance whose combined supply exceeds u64 before queuing it', async () => {
+    const service = {
+      sync: vi.fn(),
+      getSnapshot: vi.fn().mockReturnValue({ syncedAt: 1, utxos: [] }),
+      getAvailableIssueUtxos: vi.fn(),
+      queueIssue: vi.fn(),
+    }
+    const operation = new RgbIssueOperations({
+      getContext: vi.fn().mockResolvedValue({ service, wallet }),
+      syncIndexerOutbox: vi.fn(),
+      now: () => 1_700_000_000_000,
+    })
+
+    await expect(
+      operation.issueNia({
+        ticker: 'TOK',
+        name: 'Token',
+        precision: 0,
+        amounts: ['18446744073709551615', '1'],
+      })
+    ).rejects.toThrow('RGB issuance total supply exceeds the maximum u64 value')
+    expect(service.getAvailableIssueUtxos).not.toHaveBeenCalled()
+    expect(service.queueIssue).not.toHaveBeenCalled()
+  })
+
   it('uses only issue funding UTXOs that the service has excluded from active invoice reservations', async () => {
     const invoiceReserved = fundingUtxo('a'.repeat(64), 0)
     const issueFunding = fundingUtxo('b'.repeat(64), 1)

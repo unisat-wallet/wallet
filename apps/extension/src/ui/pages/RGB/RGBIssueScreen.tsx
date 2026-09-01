@@ -38,6 +38,14 @@ type IssueFormErrors = Partial<Record<IssueField, string>>;
 const TICKER_MAX_BYTES = 8;
 const NAME_MAX_BYTES = 40;
 const PRECISION_MAX = 18;
+const MAX_RGB_ISSUED_SUPPLY = BigInt('18446744073709551615');
+
+const formatMaxRgbSupply = (precision: number) => {
+  const atomic = MAX_RGB_ISSUED_SUPPLY.toString();
+  if (precision === 0) return atomic;
+  const padded = atomic.padStart(precision + 1, '0');
+  return `${padded.slice(0, -precision)}.${padded.slice(-precision)}`;
+};
 
 const getErrorMessage = (error: unknown) => {
   if (error && typeof error === 'object') {
@@ -86,6 +94,8 @@ const getFormErrors = (ticker: string, name: string, amount: string, precision: 
     !/[1-9]/.test(toRgbAtomicAmount(amount, parsedPrecision))
   ) {
     errors.amount = 'Enter a valid supply';
+  } else if (BigInt(toRgbAtomicAmount(amount, parsedPrecision)) > MAX_RGB_ISSUED_SUPPLY) {
+    errors.amount = `Maximum supply is ${formatMaxRgbSupply(parsedPrecision)}`;
   }
   return errors;
 };
