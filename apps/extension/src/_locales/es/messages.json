@@ -3172,6 +3172,7 @@
   "rgb_transfer_broadcasted_notification": { "message": "El destinatario aceptó $1 $2. La transacción se transmitió." },
   "rgb_status_canceled_by_sender": { "message": "Cancelada por el remitente" },
   "rgb_status_canceled": { "message": "Cancelada" },
+  "rgb_status_rejected_by_receiver": { "message": "Rechazada por el destinatario" },
   "rgb_transfer_canceled_description": { "message": "Esta transferencia se canceló antes de transmitirse." },
   "rgb_transfer_canceled_by_sender_description": { "message": "El remitente canceló esta transferencia." },
   "rgb_accept_transfer": { "message": "Aceptar" },

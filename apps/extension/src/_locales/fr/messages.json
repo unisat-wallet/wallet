@@ -3183,6 +3183,7 @@
   },
   "rgb_status_canceled_by_sender": { "message": "Annulé par l'expéditeur" },
   "rgb_status_canceled": { "message": "Annulé" },
+  "rgb_status_rejected_by_receiver": { "message": "Rejeté par le destinataire" },
   "rgb_transfer_canceled_description": { "message": "Ce transfert a été annulé avant sa diffusion." },
   "rgb_transfer_canceled_by_sender_description": { "message": "L'expéditeur a annulé ce transfert." },
   "rgb_accept_transfer": { "message": "Accepter" },

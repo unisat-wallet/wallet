@@ -3212,6 +3212,9 @@
   "rgb_status_canceled": {
     "message": "Canceled"
   },
+  "rgb_status_rejected_by_receiver": {
+    "message": "Rejected by receiver"
+  },
   "rgb_transfer_canceled_description": {
     "message": "This transfer was canceled before it was broadcast."
   },

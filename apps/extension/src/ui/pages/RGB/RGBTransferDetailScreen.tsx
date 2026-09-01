@@ -41,7 +41,7 @@ function getStatusLabel(status: string, t: (key: string) => string, type?: RgbTr
     case 'cancelled':
       return type === 'receive' ? t('rgb_status_canceled_by_sender') : t('rgb_status_canceled');
     case 'rejected':
-      return t('rejected');
+      return type === 'send' ? t('rgb_status_rejected_by_receiver') : t('rejected');
     default:
       return status || t('pending');
   }

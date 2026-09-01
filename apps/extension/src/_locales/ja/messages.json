@@ -3183,6 +3183,7 @@
   },
   "rgb_status_canceled_by_sender": { "message": "送信者がキャンセルしました" },
   "rgb_status_canceled": { "message": "キャンセル済み" },
+  "rgb_status_rejected_by_receiver": { "message": "受取人によって拒否されました" },
   "rgb_transfer_canceled_description": { "message": "この送金はブロードキャスト前にキャンセルされました。" },
   "rgb_transfer_canceled_by_sender_description": { "message": "送信者がこの送金をキャンセルしました。" },
   "rgb_accept_transfer": { "message": "承認" },

@@ -3179,6 +3179,7 @@
   "rgb_transfer_broadcasted_notification": { "message": "Получатель принял $1 $2. Транзакция отправлена в сеть." },
   "rgb_status_canceled_by_sender": { "message": "Отменено отправителем" },
   "rgb_status_canceled": { "message": "Отменено" },
+  "rgb_status_rejected_by_receiver": { "message": "Отклонено получателем" },
   "rgb_transfer_canceled_description": { "message": "Этот перевод был отменён до отправки в сеть." },
   "rgb_transfer_canceled_by_sender_description": { "message": "Отправитель отменил этот перевод." },
   "rgb_accept_transfer": { "message": "Принять" },

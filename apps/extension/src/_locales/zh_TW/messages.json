@@ -3209,6 +3209,9 @@
   "rgb_status_canceled": {
     "message": "已取消"
   },
+  "rgb_status_rejected_by_receiver": {
+    "message": "已被收款方拒絕"
+  },
   "rgb_transfer_canceled_description": {
     "message": "此轉帳已在廣播前取消。"
   },
