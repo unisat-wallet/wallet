@@ -74,8 +74,12 @@ export class RgbIssueOperations {
           {
             assetId,
             amount: amount.toString(),
-            settled: utxo.chainStatus === 'confirmed',
-            spendable: utxo.chainStatus === 'confirmed',
+            // A locally issued NIA is valid as soon as its genesis outpoint
+            // is in the mempool. Mark it spendable so the issuer can create
+            // a child RGB transfer without waiting for the funding parent to
+            // confirm.
+            settled: true,
+            spendable: true,
             opId: Buffer.from(genesis.assetId).toString('hex'),
             assignmentIndex: genesis.allocationIndexes.indexOf(index),
             assignmentType: 4000,
@@ -109,7 +113,10 @@ export class RgbIssueOperations {
       assetId,
       genesis: Buffer.from(genesis.strict).toString('base64'),
       contract: Buffer.from(contract.strict).toString('base64'),
-      pendingConfirmation: selectedFunding.some(utxo => utxo.chainStatus !== 'confirmed'),
+      // Issued NIA can be transferred from an unconfirmed genesis outpoint.
+      // Keep this result false so the UI does not present the new asset as a
+      // pending, unusable issuance.
+      pendingConfirmation: false,
       syncPending,
     }
   }

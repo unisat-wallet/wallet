@@ -1783,7 +1783,7 @@ describe('RGB wallet references', () => {
     ])
   })
 
-  it('issues an RGB asset on a mempool funding UTXO as non-spendable', async () => {
+  it('issues an RGB asset on a mempool funding UTXO as immediately spendable', async () => {
     const wallet = new WalletController()
     const snapshot = {
       syncedAt: 1,
@@ -1827,12 +1827,12 @@ describe('RGB wallet references', () => {
       amounts: ['1'],
     })
 
-    expect(result).toMatchObject({ pendingConfirmation: true })
+    expect(result).toMatchObject({ pendingConfirmation: false })
     expect(syncRgbUtxos).toHaveBeenCalledWith(
       expect.objectContaining({
         outpoints: [
           expect.objectContaining({
-            allocations: [expect.objectContaining({ settled: false, spendable: false })],
+            allocations: [expect.objectContaining({ settled: true, spendable: true })],
           }),
         ],
       })

@@ -590,7 +590,7 @@ describe('RgbService', () => {
     expect(service.getPendingTransfers()).toEqual([])
   })
 
-  it('refuses to prepare a transfer when a selected outpoint is no longer confirmed', async () => {
+  it('refuses to prepare a transfer when a selected outpoint is no longer spendable', async () => {
     const dependencies = createDependencies()
     dependencies.stateSource.verifyUtxos = vi.fn().mockResolvedValue([
       {
@@ -605,7 +605,7 @@ describe('RgbService', () => {
 
     await expect(
       service.prepareSend({ assetId: 'rgb:asset', amount: '40', invoice: rgbInvoice(40), feeRate: 2 })
-    ).rejects.toThrow('Selected RGB allocation is no longer confirmed and spendable')
+    ).rejects.toThrow('Selected RGB allocation is no longer spendable')
     expect(dependencies.encoder.prepareTransfer).not.toHaveBeenCalled()
   })
 
@@ -1048,8 +1048,21 @@ describe('RgbService', () => {
     expect(service.getPendingConfirmationReceiveUtxos()).toEqual([])
   })
 
-  it('does not select unconfirmed RGB allocations for a transfer', async () => {
+  it('selects a locally issued NIA whose genesis outpoint is in the mempool', async () => {
     const dependencies = createDependencies()
+    dependencies.encoder.prepareTransfer = vi.fn().mockResolvedValue({
+      id: 'transfer-mempool',
+      psbt: 'cHNidP8=',
+      toSignInputs: [{ index: 0, publicKey: '02' + '22'.repeat(32) }],
+      lockedOutpoints: [{ txid: 'e'.repeat(64), vout: 0 }],
+    })
+    dependencies.stateSource.verifyUtxos = vi.fn().mockResolvedValue([
+      {
+        outpoint: { txid: 'e'.repeat(64), vout: 0 },
+        status: 'mempool',
+        confirmations: 0,
+      },
+    ])
     vi.mocked(dependencies.stateSource.getSnapshot).mockResolvedValue({
       syncedAt: 1,
       utxos: [
@@ -1085,7 +1098,12 @@ describe('RgbService', () => {
         invoice: rgbInvoice(),
         feeRate: 2,
       })
-    ).rejects.toBeInstanceOf(RgbInsufficientBalanceError)
+    ).resolves.toMatchObject({ id: 'transfer-mempool' })
+    expect(dependencies.encoder.prepareTransfer).toHaveBeenCalledWith(
+      expect.objectContaining({
+        selectedUtxos: [expect.objectContaining({ chainStatus: 'mempool' })],
+      })
+    )
   })
 
   it('selects and locks local colored UTXOs before requesting a local PSBT', async () => {

@@ -2043,7 +2043,11 @@ export class RgbService {
     const candidates = state.snapshot.utxos
       .filter(
         utxo =>
-          (utxo.chainStatus === undefined || utxo.chainStatus === 'confirmed') &&
+          // A locally issued NIA may be spent by a child transaction while
+          // its genesis outpoint is still in the mempool.
+          (utxo.chainStatus === undefined ||
+            utxo.chainStatus === 'confirmed' ||
+            utxo.chainStatus === 'mempool') &&
           !locked.has(outpointKey(utxo))
       )
       .map(utxo => ({ utxo, amount: getSpendableAmount(utxo, assetId) }))
@@ -2070,11 +2074,12 @@ export class RgbService {
     const statuses = new Map(
       verified.map(item => [`${item.outpoint.txid}:${item.outpoint.vout}`, item.status])
     )
-    const unavailable = selectedUtxos.find(
-      utxo => statuses.get(outpointKey(utxo)) !== 'confirmed'
-    )
+    const unavailable = selectedUtxos.find(utxo => {
+      const status = statuses.get(outpointKey(utxo))
+      return status !== 'confirmed' && status !== 'mempool'
+    })
     if (unavailable) {
-      throw new RgbServiceError('Selected RGB allocation is no longer confirmed and spendable')
+      throw new RgbServiceError('Selected RGB allocation is no longer spendable')
     }
   }
 
