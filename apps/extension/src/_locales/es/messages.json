@@ -2849,6 +2849,9 @@
   "enter_amount_greater_than_0": {
     "message": "Introduce un importe mayor que 0."
   },
+  "rgb_amount_precision_invalid": {
+    "message": "Introduce un importe con hasta $precision decimales."
+  },
   "select_asset": {
     "message": "Seleccionar activo"
   },

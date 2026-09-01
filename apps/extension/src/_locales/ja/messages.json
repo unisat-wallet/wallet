@@ -2858,6 +2858,9 @@
   "enter_amount_greater_than_0": {
     "message": "0 より大きい数量を入力してください。"
   },
+  "rgb_amount_precision_invalid": {
+    "message": "小数点以下 $precision 桁までの金額を入力してください。"
+  },
   "select_asset": {
     "message": "資産を選択"
   },

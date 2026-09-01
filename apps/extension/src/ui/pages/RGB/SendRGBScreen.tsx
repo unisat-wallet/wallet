@@ -102,6 +102,7 @@ export default function SendRGBScreen() {
     amountPlaceholder,
     amountMuted,
     amountInvalidVisible,
+    amountValidationMessage,
     blockingSendMessage,
     error,
     feePoolRequirement,
@@ -244,7 +245,7 @@ export default function SendRGBScreen() {
                 amountMuted={amountMuted}
                 inputTestId="send-rgb-amount-input"
               />
-              {amountInvalidVisible ? <Text text={t('enter_amount_greater_than_0')} size="xs" color="danger" /> : null}
+              {amountInvalidVisible ? <Text text={amountValidationMessage} size="xs" color="danger" /> : null}
               {blockingSendMessage ? <Text text={blockingSendMessage} size="xs" color="danger" wrap /> : null}
             </TransferAmountSection>
           ) : null}

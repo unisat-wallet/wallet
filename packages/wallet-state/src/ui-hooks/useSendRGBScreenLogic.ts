@@ -216,9 +216,8 @@ export function useSendRGBScreenLogic() {
   const assetPrecision = getRgbTokenPrecision(tokenBalance)
   const spendable = blockingSendStatus ? '0' : toRgbDisplayAmount(rawSpendable, assetPrecision)
   const normalizedAmount = toRgbAtomicAmount(amountInput, assetPrecision)
-  const isAmountValid =
-    !requiresAmount ||
-    (isValidRgbDecimalAmount(amountInput, assetPrecision) && /[1-9]/.test(normalizedAmount))
+  const isAmountFormatValid = isValidRgbDecimalAmount(amountInput, assetPrecision)
+  const isAmountValid = !requiresAmount || (isAmountFormatValid && /[1-9]/.test(normalizedAmount))
   const requestedAmount = requiresAmount ? normalizedAmount : invoiceAmount
   const insufficientBalance =
     invoiceReadyForAmount &&
@@ -230,6 +229,11 @@ export function useSendRGBScreenLogic() {
   const amountPlaceholder = requiresAmount ? '0' : invoice.trim() ? t('any_amount') : '0'
   const amountMuted = !displayAmount
   const amountInvalidVisible = requiresAmount && amount.trim().length > 0 && !isAmountValid
+  const amountValidationMessage = !amountInvalidVisible
+    ? ''
+    : !isAmountFormatValid
+      ? t('rgb_amount_precision_invalid', { precision: String(assetPrecision) })
+      : t('enter_amount_greater_than_0')
   const blockingSendMessage =
     blockingSendStatus === 'waiting_ack'
       ? t('rgb_transfer_waiting_ack_description')
@@ -568,6 +572,7 @@ export function useSendRGBScreenLogic() {
     amountPlaceholder,
     amountMuted,
     amountInvalidVisible,
+    amountValidationMessage,
     blockingSendMessage,
     feeRate,
     signRequestVersion,

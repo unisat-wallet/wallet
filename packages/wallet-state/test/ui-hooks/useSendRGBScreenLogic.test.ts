@@ -171,6 +171,32 @@ describe('useSendRGBScreenLogic', () => {
     )
   })
 
+  it('reports an amount that exceeds the RGB token precision', async () => {
+    const assetId = 'rgb:test-asset'
+    const invoice = 'rgb:test-asset/~/~/bc:utxob:test?endpoints=rpc://proxy'
+    const { wrapper } = createHookTestHarness({
+      routeState: {
+        assetId,
+        tokenBalance: { assetId, ticker: 'RGB', precision: 1, spendable: '150' },
+      },
+    })
+    const { result, unmount } = renderHook(() => useSendRGBScreenLogic(), { wrapper })
+
+    await act(async () => {
+      await Promise.resolve()
+    })
+
+    act(() => {
+      result.current.onInvoiceChange(invoice)
+      result.current.onAmountChange('1.01')
+    })
+
+    expect(result.current.isAmountValid).toBe(false)
+    expect(result.current.amountValidationMessage).toBe('rgb_amount_precision_invalid')
+
+    unmount()
+  })
+
   it('disables Next when an RGB invoice amount exceeds the spendable balance', async () => {
     const assetId = 'rgb:test-asset'
     const fixedAmountInvoice = JSON.stringify({
