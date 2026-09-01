@@ -31,6 +31,12 @@ const feeIconStyle = {
   justifyContent: 'center'
 };
 
+const accountInfoCardStyle = {
+  borderRadius: 10,
+  padding: '14px 16px',
+  boxSizing: 'border-box' as const
+};
+
 const statusPillStyle = (available: boolean, pending: boolean) => ({
   height: 20,
   padding: '0 6px',
@@ -107,27 +113,39 @@ export default function RgbFeePoolInspectionScreen() {
     <Layout>
       <Header onBack={() => window.history.go(-1)} title={t('rgb_fee_pool_title')} />
       <Content>
-        <Card
-          style={{ borderRadius: 10, cursor: inspection ? 'pointer' : 'default' }}
-          onClick={() => inspection && nav.navToExplorerAddress(inspection.address)}>
-          <Column fullX gap="sm">
-            <Row full justifyBetween>
-              <Text text={t('address')} preset="bold" size="sm" />
-              <Row itemsCenter gap="xs">
-                <Text text={t('view_all')} color="textDim" size="xs" />
-                <Icon icon="right" color="textDim" size={14} />
+        <Card style={accountInfoCardStyle}>
+          <Column fullX gap="md">
+            <Text text={t('rgb_fee_pool_title')} preset="bold" size="sm" />
+            <Column fullX gap="xs">
+              <Text text={t('address')} color="textDim" size="xs" />
+              <Row
+                fullX
+                itemsCenter
+                gap="sm"
+                style={{ cursor: inspection ? 'pointer' : 'default', minWidth: 0 }}
+                onClick={() => inspection && nav.navToExplorerAddress(inspection.address)}>
+                <Text
+                  text={inspection?.address || '—'}
+                  selectText
+                  color="white"
+                  size="xs"
+                  ellipsis
+                  style={{ flex: 1, minWidth: 0 }}
+                />
+                {inspection ? <Icon icon="right" color="textDim" size={14} /> : null}
               </Row>
-            </Row>
-            <Text text={inspection ? shortValue(inspection.address) : '—'} selectText color="textDim" size="xs" />
-            {inspection ? (
+            </Column>
+            <Column fullX gap="xs">
+              <Text text={t('derivation_path')} color="textDim" size="xs" />
               <Text
-                text={`${inspection.availableCount}/${inspection.targetCount} ${t(
-                  'available'
-                )} · ≥ ${inspection.minimumSatoshis.toLocaleString()} sats`}
-                color={inspection.ready ? 'success' : 'gold'}
+                text={inspection?.derivationPath || '—'}
+                selectText
+                color="white"
                 size="xs"
+                ellipsis
+                style={{ minWidth: 0 }}
               />
-            ) : null}
+            </Column>
           </Column>
         </Card>
 

@@ -792,6 +792,7 @@ export interface WalletController {
     targetCount: number
     minimumSatoshis: number
     address: string
+    derivationPath: string
     utxos: Array<{
       txid: string
       vout: number

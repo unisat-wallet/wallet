@@ -3755,6 +3755,7 @@ export class WalletController extends BaseController {
     const availableCount = utxos.filter(utxo => utxo.available).length
     return {
       address: feeAccount.address,
+      derivationPath: feeAccount.derivationPath,
       minimumSatoshis,
       availableCount,
       targetCount: RGB_FEE_POOL_TARGET_UTXOS,
