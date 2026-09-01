@@ -37,6 +37,12 @@ function transferDateKey(timestamp?: number) {
 }
 
 function getCounterpartyLine(item: RgbTransferItem, t: (key: string) => string) {
+  if (
+    item.type === 'receive' &&
+    ['canceled', 'cancelled'].includes(item.status.toLowerCase())
+  ) {
+    return '';
+  }
   if (item.type === 'receive') {
     const address = item.from?.trim();
     return `${t('from')} ${address ? shortAddress(address) : '--'}`;
@@ -140,8 +146,11 @@ export function RGBTransfersList({ transfers }: RGBTransfersListProps) {
           const pending = isPending(item.status);
           const assetLabel = getTransferAssetLabel(item);
           const isReceive = item.type === 'receive';
+          const isCanceledReceive =
+            isReceive && ['canceled', 'cancelled'].includes(item.status.toLowerCase());
           const amountColor = isReceive ? 'rgba(124, 219, 152, 0.85)' : 'rgba(255, 255, 255, 0.85)';
           const sign = item.type === 'issue' ? '' : isReceive ? '+' : '-';
+          const counterpartyLine = getCounterpartyLine(item, t);
           return (
             <Column fullX gap="zero">
               {showDate ? <Text text={date} color="textDim" size="sm" style={{ paddingTop: 12, paddingBottom: 4 }} /> : null}
@@ -184,19 +193,21 @@ export function RGBTransfersList({ transfers }: RGBTransfersListProps) {
                         </Row>
                       ) : null}
                     </Row>
-                    <Text text={getCounterpartyLine(item, t)} preset="sub" />
+                    {counterpartyLine ? <Text text={counterpartyLine} preset="sub" /> : null}
                   </Column>
                 </Row>
-                <Column itemsEnd gap="zero">
-                  <Row gap="sm" itemsCenter justifyEnd>
-                    {sign ? <Text text={sign} style={{ fontSize: 14, lineHeight: '20px', color: amountColor }} /> : null}
-                    <Text
-                      text={item.amount ? toRgbDisplayAmount(item.amount, getRgbTokenPrecision(item)) : '--'}
-                      style={{ fontSize: 14, lineHeight: '20px', color: amountColor }}
-                    />
-                    <Text text={assetLabel} style={{ fontSize: 14, lineHeight: '20px', color: amountColor }} />
-                  </Row>
-                </Column>
+                {!isCanceledReceive ? (
+                  <Column itemsEnd gap="zero">
+                    <Row gap="sm" itemsCenter justifyEnd>
+                      {sign ? <Text text={sign} style={{ fontSize: 14, lineHeight: '20px', color: amountColor }} /> : null}
+                      <Text
+                        text={item.amount ? toRgbDisplayAmount(item.amount, getRgbTokenPrecision(item)) : '--'}
+                        style={{ fontSize: 14, lineHeight: '20px', color: amountColor }}
+                      />
+                      <Text text={assetLabel} style={{ fontSize: 14, lineHeight: '20px', color: amountColor }} />
+                    </Row>
+                  </Column>
+                ) : null}
               </Row>
             </Column>
           );
