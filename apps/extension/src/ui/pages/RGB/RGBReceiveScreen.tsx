@@ -242,7 +242,6 @@ export default function RGBReceiveScreen() {
   } = useRGBReceiveScreenLogic();
   const assetDisplayTicker = assetId ? assetTicker : t('any_rgb_asset');
   const assetDisplayName = assetId ? getRgbAssetName(selectedRgbItem) || assetTicker : t('any_rgb_asset');
-  const invoiceAwaitingConfirmation = isRgbPendingInvoiceAwaitingConfirmation(selectedPendingInvoice);
 
   const getRgbPendingAmountTagText = (amount?: number | string, precision = 0) => {
     if (amount === undefined || amount === null || amount === '' || String(amount) === '0') {
@@ -563,16 +562,16 @@ export default function RGBReceiveScreen() {
             {awaitingAcceptance ? (
               <Text text={t('rgb_status_pending_accept')} color="gold" size="xs" />
             ) : awaitingConfirmation ? (
-              <Text text={`${t('unavailable')} - ${t('transaction_unconfirmed')}`} color="gold" size="xs" />
+              <Text text={t('transaction_unconfirmed')} color="gold" size="xs" />
             ) : null}
           </Column>
         </Row>
 
         <div
-          style={{ ...pendingCopyButtonStyle, opacity: awaitingConfirmation || awaitingAcceptance ? 0.45 : 1 }}
+          style={{ ...pendingCopyButtonStyle, opacity: awaitingAcceptance ? 0.45 : 1 }}
           onClick={(e) => {
             e.stopPropagation();
-            if (!awaitingConfirmation && !awaitingAcceptance) onCopyPendingInvoice(item);
+            if (!awaitingAcceptance) onCopyPendingInvoice(item);
           }}
         >
           <Icon icon="copy" color="white_muted" size={14} />
@@ -682,13 +681,10 @@ export default function RGBReceiveScreen() {
             <ReceiveQRCodeCard
               title={renderInvoiceTitle()}
               description={
-                invoiceAwaitingConfirmation
-                  ? `${t('unavailable')}: ${t('tx_sent_desc')}`
-                  : t('use_this_invoice_to_receive', { ticker: assetDisplayTicker })
+                t('use_this_invoice_to_receive', { ticker: assetDisplayTicker })
               }
               value={invoice}
               valueLabel={t('receiving_invoice')}
-              copyDisabled={invoiceAwaitingConfirmation}
               qrCenter={
                 <div
                   style={{
