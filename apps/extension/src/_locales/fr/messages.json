@@ -3114,7 +3114,7 @@
     "message": "L’actif de la facture ne correspond pas à ce token RGB."
   },
   "pending_invoices": {
-    "message": "Factures en attente"
+    "message": "Factures"
   },
   "view_all": {
     "message": "Tout voir"

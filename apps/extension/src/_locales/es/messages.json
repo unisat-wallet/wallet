@@ -3105,7 +3105,7 @@
     "message": "El activo de la factura no coincide con este token RGB."
   },
   "pending_invoices": {
-    "message": "Facturas pendientes"
+    "message": "Facturas"
   },
   "view_all": {
     "message": "Ver todo"

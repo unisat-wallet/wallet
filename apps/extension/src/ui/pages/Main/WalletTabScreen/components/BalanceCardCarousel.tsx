@@ -249,7 +249,7 @@ function RGBUsdtBalanceCard({
             }}>
             <Row itemsCenter gap="zero">
               <Text
-                text={t('pending_rgb_invoices')}
+                text={t('pending_invoices')}
                 style={{ color: 'rgba(0,0,0,0.65)', fontSize: 13, fontWeight: 600 }}
               />
               <Text

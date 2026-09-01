@@ -3120,7 +3120,7 @@
     "message": "Invoice asset does not match this RGB token."
   },
   "pending_invoices": {
-    "message": "Pending Invoices"
+    "message": "Invoices"
   },
   "view_all": {
     "message": "View All"

@@ -3114,7 +3114,7 @@
     "message": "インボイスの資産がこの RGB トークンと一致しません。"
   },
   "pending_invoices": {
-    "message": "保留中のインボイス"
+    "message": "インボイス"
   },
   "view_all": {
     "message": "すべて表示"

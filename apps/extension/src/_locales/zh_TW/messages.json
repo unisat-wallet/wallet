@@ -3117,7 +3117,7 @@
     "message": "發票資產與此 RGB 代幣不符。"
   },
   "pending_invoices": {
-    "message": "待處理發票"
+    "message": "發票"
   },
   "view_all": {
     "message": "查看全部"
