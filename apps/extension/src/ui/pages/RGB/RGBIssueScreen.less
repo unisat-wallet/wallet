@@ -176,22 +176,27 @@
 
 .rgb-issue-review-modal-row {
   display: flex;
-  align-items: flex-end;
+  align-items: flex-start;
   justify-content: space-between;
   gap: 16px;
 }
 
 .rgb-issue-review-modal-row > span {
+  flex-shrink: 0;
   color: rgba(255, 255, 255, 0.6);
   font-size: 14px;
   line-height: 22px;
 }
 
 .rgb-issue-review-modal-row > strong {
+  min-width: 0;
+  flex: 1;
   color: #fff;
   font-size: 14px;
   font-weight: 500;
   text-align: right;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .rgb-issue-review-cancel-button,
