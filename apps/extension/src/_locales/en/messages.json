@@ -3053,6 +3053,12 @@
   "rgb_fee_pool_title": {
     "message": "RGB Fee Pool"
   },
+  "rgb_fee_address": {
+    "message": "RGB Fee Address"
+  },
+  "rgb_fee_pool_locked": {
+    "message": "Locked"
+  },
   "rgb_fee_pool_withdraw": {
     "message": "Withdraw to BTC wallet"
   },

@@ -2993,6 +2993,12 @@
   "rgb_fee_pool_title": {
     "message": "RGB 手数料プール"
   },
+  "rgb_fee_address": {
+    "message": "RGB 手数料アドレス"
+  },
+  "rgb_fee_pool_locked": {
+    "message": "ロック済み"
+  },
   "rgb_fee_pool_withdraw": {
     "message": "BTC ウォレットへ引き出す"
   },

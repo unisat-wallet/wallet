@@ -2993,6 +2993,12 @@
   "rgb_fee_pool_title": {
     "message": "Pool de frais RGB"
   },
+  "rgb_fee_address": {
+    "message": "Adresse des frais RGB"
+  },
+  "rgb_fee_pool_locked": {
+    "message": "Verrouillé"
+  },
   "rgb_fee_pool_withdraw": {
     "message": "Retirer vers le portefeuille BTC"
   },

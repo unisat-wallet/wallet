@@ -20,31 +20,26 @@ const feeUtxoCardStyle = {
   cursor: 'pointer'
 };
 
-const feeIconStyle = {
-  width: 36,
-  height: 36,
-  minWidth: 36,
-  borderRadius: 8,
-  background: 'rgba(255,255,255,0.10)',
-  display: 'flex',
-  alignItems: 'center',
-  justifyContent: 'center'
-};
-
 const accountInfoCardStyle = {
   borderRadius: 10,
   padding: '14px 16px',
   boxSizing: 'border-box' as const
 };
 
-const statusPillStyle = (available: boolean, pending: boolean) => ({
+const statusPillStyle = (available: boolean, pending: boolean, locked: boolean) => ({
   height: 20,
   padding: '0 6px',
   borderRadius: 3,
   display: 'inline-flex',
   alignItems: 'center',
   boxSizing: 'border-box' as const,
-  background: pending ? 'rgba(244,182,44,0.18)' : available ? 'rgba(123,224,152,0.16)' : 'rgba(255,255,255,0.10)'
+  background: locked
+    ? 'rgba(255,255,255,0.10)'
+    : pending
+    ? 'rgba(244,182,44,0.18)'
+    : available
+    ? 'rgba(123,224,152,0.16)'
+    : 'rgba(255,255,255,0.10)'
 });
 
 export default function RgbFeePoolInspectionScreen() {
@@ -111,11 +106,11 @@ export default function RgbFeePoolInspectionScreen() {
 
   return (
     <Layout>
-      <Header onBack={() => window.history.go(-1)} title={t('rgb_fee_pool_title')} />
+      <Header onBack={() => window.history.go(-1)} title={t('rgb_fee_address')} />
       <Content>
         <Card style={accountInfoCardStyle}>
           <Column fullX gap="md">
-            <Text text={t('rgb_fee_pool_title')} preset="bold" size="sm" />
+            <Text text={t('rgb_fee_address')} preset="bold" size="sm" />
             <Column fullX gap="xs">
               <Text text={t('address')} color="textDim" size="xs" />
               <Row
@@ -150,8 +145,8 @@ export default function RgbFeePoolInspectionScreen() {
         </Card>
 
         {inspection?.utxos.map((utxo) => {
-          const status = utxo.pending ? t('pending') : utxo.available ? t('available') : t('unavailable');
-          const statusColor = utxo.pending ? 'gold' : utxo.available ? 'success' : 'textDim';
+          const status = utxo.locked ? t('rgb_fee_pool_locked') : utxo.pending ? t('pending') : t('available');
+          const statusColor = utxo.locked ? 'textDim' : utxo.pending ? 'gold' : 'success';
           return (
             <Row
               key={`${utxo.txid}:${utxo.vout}`}
@@ -159,20 +154,23 @@ export default function RgbFeePoolInspectionScreen() {
               gap="md"
               style={feeUtxoCardStyle}
               onClick={() => nav.navToExplorerTx(utxo.txid)}>
-              <div style={feeIconStyle}>
-                <Icon icon="btc" color={utxo.pending ? 'gold' : 'white_muted'} size={20} />
-              </div>
+              <Icon icon="btc" color={utxo.locked ? 'textDim' : utxo.pending ? 'gold' : 'success'} size={32} />
               <Column fullX gap="xs" style={{ minWidth: 0 }}>
                 <Row full justifyBetween itemsCenter gap="sm">
-                  <Text text={`Fee UTXO #${utxo.vout}`} color="white" preset="bold" size="sm" />
+                  <Text
+                    text={`${shortValue(utxo.txid)}:${utxo.vout}`}
+                    color="white"
+                    preset="bold"
+                    size="sm"
+                    style={{ flex: 1, minWidth: 0 }}
+                  />
                   <Row itemsCenter gap="sm">
-                    <div style={statusPillStyle(utxo.available, utxo.pending)}>
+                    <div style={statusPillStyle(utxo.available, utxo.pending, utxo.locked)}>
                       <Text text={status} color={statusColor} size="xxs" />
                     </div>
                     <Icon icon="right" color="textDim" size={14} />
                   </Row>
                 </Row>
-                <Text text={`${shortValue(utxo.txid)}:${utxo.vout}`} selectText color="textDim" size="xs" />
                 <Text text={`${utxo.satoshis.toLocaleString()} sats`} color="textDim" size="xs" />
               </Column>
             </Row>

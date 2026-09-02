@@ -3742,14 +3742,15 @@ export class WalletController extends BaseController {
         })
       }
     })
-    // Keep fee-pool outputs at the configured pool unit. RGB PSBT building
-    // combines multiple pool UTXOs when a higher relay-safe fee is required.
+    // The pool unit is only the recommended size for newly created outputs.
+    // RGB PSBT building combines fee UTXOs, so every unlocked output remains
+    // eligible even when it is smaller than the recommended unit.
     const minimumSatoshis = RGB_FEE_POOL_UTXO_SATS
     const utxos = [...all.entries()]
       .map(([key, utxo]) => ({
         ...utxo,
         locked: locked.has(key),
-        available: !locked.has(key) && utxo.satoshis >= minimumSatoshis,
+        available: !locked.has(key),
       }))
       .sort((a, b) => a.txid.localeCompare(b.txid) || a.vout - b.vout)
     const availableCount = utxos.filter(utxo => utxo.available).length

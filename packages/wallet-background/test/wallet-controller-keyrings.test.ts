@@ -227,6 +227,50 @@ describe('planRgbFeePoolTopUp', () => {
   })
 })
 
+describe('RGB fee-pool inspection', () => {
+  it('keeps every unlocked Fee Pool UTXO eligible regardless of its individual value', async () => {
+    const wallet = new WalletController()
+    const service = {
+      getPendingTransfers: vi.fn(() => [
+        { prepared: { feeOutpoints: [{ txid: 'b'.repeat(64), vout: 1 }] } },
+      ]),
+      getPendingFeePoolUtxos: vi.fn(() => [
+        {
+          outpoint: { txid: 'c'.repeat(64), vout: 2 },
+          satoshis: 500,
+          scriptPubKey: '5120' + '33'.repeat(32),
+          publicKey: validCompressedPubkey,
+          createdAt: 1,
+        },
+      ]),
+    }
+    vi.spyOn(wallet as any, 'getLocalRgbService').mockResolvedValue({
+      service,
+      wallet: { fundingAddress: 'bc1p-rgb-funding', network: 'mainnet' },
+    })
+    vi.spyOn(wallet as any, 'getCurrentRgbFeeAccount').mockResolvedValue({
+      address: 'bc1p-rgb-fee',
+      derivationPath: "m/86'/0'/0'/1/0",
+    })
+    vi.mocked(walletApiService.bitcoin.getBTCUtxos).mockResolvedValue([
+      { txid: 'a'.repeat(64), vout: 0, satoshis: 1_000 },
+      { txid: 'b'.repeat(64), vout: 1, satoshis: 5_000 },
+    ] as any)
+
+    const inspection = await wallet.getRgbFeePoolInspection()
+
+    expect(inspection.ready).toBe(true)
+    expect(inspection.availableCount).toBe(2)
+    expect(inspection.utxos).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ txid: 'a'.repeat(64), vout: 0, available: true, locked: false }),
+        expect.objectContaining({ txid: 'b'.repeat(64), vout: 1, available: false, locked: true }),
+        expect.objectContaining({ txid: 'c'.repeat(64), vout: 2, available: true, pending: true }),
+      ])
+    )
+  })
+})
+
 describe('RGB wallet references', () => {
   it('shares one local RGB service initialization for concurrent first requests', async () => {
     const wallet = new WalletController()

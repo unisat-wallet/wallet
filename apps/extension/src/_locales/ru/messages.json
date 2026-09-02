@@ -2993,6 +2993,12 @@
   "rgb_fee_pool_title": {
     "message": "Пул комиссий RGB"
   },
+  "rgb_fee_address": {
+    "message": "Адрес комиссии RGB"
+  },
+  "rgb_fee_pool_locked": {
+    "message": "Заблокировано"
+  },
   "rgb_fee_pool_withdraw": {
     "message": "Вывести в BTC-кошелёк"
   },
