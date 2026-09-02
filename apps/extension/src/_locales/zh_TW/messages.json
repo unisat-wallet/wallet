@@ -1874,6 +1874,9 @@
   "recommended": {
     "message": "建議值"
   },
+  "utxo": {
+    "message": "UTXO"
+  },
   "recommended_fee_rates": {
     "message": "建議手續費率："
   },
@@ -1885,6 +1888,9 @@
   },
   "reject": {
     "message": "拒絕"
+  },
+  "rejected": {
+    "message": "已拒絕"
   },
   "reject_all": {
     "message": "全部拒絕"

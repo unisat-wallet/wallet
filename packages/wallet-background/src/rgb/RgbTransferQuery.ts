@@ -282,7 +282,19 @@ export class RgbTransferQuery {
     }
     const includeLocalTransfers = currentPage === 1
     const visibleLocalSends = includeLocalTransfers ? localSends : []
-    const visibleLocalReceiveHistory = includeLocalTransfers ? localReceiveHistory : []
+    // A previously persisted local NACK must not hide a transaction the
+    // indexer has since confirmed. This heals historical records produced by
+    // older recovery flows while the service keeps a one-way settled state for
+    // all new records.
+    const visibleLocalReceiveHistory = includeLocalTransfers
+      ? localReceiveHistory.map(receive =>
+          receive.status === 'rejected' &&
+          receive.txid &&
+          confirmedActivityTxids.has(receive.txid)
+            ? { ...receive, status: 'settled', local: false }
+            : receive
+        )
+      : []
     const visibleLocalReceives = includeLocalTransfers ? localReceives : []
     const visibleLocalHistory = includeLocalTransfers ? visibleLocalSendHistory : []
     const localTxids = new Set(

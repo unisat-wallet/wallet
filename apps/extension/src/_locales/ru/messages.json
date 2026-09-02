@@ -1871,6 +1871,9 @@
   "recommended": {
     "message": "Рекомендуемый"
   },
+  "utxo": {
+    "message": "UTXO"
+  },
   "recommended_fee_rates": {
     "message": "Рекомендуемые ставки комиссии:"
   },
@@ -1882,6 +1885,9 @@
   },
   "reject": {
     "message": "Отклонить"
+  },
+  "rejected": {
+    "message": "Отклонено"
   },
   "reject_all": {
     "message": "Отклонить всё"

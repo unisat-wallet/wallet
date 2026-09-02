@@ -201,6 +201,30 @@ export class RgbService {
     await this.dependencies.storage.set(this.storageKey(state.wallet), persistState(state))
   }
 
+  /**
+   * The recovery backend can explicitly report that this wallet has no
+   * checkpoint (for example after its data was reset). Retain the local RGB
+   * state, but discard the old compare-and-swap baseline and enqueue a fresh
+   * upload once the controller has acquired the writer lease.
+   */
+  async requeueRecoveryCheckpointAfterRemoteReset() {
+    const state = this.requireState()
+    state.recoveryCheckpointUpdatedAt = undefined
+    state.recoveryCheckpointRevision = undefined
+    // A prior client version could classify this exact remote-empty case as
+    // a cross-installation conflict. The authoritative empty response has now
+    // been verified by the controller, so let the re-established checkpoint
+    // clear that stale local fence.
+    state.recoveryConflict = undefined
+    state.recoveryCheckpoint = {
+      ...state.recoveryCheckpoint,
+      dirty: true,
+      verified: false,
+      lastError: 'remote recovery checkpoint was reset',
+    }
+    await this.dependencies.storage.set(this.storageKey(state.wallet), persistState(state))
+  }
+
   async markRecoveryConflict() {
     const state = this.requireState()
     this.recoveryBackupEnabled = false
@@ -754,7 +778,9 @@ export class RgbService {
       try {
         const match = this.validateIncomingConsignment(receive, item)
         if (!match) {
-          await this.acknowledgeProxyConsignment(item, false)
+          await this.rejectInvalidProxyConsignment(receive, item)
+          pending.splice(receiveIndex, 1)
+          changed = true
           continue
         }
         if (receive.rejectedConsignmentTxids?.includes(match.txid)) continue
@@ -865,8 +891,16 @@ export class RgbService {
           changed = true
         }
       } catch (error) {
-        await this.acknowledgeProxyConsignment(item, false)
-        throw error
+        // A malformed or mismatched consignment must not keep an invoice in a
+        // failing polling loop. NACK it when possible; if the proxy already
+        // made its ACK immutable, archive the unusable local receive anyway.
+        try {
+          await this.rejectInvalidProxyConsignment(receive, item)
+        } catch {
+          throw error
+        }
+        pending.splice(receiveIndex, 1)
+        changed = true
       }
     }
     if (changed) {
@@ -1120,7 +1154,10 @@ export class RgbService {
       receive.receivedConsignment?.amount ?? receive.pendingAccept?.amount ?? receive.amount
     const existing = pendingReceiveHistory.find(item => item.transferId === transferId)
     if (existing) {
-      existing.status = status
+      // Settlement is terminal. A delayed proxy poll (especially after local
+      // recovery) must never relabel an already confirmed receive as rejected
+      // or canceled.
+      if (existing.status !== 'settled' || status === 'settled') existing.status = status
       existing.txid = txid || existing.txid
       if (assetId) existing.assetId = assetId
       if (amount) existing.amount = amount
@@ -2104,6 +2141,26 @@ export class RgbService {
       endpoints: [item.endpoint],
       acknowledged,
     })
+  }
+
+  private async rejectInvalidProxyConsignment(
+    receive: import('./types').RgbPendingReceive,
+    item: { recipientId: string; txid?: string; endpoint?: string }
+  ) {
+    try {
+      await this.acknowledgeProxyConsignment(item, false)
+    } catch (error) {
+      // RGB proxy ACKs are immutable. A recovered local state can legitimately
+      // retry a NACK after the proxy has already settled that recipient ID.
+      // This is terminal for the stale/mismatched local receive, not a reason
+      // to surface the same error on every polling interval.
+      if (!String(error).includes('Cannot change ACK')) throw error
+    }
+    this.recordReceiveOutcome(
+      receive,
+      'rejected',
+      item.txid || receive.pendingAccept?.txid || receive.receivedConsignment?.txid || ''
+    )
   }
 
   private runPendingTransferOperation<T>(transferId: string, operation: () => Promise<T>) {

@@ -516,6 +516,70 @@ describe('RgbService', () => {
     expect(service.getPendingAssetMetadata()).toEqual([])
   })
 
+  it('archives an invalid receive when the proxy ACK is already immutable', async () => {
+    const dependencies = createDependencies()
+    dependencies.transport.getConsignment = vi.fn().mockResolvedValue({
+      recipientId: 'recipient',
+      payload: 'invalid-consignment',
+      txid: 'c'.repeat(64),
+      endpoint: proxyEndpoint,
+    })
+    dependencies.transport.acknowledgeConsignment = vi
+      .fn()
+      .mockRejectedValue(new Error('RGB proxy ack.post failed: Cannot change ACK'))
+    const service = new RgbService(dependencies)
+    await service.open(wallet)
+    ;(service as any).state.pendingReceives = [
+      {
+        invoice: rgbInvoice(),
+        recipientId: 'recipient',
+        createdAt: 1,
+        seal: { txid: 'a'.repeat(64), vout: 0, blinding: 1n },
+      },
+    ]
+    ;(service as any).validateIncomingConsignment = vi.fn().mockReturnValue(undefined)
+
+    await expect(service.processClaimedReceives({ includeClaimed: false })).resolves.toMatchObject({
+      received: 0,
+    })
+
+    expect(service.getPendingReceives()).toEqual([])
+    expect(service.getPendingReceiveHistory()).toEqual([
+      expect.objectContaining({ status: 'rejected', txid: 'c'.repeat(64) }),
+    ])
+  })
+
+  it('does not downgrade a settled receive history record during a later proxy poll', () => {
+    const dependencies = createDependencies()
+    const service = new RgbService(dependencies)
+    ;(service as any).state = {
+      version: 1,
+      wallet,
+      snapshot: { syncedAt: 0, utxos: [] },
+      pending: {},
+      pendingReceiveHistory: [
+        {
+          transferId: 'receive:recipient',
+          assetId: 'rgb:asset',
+          amount: '60',
+          txid: 'c'.repeat(64),
+          createdAt: 1,
+          status: 'settled',
+        },
+      ],
+    }
+
+    ;(service as any).recordReceiveOutcome(
+      { recipientId: 'recipient', createdAt: 1 },
+      'rejected',
+      'c'.repeat(64)
+    )
+
+    expect(service.getPendingReceiveHistory()).toEqual([
+      expect.objectContaining({ status: 'settled' }),
+    ])
+  })
+
   it('coalesces concurrent snapshot synchronizations', async () => {
     const dependencies = createDependencies()
     let releaseSnapshot: (() => void) | undefined

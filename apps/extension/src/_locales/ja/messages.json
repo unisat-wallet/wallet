@@ -1871,6 +1871,9 @@
   "recommended": {
     "message": "推奨"
   },
+  "utxo": {
+    "message": "UTXO"
+  },
   "recommended_fee_rates": {
     "message": "推奨手数料率:"
   },
@@ -1882,6 +1885,9 @@
   },
   "reject": {
     "message": "拒否"
+  },
+  "rejected": {
+    "message": "拒否済み"
   },
   "reject_all": {
     "message": "すべて拒否"

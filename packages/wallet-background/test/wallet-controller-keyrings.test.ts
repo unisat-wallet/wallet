@@ -370,6 +370,42 @@ describe('RGB wallet references', () => {
     expect(service.setRecoveryCheckpointRevision).toHaveBeenCalledWith('b'.repeat(24))
   })
 
+  it('requeues verified local RGB state when the recovery backend is explicitly empty', async () => {
+    const wallet = new WalletController()
+    const walletRef = {
+      walletId: 'rgb-wallet',
+      network: 'mainnet',
+      fundingAddress: 'bc1p-rgb-funding',
+    }
+    const service = {
+      needsRecoveryRestore: vi.fn(() => false),
+      getRecoveryCheckpointRevision: vi.fn(() => 'a'.repeat(24)),
+      canFastForwardRecoveryState: vi.fn(() => false),
+      matchesRecoveryState: vi.fn(),
+      markRecoveryConflict: vi.fn(),
+      requeueRecoveryCheckpointAfterRemoteReset: vi.fn(),
+      setRecoveryCheckpointVersion: vi.fn(),
+      setRecoveryCheckpointRevision: vi.fn(),
+      enableRecoveryBackup: vi.fn(),
+      getRecoveryCheckpointStatus: vi.fn(() => ({ dirty: true, verified: false })),
+      retryRecoveryCheckpoint: vi.fn(),
+    }
+    ;(walletApiService as any).rgb = {
+      getRgbRecoveryCheckpoint: vi.fn().mockResolvedValue({}),
+    }
+    const ensureLease = vi.spyOn(wallet as any, 'ensureRgbWriteLease').mockResolvedValue(undefined)
+
+    await (wallet as any).restoreRgbRecoveryIfNeeded({ service, wallet: walletRef })
+
+    expect(ensureLease).toHaveBeenCalledWith({ service, wallet: walletRef }, {
+      forceRenew: true,
+      ignoreCheckpointRevision: true,
+    })
+    expect(service.requeueRecoveryCheckpointAfterRemoteReset).toHaveBeenCalledTimes(1)
+    expect(service.markRecoveryConflict).not.toHaveBeenCalled()
+    expect(service.retryRecoveryCheckpoint).toHaveBeenCalledTimes(1)
+  })
+
   it('does not expose local blind-seal bigint values through wallet responses', () => {
     const result = toPublicRgbPendingReceiveInvoice(
       {
@@ -1184,6 +1220,45 @@ describe('RGB wallet references', () => {
 
     resolveAcquire?.({ leaseId: 'a'.repeat(24), fencingToken: 1, expiresAt: Date.now() + 60_000 })
     await expect(Promise.all([first, second])).resolves.toEqual([undefined, undefined])
+  })
+
+  it('reacquires a missing server lease after recovery data was reset', async () => {
+    const wallet = new WalletController()
+    const walletRef = { walletId: 'wallet-1', fundingAddress: 'bc1p-rgb-funding', network: 'mainnet' }
+    const service = {
+      getRecoveryCheckpointRevision: vi.fn(() => 'a'.repeat(24)),
+      requeueRecoveryCheckpointAfterRemoteReset: vi.fn(),
+    }
+    const context = { service, wallet: walletRef }
+    const renewRgbWriteLease = vi
+      .fn()
+      .mockRejectedValue(new Error('RGB write lease is unavailable'))
+    const getRgbRecoveryCheckpoint = vi.fn().mockResolvedValue({})
+    const acquireRgbWriteLease = vi.fn().mockResolvedValue({
+      leaseId: 'b'.repeat(24),
+      fencingToken: 2,
+      expiresAt: Date.now() + 60_000,
+    })
+    ;(walletApiService as any).rgb = {
+      renewRgbWriteLease,
+      getRgbRecoveryCheckpoint,
+      acquireRgbWriteLease,
+    }
+    vi.spyOn(wallet as any, 'getRgbDeviceId').mockResolvedValue('device_abcdefghijklmnop')
+    ;(wallet as any).rgbWriteLeases.set('mainnet:bc1p-rgb-funding', {
+      deviceId: 'device_abcdefghijklmnop',
+      leaseId: 'a'.repeat(24),
+      fencingToken: 1,
+      expiresAt: Date.now() + 60_000,
+    })
+
+    await expect((wallet as any).ensureRgbWriteLease(context, { forceRenew: true })).resolves.toBeUndefined()
+
+    expect(service.requeueRecoveryCheckpointAfterRemoteReset).toHaveBeenCalledTimes(1)
+    expect(acquireRgbWriteLease).toHaveBeenCalledWith({
+      wallet: walletRef,
+      deviceId: 'device_abcdefghijklmnop',
+    })
   })
 
   it('retries a durable received-allocation UTXO replacement after a backend failure', async () => {

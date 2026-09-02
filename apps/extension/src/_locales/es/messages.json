@@ -1871,6 +1871,9 @@
   "recommended": {
     "message": "Recomendado"
   },
+  "utxo": {
+    "message": "UTXO"
+  },
   "recommended_fee_rates": {
     "message": "Tasas de tarifa recomendadas:"
   },
@@ -1882,6 +1885,9 @@
   },
   "reject": {
     "message": "Rechazar"
+  },
+  "rejected": {
+    "message": "Rechazado"
   },
   "reject_all": {
     "message": "Rechazar Todo"

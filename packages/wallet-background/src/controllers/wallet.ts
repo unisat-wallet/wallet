@@ -4281,6 +4281,24 @@ export class WalletController extends BaseController {
         const needsRestore = service.needsRecoveryRestore?.()
         const localRevision = service.getRecoveryCheckpointRevision()
         const revisionChanged = localRevision !== checkpoint.revision
+        const remoteCheckpointMissing =
+          !checkpoint.payload && checkpoint.updatedAt === undefined && checkpoint.revision === undefined
+        if (!needsRestore && revisionChanged && remoteCheckpointMissing && localRevision !== undefined) {
+          // An explicitly empty remote response is not a newer checkpoint. It
+          // can occur when recovery data was reset server-side. Re-establish
+          // the backup from the complete local state, but only after holding
+          // the writer lease so a concurrently active installation is never
+          // overwritten.
+          await this.ensureRgbWriteLease(context, {
+            forceRenew: true,
+            ignoreCheckpointRevision: true,
+          })
+          this.rgbRecoveryVersions.delete(key)
+          await service.requeueRecoveryCheckpointAfterRemoteReset()
+          log.warn('RGB recovery: remote checkpoint was empty; re-queuing local state', {
+            wallet: rgbRecoveryWalletTag(wallet),
+          })
+        }
         const shouldFastForward =
           !needsRestore &&
           revisionChanged &&
@@ -4295,7 +4313,12 @@ export class WalletController extends BaseController {
           )
           return decryptedCheckpoint
         }
-        if (!needsRestore && revisionChanged && !shouldFastForward) {
+        if (
+          !needsRestore &&
+          revisionChanged &&
+          !shouldFastForward &&
+          !remoteCheckpointMissing
+        ) {
           const matchesRemoteCheckpoint =
             Boolean(checkpoint.payload) &&
             service.matchesRecoveryState?.(await decryptCheckpoint()) === true
@@ -4604,7 +4627,7 @@ export class WalletController extends BaseController {
   /** Acquire/refresh the server-enforced single-writer lease before preparing a send. */
   private async ensureRgbWriteLease(
     context: LocalRgbServiceContext,
-    options: { takeover?: boolean; forceRenew?: boolean } = {}
+    options: { takeover?: boolean; forceRenew?: boolean; ignoreCheckpointRevision?: boolean } = {}
   ): Promise<void> {
     const key = this.rgbWriteLeaseKey(context.wallet)
     const existing = this.rgbWriteLeases.get(key)
@@ -4628,27 +4651,54 @@ export class WalletController extends BaseController {
 
   private async ensureRgbWriteLeaseOnce(
     context: LocalRgbServiceContext,
-    options: { takeover?: boolean; forceRenew?: boolean }
+    options: { takeover?: boolean; forceRenew?: boolean; ignoreCheckpointRevision?: boolean }
   ): Promise<void> {
     const key = this.rgbWriteLeaseKey(context.wallet)
     const existing = this.rgbWriteLeases.get(key)
     const deviceId = await this.getRgbDeviceId()
+    let ignoreCheckpointRevision = options.ignoreCheckpointRevision === true
     if (existing && existing.expiresAt > Date.now()) {
-      const renewed = await getRgbApiService().renewRgbWriteLease({
-        wallet: context.wallet,
-        deviceId: existing.deviceId,
-        leaseId: existing.leaseId,
-        fencingToken: existing.fencingToken,
-      })
-      this.rgbWriteLeases.set(key, { deviceId: existing.deviceId, ...renewed })
-      return
+      try {
+        const renewed = await getRgbApiService().renewRgbWriteLease({
+          wallet: context.wallet,
+          deviceId: existing.deviceId,
+          leaseId: existing.leaseId,
+          fencingToken: existing.fencingToken,
+        })
+        this.rgbWriteLeases.set(key, { deviceId: existing.deviceId, ...renewed })
+        return
+      } catch (error) {
+        if (!String(error).includes('RGB write lease is unavailable')) throw error
+        // A recovery-data reset can remove the server lease while this
+        // service worker still has a valid-looking local lease cache. Confirm
+        // that the checkpoint is also absent before replacing both bases.
+        this.rgbWriteLeases.delete(key)
+        try {
+          const checkpoint = await getRgbApiService().getRgbRecoveryCheckpoint({
+            wallet: context.wallet,
+          })
+          const remoteCheckpointMissing =
+            !checkpoint.payload && checkpoint.updatedAt === undefined && checkpoint.revision === undefined
+          if (
+            remoteCheckpointMissing &&
+            context.service.getRecoveryCheckpointRevision?.() !== undefined
+          ) {
+            this.rgbRecoveryVersions.delete(key)
+            await context.service.requeueRecoveryCheckpointAfterRemoteReset()
+            ignoreCheckpointRevision = true
+          }
+        } catch {
+          // A lease disappearance alone can result from expiry. Fall through
+          // to a regular acquire when checkpoint inspection is unavailable.
+        }
+      }
     }
     let lease: { leaseId: string; fencingToken: number; expiresAt: number }
     try {
       lease = await getRgbApiService().acquireRgbWriteLease({
         wallet: context.wallet,
         deviceId,
-        ...(context.service.getRecoveryCheckpointRevision?.()
+        ...(!ignoreCheckpointRevision && context.service.getRecoveryCheckpointRevision?.()
           ? { checkpointRevision: context.service.getRecoveryCheckpointRevision?.() }
           : {}),
         ...(options.takeover ? { takeover: true } : {}),
