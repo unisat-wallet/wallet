@@ -549,6 +549,60 @@ describe('RgbService', () => {
     ])
   })
 
+  it('keeps an acknowledged receive pending when local settlement fails', async () => {
+    const dependencies = createDependencies()
+    dependencies.transport.acknowledgeConsignment = vi.fn()
+    dependencies.transport.getConsignment = vi.fn().mockResolvedValue({
+      recipientId: 'recipient',
+      payload: 'consignment',
+      txid: 'c'.repeat(64),
+      endpoint: proxyEndpoint,
+    })
+    const service = new RgbService(dependencies)
+    await service.open(wallet)
+    ;(service as any).state.pendingReceives = [
+      {
+        invoice: rgbInvoice(),
+        recipientId: 'recipient',
+        assetId: 'rgb:asset',
+        amount: '60',
+        createdAt: 1,
+        seal: { txid: 'a'.repeat(64), vout: 0, blinding: 1n },
+        receivedConsignment: {
+          txid: 'c'.repeat(64),
+          receivedAt: 1,
+          accepted: true,
+          payload: 'consignment',
+          endpoint: proxyEndpoint,
+        },
+      },
+    ]
+    ;(service as any).validateIncomingConsignment = vi.fn().mockReturnValue({
+      assetId: 'rgb:asset',
+      amount: '60',
+      txid: 'c'.repeat(64),
+      decoded: {
+        metadata: { ticker: 'TOK', name: 'Token', precision: 0, schema: 'NIA', issuedSupply: '60' },
+      },
+    })
+    vi.spyOn(service as any, 'advanceAcceptedReceive').mockRejectedValue(
+      new RgbServiceError('RGB history has conflicting Transition data')
+    )
+
+    await expect(service.processClaimedReceives({ includeClaimed: false })).resolves.toMatchObject({
+      received: 0,
+    })
+
+    expect(dependencies.transport.acknowledgeConsignment).not.toHaveBeenCalled()
+    expect(service.getPendingReceives()).toEqual([
+      expect.objectContaining({
+        recipientId: 'recipient',
+        receivedConsignment: expect.objectContaining({ accepted: true }),
+      }),
+    ])
+    expect(service.getPendingReceiveHistory()).toEqual([])
+  })
+
   it('does not downgrade a settled receive history record during a later proxy poll', () => {
     const dependencies = createDependencies()
     const service = new RgbService(dependencies)

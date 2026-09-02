@@ -1,12 +1,15 @@
 import { Psbt } from 'bitcoinjs-lib'
 import { describe, expect, it } from 'vitest'
 import {
+  decodeNiaConsignment,
   decodeRgbInvoice,
+  encodeBlindRgbInvoice,
   encodeNiaContract,
   encodeNiaGenesis,
   encodeNiaTransferConsignment,
   mergeNiaConsignmentHistory,
   prepareNiaOpretTransfer,
+  revealNiaConsignmentBlindSeals,
   serializeNiaOpretWitnessBundle,
 } from '../src'
 
@@ -30,9 +33,11 @@ function transfer(input: {
   txid: string
   nonce: bigint
   entropy: bigint
+  invoice?: string
 }) {
   const invoice = decodeRgbInvoice(
-    `rgb:${input.assetId.slice(4)}/schema/~/bc:utxob:xDfmDF9g-yNOjriV-6Anbe6H-MLJ__g6-lo7Dd4f-dhWBW8S-XYGBm?amount=60`
+    input.invoice ||
+      `rgb:${input.assetId.slice(4)}/schema/~/bc:utxob:xDfmDF9g-yNOjriV-6Anbe6H-MLJ__g6-lo7Dd4f-dhWBW8S-XYGBm?amount=60`
   )
   const prepared = prepareNiaOpretTransfer({
     network: 'mainnet',
@@ -204,5 +209,67 @@ describe('mergeNiaConsignmentHistory', () => {
         requiredOpIds: ['ff'.repeat(32)],
       })
     ).toThrow('missing an allocation parent Transition')
+  })
+
+  it('merges equivalent confidential and revealed Transition representations', () => {
+    const genesis = root()
+    const assetId = `rgb:${Buffer.from(genesis.assetId).toString('hex')}`
+    const blindSeal = { txid: 'ee'.repeat(32), vout: 2, blinding: 3n }
+    const first = transfer({
+      assetId,
+      parentOpId: assetId.slice(4),
+      parentAmount: '100',
+      txid: genesisTxid,
+      nonce: 1n,
+      entropy: 2n,
+      invoice: encodeBlindRgbInvoice({
+        network: 'mainnet',
+        assetId,
+        amount: '60',
+        seal: blindSeal,
+      }),
+    })
+    const confidentialPayload = Buffer.from(
+      encodeNiaTransferConsignment({
+        genesis,
+        witnessBundle: first.bundle.strict,
+        terminals: [
+          {
+            bundleId: first.bundle.bundleId,
+            secretSeals: [
+              first.invoice.seal.type === 'confidential'
+                ? first.invoice.seal.secretSeal
+                : new Uint8Array(32),
+            ],
+          },
+        ],
+      })
+    ).toString('base64')
+    const revealed = revealNiaConsignmentBlindSeals(
+      decodeNiaConsignment(Uint8Array.from(Buffer.from(confidentialPayload, 'base64'))),
+      [blindSeal]
+    )
+    const revealedBundle = revealed.witnessBundles[0]
+    if (!revealedBundle) throw new Error('missing revealed witness bundle')
+    const revealedPayload = Buffer.from(
+      encodeNiaTransferConsignment({
+        genesis,
+        witnessBundle: revealedBundle.strict,
+        terminals: [],
+      })
+    ).toString('base64')
+
+    const merged = mergeNiaConsignmentHistory({
+      assetId,
+      consignments: [
+        { opId: first.transitionId, payload: confidentialPayload },
+        { opId: first.transitionId, payload: revealedPayload },
+      ],
+      requiredOpIds: [first.transitionId],
+    })
+
+    expect(merged.transitionIds).toEqual([first.transitionId])
+    expect(merged.witnessBundles).toHaveLength(1)
+    expect(Buffer.from(merged.witnessBundles[0]!)).toEqual(Buffer.from(revealedBundle.strict))
   })
 })

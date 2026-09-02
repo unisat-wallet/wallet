@@ -891,6 +891,13 @@ export class RgbService {
           changed = true
         }
       } catch (error) {
+        if (receive.receivedConsignment?.accepted) {
+          // ACK is immutable once accepted. A local settlement failure (for
+          // example, while merging recovered history) is retriable and must
+          // never turn a successfully acknowledged transfer into a NACK or a
+          // user-visible rejected receive.
+          continue
+        }
         // A malformed or mismatched consignment must not keep an invoice in a
         // failing polling loop. NACK it when possible; if the proxy already
         // made its ACK immutable, archive the unusable local receive anyway.

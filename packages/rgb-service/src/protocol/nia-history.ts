@@ -2,13 +2,15 @@ import { sha256 } from '@noble/hashes/sha256'
 import { RgbServiceError } from '../errors'
 import { normalizeRgbAssetId, rgbContractIdHex } from './contract-id'
 import {
+  reencodeNiaWitnessBundle,
   decodeNiaConsignment,
   revealNiaConsignmentBlindSeals,
   validateNiaConsignmentParentState,
   type DecodedNiaConsignment,
 } from './nia-consignment'
 import type { EncodedNiaGenesis } from './nia-genesis'
-import type { RgbBlindSeal } from './receive'
+import { encodeNiaTransition } from './nia'
+import { concealBlindSeal, type RgbBlindSeal } from './receive'
 
 function hex(value: Uint8Array): string {
   return Buffer.from(value).toString('hex')
@@ -40,7 +42,48 @@ function parsePayload(value: string): DecodedNiaConsignment {
 interface HistoryBundle {
   id: string
   strict: Uint8Array
+  canonicalStrict: Uint8Array
   witnessBundle: DecodedNiaConsignment['witnessBundles'][number]
+}
+
+/**
+ * Transition IDs commit to concealed seals. A history can therefore contain
+ * the same transition once with a blind secret and once with that secret's
+ * revealed txid:vout:blinding form. Compare this canonical concealed form
+ * instead of its transport strict encoding.
+ */
+function canonicalTransitionStrict(
+  transition: DecodedNiaConsignment['transitions'][number]
+): Uint8Array {
+  const encoded = encodeNiaTransition({
+    contractId: transition.contractId,
+    nonce: transition.nonce,
+    inputs: transition.inputs,
+    assignments: transition.assignments.map(assignment => ({
+      ...assignment,
+      // `txid: null` is the relative reference used for a newly-created
+      // witness output. It cannot be a blind invoice seal, so keep that
+      // representation while concealing every concrete outpoint.
+      seal:
+        'secretSeal' in assignment.seal || assignment.seal.txid === null
+          ? assignment.seal
+          : { secretSeal: hex(concealBlindSeal(assignment.seal)) },
+    })),
+  })
+  if (hex(encoded.opId) !== transition.opId) {
+    throw new RgbServiceError('RGB history Transition seal normalization changed its operation ID')
+  }
+  return encoded.strict
+}
+
+function revealedSealCount(transition: DecodedNiaConsignment['transitions'][number]): number {
+  return transition.assignments.filter(assignment => !('secretSeal' in assignment.seal)).length
+}
+
+function bundleRevealedSealCount(
+  bundle: DecodedNiaConsignment['witnessBundles'][number]
+): number {
+  return bundle.transitions.reduce((count, transition) => count + revealedSealCount(transition), 0)
 }
 
 export interface MergedNiaHistory {
@@ -81,23 +124,39 @@ export function mergeNiaConsignmentHistory(input: {
   const bundles = new Map<string, HistoryBundle>()
   for (const consignment of decoded) {
     for (const witnessBundle of consignment.witnessBundles) {
-      const id = hex(sha256(witnessBundle.strict))
+      const canonicalStrict = reencodeNiaWitnessBundle(
+        witnessBundle,
+        witnessBundle.transitions.map(transition => ({
+          ...transition,
+          strict: canonicalTransitionStrict(transition),
+        }))
+      )
+      const id = hex(sha256(canonicalStrict))
       const existing = bundles.get(id)
-      if (existing && !same(existing.strict, witnessBundle.strict))
+      if (existing && !same(existing.canonicalStrict, canonicalStrict))
         throw new RgbServiceError('RGB history has a conflicting WitnessBundle')
-      if (!existing) {
+      if (
+        !existing ||
+        bundleRevealedSealCount(witnessBundle) > bundleRevealedSealCount(existing.witnessBundle)
+      ) {
         bundles.set(id, {
           id,
           strict: witnessBundle.strict,
+          canonicalStrict,
           witnessBundle,
         })
       }
       for (const transition of witnessBundle.transitions) {
         const previous = transitions.get(transition.opId)
-        if (previous && !same(previous.strict, transition.strict)) {
+        if (
+          previous &&
+          !same(canonicalTransitionStrict(previous), canonicalTransitionStrict(transition))
+        ) {
           throw new RgbServiceError('RGB history has conflicting Transition data')
         }
-        transitions.set(transition.opId, transition)
+        if (!previous || revealedSealCount(transition) > revealedSealCount(previous)) {
+          transitions.set(transition.opId, transition)
+        }
       }
     }
   }

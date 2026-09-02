@@ -16,7 +16,7 @@ const NIA_ASSET_OWNER = 4000
 const NIA_TRANSFER = 10000
 const OPRET_PROOF_TAG = 2
 
-type DecodedNiaTransition = {
+export type DecodedNiaTransition = {
   opId: string
   contractId: string
   nonce: bigint
@@ -26,7 +26,7 @@ type DecodedNiaTransition = {
   assignments: NiaFungibleAssignment[]
 }
 
-type DecodedNiaWitnessBundle = {
+export type DecodedNiaWitnessBundle = {
   strict: Uint8Array
   witnessTxStrict: Uint8Array
   proof: Uint8Array
@@ -346,7 +346,13 @@ function readWitnessBundle(reader: StrictReader): DecodedNiaWitnessBundle {
   }
 }
 
-function reencodeWitnessBundle(
+/**
+ * Rebuild a decoded WitnessBundle after replacing an equivalent Transition
+ * representation (for example, a confidential seal with its revealed form).
+ * The MPC commitment is over the Transition operation IDs, so it remains
+ * valid as long as each replacement retains its original operation ID.
+ */
+export function reencodeNiaWitnessBundle(
   bundle: DecodedNiaWitnessBundle,
   transitions: DecodedNiaTransition[]
 ): Uint8Array {
@@ -411,7 +417,7 @@ export function revealNiaConsignmentBlindSeals(
     })
     if (!bundleChanged) return bundle
     changed = true
-    return { ...bundle, transitions, strict: reencodeWitnessBundle(bundle, transitions) }
+    return { ...bundle, transitions, strict: reencodeNiaWitnessBundle(bundle, transitions) }
   })
   return changed
     ? { ...consignment, witnessBundles, transitions: witnessBundles.flatMap(bundle => bundle.transitions) }
