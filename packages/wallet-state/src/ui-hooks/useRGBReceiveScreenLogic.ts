@@ -463,7 +463,11 @@ export function useRGBReceiveScreenLogic() {
     const pendingInvoice = getRecordPayload(value)
     const recipientId = readStringPath(pendingInvoice, ['recipientId'])
     if (recipientId && invoice) {
-      nav.navigate('RGBInvoiceDetailScreen', { recipientId, invoice })
+      nav.navigate('RGBInvoiceDetailScreen', {
+        recipientId,
+        invoice,
+        ...(pendingInvoice ? { initialInvoice: pendingInvoice } : {}),
+      })
       return
     }
     setInvoice(invoice)

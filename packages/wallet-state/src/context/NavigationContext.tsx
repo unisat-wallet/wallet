@@ -200,6 +200,8 @@ export type RouteParamList = {
   RGBInvoiceDetailScreen: {
     recipientId?: string
     invoice?: string
+    /** Newly-created invoice data lets the detail screen render without an immediate refresh. */
+    initialInvoice?: Record<string, unknown>
   }
   RgbInvoiceExpiryScreen: undefined
   RGBTokenScreen: {

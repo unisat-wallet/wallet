@@ -999,6 +999,51 @@ describe('RgbService', () => {
     expect(service.getAvailableReceiveUtxos()).toHaveLength(1)
   })
 
+  it('batches a new invoice and its claim into one recovery checkpoint', async () => {
+    const dependencies = createDependencies()
+    vi.mocked(dependencies.stateSource.getSnapshot).mockResolvedValue({
+      syncedAt: 1,
+      utxos: [
+        {
+          outpoint: { txid: 'f'.repeat(64), vout: 0 },
+          satoshis: 1_000,
+          scriptPubKey: '5120' + '11'.repeat(32),
+          publicKey: '02' + '22'.repeat(32),
+          chainStatus: 'confirmed',
+          confirmations: 1,
+          allocations: [],
+        },
+      ],
+    })
+    dependencies.onStatePersisted = vi.fn()
+    dependencies.stateSource.claimConsignments = vi.fn().mockResolvedValue(1)
+    const service = new RgbService(dependencies)
+    await service.open(wallet)
+    await service.sync()
+    await service.enableRecoveryBackup()
+    ;(service as any).state.recoveryCheckpoint = { dirty: false, verified: true }
+    vi.mocked(dependencies.onStatePersisted).mockClear()
+
+    await expect(
+      service.createBlindReceive({
+        assetId: 'rgb:asset',
+        amount: '1',
+        deferRecoveryCheckpoint: true,
+      })
+    ).resolves.toMatchObject({ assetId: 'rgb:asset' })
+
+    expect(dependencies.onStatePersisted).not.toHaveBeenCalled()
+    await expect(service.claimPendingReceives()).resolves.toEqual({ claimed: 1 })
+    expect(dependencies.onStatePersisted).toHaveBeenCalledTimes(1)
+    expect(dependencies.onStatePersisted).toHaveBeenCalledWith(
+      expect.objectContaining({
+        pendingReceives: [expect.objectContaining({ claimedAt: expect.any(Number) })],
+      }),
+      { reason: 'state_change' }
+    )
+    expect(service.getPendingReceives()).toHaveLength(1)
+  })
+
   it('releases prepared-send allocations when its recovery checkpoint fails', async () => {
     const dependencies = createDependencies()
     dependencies.onStatePersisted = vi.fn().mockRejectedValue(new Error('recovery unavailable'))

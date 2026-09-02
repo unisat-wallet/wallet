@@ -33,6 +33,10 @@ export class RgbReceiveOperations {
       ...(params.assetId === undefined ? {} : { assetId: params.assetId }),
       ...(params.amount === undefined ? {} : { amount: String(params.amount) }),
       ...(params.durationSeconds === undefined ? {} : { durationSeconds: params.durationSeconds }),
+      // The following claim updates this exact pending receive and performs
+      // the durable checkpoint. Avoid uploading the intermediate, unclaimed
+      // invoice state only to upload it again a few milliseconds later.
+      deferRecoveryCheckpoint: true,
     })
     // Persist recipient ownership before a sender uploads the consignment, so a
     // reinstalled wallet can discover it even when the proxy is no longer available.

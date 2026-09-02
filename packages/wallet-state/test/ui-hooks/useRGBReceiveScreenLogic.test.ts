@@ -241,6 +241,7 @@ describe('useRGBReceiveScreenLogic', () => {
     expect(navigation.navigate).toHaveBeenCalledWith('RGBInvoiceDetailScreen', {
       recipientId: 'recipient-id',
       invoice: 'rgb:invoice',
+      initialInvoice: waitingInvoice,
     })
   })
 

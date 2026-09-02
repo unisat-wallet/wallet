@@ -410,7 +410,13 @@ export class RgbService {
     }
   }
 
-  async createBlindReceive(input: { assetId?: string; amount?: string; durationSeconds?: number }) {
+  async createBlindReceive(input: {
+    assetId?: string
+    amount?: string
+    durationSeconds?: number
+    /** The caller will immediately claim the recipient and persist the combined state. */
+    deferRecoveryCheckpoint?: boolean
+  }) {
     const state = this.requireState()
     if (!state.snapshot.syncedAt) await this.sync()
     const assetId = input.assetId ? normalizeAssetId(input.assetId) : undefined
@@ -462,7 +468,9 @@ export class RgbService {
     }
     const rollback = snapshotState(state)
     receives.push(pending)
-    await this.persistWithRecoveryRollback(rollback)
+    await this.persistWithRecoveryRollback(rollback, {
+      skipRecovery: input.deferRecoveryCheckpoint === true,
+    })
     return pending
   }
 

@@ -50,9 +50,10 @@ export default function RGBInvoiceDetailScreen() {
   const nav = useNavigation();
   const tools = useTools();
   const { t } = useI18n();
-  const { recipientId, invoice: routeInvoice } = nav.getRouteState<'RGBInvoiceDetailScreen'>();
-  const [invoice, setInvoice] = useState<RgbPendingReceiveInvoice>();
-  const [loading, setLoading] = useState(true);
+  const { recipientId, invoice: routeInvoice, initialInvoice } = nav.getRouteState<'RGBInvoiceDetailScreen'>();
+  const routePendingInvoice = initialInvoice as RgbPendingReceiveInvoice | undefined;
+  const [invoice, setInvoice] = useState<RgbPendingReceiveInvoice | undefined>(routePendingInvoice);
+  const [loading, setLoading] = useState(!routePendingInvoice);
   const [releasing, setReleasing] = useState(false);
   const [releaseConfirmVisible, setReleaseConfirmVisible] = useState(false);
   const [actionMenuVisible, setActionMenuVisible] = useState(false);
@@ -74,8 +75,12 @@ export default function RGBInvoiceDetailScreen() {
   }, [recipientId, routeInvoice, tools, wallet]);
 
   useEffect(() => {
+    // The create-invoice response is already a complete public invoice view.
+    // Rendering it directly avoids a second writer-lease refresh and proxy
+    // poll immediately after the first successful creation.
+    if (routePendingInvoice) return;
     void loadInvoice();
-  }, [loadInvoice]);
+  }, [loadInvoice, routePendingInvoice]);
 
   const release = async () => {
     if (!invoice || !isCancelableRgbPendingInvoice(invoice) || releasing) return;
