@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 
-import { Button, Card, Column, Content, Header, Icon, Layout, Row, Text } from '@/ui/components';
+import { Button, Card, Column, Content, CopyableAddress, Header, Icon, Layout, Row, Text } from '@/ui/components';
 import { SignedData, ToSignData } from '@unisat/wallet-shared';
 import { useI18n, useNavigation, useTools, useWallet } from '@unisat/wallet-state';
 
@@ -22,7 +22,14 @@ const feeUtxoCardStyle = {
 
 const accountInfoCardStyle = {
   borderRadius: 10,
-  padding: '14px 16px',
+  padding: 0,
+  overflow: 'hidden',
+  boxSizing: 'border-box' as const
+};
+
+const accountInfoRowStyle = {
+  minHeight: 52,
+  padding: '0 16px',
   boxSizing: 'border-box' as const
 };
 
@@ -51,17 +58,20 @@ export default function RgbFeePoolInspectionScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [withdrawToSignData, setWithdrawToSignData] = useState<ToSignData>();
 
-  const refresh = useCallback(async () => {
+  const refresh = useCallback(async (showSuccess = false) => {
     setRefreshing(true);
     try {
       const result = await wallet.getRgbFeePoolInspection();
       setInspection(result);
+      if (showSuccess) {
+        tools.toastSuccess(t('success'));
+      }
     } catch (error) {
       tools.toastError(error instanceof Error ? error.message : String(error));
     } finally {
       setRefreshing(false);
     }
-  }, [tools, wallet]);
+  }, [t, tools, wallet]);
 
   useEffect(() => {
     void refresh();
@@ -85,8 +95,7 @@ export default function RgbFeePoolInspectionScreen() {
     try {
       const result = await wallet.createRgbFeePoolWithdrawEnd({ signedPsbt });
       setWithdrawToSignData(undefined);
-      tools.toastSuccess(result.txid);
-      await refresh();
+      nav.navigate('TxSuccessScreen', { txid: result.txid });
     } catch (error) {
       tools.toastError(error instanceof Error ? error.message : String(error));
       setWithdrawToSignData(undefined);
@@ -104,43 +113,35 @@ export default function RgbFeePoolInspectionScreen() {
     );
   }
 
+  const canWithdraw = inspection?.utxos.some(utxo => utxo.available && !utxo.pending);
+
   return (
     <Layout>
       <Header onBack={() => window.history.go(-1)} title={t('rgb_fee_address')} />
       <Content>
         <Card style={accountInfoCardStyle}>
-          <Column fullX gap="md">
-            <Text text={t('rgb_fee_address')} preset="bold" size="sm" />
-            <Column fullX gap="xs">
-              <Text text={t('address')} color="textDim" size="xs" />
-              <Row
-                fullX
-                itemsCenter
-                gap="sm"
-                style={{ cursor: inspection ? 'pointer' : 'default', minWidth: 0 }}
-                onClick={() => inspection && nav.navToExplorerAddress(inspection.address)}>
-                <Text
-                  text={inspection?.address || '—'}
-                  selectText
-                  color="white"
-                  size="xs"
-                  ellipsis
-                  style={{ flex: 1, minWidth: 0 }}
-                />
-                {inspection ? <Icon icon="right" color="textDim" size={14} /> : null}
-              </Row>
-            </Column>
-            <Column fullX gap="xs">
-              <Text text={t('derivation_path')} color="textDim" size="xs" />
+          <Column fullX gap="zero">
+            <Row fullX itemsCenter justifyBetween gap="md" style={accountInfoRowStyle}>
+              <Text text={t('address')} color="textDim" size="sm" style={{ flexShrink: 0 }} />
+              {inspection ? (
+                <CopyableAddress address={inspection.address} copyPosition="after" color="ticker_color2" />
+              ) : (
+                <Text text="—" color="white" size="xs" />
+              )}
+            </Row>
+            <div style={{ borderTop: '1px solid rgba(255,255,255,0.06)' }} />
+            <Row fullX itemsCenter justifyBetween gap="md" style={accountInfoRowStyle}>
+              <Text text={t('derivation_path')} color="textDim" size="sm" style={{ flexShrink: 0 }} />
               <Text
                 text={inspection?.derivationPath || '—'}
                 selectText
                 color="white"
                 size="xs"
                 ellipsis
-                style={{ minWidth: 0 }}
+                textEnd
+                style={{ flex: 1, minWidth: 0 }}
               />
-            </Column>
+            </Row>
           </Column>
         </Card>
 
@@ -177,19 +178,22 @@ export default function RgbFeePoolInspectionScreen() {
           );
         })}
 
-        {inspection && !inspection.utxos.length ? (
-          <Text text={t('no_data')} color="textDim" textCenter size="sm" />
-        ) : null}
       </Content>
       <Row style={{ padding: '0 16px 16px' }}>
         <Button
           text={t('rgb_fee_pool_withdraw')}
           preset="default"
-          disabled={!inspection?.utxos.some((utxo) => !utxo.pending && !utxo.locked)}
+          disabled={!canWithdraw}
           onClick={beginWithdraw}
           style={{ flex: 1 }}
         />
-        <Button text={t('refresh')} preset="primary" disabled={refreshing} onClick={refresh} style={{ flex: 1 }} />
+        <Button
+          text={t('refresh')}
+          preset="primary"
+          disabled={refreshing}
+          onClick={() => void refresh(true)}
+          style={{ flex: 1 }}
+        />
       </Row>
     </Layout>
   );
