@@ -206,7 +206,8 @@ export function RGBTransferDetailSheet({
     !['waiting_ack', 'broadcasting', 'broadcast_failed', 'pending_accept', 'rejected'].includes(status) &&
     !!onClickExploreTx;
   const canCancelSend =
-    transfer?.type === 'send' && String(transfer?.status || '').toLowerCase() === 'waiting_ack';
+    transfer?.type === 'send' &&
+    ['signed', 'waiting_ack'].includes(String(transfer?.status || '').toLowerCase());
   const canAcceptReceive =
     transfer?.type === 'receive' && String(transfer?.status || '').toLowerCase() === 'pending_accept';
   const canRetryBroadcast =
