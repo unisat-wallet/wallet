@@ -85,6 +85,72 @@ describe('RGB proxy transport', () => {
     )
   })
 
+  it('gets multiple consignments from a configured proxy in one request', async () => {
+    const firstRecipientId = 'bc:utxob:first'
+    const secondRecipientId = 'bc:utxob:second'
+    fetchMock.mockResolvedValueOnce(
+      rpcResponse([
+        {
+          recipient_id: secondRecipientId,
+          consignment: Buffer.from('second consignment').toString('base64'),
+          txid: 'd'.repeat(64),
+        },
+      ])
+    )
+    const transport = createRgbProxyTransport([endpoint])
+
+    await expect(
+      transport.getConsignments?.([
+        { recipientId: firstRecipientId, endpoints: [endpoint] },
+        { recipientId: secondRecipientId, endpoints: [endpoint] },
+      ])
+    ).resolves.toEqual([
+      {
+        recipientId: secondRecipientId,
+        payload: Buffer.from('second consignment').toString('base64'),
+        txid: 'd'.repeat(64),
+        endpoint,
+      },
+    ])
+
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+    expect(fetchMock).toHaveBeenCalledWith(
+      'https://proxy.example',
+      expect.objectContaining({
+        method: 'POST',
+        body: expect.stringContaining('consignment.get_many'),
+      })
+    )
+    expect(JSON.parse(fetchMock.mock.calls[0]![1].body as string).params).toEqual({
+      recipient_ids: [firstRecipientId, secondRecipientId],
+    })
+  })
+
+  it('keeps using standard consignment.get for a third-party invoice endpoint', async () => {
+    const externalEndpoint = 'rpcs://third-party.example/json-rpc'
+    fetchMock.mockResolvedValueOnce(
+      rpcResponse({ consignment: Buffer.from('consignment').toString('base64'), txid: 'c'.repeat(64) })
+    )
+    const transport = createRgbProxyTransport([endpoint])
+
+    await expect(
+      transport.getConsignments?.([{ recipientId, endpoints: [externalEndpoint] }])
+    ).resolves.toEqual([
+      {
+        recipientId,
+        payload: Buffer.from('consignment').toString('base64'),
+        txid: 'c'.repeat(64),
+        endpoint: externalEndpoint,
+      },
+    ])
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      'https://third-party.example/json-rpc',
+      expect.objectContaining({ body: expect.stringContaining('consignment.get') })
+    )
+    expect(fetchMock.mock.calls[0]![1].body).not.toContain('consignment.get_many')
+  })
+
   it('checks invoice availability without uploading a consignment', async () => {
     fetchMock
       .mockResolvedValueOnce(

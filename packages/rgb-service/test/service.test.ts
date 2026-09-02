@@ -353,6 +353,30 @@ describe('RgbService', () => {
     expect(dependencies.stateSource.getClaimedConsignments).not.toHaveBeenCalled()
   })
 
+  it('uses the optional batched proxy lookup for pending receive invoices', async () => {
+    const dependencies = createDependencies()
+    const getConsignments = vi.fn().mockResolvedValue([])
+    dependencies.transport.getConsignments = getConsignments
+    dependencies.transport.getConsignment = vi.fn()
+    const service = new RgbService(dependencies)
+    await service.open(wallet)
+    ;(service as any).state.pendingReceives = [
+      {
+        invoice: rgbInvoice(),
+        recipientId: 'recipient',
+        createdAt: 1,
+        seal: { txid: 'a'.repeat(64), vout: 0, blinding: 1n },
+      },
+    ]
+
+    await (service as any).getProxyConsignments()
+
+    expect(getConsignments).toHaveBeenCalledWith([
+      { recipientId: 'recipient', endpoints: [proxyEndpoint] },
+    ])
+    expect(dependencies.transport.getConsignment).not.toHaveBeenCalled()
+  })
+
   it('claims each pending invoice only once after the recovery service accepts it', async () => {
     const dependencies = createDependencies()
     const claimConsignments = vi.fn().mockResolvedValue(1)

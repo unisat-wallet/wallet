@@ -9,13 +9,31 @@ type JsonRpcResponse<T> = {
   error?: { code?: number; message?: string }
 }
 
+type ProxyConsignment = {
+  consignment: string
+  txid: string
+}
+
+type ProxyBatchConsignment = ProxyConsignment & {
+  recipient_id: string
+}
+
 const NOT_FOUND_CODES = new Set([-302, -400])
 const RGB_PROXY_REQUEST_TIMEOUT_MS = 10_000
+const MAX_CONSIGNMENT_GET_MANY_RECIPIENTS = 100
 
 function normalizeEndpoints(endpoints: string[]) {
   return endpoints
     .map(endpoint => endpoint.trim())
     .filter(Boolean)
+}
+
+function chunk<T>(items: T[], size: number) {
+  const chunks: T[][] = []
+  for (let index = 0; index < items.length; index += size) {
+    chunks.push(items.slice(index, index + size))
+  }
+  return chunks
 }
 
 function toHttpEndpoint(endpoint: string) {
@@ -118,8 +136,45 @@ async function tryEndpoints<T>(endpoints: string[], request: (endpoint: string) 
   throw lastError || new Error('RGB proxy endpoint is missing')
 }
 
+async function getConsignmentFromEndpoints({
+  recipientId,
+  endpoints,
+}: {
+  recipientId: string
+  endpoints: string[]
+}): Promise<RgbReceivedConsignment | undefined> {
+  for (const endpoint of endpoints) {
+    try {
+      const body = await postJson<ProxyConsignment>(endpoint, 'consignment.get', {
+        recipient_id: recipientId,
+      })
+      if (body.error) {
+        if (NOT_FOUND_CODES.has(body.error.code || 0)) continue
+        throw new Error(`RGB proxy consignment.get failed: ${body.error.message || body.error.code}`)
+      }
+      if (!body.result?.consignment || !body.result.txid) {
+        throw new Error('RGB proxy returned an incomplete consignment')
+      }
+      return {
+        recipientId,
+        payload: body.result.consignment,
+        txid: body.result.txid,
+        endpoint,
+      }
+    } catch (error) {
+      if (endpoint === endpoints[endpoints.length - 1]) throw error
+    }
+  }
+  return undefined
+}
+
 export function createRgbProxyTransport(proxyEndpoints: string[] = []): RgbTransport {
   const endpoints = normalizeEndpoints(proxyEndpoints)
+  // Only endpoints configured by the wallet are operated by us. Invoice
+  // endpoints supplied by other wallets remain on the standard single-get
+  // protocol path and never receive this extension request.
+  const batchEndpoints = new Set(endpoints)
+  const unsupportedBatchEndpoints = new Set<string>()
   return {
     getEndpoints: () => endpoints,
 
@@ -154,36 +209,73 @@ export function createRgbProxyTransport(proxyEndpoints: string[] = []): RgbTrans
       throw lastError || new Error('RGB invoice has no proxy transport endpoint')
     },
 
-    getConsignment: async ({ recipientId, endpoints }) => {
-      for (const endpoint of endpoints) {
-        try {
-          const body = await postJson<{ consignment: string; txid: string }>(
-            endpoint,
-            'consignment.get',
-            {
-              recipient_id: recipientId,
-            }
-          )
-          if (body.error) {
-            if (NOT_FOUND_CODES.has(body.error.code || 0)) continue
-            throw new Error(
-              `RGB proxy consignment.get failed: ${body.error.message || body.error.code}`
-            )
-          }
-          if (!body.result?.consignment || !body.result.txid) {
-            throw new Error('RGB proxy returned an incomplete consignment')
-          }
-          return {
-            recipientId,
-            payload: body.result.consignment,
-            txid: body.result.txid,
-            endpoint,
-          } satisfies RgbReceivedConsignment
-        } catch (error) {
-          if (endpoint === endpoints[endpoints.length - 1]) throw error
+    getConsignment: getConsignmentFromEndpoints,
+
+    getConsignments: async inputs => {
+      const grouped = new Map<string, Array<(typeof inputs)[number]>>()
+      const individual: typeof inputs = []
+      for (const input of inputs) {
+        const [endpoint] = input.endpoints
+        if (
+          input.endpoints.length === 1 &&
+          endpoint &&
+          batchEndpoints.has(endpoint) &&
+          !unsupportedBatchEndpoints.has(endpoint)
+        ) {
+          const group = grouped.get(endpoint) || []
+          group.push(input)
+          grouped.set(endpoint, group)
+        } else {
+          individual.push(input)
         }
       }
-      return undefined
+      for (const [endpoint, group] of grouped) {
+        if (group.length > 1) continue
+        individual.push(group[0]!)
+        grouped.delete(endpoint)
+      }
+
+      const batched = await Promise.all(
+        [...grouped.entries()].flatMap(([endpoint, group]) =>
+          chunk(group, MAX_CONSIGNMENT_GET_MANY_RECIPIENTS).map(async group => {
+            const recipientIds = [...new Set(group.map(input => input.recipientId))]
+            const body = await postJson<ProxyBatchConsignment[]>(endpoint, 'consignment.get_many', {
+              recipient_ids: recipientIds,
+            })
+            if (body.error) {
+              // During a rolling proxy upgrade, retain compatibility with the
+              // standard endpoint rather than failing receive polling.
+              if (body.error.code === -32601) {
+                unsupportedBatchEndpoints.add(endpoint)
+                return Promise.all(group.map(input => getConsignmentFromEndpoints(input)))
+              }
+              throw new Error(
+                `RGB proxy consignment.get_many failed: ${body.error.message || body.error.code}`
+              )
+            }
+            if (!Array.isArray(body.result)) {
+              throw new Error('RGB proxy returned an invalid consignment.get_many response')
+            }
+            const byRecipientId = new Map(body.result.map(item => [item.recipient_id, item]))
+            return group.map(input => {
+              const result = byRecipientId.get(input.recipientId)
+              if (!result?.consignment || !result.txid) return undefined
+              return {
+                recipientId: input.recipientId,
+                payload: result.consignment,
+                txid: result.txid,
+                endpoint,
+              } satisfies RgbReceivedConsignment
+            })
+          })
+        )
+      )
+      const individuallyFetched = await Promise.all(
+        individual.map(input => getConsignmentFromEndpoints(input))
+      )
+      return [...batched.flat(), ...individuallyFetched].filter(
+        (item): item is RgbReceivedConsignment => !!item
+      )
     },
 
     checkConsignmentAvailability: async ({ recipientId, endpoints: invoiceEndpoints }) => {

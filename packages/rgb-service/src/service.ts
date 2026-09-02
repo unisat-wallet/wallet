@@ -2030,22 +2030,23 @@ export class RgbService {
 
   private async getProxyConsignments() {
     const getConsignment = this.dependencies.transport.getConsignment
+    const getConsignments = this.dependencies.transport.getConsignments
+    if (!getConsignment && !getConsignments) return []
+    const pending = this.getPendingReceives()
+      .filter(
+        receive =>
+          (!receive.receivedConsignment?.accepted &&
+            !receive.receivedConsignment?.acknowledgementPending) ||
+          !receive.receivedConsignment.payload
+      )
+      .flatMap(receive => {
+        const endpoints = decodeRgbInvoice(receive.invoice).transportEndpoints
+        return endpoints.length ? [{ recipientId: receive.recipientId, endpoints }] : []
+      })
+    if (getConsignments) return getConsignments(pending)
     if (!getConsignment) return []
     return (
-      await Promise.all(
-        this.getPendingReceives()
-          .filter(
-            receive =>
-              (!receive.receivedConsignment?.accepted &&
-                !receive.receivedConsignment?.acknowledgementPending) ||
-              !receive.receivedConsignment.payload
-          )
-          .map(async receive => {
-            const endpoints = decodeRgbInvoice(receive.invoice).transportEndpoints
-            if (!endpoints.length) return undefined
-            return getConsignment({ recipientId: receive.recipientId, endpoints })
-          })
-      )
+      await Promise.all(pending.map(input => getConsignment(input)))
     ).filter((item): item is NonNullable<typeof item> => !!item)
   }
 

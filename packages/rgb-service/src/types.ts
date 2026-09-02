@@ -412,6 +412,13 @@ export interface RgbTransport {
     recipientId: string
     endpoints: string[]
   }): Promise<RgbReceivedConsignment | undefined>
+  /** Optional extension for fetching several receive invoices from a trusted proxy in one request. */
+  getConsignments?(
+    input: Array<{
+      recipientId: string
+      endpoints: string[]
+    }>
+  ): Promise<RgbReceivedConsignment[]>
   /** Read-only check that at least one invoice endpoint has no consignment for this recipient ID. */
   checkConsignmentAvailability?(input: {
     recipientId: string
