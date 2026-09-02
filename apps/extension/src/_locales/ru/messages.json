@@ -3005,6 +3005,12 @@
   "rgb_fee_pool_withdraw": {
     "message": "Вывести в BTC-кошелёк"
   },
+  "rgb_fee_pool_empty": {
+    "message": "UTXO для комиссий RGB не найдены"
+  },
+  "rgb_fee_pool_empty_description": {
+    "message": "UTXO для комиссий RGB создаются автоматически, когда они нужны для RGB-перевода."
+  },
   "rgb_fee_pool_explanation": {
     "message": "Для отправки RGB кошельку нужно создать $count повторно используемых UTXO для комиссий. Эти средства останутся в пуле для будущих RGB-переводов и не являются комиссией этой транзакции."
   },
@@ -3058,6 +3064,9 @@
   },
   "rgb_utxo_empty": {
     "message": "UTXO RGB не найдены"
+  },
+  "rgb_utxo_empty_description": {
+    "message": "RGB UTXO создаются автоматически при создании инвойса."
   },
   "rgb_asset": {
     "message": "RGB-актив"

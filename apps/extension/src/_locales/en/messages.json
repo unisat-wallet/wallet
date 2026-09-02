@@ -2819,6 +2819,9 @@
   "rgb_utxo_empty": {
     "message": "No RGB UTXOs found"
   },
+  "rgb_utxo_empty_description": {
+    "message": "RGB UTXOs are created automatically when you create an invoice."
+  },
   "rgb_asset": {
     "message": "RGB Asset"
   },
@@ -3064,6 +3067,12 @@
   },
   "rgb_fee_pool_withdraw": {
     "message": "Withdraw to BTC wallet"
+  },
+  "rgb_fee_pool_empty": {
+    "message": "No RGB Fee UTXOs found"
+  },
+  "rgb_fee_pool_empty_description": {
+    "message": "RGB Fee UTXOs are created automatically when they are needed for an RGB transfer."
   },
   "rgb_fee_pool_explanation": {
     "message": "To send RGB, your wallet needs to create $count reusable fee UTXOs. These funds remain in the pool for future RGB transfers; they are not the fee for this transfer."

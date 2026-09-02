@@ -2996,6 +2996,12 @@
   "rgb_fee_pool_withdraw": {
     "message": "Retirar a la billetera BTC"
   },
+  "rgb_fee_pool_empty": {
+    "message": "No se encontraron UTXO de comisiones RGB"
+  },
+  "rgb_fee_pool_empty_description": {
+    "message": "Los UTXO de comisiones RGB se crean automáticamente cuando se necesitan para una transferencia RGB."
+  },
   "rgb_fee_pool_explanation": {
     "message": "Para enviar RGB, tu cartera debe crear $count UTXO de comisiones reutilizables. Estos fondos permanecen en el fondo para futuras transferencias RGB; no son la comisión de esta transferencia."
   },
@@ -3049,6 +3055,9 @@
   },
   "rgb_utxo_empty": {
     "message": "No se encontraron UTXO RGB"
+  },
+  "rgb_utxo_empty_description": {
+    "message": "Los UTXO RGB se crean automáticamente al crear una factura."
   },
   "rgb_asset": {
     "message": "Activo RGB"

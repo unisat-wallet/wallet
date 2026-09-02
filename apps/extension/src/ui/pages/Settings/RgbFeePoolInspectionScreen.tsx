@@ -26,6 +26,14 @@ const feeUtxoSequenceStyle = {
   textAlign: 'center' as const
 };
 
+const emptyStateCardStyle = {
+  padding: '32px 16px',
+  borderRadius: 8,
+  boxSizing: 'border-box' as const,
+  background: 'rgba(255,255,255,0.04)',
+  border: '1px solid rgba(255,255,255,0.08)'
+};
+
 const accountInfoCardStyle = {
   borderRadius: 10,
   padding: 0,
@@ -183,6 +191,13 @@ export default function RgbFeePoolInspectionScreen() {
             </Row>
           );
         })}
+        {inspection && !inspection.utxos.length ? (
+          <Column fullX itemsCenter gap="sm" style={emptyStateCardStyle}>
+            <Icon icon="emptyBox" color="textDim" size={32} />
+            <Text text={t('rgb_fee_pool_empty')} color="white" size="sm" />
+            <Text text={t('rgb_fee_pool_empty_description')} color="textDim" size="xs" textCenter wrap />
+          </Column>
+        ) : null}
 
       </Content>
       <Row style={{ padding: '0 16px 16px' }}>

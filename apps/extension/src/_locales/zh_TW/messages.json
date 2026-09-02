@@ -2816,6 +2816,9 @@
   "rgb_utxo_empty": {
     "message": "找不到 RGB UTXO"
   },
+  "rgb_utxo_empty_description": {
+    "message": "建立 Invoice 時會自動建立 RGB UTXO。"
+  },
   "rgb_asset": {
     "message": "RGB 資產"
   },
@@ -3061,6 +3064,12 @@
   },
   "rgb_fee_pool_withdraw": {
     "message": "提回 BTC 錢包"
+  },
+  "rgb_fee_pool_empty": {
+    "message": "找不到 RGB 手續費 UTXO"
+  },
+  "rgb_fee_pool_empty_description": {
+    "message": "需要進行 RGB 轉帳時，會自動建立 RGB 手續費 UTXO。"
   },
   "rgb_fee_pool_explanation": {
     "message": "發送 RGB 前，錢包需要建立 $count 個可重複使用的手續費 UTXO。這些資金會保留在資金池中供後續 RGB 轉帳使用，並非本次轉帳所花費的手續費。"
