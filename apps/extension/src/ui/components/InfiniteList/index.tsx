@@ -14,6 +14,8 @@ interface InfiniteListProps<T> {
   onRefresh: () => void;
   hasMore: boolean;
   loading: boolean;
+  /** Whether to show the loading overlay while a request is in progress. */
+  showLoading?: boolean;
   height?: number | string;
   numColumns?: number;
   total: number;
@@ -32,6 +34,7 @@ export function InfiniteList<T>({
   onRefresh,
   hasMore,
   loading,
+  showLoading,
   height,
   numColumns = 1,
   emptyText,
@@ -84,8 +87,9 @@ export function InfiniteList<T>({
           width: '100%',
           height: height || 'auto',
           overflowY: height ? 'auto' : 'visible'
-        }}>
-        {loading && (
+        }}
+      >
+        {(showLoading ?? loading) && (
           <Row justifyCenter style={{ position: 'absolute', width: '100%', zIndex: 10, padding: '10px 0' }}>
             <div style={{ backgroundColor: 'rgba(0,0,0,0.7)', padding: '8px 12px', borderRadius: '4px' }}>
               <LoadingOutlined style={{ color: '#ffde04' }} />
@@ -103,7 +107,8 @@ export function InfiniteList<T>({
                 display: 'grid',
                 gridTemplateColumns: `repeat(${numColumns}, 1fr)`,
                 gap: '8px'
-              }}>
+              }}
+            >
               {row.map((item, idx) => (
                 <div key={keyExtractor(item, idx)} style={{ width: '100%' }}>
                   {renderItem({ item, index: idx })}

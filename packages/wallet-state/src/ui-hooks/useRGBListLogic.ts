@@ -13,9 +13,10 @@ import { WalletView } from '../types/ui'
 import { useInfiniteList } from './useInfiniteList'
 import { uiEventBus } from '../utils/eventBus'
 
-export function useRGBListLogic(
-  { autoRefresh = false, enabled = true }: { autoRefresh?: boolean; enabled?: boolean } = {}
-) {
+export function useRGBListLogic({
+  autoRefresh = false,
+  enabled = true,
+}: { autoRefresh?: boolean; enabled?: boolean } = {}) {
   const nav = useNavigation()
   const wallet = useWallet()
   const currentKeyring = useCurrentKeyring()
@@ -62,8 +63,9 @@ export function useRGBListLogic(
     data: items,
     total,
     loading,
+    showLoading,
     hasMore,
-    onRefresh,
+    onRefresh: refreshList,
     onLoadMore,
   } = useInfiniteList<RgbBalance>({
     fetcher: async (page, pageSize) => {
@@ -93,33 +95,33 @@ export function useRGBListLogic(
     if (alreadyRefreshed) return
 
     refreshFundingAddress()
-    onRefresh()
+    refreshList()
     lastRefreshTimeRef.current = walletTabFocusRefresh
-  }, [enabled, walletTabFocusRefresh, isFocus, onRefresh, refreshFundingAddress])
+  }, [enabled, walletTabFocusRefresh, isFocus, refreshList, refreshFundingAddress])
 
   useEffect(() => {
     if (!autoRefresh || !enabled || !isFocus || !isRgbSupported) return undefined
 
     const intervalId = setInterval(() => {
       refreshFundingAddress()
-      onRefresh()
+      refreshList({ showLoading: false })
     }, 5000)
 
     return () => clearInterval(intervalId)
-  }, [autoRefresh, enabled, isFocus, isRgbSupported, onRefresh, refreshFundingAddress])
+  }, [autoRefresh, enabled, isFocus, isRgbSupported, refreshList, refreshFundingAddress])
 
   useEffect(() => {
     const handleRgbAssetsChanged = () => {
       if (!enabled || !isFocus || !isRgbSupported) return
       refreshFundingAddress()
-      onRefresh()
+      refreshList()
     }
 
     uiEventBus.addEventListener(BUS_METHODS.RGB_ASSETS_CHANGED, handleRgbAssetsChanged)
     return () => {
       uiEventBus.removeEventListener(BUS_METHODS.RGB_ASSETS_CHANGED, handleRgbAssetsChanged)
     }
-  }, [enabled, isFocus, isRgbSupported, onRefresh, refreshFundingAddress])
+  }, [enabled, isFocus, isRgbSupported, refreshList, refreshFundingAddress])
 
   const onClickItem = (item: RgbBalance) => {
     const assetId = item.assetId
@@ -132,13 +134,14 @@ export function useRGBListLogic(
     if (enabled && isFocus) {
       refreshFundingAddress()
     }
-    onRefresh()
-  }, [enabled, isFocus, onRefresh, refreshFundingAddress])
+    refreshList()
+  }, [enabled, isFocus, refreshList, refreshFundingAddress])
 
   return {
     items,
     total,
     loading,
+    showLoading,
     hasMore,
     fundingAddress,
     fundingBalance,

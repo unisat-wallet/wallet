@@ -6,6 +6,10 @@ interface UseInfiniteListOptions<T> {
   dependencies?: any[]
 }
 
+type RefreshOptions = {
+  showLoading?: boolean
+}
+
 export function useInfiniteList<T>({
   fetcher,
   pageSize = 20,
@@ -14,6 +18,7 @@ export function useInfiniteList<T>({
   const [data, setData] = useState<T[]>([])
   const [total, setTotal] = useState(0)
   const [loading, _setLoading] = useState(false)
+  const [showLoading, setShowLoading] = useState(false)
   const [hasMore, setHasMore] = useState(true)
   const [page, _setPage] = useState(1)
 
@@ -21,6 +26,7 @@ export function useInfiniteList<T>({
   const loadingRef = useRef(false)
   const dataRef = useRef<T[]>([])
   const refreshQueuedRef = useRef(false)
+  const refreshQueuedShowLoadingRef = useRef(false)
   const fetcherRef = useRef(fetcher)
   const pageSizeRef = useRef(pageSize)
   const requestVersionRef = useRef(0)
@@ -38,56 +44,61 @@ export function useInfiniteList<T>({
     _setPage(v)
   }
 
-  const loadData = useCallback(
-    async (isRefresh = false) => {
-      if (loadingRef.current) return
+  const loadData = useCallback(async (isRefresh = false, showLoadingOverlay = true) => {
+    if (loadingRef.current) return
 
-      loadingRef.current = true
-      setLoading(true)
-      try {
-        const requestVersion = requestVersionRef.current
-        const pageToLoad = isRefresh ? 1 : pageRef.current
-        const { list, total } = await fetcherRef.current(pageToLoad, pageSizeRef.current)
+    loadingRef.current = true
+    setLoading(true)
+    setShowLoading(showLoadingOverlay)
+    try {
+      const requestVersion = requestVersionRef.current
+      const pageToLoad = isRefresh ? 1 : pageRef.current
+      const { list, total } = await fetcherRef.current(pageToLoad, pageSizeRef.current)
 
-        // Dependencies may have changed while this request was pending. Do not
-        // let results from the previous account/chain replace the reset list.
-        if (requestVersion !== requestVersionRef.current) return
+      // Dependencies may have changed while this request was pending. Do not
+      // let results from the previous account/chain replace the reset list.
+      if (requestVersion !== requestVersionRef.current) return
 
-        const nextData = isRefresh ? list : [...dataRef.current, ...list]
+      const nextData = isRefresh ? list : [...dataRef.current, ...list]
 
-        setTotal(total)
-        dataRef.current = nextData
-        setData(nextData)
+      setTotal(total)
+      dataRef.current = nextData
+      setData(nextData)
 
-        setHasMore(nextData.length < total)
+      setHasMore(nextData.length < total)
 
-        const nextPage = isRefresh ? 2 : pageToLoad + 1
-        pageRef.current = nextPage
-        setPage(nextPage)
-      } catch (e) {
-        console.error(e)
-      } finally {
-        loadingRef.current = false
-        setLoading(false)
-        if (refreshQueuedRef.current) {
-          refreshQueuedRef.current = false
-          void loadData(true)
-        }
+      const nextPage = isRefresh ? 2 : pageToLoad + 1
+      pageRef.current = nextPage
+      setPage(nextPage)
+    } catch (e) {
+      console.error(e)
+    } finally {
+      loadingRef.current = false
+      setLoading(false)
+      setShowLoading(false)
+      if (refreshQueuedRef.current) {
+        refreshQueuedRef.current = false
+        const queuedShowLoading = refreshQueuedShowLoadingRef.current
+        refreshQueuedShowLoadingRef.current = false
+        void loadData(true, queuedShowLoading)
       }
-    },
-    []
-  )
-
-  const onRefresh = () => {
-    if (loadingRef.current) {
-      refreshQueuedRef.current = true
-      return
     }
-    void loadData(true)
-  }
-  const onLoadMore = () => {
+  }, [])
+
+  const onRefresh = useCallback(
+    ({ showLoading: showLoadingOverlay = true }: RefreshOptions = {}) => {
+      if (loadingRef.current) {
+        refreshQueuedRef.current = true
+        refreshQueuedShowLoadingRef.current ||= showLoadingOverlay
+        return
+      }
+      void loadData(true, showLoadingOverlay)
+    },
+    [loadData]
+  )
+  const onLoadMore = useCallback(() => {
     if (hasMore && !loadingRef.current) loadData(false)
-  }
+  }, [hasMore, loadData])
 
   useEffect(() => {
     // Invalidate any result fetched with the previous dependency context.
@@ -103,6 +114,7 @@ export function useInfiniteList<T>({
       // The current request will start this refresh once it settles. `loadData`
       // reads the latest fetcher from its ref, so it uses the new context.
       refreshQueuedRef.current = true
+      refreshQueuedShowLoadingRef.current = true
     } else {
       void loadData(true)
     }
@@ -112,6 +124,7 @@ export function useInfiniteList<T>({
     data,
     total,
     loading,
+    showLoading,
     hasMore,
     page,
     onRefresh,
