@@ -670,6 +670,8 @@ export interface WalletController {
   releaseRgbWriteLease(): Promise<{ released: boolean }>
 
   getRgbUtxoInspection(params?: { forceSync?: boolean }): Promise<{
+    address: string
+    derivationPath: string
     snapshot: {
       syncedAt: number
       utxos: Array<{
@@ -686,6 +688,7 @@ export interface WalletController {
       }>
     }
     invoiceReservations: Array<{
+      invoice: string
       recipientId: string
       assetId?: string
       amount?: string

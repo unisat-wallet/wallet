@@ -453,11 +453,15 @@ export function useRGBReceiveScreenLogic() {
   const finishCreateInvoice = async (skipSync = false) => {
     setLoadingText('Creating invoice...')
     const value = await createReceiveInvoice(skipSync)
-    setInvoice(getInvoiceText(value))
+    const invoice = getInvoiceText(value)
     const pendingInvoice = getRecordPayload(value)
-    if (pendingInvoice?.['invoice']) {
-      setSelectedPendingInvoice(pendingInvoice as RgbPendingReceiveInvoice)
+    const recipientId = readStringPath(pendingInvoice, ['recipientId'])
+    if (recipientId && invoice) {
+      nav.navigate('RGBInvoiceDetailScreen', { recipientId, invoice })
+      return
     }
+    setInvoice(invoice)
+    if (pendingInvoice?.['invoice']) setSelectedPendingInvoice(pendingInvoice as RgbPendingReceiveInvoice)
     setStep('create_invoice')
   }
 
@@ -646,9 +650,7 @@ export function useRGBReceiveScreenLogic() {
   }
 
   const onOpenPendingInvoices = () => {
-    setError('')
-    setStep('pending_invoices')
-    void loadPendingInvoices()
+    nav.navigate('RGBInvoiceListScreen', assetId ? { assetId } : {})
   }
 
   const onClosePendingInvoices = () => {

@@ -3699,8 +3699,13 @@ export class WalletController extends BaseController {
   /** Wallet-only RGB UTXO diagnostic view. Never exposed through the dApp provider. */
   getRgbUtxoInspection = async (params: { forceSync?: boolean } = {}) => {
     const { service } = await this.getLocalRgbService()
+    const fundingAccount = await this.getCurrentRgbFundingAccount()
     if (params.forceSync) await service.sync()
-    return service.getUtxoInspection()
+    return {
+      ...service.getUtxoInspection(),
+      address: fundingAccount.address,
+      derivationPath: fundingAccount.derivationPath,
+    }
   }
 
   cancelRgbReceiveInvoice = async (params: Omit<RgbCancelReceiveInvoiceRequest, 'wallet'>) => {

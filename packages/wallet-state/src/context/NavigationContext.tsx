@@ -194,6 +194,13 @@ export type RouteParamList = {
     tokenBalance?: RgbBalance
     initialStep?: 'create_invoice' | 'pending_invoices' | 'sign_rgb_utxo'
   }
+  RGBInvoiceListScreen: {
+    assetId?: string
+  }
+  RGBInvoiceDetailScreen: {
+    recipientId?: string
+    invoice?: string
+  }
   RGBTokenScreen: {
     assetId: string
     tokenBalance?: RgbBalance

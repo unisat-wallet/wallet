@@ -1412,6 +1412,7 @@ export class RgbService {
     return {
       snapshot: state.snapshot,
       invoiceReservations: (state.pendingReceives || []).map(receive => ({
+        invoice: receive.invoice,
         recipientId: receive.recipientId,
         assetId: receive.assetId,
         amount: receive.amount,

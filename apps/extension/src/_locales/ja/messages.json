@@ -2996,6 +2996,9 @@
   "rgb_fee_address": {
     "message": "RGB 手数料アドレス"
   },
+  "rgb_asset_address": {
+    "message": "RGB アセットアドレス"
+  },
   "rgb_fee_pool_locked": {
     "message": "ロック済み"
   },

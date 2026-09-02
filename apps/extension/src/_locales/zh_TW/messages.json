@@ -3053,6 +3053,9 @@
   "rgb_fee_address": {
     "message": "RGB 手續費地址"
   },
+  "rgb_asset_address": {
+    "message": "RGB 資產地址"
+  },
   "rgb_fee_pool_locked": {
     "message": "已鎖定"
   },
