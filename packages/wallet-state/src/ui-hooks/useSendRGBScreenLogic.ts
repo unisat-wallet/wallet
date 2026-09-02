@@ -76,6 +76,19 @@ function getRgbFeePoolRequirement(error: unknown): RgbFeePoolRequirement | undef
   }
 }
 
+function getRgbErrorMessage(error: unknown): string | undefined {
+  if (error instanceof Error && error.message) return error.message
+  if (!error || typeof error !== 'object') return undefined
+  const record = error as Record<string, unknown>
+  return typeof record['message'] === 'string'
+    ? record['message']
+    : typeof record['msg'] === 'string'
+      ? record['msg']
+      : typeof record['reason'] === 'string'
+        ? record['reason']
+        : undefined
+}
+
 export function getSendErrorMessage(
   error: unknown,
   fallback: string,
@@ -100,7 +113,7 @@ export function getSendErrorMessage(
     }
     return t('rgb_fee_pool_insufficient_btc_generic')
   }
-  return error instanceof Error && error.message ? error.message : fallback
+  return getRgbErrorMessage(error) || fallback
 }
 
 function getBlockingRgbSendStatus(

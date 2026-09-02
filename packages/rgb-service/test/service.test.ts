@@ -6,7 +6,7 @@ import type {
   RgbWalletRef,
   RgbWalletSnapshot,
 } from '../src'
-import { RgbInsufficientBalanceError, RgbService } from '../src'
+import { RgbInsufficientBalanceError, RgbService, RgbServiceError } from '../src'
 
 const wallet: RgbWalletRef = {
   walletId: 'rgb-wallet-1',
@@ -1336,6 +1336,45 @@ describe('RgbService', () => {
         }),
       })
     )
+  })
+
+  it('refetches history when a checkpoint index claims an allocation missing from its payload', async () => {
+    const dependencies = createDependencies()
+    const service = new RgbService(dependencies)
+    await service.open(wallet)
+    await service.sync()
+    ;(service as any).state.contracts = {
+      'rgb:asset': {
+        consignment: 'Y29tcGxldGUtbG9jYWwtaGlzdG9yeQ==',
+        createdAt: 1,
+        history: {
+          payload: 'Y29tcGxldGUtbG9jYWwtaGlzdG9yeQ==',
+          opIds: ['c'.repeat(64), 'd'.repeat(64)],
+          updatedAt: 1,
+        },
+      },
+    }
+    vi.mocked(dependencies.encoder.prepareTransfer)
+      .mockRejectedValueOnce(
+        new RgbServiceError('RGB allocation parent Transition is missing from local history')
+      )
+      .mockResolvedValueOnce({
+        id: 'transfer-recovered-history',
+        psbt: 'cHNidP8=',
+        toSignInputs: [],
+        lockedOutpoints: [{ txid: 'b'.repeat(64), vout: 1 }],
+      })
+    vi.mocked(dependencies.stateSource.getValidationHistory).mockResolvedValueOnce({
+      assetId: 'rgb:asset',
+      consignments: [{ opId: 'd'.repeat(64), payload: 'cmVtb3RlLWhpc3Rvcnk=' }],
+    })
+
+    await expect(
+      service.prepareSend({ assetId: 'rgb:asset', amount: '100', invoice: rgbInvoice(100), feeRate: 2 })
+    ).resolves.toMatchObject({ id: 'transfer-recovered-history' })
+
+    expect(dependencies.stateSource.getValidationHistory).toHaveBeenCalledTimes(1)
+    expect(dependencies.encoder.prepareTransfer).toHaveBeenCalledTimes(2)
   })
 
   it('publishes and receives acknowledgement before broadcasting the completed transfer', async () => {

@@ -33,6 +33,7 @@ import type {
   RgbServiceState,
   RgbTransferRequest,
   RgbUtxo,
+  RgbValidationHistory,
   RgbWalletRef,
   RgbWalletSnapshot,
 } from './types'
@@ -54,6 +55,13 @@ function getSpendableAmount(utxo: RgbUtxo, assetId: string) {
       allocation => allocation.assetId === assetId && allocation.settled && allocation.spendable
     )
     .reduce((total, allocation) => total + BigInt(allocation.amount), 0n)
+}
+
+function isIncompleteLocalHistoryError(error: unknown) {
+  return (
+    error instanceof RgbServiceError &&
+    error.message === 'RGB allocation parent Transition is missing from local history'
+  )
 }
 
 /**
@@ -1599,29 +1607,37 @@ export class RgbService {
     // A verified, canonical local DAG is authoritative. Do not make an
     // offline spend depend on the address-scoped backend being available.
     const localHistory = this.getLocalValidationHistory(requestedAssetId)
-    const validationHistory = this.localHistoryCoversAllocations(
+    const usingLocalHistory = this.localHistoryCoversAllocations(
       requestedAssetId,
       allocations.map(allocation => allocation.opId)
     )
-      ? { assetId: requestedAssetId, consignments: localHistory }
-      : await this.dependencies.stateSource.getValidationHistory(state.wallet, {
-          assetId: requestedAssetId,
-          allocations,
-        })
-    const localContract = this.getContractConsignment(requestedAssetId)
-    const localGenesis = this.getContractGenesis(requestedAssetId)
-    if (
-      localContract &&
-      !validationHistory.consignments.some(item => item.payload === localContract)
-    ) {
-      validationHistory.consignments.unshift({
-        opId: contractOperationId(requestedAssetId),
-        payload: localContract,
+    const getRemoteHistory = () =>
+      this.dependencies.stateSource.getValidationHistory(state.wallet, {
+        assetId: requestedAssetId,
+        allocations,
       })
+    const enrichValidationHistory = (history: RgbValidationHistory) => {
+      const localContract = this.getContractConsignment(requestedAssetId)
+      const localGenesis = this.getContractGenesis(requestedAssetId)
+      if (
+        localContract &&
+        !history.consignments.some(item => item.payload === localContract)
+      ) {
+        history.consignments.unshift({
+          opId: contractOperationId(requestedAssetId),
+          payload: localContract,
+        })
+      }
+      if (localContract) history.localContract = localContract
+      if (localGenesis) history.localGenesis = localGenesis
+      history.knownBlindSeals = this.getKnownBlindSeals()
+      return history
     }
-    if (localContract) validationHistory.localContract = localContract
-    if (localGenesis) validationHistory.localGenesis = localGenesis
-    validationHistory.knownBlindSeals = this.getKnownBlindSeals()
+    let validationHistory = enrichValidationHistory(
+      usingLocalHistory
+        ? { assetId: requestedAssetId, consignments: localHistory }
+        : await getRemoteHistory()
+    )
     const feeFunding = await this.dependencies.feeSource?.getFeeFunding(state.wallet)
     const reservedFeeOutpoints = new Set(
       Object.values(state.pending).flatMap(pending =>
@@ -1647,7 +1663,7 @@ export class RgbService {
         selectedUtxos,
       }),
     }
-    const prepared: RgbPreparedTransfer = await this.dependencies.encoder.prepareTransfer({
+    const encoderInput = () => ({
       wallet: state.wallet,
       snapshot: state.snapshot,
       request: resolvedRequest,
@@ -1656,6 +1672,19 @@ export class RgbService {
       ...(availableFeeFunding === undefined ? {} : { feeFunding: availableFeeFunding }),
       validationHistory,
     })
+    let prepared: RgbPreparedTransfer
+    try {
+      prepared = await this.dependencies.encoder.prepareTransfer(encoderInput())
+    } catch (error) {
+      // `history.opIds` is metadata from the encrypted checkpoint. Older
+      // checkpoints can claim an allocation Transition while their compact
+      // payload no longer reveals that assignment. Do not trust that index
+      // blindly: obtain the authoritative history once and retry before
+      // failing the send.
+      if (!usingLocalHistory || !isIncompleteLocalHistoryError(error)) throw error
+      validationHistory = enrichValidationHistory(await getRemoteHistory())
+      prepared = await this.dependencies.encoder.prepareTransfer(encoderInput())
+    }
 
     const selectedOutpoints = new Set(selectedUtxos.map(outpointKey))
     const lockedOutpoints = new Set(
