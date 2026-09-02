@@ -186,10 +186,12 @@ type RgbControllerApiService = {
   saveRgbRecoveryCheckpoint: (params: {
     wallet: RgbWalletRef
     lease?: RgbControllerWriteLeaseCredential
-    payloadParts: string[]
+    payload?: string
+    payloadParts?: string[]
     expectedUpdatedAt?: number
+    expectedRevision?: string
     updatedAt: number
-  }) => Promise<{ saved: boolean; updatedAt: number }>
+  }) => Promise<{ saved: boolean; updatedAt: number; revision?: string }>
   startRgbRecoveryCheckpointUpload: (params: {
     wallet: RgbWalletRef
     lease?: RgbControllerWriteLeaseCredential
@@ -4410,7 +4412,6 @@ export class WalletController extends BaseController {
         const checksum = await rgbRecoveryPayloadChecksum(payload)
         const expected = this.rgbRecoveryVersions.get(key)
         const updatedAt = Math.max(Date.now(), (expected?.updatedAt ?? -1) + 1)
-        const partCount = Math.ceil(payload.length / RGB_RECOVERY_PAYLOAD_PART_SIZE)
         const api = getRgbApiService()
         const activeLease = this.getRgbActiveWriteLease(wallet)
         const lease = activeLease
@@ -4420,75 +4421,93 @@ export class WalletController extends BaseController {
               fencingToken: activeLease.fencingToken,
             }
           : undefined
-        const { uploadId } = await api.startRgbRecoveryCheckpointUpload({
-          wallet,
-          ...(lease ? { lease } : {}),
-          partCount,
-          totalLength: payload.length,
-          checksum,
-          ...(expected?.updatedAt === undefined ? {} : { expectedUpdatedAt: expected.updatedAt }),
-          ...(expected?.revision === undefined ? {} : { expectedRevision: expected.revision }),
-          updatedAt,
-        })
-        let receivedIndexes = new Set<number>()
-        for (let index = 0; index < partCount; index++) {
-          if (receivedIndexes.has(index)) continue
-          const payloadPart = payload.slice(
-            index * RGB_RECOVERY_PAYLOAD_PART_SIZE,
-            (index + 1) * RGB_RECOVERY_PAYLOAD_PART_SIZE
-          )
-          try {
-            await api.uploadRgbRecoveryCheckpointPart({
-              wallet,
-              ...(lease ? { lease } : {}),
-              uploadId,
-              index,
-              payload: payloadPart,
-            })
-          } catch (error) {
-            const status = await api.getRgbRecoveryCheckpointUploadStatus({ wallet, uploadId }).catch(() => undefined)
-            if (!status || status.status !== 'pending') throw error
-            receivedIndexes = new Set(status.receivedIndexes || [])
-            if (!receivedIndexes.has(index)) throw error
-          }
-        }
         let result: { saved: boolean; updatedAt: number; revision?: string } | undefined
-        try {
-          result = await api.completeRgbRecoveryCheckpointUpload({
+        if (payload.length <= RGB_RECOVERY_PAYLOAD_PART_SIZE) {
+          // The normal checkpoint fits in one JSON request. The endpoint
+          // atomically replaces the encrypted payload with the same revision
+          // CAS as the resumable flow, avoiding start/part/complete/read.
+          result = await api.saveRgbRecoveryCheckpoint({
             wallet,
             ...(lease ? { lease } : {}),
-            uploadId,
+            payload,
+            ...(expected?.updatedAt === undefined ? {} : { expectedUpdatedAt: expected.updatedAt }),
+            ...(expected?.revision === undefined ? {} : { expectedRevision: expected.revision }),
+            updatedAt,
           })
-        } catch (error) {
-          let completionError = error
-          for (let attempt = 0; attempt < 7; attempt++) {
-            const status = await api.getRgbRecoveryCheckpointUploadStatus({ wallet, uploadId }).catch(() => undefined)
-            if (status?.status === 'completed') {
-              result = {
-                saved: status.saved === true,
-                updatedAt: status.updatedAt,
-                ...(status.revision ? { revision: status.revision } : {}),
-              }
-              break
-            }
-            // Do not mistake a timeout/concurrent complete for a failed
-            // checkpoint. The server holds a durable publishing lease and a
-            // later complete retry either resumes it or returns its terminal
-            // result.
-            if (status?.status !== 'publishing') throw completionError
-            await new Promise<void>(resolve => setTimeout(resolve, 5_000))
+        } else {
+          const partCount = Math.ceil(payload.length / RGB_RECOVERY_PAYLOAD_PART_SIZE)
+          const { uploadId } = await api.startRgbRecoveryCheckpointUpload({
+            wallet,
+            ...(lease ? { lease } : {}),
+            partCount,
+            totalLength: payload.length,
+            checksum,
+            ...(expected?.updatedAt === undefined ? {} : { expectedUpdatedAt: expected.updatedAt }),
+            ...(expected?.revision === undefined ? {} : { expectedRevision: expected.revision }),
+            updatedAt,
+          })
+          let receivedIndexes = new Set<number>()
+          for (let index = 0; index < partCount; index++) {
+            if (receivedIndexes.has(index)) continue
+            const payloadPart = payload.slice(
+              index * RGB_RECOVERY_PAYLOAD_PART_SIZE,
+              (index + 1) * RGB_RECOVERY_PAYLOAD_PART_SIZE
+            )
             try {
-              result = await api.completeRgbRecoveryCheckpointUpload({
+              await api.uploadRgbRecoveryCheckpointPart({
                 wallet,
                 ...(lease ? { lease } : {}),
                 uploadId,
+                index,
+                payload: payloadPart,
               })
-              break
-            } catch (retryError) {
-              completionError = retryError
+            } catch (error) {
+              const status = await api
+                .getRgbRecoveryCheckpointUploadStatus({ wallet, uploadId })
+                .catch(() => undefined)
+              if (!status || status.status !== 'pending') throw error
+              receivedIndexes = new Set(status.receivedIndexes || [])
+              if (!receivedIndexes.has(index)) throw error
             }
           }
-          if (!result) throw completionError
+          try {
+            result = await api.completeRgbRecoveryCheckpointUpload({
+              wallet,
+              ...(lease ? { lease } : {}),
+              uploadId,
+            })
+          } catch (error) {
+            let completionError = error
+            for (let attempt = 0; attempt < 7; attempt++) {
+              const status = await api
+                .getRgbRecoveryCheckpointUploadStatus({ wallet, uploadId })
+                .catch(() => undefined)
+              if (status?.status === 'completed') {
+                result = {
+                  saved: status.saved === true,
+                  updatedAt: status.updatedAt,
+                  ...(status.revision ? { revision: status.revision } : {}),
+                }
+                break
+              }
+              // Do not mistake a timeout/concurrent complete for a failed
+              // checkpoint. The server holds a durable publishing lease and a
+              // later complete retry either resumes it or returns its result.
+              if (status?.status !== 'publishing') throw completionError
+              await new Promise<void>(resolve => setTimeout(resolve, 5_000))
+              try {
+                result = await api.completeRgbRecoveryCheckpointUpload({
+                  wallet,
+                  ...(lease ? { lease } : {}),
+                  uploadId,
+                })
+                break
+              } catch (retryError) {
+                completionError = retryError
+              }
+            }
+            if (!result) throw completionError
+          }
         }
         if (!result) throw new Error('RGB recovery checkpoint completion did not return a result')
         this.rgbRecoveryVersions.set(key, {
@@ -4496,37 +4515,20 @@ export class WalletController extends BaseController {
           ...(result.revision ? { revision: result.revision } : {}),
         })
         if (!result.saved) return result
-        let verified = false
-        let verifiedRevision = result.revision
-        try {
-          const readback = await api.getRgbRecoveryCheckpoint({ wallet })
-          if (
-            !readback.payload ||
-            (result.revision !== undefined && readback.revision !== result.revision) ||
-            readback.payload.length !== payload.length ||
-            (await rgbRecoveryPayloadChecksum(readback.payload)) !== checksum
-          ) {
-            throw new Error('RGB recovery checkpoint verification failed')
-          }
-          await decryptRgbRecoveryCheckpoint(readback.payload, await this.rgbRecoveryKey(wallet))
-          verified = true
-          verifiedRevision ||= readback.revision
-          this.rgbRecoveryVerifiedFingerprints.set(key, diagnostic.fingerprint)
-          this.rgbRecoveryVersions.set(key, {
-            updatedAt: result.updatedAt,
-            ...(verifiedRevision ? { revision: verifiedRevision } : {}),
-          })
-        } catch (error) {
-          // Completion already returned a durable server revision. Treat an
-          // unavailable read-back as a retryable verification warning, not a
-          // failed write that would fork local state from the new checkpoint.
-          log.warn('RGB recovery checkpoint read-back verification failed', error)
-        }
+        // The API atomically commits the encrypted payload after its CAS (and
+        // verifies the checksum for multipart uploads). Local encryption has
+        // already succeeded, so a read-back only adds latency to every send.
+        const verifiedRevision = result.revision
+        this.rgbRecoveryVerifiedFingerprints.set(key, diagnostic.fingerprint)
+        this.rgbRecoveryVersions.set(key, {
+          updatedAt: result.updatedAt,
+          ...(verifiedRevision ? { revision: verifiedRevision } : {}),
+        })
         log.debug('RGB recovery: checkpoint saved', diagnostic)
         return {
           ...result,
           ...(verifiedRevision ? { revision: verifiedRevision } : {}),
-          verified,
+          verified: true,
           checksum,
           totalLength: payload.length,
         }

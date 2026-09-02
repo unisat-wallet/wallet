@@ -2591,4 +2591,29 @@ describe('RgbService', () => {
     expect(service.getSnapshot().syncedAt).toBe(2)
     expect(service.getLocalAssetBalance('rgb:asset')).toMatchObject({ balance: '80' })
   })
+
+  it('checkpoints only irreversible RGB send milestones', async () => {
+    const dependencies = createDependencies()
+    dependencies.onStatePersisted = vi.fn().mockResolvedValue({ verified: true })
+    const service = new RgbService(dependencies)
+    await service.open(wallet)
+    await service.enableRecoveryBackup()
+    await service.sync()
+    vi.mocked(dependencies.onStatePersisted).mockClear()
+
+    await service.prepareSend({
+      assetId: 'rgb:asset',
+      amount: '60',
+      invoice: rgbInvoice(),
+      feeRate: 2,
+    })
+    expect(dependencies.onStatePersisted).not.toHaveBeenCalled()
+
+    await service.completeSend('transfer-1', 'signed-psbt')
+
+    // Signed state, recipient ACK, and successful Bitcoin broadcast are the
+    // only non-replayable milestones. Publishing and history bookkeeping are
+    // recoverable from those checkpoints and stay local.
+    expect(dependencies.onStatePersisted).toHaveBeenCalledTimes(3)
+  })
 })

@@ -1673,7 +1673,10 @@ export class RgbService {
 
     const rollback = snapshotState(state)
     state.pending[prepared.id] = { prepared, request: resolvedRequest, createdAt: this.now() }
-    await this.persistWithRecoveryRollback(rollback)
+    // The unsigned reservation is locally durable and can be rebuilt after a
+    // restart. Do not upload a full checkpoint before signing produces an
+    // irreversible RGB transfer.
+    await this.persistWithRecoveryRollback(rollback, { skipRecovery: true })
     return prepared
   }
 
@@ -1852,7 +1855,9 @@ export class RgbService {
     if (existingHistory) Object.assign(existingHistory, broadcastedHistory)
     else sendHistory.push(broadcastedHistory)
     delete state.pending[transferId]
-    await this.persist()
+    // The preceding broadcast checkpoint contains the complete transaction;
+    // moving it into display history is local bookkeeping only.
+    await this.persist({ skipRecovery: true })
     return broadcast.completed
   }
 
@@ -1888,7 +1893,9 @@ export class RgbService {
     }
     if (!delivery.publishedAt) {
       delivery.publishedAt = this.now()
-      await this.persist({ waitForRecovery: true })
+      // Publication is replayable from the signed checkpoint and does not
+      // require another remote backup before requesting the recipient ACK.
+      await this.persist({ skipRecovery: true })
     }
     const getAcknowledgement = this.dependencies.transport.getAcknowledgement
     if (!getAcknowledgement)
@@ -2224,9 +2231,12 @@ export class RgbService {
    * succeeds. Restore both memory and encrypted storage when it fails, so a
    * reported failure cannot leave an invisible invoice or locked send behind.
    */
-  private async persistWithRecoveryRollback(rollback: RgbServiceState) {
+  private async persistWithRecoveryRollback(
+    rollback: RgbServiceState,
+    options: { skipRecovery?: boolean } = {}
+  ) {
     try {
-      await this.persist({ waitForRecovery: true })
+      await this.persist({ waitForRecovery: true, ...options })
     } catch (error) {
       const recoveryConflict = this.hasRecoveryConflict()
       this.state = rollback
