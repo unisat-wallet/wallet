@@ -1,8 +1,9 @@
 import { useNavigate } from 'react-router-dom';
+import { useEffect, useState } from 'react';
 
 import { Column, Icon, Row, Text } from '@/ui/components';
 import { fontSizes } from '@/ui/theme/font';
-import { useI18n, useSupportedAssets } from '@unisat/wallet-state';
+import { useI18n, useSupportedAssets, useWallet } from '@unisat/wallet-state';
 
 const rgbActionStyle = {
   width: '100%',
@@ -19,7 +20,22 @@ const rgbActionStyle = {
 export function RgbCard() {
   const navigate = useNavigate();
   const { t } = useI18n();
+  const wallet = useWallet();
   const supportedAssets = useSupportedAssets();
+  const [invoiceExpiry, setInvoiceExpiry] = useState(24 * 60 * 60);
+
+  useEffect(() => {
+    wallet.getRgbInvoiceExpirySeconds().then(setInvoiceExpiry).catch(() => undefined);
+  }, [wallet]);
+
+  const invoiceExpiryLabel =
+    invoiceExpiry === 0
+      ? t('rgb_invoice_expiry_never')
+      : invoiceExpiry === 60 * 60
+      ? t('rgb_invoice_expiry_1h')
+      : invoiceExpiry === 7 * 24 * 60 * 60
+      ? t('rgb_invoice_expiry_7d')
+      : t('rgb_invoice_expiry_24h');
 
   if (!supportedAssets.assets.rgb) return null;
 
@@ -47,6 +63,20 @@ export function RgbCard() {
           </Column>
         </Row>
         <Icon icon="right" size={fontSizes.lg} color="textDim" />
+      </Row>
+
+      <Row full itemsCenter justifyBetween style={rgbActionStyle} onClick={() => navigate('/settings/rgb-invoice-expiry')}>
+        <Row gap="md" itemsCenter style={{ minWidth: 0 }}>
+          <Icon icon="invoice" color="gold" size={20} />
+          <Column gap="xs" style={{ minWidth: 0 }}>
+            <Text text={t('rgb_default_invoice_expiry')} color="white" size="sm" />
+            <Text text={t('rgb_invoice_expiry_description')} color="textDim" size="xs" />
+          </Column>
+        </Row>
+        <Row itemsCenter gap="xs">
+          <Text text={invoiceExpiryLabel} color="textDim" size="xs" />
+          <Icon icon="right" size={fontSizes.lg} color="textDim" />
+        </Row>
       </Row>
     </Column>
   );

@@ -491,6 +491,8 @@ export interface WalletController {
 
   setAutoLockTimeId(timeId: number): Promise<void>
   getAutoLockTimeId(): Promise<number>
+  setRgbInvoiceExpirySeconds(seconds: number): Promise<void>
+  getRgbInvoiceExpirySeconds(): Promise<number>
 
   getDeveloperMode(): Promise<boolean>
   setDeveloperMode(developerMode: boolean): Promise<void>

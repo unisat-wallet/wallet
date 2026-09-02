@@ -3002,6 +3002,25 @@
   "rgb_asset_address_description": {
     "message": "RGB アセット UTXO とインボイス予約を確認"
   },
+  "rgb_invoice_expires": {
+    "message": "$time に期限切れになります"
+  },
+  "rgb_invoice_expired": {
+    "message": "期限切れ"
+  },
+  "rgb_invoice_never_expires": {
+    "message": "有効期限なし"
+  },
+  "rgb_default_invoice_expiry": {
+    "message": "インボイスのデフォルト有効期限"
+  },
+  "rgb_invoice_expiry_description": {
+    "message": "新しいインボイスのデフォルト有効期限を設定"
+  },
+  "rgb_invoice_expiry_1h": { "message": "1 時間" },
+  "rgb_invoice_expiry_24h": { "message": "24 時間" },
+  "rgb_invoice_expiry_7d": { "message": "7 日" },
+  "rgb_invoice_expiry_never": { "message": "有効期限なし" },
   "rgb_fee_address_description": {
     "message": "RGB 手数料 UTXO を確認し、未使用 BTC を引き出す"
   },

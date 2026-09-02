@@ -3002,6 +3002,25 @@
   "rgb_asset_address_description": {
     "message": "Просмотр UTXO RGB-активов и резервов инвойсов"
   },
+  "rgb_invoice_expires": {
+    "message": "Истекает $time"
+  },
+  "rgb_invoice_expired": {
+    "message": "Истёк"
+  },
+  "rgb_invoice_never_expires": {
+    "message": "Без срока действия"
+  },
+  "rgb_default_invoice_expiry": {
+    "message": "Срок действия инвойса по умолчанию"
+  },
+  "rgb_invoice_expiry_description": {
+    "message": "Установить срок действия для новых инвойсов"
+  },
+  "rgb_invoice_expiry_1h": { "message": "1 час" },
+  "rgb_invoice_expiry_24h": { "message": "24 часа" },
+  "rgb_invoice_expiry_7d": { "message": "7 дней" },
+  "rgb_invoice_expiry_never": { "message": "Без срока действия" },
   "rgb_fee_address_description": {
     "message": "Просмотр UTXO комиссий RGB и вывод неиспользованных BTC"
   },

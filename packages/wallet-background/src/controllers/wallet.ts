@@ -5081,6 +5081,17 @@ export class WalletController extends BaseController {
     return preferenceService.getAutoLockTimeId()
   }
 
+  getRgbInvoiceExpirySeconds = async () => {
+    return preferenceService.getRgbInvoiceExpirySeconds()
+  }
+
+  setRgbInvoiceExpirySeconds = async (seconds: number) => {
+    if (![0, 60 * 60, 24 * 60 * 60, 7 * 24 * 60 * 60].includes(seconds)) {
+      throw new Error('Invalid RGB invoice expiry')
+    }
+    preferenceService.setRgbInvoiceExpirySeconds(seconds)
+  }
+
   setAutoLockTimeId = async (timeId: number) => {
     preferenceService.setAutoLockTimeId(timeId)
     this._resetTimeout()

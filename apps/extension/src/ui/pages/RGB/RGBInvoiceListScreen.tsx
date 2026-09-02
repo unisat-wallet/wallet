@@ -1,13 +1,20 @@
 import { useCallback, useEffect, useState } from 'react';
 
-import { Column, Content, Header, Icon, Layout, Row, Text } from '@/ui/components';
+import { Button, Column, Content, Footer, Header, Icon, Layout, Row, Text } from '@/ui/components';
+import { getRgbAssetName, RGBAssetIcon } from '@/ui/components/RGBAssetIcon';
 import {
-  formatRgbPendingTime,
+  ANY_RGB_ASSET,
+  ANY_RGB_ASSET_ID,
+  formatRgbPendingAmount,
+  getRgbAssetId,
+  getRgbTokenIconInfo,
+  getRgbTokenPrecision,
+  getRgbTokenTicker,
   isRgbPendingInvoiceAwaitingAcceptance,
-  isRgbPendingInvoiceAwaitingConfirmation,
   type RgbPendingReceiveInvoice,
   useI18n,
   useNavigation,
+  useRGBListLogic,
   useTools,
   useWallet
 } from '@unisat/wallet-state';
@@ -21,12 +28,56 @@ const invoiceCardStyle = {
   border: '1px solid rgba(255,255,255,0.12)'
 };
 
+const copyButtonStyle = {
+  width: 32,
+  height: 32,
+  minWidth: 32,
+  borderRadius: 4,
+  background: 'rgba(255,255,255,0.1)',
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  cursor: 'pointer'
+};
+
+const amountTagStyle = {
+  maxWidth: '100%',
+  minHeight: 20,
+  padding: '2px 6px',
+  borderRadius: 3,
+  background: 'rgba(255,255,255,0.12)',
+  display: 'inline-flex',
+  alignItems: 'center',
+  boxSizing: 'border-box' as const
+};
+
+const formatExpiryTime = (
+  expirationTimestamp: number | undefined,
+  locale: string,
+  t: (key: string, values?: Record<string, string>) => string
+) => {
+  if (!expirationTimestamp) return t('rgb_invoice_never_expires');
+  const expiresAt = expirationTimestamp > 1_000_000_000_000 ? expirationTimestamp : expirationTimestamp * 1000;
+  const remainingSeconds = Math.ceil((expiresAt - Date.now()) / 1000);
+  if (remainingSeconds <= 0) return t('rgb_invoice_expired');
+
+  const [value, unit] =
+    remainingSeconds >= 86_400
+      ? [Math.ceil(remainingSeconds / 86_400), 'day']
+      : remainingSeconds >= 3_600
+      ? [Math.ceil(remainingSeconds / 3_600), 'hour']
+      : [Math.max(1, Math.ceil(remainingSeconds / 60)), 'minute'];
+  const relativeTime = new Intl.RelativeTimeFormat(locale.replace('_', '-'), { numeric: 'always' }).format(value, unit);
+  return t('rgb_invoice_expires', { time: relativeTime });
+};
+
 export default function RGBInvoiceListScreen() {
   const wallet = useWallet();
   const nav = useNavigation();
   const tools = useTools();
-  const { t } = useI18n();
+  const { t, locale } = useI18n();
   const { assetId } = nav.getRouteState<'RGBInvoiceListScreen'>();
+  const { items: rgbItems = [] } = useRGBListLogic();
   const [invoices, setInvoices] = useState<RgbPendingReceiveInvoice[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -53,8 +104,16 @@ export default function RGBInvoiceListScreen() {
       <Content>
         {invoices.map((invoice, index) => {
           const awaitingAcceptance = isRgbPendingInvoiceAwaitingAcceptance(invoice);
-          const awaitingConfirmation = isRgbPendingInvoiceAwaitingConfirmation(invoice);
-          const timeText = formatRgbPendingTime(invoice.createdAt || invoice.expirationTimestamp);
+          const expiryText = formatExpiryTime(invoice.expirationTimestamp, locale, t);
+          const invoiceAsset = invoice.assetId
+            ? rgbItems.find(item => getRgbAssetId(item) === invoice.assetId) || { assetId: invoice.assetId }
+            : ANY_RGB_ASSET;
+          const isAnyRgbAsset = !invoice.assetId || getRgbAssetId(invoiceAsset) === ANY_RGB_ASSET_ID;
+          const ticker = isAnyRgbAsset ? t('any_rgb_asset') : getRgbTokenTicker(invoiceAsset);
+          const name = isAnyRgbAsset ? t('any_rgb_asset') : getRgbAssetName(invoiceAsset) || ticker;
+          const precision = getRgbTokenPrecision({ ...invoiceAsset, tokenInfo: invoice });
+          const fixedAmount = formatRgbPendingAmount(invoice.amount, ticker, '', precision);
+          const amountLabel = fixedAmount ? `${t('fixed_amount')}: ${fixedAmount}` : t('any_amount');
           return (
             <Row
               key={invoice.recipientId || invoice.invoice || String(index)}
@@ -85,24 +144,43 @@ export default function RGBInvoiceListScreen() {
                 });
               }}>
               <Row itemsCenter gap="md" style={{ minWidth: 0, flex: 1 }}>
-                <Icon icon="invoice" color="gold" size={24} />
+                <RGBAssetIcon
+                  iconInfo={getRgbTokenIconInfo(invoiceAsset, ticker)}
+                  ticker={ticker}
+                  name={name}
+                  size={32}
+                  isAnyRgbAsset={isAnyRgbAsset}
+                />
                 <Column gap="xs" style={{ minWidth: 0 }}>
-                  <Text text={t('receiving_invoice')} color="white" size="sm" />
-                  {timeText ? <Text text={timeText} color="textDim" size="xs" /> : null}
+                  <Row itemsCenter gap="sm" style={{ minWidth: 0, flexWrap: 'wrap' }}>
+                    <Text text={name} color="white" size="sm" ellipsis style={{ maxWidth: 130 }} />
+                    <div style={amountTagStyle}>
+                      <Text text={amountLabel} color="textDim" size="xxs" />
+                    </div>
+                  </Row>
+                  <Text text={expiryText} color="textDim" size="xs" />
                   {awaitingAcceptance ? <Text text={t('rgb_status_pending_accept')} color="gold" size="xs" /> : null}
-                  {awaitingConfirmation ? <Text text={t('transaction_unconfirmed')} color="gold" size="xs" /> : null}
                 </Column>
               </Row>
-              <Icon icon="right" color="textDim" size={14} />
+              <div
+                style={{ ...copyButtonStyle, opacity: awaitingAcceptance ? 0.45 : 1 }}
+                onClick={(event) => {
+                  event.stopPropagation();
+                  if (awaitingAcceptance) return;
+                  tools.copyToClipboard(invoice.invoice);
+                  tools.toastSuccess(t('copied'));
+                }}>
+                <Icon icon="copy" color="white_muted" size={14} />
+              </div>
             </Row>
           );
         })}
         {!loading && !invoices.length ? <Text text={t('no_pending_blind_invoices')} color="textDim" textCenter size="sm" /> : null}
         {loading ? <Text text={t('loading')} color="textDim" textCenter size="sm" /> : null}
-        {!loading ? (
-          <Text text={t('refresh')} color="gold" textCenter size="sm" onClick={() => void loadInvoices()} />
-        ) : null}
       </Content>
+      <Footer>
+        <Button full text={t('refresh')} preset="primary" disabled={loading} onClick={() => void loadInvoices()} />
+      </Footer>
     </Layout>
   );
 }

@@ -64,6 +64,7 @@ type RgbReceiveWallet = {
     batchTransferIdx: number
     skipSync?: boolean
   }): Promise<RgbCancelReceiveInvoiceResult>
+  getRgbInvoiceExpirySeconds(): Promise<number>
 }
 
 type RGBReceiveRouteState = {
@@ -361,7 +362,7 @@ export function useRGBReceiveScreenLogic() {
     if (nextMode === 'any') setAmount('')
   }
 
-  const createReceiveInvoice = (skipSync = false) => {
+  const createReceiveInvoice = async (skipSync = false) => {
     const params: {
       assetId?: string
       amount?: string
@@ -375,7 +376,12 @@ export function useRGBReceiveScreenLogic() {
       params.amount = normalizedAmount
     }
 
-    return rgbWallet.createRgbBlindReceive({ ...params, ...(skipSync ? { skipSync: true } : {}) })
+    const durationSeconds = await rgbWallet.getRgbInvoiceExpirySeconds()
+    return rgbWallet.createRgbBlindReceive({
+      ...params,
+      ...(durationSeconds > 0 ? { durationSeconds } : {}),
+      ...(skipSync ? { skipSync: true } : {})
+    })
   }
 
   const loadPendingInvoices = useCallback(async () => {

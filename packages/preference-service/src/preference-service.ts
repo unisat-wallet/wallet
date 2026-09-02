@@ -47,6 +47,7 @@ const defaultTemplate: BasePreferenceStore = {
   showSafeNotice: true,
   addressFlags: {},
   autoLockTimeId: DEFAULT_LOCKTIME_ID,
+  rgbInvoiceExpirySeconds: 24 * 60 * 60,
   openInSidePanel: false,
   developerMode: false,
   rateUsStatus: {
@@ -548,6 +549,14 @@ export class PreferenceService extends EventEmitter<PreferenceServiceEvents> {
 
   setAutoLockTimeId(id: number): void {
     this.store.autoLockTimeId = id
+  }
+
+  getRgbInvoiceExpirySeconds(): number {
+    return this.store.rgbInvoiceExpirySeconds ?? 24 * 60 * 60
+  }
+
+  setRgbInvoiceExpirySeconds(seconds: number): void {
+    this.store.rgbInvoiceExpirySeconds = seconds
   }
 
   /**

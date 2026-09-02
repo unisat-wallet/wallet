@@ -3062,6 +3062,25 @@
   "rgb_asset_address_description": {
     "message": "查看 RGB 資產 UTXO 與 Invoice 保留項目"
   },
+  "rgb_invoice_expires": {
+    "message": "將於 $time 到期"
+  },
+  "rgb_invoice_expired": {
+    "message": "已過期"
+  },
+  "rgb_invoice_never_expires": {
+    "message": "永不過期"
+  },
+  "rgb_default_invoice_expiry": {
+    "message": "預設 Invoice 有效期"
+  },
+  "rgb_invoice_expiry_description": {
+    "message": "設定新建 Invoice 的預設有效期"
+  },
+  "rgb_invoice_expiry_1h": { "message": "1 小時" },
+  "rgb_invoice_expiry_24h": { "message": "24 小時" },
+  "rgb_invoice_expiry_7d": { "message": "7 天" },
+  "rgb_invoice_expiry_never": { "message": "永不過期" },
   "rgb_fee_address_description": {
     "message": "查看 RGB 手續費 UTXO 並提回未使用 BTC"
   },

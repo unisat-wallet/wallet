@@ -96,6 +96,7 @@ export interface BasePreferenceStore {
 
   // Extension-specific fields (optional)
   autoLockTimeId?: number
+  rgbInvoiceExpirySeconds?: number
   openInSidePanel?: boolean
   developerMode?: boolean
 
@@ -121,6 +122,7 @@ export interface RateUsStatus {
 // Extension-specific additions
 export interface ExtensionPreferenceStore extends BasePreferenceStore {
   autoLockTimeId: number
+  rgbInvoiceExpirySeconds: number
   openInSidePanel: boolean
   developerMode: boolean
 }

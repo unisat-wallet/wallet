@@ -201,6 +201,7 @@ export type RouteParamList = {
     recipientId?: string
     invoice?: string
   }
+  RgbInvoiceExpiryScreen: undefined
   RGBTokenScreen: {
     assetId: string
     tokenBalance?: RgbBalance

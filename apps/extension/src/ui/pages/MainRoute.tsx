@@ -80,6 +80,7 @@ import NetworkTypeScreen from './Settings/NetworkTypeScreen';
 import NotificationListScreen from './Settings/NotificationListScreen';
 import RgbUtxoInspectionScreen from './Settings/RgbUtxoInspectionScreen';
 import RgbFeePoolInspectionScreen from './Settings/RgbFeePoolInspectionScreen';
+import RgbInvoiceExpiryScreen from './Settings/RgbInvoiceExpiryScreen';
 import UpgradeNoticeScreen from './Settings/UpgradeNoticeScreen';
 import CosmosSignDemo from './Test/CosmosSignDemo';
 import TestScreen from './Test/TestScreen';
@@ -203,6 +204,10 @@ export const routes = {
   RgbFeePoolInspectionScreen: {
     path: '/settings/rgb-fee-pool',
     element: <RgbFeePoolInspectionScreen />
+  },
+  RgbInvoiceExpiryScreen: {
+    path: '/settings/rgb-invoice-expiry',
+    element: <RgbInvoiceExpiryScreen />
   },
   LanguageScreen: {
     path: '/settings/language',

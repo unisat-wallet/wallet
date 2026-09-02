@@ -103,7 +103,7 @@ describe('useRGBReceiveScreenLogic', () => {
       await result.current.onCreateInvoice()
     })
 
-    expect(wallet.createRgbBlindReceive).toHaveBeenCalledWith({ skipSync: true })
+    expect(wallet.createRgbBlindReceive).toHaveBeenCalledWith({ durationSeconds: 86_400, skipSync: true })
   })
 
   it('clears a fixed amount when switching back to Any Asset', async () => {
@@ -159,6 +159,7 @@ describe('useRGBReceiveScreenLogic', () => {
       expect(wallet.createRgbBlindReceive).toHaveBeenCalledWith({
         assetId,
         amount: '123456789',
+        durationSeconds: 86_400,
         skipSync: true,
       })
     })
@@ -184,6 +185,7 @@ describe('useRGBReceiveScreenLogic', () => {
     expect(wallet.createRgbBlindReceive).toHaveBeenCalledWith({
       assetId,
       amount: '5000000000',
+      durationSeconds: 86_400,
       skipSync: true,
     })
   })
@@ -221,15 +223,13 @@ describe('useRGBReceiveScreenLogic', () => {
     expect(wallet.getRgbPendingReceiveInvoices).toHaveBeenCalledTimes(1)
   })
 
-  it('polls a waiting invoice and updates it when its funding UTXO confirms', async () => {
-    const setIntervalSpy = vi.spyOn(global, 'setInterval')
-    const clearIntervalSpy = vi.spyOn(global, 'clearInterval')
+  it('opens a waiting invoice in the dedicated detail screen after creation', async () => {
     const waitingInvoice = {
       invoice: 'rgb:invoice',
       recipientId: 'recipient-id',
       status: 'WaitingConfirmations',
     }
-    const { wrapper, wallet } = createHookTestHarness()
+    const { wrapper, wallet, navigation } = createHookTestHarness()
     wallet.createRgbBlindReceive.mockResolvedValue(waitingInvoice)
 
     const { result } = renderHook(() => useRGBReceiveScreenLogic(), { wrapper })
@@ -238,26 +238,10 @@ describe('useRGBReceiveScreenLogic', () => {
       await result.current.onCreateInvoice()
     })
 
-    await waitFor(() => {
-      expect(setIntervalSpy).toHaveBeenCalledWith(expect.any(Function), 10_000)
+    expect(navigation.navigate).toHaveBeenCalledWith('RGBInvoiceDetailScreen', {
+      recipientId: 'recipient-id',
+      invoice: 'rgb:invoice',
     })
-
-    wallet.getRgbPendingReceiveInvoices.mockResolvedValue({
-      list: [{ ...waitingInvoice, status: 'WaitingCounterparty' }],
-    })
-    await act(async () => {
-      await result.current.loadPendingInvoices()
-    })
-
-    expect(result.current.selectedPendingInvoice).toMatchObject({
-      status: 'WaitingCounterparty',
-    })
-    await waitFor(() => {
-      expect(clearIntervalSpy).toHaveBeenCalled()
-    })
-
-    setIntervalSpy.mockRestore()
-    clearIntervalSpy.mockRestore()
   })
 
   it('polls pending invoices from the invoice list even when none is selected', async () => {

@@ -2993,6 +2993,25 @@
   "rgb_asset_address_description": {
     "message": "Ver UTXO de activos RGB y reservas de facturas"
   },
+  "rgb_invoice_expires": {
+    "message": "Vence $time"
+  },
+  "rgb_invoice_expired": {
+    "message": "Vencida"
+  },
+  "rgb_invoice_never_expires": {
+    "message": "No vence"
+  },
+  "rgb_default_invoice_expiry": {
+    "message": "Caducidad predeterminada de la factura"
+  },
+  "rgb_invoice_expiry_description": {
+    "message": "Establece la caducidad predeterminada para nuevas facturas"
+  },
+  "rgb_invoice_expiry_1h": { "message": "1 hora" },
+  "rgb_invoice_expiry_24h": { "message": "24 horas" },
+  "rgb_invoice_expiry_7d": { "message": "7 días" },
+  "rgb_invoice_expiry_never": { "message": "No vence" },
   "rgb_fee_address_description": {
     "message": "Ver UTXO de comisiones RGB y retirar BTC no usado"
   },
