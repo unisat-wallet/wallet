@@ -353,6 +353,43 @@ describe('RgbService', () => {
     expect(dependencies.stateSource.getClaimedConsignments).not.toHaveBeenCalled()
   })
 
+  it('claims each pending invoice only once after the recovery service accepts it', async () => {
+    const dependencies = createDependencies()
+    const claimConsignments = vi.fn().mockResolvedValue(1)
+    dependencies.stateSource.claimConsignments = claimConsignments
+    const service = new RgbService(dependencies)
+    await service.open(wallet)
+    ;(service as any).state.pendingReceives = [
+      {
+        invoice: rgbInvoice(),
+        recipientId: 'recipient-1',
+        createdAt: 1,
+        seal: { txid: 'a'.repeat(64), vout: 0, blinding: 1n },
+      },
+      {
+        invoice: rgbInvoice(),
+        recipientId: 'recipient-2',
+        createdAt: 1,
+        seal: { txid: 'b'.repeat(64), vout: 1, blinding: 2n },
+      },
+    ]
+
+    await expect(service.claimPendingReceives()).resolves.toEqual({ claimed: 2 })
+    await expect(service.claimPendingReceives()).resolves.toEqual({ claimed: 0 })
+
+    const reopened = new RgbService(dependencies)
+    await reopened.open(wallet)
+    await expect(reopened.claimPendingReceives()).resolves.toEqual({ claimed: 0 })
+
+    expect(claimConsignments).toHaveBeenCalledTimes(2)
+    expect((service as any).state.pendingReceives).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ recipientId: 'recipient-1', claimedAt: expect.any(Number) }),
+        expect.objectContaining({ recipientId: 'recipient-2', claimedAt: expect.any(Number) }),
+      ])
+    )
+  })
+
   it('queues metadata from a validated receive before the user accepts it', async () => {
     const dependencies = createDependencies()
     dependencies.transport.getConsignment = vi.fn().mockResolvedValue({

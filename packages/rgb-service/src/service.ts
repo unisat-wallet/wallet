@@ -1189,16 +1189,29 @@ export class RgbService {
     const state = this.requireState()
     const claim = this.dependencies.stateSource.claimConsignments
     if (!claim) return { claimed: 0 }
-    const pending = this.getPendingReceives()
-    try {
-      const claimed = await Promise.all(
-        pending.map(receive => claim(state.wallet, receive.recipientId))
-      )
-      return { claimed: claimed.reduce((total, count) => total + count, 0) }
-    } catch (error) {
-      if (this.dependencies.transport.getConsignment) return { claimed: 0 }
-      throw error
-    }
+    // Claiming is a durable wallet-to-recipient binding. Once the backend has
+    // accepted it, retain that acknowledgement locally so ordinary receive
+    // polling does not write the same binding on every wallet open.
+    const pending = this.getPendingReceives().filter(receive => receive.claimedAt === undefined)
+    if (!pending.length) return { claimed: 0 }
+
+    const results = await Promise.allSettled(
+      pending.map(async receive => {
+        const claimed = await claim(state.wallet, receive.recipientId)
+        receive.claimedAt = this.now()
+        return claimed
+      })
+    )
+    const claimed = results.reduce((total, result) => {
+      return result.status === 'fulfilled' ? total + result.value : total
+    }, 0)
+    if (results.some(result => result.status === 'fulfilled')) await this.persist()
+
+    const failure = results.find(
+      (result): result is PromiseRejectedResult => result.status === 'rejected'
+    )
+    if (failure && !this.dependencies.transport.getConsignment) throw failure.reason
+    return { claimed }
   }
 
   async cancelBlindReceive(recipientId: string) {

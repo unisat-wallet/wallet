@@ -198,6 +198,8 @@ export interface RgbPendingReceive {
   recipientId: string
   assetId?: string
   amount?: string
+  /** This invoice's recipient ID has been durably registered with the recovery service. */
+  claimedAt?: number
   /** The validated asset metadata has already been delivered to the indexer. */
   assetMetadataIndexed?: boolean
   expirationTimestamp?: number
