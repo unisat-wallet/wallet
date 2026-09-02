@@ -824,6 +824,8 @@ export class WalletController extends BaseController {
   private readonly rgbRecoveryBackups = new Map<string, Promise<unknown>>()
   private readonly rgbRecoveryVersions = new Map<string, { updatedAt?: number; revision?: string }>()
   private readonly rgbWriteLeases = new Map<string, RgbControllerWriteLease>()
+  /** Coalesce concurrent startup pollers that need the same writer lease. */
+  private readonly rgbWriteLeaseEnsures = new Map<string, Promise<void>>()
   /** Last content successfully round-tripped to recovery for each funding wallet. */
   private readonly rgbRecoveryVerifiedFingerprints = new Map<string, string>()
   private readonly rgbCoordinator = new RgbWalletCoordinator({
@@ -4609,6 +4611,27 @@ export class WalletController extends BaseController {
     // Reserve enough time for the preflight and local encoder; a later phase
     // renews this lease while a hardware signer is awaiting user confirmation.
     if (!options.forceRenew && existing && existing.expiresAt > Date.now() + 30_000) return
+    // A user-requested takeover must retain its own server request and never
+    // be silently folded into an ordinary background refresh.
+    if (options.takeover) return this.ensureRgbWriteLeaseOnce(context, options)
+    const inFlight = this.rgbWriteLeaseEnsures.get(key)
+    if (inFlight) return inFlight
+
+    const ensure = this.ensureRgbWriteLeaseOnce(context, options)
+    this.rgbWriteLeaseEnsures.set(key, ensure)
+    try {
+      await ensure
+    } finally {
+      if (this.rgbWriteLeaseEnsures.get(key) === ensure) this.rgbWriteLeaseEnsures.delete(key)
+    }
+  }
+
+  private async ensureRgbWriteLeaseOnce(
+    context: LocalRgbServiceContext,
+    options: { takeover?: boolean; forceRenew?: boolean }
+  ): Promise<void> {
+    const key = this.rgbWriteLeaseKey(context.wallet)
+    const existing = this.rgbWriteLeases.get(key)
     const deviceId = await this.getRgbDeviceId()
     if (existing && existing.expiresAt > Date.now()) {
       const renewed = await getRgbApiService().renewRgbWriteLease({

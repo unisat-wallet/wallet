@@ -1161,6 +1161,31 @@ describe('RGB wallet references', () => {
     expect(ensure).toHaveBeenCalledWith(context, { takeover: true })
   })
 
+  it('coalesces concurrent RGB writer lease acquisition for the same wallet', async () => {
+    const wallet = new WalletController()
+    const context = {
+      service: {},
+      wallet: { walletId: 'wallet-1', fundingAddress: 'bc1p-rgb-funding', network: 'mainnet' },
+    }
+    let resolveAcquire: ((value: { leaseId: string; fencingToken: number; expiresAt: number }) => void) | undefined
+    const acquireRgbWriteLease = vi.fn(
+      () =>
+        new Promise<{ leaseId: string; fencingToken: number; expiresAt: number }>(resolve => {
+          resolveAcquire = resolve
+        })
+    )
+    ;(walletApiService as any).rgb = { acquireRgbWriteLease }
+    vi.spyOn(wallet as any, 'getRgbDeviceId').mockResolvedValue('device_abcdefghijklmnop')
+
+    const first = (wallet as any).ensureRgbWriteLease(context, { forceRenew: true })
+    const second = (wallet as any).ensureRgbWriteLease(context, { forceRenew: true })
+    await new Promise(resolve => setTimeout(resolve, 0))
+    expect(acquireRgbWriteLease).toHaveBeenCalledTimes(1)
+
+    resolveAcquire?.({ leaseId: 'a'.repeat(24), fencingToken: 1, expiresAt: Date.now() + 60_000 })
+    await expect(Promise.all([first, second])).resolves.toEqual([undefined, undefined])
+  })
+
   it('retries a durable received-allocation UTXO replacement after a backend failure', async () => {
     const wallet = new WalletController()
     let pendingUtxoSync: any = {
