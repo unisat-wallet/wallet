@@ -296,6 +296,11 @@ export class RgbService {
     const snapshot = normalizeSnapshot(
       await this.dependencies.stateSource.getSnapshot(state.wallet)
     )
+    // Keep the local funding update while the indexer still returns the RGB
+    // allocations that this installation already spent in a broadcast tx.
+    // Once those outpoints disappear from the remote snapshot, it is safe to
+    // accept the remote state again, even before the transfer is confirmed.
+    if (this.hasStaleBroadcastedFundingOutpoints(snapshot)) return state.snapshot
     // The indexer is an eventually-consistent replica of wallet-owned state.
     // Before accepting an empty response, confirm that every locally retained
     // UTXO is terminal. This preserves state while an indexer is rebuilding,
@@ -315,6 +320,20 @@ export class RgbService {
     state.snapshot = snapshot
     await this.persist({ skipRecovery: !checkpointSnapshotChanged })
     return state.snapshot
+  }
+
+  private hasStaleBroadcastedFundingOutpoints(snapshot: RgbWalletSnapshot) {
+    const state = this.requireState()
+    const spentOutpoints = new Set(
+      (state.pendingSendHistory || [])
+        .filter(item => item.status === 'broadcasted')
+        .flatMap(item => item.spentOutpoints || [])
+        .map(outpoint => `${outpoint.txid}:${outpoint.vout}`)
+    )
+    return (
+      spentOutpoints.size > 0 &&
+      snapshot.utxos.some(utxo => spentOutpoints.has(outpointKey(utxo)))
+    )
   }
 
   private async areLocalSnapshotUtxosTerminal() {
@@ -1811,6 +1830,9 @@ export class RgbService {
       amount: pending.request.amount,
       txid: broadcast.completed.txid,
       invoice: pending.request.invoice,
+      ...(broadcast.completed.fundingUpdate?.spentOutpoints
+        ? { spentOutpoints: broadcast.completed.fundingUpdate.spentOutpoints }
+        : {}),
       createdAt: broadcast.broadcastAt,
       status: 'broadcasted' as const,
     }

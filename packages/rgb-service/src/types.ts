@@ -259,6 +259,8 @@ export interface RgbPendingSendHistory {
   amount: string
   txid?: string
   invoice?: string
+  /** Funding allocations removed locally when this broadcast was accepted. */
+  spentOutpoints?: RgbOutpoint[]
   createdAt: number
   status: 'broadcasted' | 'canceled' | 'rejected'
 }

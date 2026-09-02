@@ -2475,5 +2475,59 @@ describe('RgbService', () => {
       { txid: 'a'.repeat(64), vout: 0 },
       { txid: 'e'.repeat(64), vout: 1 },
     ])
+    expect(service.getLocalAssetBalance('rgb:asset')).toMatchObject({ balance: '80' })
+
+    // The indexer has not yet observed the funding transaction and still
+    // reports the spent 60-unit allocation. Do not regress the local balance.
+    await service.sync()
+    expect(service.getSnapshot().utxos.map(utxo => utxo.outpoint)).toEqual([
+      { txid: 'a'.repeat(64), vout: 0 },
+      { txid: 'e'.repeat(64), vout: 1 },
+    ])
+
+    // As soon as the remote snapshot no longer contains the spent outpoint,
+    // normal snapshot synchronization resumes.
+    vi.mocked(dependencies.stateSource.getSnapshot).mockResolvedValue({
+      syncedAt: 2,
+      utxos: [
+        {
+          outpoint: { txid: 'a'.repeat(64), vout: 0 },
+          satoshis: 1000,
+          scriptPubKey: '5120' + '00'.repeat(32),
+          publicKey: '02' + '11'.repeat(32),
+          allocations: [
+            {
+              assetId: 'rgb:asset',
+              amount: '40',
+              settled: true,
+              spendable: true,
+              opId: 'c'.repeat(64),
+              assignmentIndex: 0,
+              assignmentType: 4000,
+            },
+          ],
+        },
+        {
+          outpoint: { txid: 'e'.repeat(64), vout: 1 },
+          satoshis: 700,
+          scriptPubKey: '5120' + '11'.repeat(32),
+          publicKey: '02' + '22'.repeat(32),
+          allocations: [
+            {
+              assetId: 'rgb:asset',
+              amount: '40',
+              settled: true,
+              spendable: true,
+              opId: 'd'.repeat(64),
+              assignmentIndex: 1,
+              assignmentType: 4000,
+            },
+          ],
+        },
+      ],
+    })
+    await service.sync()
+    expect(service.getSnapshot().syncedAt).toBe(2)
+    expect(service.getLocalAssetBalance('rgb:asset')).toMatchObject({ balance: '80' })
   })
 })
