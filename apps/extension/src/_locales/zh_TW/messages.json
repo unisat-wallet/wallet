@@ -3059,6 +3059,12 @@
   "rgb_asset_address": {
     "message": "RGB 資產地址"
   },
+  "rgb_asset_address_description": {
+    "message": "查看 RGB 資產 UTXO 與 Invoice 保留項目"
+  },
+  "rgb_fee_address_description": {
+    "message": "查看 RGB 手續費 UTXO 並提回未使用 BTC"
+  },
   "rgb_fee_pool_locked": {
     "message": "已鎖定"
   },

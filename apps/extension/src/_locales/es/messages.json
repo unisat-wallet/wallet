@@ -2990,6 +2990,12 @@
   "rgb_asset_address": {
     "message": "Dirección de activos RGB"
   },
+  "rgb_asset_address_description": {
+    "message": "Ver UTXO de activos RGB y reservas de facturas"
+  },
+  "rgb_fee_address_description": {
+    "message": "Ver UTXO de comisiones RGB y retirar BTC no usado"
+  },
   "rgb_fee_pool_locked": {
     "message": "Bloqueado"
   },

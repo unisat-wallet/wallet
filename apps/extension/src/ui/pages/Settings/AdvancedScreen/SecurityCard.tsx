@@ -12,7 +12,7 @@ export function SecurityCard() {
   const lockTimeConfig = getLockTimeInfo(autoLockTimeId, t);
 
   return (
-    <Card style={{ borderRadius: 10 }}>
+    <Card style={{ borderRadius: 10, padding: '12px 16px' }}>
       <Column fullX>
         {/* Change Password Option */}
         <Row

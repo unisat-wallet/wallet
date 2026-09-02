@@ -3062,6 +3062,12 @@
   "rgb_asset_address": {
     "message": "RGB Asset Address"
   },
+  "rgb_asset_address_description": {
+    "message": "View RGB asset UTXOs and invoice reservations"
+  },
+  "rgb_fee_address_description": {
+    "message": "View RGB Fee UTXOs and withdraw unused BTC"
+  },
   "rgb_fee_pool_locked": {
     "message": "Locked"
   },

@@ -2999,6 +2999,12 @@
   "rgb_asset_address": {
     "message": "RGB アセットアドレス"
   },
+  "rgb_asset_address_description": {
+    "message": "RGB アセット UTXO とインボイス予約を確認"
+  },
+  "rgb_fee_address_description": {
+    "message": "RGB 手数料 UTXO を確認し、未使用 BTC を引き出す"
+  },
   "rgb_fee_pool_locked": {
     "message": "ロック済み"
   },
