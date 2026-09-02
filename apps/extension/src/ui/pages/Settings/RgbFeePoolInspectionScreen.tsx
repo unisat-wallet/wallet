@@ -20,6 +20,12 @@ const feeUtxoCardStyle = {
   cursor: 'pointer'
 };
 
+const feeUtxoSequenceStyle = {
+  width: 20,
+  minWidth: 20,
+  textAlign: 'center' as const
+};
+
 const accountInfoCardStyle = {
   borderRadius: 10,
   padding: 0,
@@ -145,7 +151,7 @@ export default function RgbFeePoolInspectionScreen() {
           </Column>
         </Card>
 
-        {inspection?.utxos.map((utxo) => {
+        {inspection?.utxos.map((utxo, index) => {
           const status = utxo.locked ? t('rgb_fee_pool_locked') : utxo.pending ? t('pending') : t('available');
           const statusColor = utxo.locked ? 'textDim' : utxo.pending ? 'gold' : 'success';
           return (
@@ -155,7 +161,7 @@ export default function RgbFeePoolInspectionScreen() {
               gap="md"
               style={feeUtxoCardStyle}
               onClick={() => nav.navToExplorerTx(utxo.txid)}>
-              <Icon icon="btc" color={utxo.locked ? 'textDim' : utxo.pending ? 'gold' : 'success'} size={32} />
+              <Text text={index + 1} color="textDim" size="sm" style={feeUtxoSequenceStyle} />
               <Column fullX gap="xs" style={{ minWidth: 0 }}>
                 <Row full justifyBetween itemsCenter gap="sm">
                   <Text

@@ -1409,8 +1409,24 @@ export class RgbService {
    */
   getUtxoInspection() {
     const state = this.requireState()
+    const assetMetadata = Object.fromEntries(
+      [...new Set(state.snapshot.utxos.flatMap(utxo => utxo.allocations.map(allocation => allocation.assetId)))].map(
+        assetId => {
+          const asset = this.getLocalAssetDetail(assetId)
+          return [
+            assetId,
+            {
+              ...(asset.name ? { name: asset.name } : {}),
+              ...(asset.ticker ? { ticker: asset.ticker } : {}),
+              ...(asset.precision === undefined ? {} : { precision: asset.precision }),
+            },
+          ]
+        }
+      )
+    )
     return {
       snapshot: state.snapshot,
+      assetMetadata,
       invoiceReservations: (state.pendingReceives || []).map(receive => ({
         invoice: receive.invoice,
         recipientId: receive.recipientId,

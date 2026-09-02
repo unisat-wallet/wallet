@@ -687,6 +687,7 @@ export interface WalletController {
         }>
       }>
     }
+    assetMetadata: Record<string, { name?: string; ticker?: string; precision?: number }>
     invoiceReservations: Array<{
       invoice: string
       recipientId: string

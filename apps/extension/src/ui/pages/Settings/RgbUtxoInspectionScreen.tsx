@@ -1,14 +1,11 @@
 import { useCallback, useEffect, useState } from 'react';
 
 import { Button, Card, Column, Content, CopyableAddress, Header, Icon, Layout, Row, Text } from '@/ui/components';
-import { useI18n, useNavigation, useTools, useWallet } from '@unisat/wallet-state';
+import { toRgbDisplayAmount, useI18n, useNavigation, useTools, useWallet } from '@unisat/wallet-state';
 
 type UtxoInspection = Awaited<ReturnType<ReturnType<typeof useWallet>['getRgbUtxoInspection']>>;
 
 const shortTxid = (txid: string) => (txid.length > 18 ? `${txid.slice(0, 10)}…${txid.slice(-6)}` : txid);
-
-const displaySyncTime = (syncedAt: number) =>
-  syncedAt ? new Intl.DateTimeFormat(undefined, { dateStyle: 'short', timeStyle: 'medium' }).format(syncedAt) : '—';
 
 const utxoCardStyle = {
   minHeight: 72,
@@ -27,7 +24,7 @@ const utxoCardWithDetailsStyle = {
 };
 
 const utxoDetailsCardStyle = {
-  padding: '8px 12px 10px 52px',
+  padding: '8px 12px 10px 40px',
   borderRadius: '0 0 8px 8px',
   boxSizing: 'border-box' as const,
   background: 'rgba(255,255,255,0.04)',
@@ -35,17 +32,11 @@ const utxoDetailsCardStyle = {
   borderTop: 0
 };
 
-const summaryRowStyle = {
-  minHeight: 52,
-  padding: '0 16px',
-  boxSizing: 'border-box' as const
-};
-
 const accountInfoCardStyle = {
   borderRadius: 10,
   padding: 0,
   overflow: 'hidden',
-  minHeight: 211,
+  minHeight: 120,
   boxSizing: 'border-box' as const
 };
 
@@ -71,15 +62,19 @@ const statusPillStyle = (kind: 'invoice' | 'assets' | 'available') => ({
       : 'rgba(255,255,255,0.10)'
 });
 
-const allocationPillStyle = {
-  maxWidth: '100%',
-  height: 20,
-  padding: '0 6px',
-  borderRadius: 3,
-  background: 'rgba(255,255,255,0.10)',
-  display: 'inline-flex',
-  alignItems: 'center',
+const assetAllocationCardStyle = {
+  minHeight: 40,
+  padding: '6px 8px',
+  borderRadius: 6,
+  background: 'rgba(255,255,255,0.07)',
+  border: '1px solid rgba(255,255,255,0.08)',
   boxSizing: 'border-box' as const
+};
+
+const utxoSequenceStyle = {
+  width: 20,
+  minWidth: 20,
+  textAlign: 'center' as const
 };
 
 export default function RgbUtxoInspectionScreen() {
@@ -90,30 +85,39 @@ export default function RgbUtxoInspectionScreen() {
   const [inspection, setInspection] = useState<UtxoInspection>();
   const [refreshing, setRefreshing] = useState(false);
 
-  const refresh = useCallback(async (showSuccess = false) => {
-    setRefreshing(true);
-    try {
-      setInspection(await wallet.getRgbUtxoInspection({ forceSync: true }));
-      if (showSuccess) {
-        tools.toastSuccess(t('success'));
+  const refresh = useCallback(
+    async (showSuccess = false) => {
+      setRefreshing(true);
+      try {
+        setInspection(await wallet.getRgbUtxoInspection({ forceSync: true }));
+        if (showSuccess) {
+          tools.toastSuccess(t('success'));
+        }
+      } catch (error) {
+        tools.toastError(error instanceof Error ? error.message : String(error));
+      } finally {
+        setRefreshing(false);
       }
-    } catch (error) {
-      tools.toastError(error instanceof Error ? error.message : String(error));
-    } finally {
-      setRefreshing(false);
-    }
-  }, [t, tools, wallet]);
+    },
+    [t, tools, wallet]
+  );
 
   useEffect(() => {
     void refresh();
   }, [refresh]);
 
   const invoiceReservations = new Map(
-    inspection?.invoiceReservations.map(item => [`${item.txid}:${item.vout}`, item]) || []
+    inspection?.invoiceReservations.map((item) => [`${item.txid}:${item.vout}`, item]) || []
   );
-  const utxos = inspection?.snapshot.utxos || [];
-  const assetUtxoCount = utxos.filter((item) => item.allocations.length > 0).length;
-
+  const utxos = [...(inspection?.snapshot.utxos || [])].sort((left, right) => {
+    const priority = (utxo: NonNullable<UtxoInspection>['snapshot']['utxos'][number]) => {
+      if (utxo.allocations.length > 0) return 0;
+      return invoiceReservations.has(`${utxo.outpoint.txid}:${utxo.outpoint.vout}`) ? 1 : 2;
+    };
+    const priorityDifference = priority(left) - priority(right);
+    if (priorityDifference) return priorityDifference;
+    return left.outpoint.txid.localeCompare(right.outpoint.txid) || left.outpoint.vout - right.outpoint.vout;
+  });
   return (
     <Layout>
       <Header onBack={() => window.history.go(-1)} title={t('rgb_asset_address')} />
@@ -141,28 +145,10 @@ export default function RgbUtxoInspectionScreen() {
                 style={{ flex: 1, minWidth: 0 }}
               />
             </Row>
-            <div style={{ borderTop: '1px solid rgba(255,255,255,0.06)' }} />
-            <Row fullX itemsCenter justifyBetween gap="md" style={summaryRowStyle}>
-              <Text text={t('rgb_utxo_summary')} color="textDim" size="sm" />
-              <Text text={displaySyncTime(inspection?.snapshot.syncedAt || 0)} color="textDim" size="xs" />
-            </Row>
-            <div style={{ borderTop: '1px solid rgba(255,255,255,0.06)' }} />
-            <Row fullX itemsCenter style={summaryRowStyle}>
-              <Text
-                text={t('rgb_utxo_summary_counts', {
-                  utxos: utxos.length,
-                  assets: assetUtxoCount,
-                  invoices: inspection?.invoiceReservations.length || 0
-                })}
-                color="white"
-                size="xs"
-                wrap
-              />
-            </Row>
           </Column>
         </Card>
 
-        {utxos.map((utxo) => {
+        {utxos.map((utxo, index) => {
           const key = `${utxo.outpoint.txid}:${utxo.outpoint.vout}`;
           const reservation = invoiceReservations.get(key);
           const hasAssets = utxo.allocations.length > 0;
@@ -181,7 +167,7 @@ export default function RgbUtxoInspectionScreen() {
                 gap="md"
                 style={hasDetails ? utxoCardWithDetailsStyle : utxoCardStyle}
                 onClick={() => nav.navToExplorerTx(utxo.outpoint.txid)}>
-                <Icon icon="utxo" color={reservation ? 'gold' : 'white_muted'} size={32} />
+                <Text text={index + 1} color="textDim" size="sm" style={utxoSequenceStyle} />
                 <Column fullX gap="xs" style={{ minWidth: 0 }}>
                   <Row full justifyBetween itemsCenter gap="sm">
                     <Text
@@ -229,25 +215,43 @@ export default function RgbUtxoInspectionScreen() {
                     </Row>
                   ) : null}
                   {hasAssets ? (
-                    <Row gap="xs" style={{ flexWrap: 'wrap' }}>
-                      {utxo.allocations.map((allocation, index) => (
-                        <div key={`${allocation.assetId}:${index}`} style={allocationPillStyle}>
-                          <Text
-                            text={`${shortTxid(allocation.assetId)} · ${allocation.amount}`}
-                            selectText
-                            color="textDim"
-                            size="xxs"
-                          />
-                        </div>
-                      ))}
-                    </Row>
+                    <Column fullX gap="xs">
+                      {utxo.allocations.map((allocation, index) => {
+                        const asset = inspection?.assetMetadata[allocation.assetId];
+                        const name = asset?.name || shortTxid(allocation.assetId);
+                        const ticker = asset?.ticker || 'RGB';
+                        const amount = toRgbDisplayAmount(allocation.amount, asset?.precision || 0);
+                        return (
+                          <Row
+                            key={`${allocation.assetId}:${index}`}
+                            fullX
+                            itemsCenter
+                            justifyBetween
+                            gap="sm"
+                            style={assetAllocationCardStyle}>
+                            <Row itemsCenter gap="sm" style={{ flex: 1, minWidth: 0 }}>
+                              <Icon icon="rgb" color="ticker_color2" size={20} />
+                              <Column gap="xs" style={{ minWidth: 0 }}>
+                                <Text text={name} color="white" size="xs" ellipsis style={{ maxWidth: 130 }} />
+                                <CopyableAddress
+                                  address={allocation.assetId}
+                                  copyPosition="after"
+                                  len={6}
+                                  color="textDim"
+                                />
+                              </Column>
+                            </Row>
+                            <Text text={`${amount} ${ticker}`} color="white" preset="bold" size="xs" />
+                          </Row>
+                        );
+                      })}
+                    </Column>
                   ) : null}
                 </Column>
               ) : null}
             </Column>
           );
         })}
-
       </Content>
       <Row style={{ padding: '0 16px 16px' }}>
         <Button
