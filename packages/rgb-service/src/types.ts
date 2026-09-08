@@ -215,6 +215,8 @@ export interface RgbPendingReceive {
     endpoint?: string
     assetId: string
     amount: string
+    /** Contract precision decoded from the validated consignment. */
+    precision?: number
     discoveredAt: number
     /** Spendable witness output scripts used to recover the sender address. */
     counterpartyScriptPubKeys?: string[]
@@ -229,6 +231,8 @@ export interface RgbPendingReceive {
     assetId?: string
     /** Actual atomic amount received; distinct from an optional invoice constraint. */
     amount?: string
+    /** Contract precision decoded from the validated consignment. */
+    precision?: number
     /** True only after acceptReceive(); missing on older auto-accepted state. */
     accepted?: boolean
     /** ACK intent was durably recorded before the proxy acknowledgement request. */
@@ -248,6 +252,8 @@ export interface RgbPendingReceiveHistory {
   transferId: string
   assetId: string
   amount: string
+  /** Contract precision decoded from the validated consignment. */
+  precision?: number
   txid: string
   createdAt: number
   status?: 'settled' | 'canceled' | 'rejected'

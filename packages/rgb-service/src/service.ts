@@ -516,14 +516,21 @@ export class RgbService {
     const state = this.requireState()
     const receives = state.pendingReceives || []
     return (state.pendingReceiveHistory || []).map(item => {
-      if (item.assetId && item.amount) return item
+      if (item.assetId && item.amount && item.precision !== undefined) return item
       const recipientId = item.transferId.replace(/^receive:/, '')
       const receive = receives.find(candidate => candidate.recipientId === recipientId)
       const assetId =
         receive?.receivedConsignment?.assetId ?? receive?.pendingAccept?.assetId ?? receive?.assetId
       const amount =
         receive?.receivedConsignment?.amount ?? receive?.pendingAccept?.amount ?? receive?.amount
-      return { ...item, ...(assetId ? { assetId } : {}), ...(amount ? { amount } : {}) }
+      const precision =
+        receive?.receivedConsignment?.precision ?? receive?.pendingAccept?.precision
+      return {
+        ...item,
+        ...(assetId ? { assetId } : {}),
+        ...(amount ? { amount } : {}),
+        ...(precision === undefined ? {} : { precision }),
+      }
     })
   }
 
@@ -789,6 +796,14 @@ export class RgbService {
           ? false
           : this.queueAssetMetadata(match.assetId, match.decoded.metadata)
         changed = metadataChanged || changed
+        const precision = match.decoded.metadata.precision
+        if (
+          receive.receivedConsignment &&
+          receive.receivedConsignment.precision !== precision
+        ) {
+          receive.receivedConsignment.precision = precision
+          changed = true
+        }
 
         // The proxy may have accepted ACK immediately before an extension
         // shutdown. Reconcile that durable local intent before treating any
@@ -870,7 +885,8 @@ export class RgbService {
         if (
           !receive.pendingAccept ||
           receive.pendingAccept.txid !== match.txid ||
-          receive.pendingAccept.payload !== item.payload
+          receive.pendingAccept.payload !== item.payload ||
+          receive.pendingAccept.precision !== precision
         ) {
           receive.pendingAccept = {
             payload: item.payload,
@@ -878,6 +894,7 @@ export class RgbService {
             endpoint: item.endpoint,
             assetId: match.assetId,
             amount: match.amount,
+            precision,
             discoveredAt: receive.receivedConsignment?.receivedAt || this.now(),
             counterpartyScriptPubKeys: niaConsignmentSpendableOutputScripts(item.payload),
           }
@@ -951,6 +968,7 @@ export class RgbService {
         receivedAt: this.now(),
         assetId: receive.pendingAccept.assetId,
         amount: receive.pendingAccept.amount,
+        precision: receive.pendingAccept.precision,
         acknowledgementPending: true,
         payload: receive.pendingAccept.payload,
         endpoint: receive.pendingAccept.endpoint,
@@ -1159,6 +1177,7 @@ export class RgbService {
       receive.receivedConsignment?.assetId ?? receive.pendingAccept?.assetId ?? receive.assetId
     const amount =
       receive.receivedConsignment?.amount ?? receive.pendingAccept?.amount ?? receive.amount
+    const precision = receive.receivedConsignment?.precision ?? receive.pendingAccept?.precision
     const existing = pendingReceiveHistory.find(item => item.transferId === transferId)
     if (existing) {
       // Settlement is terminal. A delayed proxy poll (especially after local
@@ -1168,6 +1187,7 @@ export class RgbService {
       existing.txid = txid || existing.txid
       if (assetId) existing.assetId = assetId
       if (amount) existing.amount = amount
+      if (precision !== undefined) existing.precision = precision
       existing.counterpartyScriptPubKeys =
         existing.counterpartyScriptPubKeys ||
         receive.pendingAccept?.counterpartyScriptPubKeys ||
@@ -1178,6 +1198,7 @@ export class RgbService {
       transferId,
       assetId: assetId || '',
       amount: amount || '',
+      ...(precision === undefined ? {} : { precision }),
       txid,
       createdAt:
         receive.receivedConsignment?.receivedAt ||

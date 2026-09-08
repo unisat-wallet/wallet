@@ -20,6 +20,7 @@ export type RgbRemoteActivity = {
   to?: string
   ticker?: string
   name?: string
+  precision?: number
 }
 
 type RgbTransferQueryDependencies = {
@@ -138,6 +139,8 @@ export class RgbTransferQuery {
         receivedConsignment?.assetId ?? receive.pendingAccept?.assetId ?? receive.assetId
       const receivedAmount =
         receivedConsignment?.amount ?? receive.pendingAccept?.amount ?? receive.amount
+      const receivedPrecision =
+        receivedConsignment?.precision ?? receive.pendingAccept?.precision
       const acknowledgementPending =
         (receivedConsignment as { acknowledgementPending?: boolean } | undefined)
           ?.acknowledgementPending === true
@@ -151,6 +154,7 @@ export class RgbTransferQuery {
             assetId: receivedAssetId,
             type: 'receive' as const,
             amount: receivedAmount,
+            precision: receivedPrecision,
             txid: receivedConsignment.txid,
             timestamp: receivedConsignment.receivedAt,
             status: 'waiting_receive',
@@ -175,6 +179,7 @@ export class RgbTransferQuery {
             assetId: receivedAssetId,
             type: 'receive' as const,
             amount: receivedAmount,
+            precision: receivedPrecision,
             txid: receive.pendingAccept.txid,
             timestamp: receive.pendingAccept.discoveredAt || receive.createdAt,
             status: 'pending_accept',
@@ -200,6 +205,7 @@ export class RgbTransferQuery {
             assetId: receivedAssetId,
             type: 'receive' as const,
             amount: receivedAmount,
+            precision: receivedPrecision,
             txid: receivedConsignment.txid,
             timestamp: receivedConsignment.receivedAt,
             status: 'pending_accept',
@@ -220,6 +226,7 @@ export class RgbTransferQuery {
           assetId: receivedAssetId,
           type: 'receive' as const,
           amount: receivedAmount,
+          precision: receivedPrecision,
           txid: receivedConsignment.txid,
           timestamp: receivedConsignment.receivedAt,
           status: receivedConsignment.broadcastDetectedAt ? 'confirming' : 'waiting_receive',
@@ -239,6 +246,7 @@ export class RgbTransferQuery {
       assetId: receive.assetId,
       type: 'receive' as const,
       amount: receive.amount,
+      precision: receive.precision,
       txid: receive.txid,
       timestamp: receive.createdAt,
       status: receive.status ?? 'settled',
@@ -330,6 +338,7 @@ export class RgbTransferQuery {
         to: item.to,
         ticker: item.ticker,
         name: item.name,
+        precision: item.precision,
         timestamp: item.timestamp ?? item.createdAt ?? 0,
         status:
           item.type === 'receive' &&

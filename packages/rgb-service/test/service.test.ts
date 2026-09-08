@@ -459,6 +459,11 @@ describe('RgbService', () => {
         metadata,
       },
     ])
+    expect(service.getPendingReceives()[0]?.pendingAccept).toMatchObject({
+      assetId: 'rgb:ByzWWOsh-yWg6Im0-FB8oump-lf5bv7o-mJTgBls-Z~CmcZ8',
+      amount: '60',
+      precision: 2,
+    })
 
     const reopened = new RgbService(dependencies)
     await reopened.open(wallet)
@@ -481,6 +486,7 @@ describe('RgbService', () => {
           endpoint: proxyEndpoint,
           assetId: 'rgb:asset',
           amount: '60',
+          precision: 2,
           discoveredAt: 1,
         },
       },
@@ -1602,6 +1608,7 @@ describe('RgbService', () => {
           endpoint: proxyEndpoint,
           assetId: 'rgb:asset',
           amount: '60',
+          precision: 2,
           discoveredAt: 1,
         },
       },
@@ -1612,6 +1619,7 @@ describe('RgbService', () => {
     expect((service as any).state.pendingReceives[0].receivedConsignment).toMatchObject({
       assetId: 'rgb:asset',
       amount: '60',
+      precision: 2,
     })
 
     expect(dependencies.transport.getAcknowledgement).toHaveBeenCalledTimes(1)

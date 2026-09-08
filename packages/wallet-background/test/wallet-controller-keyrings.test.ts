@@ -4,7 +4,7 @@ import { KeyringType } from '@unisat/keyring-service/types'
 import { RgbTransferAwaitingAckError, RgbTransferRejectedError } from '@unisat/rgb-service'
 import * as txHelpers from '@unisat/tx-helpers'
 import { bitcoin, scriptPkToAddress } from '@unisat/wallet-bitcoin'
-import { BUS_EVENTS, BUS_METHODS, CHAINS_MAP } from '@unisat/wallet-shared'
+import { BUS_EVENTS, BUS_METHODS, CHAINS_MAP, toRgbDisplayAmount } from '@unisat/wallet-shared'
 import { AddressType, ChainType, NetworkType } from '@unisat/wallet-types'
 import log from 'loglevel'
 import {
@@ -1828,7 +1828,8 @@ describe('RGB wallet references', () => {
             payload: 'consignment',
             txid: 'd'.repeat(64),
             assetId: 'rgb:asset',
-            amount: '5',
+            amount: '100',
+            precision: 2,
             discoveredAt: 96,
           },
         },
@@ -1906,7 +1907,8 @@ describe('RGB wallet references', () => {
       expect.objectContaining({
         id: 'local-receive:pending-accept',
         status: 'pending_accept',
-        amount: '5',
+        amount: '100',
+        precision: 2,
       }),
       expect.objectContaining({
         id: 'local-receive:ack-intent',
@@ -1925,6 +1927,8 @@ describe('RGB wallet references', () => {
         amount: '7',
       }),
     ])
+    const pendingReceive = result.list.find(item => item.id === 'local-receive:pending-accept')
+    expect(toRgbDisplayAmount(pendingReceive?.amount, pendingReceive?.precision ?? 0)).toBe('1')
   })
 
   it('issues an RGB asset on a mempool funding UTXO as immediately spendable', async () => {
