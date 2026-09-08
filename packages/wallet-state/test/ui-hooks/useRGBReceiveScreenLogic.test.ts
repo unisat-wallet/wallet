@@ -6,6 +6,8 @@ import {
   ANY_RGB_ASSET,
   isCancelableRgbPendingInvoice,
   isRgbPendingInvoiceAwaitingAcceptance,
+  isRgbPendingInvoiceAwaitingSenderBroadcast,
+  isRgbPendingInvoiceAwaitingSenderConfirmation,
   useRGBReceiveScreenLogic,
 } from '../../src/ui-hooks/useRGBReceiveScreenLogic'
 import { createHookTestHarness } from './testHelpers'
@@ -21,6 +23,59 @@ describe('useRGBReceiveScreenLogic', () => {
         canCancel: false,
       })
     ).toBe(false)
+  })
+
+  it('opens transfer details for an invoice awaiting the sender broadcast', async () => {
+    const { wrapper, navigation } = createHookTestHarness()
+    const { result } = renderHook(() => useRGBReceiveScreenLogic(), { wrapper })
+
+    const invoice = {
+      invoice: 'rgb:invoice',
+      recipientId: 'recipient-id',
+      assetId: 'rgb:asset',
+      amount: '42',
+      createdAt: 123,
+      status: 'WaitingSenderBroadcast',
+    }
+    expect(isRgbPendingInvoiceAwaitingSenderBroadcast(invoice)).toBe(true)
+
+    await act(async () => {
+      result.current.onSelectPendingInvoice(invoice)
+    })
+
+    expect(navigation.navigate).toHaveBeenCalledWith(
+      'RGBTransferDetailScreen',
+      expect.objectContaining({
+        transferId: 'recipient-id',
+        initialTransfer: expect.objectContaining({
+          status: 'waiting_receive',
+          type: 'receive',
+        }),
+      })
+    )
+  })
+
+  it('opens transfer details with confirming status after the sender broadcast', async () => {
+    const { wrapper, navigation } = createHookTestHarness()
+    const { result } = renderHook(() => useRGBReceiveScreenLogic(), { wrapper })
+
+    const invoice = {
+      invoice: 'rgb:invoice',
+      recipientId: 'recipient-id',
+      status: 'WaitingSenderConfirmation',
+    }
+    expect(isRgbPendingInvoiceAwaitingSenderConfirmation(invoice)).toBe(true)
+
+    await act(async () => {
+      result.current.onSelectPendingInvoice(invoice)
+    })
+
+    expect(navigation.navigate).toHaveBeenCalledWith(
+      'RGBTransferDetailScreen',
+      expect.objectContaining({
+        initialTransfer: expect.objectContaining({ status: 'confirming', type: 'receive' }),
+      })
+    )
   })
 
   it('does not offer release for an invoice awaiting receipt acceptance', () => {

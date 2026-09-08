@@ -30,6 +30,8 @@ import {
   isCancelableRgbPendingInvoice,
   isRgbPendingInvoiceAwaitingAcceptance,
   isRgbPendingInvoiceAwaitingConfirmation,
+  isRgbPendingInvoiceAwaitingSenderBroadcast,
+  isRgbPendingInvoiceAwaitingSenderConfirmation,
   toRgbDisplayAmount,
   useI18n,
   useRGBReceiveScreenLogic,
@@ -552,6 +554,9 @@ export default function RGBReceiveScreen() {
     const timeText = formatRgbPendingTime(item.createdAt || item.expirationTimestamp);
     const awaitingAcceptance = isRgbPendingInvoiceAwaitingAcceptance(item);
     const awaitingConfirmation = isRgbPendingInvoiceAwaitingConfirmation(item);
+    const awaitingSenderBroadcast = isRgbPendingInvoiceAwaitingSenderBroadcast(item);
+    const awaitingSenderConfirmation = isRgbPendingInvoiceAwaitingSenderConfirmation(item);
+    const invoiceInUse = awaitingAcceptance || awaitingSenderBroadcast || awaitingSenderConfirmation;
 
     return (
       <Row
@@ -568,6 +573,10 @@ export default function RGBReceiveScreen() {
             {timeText ? <Text text={timeText} color="white_muted" size="xs" /> : null}
             {awaitingAcceptance ? (
               <Text text={t('rgb_status_pending_accept')} color="gold" size="xs" />
+            ) : awaitingSenderBroadcast ? (
+              <Text text={t('rgb_status_waiting_receive')} color="gold" size="xs" />
+            ) : awaitingSenderConfirmation ? (
+              <Text text={t('rgb_status_confirming')} color="gold" size="xs" />
             ) : awaitingConfirmation ? (
               <Text text={t('transaction_unconfirmed')} color="gold" size="xs" />
             ) : null}
@@ -575,10 +584,10 @@ export default function RGBReceiveScreen() {
         </Row>
 
         <div
-          style={{ ...pendingCopyButtonStyle, opacity: awaitingAcceptance ? 0.45 : 1 }}
+          style={{ ...pendingCopyButtonStyle, opacity: invoiceInUse ? 0.45 : 1 }}
           onClick={(e) => {
             e.stopPropagation();
-            if (!awaitingAcceptance) onCopyPendingInvoice(item);
+            if (!invoiceInUse) onCopyPendingInvoice(item);
           }}
         >
           <Icon icon="copy" color="white_muted" size={14} />

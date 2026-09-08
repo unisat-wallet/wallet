@@ -11,6 +11,8 @@ import {
   getRgbTokenPrecision,
   getRgbTokenTicker,
   isRgbPendingInvoiceAwaitingAcceptance,
+  isRgbPendingInvoiceAwaitingSenderBroadcast,
+  isRgbPendingInvoiceAwaitingSenderConfirmation,
   type RgbPendingReceiveInvoice,
   useI18n,
   useNavigation,
@@ -112,6 +114,9 @@ export default function RGBInvoiceListScreen() {
       <Content>
         {invoices.map((invoice, index) => {
           const awaitingAcceptance = isRgbPendingInvoiceAwaitingAcceptance(invoice);
+          const awaitingSenderBroadcast = isRgbPendingInvoiceAwaitingSenderBroadcast(invoice);
+          const awaitingSenderConfirmation = isRgbPendingInvoiceAwaitingSenderConfirmation(invoice);
+          const invoiceInUse = awaitingAcceptance || awaitingSenderBroadcast || awaitingSenderConfirmation;
           const expiryText = formatExpiryTime(invoice.expirationTimestamp, locale, t);
           const invoiceAsset = invoice.assetId
             ? rgbItems.find(item => getRgbAssetId(item) === invoice.assetId) || { assetId: invoice.assetId }
@@ -130,7 +135,7 @@ export default function RGBInvoiceListScreen() {
               gap="md"
               style={invoiceCardStyle}
               onClick={() => {
-                if (awaitingAcceptance && invoice.recipientId) {
+                if (invoiceInUse && invoice.recipientId) {
                   nav.navigate('RGBTransferDetailScreen', {
                     transferId: invoice.recipientId,
                     initialTransfer: {
@@ -140,7 +145,7 @@ export default function RGBInvoiceListScreen() {
                       type: 'receive',
                       ...(invoice.amount === undefined ? {} : { amount: String(invoice.amount) }),
                       timestamp: invoice.createdAt || Date.now(),
-                      status: 'pending_accept',
+                      status: awaitingAcceptance ? 'pending_accept' : awaitingSenderConfirmation ? 'confirming' : 'waiting_receive',
                       local: true
                     }
                   });
@@ -168,13 +173,15 @@ export default function RGBInvoiceListScreen() {
                   </Row>
                   <Text text={expiryText} color="textDim" size="xs" />
                   {awaitingAcceptance ? <Text text={t('rgb_status_pending_accept')} color="gold" size="xs" /> : null}
+                  {awaitingSenderBroadcast ? <Text text={t('rgb_status_waiting_receive')} color="gold" size="xs" /> : null}
+                  {awaitingSenderConfirmation ? <Text text={t('rgb_status_confirming')} color="gold" size="xs" /> : null}
                 </Column>
               </Row>
               <div
-                style={{ ...copyButtonStyle, opacity: awaitingAcceptance ? 0.45 : 1 }}
+                style={{ ...copyButtonStyle, opacity: invoiceInUse ? 0.45 : 1 }}
                 onClick={(event) => {
                   event.stopPropagation();
-                  if (awaitingAcceptance) return;
+                  if (invoiceInUse) return;
                   tools.copyToClipboard(invoice.invoice);
                   tools.toastSuccess(t('copied'));
                 }}>

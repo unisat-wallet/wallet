@@ -17,6 +17,8 @@ import { BottomModal } from '@/ui/components/BottomModal';
 import { colors } from '@/ui/theme/colors';
 import {
   isCancelableRgbPendingInvoice,
+  isRgbPendingInvoiceAwaitingSenderBroadcast,
+  isRgbPendingInvoiceAwaitingSenderConfirmation,
   useI18n,
   useNavigation,
   useTools,
@@ -76,10 +78,11 @@ export default function RGBInvoiceDetailScreen() {
 
   useEffect(() => {
     // The create-invoice response is already a complete public invoice view.
-    // Rendering it directly avoids a second writer-lease refresh and proxy
-    // poll immediately after the first successful creation.
-    if (routePendingInvoice) return;
-    void loadInvoice();
+    // Do not re-fetch it immediately, but keep it current so a claimed
+    // invoice stops being shown as reusable once the sender is ready to broadcast.
+    if (!routePendingInvoice) void loadInvoice();
+    const intervalId = setInterval(() => void loadInvoice(), 10_000);
+    return () => clearInterval(intervalId);
   }, [loadInvoice, routePendingInvoice]);
 
   const release = async () => {
@@ -101,7 +104,10 @@ export default function RGBInvoiceDetailScreen() {
     }
   };
 
-  const invoiceText = invoice?.invoice || routeInvoice || '';
+  const invoiceText = invoice?.invoice || (loading ? routeInvoice || '' : '');
+  const awaitingSenderBroadcast = isRgbPendingInvoiceAwaitingSenderBroadcast(invoice);
+  const awaitingSenderConfirmation = isRgbPendingInvoiceAwaitingSenderConfirmation(invoice);
+  const invoiceInUse = awaitingSenderBroadcast || awaitingSenderConfirmation;
 
   return (
     <Layout>
@@ -115,13 +121,23 @@ export default function RGBInvoiceDetailScreen() {
         }
       />
       <Content>
-        {invoiceText ? (
+        {invoiceText && !invoiceInUse ? (
           <ReceiveQRCodeCard
             title={t('receiving_invoice')}
             value={invoiceText}
             valueLabel={t('receiving_invoice')}
             accentColor="#F4B62C"
           />
+        ) : null}
+        {invoiceInUse ? (
+          <Column fullX itemsCenter gap="sm" style={{ padding: '32px 16px' }}>
+            <Icon icon="history_receive" color="gold" size={32} />
+            <Text
+              text={awaitingSenderConfirmation ? t('rgb_status_confirming') : t('rgb_status_waiting_receive')}
+              color="white"
+              size="sm"
+            />
+          </Column>
         ) : null}
         {!loading && !invoiceText ? (
           <Text text={t('no_pending_blind_invoices')} color="textDim" textCenter size="sm" />

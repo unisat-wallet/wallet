@@ -447,8 +447,30 @@ describe('RGB wallet references', () => {
       0
     )
 
-    expect(result).toMatchObject({ canCancel: false, batchTransferIdx: 0 })
+    expect(result).toMatchObject({
+      status: 'WaitingSenderBroadcast',
+      canCancel: false,
+      batchTransferIdx: 0,
+    })
     expect(result).not.toHaveProperty('seal')
+  })
+
+  it('marks an accepted receipt as awaiting confirmation once its sender transaction is broadcast', () => {
+    const result = toPublicRgbPendingReceiveInvoice(
+      {
+        invoice: 'rgb:invoice',
+        recipientId: 'recipient-id',
+        seal: {
+          txid: '11'.repeat(32),
+          vout: 0,
+          blinding: 1n,
+        },
+        receivedConsignment: { accepted: true, broadcastDetectedAt: 1 },
+      },
+      0
+    )
+
+    expect(result).toMatchObject({ status: 'WaitingSenderConfirmation', canCancel: false })
   })
 
   it('marks invoices backed by unconfirmed funding UTXOs as waiting for confirmation', () => {

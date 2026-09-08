@@ -14,21 +14,33 @@ export type RgbPendingReceiveInvoice = {
   [key: string]: unknown
 }
 
+type RgbReceiveInvoiceStatus =
+  | 'WaitingConfirmations'
+  | 'WaitingCounterparty'
+  | 'WaitingSenderBroadcast'
+  | 'WaitingSenderConfirmation'
+
 export function toPublicRgbPendingReceiveInvoice(
   item: {
     invoice: string
     recipientId: string
     assetId?: string
-  amount?: string
-  expirationTimestamp?: number
-  createdAt?: number
-  pendingAccept?: unknown
-  receivedConsignment?: { accepted?: boolean; acknowledgementPending?: boolean }
+    amount?: string
+    expirationTimestamp?: number
+    createdAt?: number
+    pendingAccept?: unknown
+    receivedConsignment?: {
+      accepted?: boolean
+      acknowledgementPending?: boolean
+      broadcastDetectedAt?: number
+    }
   },
   batchTransferIdx?: number,
-  status: 'WaitingConfirmations' | 'WaitingCounterparty' = 'WaitingCounterparty'
+  status: RgbReceiveInvoiceStatus = 'WaitingCounterparty'
 ): RgbPendingReceiveInvoice {
   const awaitingAcceptance = item.pendingAccept !== undefined
+  const awaitingSenderBroadcast = item.receivedConsignment?.accepted === true
+  const awaitingSenderConfirmation = item.receivedConsignment?.broadcastDetectedAt !== undefined
   return {
     invoice: item.invoice,
     recipientId: item.recipientId,
@@ -39,7 +51,13 @@ export function toPublicRgbPendingReceiveInvoice(
       : { expirationTimestamp: item.expirationTimestamp }),
     ...(item.createdAt === undefined ? {} : { createdAt: item.createdAt }),
     kind: 'ReceiveBlind',
-    status: awaitingAcceptance ? 'PendingAccept' : status,
+    status: awaitingAcceptance
+      ? 'PendingAccept'
+      : awaitingSenderConfirmation
+        ? 'WaitingSenderConfirmation'
+      : awaitingSenderBroadcast
+        ? 'WaitingSenderBroadcast'
+        : status,
     canCancel:
       !awaitingAcceptance &&
       item.receivedConsignment?.accepted !== true &&

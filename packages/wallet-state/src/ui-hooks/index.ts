@@ -53,6 +53,8 @@ export {
   formatRgbPendingTime,
   isRgbPendingInvoiceAwaitingAcceptance,
   isRgbPendingInvoiceAwaitingConfirmation,
+  isRgbPendingInvoiceAwaitingSenderBroadcast,
+  isRgbPendingInvoiceAwaitingSenderConfirmation,
   getRgbAssetId,
   getRgbTokenIconInfo,
   getRgbTokenTicker,

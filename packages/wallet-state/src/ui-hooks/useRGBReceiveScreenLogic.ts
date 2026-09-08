@@ -281,6 +281,14 @@ export const isRgbPendingInvoiceAwaitingAcceptance = (item?: RgbPendingReceiveIn
   return String(item?.status || '').toLowerCase() === 'pendingaccept'
 }
 
+export const isRgbPendingInvoiceAwaitingSenderBroadcast = (item?: RgbPendingReceiveInvoice) => {
+  return String(item?.status || '').toLowerCase() === 'waitingsenderbroadcast'
+}
+
+export const isRgbPendingInvoiceAwaitingSenderConfirmation = (item?: RgbPendingReceiveInvoice) => {
+  return String(item?.status || '').toLowerCase() === 'waitingsenderconfirmation'
+}
+
 export function useRGBReceiveScreenLogic() {
   const nav = useNavigation()
   const wallet = useWallet()
@@ -413,16 +421,23 @@ export function useRGBReceiveScreenLogic() {
     void loadPendingInvoices()
   }, [loadPendingInvoices])
 
-  const hasPendingInvoiceAwaitingConfirmation =
+  const hasPendingInvoiceAwaitingUpdate =
     isRgbPendingInvoiceAwaitingConfirmation(selectedPendingInvoice) ||
-    pendingInvoices.some(isRgbPendingInvoiceAwaitingConfirmation)
+    isRgbPendingInvoiceAwaitingSenderBroadcast(selectedPendingInvoice) ||
+    isRgbPendingInvoiceAwaitingSenderConfirmation(selectedPendingInvoice) ||
+    pendingInvoices.some(
+      item =>
+        isRgbPendingInvoiceAwaitingConfirmation(item) ||
+        isRgbPendingInvoiceAwaitingSenderBroadcast(item) ||
+        isRgbPendingInvoiceAwaitingSenderConfirmation(item)
+    )
 
   useEffect(() => {
-    if (!hasPendingInvoiceAwaitingConfirmation) return undefined
+    if (!hasPendingInvoiceAwaitingUpdate) return undefined
 
     const intervalId = setInterval(() => void loadPendingInvoices(), 10_000)
     return () => clearInterval(intervalId)
-  }, [hasPendingInvoiceAwaitingConfirmation, loadPendingInvoices])
+  }, [hasPendingInvoiceAwaitingUpdate, loadPendingInvoices])
 
   useEffect(() => {
     if (step !== 'create_invoice') return undefined
@@ -635,7 +650,10 @@ export function useRGBReceiveScreenLogic() {
   }
 
   const onSelectPendingInvoice = (item: RgbPendingReceiveInvoice) => {
-    if (isRgbPendingInvoiceAwaitingAcceptance(item) && item.recipientId) {
+    const awaitingAcceptance = isRgbPendingInvoiceAwaitingAcceptance(item)
+    const awaitingSenderBroadcast = isRgbPendingInvoiceAwaitingSenderBroadcast(item)
+    const awaitingSenderConfirmation = isRgbPendingInvoiceAwaitingSenderConfirmation(item)
+    if ((awaitingAcceptance || awaitingSenderBroadcast || awaitingSenderConfirmation) && item.recipientId) {
       nav.navigate('RGBTransferDetailScreen', {
         transferId: item.recipientId,
         initialTransfer: {
@@ -645,7 +663,11 @@ export function useRGBReceiveScreenLogic() {
           type: 'receive',
           ...(item.amount === undefined ? {} : { amount: String(item.amount) }),
           timestamp: item.createdAt || Date.now(),
-          status: 'pending_accept',
+          status: awaitingAcceptance
+            ? 'pending_accept'
+            : awaitingSenderConfirmation
+              ? 'confirming'
+              : 'waiting_receive',
           local: true,
         },
       })
