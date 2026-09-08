@@ -5,7 +5,6 @@ import { Button, Checkbox, Column, Row, Text, Icon, CopyableAddress, RGBAssetIco
 import { BottomSheetHeader } from '@/ui/components/BottomSheetHeader';
 import { BottomModal } from '@/ui/components/BottomModal';
 import { getRgbAssetName } from '@/ui/components/RGBAssetIcon';
-import { RgbAddressBadge } from '@/ui/components/RgbAddressBadge';
 import { colors } from '@/ui/theme/colors';
 import {
   getRgbTokenIconInfo,
@@ -213,9 +212,6 @@ export function RGBTransferDetailSheet({
   const canRetryBroadcast =
     transfer?.type === 'send' && String(transfer?.status || '').toLowerCase() === 'broadcast_failed';
   const assetId = transfer?.assetId?.trim();
-  const counterpartyAddress =
-    transfer?.type === 'receive' ? transfer?.from?.trim() : transfer?.type === 'send' ? transfer?.to?.trim() : '';
-  const counterpartyLabel = transfer?.type === 'receive' ? t('from') : transfer?.type === 'send' ? t('to') : '';
 
   const onCancelSend = async () => {
     const abortId = resolveAbortTransferId(transfer, transferId);
@@ -459,35 +455,6 @@ export function RGBTransferDetailSheet({
                 />
               )}
             </Row>
-            {counterpartyLabel ? (
-              <Row fullX justifyBetween itemsCenter style={{ minHeight: 32 }}>
-                <Text
-                  text={counterpartyLabel}
-                  style={{
-                    fontSize: 14,
-                    fontWeight: 500,
-                    color: 'rgba(255,255,255,0.45)'
-                  }}
-                />
-                {counterpartyAddress ? (
-                  <CopyableAddress
-                    address={counterpartyAddress}
-                    copyPosition="after"
-                    color="ticker_color2"
-                    suffix={<RgbAddressBadge />}
-                  />
-                ) : (
-                  <Text
-                    text="--"
-                    style={{
-                      fontSize: 14,
-                      fontWeight: 500,
-                      color: 'rgba(255,255,255,0.85)'
-                    }}
-                  />
-                )}
-              </Row>
-            ) : null}
             {status !== 'rejected' ? (
               <Row fullX justifyBetween itemsCenter style={{ minHeight: 32 }}>
                 <Text

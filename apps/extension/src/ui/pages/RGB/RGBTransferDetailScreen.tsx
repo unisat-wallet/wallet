@@ -1,5 +1,4 @@
 import { Button, Card, Column, Content, CopyableAddress, Footer, Header, Icon, Layout, Row, Text } from '@/ui/components';
-import { RgbAddressBadge } from '@/ui/components/RgbAddressBadge';
 import { TxResultStatusMark } from '@/ui/components/TxResultStatusMark';
 import { colors } from '@/ui/theme/colors';
 import { spacing } from '@/ui/theme/spacing';
@@ -101,9 +100,6 @@ export default function RGBTransferDetailScreen() {
     !!transfer?.txid &&
     !['waiting_ack', 'broadcasting', 'broadcast_failed', 'pending_accept', 'rejected'].includes(status);
   const assetId = transfer?.assetId?.trim();
-  const counterpartyAddress =
-    transfer?.type === 'receive' ? transfer?.from?.trim() : transfer?.type === 'send' ? transfer?.to?.trim() : '';
-  const counterpartyLabel = transfer?.type === 'receive' ? t('from') : transfer?.type === 'send' ? t('to') : '';
 
   const isConfirmed = isConfirmedStatus(status);
   const isFailed = isFailedStatus(status);
@@ -155,21 +151,6 @@ export default function RGBTransferDetailScreen() {
               <Text text={t('amount')} color="textDim" />
               <Text text={displayAmount} color="ticker_color2" />
             </Row>
-            {counterpartyLabel ? (
-              <Row justifyBetween itemsCenter>
-                <Text text={counterpartyLabel} color="textDim" />
-                {counterpartyAddress ? (
-                  <CopyableAddress
-                    address={counterpartyAddress}
-                    copyPosition="after"
-                    color="ticker_color2"
-                    suffix={<RgbAddressBadge />}
-                  />
-                ) : (
-                  <Text text="--" color="ticker_color2" />
-                )}
-              </Row>
-            ) : null}
             {status !== 'rejected' ? (
               <Row justifyBetween itemsCenter>
                 <Text text={t('rgb_transfer_id')} color="textDim" />
