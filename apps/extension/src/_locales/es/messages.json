@@ -2898,7 +2898,7 @@
     "message": "Cargando facturas pendientes..."
   },
   "no_pending_blind_invoices": {
-    "message": "No hay facturas blind pendientes."
+    "message": "No hay facturas."
   },
   "creating": {
     "message": "Creando..."

@@ -170,6 +170,14 @@ const amountPillTextStyle = {
   whiteSpace: 'nowrap' as const
 };
 
+const emptyStateCardStyle = {
+  padding: '32px 16px',
+  borderRadius: 8,
+  boxSizing: 'border-box' as const,
+  background: 'rgba(255,255,255,0.04)',
+  border: '1px solid rgba(255,255,255,0.08)'
+};
+
 const confirmMaskStyle = {
   position: 'fixed' as const,
   inset: 0,
@@ -225,7 +233,6 @@ export default function RGBReceiveScreen() {
     pendingLoading,
     pendingInvoices,
     insufficientBtcForInvoice,
-    loadPendingInvoices,
     onOpenPendingInvoices,
     onClosePendingInvoices,
     onCopyPendingInvoice,
@@ -649,21 +656,10 @@ export default function RGBReceiveScreen() {
             {pendingInvoices.length > 0 ? (
               pendingInvoices.map(renderPendingInvoiceListItem)
             ) : (
-              <Column itemsCenter gap="md" style={{ paddingTop: 80 }}>
-                <Text
-                  text={pendingLoading ? t('loading_pending_invoices') : t('no_pending_blind_invoices')}
-                  color="white_muted"
-                  size="sm"
-                  textCenter
-                />
-                {!pendingLoading ? (
-                  <Text
-                    text={t('refresh')}
-                    size="sm"
-                    style={{ color: GOLD, cursor: 'pointer' }}
-                    onClick={loadPendingInvoices}
-                  />
-                ) : null}
+              <Column fullX itemsCenter gap="sm" style={emptyStateCardStyle}>
+                {pendingLoading ? <Text text={t('loading_pending_invoices')} color="textDim" size="sm" textCenter /> : null}
+                {!pendingLoading ? <Icon icon="emptyBox" color="textDim" size={32} /> : null}
+                {!pendingLoading ? <Text text={t('no_pending_blind_invoices')} color="white" size="sm" textCenter /> : null}
               </Column>
             )}
           </Column>

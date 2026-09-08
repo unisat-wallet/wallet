@@ -2967,7 +2967,7 @@
     "message": "正在載入待處理發票..."
   },
   "no_pending_blind_invoices": {
-    "message": "沒有待處理的盲發票。"
+    "message": "沒有發票。"
   },
   "creating": {
     "message": "正在建立..."

@@ -2970,7 +2970,7 @@
     "message": "Loading pending invoices..."
   },
   "no_pending_blind_invoices": {
-    "message": "No pending blind invoices."
+    "message": "No invoices."
   },
   "creating": {
     "message": "Creating..."

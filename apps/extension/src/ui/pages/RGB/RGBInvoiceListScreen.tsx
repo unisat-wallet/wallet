@@ -51,6 +51,14 @@ const amountTagStyle = {
   boxSizing: 'border-box' as const
 };
 
+const emptyStateCardStyle = {
+  padding: '32px 16px',
+  borderRadius: 8,
+  boxSizing: 'border-box' as const,
+  background: 'rgba(255,255,255,0.04)',
+  border: '1px solid rgba(255,255,255,0.08)'
+};
+
 const formatExpiryTime = (
   expirationTimestamp: number | undefined,
   locale: string,
@@ -175,12 +183,19 @@ export default function RGBInvoiceListScreen() {
             </Row>
           );
         })}
-        {!loading && !invoices.length ? <Text text={t('no_pending_blind_invoices')} color="textDim" textCenter size="sm" /> : null}
+        {!loading && !invoices.length ? (
+          <Column fullX itemsCenter gap="sm" style={emptyStateCardStyle}>
+            <Icon icon="emptyBox" color="textDim" size={32} />
+            <Text text={t('no_pending_blind_invoices')} color="white" size="sm" />
+          </Column>
+        ) : null}
         {loading ? <Text text={t('loading')} color="textDim" textCenter size="sm" /> : null}
       </Content>
-      <Footer>
-        <Button full text={t('refresh')} preset="primary" disabled={loading} onClick={() => void loadInvoices()} />
-      </Footer>
+      {invoices.length ? (
+        <Footer>
+          <Button full text={t('refresh')} preset="primary" disabled={loading} onClick={() => void loadInvoices()} />
+        </Footer>
+      ) : null}
     </Layout>
   );
 }

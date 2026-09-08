@@ -2907,7 +2907,7 @@
     "message": "Загрузка ожидающих инвойсов..."
   },
   "no_pending_blind_invoices": {
-    "message": "Нет ожидающих blind-инвойсов."
+    "message": "Нет инвойсов."
   },
   "creating": {
     "message": "Создание..."

@@ -2907,7 +2907,7 @@
     "message": "保留中のインボイスを読み込み中..."
   },
   "no_pending_blind_invoices": {
-    "message": "保留中の blind インボイスはありません。"
+    "message": "インボイスはありません。"
   },
   "creating": {
     "message": "作成中..."

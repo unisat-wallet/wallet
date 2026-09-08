@@ -2907,7 +2907,7 @@
     "message": "Chargement des factures en attente..."
   },
   "no_pending_blind_invoices": {
-    "message": "Aucune facture blind en attente."
+    "message": "Aucune facture."
   },
   "creating": {
     "message": "Création..."
