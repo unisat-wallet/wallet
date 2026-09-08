@@ -194,7 +194,9 @@ export function RGBTransferDetailSheet({
   const status = transfer?.status || 'pending';
   const ticker = transfer?.ticker || transfer?.name || 'RGB';
   const assetName = transfer?.name || transfer?.ticker || 'RGB';
-  const amountPrefix = transfer?.type === 'receive' ? '+ ' : transfer?.type === 'send' ? '- ' : '';
+  const isCanceledReceive =
+    transfer?.type === 'receive' && ['canceled', 'cancelled'].includes(status.toLowerCase());
+  const amountPrefix = isCanceledReceive ? '' : transfer?.type === 'receive' ? '+ ' : transfer?.type === 'send' ? '- ' : '';
   const displayAmount = transfer?.amount
     ? toRgbDisplayAmount(transfer.amount, getRgbTokenPrecision(transfer))
     : '--';
@@ -382,24 +384,28 @@ export function RGBTransferDetailSheet({
               name={getRgbAssetName(transfer) || assetName}
               size={32}
             />
-            <Text
-              text={amountText}
-              style={{
-                fontSize: 18,
-                fontWeight: 500,
-                color: 'rgba(255,255,255,0.85)',
-                lineHeight: '1.4'
-              }}
-            />
-            <Text
-              text={assetName}
-              style={{
-                fontSize: 18,
-                fontWeight: 500,
-                color: 'rgba(255,255,255,0.85)',
-                lineHeight: '1.4'
-              }}
-            />
+            {!isCanceledReceive ? (
+              <>
+                <Text
+                  text={amountText}
+                  style={{
+                    fontSize: 18,
+                    fontWeight: 500,
+                    color: 'rgba(255,255,255,0.85)',
+                    lineHeight: '1.4'
+                  }}
+                />
+                <Text
+                  text={assetName}
+                  style={{
+                    fontSize: 18,
+                    fontWeight: 500,
+                    color: 'rgba(255,255,255,0.85)',
+                    lineHeight: '1.4'
+                  }}
+                />
+              </>
+            ) : null}
             <Row
               itemsCenter
               justifyCenter
