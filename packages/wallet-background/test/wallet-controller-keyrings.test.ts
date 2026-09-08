@@ -174,12 +174,15 @@ describe('chainTypeToRgbNetwork', () => {
 
   it.each([
     ChainType.BITCOIN_TESTNET,
-    ChainType.BITCOIN_TESTNET4,
     ChainType.BITCOIN_SIGNET,
     ChainType.FRACTAL_BITCOIN_MAINNET,
     ChainType.FRACTAL_BITCOIN_TESTNET,
   ])('rejects disabled chain %s', chainType => {
     expect(() => chainTypeToRgbNetwork(chainType)).toThrow('RGB is not enabled for wallet chain')
+  })
+
+  it('maps Bitcoin Testnet4', () => {
+    expect(chainTypeToRgbNetwork(ChainType.BITCOIN_TESTNET4)).toBe('testnet4')
   })
 
   it('enables a supported test chain when its RGB proxy endpoint is configured', () => {

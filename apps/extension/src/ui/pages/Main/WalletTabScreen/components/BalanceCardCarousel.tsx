@@ -6,6 +6,7 @@ import {
   uiActions,
   useAppDispatch,
   useBalanceCardDetailExpanded,
+  useChain,
   useI18n,
   useSupportedAssets,
   useToggleBalanceCardDetailExpanded,
@@ -14,6 +15,7 @@ import {
   useRGBListLogic,
   useRGBUsdtBalanceCardLogic
 } from '@unisat/wallet-state';
+import { ChainType } from '@unisat/wallet-types';
 
 import { useNavigate } from '../../../MainRoute';
 import { BalanceCard } from './BalanceCard';
@@ -270,12 +272,126 @@ function RGBUsdtBalanceCard({
   );
 }
 
-function UnsupportedRGBUsdtBalanceCard({
+function RGBAssetsBalanceCard({
+  isDetailExpanded,
+  onExpandToggle,
   suppressClickRef,
-  onSwitchWallet
+  rgbList
+}: {
+  isDetailExpanded: boolean;
+  onExpandToggle: () => void;
+  suppressClickRef: React.MutableRefObject<boolean>;
+  rgbList: ReturnType<typeof useRGBListLogic>;
+}) {
+  const {
+    assetCount,
+    pendingInvoiceCount,
+    isBalanceHidden,
+    handleHiddenToggle,
+    refreshBalance,
+    onViewPendingInvoices,
+    t
+  } = useRGBUsdtBalanceCardLogic(rgbList);
+
+  const stopCardToggle = (event: { stopPropagation: () => void }) => {
+    event.stopPropagation();
+  };
+
+  return (
+    <Column
+      fullX
+      style={{
+        background: 'linear-gradient(131deg, #7467E8 1.38%, #584AC7 47.46%, #342E80 94.19%)',
+        borderRadius: 16,
+        padding: '12px 12px 16px',
+        position: 'relative',
+        overflow: 'hidden',
+        minHeight: isDetailExpanded ? EXPANDED_CARD_MIN_HEIGHT : COLLAPSED_CARD_MIN_HEIGHT,
+        height: '100%',
+        boxSizing: 'border-box',
+        justifyContent: 'space-between'
+      }}
+      onClick={(event) => {
+        if (suppressClickRef.current || isCardActionTarget(event.target)) return;
+        onExpandToggle();
+      }}>
+      <Icon
+        icon="rgb"
+        size={72}
+        color="white"
+        style={{ position: 'absolute', top: -2, right: 8, opacity: 0.18, pointerEvents: 'none' }}
+      />
+      <Column style={{ flex: 1, position: 'relative', zIndex: 1 }} gap="md">
+        <Row itemsCenter justifyBetween gap="sm">
+          <Row itemsCenter gap="sm">
+            <Text size="sm" text={t('rgb_assets')} style={{ color: 'rgba(255,255,255,0.72)', fontWeight: 600 }} />
+            <div style={{ ...rgbBadgeStyle, backgroundColor: 'rgba(255,255,255,0.16)' }}>
+              <Icon icon="rgb" size={14} color="white" />
+              <Text text="RGB" size="xs" style={{ color: 'rgba(255,255,255,0.8)', fontWeight: 600 }} />
+            </div>
+          </Row>
+          <div data-card-action="true">
+            <Row itemsCenter gap="sm">
+              <Row
+                style={{ padding: 6, margin: -6, cursor: 'pointer' }}
+                onClick={(event) => {
+                  stopCardToggle(event);
+                  handleHiddenToggle();
+                }}>
+                <Icon color="white" icon={isBalanceHidden ? 'balance-eyes-closed' : 'balance-eyes'} size={20} />
+              </Row>
+              <RefreshButton onClick={refreshBalance as any} hideText iconColor="rgba(255,255,255,0.8)" />
+            </Row>
+          </div>
+        </Row>
+
+        <Row itemsEnd>
+          <Text text={isBalanceHidden ? '****' : String(assetCount)} preset="title-bold" style={{ fontSize: 28, color: '#fff' }} />
+          <Text
+            text={t('assets')}
+            preset="title-bold"
+            style={{ fontSize: 18, color: 'rgba(255,255,255,0.72)', marginLeft: 4, marginBottom: 2 }}
+          />
+          <Icon color="white" size={16} icon={isDetailExpanded ? 'up' : 'down'} />
+        </Row>
+      </Column>
+
+      {isDetailExpanded ? (
+        <div data-card-action="true" style={{ position: 'relative', zIndex: 1 }}>
+          <Row
+            fullX
+            justifyBetween
+            itemsCenter
+            style={{ ...pendingFooterStyle, borderTop: '1px solid rgba(255,255,255,0.16)', paddingTop: 12 }}
+            onClick={(event) => {
+              stopCardToggle(event);
+              onViewPendingInvoices(event);
+            }}>
+            <Row itemsCenter gap="zero">
+              <Text text={t('pending_invoices')} style={{ color: 'rgba(255,255,255,0.72)', fontSize: 13, fontWeight: 600 }} />
+              <Text text={` (${pendingInvoiceCount})`} style={{ color: '#fff', fontSize: 14, fontWeight: 600 }} />
+            </Row>
+            {pendingInvoiceCount > 0 ? (
+              <Row itemsCenter gap="sm">
+                <Text text={t('view_all')} style={{ color: 'rgba(255,255,255,0.72)', fontSize: 13, fontWeight: 600 }} />
+                <Icon icon="right" color="white" size={11} />
+              </Row>
+            ) : null}
+          </Row>
+        </div>
+      ) : null}
+    </Column>
+  );
+}
+
+function UnsupportedRGBBalanceCard({
+  suppressClickRef,
+  onSwitchWallet,
+  generic = false
 }: {
   suppressClickRef: React.MutableRefObject<boolean>;
   onSwitchWallet: () => void;
+  generic?: boolean;
 }) {
   const { t } = useI18n();
 
@@ -283,8 +399,9 @@ function UnsupportedRGBUsdtBalanceCard({
     <Column
       fullX
       style={{
-        // Match supported USDT card chrome (Figma 2944:12207).
-        background: 'linear-gradient(131deg, #4ee8b8 1.38%, #2bb7ac 47.46%, #147a5a 94.19%)',
+        background: generic
+          ? 'linear-gradient(131deg, #7467E8 1.38%, #584AC7 47.46%, #342E80 94.19%)'
+          : 'linear-gradient(131deg, #4ee8b8 1.38%, #2bb7ac 47.46%, #147a5a 94.19%)',
         borderRadius: 16,
         padding: 12,
         position: 'relative',
@@ -324,17 +441,34 @@ function UnsupportedRGBUsdtBalanceCard({
           }}
         />
       </div>
-      <Image
-        src="./images/icons/protocol/usdt.png"
-        size={65}
-        style={{ position: 'absolute', top: 0, right: 8, opacity: 0.35, pointerEvents: 'none', zIndex: 1 }}
-      />
+      {generic ? (
+        <Icon
+          icon="rgb"
+          color="white"
+          size={72}
+          style={{ position: 'absolute', top: -2, right: 8, opacity: 0.18, pointerEvents: 'none', zIndex: 1 }}
+        />
+      ) : (
+        <Image
+          src="./images/icons/protocol/usdt.png"
+          size={65}
+          style={{ position: 'absolute', top: 0, right: 8, opacity: 0.35, pointerEvents: 'none', zIndex: 1 }}
+        />
+      )}
 
       <Row itemsCenter gap="sm" style={{ position: 'absolute', top: 12, left: 12, zIndex: 1 }}>
-        <Text size="sm" text="USDT" style={{ color: 'rgba(0,0,0,0.55)', fontWeight: 600 }} />
-        <div style={rgbBadgeStyle}>
-          <Icon icon="rgb" size={14} />
-          <Text text="RGB" size="xs" style={{ color: 'rgba(0,0,0,0.55)', fontWeight: 600 }} />
+        <Text
+          size="sm"
+          text={generic ? t('rgb_assets') : 'USDT'}
+          style={{ color: generic ? 'rgba(255,255,255,0.72)' : 'rgba(0,0,0,0.55)', fontWeight: 600 }}
+        />
+        <div style={{ ...rgbBadgeStyle, ...(generic ? { backgroundColor: 'rgba(255,255,255,0.16)' } : {}) }}>
+          <Icon icon="rgb" size={14} color={generic ? 'white' : undefined} />
+          <Text
+            text="RGB"
+            size="xs"
+            style={{ color: generic ? 'rgba(255,255,255,0.8)' : 'rgba(0,0,0,0.55)', fontWeight: 600 }}
+          />
         </div>
       </Row>
 
@@ -354,20 +488,24 @@ function UnsupportedRGBUsdtBalanceCard({
         <Text
           text={t('not_supported_in_this_wallet')}
           textCenter
-          style={{ color: 'rgba(0,0,0,0.45)', fontSize: 13, fontWeight: 600, lineHeight: '20px' }}
+          style={{ color: generic ? 'rgba(255,255,255,0.62)' : 'rgba(0,0,0,0.45)', fontSize: 13, fontWeight: 600, lineHeight: '20px' }}
         />
         <Row itemsCenter style={{ pointerEvents: 'auto', gap: 6 }}>
           <Text
             text={t('switch_to_hd_wallet')}
-            style={{ color: 'rgba(0,0,0,0.65)', fontSize: 13, fontWeight: 600, lineHeight: '20px' }}
+            style={{ color: generic ? 'rgba(255,255,255,0.8)' : 'rgba(0,0,0,0.65)', fontSize: 13, fontWeight: 600, lineHeight: '20px' }}
           />
-          <img
-            src="./images/icons/nav/right-sm.svg"
-            alt=""
-            width={6}
-            height={11}
-            style={{ display: 'block', flexShrink: 0 }}
-          />
+          {generic ? (
+            <Icon icon="right" color="white" size={11} />
+          ) : (
+            <img
+              src="./images/icons/nav/right-sm.svg"
+              alt=""
+              width={6}
+              height={11}
+              style={{ display: 'block', flexShrink: 0 }}
+            />
+          )}
         </Row>
       </Column>
     </Column>
@@ -523,6 +661,7 @@ function SyncedBalanceCard({
 
 export function BalanceCardCarousel({ rgbList }: { rgbList: ReturnType<typeof useRGBListLogic> }) {
   const supportedAssets = useSupportedAssets();
+  const chain = useChain();
   const walletView = useWalletView();
   const dispatch = useAppDispatch();
   const navigate = useNavigate();
@@ -538,6 +677,7 @@ export function BalanceCardCarousel({ rgbList }: { rgbList: ReturnType<typeof us
   const isRgbFullySupported = supportedAssets.assets.rgb;
   const canShowRgbCard = supportedAssets.assets.rgbCard;
   const isUnsupportedRgbCard = canShowRgbCard && !isRgbFullySupported;
+  const useGenericRgbCard = chain.enum === ChainType.BITCOIN_TESTNET4;
   const activeIndex = isRgbFullySupported
     ? walletView === WalletView.RGB
       ? 1
@@ -662,7 +802,18 @@ export function BalanceCardCarousel({ rgbList }: { rgbList: ReturnType<typeof us
           }}
           onClickCapture={handlePeekCardClickCapture(1)}>
           {isUnsupportedRgbCard ? (
-            <UnsupportedRGBUsdtBalanceCard suppressClickRef={suppressClickRef} onSwitchWallet={onSwitchWallet} />
+            <UnsupportedRGBBalanceCard
+              suppressClickRef={suppressClickRef}
+              onSwitchWallet={onSwitchWallet}
+              generic={useGenericRgbCard}
+            />
+          ) : useGenericRgbCard ? (
+            <RGBAssetsBalanceCard
+              isDetailExpanded={isDetailExpanded}
+              onExpandToggle={toggleDetailExpanded}
+              suppressClickRef={suppressClickRef}
+              rgbList={rgbList}
+            />
           ) : (
             <RGBUsdtBalanceCard
               isDetailExpanded={isDetailExpanded}

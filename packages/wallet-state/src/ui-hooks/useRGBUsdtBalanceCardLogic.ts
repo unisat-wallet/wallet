@@ -138,6 +138,7 @@ export function useRGBUsdtBalanceCardLogic({ items, onRefresh }: RgbListSource) 
 
   return {
     usdtToken,
+    assetCount: items.length,
     balanceAmount,
     mainPart,
     subPart,

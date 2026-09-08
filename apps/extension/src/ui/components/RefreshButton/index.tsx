@@ -9,10 +9,12 @@ import styles from './index.module.less';
 
 export function RefreshButton({
   onClick,
-  hideText = false
+  hideText = false,
+  iconColor = 'rgba(0,0,0,0.5)'
 }: {
   onClick: ReactEventHandler<HTMLDivElement>;
   hideText?: boolean;
+  iconColor?: string;
 }) {
   const [leftTime, setLeftTime] = useState(0);
   const [disabled, setDisabled] = useState(false);
@@ -51,7 +53,7 @@ export function RefreshButton({
         onClick(e);
       }}
       style={hideText ? { padding: 6, margin: -6 } : { padding: '6px 8px', margin: '-6px -8px' }}>
-      <ReloadOutlined className={isRotating ? styles.rotate : ''} style={{ fontSize: 14, color: 'rgba(0,0,0,0.5)' }} />
+      <ReloadOutlined className={isRotating ? styles.rotate : ''} style={{ fontSize: 14, color: iconColor }} />
       {!hideText && (
         <Text text={disabled ? `${leftTime} ${t('secs')}` : t('refresh')} color="black_muted" size="sm" textCenter />
       )}

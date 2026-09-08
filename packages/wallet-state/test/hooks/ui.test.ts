@@ -46,7 +46,7 @@ describe('getSupportedAssets', () => {
     expect(assets.assets.rgbCard).toBe(false)
   })
 
-  it.each([ChainType.BITCOIN_TESTNET, ChainType.BITCOIN_TESTNET4, ChainType.BITCOIN_SIGNET])(
+  it.each([ChainType.BITCOIN_TESTNET, ChainType.BITCOIN_SIGNET])(
     'hides RGB on unsupported Bitcoin network %s',
     chainType => {
       const assets = getSupportedAssets(chainType, 'tb1qxy2kgdygjrsqtzq2n0yrf2493p83kkfjhx0wlh', {
@@ -57,4 +57,15 @@ describe('getSupportedAssets', () => {
       expect(assets.assets.rgbCard).toBe(false)
     }
   )
+
+  it('enables RGB on Bitcoin Testnet4 for HD wallets', () => {
+    const assets = getSupportedAssets(
+      ChainType.BITCOIN_TESTNET4,
+      'tb1qxy2kgdygjrsqtzq2n0yrf2493p83kkfjhx0wlh',
+      { keyringType: KeyringType.HdKeyring }
+    )
+
+    expect(assets.assets.rgb).toBe(true)
+    expect(assets.assets.rgbCard).toBe(true)
+  })
 })

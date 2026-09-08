@@ -296,6 +296,7 @@ const PROD_CHAINS_MAP: { [key: string]: TypeChain } = {
     okxExplorerUrl: '',
     showPrice: false,
     defaultExplorer: 'mempool-space',
+    rgbProxyEndpoints: ['rpcs://wallet-api-testnet4.unisat.space/_/rgb/json-rpc'],
     svg: 'bitcoin-testnet',
   },
   [ChainType.BITCOIN_SIGNET]: {
