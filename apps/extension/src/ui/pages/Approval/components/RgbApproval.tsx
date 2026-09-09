@@ -277,17 +277,90 @@ export function RgbReceiveReject({ params: { data, session } }: Props) {
 }
 
 export function RgbPayment({ params: { data, session } }: Props) {
+  return <RgbPaymentApproval data={data} session={session} />;
+}
+
+function RgbPaymentApproval({ data, session }: { data: Props['params']['data']; session: Props['params']['session'] }) {
+  const wallet = useWallet();
+  const { resolveApproval, rejectApproval } = useApproval();
+  const [feePoolToSignData, setFeePoolToSignData] = useState<ToSignData>();
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+
+  const getErrorMessage = (value: unknown) => {
+    if (value && typeof value === 'object' && 'message' in value && typeof value.message === 'string') {
+      return value.message;
+    }
+    return String(value || 'Unable to fund the RGB fee pool');
+  };
+
+  const onPreparePayment = async () => {
+    setLoading(true);
+    setError('');
+    try {
+      const feePool = await wallet.getRgbFeePoolStatus();
+      if (feePool.ready) {
+        await resolveApproval();
+        return;
+      }
+
+      const result = await wallet.createRgbFeePoolTopUpBegin();
+      const toSignData = result?.toSignData as ToSignData | undefined;
+      if (!toSignData) throw new Error('RGB fee-pool top-up did not return signing data');
+      setFeePoolToSignData(toSignData);
+    } catch (e) {
+      setError(getErrorMessage(e));
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const onSignFeePoolTopUp = async (signedDatas: SignedData[]) => {
+    const signedPsbt = signedDatas[0]?.psbtHex;
+    if (!signedPsbt) {
+      setError('RGB fee-pool PSBT signing did not return psbtHex');
+      setFeePoolToSignData(undefined);
+      return;
+    }
+
+    setLoading(true);
+    setError('');
+    try {
+      await wallet.createRgbFeePoolTopUpEnd({ signedPsbt });
+      await resolveApproval();
+    } catch (e) {
+      setError(getErrorMessage(e));
+      setFeePoolToSignData(undefined);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (feePoolToSignData) {
+    return (
+      <SignPsbt
+        params={{ data: { toSignDatas: [feePoolToSignData] }, session }}
+        handleCancel={() => setFeePoolToSignData(undefined)}
+        handleConfirm={(signedDatas) => void onSignFeePoolTopUp(signedDatas)}
+      />
+    );
+  }
+
   return (
     <RgbApprovalLayout
       session={session}
       title="Prepare RGB payment"
-      description="Your wallet will prepare an RGB transfer. You will review and sign the Bitcoin transaction in the next step."
+      description="Your wallet will prepare an RGB transfer. If needed, you will first fund the RGB fee pool used to pay the Bitcoin network fee."
       rows={[
         ['Asset', data.assetId || 'Unknown asset'],
         ['Amount', data.amount || 'Use invoice amount'],
         ['Invoice', data.invoice || '']
       ]}
-      confirmText="Continue"
+      confirmText={loading ? 'Checking fee pool...' : 'Continue'}
+      onConfirm={() => void onPreparePayment()}
+      onCancel={() => rejectApproval()}
+      confirmDisabled={loading}
+      error={error}
     />
   );
 }
