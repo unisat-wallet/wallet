@@ -295,6 +295,8 @@ export interface RgbIssueHistoryItem {
   txid: string
   createdAt: number
   asset: RgbContractMetadata
+  /** Last known chain state of the genesis allocation UTXO. */
+  chainStatus?: RgbUtxo['chainStatus']
 }
 
 export interface RgbContractMetadata {

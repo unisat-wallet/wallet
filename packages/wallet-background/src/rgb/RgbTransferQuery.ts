@@ -133,7 +133,6 @@ export class RgbTransferQuery {
       from: wallet.fundingAddress,
       to: this.dependencies.getInvoiceDestination(send.invoice, networkType),
     }))
-    const pendingIssueIds = new Set((service.getPendingIssues?.() || []).map(issue => issue.assetId))
     const localIssues = (service.getIssueHistory?.() || []).map(issue => ({
       id: `local-issue:${issue.assetId}`,
       assetId: issue.assetId,
@@ -141,7 +140,7 @@ export class RgbTransferQuery {
       amount: issue.amount,
       txid: issue.txid,
       timestamp: issue.createdAt,
-      status: pendingIssueIds.has(issue.assetId) ? 'pending' : 'settled',
+      status: rgbIssueActivityStatus(issue.chainStatus),
       local: true,
       from: wallet.fundingAddress,
       to: wallet.fundingAddress,
@@ -393,4 +392,10 @@ export class RgbTransferQuery {
       list,
     }
   }
+}
+
+function rgbIssueActivityStatus(chainStatus?: string) {
+  if (chainStatus === 'confirmed' || chainStatus === 'spent') return 'confirmed'
+  if (chainStatus === 'replaced') return 'failed'
+  return 'unconfirmed'
 }

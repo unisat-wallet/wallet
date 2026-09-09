@@ -1627,7 +1627,7 @@ describe('RGB wallet references', () => {
     ])
   })
 
-  it('lists a locally issued RGB asset even before the indexer has activity history', async () => {
+  it('lists a locally issued RGB asset as unconfirmed when its genesis UTXO is not confirmed', async () => {
     const wallet = new WalletController()
     const txid = 'c'.repeat(64)
     const service = {
@@ -1663,7 +1663,7 @@ describe('RGB wallet references', () => {
         type: 'issue',
         amount: '100000000',
         txid,
-        status: 'settled',
+        status: 'unconfirmed',
         ticker: 'ISS',
         precision: 8,
         local: true,
@@ -2157,7 +2157,7 @@ describe('RGB wallet references', () => {
       amounts: ['1'],
     })
 
-    expect(result).toMatchObject({ pendingConfirmation: false })
+    expect(result).toMatchObject({ pendingConfirmation: true })
     expect(syncRgbUtxos).toHaveBeenCalledWith(
       expect.objectContaining({
         outpoints: [

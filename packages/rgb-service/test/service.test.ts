@@ -930,9 +930,15 @@ describe('RgbService', () => {
         assetId: 'rgb:issued',
         amount: '1',
         txid: outpoints[0]!.outpoint.txid,
+        chainStatus: 'confirmed',
         asset: expect.objectContaining({ ticker: 'ISS', name: 'Issued' }),
       }),
     ])
+    ;(reopened as any).state.snapshot.utxos[0].chainStatus = 'mempool'
+    expect(reopened.getIssueHistory()).toEqual([
+      expect.objectContaining({ assetId: 'rgb:issued', chainStatus: 'mempool' }),
+    ])
+    ;(reopened as any).state.snapshot.utxos[0].chainStatus = 'confirmed'
     await reopened.markIssueSynced('rgb:issued')
     expect(reopened.getIssueHistory()).toHaveLength(1)
     expect(reopened.getSnapshot().utxos).toEqual(outpoints)

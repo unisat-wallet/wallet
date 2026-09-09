@@ -114,14 +114,14 @@ export class RgbIssueOperations {
       utxoSync: { txid: firstFunding.outpoint.txid, outpoints },
     })
     const syncPending = !(await this.dependencies.syncIndexerOutbox(context))
+    const pendingConfirmation = selectedFunding.some(utxo => utxo.chainStatus !== 'confirmed')
     return {
       assetId,
       genesis: Buffer.from(genesis.strict).toString('base64'),
       contract: Buffer.from(contract.strict).toString('base64'),
-      // Issued NIA can be transferred from an unconfirmed genesis outpoint.
-      // Keep this result false so the UI does not present the new asset as a
-      // pending, unusable issuance.
-      pendingConfirmation: false,
+      // An unconfirmed genesis is still usable for RGB transitions, but the
+      // UI must not label the issuance confirmed until Bitcoin confirms it.
+      pendingConfirmation,
       syncPending,
     }
   }

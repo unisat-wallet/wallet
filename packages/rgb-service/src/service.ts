@@ -545,7 +545,17 @@ export class RgbService {
 
   /** Self-issued assets have no inbound consignment, so retain their history locally. */
   getIssueHistory() {
-    return this.requireState().issueHistory || []
+    const state = this.requireState()
+    return (state.issueHistory || []).map(issue => {
+      const genesisUtxo = state.snapshot.utxos.find(
+        utxo =>
+          utxo.outpoint.txid === issue.txid &&
+          utxo.allocations.some(allocation => allocation.assetId === issue.assetId)
+      )
+      return genesisUtxo?.chainStatus
+        ? { ...issue, chainStatus: genesisUtxo.chainStatus }
+        : issue
+    })
   }
 
   async markUtxoSyncCompleted(txid: string) {
@@ -657,6 +667,11 @@ export class RgbService {
       txid: input.utxoSync.txid,
       createdAt: this.now(),
       asset: input.asset,
+      chainStatus: utxos.find(
+        utxo =>
+          utxo.outpoint.txid === input.utxoSync.txid &&
+          utxo.allocations.some(allocation => allocation.assetId === assetId)
+      )?.chainStatus,
     }
     const historyIndex = history.findIndex(item => item.assetId === assetId)
     if (historyIndex >= 0) history[historyIndex] = historyItem
@@ -2581,7 +2596,11 @@ function validateRecoveredState(state: RgbServiceState, currentWallet: RgbWallet
       typeof issue.asset.name !== 'string' ||
       !Number.isInteger(issue.asset.precision) ||
       typeof issue.asset.schema !== 'string' ||
-      !/^(0|[1-9][0-9]*)$/.test(issue.asset.issuedSupply)
+      !/^(0|[1-9][0-9]*)$/.test(issue.asset.issuedSupply) ||
+      (issue.chainStatus !== undefined &&
+        !['mempool', 'confirmed', 'pending_spend', 'spent', 'replaced', 'unknown'].includes(
+          issue.chainStatus
+        ))
     ) {
       throw new RgbServiceError('RGB recovery checkpoint contains an invalid issue history item')
     }

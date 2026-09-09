@@ -804,6 +804,12 @@ function rgbRecoveryServiceSummary(service: LocalRgbService) {
   })
 }
 
+function rgbIssueActivityStatus(chainStatus?: string) {
+  if (chainStatus === 'confirmed' || chainStatus === 'spent') return 'confirmed'
+  if (chainStatus === 'replaced') return 'failed'
+  return 'unconfirmed'
+}
+
 export class WalletController extends BaseController {
   timer: any = null
 
@@ -3562,7 +3568,6 @@ export class WalletController extends BaseController {
     const { service, wallet } = await this.getLocalRgbReadService()
     if (params.address !== wallet.fundingAddress) return page
 
-    const pendingIssueIds = new Set((service.getPendingIssues?.() || []).map(issue => issue.assetId))
     const localIssues = (service.getIssueHistory?.() || [])
       .filter(issue => !params.assetId || issue.assetId === params.assetId)
       .map(issue => ({
@@ -3572,7 +3577,7 @@ export class WalletController extends BaseController {
         amount: issue.amount,
         txid: issue.txid,
         timestamp: issue.createdAt,
-        status: pendingIssueIds.has(issue.assetId) ? 'pending' : 'settled',
+        status: rgbIssueActivityStatus(issue.chainStatus),
         from: wallet.fundingAddress,
         to: wallet.fundingAddress,
         ticker: issue.asset.ticker,
