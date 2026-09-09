@@ -51,7 +51,7 @@ export async function restoreAppState() {
       await i18nService.changeLanguage(locale);
     };
 
-    await keyringService.init({
+    const keyringInit = keyringService.init({
       storage: proxyStorage,
       logger: logger,
       encryptor: encryptor,
@@ -59,38 +59,53 @@ export async function restoreAppState() {
       eventBus: bgEventBus
     });
 
-    await preferenceService.init({
+    const preferenceInit = preferenceService.init({
       storage: proxyStorage,
       logger: logger,
       t: t,
       eventBus: bgEventBus as any
     });
 
-    let chainType = preferenceService.getChainType();
-    if (!chainType || !CHAINS_MAP[chainType]) {
-      chainType = ChainType.BITCOIN_MAINNET;
-      preferenceService.setChainType(chainType);
-    }
-
-    const endpoint = CHAINS_MAP[chainType].endpoints[0];
     const httpClient = new HttpClient();
-    await walletApiService.init({
+    const walletApiInit = walletApiService.init({
       storage: proxyStorage,
       logger: logger,
-      endpoint,
       httpClient: httpClient
     });
 
-    await permissionService.init({
+    const permissionInit = permissionService.init({
       storage: proxyStorage,
       logger: logger,
       autoSync: true
     });
 
-    await contactBookService.init({
+    const contactBookInit = contactBookService.init({
       storage: proxyStorage,
       logger: logger
     });
+
+    const adapter = new ExtensionAdapter();
+    const phishingDetectInit = phishingDetectService.init({
+      adapter,
+      logger: logger,
+      t: t
+    });
+
+    await Promise.all([
+      keyringInit,
+      preferenceInit,
+      walletApiInit,
+      permissionInit,
+      contactBookInit,
+      phishingDetectInit
+    ]);
+
+    let chainType = preferenceService.getChainType();
+    if (!chainType || !CHAINS_MAP[chainType]) {
+      chainType = ChainType.BITCOIN_MAINNET;
+      preferenceService.setChainType(chainType);
+    }
+    await walletApiService.setEndpoint(CHAINS_MAP[chainType].endpoints[0]);
 
     await notificationService.init({
       storage: proxyStorage,
@@ -98,17 +113,9 @@ export async function restoreAppState() {
       api: walletApiService
     });
 
-    const adapter = new ExtensionAdapter();
-    phishingDetectService.init({
-      adapter,
-      logger: logger,
-      t: t
-    });
-    // Initialize phishing service early to ensure protection is active
-
     appStateRestored = true;
 
-    walletController.setBackgroundInited(true);
+    await walletController.setBackgroundInited(true);
   } catch (err) {
     console.error('[Background] Initialization failed', err);
   }

@@ -17,13 +17,13 @@ if (process.env.NODE_ENV === 'development') {
 async function bootstrap() {
   restoreAppState().then(() => {
     initSidePanel();
+    initPhishingDetect();
   });
   initPlatformEnv();
   initMessaging();
   initInstallEvent();
   initKeepAlive();
   initWindow();
-  initPhishingDetect();
 }
 
 bootstrap();
