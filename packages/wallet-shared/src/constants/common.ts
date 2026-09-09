@@ -254,7 +254,6 @@ const PROD_CHAINS_MAP: { [key: string]: TypeChain } = {
     enableBrc20Prog: true,
     iconBaseUrl: 'https://static.unisat.space/icon',
     enableLowFeeMode: true,
-    rgbProxyEndpoints: ['rpcs://wallet-api.unisat.space/_/rgb/json-rpc'],
     svg: 'bitcoin-mainnet',
   },
   [ChainType.BITCOIN_TESTNET]: {
