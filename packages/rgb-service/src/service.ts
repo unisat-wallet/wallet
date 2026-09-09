@@ -26,6 +26,7 @@ import type {
   RgbPreparedTransfer,
   RgbPendingIssue,
   RgbPendingAssetMetadata,
+  RgbIssueHistoryItem,
   RgbPendingTransfer,
   RgbPendingUtxoSync,
   RgbOutpoint,
@@ -542,6 +543,11 @@ export class RgbService {
     return this.requireState().pendingIssues || []
   }
 
+  /** Self-issued assets have no inbound consignment, so retain their history locally. */
+  getIssueHistory() {
+    return this.requireState().issueHistory || []
+  }
+
   async markUtxoSyncCompleted(txid: string) {
     const state = this.requireState()
     if (!state.pendingUtxoSync || state.pendingUtxoSync.txid !== txid) return
@@ -644,6 +650,17 @@ export class RgbService {
     const index = pending.findIndex(issue => issue.assetId === assetId)
     if (index >= 0) pending[index] = task
     else pending.push(task)
+    const history = state.issueHistory || (state.issueHistory = [])
+    const historyItem: RgbIssueHistoryItem = {
+      assetId,
+      amount: input.asset.issuedSupply,
+      txid: input.utxoSync.txid,
+      createdAt: this.now(),
+      asset: input.asset,
+    }
+    const historyIndex = history.findIndex(item => item.assetId === assetId)
+    if (historyIndex >= 0) history[historyIndex] = historyItem
+    else history.push(historyItem)
     await this.persistWithRecoveryRollback(rollback)
   }
 
@@ -2548,6 +2565,27 @@ function validateRecoveredState(state: RgbServiceState, currentWallet: RgbWallet
       }
     }
   }
+  for (const issue of state.issueHistory || []) {
+    try {
+      normalizeAssetId(issue.assetId)
+    } catch {
+      throw new RgbServiceError('RGB recovery checkpoint contains an invalid issue history asset ID')
+    }
+    if (
+      !/^(0|[1-9][0-9]*)$/.test(issue.amount) ||
+      !/^[0-9a-f]{64}$/i.test(issue.txid) ||
+      !Number.isSafeInteger(issue.createdAt) ||
+      issue.createdAt < 0 ||
+      !issue.asset ||
+      typeof issue.asset.ticker !== 'string' ||
+      typeof issue.asset.name !== 'string' ||
+      !Number.isInteger(issue.asset.precision) ||
+      typeof issue.asset.schema !== 'string' ||
+      !/^(0|[1-9][0-9]*)$/.test(issue.asset.issuedSupply)
+    ) {
+      throw new RgbServiceError('RGB recovery checkpoint contains an invalid issue history item')
+    }
+  }
 }
 
 function isBase64(value: string) {
@@ -2647,6 +2685,7 @@ function normalizeStateAssetIds(state: RgbServiceState): RgbServiceState {
   state.pendingReceiveHistory?.forEach(item => (item.assetId = normalizeAssetId(item.assetId)))
   state.pendingSendHistory?.forEach(item => (item.assetId = normalizeAssetId(item.assetId)))
   state.pendingIssues?.forEach(item => (item.assetId = normalizeAssetId(item.assetId)))
+  state.issueHistory?.forEach(item => (item.assetId = normalizeAssetId(item.assetId)))
   state.pendingAssetMetadata?.forEach(item => (item.assetId = normalizeAssetId(item.assetId)))
   if (state.contracts) {
     state.contracts = Object.fromEntries(

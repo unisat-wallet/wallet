@@ -1627,6 +1627,82 @@ describe('RGB wallet references', () => {
     ])
   })
 
+  it('lists a locally issued RGB asset even before the indexer has activity history', async () => {
+    const wallet = new WalletController()
+    const txid = 'c'.repeat(64)
+    const service = {
+      getPendingTransfers: vi.fn(() => []),
+      getPendingReceives: vi.fn(() => []),
+      getPendingIssues: vi.fn(() => []),
+      getIssueHistory: vi.fn(() => [
+        {
+          assetId: 'rgb:issued',
+          amount: '100000000',
+          txid,
+          createdAt: 100,
+          asset: { ticker: 'ISS', name: 'Issued', precision: 8, schema: 'NIA', issuedSupply: '100000000' },
+        },
+      ]),
+    }
+    vi.spyOn(wallet as any, 'getLocalRgbService').mockResolvedValue({
+      service,
+      wallet: { fundingAddress: 'bc1p-rgb-funding' },
+    })
+    vi.spyOn(wallet, 'getAddressRgbActivity').mockResolvedValue({
+      currentPage: 1,
+      pageSize: 20,
+      total: 0,
+      list: [],
+    })
+
+    const result = await wallet.getRgbTransfers(1, 20, { skipSync: true })
+
+    expect(result.list).toMatchObject([
+      {
+        id: 'local-issue:rgb:issued',
+        type: 'issue',
+        amount: '100000000',
+        txid,
+        status: 'settled',
+        ticker: 'ISS',
+        precision: 8,
+        local: true,
+      },
+    ])
+  })
+
+  it('merges local issuance into the public RGB activity endpoints', async () => {
+    const wallet = new WalletController()
+    const walletRef = { fundingAddress: 'bc1p-rgb-funding', network: 'mainnet', walletId: 'rgb-wallet' }
+    const service = {
+      getPendingIssues: vi.fn(() => []),
+      getIssueHistory: vi.fn(() => [
+        {
+          assetId: 'rgb:issued',
+          amount: '42',
+          txid: 'd'.repeat(64),
+          createdAt: 100,
+          asset: { ticker: 'ISS', name: 'Issued', precision: 0, schema: 'NIA', issuedSupply: '42' },
+        },
+      ]),
+    }
+    ;(walletApiService as any).rgb = {
+      getRgbAssetActivity: vi.fn().mockResolvedValue({ total: 0, list: [] }),
+      getAddressRgbActivity: vi.fn().mockResolvedValue({ total: 0, list: [] }),
+    }
+    vi.spyOn(wallet as any, 'getLocalRgbReadService').mockResolvedValue({ service, wallet: walletRef })
+
+    await expect(wallet.getRgbAssetActivity('rgb:issued', 1, 20, walletRef.fundingAddress)).resolves
+      .toMatchObject({
+        total: 1,
+        list: [{ id: 'local-issue:rgb:issued', type: 'issue', amount: '42' }],
+      })
+    await expect(wallet.getAddressRgbActivity(walletRef.fundingAddress, 1, 20)).resolves.toMatchObject({
+      total: 1,
+      list: [{ id: 'local-issue:rgb:issued', type: 'issue', amount: '42' }],
+    })
+  })
+
   it('does not advance pending RGB transfers when this device cannot renew the writer lease', async () => {
     const wallet = new WalletController()
     const service = { syncPendingTransfers: vi.fn().mockResolvedValue(undefined) }

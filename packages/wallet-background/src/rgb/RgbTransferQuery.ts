@@ -133,6 +133,22 @@ export class RgbTransferQuery {
       from: wallet.fundingAddress,
       to: this.dependencies.getInvoiceDestination(send.invoice, networkType),
     }))
+    const pendingIssueIds = new Set((service.getPendingIssues?.() || []).map(issue => issue.assetId))
+    const localIssues = (service.getIssueHistory?.() || []).map(issue => ({
+      id: `local-issue:${issue.assetId}`,
+      assetId: issue.assetId,
+      type: 'issue' as const,
+      amount: issue.amount,
+      txid: issue.txid,
+      timestamp: issue.createdAt,
+      status: pendingIssueIds.has(issue.assetId) ? 'pending' : 'settled',
+      local: true,
+      from: wallet.fundingAddress,
+      to: wallet.fundingAddress,
+      ticker: issue.asset.ticker,
+      name: issue.asset.name,
+      precision: issue.asset.precision,
+    }))
     const localReceives = service.getPendingReceives().flatMap(receive => {
       const receivedConsignment = receive.receivedConsignment
       const receivedAssetId =
@@ -290,6 +306,7 @@ export class RgbTransferQuery {
     }
     const includeLocalTransfers = currentPage === 1
     const visibleLocalSends = includeLocalTransfers ? localSends : []
+    const visibleLocalIssues = includeLocalTransfers ? localIssues : []
     // A previously persisted local NACK must not hide a transaction the
     // indexer has since confirmed. This heals historical records produced by
     // older recovery flows while the service keeps a one-way settled state for
@@ -308,6 +325,7 @@ export class RgbTransferQuery {
     const localTxids = new Set(
       [
         ...visibleLocalSends,
+        ...visibleLocalIssues,
         ...visibleLocalHistory,
         ...visibleLocalReceives,
         ...visibleLocalReceiveHistory,
@@ -350,6 +368,7 @@ export class RgbTransferQuery {
       }))
     const list = [
       ...visibleLocalSends.map(withActivityAddresses),
+      ...visibleLocalIssues.map(withActivityAddresses),
       ...visibleLocalHistory.map(withActivityAddresses),
       ...visibleLocalReceives.map(withActivityAddresses),
       ...visibleLocalReceiveHistory.map(withActivityAddresses),
@@ -358,6 +377,7 @@ export class RgbTransferQuery {
     const localOnlyTransferKeys = new Set(
       [
         ...visibleLocalSends,
+        ...visibleLocalIssues,
         ...visibleLocalHistory.filter(send => send.status !== 'broadcasted'),
         ...visibleLocalReceives,
         ...visibleLocalReceiveHistory,

@@ -925,6 +925,16 @@ describe('RgbService', () => {
     expect(reopened.getPendingIssues()).toEqual([
       expect.objectContaining({ assetId: 'rgb:issued', utxoSync: { txid: outpoints[0]!.outpoint.txid, outpoints } }),
     ])
+    expect(reopened.getIssueHistory()).toEqual([
+      expect.objectContaining({
+        assetId: 'rgb:issued',
+        amount: '1',
+        txid: outpoints[0]!.outpoint.txid,
+        asset: expect.objectContaining({ ticker: 'ISS', name: 'Issued' }),
+      }),
+    ])
+    await reopened.markIssueSynced('rgb:issued')
+    expect(reopened.getIssueHistory()).toHaveLength(1)
     expect(reopened.getSnapshot().utxos).toEqual(outpoints)
   })
 

@@ -3464,7 +3464,13 @@ export class WalletController extends BaseController {
     if (address) params.address = address
     if (type) params.type = type
 
-    const { total, list } = await getRgbApiService().getRgbAssetActivity(assetId, params)
+    const pageResult = await getRgbApiService().getRgbAssetActivity(assetId, params)
+    const { total, list } = await this.mergeLocalRgbIssueHistory(pageResult, {
+      currentPage,
+      address,
+      assetId,
+      type,
+    })
 
     return {
       currentPage,
@@ -3516,7 +3522,13 @@ export class WalletController extends BaseController {
     if (assetId) params.assetId = assetId
     if (type) params.type = type
 
-    const { total, list } = await getRgbApiService().getAddressRgbActivity(address, params)
+    const pageResult = await getRgbApiService().getAddressRgbActivity(address, params)
+    const { total, list } = await this.mergeLocalRgbIssueHistory(pageResult, {
+      currentPage,
+      address,
+      assetId,
+      type,
+    })
 
     return {
       currentPage,
@@ -3534,6 +3546,56 @@ export class WalletController extends BaseController {
     type?: RgbActivityType
   ) => {
     return this.getAddressRgbActivity(address, currentPage, pageSize, assetId, type)
+  }
+
+  /** Add self-issued assets the indexer has not yet (or no longer) reports as activity. */
+  private mergeLocalRgbIssueHistory = async (
+    page: RgbControllerPageResponse,
+    params: {
+      currentPage: number
+      address?: string | undefined
+      assetId?: string | undefined
+      type?: RgbActivityType | undefined
+    }
+  ) => {
+    if (params.currentPage !== 1 || (params.type && params.type !== 'issue')) return page
+    const { service, wallet } = await this.getLocalRgbReadService()
+    if (params.address !== wallet.fundingAddress) return page
+
+    const pendingIssueIds = new Set((service.getPendingIssues?.() || []).map(issue => issue.assetId))
+    const localIssues = (service.getIssueHistory?.() || [])
+      .filter(issue => !params.assetId || issue.assetId === params.assetId)
+      .map(issue => ({
+        id: `local-issue:${issue.assetId}`,
+        assetId: issue.assetId,
+        type: 'issue',
+        amount: issue.amount,
+        txid: issue.txid,
+        timestamp: issue.createdAt,
+        status: pendingIssueIds.has(issue.assetId) ? 'pending' : 'settled',
+        from: wallet.fundingAddress,
+        to: wallet.fundingAddress,
+        ticker: issue.asset.ticker,
+        name: issue.asset.name,
+        precision: issue.asset.precision,
+        local: true,
+      }))
+    const remoteTxids = new Set(
+      page.list
+        .map(item => (item as { txid?: string }).txid)
+        .filter((txid): txid is string => Boolean(txid))
+    )
+    const additions = localIssues.filter(issue => !remoteTxids.has(issue.txid))
+    if (!additions.length) return page
+    const list = [...additions, ...page.list].sort(
+      (left, right) =>
+        Number((right as { timestamp?: number; createdAt?: number }).timestamp ?? (right as { createdAt?: number }).createdAt ?? 0) -
+        Number((left as { timestamp?: number; createdAt?: number }).timestamp ?? (left as { createdAt?: number }).createdAt ?? 0)
+    )
+    return {
+      total: Math.max(page.total + additions.length, list.length),
+      list,
+    }
   }
 
   getRgbTransfers = async (

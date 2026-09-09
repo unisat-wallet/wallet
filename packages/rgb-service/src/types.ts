@@ -288,6 +288,15 @@ export interface RgbPendingIssue {
   utxoSync: RgbPendingUtxoSync
 }
 
+/** Durable local record of a self-issued asset, retained after indexing completes. */
+export interface RgbIssueHistoryItem {
+  assetId: string
+  amount: string
+  txid: string
+  createdAt: number
+  asset: RgbContractMetadata
+}
+
 export interface RgbContractMetadata {
   ticker: string
   name: string
@@ -333,6 +342,7 @@ export interface RgbServiceState {
   pendingSendHistory?: RgbPendingSendHistory[]
   pendingUtxoSync?: RgbPendingUtxoSync
   pendingIssues?: RgbPendingIssue[]
+  issueHistory?: RgbIssueHistoryItem[]
   /** Asset metadata learned from received consignments and waiting for indexing. */
   pendingAssetMetadata?: RgbPendingAssetMetadata[]
   /** Unconfirmed fee-pool outputs retained until the address indexer exposes them. */
