@@ -1,21 +1,37 @@
 import { browserStorageLocalGet, browserStorageLocalSet } from '../webapi/browser';
 
-let cacheMap;
+const cacheMap = new Map<string, unknown>();
+const loadedKeys = new Set<string>();
+let allKeysLoaded = false;
 
-const get = async (prop?) => {
-  if (cacheMap) {
+const get = async (prop?: string) => {
+  if (prop === undefined) {
+    if (!allKeysLoaded) {
+      const result = await browserStorageLocalGet(null);
+      Object.entries(result).forEach(([key, value]) => {
+        cacheMap.set(key, value);
+        loadedKeys.add(key);
+      });
+      allKeysLoaded = true;
+    }
+    return Object.fromEntries(cacheMap);
+  }
+
+  if (loadedKeys.has(prop)) {
     return cacheMap.get(prop);
   }
 
-  const result = await browserStorageLocalGet(null);
-  cacheMap = new Map(Object.entries(result).map(([k, v]) => [k, v]));
-
-  return prop ? result[prop] : result;
+  const result = await browserStorageLocalGet(prop);
+  const value = result[prop];
+  cacheMap.set(prop, value);
+  loadedKeys.add(prop);
+  return value;
 };
 
 const set = async (prop, value): Promise<void> => {
   await browserStorageLocalSet({ [prop]: value });
   cacheMap.set(prop, value);
+  loadedKeys.add(prop);
 };
 
 const byteInUse = async (): Promise<number> => {
