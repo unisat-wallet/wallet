@@ -1671,8 +1671,9 @@ describe('RGB wallet references', () => {
     ])
   })
 
-  it('merges local issuance into the public RGB activity endpoints', async () => {
+  it('uses the latest genesis UTXO state when merging local issuance into activity', async () => {
     const wallet = new WalletController()
+    vi.spyOn(wallet as any, 'assertRgbEnabled').mockImplementation(() => undefined)
     const walletRef = { fundingAddress: 'bc1p-rgb-funding', network: 'mainnet', walletId: 'rgb-wallet' }
     const service = {
       getPendingIssues: vi.fn(() => []),
@@ -1683,23 +1684,35 @@ describe('RGB wallet references', () => {
           txid: 'd'.repeat(64),
           createdAt: 100,
           asset: { ticker: 'ISS', name: 'Issued', precision: 0, schema: 'NIA', issuedSupply: '42' },
+          chainStatus: 'mempool',
         },
       ]),
     }
     ;(walletApiService as any).rgb = {
       getRgbAssetActivity: vi.fn().mockResolvedValue({ total: 0, list: [] }),
       getAddressRgbActivity: vi.fn().mockResolvedValue({ total: 0, list: [] }),
+      getRgbWalletUtxoSnapshot: vi.fn().mockResolvedValue({
+        syncedAt: 1,
+        utxos: [
+          {
+            txid: 'd'.repeat(64),
+            vout: 0,
+            allocations: [{ assetId: 'rgb:issued', amount: '42', settled: true, spendable: true }],
+            chainStatus: 'confirmed',
+          },
+        ],
+      }),
     }
     vi.spyOn(wallet as any, 'getLocalRgbReadService').mockResolvedValue({ service, wallet: walletRef })
 
     await expect(wallet.getRgbAssetActivity('rgb:issued', 1, 20, walletRef.fundingAddress)).resolves
       .toMatchObject({
         total: 1,
-        list: [{ id: 'local-issue:rgb:issued', type: 'issue', amount: '42' }],
+        list: [{ id: 'local-issue:rgb:issued', type: 'issue', amount: '42', status: 'confirmed' }],
       })
     await expect(wallet.getAddressRgbActivity(walletRef.fundingAddress, 1, 20)).resolves.toMatchObject({
       total: 1,
-      list: [{ id: 'local-issue:rgb:issued', type: 'issue', amount: '42' }],
+      list: [{ id: 'local-issue:rgb:issued', type: 'issue', amount: '42', status: 'confirmed' }],
     })
   })
 

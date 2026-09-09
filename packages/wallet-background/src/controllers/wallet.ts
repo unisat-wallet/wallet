@@ -3568,23 +3568,37 @@ export class WalletController extends BaseController {
     const { service, wallet } = await this.getLocalRgbReadService()
     if (params.address !== wallet.fundingAddress) return page
 
-    const localIssues = (service.getIssueHistory?.() || [])
+    const issueHistory = service.getIssueHistory?.() || []
+    // Activity is not currently persisted for local issuance. Read the UTXO
+    // replica directly so this display follows the latest genesis chain state
+    // without synchronizing or mutating the encrypted local RGB snapshot.
+    const latestSnapshot = await getRgbApiService()
+      .getRgbWalletUtxoSnapshot({ wallet, forceSync: true })
+      .catch(() => undefined)
+    const localIssues = issueHistory
       .filter(issue => !params.assetId || issue.assetId === params.assetId)
-      .map(issue => ({
-        id: `local-issue:${issue.assetId}`,
-        assetId: issue.assetId,
-        type: 'issue',
-        amount: issue.amount,
-        txid: issue.txid,
-        timestamp: issue.createdAt,
-        status: rgbIssueActivityStatus(issue.chainStatus),
-        from: wallet.fundingAddress,
-        to: wallet.fundingAddress,
-        ticker: issue.asset.ticker,
-        name: issue.asset.name,
-        precision: issue.asset.precision,
-        local: true,
-      }))
+      .map(issue => {
+        const latestChainStatus = latestSnapshot?.utxos.find(
+          utxo =>
+            utxo.txid === issue.txid &&
+            utxo.allocations.some(allocation => allocation.assetId === issue.assetId)
+        )?.chainStatus
+        return {
+          id: `local-issue:${issue.assetId}`,
+          assetId: issue.assetId,
+          type: 'issue',
+          amount: issue.amount,
+          txid: issue.txid,
+          timestamp: issue.createdAt,
+          status: rgbIssueActivityStatus(latestChainStatus ?? issue.chainStatus),
+          from: wallet.fundingAddress,
+          to: wallet.fundingAddress,
+          ticker: issue.asset.ticker,
+          name: issue.asset.name,
+          precision: issue.asset.precision,
+          local: true,
+        }
+      })
     const remoteTxids = new Set(
       page.list
         .map(item => (item as { txid?: string }).txid)
