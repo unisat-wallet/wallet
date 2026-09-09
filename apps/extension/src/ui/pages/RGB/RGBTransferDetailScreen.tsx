@@ -103,6 +103,8 @@ export default function RGBTransferDetailScreen() {
 
   const isConfirmed = isConfirmedStatus(status);
   const isFailed = isFailedStatus(status);
+  const isIssue = transfer?.type === 'issue';
+  const recordId = isIssue ? transfer?.txid : transfer?.transferId || transferId;
 
   return (
     <Layout>
@@ -153,9 +155,9 @@ export default function RGBTransferDetailScreen() {
             </Row>
             {status !== 'rejected' ? (
               <Row justifyBetween itemsCenter>
-                <Text text={t('rgb_transfer_id')} color="textDim" />
+                <Text text={t(isIssue ? 'rgb_genesis_txid' : 'rgb_transfer_id')} color="textDim" />
                 <CopyableAddress
-                  address={transfer?.transferId || transferId}
+                  address={recordId}
                   copyPosition="after"
                   len={10}
                   color="ticker_color2"

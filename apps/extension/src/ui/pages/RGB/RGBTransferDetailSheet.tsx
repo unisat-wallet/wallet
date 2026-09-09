@@ -214,6 +214,8 @@ export function RGBTransferDetailSheet({
   const canRetryBroadcast =
     transfer?.type === 'send' && String(transfer?.status || '').toLowerCase() === 'broadcast_failed';
   const assetId = transfer?.assetId?.trim();
+  const isIssue = transfer?.type === 'issue';
+  const recordId = isIssue ? transfer?.txid : transfer?.transferId || transferId || '';
 
   const onCancelSend = async () => {
     const abortId = resolveAbortTransferId(transfer, transferId);
@@ -464,7 +466,7 @@ export function RGBTransferDetailSheet({
             {status !== 'rejected' ? (
               <Row fullX justifyBetween itemsCenter style={{ minHeight: 32 }}>
                 <Text
-                  text={t('rgb_transfer_id')}
+                  text={t(isIssue ? 'rgb_genesis_txid' : 'rgb_transfer_id')}
                   style={{
                     fontSize: 14,
                     fontWeight: 500,
@@ -472,7 +474,7 @@ export function RGBTransferDetailSheet({
                   }}
                 />
                 <CopyableAddress
-                  address={transfer?.transferId || transferId || ''}
+                  address={recordId}
                   copyPosition="after"
                   len={10}
                   color="ticker_color2"

@@ -3198,6 +3198,9 @@
   "rgb_transfer_id": {
     "message": "ID de transferencia"
   },
+  "rgb_genesis_txid": {
+    "message": "TXID de génesis"
+  },
   "rgb_transfer_waiting_ack_description": {
     "message": "El consignment fue entregado. Esperando la confirmacion del receptor."
   },

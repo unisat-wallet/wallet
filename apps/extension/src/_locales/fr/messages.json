@@ -3207,6 +3207,9 @@
   "rgb_transfer_id": {
     "message": "ID du transfert"
   },
+  "rgb_genesis_txid": {
+    "message": "TXID de genèse"
+  },
   "rgb_transfer_waiting_ack_description": {
     "message": "Le consignment a ete livre. En attente de la confirmation du receveur."
   },

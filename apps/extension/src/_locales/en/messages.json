@@ -3308,6 +3308,9 @@
   "rgb_transfer_id": {
     "message": "Transfer ID"
   },
+  "rgb_genesis_txid": {
+    "message": "Genesis TXID"
+  },
   "rgb_transfer_waiting_ack_description": {
     "message": "The consignment was delivered. Waiting for the receiver to confirm it."
   },

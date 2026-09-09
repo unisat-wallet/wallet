@@ -3297,6 +3297,9 @@
   "rgb_transfer_id": {
     "message": "轉帳 ID"
   },
+  "rgb_genesis_txid": {
+    "message": "Genesis TXID"
+  },
   "rgb_transfer_waiting_ack_description": {
     "message": "已送達 Consignment，正在等待接收方確認。"
   },

@@ -3207,6 +3207,9 @@
   "rgb_transfer_id": {
     "message": "送受信 ID"
   },
+  "rgb_genesis_txid": {
+    "message": "ジェネシス TXID"
+  },
   "rgb_transfer_waiting_ack_description": {
     "message": "Consignment は送信済みです。受信者の確認を待っています。"
   },

@@ -3207,6 +3207,9 @@
   "rgb_transfer_id": {
     "message": "ID перевода"
   },
+  "rgb_genesis_txid": {
+    "message": "TXID генезиса"
+  },
   "rgb_transfer_waiting_ack_description": {
     "message": "Consignment доставлен. Ожидается подтверждение получателя."
   },
