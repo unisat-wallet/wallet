@@ -65,6 +65,18 @@ function isIncompleteLocalHistoryError(error: unknown) {
   )
 }
 
+/** RGB invoices use the shared `tb:` beneficiary prefix for Testnet and Testnet4. */
+function isCompatibleInvoiceNetwork(
+  invoiceNetwork: RgbWalletRef['network'],
+  walletNetwork: RgbWalletRef['network']
+) {
+  return (
+    invoiceNetwork === walletNetwork ||
+    ((invoiceNetwork === 'testnet' || invoiceNetwork === 'testnet4') &&
+      (walletNetwork === 'testnet' || walletNetwork === 'testnet4'))
+  )
+}
+
 /**
  * Local RGB wallet orchestration. The only remote calls are address-scoped
  * state sync and consignment transport; RGB transaction construction remains
@@ -1626,7 +1638,10 @@ export class RgbService {
    */
   async checkInvoiceAvailability(invoiceText: string) {
     const invoice = decodeRgbInvoice(invoiceText)
-    if (invoice.network && invoice.network !== this.requireState().wallet.network) {
+    if (
+      invoice.network &&
+      !isCompatibleInvoiceNetwork(invoice.network, this.requireState().wallet.network)
+    ) {
       throw new RgbServiceError('RGB invoice network does not match the current wallet')
     }
     if (invoice.expirationTimestamp && invoice.expirationTimestamp <= Math.floor(this.now() / 1000)) {
@@ -1668,7 +1683,7 @@ export class RgbService {
     if (invoice.assetId && invoice.assetId !== requestedAssetId) {
       throw new RgbServiceError('RGB invoice asset does not match the requested asset')
     }
-    if (invoice.network && invoice.network !== state.wallet.network) {
+    if (invoice.network && !isCompatibleInvoiceNetwork(invoice.network, state.wallet.network)) {
       throw new RgbServiceError('RGB invoice network does not match the current wallet')
     }
     if (

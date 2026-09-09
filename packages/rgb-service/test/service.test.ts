@@ -103,6 +103,25 @@ function createDependencies(): RgbServiceDependencies {
 }
 
 describe('RgbService', () => {
+  it('accepts the shared tb invoice prefix for a Testnet4 wallet', async () => {
+    const dependencies = createDependencies()
+    const service = new RgbService(dependencies)
+    await service.open({ ...wallet, network: 'testnet4' })
+    await service.sync()
+    const testnetInvoice = rgbInvoice(40).replace('/bc:', '/tb:')
+    vi.mocked(dependencies.encoder.prepareTransfer).mockResolvedValueOnce({
+      id: 'transfer-1',
+      psbt: 'cHNidP8=',
+      toSignInputs: [{ index: 0, publicKey: '02' + '11'.repeat(32) }],
+      lockedOutpoints: [{ txid: 'a'.repeat(64), vout: 0 }],
+    })
+
+    await expect(service.checkInvoiceAvailability(testnetInvoice)).resolves.toEqual({ available: true })
+    await expect(
+      service.prepareSend({ assetId: 'rgb:asset', amount: '40', invoice: testnetInvoice, feeRate: 2 })
+    ).resolves.toMatchObject({ id: 'transfer-1' })
+  })
+
   it('rejects an invoice whose transport recipient ID is already occupied', async () => {
     const dependencies = createDependencies()
     dependencies.transport.checkConsignmentAvailability = vi.fn().mockResolvedValue(false)
