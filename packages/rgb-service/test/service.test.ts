@@ -131,8 +131,10 @@ describe('RgbService', () => {
 
     expect(service.getUtxoInspection()).toEqual({
       snapshot: service.getSnapshot(),
+      assetMetadata: {},
       invoiceReservations: [
         {
+          invoice: 'rgb:invoice',
           recipientId: 'recipient-id',
           assetId: 'rgb:asset',
           amount: '50',
