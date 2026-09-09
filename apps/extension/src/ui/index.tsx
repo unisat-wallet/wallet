@@ -89,6 +89,7 @@ async function waitUntilReady() {
         renderApp();
         return;
       }
+      await new Promise((resolve) => setTimeout(resolve, 100));
     } catch {
       await new Promise((r) => setTimeout(r, 50));
     }

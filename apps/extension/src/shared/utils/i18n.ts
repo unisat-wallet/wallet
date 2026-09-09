@@ -1,28 +1,22 @@
-import i18n from 'i18next';
 import log from 'loglevel';
-import { initReactI18next } from 'react-i18next';
 
 import { FALLBACK_LOCALE, SUPPORTED_LOCALES, SupportedLocale } from '@unisat/wallet-shared';
 import { ProxyStorageAdapter } from '@unisat/wallet-storage';
 
-const fetchLocale = async (locale: string) => {
+export interface Translations {
+  [key: string]: string;
+}
+
+const fetchLocale = async (locale: string): Promise<Translations> => {
   const res = await fetch(`./_locales/${locale}/messages.json`);
   const data: Record<string, { message: string; description: string }> = await res.json();
-  return Object.keys(data).reduce((res, key) => {
-    return {
-      ...res,
-      [key.replace(/__/g, ' ')]: data[key].message
-    };
-  }, {});
-};
+  const translations: Translations = {};
 
-const I18N_NS = 'translations';
+  for (const [key, value] of Object.entries(data)) {
+    translations[key] = value.message;
+  }
 
-const addResourceBundle = async (locale: string) => {
-  if (i18n.hasResourceBundle(locale, I18N_NS)) return;
-  const bundle = await fetchLocale(locale);
-
-  i18n.addResourceBundle(locale, 'translations', bundle);
+  return translations;
 };
 
 const processSubstitutions = (
@@ -54,16 +48,10 @@ const processSubstitutions = (
   }
 };
 
-export interface TranslationMessage {
-  message: string;
-}
-
-export interface Translations {
-  [key: string]: TranslationMessage;
-}
 class I18nService {
   private currentLocale: string;
   private translations: Map<string, Translations> = new Map();
+  private loadingLocales: Map<string, Promise<Translations>> = new Map();
   private initialized = false;
   private storage: ProxyStorageAdapter = undefined!;
 
@@ -74,22 +62,7 @@ class I18nService {
   async init(config: { storage?: ProxyStorageAdapter }) {
     this.storage = config.storage!;
 
-    i18n
-      .use(initReactI18next) // passes i18n down to react-i18next
-      .init({
-        fallbackLng: 'en',
-        defaultNS: 'translations',
-        interpolation: {
-          escapeValue: false // react already safes from xss
-        }
-      });
-
-    addResourceBundle('en');
     await this.loadLocale(FALLBACK_LOCALE);
-
-    i18n.on('languageChanged', function (lng: string) {
-      addResourceBundle(lng);
-    });
 
     if (this.storage) {
       const locale = await this.storage.get('i18nextLng');
@@ -106,12 +79,20 @@ class I18nService {
     }
 
     try {
-      const translations = await fetchLocale(locale);
+      let loadingLocale = this.loadingLocales.get(locale);
+      if (!loadingLocale) {
+        loadingLocale = fetchLocale(locale);
+        this.loadingLocales.set(locale, loadingLocale);
+      }
+
+      const translations = await loadingLocale;
       this.translations.set(locale, translations);
     } catch (error) {
       if (locale !== FALLBACK_LOCALE) {
         await this.loadLocale(FALLBACK_LOCALE);
       }
+    } finally {
+      this.loadingLocales.delete(locale);
     }
   }
 
@@ -121,14 +102,18 @@ class I18nService {
       return key;
     }
 
+    const rawKey = key.includes(' ') ? key.replace(/ /g, '__') : key;
     const translations = this.translations.get(this.currentLocale);
-    const translation = translations?.[key] ?? this.translations.get(FALLBACK_LOCALE)?.[key];
+    const translation =
+      translations?.[key] ??
+      translations?.[rawKey] ??
+      this.translations.get(FALLBACK_LOCALE)?.[key] ??
+      this.translations.get(FALLBACK_LOCALE)?.[rawKey];
     if (translation === undefined) {
       log.warn(`Translation for key "${key}" not found in locale "${this.currentLocale}"`);
       return key;
     }
-    const message = translation as any; // inconsistent with previous type definition
-    const result = processSubstitutions(message, substitutions);
+    const result = processSubstitutions(translation, substitutions);
 
     return result;
   };
