@@ -310,6 +310,10 @@ export function useSendRGBScreenLogic() {
             return
           }
           setInvoiceAvailability('error')
+          if (error.message) {
+            setInvoiceAvailabilityError(error.message)
+            return
+          }
           setInvoiceAvailabilityError(error instanceof Error ? error.message : String(error))
         })
     }, 400)
