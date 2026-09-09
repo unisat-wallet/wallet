@@ -114,16 +114,27 @@ export class RgbWalletCoordinator {
     const snapshot = service.getSnapshot?.()
     if (!snapshot) return new Map<string, bigint>()
     const lockedAmounts = new Map<string, bigint>()
-    for (const pending of service.getPendingTransfers?.() || []) {
-      if (pending.broadcast) continue
+    const lockedTransfers = [
+      ...(service.getPendingTransfers?.() || []).map(pending => ({
+        assetId: pending.request.assetId,
+        lockedOutpoints: pending.prepared.lockedOutpoints,
+      })),
+      ...(service.getPendingSendHistory?.() || [])
+        .filter(item => item.status === 'broadcasted')
+        .map(item => ({
+          assetId: item.assetId,
+          lockedOutpoints: item.spentOutpoints || [],
+        })),
+    ]
+    for (const transfer of lockedTransfers) {
       const lockedOutpoints = new Set(
-        pending.prepared.lockedOutpoints.map(outpoint => `${outpoint.txid}:${outpoint.vout}`)
+        transfer.lockedOutpoints.map(outpoint => `${outpoint.txid}:${outpoint.vout}`)
       )
       for (const utxo of snapshot.utxos) {
         if (!lockedOutpoints.has(`${utxo.outpoint.txid}:${utxo.outpoint.vout}`)) continue
         for (const allocation of utxo.allocations) {
           if (
-            allocation.assetId !== pending.request.assetId ||
+            allocation.assetId !== transfer.assetId ||
             !allocation.settled ||
             !allocation.spendable
           ) {

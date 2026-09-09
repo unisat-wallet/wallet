@@ -27,6 +27,7 @@ export function useRGBTokenScreenLogic() {
   const [detailLoading, setDetailLoading] = useState(true)
   const [fetchedTokenBalance, setFetchedTokenBalance] = useState<RgbBalance>()
   const [balanceLoading, setBalanceLoading] = useState(true)
+  const [balanceChecked, setBalanceChecked] = useState(false)
   const [activityType, setActivityType] = useState<RgbActivityType | undefined>()
   const [activeTab, setActiveTab] = useState<RGBTokenScreenTabKey>(RGBTokenScreenTabKey.HISTORY)
 
@@ -54,11 +55,13 @@ export function useRGBTokenScreenLogic() {
     if (assetId === '') {
       setFetchedTokenBalance(undefined)
       setBalanceLoading(false)
+      setBalanceChecked(true)
       return
     }
 
     setFetchedTokenBalance(undefined)
     setBalanceLoading(true)
+    setBalanceChecked(false)
     try {
       const data = await wallet.getRGBAssetBalance('', assetId)
       setFetchedTokenBalance(data)
@@ -66,6 +69,7 @@ export function useRGBTokenScreenLogic() {
       setFetchedTokenBalance(undefined)
     } finally {
       setBalanceLoading(false)
+      setBalanceChecked(true)
     }
   }, [assetId, wallet])
 
@@ -135,13 +139,12 @@ export function useRGBTokenScreenLogic() {
     iconShortName: getRgbIconShortName(name, ticker),
   }
 
-  const transferBalance =
-    resolvedTokenBalance?.spendable ||
-    detail?.balance?.spendable ||
-    resolvedTokenBalance?.balance ||
-    detail?.balance?.balance ||
-    resolvedTokenBalance?.amount
-  const enableTransfer = !!assetId && hasPositiveAmount(transferBalance)
+  // The route can carry a stale optimistic list balance while a just-broadcast
+  // transfer is being reconciled. Only a completed local-balance read may
+  // authorize another send; otherwise the same allocation could appear
+  // spendable for a brief period before it becomes pending.
+  const enableTransfer =
+    !!assetId && balanceChecked && hasPositiveAmount(fetchedTokenBalance?.spendable)
 
   const tabItems = useMemo(
     () => [

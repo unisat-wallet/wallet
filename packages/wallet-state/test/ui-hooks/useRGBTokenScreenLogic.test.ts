@@ -1,4 +1,4 @@
-import { renderHook, waitFor } from '@testing-library/react'
+import { act, renderHook, waitFor } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
 
 import { useRGBTokenScreenLogic } from '../../src/ui-hooks/useRGBTokenScreenLogic'
@@ -58,6 +58,64 @@ describe('useRGBTokenScreenLogic', () => {
     })
 
     expect(wallet.getRGBAssetBalance).toHaveBeenCalledWith('', assetId)
+  })
+
+  it('keeps Send disabled until a stale route balance has been refreshed', async () => {
+    const routeBalance = {
+      assetId,
+      ticker: 'RGB',
+      spendable: '8500',
+      balance: '8500',
+    }
+    let resolveBalance: ((value: typeof fetchedBalance) => void) | undefined
+    const { wrapper, wallet } = createHookTestHarness({
+      routeState: { assetId, tokenBalance: routeBalance },
+    })
+    wallet.getRGBAssetDetail.mockResolvedValue(detail)
+    wallet.getRGBAssetBalance.mockReturnValue(
+      new Promise(resolve => {
+        resolveBalance = resolve
+      })
+    )
+    wallet.getRGBAssetActivity.mockResolvedValue({ list: [], total: 0 })
+
+    const { result } = renderHook(() => useRGBTokenScreenLogic(), { wrapper })
+
+    await waitFor(() => {
+      expect(wallet.getRGBAssetBalance).toHaveBeenCalledWith('', assetId)
+    })
+    expect(result.current.enableTransfer).toBe(false)
+
+    await act(async () => {
+      resolveBalance?.({ ...routeBalance, spendable: '0', pending: '8500' })
+    })
+
+    await waitFor(() => {
+      expect(result.current.enableTransfer).toBe(false)
+      expect(result.current.tokenBalance).toMatchObject({ spendable: '0', pending: '8500' })
+    })
+  })
+
+  it('does not re-enable Send when the refreshed balance cannot be read', async () => {
+    const routeBalance = {
+      assetId,
+      ticker: 'RGB',
+      spendable: '8500',
+      balance: '8500',
+    }
+    const { wrapper, wallet } = createHookTestHarness({
+      routeState: { assetId, tokenBalance: routeBalance },
+    })
+    wallet.getRGBAssetDetail.mockResolvedValue(detail)
+    wallet.getRGBAssetBalance.mockRejectedValue(new Error('temporary balance read failure'))
+    wallet.getRGBAssetActivity.mockResolvedValue({ list: [], total: 0 })
+
+    const { result } = renderHook(() => useRGBTokenScreenLogic(), { wrapper })
+
+    await waitFor(() => {
+      expect(result.current.balanceLoading).toBe(false)
+    })
+    expect(result.current.enableTransfer).toBe(false)
   })
 
   it('retains asset precision when the refreshed balance only contains amounts', async () => {

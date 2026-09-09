@@ -1741,6 +1741,74 @@ describe('RGB wallet references', () => {
     expect(result.list).toEqual([{ assetId: 'rgb:asset', spendable: '0', lockedAmount: '10' }])
   })
 
+  it('keeps a broadcast RGB transfer locked until the snapshot reflects its change allocation', async () => {
+    const wallet = new WalletController()
+    const service = {
+      getPendingTransfers: vi.fn(() => [
+        {
+          broadcast: { completed: { txid: 'b'.repeat(64) } },
+          request: { assetId: 'rgb:asset', amount: '2' },
+          prepared: { lockedOutpoints: [{ txid: 'a'.repeat(64), vout: 0 }] },
+        },
+      ]),
+      getSnapshot: vi.fn(() => ({
+        utxos: [
+          {
+            outpoint: { txid: 'a'.repeat(64), vout: 0 },
+            allocations: [
+              { assetId: 'rgb:asset', amount: '10', settled: true, spendable: true },
+            ],
+          },
+        ],
+      })),
+    }
+    vi.spyOn(wallet as any, 'getLocalRgbService').mockResolvedValue({ service })
+    vi.spyOn(wallet as any, 'getLocalRgbReadService').mockResolvedValue({ service })
+    vi.spyOn(wallet, 'getRgbFundingAddress').mockResolvedValue({ address: 'bc1p-rgb-funding' })
+    vi.spyOn(wallet, 'getRgbAssetBalance').mockResolvedValue({ assetId: 'rgb:asset', spendable: '10' })
+
+    await expect(wallet.getRGBAssetBalance('', 'rgb:asset')).resolves.toEqual({
+      assetId: 'rgb:asset',
+      spendable: '0',
+      lockedAmount: '10',
+    })
+  })
+
+  it('keeps a broadcast RGB history entry locked after it is compacted from pending transfers', async () => {
+    const wallet = new WalletController()
+    const service = {
+      getPendingTransfers: vi.fn(() => []),
+      getPendingSendHistory: vi.fn(() => [
+        {
+          transferId: 'broadcasted-transfer',
+          assetId: 'rgb:asset',
+          status: 'broadcasted',
+          spentOutpoints: [{ txid: 'a'.repeat(64), vout: 0 }],
+        },
+      ]),
+      getSnapshot: vi.fn(() => ({
+        utxos: [
+          {
+            outpoint: { txid: 'a'.repeat(64), vout: 0 },
+            allocations: [
+              { assetId: 'rgb:asset', amount: '10', settled: true, spendable: true },
+            ],
+          },
+        ],
+      })),
+    }
+    vi.spyOn(wallet as any, 'getLocalRgbService').mockResolvedValue({ service })
+    vi.spyOn(wallet as any, 'getLocalRgbReadService').mockResolvedValue({ service })
+    vi.spyOn(wallet, 'getRgbFundingAddress').mockResolvedValue({ address: 'bc1p-rgb-funding' })
+    vi.spyOn(wallet, 'getRgbAssetBalance').mockResolvedValue({ assetId: 'rgb:asset', spendable: '10' })
+
+    await expect(wallet.getRGBAssetBalance('', 'rgb:asset')).resolves.toEqual({
+      assetId: 'rgb:asset',
+      spendable: '0',
+      lockedAmount: '10',
+    })
+  })
+
   it('does not count a broadcasted local send twice when its backend activity already exists', async () => {
     const wallet = new WalletController()
     const transferId = 'broadcasted-transfer'
