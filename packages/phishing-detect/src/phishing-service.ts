@@ -13,6 +13,7 @@ import type {
 } from './types'
 
 const STORE_KEY = 'phishing'
+const COMPACT_CONFIG_ENCODING = 'newline-list:v1'
 const CACHE_DURATION = 24 * 60 * 60 * 1000 // 24 hours
 const VERSION = 2
 const HOTLIST_UPDATE_INTERVAL = 10 * 60 * 1000 // 10 minutes
@@ -27,6 +28,32 @@ const initConfig: PhishingConfig = {
   cacheExpireTime: CACHE_DURATION,
 }
 
+interface CompactPhishingConfig {
+  encoding: typeof COMPACT_CONFIG_ENCODING
+  config: Omit<PhishingConfig, 'blacklist'>
+  blacklist: string
+}
+
+const isCompactConfig = (config: unknown): config is CompactPhishingConfig => {
+  if (!config || typeof config !== 'object') {
+    return false
+  }
+
+  const { encoding, config: metadata, blacklist } = config as Partial<CompactPhishingConfig>
+  return encoding === COMPACT_CONFIG_ENCODING && !!metadata && typeof blacklist === 'string'
+}
+
+const decodeConfig = (stored: unknown): PhishingConfig | undefined => {
+  if (isCompactConfig(stored)) {
+    return {
+      ...stored.config,
+      blacklist: stored.blacklist ? stored.blacklist.split('\n') : [],
+    }
+  }
+
+  return stored as PhishingConfig | undefined
+}
+
 export class PhishingService extends EventEmitter<PhishingServiceEvents> {
   private config: PhishingConfig = { ...initConfig }
 
@@ -39,6 +66,7 @@ export class PhishingService extends EventEmitter<PhishingServiceEvents> {
   private whitelistSet: Set<string> = new Set()
   private updateTimer: NodeJS.Timeout | null = null
   private hotlistTimer: NodeJS.Timeout | null = null
+  private legacyMigrationTimer: NodeJS.Timeout | null = null
   private initialized = false
 
   constructor() {
@@ -79,6 +107,10 @@ export class PhishingService extends EventEmitter<PhishingServiceEvents> {
     if (this.hotlistTimer) {
       clearTimeout(this.hotlistTimer)
       this.hotlistTimer = null
+    }
+    if (this.legacyMigrationTimer) {
+      clearTimeout(this.legacyMigrationTimer)
+      this.legacyMigrationTimer = null
     }
     this.removeAllListeners()
     this.initialized = false
@@ -214,10 +246,17 @@ export class PhishingService extends EventEmitter<PhishingServiceEvents> {
   private async loadConfig(): Promise<void> {
     try {
       const stored = await this.adapter.get(STORE_KEY)
+      const storedConfig = decodeConfig(stored)
 
-      if (stored && stored.version === this.config.version) {
-        this.config = { ...this.config, ...stored }
+      if (storedConfig && storedConfig.version === this.config.version) {
+        this.config = { ...this.config, ...storedConfig }
         this.updateSets()
+
+        // Migrate legacy formats without holding up startup. A compact string avoids Chrome having
+        // to clone and deserialize the full blacklist object on later starts.
+        if (!isCompactConfig(stored)) {
+          this.scheduleLegacyConfigMigration()
+        }
       } else {
         // Config version mismatch or doesn't exist, need to update
         await this.updatePhishingList()
@@ -231,11 +270,30 @@ export class PhishingService extends EventEmitter<PhishingServiceEvents> {
 
   private async saveConfig(): Promise<void> {
     try {
-      await this.adapter.set(STORE_KEY, this.config)
+      const { blacklist, ...config } = this.config
+      const value: CompactPhishingConfig = {
+        encoding: COMPACT_CONFIG_ENCODING,
+        config,
+        blacklist: blacklist.join('\n'),
+      }
+      await this.adapter.set(STORE_KEY, value)
     } catch (error) {
       this.logger.error('Failed to save phishing config:', error)
       this.emit('phishing:error', error as Error)
     }
+  }
+
+  private scheduleLegacyConfigMigration(): void {
+    if (this.legacyMigrationTimer) {
+      return
+    }
+
+    // Let the current startup finish before replacing the legacy format. Subsequent starts use the
+    // compact representation.
+    this.legacyMigrationTimer = setTimeout(() => {
+      this.legacyMigrationTimer = null
+      void this.saveConfig()
+    }, 3000)
   }
 
   private updateSets(): void {
