@@ -3,17 +3,17 @@ import React, { CSSProperties, useCallback, useEffect, useLayoutEffect, useRef, 
 import { Column, Icon, Image, Row, Text } from '@/ui/components';
 import { RefreshButton } from '@/ui/components/RefreshButton';
 import {
+  WalletView,
   uiActions,
   useAppDispatch,
   useBalanceCardDetailExpanded,
   useChain,
   useI18n,
+  useRGBListLogic,
+  useRGBUsdtBalanceCardLogic,
   useSupportedAssets,
   useToggleBalanceCardDetailExpanded,
-  useWalletView,
-  WalletView,
-  useRGBListLogic,
-  useRGBUsdtBalanceCardLogic
+  useWalletView
 } from '@unisat/wallet-state';
 import { ChainType } from '@unisat/wallet-types';
 
@@ -250,10 +250,7 @@ function RGBUsdtBalanceCard({
               onViewPendingInvoices(event);
             }}>
             <Row itemsCenter gap="zero">
-              <Text
-                text={t('pending_invoices')}
-                style={{ color: 'rgba(0,0,0,0.65)', fontSize: 13, fontWeight: 600 }}
-              />
+              <Text text={t('pending_invoices')} style={{ color: 'rgba(0,0,0,0.65)', fontSize: 13, fontWeight: 600 }} />
               <Text
                 text={` (${pendingInvoiceCount})`}
                 style={{ color: 'rgba(0,0,0,0.85)', fontSize: 14, fontWeight: 600 }}
@@ -315,12 +312,6 @@ function RGBAssetsBalanceCard({
         if (suppressClickRef.current || isCardActionTarget(event.target)) return;
         onExpandToggle();
       }}>
-      <Icon
-        icon="rgb"
-        size={72}
-        color="white"
-        style={{ position: 'absolute', top: -2, right: 8, opacity: 0.18, pointerEvents: 'none' }}
-      />
       <Column style={{ flex: 1, position: 'relative', zIndex: 1 }} gap="md">
         <Row itemsCenter justifyBetween gap="sm">
           <Row itemsCenter gap="sm">
@@ -345,13 +336,20 @@ function RGBAssetsBalanceCard({
           </div>
         </Row>
 
-        <Row itemsEnd>
-          <Text text={isBalanceHidden ? '****' : String(assetCount)} preset="title-bold" style={{ fontSize: 28, color: '#fff' }} />
-          <Text
-            text={t('assets')}
-            preset="title-bold"
-            style={{ fontSize: 18, color: 'rgba(255,255,255,0.72)', marginLeft: 4, marginBottom: 2 }}
-          />
+        <Row itemsCenter>
+          <Row itemsCenter>
+            <Text
+              text={isBalanceHidden ? '****' : String(assetCount)}
+              preset="title-bold"
+              style={{ fontSize: 28, color: '#fff' }}
+            />
+            <Text
+              text={t('assets')}
+              preset="title-bold"
+              style={{ fontSize: 18, color: 'rgba(255,255,255,0.72)', marginLeft: 4, marginBottom: 2 }}
+            />
+          </Row>
+
           <Icon color="white" size={16} icon={isDetailExpanded ? 'up' : 'down'} />
         </Row>
       </Column>
@@ -368,7 +366,10 @@ function RGBAssetsBalanceCard({
               onViewPendingInvoices(event);
             }}>
             <Row itemsCenter gap="zero">
-              <Text text={t('pending_invoices')} style={{ color: 'rgba(255,255,255,0.72)', fontSize: 13, fontWeight: 600 }} />
+              <Text
+                text={t('pending_invoices')}
+                style={{ color: 'rgba(255,255,255,0.72)', fontSize: 13, fontWeight: 600 }}
+              />
               <Text text={` (${pendingInvoiceCount})`} style={{ color: '#fff', fontSize: 14, fontWeight: 600 }} />
             </Row>
             {pendingInvoiceCount > 0 ? (
@@ -488,12 +489,22 @@ function UnsupportedRGBBalanceCard({
         <Text
           text={t('not_supported_in_this_wallet')}
           textCenter
-          style={{ color: generic ? 'rgba(255,255,255,0.62)' : 'rgba(0,0,0,0.45)', fontSize: 13, fontWeight: 600, lineHeight: '20px' }}
+          style={{
+            color: generic ? 'rgba(255,255,255,0.62)' : 'rgba(0,0,0,0.45)',
+            fontSize: 13,
+            fontWeight: 600,
+            lineHeight: '20px'
+          }}
         />
         <Row itemsCenter style={{ pointerEvents: 'auto', gap: 6 }}>
           <Text
             text={t('switch_to_hd_wallet')}
-            style={{ color: generic ? 'rgba(255,255,255,0.8)' : 'rgba(0,0,0,0.65)', fontSize: 13, fontWeight: 600, lineHeight: '20px' }}
+            style={{
+              color: generic ? 'rgba(255,255,255,0.8)' : 'rgba(0,0,0,0.65)',
+              fontSize: 13,
+              fontWeight: 600,
+              lineHeight: '20px'
+            }}
           />
           {generic ? (
             <Icon icon="right" color="white" size={11} />
@@ -516,11 +527,7 @@ function isCardActionTarget(target: EventTarget | null) {
   return target instanceof Element && Boolean(target.closest('[data-card-action]'));
 }
 
-function useSwipeCarousel(
-  activeIndex: number,
-  onIndexChange: (index: number) => void,
-  snapStride: number
-) {
+function useSwipeCarousel(activeIndex: number, onIndexChange: (index: number) => void, snapStride: number) {
   const pointerStartXRef = useRef(0);
   const pointerStartYRef = useRef(0);
   const pointerDeltaXRef = useRef(0);
@@ -677,12 +684,8 @@ export function BalanceCardCarousel({ rgbList }: { rgbList: ReturnType<typeof us
   const isRgbFullySupported = supportedAssets.assets.rgb;
   const canShowRgbCard = supportedAssets.assets.rgbCard;
   const isUnsupportedRgbCard = canShowRgbCard && !isRgbFullySupported;
-  const useGenericRgbCard = chain.enum === ChainType.BITCOIN_TESTNET4;
-  const activeIndex = isRgbFullySupported
-    ? walletView === WalletView.RGB
-      ? 1
-      : 0
-    : unsupportedPreviewIndex;
+  const useGenericRgbCard = chain.enum !== ChainType.BITCOIN_MAINNET;
+  const activeIndex = isRgbFullySupported ? (walletView === WalletView.RGB ? 1 : 0) : unsupportedPreviewIndex;
 
   const setActiveIndex = useCallback(
     (index: number) => {
@@ -723,13 +726,8 @@ export function BalanceCardCarousel({ rgbList }: { rgbList: ReturnType<typeof us
 
   const slideWidth = containerWidth > 0 ? Math.max(containerWidth - CARD_GAP - CARD_PEEK, 0) : 0;
   const snapStride = slideWidth > 0 ? slideWidth - CARD_PEEK : 0;
-  const slideFlex =
-    slideWidth > 0 ? `0 0 ${slideWidth}px` : `0 0 calc(100% - ${CARD_GAP + CARD_PEEK}px)`;
-  const { dragOffset, suppressClickRef, carouselHandlers } = useSwipeCarousel(
-    activeIndex,
-    setActiveIndex,
-    snapStride
-  );
+  const slideFlex = slideWidth > 0 ? `0 0 ${slideWidth}px` : `0 0 calc(100% - ${CARD_GAP + CARD_PEEK}px)`;
+  const { dragOffset, suppressClickRef, carouselHandlers } = useSwipeCarousel(activeIndex, setActiveIndex, snapStride);
 
   // Network changes can toggle this component between the single BTC card
   // and the carousel. Keep these hooks above that conditional render so the

@@ -84,6 +84,7 @@ export const WalletActions = ({ chain, walletView = WalletView.BITCOIN }: Wallet
   const { t } = useI18n();
   const accountCapabilities = useCurrentAccountCapabilities();
   const isRgbView = walletView === WalletView.RGB;
+  const canSendRgbUsdtToken = chain.enum === ChainType.BITCOIN_MAINNET;
 
   const handleUtxoClick = () => {
     nav.navToUtxoTools();
@@ -147,7 +148,7 @@ export const WalletActions = ({ chain, walletView = WalletView.BITCOIN }: Wallet
 
   const actionItems = useMemo<WalletActionItem[]>(() => {
     if (isRgbView) {
-      return [
+      const items: WalletActionItem[] = [
         {
           key: 'receive-rgb',
           label: t('receive'),
@@ -156,15 +157,6 @@ export const WalletActions = ({ chain, walletView = WalletView.BITCOIN }: Wallet
           priority: 1,
           dataTestId: 'receive-rgb-button'
         },
-        {
-          key: 'send-usdt',
-          label: t('send'),
-          icon: 'usdt',
-          onClick: onSendClick,
-          priority: 2,
-          dataTestId: 'send-usdt-button'
-        },
-
         {
           key: 'issue',
           label: t('issue'),
@@ -175,6 +167,19 @@ export const WalletActions = ({ chain, walletView = WalletView.BITCOIN }: Wallet
           dataTestId: 'issue-button'
         }
       ];
+
+      if (canSendRgbUsdtToken) {
+        items.splice(1, 0, {
+          key: 'send-usdt',
+          label: t('send'),
+          icon: 'usdt',
+          onClick: onSendClick,
+          priority: 2,
+          dataTestId: 'send-usdt-button'
+        });
+      }
+
+      return items;
     }
 
     const items: WalletActionItem[] = [
@@ -235,6 +240,7 @@ export const WalletActions = ({ chain, walletView = WalletView.BITCOIN }: Wallet
   }, [
     accountCapabilities.canCreateSigningRequest,
     buyDisabled,
+    canSendRgbUsdtToken,
     handleUtxoClick,
     isFractal,
     isRgbView,
