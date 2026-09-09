@@ -900,8 +900,15 @@ export class WalletController extends BaseController {
       this.rgbCoordinator.clear()
       this.rgbRecoveryRestores.clear()
       this.rgbRecoveryBackups.clear()
+      this.clearRgbRecoveryCaches()
       this.rgbWriteLeases.clear()
     })
+  }
+
+  /** Recovery-version caches are valid only while their encrypted wallet state remains open. */
+  private clearRgbRecoveryCaches = () => {
+    this.rgbRecoveryVersions.clear()
+    this.rgbRecoveryVerifiedFingerprints.clear()
   }
 
   private _cacheCosmosKeyringKey: string | null = null
@@ -1081,11 +1088,13 @@ export class WalletController extends BaseController {
 
   clearKeyrings = () => {
     this.clearCosmosKeyringCache()
+    this.clearRgbRecoveryCaches()
     return keyringService.clearKeyrings()
   }
 
   resetAllData = async () => {
     this.clearCosmosKeyringCache()
+    this.clearRgbRecoveryCaches()
     await keyringService.resetAllData()
     await preferenceService.resetAllData()
     await permissionService.resetAllData()
@@ -1472,6 +1481,7 @@ export class WalletController extends BaseController {
 
   removeKeyring = async (keyring: WalletKeyring) => {
     this.clearCosmosKeyringCache()
+    this.clearRgbRecoveryCaches()
     await keyringService.removeKeyring(keyring.index)
     const keyrings = await this.getKeyrings()
     const nextKeyring = keyrings[keyrings.length - 1]

@@ -330,6 +330,19 @@ describe('RGB wallet references', () => {
     await recovery
   })
 
+  it('clears recovery cache entries when encrypted wallet state is discarded', () => {
+    const wallet = new WalletController()
+    ;(wallet as any).rgbRecoveryVersions.set('mainnet:bc1p-rgb-funding', {
+      revision: 'a'.repeat(24),
+    })
+    ;(wallet as any).rgbRecoveryVerifiedFingerprints.set('mainnet:bc1p-rgb-funding', 'fingerprint')
+
+    ;(wallet as any).clearRgbRecoveryCaches()
+
+    expect((wallet as any).rgbRecoveryVersions.size).toBe(0)
+    expect((wallet as any).rgbRecoveryVerifiedFingerprints.size).toBe(0)
+  })
+
   it('adopts a newer recovery revision when the decrypted checkpoint matches local state', async () => {
     const wallet = new WalletController()
     const walletRef = {
