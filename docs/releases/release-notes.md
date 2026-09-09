@@ -1,5 +1,21 @@
 # UniSat Wallet Release Notes
 
+## v1.7.21
+
+### New Features
+
+- Added RGB asset support on Bitcoin Testnet4: issue assets, create receive invoices, send and receive transfers, and view balances and transfer history.
+- Added RGB UTXO and fee-pool management, including guided funding and withdrawal flows.
+- Added RGB payment requests for connected dApps with an explicit approval flow.
+
+### Improvements
+
+- Optimized extension and popup startup performance through on-demand storage loading, parallel background-service initialization, and more efficient locale and phishing-list caching.
+
+### Availability
+
+- RGB is currently available on **Bitcoin Testnet4 only**. Bitcoin Mainnet RGB support is intentionally disabled in this release and will be enabled in a future version.
+
 ## v1.7.20
 
 ### Improvements
