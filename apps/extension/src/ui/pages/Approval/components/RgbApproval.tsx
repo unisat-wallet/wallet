@@ -347,21 +347,96 @@ function RgbPaymentApproval({ data, session }: { data: Props['params']['data']; 
   }
 
   return (
-    <RgbApprovalLayout
-      session={session}
-      title="Prepare RGB payment"
-      description="Your wallet will prepare an RGB transfer. If needed, you will first fund the RGB fee pool used to pay the Bitcoin network fee."
-      rows={[
-        ['Asset', data.assetId || 'Unknown asset'],
-        ['Amount', data.amount || 'Use invoice amount'],
-        ['Invoice', data.invoice || '']
-      ]}
-      confirmText={loading ? 'Checking fee pool...' : 'Continue'}
-      onConfirm={() => void onPreparePayment()}
-      onCancel={() => rejectApproval()}
-      confirmDisabled={loading}
-      error={error}
-    />
+    <Layout>
+      <Header>
+        <WebsiteBar session={session} />
+      </Header>
+      <Content>
+        <Column mt="lg" gap="lg">
+          <Column itemsCenter gap="sm">
+            <div
+              style={{
+                width: 52,
+                height: 52,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                borderRadius: 16,
+                background: 'rgba(255, 123, 33, 0.14)',
+                border: '1px solid rgba(255, 123, 33, 0.30)'
+              }}
+            >
+              <Icon icon="send" color="orange" size={26} />
+            </div>
+            <Text text="Prepare RGB payment" preset="title-bold" textCenter />
+            <Text
+              text={`${session.name || session.origin} wants to prepare an RGB payment.`}
+              preset="sub"
+              textCenter
+              color="textDim"
+            />
+          </Column>
+
+          <Card style={{ display: 'block', padding: 16, border: '1px solid rgba(255,255,255,0.10)' }}>
+            <Column gap="lg">
+              <Row justifyBetween itemsCenter>
+                <Text text="Payment request" preset="bold" />
+                <Row itemsCenter gap="xs">
+                  <Icon icon="rgb" size={16} />
+                  <Text text="RGB" size="xs" color="gold" />
+                </Row>
+              </Row>
+              <Column gap="sm">
+                <RgbReceiveDetail label="Asset" value={data.assetId || 'Unknown asset'} />
+                <RgbReceiveDetail label="Amount" value={data.amount || 'Use invoice amount'} />
+                <RgbReceiveDetail label="Recipient invoice" value={data.invoice || 'Not provided'} />
+              </Column>
+            </Column>
+          </Card>
+
+          <Card style={{ display: 'block', padding: 16, background: 'rgba(255, 123, 33, 0.09)' }}>
+            <Column gap="md">
+              <Row itemsCenter gap="sm">
+                <Icon icon="btc" color="orange" size={20} />
+                <Text text="Bitcoin network fee" preset="bold" />
+              </Row>
+              <Text
+                text="Your wallet checks its dedicated RGB fee pool before preparing this payment."
+                size="xs"
+                color="textDim"
+              />
+              <RgbReceiveStep number="1" text="If fee UTXOs are available, the payment is prepared." />
+              <RgbReceiveStep
+                number="2"
+                text="If the fee pool is empty, you will review and sign a BTC funding transaction."
+              />
+              <RgbReceiveStep number="3" text="You will review the final RGB payment transaction in the next step." />
+            </Column>
+          </Card>
+
+          {error && (
+            <Card style={{ display: 'block', padding: 12, background: 'rgba(237, 51, 75, 0.12)' }}>
+              <Row itemsCenter gap="sm">
+                <Icon icon="warning" color="red" size={18} />
+                <Text text={error} preset="sub" color="red" style={{ flex: 1, wordBreak: 'break-word' }} />
+              </Row>
+            </Card>
+          )}
+        </Column>
+      </Content>
+      <Footer>
+        <Row full>
+          <Button text="Cancel" preset="default" onClick={() => rejectApproval()} full />
+          <Button
+            text={loading ? 'Checking fee pool...' : 'Prepare payment'}
+            preset="primary"
+            onClick={() => void onPreparePayment()}
+            disabled={loading}
+            full
+          />
+        </Row>
+      </Footer>
+    </Layout>
   );
 }
 
