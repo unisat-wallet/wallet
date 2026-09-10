@@ -45,6 +45,24 @@ describe('createRgbOpretPsbt', () => {
     expect(built.feeOutpoints).toEqual([feeFunding.utxos[0]!.outpoint])
   })
 
+  it('reserves fees for the final RGB commitment in the OP_RETURN host', () => {
+    const invoice = decodeRgbInvoice(
+      'rgb:asset/schema/~/bc:utxob:xDfmDF9g-yNOjriV-6Anbe6H-MLJ__g6-lo7Dd4f-dhWBW8S-XYGBm'
+    )
+    const built = createRgbOpretPsbt({
+      network: 'mainnet',
+      selectedUtxos: [utxo],
+      recipientSeal: invoice.seal,
+      feeRate: 1,
+      preserveFundingOutput: true,
+      feeFunding,
+    })
+
+    // Two P2TR inputs and three P2TR/OP_RETURN outputs are 255 vB once the
+    // empty host becomes OP_RETURN <32-byte RGB commitment>.
+    expect(built.fee).toBe(255)
+  })
+
   it('uses the witness beneficiary script and reserves its output index', () => {
     const invoice = decodeRgbInvoice(
       'rgb:asset/schema/~/bc:wvout:A8cJ7Ww3-NIzADo3-Tzp_5aD-7CTBWmA-AAAAAAA-AAAAAAA-ALSQkcw'

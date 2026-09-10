@@ -73,6 +73,10 @@ function outputSize(script: Uint8Array) {
   return 8 + compactSizeLength(script.length) + script.length
 }
 
+// The PSBT starts with an empty OP_RETURN host, then commitOpretRgbPsbt replaces it
+// with OP_RETURN + a 32-byte MPC commitment before signing and broadcasting.
+const OPRET_RGB_COMMITMENT_SCRIPT_SIZE = 34
+
 /** Conservative vsize estimate for P2TR RGB inputs and standard SegWit BTC fee inputs. */
 function estimateSegwitVsize(inputScripts: Uint8Array[], outputScripts: Uint8Array[]) {
   const witnessInputBytes = inputScripts.reduce((size, value) => {
@@ -138,7 +142,7 @@ export function createRgbOpretPsbt(input: RgbOpretPsbtRequest): RgbOpretPsbt {
   }
   const rgbFundingAmount = input.preserveFundingOutput ? totalInput : 0
   const fixedOutputScripts = [
-    Uint8Array.from([0x6a]),
+    new Uint8Array(OPRET_RGB_COMMITMENT_SCRIPT_SIZE),
     ...(recipientScript ? [recipientScript] : []),
     ...(input.preserveFundingOutput ? [fundingScript] : []),
   ]
