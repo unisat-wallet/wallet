@@ -1,5 +1,6 @@
 import { act, renderHook, waitFor } from '@testing-library/react'
 import { BUS_METHODS } from '@unisat/wallet-shared'
+import { ChainType } from '@unisat/wallet-types'
 import { describe, expect, it, vi } from 'vitest'
 
 import { useRGBListLogic } from '../../src/ui-hooks/useRGBListLogic'
@@ -9,8 +10,11 @@ import { uiEventBus } from '../../src/utils/eventBus'
 import { createHookTestHarness } from './testHelpers'
 
 describe('useRGBListLogic', () => {
+  const createRgbHookTestHarness = () =>
+    createHookTestHarness({ chainType: ChainType.BITCOIN_TESTNET4 })
+
   it('does not load the RGB asset list when disabled', async () => {
-    const { wrapper, wallet } = createHookTestHarness()
+    const { wrapper, wallet } = createRgbHookTestHarness()
 
     renderHook(() => useRGBListLogic({ enabled: false }), { wrapper })
 
@@ -20,7 +24,7 @@ describe('useRGBListLogic', () => {
   })
 
   it('loads the RGB asset list without a full sync on the Bitcoin home view', async () => {
-    const { wrapper, wallet } = createHookTestHarness()
+    const { wrapper, wallet } = createRgbHookTestHarness()
 
     renderHook(() => useRGBListLogic(), { wrapper })
 
@@ -34,7 +38,7 @@ describe('useRGBListLogic', () => {
   })
 
   it('syncs RGB allocations and funding balance while the RGB wallet view is visible', async () => {
-    const { store, wrapper, wallet } = createHookTestHarness()
+    const { store, wrapper, wallet } = createRgbHookTestHarness()
     store.dispatch(uiActions.setWalletView(WalletView.RGB))
 
     const { result } = renderHook(() => useRGBListLogic(), { wrapper })
@@ -52,7 +56,7 @@ describe('useRGBListLogic', () => {
   })
 
   it('polls the RGB asset list while the RGB wallet view is visible', async () => {
-    const { store, wrapper } = createHookTestHarness()
+    const { store, wrapper } = createRgbHookTestHarness()
     const setIntervalSpy = vi.spyOn(global, 'setInterval')
 
     renderHook(() => useRGBListLogic({ autoRefresh: true }), { wrapper })
@@ -71,7 +75,7 @@ describe('useRGBListLogic', () => {
   })
 
   it('refreshes the visible RGB asset list after the background reports a change', async () => {
-    const { store, wrapper, wallet } = createHookTestHarness()
+    const { store, wrapper, wallet } = createRgbHookTestHarness()
     store.dispatch(uiActions.setWalletView(WalletView.RGB))
 
     renderHook(() => useRGBListLogic(), { wrapper })

@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { KeyringType } from '@unisat/keyring-service/types'
 import { RgbTransferAwaitingAckError, RgbTransferRejectedError } from '@unisat/rgb-service'
@@ -168,8 +168,10 @@ describe('WalletController keyring recovery', () => {
 })
 
 describe('chainTypeToRgbNetwork', () => {
-  it('maps Bitcoin mainnet', () => {
-    expect(chainTypeToRgbNetwork(ChainType.BITCOIN_MAINNET)).toBe('mainnet')
+  it('rejects Bitcoin mainnet while its RGB proxy is disabled', () => {
+    expect(() => chainTypeToRgbNetwork(ChainType.BITCOIN_MAINNET)).toThrow(
+      'RGB is not enabled for wallet chain'
+    )
   })
 
   it.each([
@@ -192,6 +194,18 @@ describe('chainTypeToRgbNetwork', () => {
 
     try {
       expect(chainTypeToRgbNetwork(ChainType.BITCOIN_TESTNET)).toBe('testnet')
+    } finally {
+      chain.rgbProxyEndpoints = previousEndpoints
+    }
+  })
+
+  it('maps Bitcoin mainnet when its RGB proxy endpoint is configured', () => {
+    const chain = CHAINS_MAP[ChainType.BITCOIN_MAINNET]!
+    const previousEndpoints = chain.rgbProxyEndpoints
+    chain.rgbProxyEndpoints = ['rpcs://rgb-mainnet.example/json-rpc']
+
+    try {
+      expect(chainTypeToRgbNetwork(ChainType.BITCOIN_MAINNET)).toBe('mainnet')
     } finally {
       chain.rgbProxyEndpoints = previousEndpoints
     }
@@ -275,6 +289,20 @@ describe('RGB fee-pool inspection', () => {
 })
 
 describe('RGB wallet references', () => {
+  let previousMainnetRgbProxyEndpoints: string[] | undefined
+
+  // These tests cover RGB wallet behavior independently from the production
+  // feature flag. Production mainnet remains disabled and is covered above.
+  beforeEach(() => {
+    const chain = CHAINS_MAP[ChainType.BITCOIN_MAINNET]!
+    previousMainnetRgbProxyEndpoints = chain.rgbProxyEndpoints
+    chain.rgbProxyEndpoints = ['rpcs://rgb-mainnet.example/json-rpc']
+  })
+
+  afterEach(() => {
+    CHAINS_MAP[ChainType.BITCOIN_MAINNET]!.rgbProxyEndpoints = previousMainnetRgbProxyEndpoints
+  })
+
   it('shares one local RGB service initialization for concurrent first requests', async () => {
     const wallet = new WalletController()
     let resolveStorage: ((value: undefined) => void) | undefined

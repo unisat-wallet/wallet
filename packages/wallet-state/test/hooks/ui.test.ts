@@ -6,15 +6,15 @@ import { getSupportedAssets } from '../../src/hooks/ui'
 import { AssetTabKey } from '../../src/types/ui'
 
 describe('getSupportedAssets', () => {
-  it('enables the RGB view for an HD wallet regardless of the selected Bitcoin address type', () => {
+  it('enables the RGB view for an HD wallet on an RGB-enabled network regardless of address type', () => {
     const p2wpkh = getSupportedAssets(
-      ChainType.BITCOIN_MAINNET,
-      'bc1qxy2kgdygjrsqtzq2n0yrf2493p83kkfjhx0wlh',
+      ChainType.BITCOIN_TESTNET4,
+      'tb1qxy2kgdygjrsqtzq2n0yrf2493p83kkfjhx0wlh',
       { keyringType: KeyringType.HdKeyring }
     )
     const p2tr = getSupportedAssets(
-      ChainType.BITCOIN_MAINNET,
-      'bc1p5cyxnuxmeuwuvkwfem96llyxf9xq9tm9s2h2zs',
+      ChainType.BITCOIN_TESTNET4,
+      'tb1p5cyxnuxmeuwuvkwfem96llyxf9xq9tm9s2h2zs',
       { keyringType: KeyringType.HdKeyring }
     )
 
@@ -24,15 +24,26 @@ describe('getSupportedAssets', () => {
     expect(p2tr.tabKeys).not.toContain(AssetTabKey.RGB)
   })
 
-  it('does not expose RGB for keyrings without an HD root', () => {
+  it('does not expose RGB for keyrings without an HD root on an RGB-enabled network', () => {
     const assets = getSupportedAssets(
-      ChainType.BITCOIN_MAINNET,
-      'bc1p5cyxnuxmeuwuvkwfem96llyxf9xq9tm9s2h2zs',
+      ChainType.BITCOIN_TESTNET4,
+      'tb1p5cyxnuxmeuwuvkwfem96llyxf9xq9tm9s2h2zs',
       { keyringType: KeyringType.SimpleKeyring }
     )
 
     expect(assets.assets.rgb).toBe(false)
     expect(assets.assets.rgbCard).toBe(true)
+  })
+
+  it('hides RGB on Bitcoin Mainnet while its production proxy is disabled', () => {
+    const assets = getSupportedAssets(
+      ChainType.BITCOIN_MAINNET,
+      'bc1p5cyxnuxmeuwuvkwfem96llyxf9xq9tm9s2h2zs',
+      { keyringType: KeyringType.HdKeyring }
+    )
+
+    expect(assets.assets.rgb).toBe(false)
+    expect(assets.assets.rgbCard).toBe(false)
   })
 
   it('hides the RGB card outside RGB-capable Bitcoin networks', () => {

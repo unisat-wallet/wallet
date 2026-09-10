@@ -1,6 +1,6 @@
 import { configureStore } from '@reduxjs/toolkit'
 import { KeyringType } from '@unisat/wallet-shared'
-import { AddressType } from '@unisat/wallet-types'
+import { AddressType, ChainType } from '@unisat/wallet-types'
 import React, { type ReactNode } from 'react'
 import { Provider } from 'react-redux'
 import { vi } from 'vitest'
@@ -14,11 +14,11 @@ import browser from '../../src/reducers/browser'
 import discovery from '../../src/reducers/discovery'
 import global from '../../src/reducers/global'
 import keyrings, { keyringsActions } from '../../src/reducers/keyrings'
-import settings from '../../src/reducers/settings'
+import settings, { settingsActions } from '../../src/reducers/settings'
 import transactions from '../../src/reducers/transactions'
 import ui from '../../src/reducers/ui'
 
-export function createTestStore() {
+export function createTestStore(chainType: ChainType = ChainType.BITCOIN_MAINNET) {
   const store = configureStore({
     reducer: {
       accounts,
@@ -32,9 +32,14 @@ export function createTestStore() {
     },
   })
 
+  store.dispatch(settingsActions.updateSettings({ chainType }))
+
   const currentAccount = {
     type: KeyringType.HdKeyring,
-    address: 'bc1qxy2kgdygjrsqtzq2n0yrf2493p83kkfjhx0wlh',
+    address:
+      chainType === ChainType.BITCOIN_TESTNET4
+        ? 'tb1qxy2kgdygjrsqtzq2n0yrf2493p83kkfjhx0wlh'
+        : 'bc1qxy2kgdygjrsqtzq2n0yrf2493p83kkfjhx0wlh',
     brandName: 'UniSat',
     alianName: 'Account 1',
     displayBrandName: 'UniSat',
@@ -53,7 +58,7 @@ export function createTestStore() {
         availableBalance: 210000,
         unavailableBalance: 0,
         totalBalance: 210000,
-        chainType: 'BITCOIN_MAINNET' as any,
+        chainType,
       },
     })
   )
@@ -186,13 +191,15 @@ export function createHookTestHarness({
   routeState = {},
   navigation = createNavigationMock(routeState),
   tools = createToolsMock(),
+  chainType = ChainType.BITCOIN_MAINNET,
 }: {
   wallet?: ReturnType<typeof createWalletMock>
   routeState?: any
   navigation?: NavigationContextType
   tools?: ToolsContextType
+  chainType?: ChainType
 } = {}) {
-  const store = createTestStore()
+  const store = createTestStore(chainType)
   const approval = {
     getApproval: vi.fn().mockResolvedValue(undefined),
     resolveApproval: vi.fn().mockResolvedValue(undefined),
