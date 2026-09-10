@@ -156,12 +156,16 @@ export default function RGBTransferDetailScreen() {
             {status !== 'rejected' ? (
               <Row justifyBetween itemsCenter>
                 <Text text={t(isIssue ? 'rgb_genesis_txid' : 'rgb_transfer_id')} color="textDim" />
-                <CopyableAddress
-                  address={recordId}
-                  copyPosition="after"
-                  len={10}
-                  color="ticker_color2"
-                />
+                {recordId ? (
+                  <CopyableAddress
+                    address={recordId}
+                    copyPosition="after"
+                    len={10}
+                    color="ticker_color2"
+                  />
+                ) : (
+                  <Text text="--" color="ticker_color2" />
+                )}
               </Row>
             ) : null}
           </Column>

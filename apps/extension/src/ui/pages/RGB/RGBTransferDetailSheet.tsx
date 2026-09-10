@@ -473,12 +473,16 @@ export function RGBTransferDetailSheet({
                     color: 'rgba(255,255,255,0.45)'
                   }}
                 />
-                <CopyableAddress
-                  address={recordId}
-                  copyPosition="after"
-                  len={10}
-                  color="ticker_color2"
-                />
+                {recordId ? (
+                  <CopyableAddress
+                    address={recordId}
+                    copyPosition="after"
+                    len={10}
+                    color="ticker_color2"
+                  />
+                ) : (
+                  <Text text="--" color="ticker_color2" />
+                )}
               </Row>
             ) : null}
           </Column>
