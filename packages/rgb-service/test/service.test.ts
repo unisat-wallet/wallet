@@ -166,6 +166,71 @@ describe('RgbService', () => {
     })
   })
 
+  it('persists provider payment ownership across a restart without checkpointing the origin', async () => {
+    const stored = new Map<string, unknown>()
+    const checkpoint = vi.fn().mockResolvedValue(undefined)
+    const dependencies = createDependencies()
+    dependencies.storage = {
+      get: async <T>(key: string) => stored.get(key) as T | undefined,
+      set: async <T>(key: string, value: T) => void stored.set(key, value),
+      remove: async key => void stored.delete(key),
+    }
+    dependencies.onStatePersisted = checkpoint
+    const service = new RgbService(dependencies)
+    await service.open(wallet)
+    await service.sync()
+    await service.enableRecoveryBackup()
+    checkpoint.mockClear()
+
+    const prepared = await service.prepareSend(
+      { assetId: 'rgb:asset', amount: '60', invoice: rgbInvoice(), feeRate: 2 },
+      { providerOrigin: 'https://dapp.example' }
+    )
+
+    await expect(service.getTransferProviderOrigin(prepared.id)).resolves.toBe('https://dapp.example')
+
+    const restarted = new RgbService(dependencies)
+    await restarted.open(wallet)
+    await expect(restarted.getTransferProviderOrigin(prepared.id)).resolves.toBe('https://dapp.example')
+
+    await restarted.queueFeePoolUtxos([])
+    const recovery = checkpoint.mock.calls.at(-1)?.[0] as {
+      pending: Record<string, { providerOrigin?: string }>
+    }
+    expect(recovery.pending[prepared.id]?.providerOrigin).toBeUndefined()
+
+    await restarted.abortSend(prepared.id)
+    await expect(restarted.getTransferProviderOrigin(prepared.id)).resolves.toBe('https://dapp.example')
+  })
+
+  it('removes completed payment ownership after 24 hours', async () => {
+    let now = 1_000
+    const stored = new Map<string, unknown>()
+    const dependencies = createDependencies()
+    dependencies.now = () => now
+    dependencies.storage = {
+      get: async <T>(key: string) => stored.get(key) as T | undefined,
+      set: async <T>(key: string, value: T) => void stored.set(key, value),
+      remove: async key => void stored.delete(key),
+    }
+    const service = new RgbService(dependencies)
+    await service.open(wallet)
+    await service.sync()
+    const prepared = await service.prepareSend(
+      { assetId: 'rgb:asset', amount: '60', invoice: rgbInvoice(), feeRate: 2 },
+      { providerOrigin: 'https://dapp.example' }
+    )
+
+    await service.abortSend(prepared.id)
+    await expect(service.getTransferProviderOrigin(prepared.id)).resolves.toBe('https://dapp.example')
+
+    now += 24 * 60 * 60 * 1000
+    const restarted = new RgbService(dependencies)
+    await restarted.open(wallet)
+    expect(restarted.getPendingSendHistory()[0]).toMatchObject({ transferId: prepared.id })
+    expect(restarted.getPendingSendHistory()[0]).not.toHaveProperty('providerOrigin')
+  })
+
   it('does not release an invoice after a consignment is awaiting acceptance', async () => {
     const dependencies = createDependencies()
     const service = new RgbService(dependencies)

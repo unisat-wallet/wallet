@@ -176,6 +176,11 @@ export interface RgbPendingTransfer {
   /** The amount is resolved from the request or a fixed-amount invoice. */
   request: RgbTransferRequest & { amount: string }
   createdAt: number
+  /**
+   * Provider origin that created this transfer. This is encrypted local
+   * state only and is deliberately omitted from recovery checkpoints.
+   */
+  providerOrigin?: string
   /** A signed transfer posted to transport, awaiting recipient acknowledgement. */
   delivery?: {
     completed: RgbCompletedTransfer
@@ -271,6 +276,10 @@ export interface RgbPendingSendHistory {
   spentOutpoints?: RgbOutpoint[]
   createdAt: number
   status: 'broadcasted' | 'canceled' | 'rejected'
+  /** Local-only provider ownership retained while the status is available. */
+  providerOrigin?: string
+  /** Epoch milliseconds after which the local provider owner is discarded. */
+  providerOriginExpiresAt?: number
 }
 
 /** Full address snapshot retained until the indexer acknowledges its replacement. */

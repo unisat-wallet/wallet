@@ -38,6 +38,8 @@ export type RgbSendBeginParams = {
   feeRate?: number
   minConfirmations?: number
   donation?: boolean
+  /** Trusted provider origin persisted with a dApp-created payment. */
+  providerOrigin?: string
 }
 
 /** Local RGB send state machine. Signing presentation remains a controller-provided capability. */
@@ -52,16 +54,19 @@ export class RgbSendOperations {
     if (!feeRate || feeRate <= 0) throw new Error('Invalid RGB transaction fee rate')
 
     await service.sync()
-    const prepared = await service.prepareSend({
-      assetId: params.assetId,
-      invoice: params.invoice,
-      feeRate,
-      ...(params.amount === undefined ? {} : { amount: String(params.amount) }),
-      ...(params.donation === undefined ? {} : { donation: params.donation }),
-      ...(params.minConfirmations === undefined
-        ? {}
-        : { minConfirmations: params.minConfirmations }),
-    })
+    const prepared = await service.prepareSend(
+      {
+        assetId: params.assetId,
+        invoice: params.invoice,
+        feeRate,
+        ...(params.amount === undefined ? {} : { amount: String(params.amount) }),
+        ...(params.donation === undefined ? {} : { donation: params.donation }),
+        ...(params.minConfirmations === undefined
+          ? {}
+          : { minConfirmations: params.minConfirmations }),
+      },
+      { providerOrigin: params.providerOrigin }
+    )
     const toSignData = await this.dependencies.getToSignData({
       psbt: prepared.psbt,
       toSignInputs: prepared.toSignInputs,

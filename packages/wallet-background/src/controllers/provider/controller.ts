@@ -140,15 +140,9 @@ function getToSignDatas(toSignDatas?: ToSignData[]) {
   return toSignDatas
 }
 
-/**
- * Prepared payments are private to the connected dApp that created them. The
- * transfer itself remains in durable RGB state; this association prevents a
- * different origin from operating on a guessed ID through the provider API.
- */
-const rgbPaymentOrigins = new Map<string, string>()
-
-function assertRgbPaymentOrigin(transferId: string, origin: string) {
-  if (rgbPaymentOrigins.get(transferId) !== origin) {
+/** Prepared RGB payments remain bound to their creating dApp after a worker restart. */
+async function assertRgbPaymentOrigin(transferId: string, origin: string) {
+  if ((await wallet.getRgbPaymentOrigin({ transferId })) !== origin) {
     throw new Error('RGB payment is not available to this site')
   }
 }
@@ -679,8 +673,8 @@ class ProviderController extends BaseController {
       assetId: params.assetId,
       ...(params.amount === undefined ? {} : { amount: params.amount }),
       ...(params.feeRate === undefined ? {} : { feeRate: params.feeRate }),
+      providerOrigin: origin,
     })
-    rgbPaymentOrigins.set(prepared.id, origin)
     return prepared
   }
 
@@ -691,7 +685,7 @@ class ProviderController extends BaseController {
       if (!params.transferId) throw new Error('transferId is required')
       const origin = req.session?.origin
       if (!origin) throw new Error('missing request origin')
-      assertRgbPaymentOrigin(params.transferId, origin)
+      await assertRgbPaymentOrigin(params.transferId, origin)
       params.toSignDatas = [await wallet.getRgbPaymentSigningData({ transferId: params.transferId })]
     },
   ])
@@ -704,7 +698,7 @@ class ProviderController extends BaseController {
     session: { origin: string }
     approvalRes: SignPsbtResult
   }) => {
-    assertRgbPaymentOrigin(params.transferId, origin)
+    await assertRgbPaymentOrigin(params.transferId, origin)
     const account = await wallet.getCurrentAccount()
     const toSignData = getToSignDatas(params.toSignDatas)[0]!
     const signedPsbt = approvalRes[0]?.psbtHex
@@ -725,7 +719,7 @@ class ProviderController extends BaseController {
     session: { origin: string }
   }) => {
     if (!params.transferId) throw new Error('transferId is required')
-    assertRgbPaymentOrigin(params.transferId, origin)
+    await assertRgbPaymentOrigin(params.transferId, origin)
     return wallet.abortRgbVanillaTx({ txid: params.transferId })
   }
 
@@ -738,7 +732,7 @@ class ProviderController extends BaseController {
     session: { origin: string }
   }) => {
     if (!params.transferId) throw new Error('transferId is required')
-    assertRgbPaymentOrigin(params.transferId, origin)
+    await assertRgbPaymentOrigin(params.transferId, origin)
     return wallet.getRgbPaymentStatus({ transferId: params.transferId })
   }
 

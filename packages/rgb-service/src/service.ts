@@ -40,6 +40,7 @@ import type {
 } from './types'
 
 const STORAGE_PREFIX = 'rgb-service:v1:'
+const PROVIDER_ORIGIN_HISTORY_TTL_MS = 24 * 60 * 60 * 1000
 // Keep these in sync with recovery checkpoint validation. Canonical history is
 // wallet state, so accepting a history that cannot be restored would make the
 // wallet locally usable only until its next recovery.
@@ -113,6 +114,7 @@ export class RgbService {
             snapshot: { utxos: [], syncedAt: 0 },
             pending: {},
     }
+    this.pruneExpiredProviderOrigins()
     this.hydrateStoredContractMetadata()
     // A local open must never upload before the controller has authenticated a
     // recovery read and obtained the checkpoint version used for CAS writes.
@@ -274,6 +276,10 @@ export class RgbService {
       return false
     try {
       const restored = normalizeStateAssetIds(hydrateState(recovery))
+      // Provider ownership is a local browser authorization boundary. Never
+      // accept it from a recovery checkpoint, even if an older/foreign client
+      // included the field unexpectedly.
+      stripProviderOrigins(restored)
       validateRecoveredState(restored, current.wallet)
       restored.recoveryRemoteStateKnown = true
       // Checkpoint delivery metadata is installation-local and must never be
@@ -1633,6 +1639,21 @@ export class RgbService {
   }
 
   /**
+   * Local provider ownership for a pending payment or its locally retained
+   * status history. It is intentionally never included in recovery state.
+   */
+  async getTransferProviderOrigin(transferId: string) {
+    const state = this.requireState()
+    const pendingOrigin = state.pending[transferId]?.providerOrigin
+    if (pendingOrigin) return pendingOrigin
+
+    if (this.pruneExpiredProviderOrigins()) await this.persist({ skipRecovery: true })
+    const history = state.pendingSendHistory?.find(item => item.transferId === transferId)
+    if (!history?.providerOrigin) return undefined
+    return history.providerOrigin
+  }
+
+  /**
    * Read-only invoice transport preflight. This prevents signing for a blind
    * recipient ID that a proxy has already bound to another consignment.
    */
@@ -1658,7 +1679,7 @@ export class RgbService {
     return { available: true }
   }
 
-  async prepareSend(request: RgbTransferRequest) {
+  async prepareSend(request: RgbTransferRequest, options: { providerOrigin?: string } = {}) {
     const previous = this.prepareSendInFlight
     let release = () => undefined
     const current = new Promise<void>(resolve => {
@@ -1668,7 +1689,7 @@ export class RgbService {
     if (previous) await previous
 
     try {
-      return await this.prepareSendOnce(request)
+      return await this.prepareSendOnce(request, options)
     } finally {
       release()
       if (this.prepareSendInFlight === current) this.prepareSendInFlight = undefined
@@ -1676,7 +1697,10 @@ export class RgbService {
   }
 
   /** Reserve RGB allocations and persist the pending transfer as one serialized operation. */
-  private async prepareSendOnce(request: RgbTransferRequest) {
+  private async prepareSendOnce(
+    request: RgbTransferRequest,
+    options: { providerOrigin?: string }
+  ) {
     const state = this.requireState()
     const invoice = decodeRgbInvoice(request.invoice)
     const requestedAssetId = normalizeAssetId(request.assetId)
@@ -1821,7 +1845,12 @@ export class RgbService {
     }
 
     const rollback = snapshotState(state)
-    state.pending[prepared.id] = { prepared, request: resolvedRequest, createdAt: this.now() }
+    state.pending[prepared.id] = {
+      prepared,
+      request: resolvedRequest,
+      createdAt: this.now(),
+      ...(options.providerOrigin ? { providerOrigin: options.providerOrigin } : {}),
+    }
     // The unsigned reservation is locally durable and can be rebuilt after a
     // restart. Do not upload a full checkpoint before signing produces an
     // irreversible RGB transfer.
@@ -1901,6 +1930,10 @@ export class RgbService {
         invoice: pending.request.invoice,
         createdAt: pending.createdAt,
         status: 'canceled',
+        ...(pending.providerOrigin ? { providerOrigin: pending.providerOrigin } : {}),
+        ...(pending.providerOrigin
+          ? { providerOriginExpiresAt: this.now() + PROVIDER_ORIGIN_HISTORY_TTL_MS }
+          : {}),
       })
     }
 
@@ -2000,6 +2033,10 @@ export class RgbService {
         : {}),
       createdAt: broadcast.broadcastAt,
       status: 'broadcasted' as const,
+      ...(pending.providerOrigin ? { providerOrigin: pending.providerOrigin } : {}),
+      ...(pending.providerOrigin
+        ? { providerOriginExpiresAt: this.now() + PROVIDER_ORIGIN_HISTORY_TTL_MS }
+        : {}),
     }
     if (existingHistory) Object.assign(existingHistory, broadcastedHistory)
     else sendHistory.push(broadcastedHistory)
@@ -2063,6 +2100,10 @@ export class RgbService {
           invoice: pending.request.invoice,
           createdAt: pending.createdAt,
           status: 'rejected',
+          ...(pending.providerOrigin ? { providerOrigin: pending.providerOrigin } : {}),
+          ...(pending.providerOrigin
+            ? { providerOriginExpiresAt: this.now() + PROVIDER_ORIGIN_HISTORY_TTL_MS }
+            : {}),
         })
       }
       delete state.pending[transferId]
@@ -2178,6 +2219,10 @@ export class RgbService {
         invoice: pending.request.invoice,
         createdAt: pending.createdAt,
         status: 'canceled',
+        ...(pending.providerOrigin ? { providerOrigin: pending.providerOrigin } : {}),
+        ...(pending.providerOrigin
+          ? { providerOriginExpiresAt: this.now() + PROVIDER_ORIGIN_HISTORY_TTL_MS }
+          : {}),
       })
     }
     delete state.pending[transferId]
@@ -2325,6 +2370,7 @@ export class RgbService {
 
   private async persist(options: { waitForRecovery?: boolean; skipRecovery?: boolean } = {}) {
     const state = this.requireState()
+    this.pruneExpiredProviderOrigins()
     // A dirty or unverified checkpoint must still retry during a later sync,
     // even when the latest snapshot itself is unchanged.
     const shouldQueueRecovery =
@@ -2422,6 +2468,23 @@ export class RgbService {
     return `${STORAGE_PREFIX}${wallet.network}:${wallet.fundingAddress}`
   }
 
+  /** Remove expired browser-origin metadata while retaining the transfer history itself. */
+  private pruneExpiredProviderOrigins() {
+    const now = this.now()
+    let changed = false
+    this.requireState().pendingSendHistory?.forEach(history => {
+      if (!history.providerOrigin) return
+      // Records written before the TTL field existed expire relative to their
+      // original history timestamp, rather than retaining an owner forever.
+      const expiresAt = history.providerOriginExpiresAt ?? history.createdAt + PROVIDER_ORIGIN_HISTORY_TTL_MS
+      if (expiresAt > now) return
+      delete history.providerOrigin
+      delete history.providerOriginExpiresAt
+      changed = true
+    })
+    return changed
+  }
+
   private queueAssetMetadata(assetId: string, metadata: RgbPendingAssetMetadata['metadata']) {
     const state = this.requireState()
     const normalized = normalizeAssetId(assetId)
@@ -2477,9 +2540,39 @@ function recoverySnapshot(state: ReturnType<typeof persistState>) {
     recoveryCheckpointRevision: _recoveryCheckpointRevision,
     recoveryRemoteStateKnown: _recoveryRemoteStateKnown,
     recoveryConflict: _recoveryConflict,
+    pending,
+    pendingSendHistory,
     ...snapshot
   } = state
-  return snapshot
+  return {
+    ...snapshot,
+    pending: Object.fromEntries(
+      Object.entries(pending).map(([transferId, transfer]) => {
+        const { providerOrigin: _providerOrigin, ...recoveryTransfer } = transfer
+        return [transferId, recoveryTransfer]
+      })
+    ),
+    ...(pendingSendHistory
+      ? {
+          pendingSendHistory: pendingSendHistory.map(item => {
+            const {
+              providerOrigin: _providerOrigin,
+              providerOriginExpiresAt: _providerOriginExpiresAt,
+              ...recoveryHistory
+            } = item
+            return recoveryHistory
+          }),
+        }
+      : {}),
+  }
+}
+
+function stripProviderOrigins(state: RgbServiceState) {
+  Object.values(state.pending).forEach(transfer => delete transfer.providerOrigin)
+  state.pendingSendHistory?.forEach(item => {
+    delete item.providerOrigin
+    delete item.providerOriginExpiresAt
+  })
 }
 
 /** Compare checkpoint data without relying on object insertion order. */

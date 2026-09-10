@@ -555,6 +555,8 @@ type RgbSendBeginRequest = {
   feeRate?: number
   minConfirmations?: number
   donation?: boolean
+  /** Trusted provider origin for a dApp-created RGB payment. */
+  providerOrigin?: string
   witnessData?: {
     amountSat: number | string
     blinding?: number | string | null
@@ -4140,6 +4142,12 @@ export class WalletController extends BaseController {
 
   createRgbSendEnd = (params: Omit<RgbSendEndRequest, 'wallet'>) =>
     this.rgbSendOperations.complete(params)
+
+  /** Local provider owner for a prepared payment or its retained status history. */
+  getRgbPaymentOrigin = async (params: { transferId: string }) => {
+    const { service } = await this.getLocalRgbReadService()
+    return service.getTransferProviderOrigin(params.transferId)
+  }
 
   /** Provider-facing signing data bound to a locally prepared RGB payment. */
   getRgbPaymentSigningData = async (params: { transferId: string }) => {
