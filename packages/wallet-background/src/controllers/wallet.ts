@@ -3878,6 +3878,75 @@ export class WalletController extends BaseController {
     return { address }
   }
 
+  /**
+   * Minimal, template-building view of confirmed RGB carrier UTXOs. This is
+   * deliberately not a reservation: prepareSwap rechecks every outpoint and
+   * locks it atomically before adding the RGB commitment.
+   */
+  getRgbFundingUtxos = async (params: { assetId: string }) => {
+    if (!params.assetId) throw new Error('assetId is required')
+    const { service } = await this.getLocalRgbReadService()
+    const assetId = service.getLocalAssetDetail(params.assetId).assetId
+    const locked = new Set(
+      service
+        .getPendingTransfers()
+        .flatMap(transfer => transfer.prepared.lockedOutpoints)
+        .map(outpoint => `${outpoint.txid}:${outpoint.vout}`)
+    )
+    return {
+      utxos: service
+        .getSnapshot()
+        .utxos.filter(utxo => {
+          const key = `${utxo.outpoint.txid}:${utxo.outpoint.vout}`
+          return (
+            utxo.chainStatus === 'confirmed' &&
+            !locked.has(key) &&
+            utxo.allocations.length > 0 &&
+            utxo.allocations.every(
+              allocation =>
+                allocation.assetId === assetId && allocation.settled && allocation.spendable
+            )
+          )
+        })
+        .map(utxo => ({
+          txid: utxo.outpoint.txid,
+          vout: utxo.outpoint.vout,
+          satoshis: utxo.satoshis,
+          scriptPubKey: utxo.scriptPubKey,
+          allocations: utxo.allocations
+            .filter(allocation => allocation.assetId === assetId && allocation.settled && allocation.spendable)
+            .map(allocation => ({ assetId: allocation.assetId, amount: allocation.amount })),
+        })),
+    }
+  }
+
+  /** Minimal view of unlocked confirmed RGB fee-pool UTXOs for swap templates. */
+  getRgbFeeUtxos = async () => {
+    const { service } = await this.getLocalRgbReadService()
+    const feeAccount = await this.getCurrentRgbFeeAccount()
+    const locked = new Set(
+      service
+        .getPendingTransfers()
+        .flatMap(transfer => transfer.prepared.feeOutpoints || [])
+        .map(outpoint => `${outpoint.txid}:${outpoint.vout}`)
+    )
+    const remoteUtxos = await walletApiService.bitcoin.getBTCUtxos(feeAccount.address)
+    const scriptPubKey = bitcoin.address
+      .toOutputScript(feeAccount.address, toPsbtNetwork(this.getNetworkType()))
+      .toString('hex')
+    return {
+      utxos: remoteUtxos
+        .filter(utxo => !locked.has(`${utxo.txid}:${utxo.vout}`))
+        .filter(utxo => !utxo.inscriptions?.length && !utxo.atomicals?.length)
+        .map(utxo => ({
+          txid: utxo.txid,
+          vout: utxo.vout,
+          satoshis: utxo.satoshis,
+          scriptPubKey,
+        })),
+    }
+  }
+
   getRgbFeePoolInspection = async (params: { feeRate?: number } = {}) => {
     const { service } = await this.getLocalRgbService()
     const feeAccount = await this.getCurrentRgbFeeAccount()

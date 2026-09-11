@@ -612,6 +612,15 @@ class ProviderController extends BaseController {
     return wallet.getRGBList('', page, pageSize, { skipSync: true })
   }
 
+  @Reflect.metadata('SAFE', true)
+  getRgbFundingUtxos = async ({ data: { params } }: { data: { params: { assetId: string } } }) => {
+    if (!params.assetId) throw new Error('assetId is required')
+    return wallet.getRgbFundingUtxos({ assetId: params.assetId })
+  }
+
+  @Reflect.metadata('SAFE', true)
+  getRgbFeeUtxos = async () => wallet.getRgbFeeUtxos()
+
   @Reflect.metadata('APPROVAL', ['RgbReceive'])
   createRgbReceiveInvoice = async ({
     data: { params },

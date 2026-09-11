@@ -65,4 +65,34 @@ describe('RGB swap PSBT preparation', () => {
   it('rejects a maker template with a second OP_RETURN output', () => {
     expect(() => prepareNiaOpretTransfer(input(swapPsbt(true)))).toThrow('additional OP_RETURN')
   })
+
+  it('recognizes a wallet fee-pool input included by the maker template', () => {
+    const feeTxid = '66'.repeat(32)
+    const feeScript = `0014${'77'.repeat(20)}`
+    const psbt = new Psbt()
+    psbt.addInput({
+      hash: txid,
+      index: 1,
+      sequence: 0xffff_ffff,
+      witnessUtxo: { value: 1000, script: Buffer.from(fundingScript, 'hex') },
+    })
+    psbt.addInput({
+      hash: feeTxid,
+      index: 2,
+      sequence: 0xffff_ffff,
+      witnessUtxo: { value: 500, script: Buffer.from(feeScript, 'hex') },
+    })
+    psbt.addOutput({ script: Buffer.from([0x6a]), value: 0 })
+    psbt.addOutput({ script: Buffer.from(`5120${'33'.repeat(32)}`, 'hex'), value: 1400 })
+
+    const prepared = prepareNiaOpretTransfer({
+      ...input(psbt.toBase64()),
+      feeFunding: {
+        utxos: [{ outpoint: { txid: feeTxid, vout: 2 }, satoshis: 500, scriptPubKey: feeScript, publicKey: `02${'88'.repeat(32)}` }],
+        changeScriptPubKey: feeScript,
+        changeDustLimit: 294,
+      },
+    })
+    expect(prepared.feeOutpoints).toEqual([{ txid: feeTxid, vout: 2 }])
+  })
 })

@@ -52,6 +52,10 @@ export type ProviderMethodList = {
     page?: number
     pageSize?: number
   }
+  getRgbFundingUtxos: {
+    assetId: string
+  }
+  getRgbFeeUtxos: undefined
   createRgbReceiveInvoice: {
     assetId?: string
     amount?: string

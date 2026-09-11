@@ -31,6 +31,7 @@ must only accept/reject the recipient ID it created or was explicitly given.
 | Method | Approval | Purpose |
 |---|---:|---|
 | `getAssets` | No | Read local RGB balances. |
+| `getFundingUtxos` / `getFeeUtxos` | No | Read eligible inputs for a maker PSBT template. |
 | `createReceiveInvoice` | Yes | Create and persist a one-time RGB invoice. |
 | `getPendingReceives` | No | List local invoices and pending incoming consignments. |
 | `acceptReceive` / `rejectReceive` | Yes | ACK or reject a validated incoming consignment. |
@@ -56,6 +57,34 @@ const assets = await rgb.getAssets(1, 50)
 
 Balances are local wallet state. A dApp should use `precision` only for display
 and always pass transfer amounts as atomic-unit strings.
+
+### `getFundingUtxos(assetId)` and `getFeeUtxos()`
+
+These methods expose the minimum unlocked input information needed to build a
+seller-side swap template. Funding UTXOs are confirmed; fee-pool availability
+follows the wallet's fee-pool source. They are candidate queries, not a
+reservation: `prepareSwap` independently rechecks ownership, confirmation and
+lock state before it writes the commitment.
+
+```ts
+const { utxos: rgbInputs } = await rgb.getFundingUtxos('rgb:...')
+const { utxos: feeInputs } = await rgb.getFeeUtxos()
+
+// RGB carrier UTXO
+// { txid, vout, satoshis, scriptPubKey, allocations: [{ assetId, amount }] }
+// RGB fee-pool UTXO
+// { txid, vout, satoshis, scriptPubKey }
+```
+
+`getFundingUtxos` excludes unconfirmed, locked and mixed-asset carriers;
+`getFeeUtxos` excludes locked fee-pool UTXOs and known inscription/atomical
+outputs. Neither method returns private keys, derivation data, RGB transition
+history, blind seals, or allocation operation IDs.
+
+When a returned fee-pool outpoint is included in a seller swap template, the
+wallet recognizes it as wallet-owned and includes it in the signing request.
+The dApp must still account for its sats correctly in the user payout/change
+outputs; querying an outpoint never reserves it.
 
 ## Receive RGB
 

@@ -269,6 +269,14 @@ export class BitcoinAPIMethods {
     return this.provider[requestMethodKey]({ method: 'getRgbAssets', params: { page, pageSize } });
   };
 
+  getRgbFundingUtxos = async (assetId: string) => {
+    return this.provider[requestMethodKey]({ method: 'getRgbFundingUtxos', params: { assetId } });
+  };
+
+  getRgbFeeUtxos = async () => {
+    return this.provider[requestMethodKey]({ method: 'getRgbFeeUtxos' });
+  };
+
   createRgbReceiveInvoice = async (params: { assetId?: string; amount?: string; durationSeconds?: number; recipientType?: 'blind' | 'witness' }) => {
     return this.provider[requestMethodKey]({ method: 'createRgbReceiveInvoice', params });
   };

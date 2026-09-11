@@ -185,8 +185,8 @@ export const localNiaProtocolEncoder: RgbProtocolEncoder = {
           publicKey: utxo.publicKey,
           useTweakedSigner: true,
         })),
-        ...prepared.feeOutpoints.map((outpoint, index) => ({
-          index: input.selectedUtxos.length + index,
+        ...prepared.feeOutpoints.map(outpoint => ({
+          index: findPsbtInputIndex(prepared.psbtHex, outpoint.txid, outpoint.vout),
           publicKey: feeUtxosByOutpoint.get(`${outpoint.txid}:${outpoint.vout}`)!.publicKey,
         })),
       ],

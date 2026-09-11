@@ -17,6 +17,8 @@ export class UnisatProvider extends EventEmitter {
   /** Experimental, versioned-in-practice RGB dApp surface. */
   public rgb: {
     getAssets: (page?: number, pageSize?: number) => Promise<any>;
+    getFundingUtxos: (assetId: string) => Promise<any>;
+    getFeeUtxos: () => Promise<any>;
     createReceiveInvoice: (params: { assetId?: string; amount?: string; durationSeconds?: number; recipientType?: 'blind' | 'witness' }) => Promise<any>;
     getPendingReceives: () => Promise<any>;
     acceptReceive: (recipientId: string) => Promise<any>;
@@ -41,6 +43,8 @@ export class UnisatProvider extends EventEmitter {
     this.keplr = new CosmosAPIMethods(this);
     this.rgb = {
       getAssets: (page, pageSize) => this.bitcoinAPI.getRgbAssets(page, pageSize),
+      getFundingUtxos: assetId => this.bitcoinAPI.getRgbFundingUtxos(assetId),
+      getFeeUtxos: () => this.bitcoinAPI.getRgbFeeUtxos(),
       createReceiveInvoice: params => this.bitcoinAPI.createRgbReceiveInvoice(params),
       getPendingReceives: () => this.bitcoinAPI.getRgbPendingReceives(),
       acceptReceive: recipientId => this.bitcoinAPI.acceptRgbReceive(recipientId),

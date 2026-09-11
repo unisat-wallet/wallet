@@ -128,6 +128,23 @@ function prepareExternalSwapPsbt(input: NiaOpretTransferRequest, hasRgbChange: b
       throw new RgbServiceError('RGB swap PSBT reserved input does not match local UTXO data')
     }
   }
+  const feeOutpoints = (input.feeFunding?.utxos || [])
+    .filter(utxo => actualInputs.has(outpointKey(utxo.outpoint.txid, utxo.outpoint.vout)))
+    .map(utxo => {
+      const index = transaction.ins.findIndex((txin: any) =>
+        outpointKey(Buffer.from(txin.hash).reverse().toString('hex'), txin.index) ===
+        outpointKey(utxo.outpoint.txid, utxo.outpoint.vout)
+      )
+      const witnessUtxo = psbt.data.inputs[index]?.witnessUtxo
+      if (
+        !witnessUtxo ||
+        witnessUtxo.value !== utxo.satoshis ||
+        !witnessUtxo.script.equals(Buffer.from(utxo.scriptPubKey, 'hex'))
+      ) {
+        throw new RgbServiceError('RGB swap PSBT fee input does not match local fee-pool data')
+      }
+      return utxo.outpoint
+    })
   const recipientScript = invoiceSealToScriptPubKey(input.recipientSeal)
   const recipientVout = recipientScript
     ? psbt.txOutputs.findIndex((output, index) =>
@@ -151,7 +168,7 @@ function prepareExternalSwapPsbt(input: NiaOpretTransferRequest, hasRgbChange: b
     ...(changeVout === undefined ? {} : { changeVout }),
     fee: 0,
     feeInputCount: 0,
-    feeOutpoints: [],
+    feeOutpoints,
   }
 }
 
