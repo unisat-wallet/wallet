@@ -53,6 +53,20 @@ const amountTagStyle = {
   boxSizing: 'border-box' as const
 };
 
+const recipientTypeTagStyle = (type: 'blind' | 'witness') => ({
+  minHeight: 20,
+  padding: '2px 6px',
+  borderRadius: 3,
+  background: type === 'witness' ? 'rgba(113, 108, 255, 0.2)' : 'rgba(255,255,255,0.12)',
+  border: `1px solid ${type === 'witness' ? 'rgba(145, 140, 255, 0.5)' : 'rgba(255,255,255,0.16)'}`,
+  display: 'inline-flex',
+  alignItems: 'center',
+  boxSizing: 'border-box' as const
+});
+
+const invoiceRecipientType = (invoice: RgbPendingReceiveInvoice): 'blind' | 'witness' =>
+  invoice.kind === 'ReceiveWitness' || invoice.transferKind === 'ReceiveWitness' ? 'witness' : 'blind';
+
 const emptyStateCardStyle = {
   padding: '32px 16px',
   borderRadius: 8,
@@ -127,6 +141,7 @@ export default function RGBInvoiceListScreen() {
           const precision = getRgbTokenPrecision({ ...invoiceAsset, tokenInfo: invoice });
           const fixedAmount = formatRgbPendingAmount(invoice.amount, ticker, '', precision);
           const amountLabel = fixedAmount ? `${t('fixed_amount')}: ${fixedAmount}` : t('any_amount');
+          const recipientType = invoiceRecipientType(invoice);
           return (
             <Row
               key={invoice.recipientId || invoice.invoice || String(index)}
@@ -169,6 +184,13 @@ export default function RGBInvoiceListScreen() {
                     <Text text={name} color="white" size="sm" ellipsis style={{ maxWidth: 130 }} />
                     <div style={amountTagStyle}>
                       <Text text={amountLabel} color="textDim" size="xxs" />
+                    </div>
+                    <div style={recipientTypeTagStyle(recipientType)}>
+                      <Text
+                        text={recipientType === 'witness' ? 'Witness' : 'Blind'}
+                        color={recipientType === 'witness' ? 'gold' : 'textDim'}
+                        size="xxs"
+                      />
                     </div>
                   </Row>
                   <Text text={expiryText} color="textDim" size="xs" />

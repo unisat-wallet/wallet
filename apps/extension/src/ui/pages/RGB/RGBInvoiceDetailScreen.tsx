@@ -47,6 +47,17 @@ const confirmModalStyle = {
   position: 'relative' as const
 };
 
+const recipientTypeTagStyle = (type: 'blind' | 'witness') => ({
+  minHeight: 20,
+  padding: '2px 6px',
+  borderRadius: 3,
+  background: type === 'witness' ? 'rgba(113, 108, 255, 0.2)' : 'rgba(255,255,255,0.12)',
+  border: `1px solid ${type === 'witness' ? 'rgba(145, 140, 255, 0.5)' : 'rgba(255,255,255,0.16)'}`,
+  display: 'inline-flex',
+  alignItems: 'center',
+  boxSizing: 'border-box' as const
+});
+
 export default function RGBInvoiceDetailScreen() {
   const wallet = useWallet();
   const nav = useNavigation();
@@ -108,6 +119,10 @@ export default function RGBInvoiceDetailScreen() {
   const awaitingSenderBroadcast = isRgbPendingInvoiceAwaitingSenderBroadcast(invoice);
   const awaitingSenderConfirmation = isRgbPendingInvoiceAwaitingSenderConfirmation(invoice);
   const invoiceInUse = awaitingSenderBroadcast || awaitingSenderConfirmation;
+  const recipientType =
+    invoice?.kind === 'ReceiveWitness' || invoice?.transferKind === 'ReceiveWitness'
+      ? 'witness'
+      : 'blind';
 
   return (
     <Layout>
@@ -121,6 +136,17 @@ export default function RGBInvoiceDetailScreen() {
         }
       />
       <Content>
+        {invoice ? (
+          <Row fullX justifyCenter style={{ marginBottom: 12 }}>
+            <div style={recipientTypeTagStyle(recipientType)}>
+              <Text
+                text={recipientType === 'witness' ? 'Witness invoice' : 'Blind invoice'}
+                color={recipientType === 'witness' ? 'gold' : 'textDim'}
+                size="xxs"
+              />
+            </div>
+          </Row>
+        ) : null}
         {invoiceText && !invoiceInUse ? (
           <ReceiveQRCodeCard
             title={t('receiving_invoice')}
