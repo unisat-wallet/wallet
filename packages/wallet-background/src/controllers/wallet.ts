@@ -4229,7 +4229,15 @@ export class WalletController extends BaseController {
   retryRgbBroadcast = (params: { transferId: string }) =>
     this.rgbSendOperations.retryBroadcast(params.transferId)
 
-  private syncRgbReceivedAllocations = () => this.rgbCoordinator.syncReceivedAllocations()
+  private syncRgbReceivedAllocations = async () => {
+    const context = await this.getLocalRgbService()
+    const funding = await this.getCurrentRgbFundingAccount()
+    // This only migrates a missing key on invoices created by the first
+    // witness-invoice build; acquire the normal writer fence before persisting.
+    await this.ensureRgbWriteLease(context, { forceRenew: true })
+    await context.service.backfillWitnessReceivePublicKey(funding.publicKey)
+    return this.rgbCoordinator.syncReceivedAllocations()
+  }
 
   /** Deliver confirmed receive history through a durable, idempotent local outbox. */
   private syncRgbReceiveHistory = async (service: LocalRgbService, wallet: LocalRgbWallet) => {

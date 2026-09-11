@@ -602,6 +602,21 @@ export class RgbService {
     )
   }
 
+  /** Fill the signing key omitted by witness invoices created before v1 support shipped. */
+  async backfillWitnessReceivePublicKey(publicKey: string) {
+    if (!/^[0-9a-f]{66}$/i.test(publicKey)) {
+      throw new RgbServiceError('RGB witness funding public key is invalid')
+    }
+    let changed = false
+    for (const receive of this.requireState().pendingReceives || []) {
+      if (receive.recipientType !== 'witness' || receive.witnessPublicKey) continue
+      receive.witnessPublicKey = publicKey.toLowerCase()
+      changed = true
+    }
+    if (changed) await this.persist({ waitForRecovery: true })
+    return { changed }
+  }
+
   getPendingReceiveHistory() {
     const state = this.requireState()
     const receives = state.pendingReceives || []

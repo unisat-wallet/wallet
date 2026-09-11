@@ -300,6 +300,11 @@ describe('RgbService', () => {
         proxyRecipientId: witness.proxyRecipientId,
       })
     )
+    ;(reopened as any).state.pendingReceives[0].witnessPublicKey = undefined
+    await expect(reopened.backfillWitnessReceivePublicKey(`02${'22'.repeat(32)}`)).resolves.toEqual({
+      changed: true,
+    })
+    expect(reopened.getPendingReceives()[0]?.witnessPublicKey).toBe(`02${'22'.repeat(32)}`)
   })
 
   it('persists locally broadcast funding UTXOs until the indexer replacement succeeds', async () => {
