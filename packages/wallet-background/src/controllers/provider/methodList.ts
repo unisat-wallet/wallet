@@ -80,6 +80,36 @@ export type ProviderMethodList = {
   getRgbPaymentStatus: {
     transferId: string
   }
+  /**
+   * Experimental RGB/BTC swap: the maker supplies an unsigned Opret-first
+   * template and the wallet colors only the locally reserved RGB inputs.
+   */
+  prepareRgbSwap: {
+    invoice: string
+    assetId: string
+    amount: string
+    btcReceiveAmount: string
+    feeRate?: number
+    psbt: string
+  }
+  finalizeRgbSwap: {
+    transferId: string
+    makerSignedPsbt: string
+  }
+  cancelRgbSwap: {
+    transferId: string
+  }
+  getRgbSwapStatus: {
+    transferId: string
+  }
+  /** Complete a buyer-side BTC-for-RGB swap after its consignment is validated. */
+  completeRgbBuySwap: {
+    recipientId: string
+    assetId: string
+    amount: string
+    maxBtcSpend: string
+    makerSignedPsbt: string
+  }
 }
 
 export type ProviderMethods = keyof ProviderMethodList

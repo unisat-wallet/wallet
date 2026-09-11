@@ -301,4 +301,24 @@ export class BitcoinAPIMethods {
     return this.provider[requestMethodKey]({ method: 'getRgbPaymentStatus', params: { transferId } });
   };
 
+  prepareRgbSwap = async (params: { invoice: string; assetId: string; amount: string; btcReceiveAmount: string; feeRate?: number; psbt: string }) => {
+    return this.provider[requestMethodKey]({ method: 'prepareRgbSwap', params });
+  };
+
+  finalizeRgbSwap = async (transferId: string, makerSignedPsbt: string) => {
+    return this.provider[requestMethodKey]({ method: 'finalizeRgbSwap', params: { transferId, makerSignedPsbt } });
+  };
+
+  cancelRgbSwap = async (transferId: string) => {
+    return this.provider[requestMethodKey]({ method: 'cancelRgbSwap', params: { transferId } });
+  };
+
+  getRgbSwapStatus = async (transferId: string) => {
+    return this.provider[requestMethodKey]({ method: 'getRgbSwapStatus', params: { transferId } });
+  };
+
+  completeRgbBuySwap = async (params: { recipientId: string; assetId: string; amount: string; maxBtcSpend: string; makerSignedPsbt: string }) => {
+    return this.provider[requestMethodKey]({ method: 'completeRgbBuySwap', params });
+  };
+
 }

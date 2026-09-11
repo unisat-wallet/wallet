@@ -381,7 +381,7 @@ export class RgbTransferQuery {
         ...visibleLocalReceives,
         ...visibleLocalReceiveHistory,
       ]
-        .map(item => item.transferId ?? item.txid ?? item.id)
+        .map(item => ('transferId' in item ? item.transferId : undefined) ?? item.txid ?? item.id)
         .filter(Boolean)
     )
 

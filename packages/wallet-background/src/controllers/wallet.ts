@@ -556,6 +556,8 @@ type RgbSendBeginRequest = {
   feeRate?: number
   minConfirmations?: number
   donation?: boolean
+  /** Maker-built, unsigned swap template. */
+  swapPsbt?: string
   /** Trusted provider origin for a dApp-created RGB payment. */
   providerOrigin?: string
   witnessData?: {
@@ -597,6 +599,23 @@ function rgbInvoiceDestinationAddress(invoice: string | undefined, networkType: 
   } catch {
     return undefined
   }
+}
+
+function sameUnsignedTransaction(left: bitcoin.Psbt, right: bitcoin.Psbt) {
+  return (
+    left.txInputs.length === right.txInputs.length &&
+    left.txOutputs.length === right.txOutputs.length &&
+    left.txInputs.every((input, index) => {
+      const other = right.txInputs[index]
+      return Boolean(
+        other && input.hash.equals(other.hash) && input.index === other.index && input.sequence === other.sequence
+      )
+    }) &&
+    left.txOutputs.every((output, index) => {
+      const other = right.txOutputs[index]
+      return Boolean(other && output.value === other.value && output.script.equals(other.script))
+    })
+  )
 }
 
 function rgbCounterpartyAddress(
@@ -3784,6 +3803,22 @@ export class WalletController extends BaseController {
 
   getRgbPendingReceiveInvoices = () => this.rgbReceiveOperations.getPendingReceiveInvoices()
 
+  /** Internal provider preflight for a buyer-side RGB/BTC swap. */
+  getRgbBuySwapReceive = async (params: { recipientId: string }) => {
+    const { service } = await this.getLocalRgbService()
+    const receive = service
+      .getPendingReceives()
+      .find(item => item.recipientId === params.recipientId || item.proxyRecipientId === params.recipientId)
+    const pending = receive?.pendingAccept
+    if (!receive || !pending) throw new Error('RGB receive is not awaiting acceptance')
+    return {
+      recipientId: receive.proxyRecipientId || receive.recipientId,
+      assetId: pending.assetId,
+      amount: pending.amount,
+      txid: pending.txid,
+    }
+  }
+
   getRgbRecoveryCheckpointStatus = async () => {
     const { service } = await this.getLocalRgbService()
     return service.getRecoveryCheckpointStatus()
@@ -4177,14 +4212,22 @@ export class WalletController extends BaseController {
   }
 
   /** Provider-facing signing data bound to a locally prepared RGB payment. */
-  getRgbPaymentSigningData = async (params: { transferId: string }) => {
+  getRgbPaymentSigningData = async (params: { transferId: string; psbt?: string }) => {
     const { service } = await this.getLocalRgbService()
     const pending = service.getPendingTransfers().find(transfer => transfer.id === params.transferId)
     if (!pending || pending.delivery || pending.broadcast) {
       throw new Error('RGB payment is not awaiting a signature')
     }
+    const psbt = params.psbt ? psbtFromString(params.psbt).toHex() : pending.prepared.psbt
+    if (params.psbt) {
+      const candidate = bitcoin.Psbt.fromHex(psbt)
+      const prepared = bitcoin.Psbt.fromHex(pending.prepared.psbt)
+      if (!sameUnsignedTransaction(candidate, prepared)) {
+        throw new Error('RGB swap PSBT changed the prepared transaction')
+      }
+    }
     return this.getRgbToSignData({
-      psbt: pending.prepared.psbt,
+      psbt,
       toSignInputs: pending.prepared.toSignInputs,
       action: {
         name: 'Send RGB',

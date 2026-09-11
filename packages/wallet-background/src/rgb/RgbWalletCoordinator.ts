@@ -195,9 +195,10 @@ export class RgbWalletCoordinator {
     return pendingReceives.some(receive => {
       // A witness invoice has no pre-existing funding UTXO. Its outpoint is
       // created by the sender and only becomes known from the consignment.
-      if (!receive.seal) return false
+      const seal = receive.seal
+      if (!seal) return false
       const funding = snapshot.utxos.find(
-        utxo => utxo.outpoint.txid === receive.seal.txid && utxo.outpoint.vout === receive.seal.vout
+        utxo => utxo.outpoint.txid === seal.txid && utxo.outpoint.vout === seal.vout
       )
       return funding?.chainStatus !== 'confirmed'
     })

@@ -2,6 +2,10 @@
 
 The `window.unisat` object is injected by the UniSat Wallet extension into every web page. dApps use this API to interact with the user's Bitcoin wallet.
 
+Experimental RGB interfaces:
+
+- [RGB API](./rgb.md)
+
 ## Getting Started
 
 1. [Detect the extension](./browser-detection.md)
@@ -17,6 +21,7 @@ The `window.unisat` object is injected by the UniSat Wallet extension into every
 | [Access Accounts](./access-accounts.md) | Get current account, address, public key |
 | [Address Types](./address-types.md) | Supported address formats |
 | [Manage Assets](./manage-assets.md) | Send BTC, inscriptions, Runes, BRC-20 |
+| [RGB API (Experimental)](./rgb.md) | RGB assets, receive, payment, and RGB/BTC swap |
 | [Manage Networks](./manage-networks.md) | Switch networks, listen for changes |
 | [Derive Context Hash (Experimental)](./derive-context-hash.md) | Deterministic secret derivation from wallet seed (experimental) |
 | [Sign Message](./sign-message.md) | BIP-322 and ECDSA message signing |

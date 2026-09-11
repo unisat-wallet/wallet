@@ -14,6 +14,23 @@ export { Interceptor };
 export class UnisatProvider extends EventEmitter {
   private bitcoinAPI: BitcoinAPIMethods;
   public keplr: CosmosAPIMethods;
+  /** Experimental, versioned-in-practice RGB dApp surface. */
+  public rgb: {
+    getAssets: (page?: number, pageSize?: number) => Promise<any>;
+    createReceiveInvoice: (params: { assetId?: string; amount?: string; durationSeconds?: number; recipientType?: 'blind' | 'witness' }) => Promise<any>;
+    getPendingReceives: () => Promise<any>;
+    acceptReceive: (recipientId: string) => Promise<any>;
+    rejectReceive: (recipientId: string) => Promise<any>;
+    preparePayment: (params: { invoice: string; assetId: string; amount?: string; feeRate?: number }) => Promise<any>;
+    signPayment: (transferId: string) => Promise<any>;
+    cancelPayment: (transferId: string) => Promise<any>;
+    getPaymentStatus: (transferId: string) => Promise<any>;
+    completeBuySwap: (params: { recipientId: string; assetId: string; amount: string; maxBtcSpend: string; makerSignedPsbt: string }) => Promise<any>;
+    prepareSwap: (params: { invoice: string; assetId: string; amount: string; btcReceiveAmount: string; feeRate?: number; psbt: string }) => Promise<any>;
+    finalizeSwap: (transferId: string, makerSignedPsbt: string) => Promise<any>;
+    cancelSwap: (transferId: string) => Promise<any>;
+    getOperationStatus: (transferId: string) => Promise<any>;
+  };
 
   constructor({ maxListeners = 100 } = {}) {
     super();
@@ -22,6 +39,22 @@ export class UnisatProvider extends EventEmitter {
     // Initialize API modules
     this.bitcoinAPI = new BitcoinAPIMethods(this);
     this.keplr = new CosmosAPIMethods(this);
+    this.rgb = {
+      getAssets: (page, pageSize) => this.bitcoinAPI.getRgbAssets(page, pageSize),
+      createReceiveInvoice: params => this.bitcoinAPI.createRgbReceiveInvoice(params),
+      getPendingReceives: () => this.bitcoinAPI.getRgbPendingReceives(),
+      acceptReceive: recipientId => this.bitcoinAPI.acceptRgbReceive(recipientId),
+      rejectReceive: recipientId => this.bitcoinAPI.rejectRgbReceive(recipientId),
+      preparePayment: params => this.bitcoinAPI.prepareRgbPayment(params),
+      signPayment: transferId => this.bitcoinAPI.signRgbPayment(transferId),
+      cancelPayment: transferId => this.bitcoinAPI.cancelRgbPayment(transferId),
+      getPaymentStatus: transferId => this.bitcoinAPI.getRgbPaymentStatus(transferId),
+      completeBuySwap: params => this.bitcoinAPI.completeRgbBuySwap(params),
+      prepareSwap: params => this.bitcoinAPI.prepareRgbSwap(params),
+      finalizeSwap: (transferId, makerSignedPsbt) => this.bitcoinAPI.finalizeRgbSwap(transferId, makerSignedPsbt),
+      cancelSwap: transferId => this.bitcoinAPI.cancelRgbSwap(transferId),
+      getOperationStatus: transferId => this.bitcoinAPI.getRgbSwapStatus(transferId),
+    };
 
     // Setup push event handlers
     _unisatProviderPrivate._pushEventHandlers = new PushEventHandlers(this, _unisatProviderPrivate);
@@ -80,17 +113,6 @@ export class UnisatProvider extends EventEmitter {
   getVersion = async () => this.bitcoinAPI.getVersion();
   deriveContextHash = async (appName: string, context: string) => this.bitcoinAPI.deriveContextHash(appName, context);
   getBitcoinUtxos = async (cursor = 0, size = 20) => this.bitcoinAPI.getBitcoinUtxos(cursor, size);
-  getRgbAssets = async (page = 1, pageSize = 50) => this.bitcoinAPI.getRgbAssets(page, pageSize);
-  createRgbReceiveInvoice = async (params: { assetId?: string; amount?: string; durationSeconds?: number; recipientType?: 'blind' | 'witness' }) =>
-    this.bitcoinAPI.createRgbReceiveInvoice(params);
-  getRgbPendingReceives = async () => this.bitcoinAPI.getRgbPendingReceives();
-  acceptRgbReceive = async (recipientId: string) => this.bitcoinAPI.acceptRgbReceive(recipientId);
-  rejectRgbReceive = async (recipientId: string) => this.bitcoinAPI.rejectRgbReceive(recipientId);
-  prepareRgbPayment = async (params: { invoice: string; assetId: string; amount?: string; feeRate?: number }) =>
-    this.bitcoinAPI.prepareRgbPayment(params);
-  signRgbPayment = async (transferId: string) => this.bitcoinAPI.signRgbPayment(transferId);
-  cancelRgbPayment = async (transferId: string) => this.bitcoinAPI.cancelRgbPayment(transferId);
-  getRgbPaymentStatus = async (transferId: string) => this.bitcoinAPI.getRgbPaymentStatus(transferId);
 }
 
 declare global {

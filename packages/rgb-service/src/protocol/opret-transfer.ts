@@ -5,6 +5,7 @@ import { createRgbOpretPsbt } from './bitcoin'
 import { transitionBundleId } from './bundle'
 import { serializeOpretFascia } from './fascia'
 import type { RgbInvoiceSeal } from './invoice'
+import { invoiceSealToScriptPubKey } from './witness'
 import { encodeNiaTransition, niaInputFromAllocation, type NiaFungibleAssignment } from './nia'
 import { commitOpretRgbPsbt } from './psbt-commit'
 
@@ -21,6 +22,8 @@ export interface NiaOpretTransferRequest {
   recipientBlinding: bigint
   changeBlinding: bigint
   feeFunding?: RgbFeeFunding
+  /** Constrained external template used by an RGB/BTC atomic swap. */
+  swapPsbt?: string
 }
 
 export interface PreparedNiaOpretTransfer {
@@ -58,6 +61,100 @@ function assertBlinding(value: bigint, name: string) {
   }
 }
 
+function parsePsbt(value: string) {
+  try {
+    return Psbt.fromHex(value)
+  } catch {
+    try {
+      return Psbt.fromBase64(value)
+    } catch {
+      throw new RgbServiceError('RGB swap PSBT is invalid')
+    }
+  }
+}
+
+function outpointKey(txid: string, vout: number) {
+  return `${txid}:${vout}`
+}
+
+/**
+ * Validate the Bitcoin side of a swap before RGB commits to it. This does not
+ * interpret maker business metadata: wallet-owned RGB inputs, the Opret host,
+ * recipient seal and RGB change are all derived from local state instead.
+ */
+function prepareExternalSwapPsbt(input: NiaOpretTransferRequest, hasRgbChange: boolean) {
+  const psbt = parsePsbt(input.swapPsbt || '')
+  if (
+    psbt.data.inputs.some(
+      item =>
+        item.partialSig?.length ||
+        item.tapKeySig ||
+        item.tapScriptSig?.length ||
+        item.finalScriptSig ||
+        item.finalScriptWitness
+    )
+  ) {
+    throw new RgbServiceError('RGB swap PSBT must be unsigned when prepared')
+  }
+  if (psbt.data.inputs.some(item => item.sighashType !== undefined && item.sighashType !== 0 && item.sighashType !== 1)) {
+    throw new RgbServiceError('RGB swap PSBT must use SIGHASH_ALL')
+  }
+  if (psbt.txOutputs.length === 0 || !psbt.txOutputs[0]!.script.equals(Buffer.from([0x6a]))) {
+    throw new RgbServiceError('RGB swap PSBT must have an empty OP_RETURN at vout 0')
+  }
+  if (psbt.txOutputs.slice(1).some(output => output.script[0] === 0x6a)) {
+    throw new RgbServiceError('RGB swap PSBT must not contain an additional OP_RETURN output')
+  }
+  const transaction = ((psbt.data.globalMap.unsignedTx as any).tx || psbt.data.globalMap.unsignedTx) as any
+  if (transaction.locktime !== 0 || transaction.ins.some((txin: any) => txin.sequence !== 0xffff_ffff)) {
+    throw new RgbServiceError('RGB swap PSBT must disable RBF and locktime')
+  }
+  const expectedInputs = new Set(
+    input.selectedUtxos.map(utxo => outpointKey(utxo.outpoint.txid, utxo.outpoint.vout))
+  )
+  const actualInputs = new Set(
+    transaction.ins.map((txin: any) => outpointKey(Buffer.from(txin.hash).reverse().toString('hex'), txin.index))
+  )
+  if (![...expectedInputs].every(key => actualInputs.has(key))) {
+    throw new RgbServiceError('RGB swap PSBT does not contain every reserved RGB input')
+  }
+  for (const utxo of input.selectedUtxos) {
+    const index = transaction.ins.findIndex((txin: any) =>
+      outpointKey(Buffer.from(txin.hash).reverse().toString('hex'), txin.index) ===
+      outpointKey(utxo.outpoint.txid, utxo.outpoint.vout)
+    )
+    const witnessUtxo = psbt.data.inputs[index]?.witnessUtxo
+    if (!witnessUtxo || witnessUtxo.value !== utxo.satoshis || !witnessUtxo.script.equals(Buffer.from(utxo.scriptPubKey, 'hex'))) {
+      throw new RgbServiceError('RGB swap PSBT reserved input does not match local UTXO data')
+    }
+  }
+  const recipientScript = invoiceSealToScriptPubKey(input.recipientSeal)
+  const recipientVout = recipientScript
+    ? psbt.txOutputs.findIndex((output, index) =>
+        index > 0 && output.script.equals(Buffer.from(recipientScript)) && output.value >= (input.witnessAmountSat || 0)
+      )
+    : undefined
+  if (recipientScript && recipientVout === -1) {
+    throw new RgbServiceError('RGB swap PSBT does not pay the witness recipient seal')
+  }
+  const fundingScript = Buffer.from(input.selectedUtxos[0]!.scriptPubKey, 'hex')
+  const changeVout = hasRgbChange
+    ? psbt.txOutputs.findIndex((output, index) => index > 0 && output.script.equals(fundingScript))
+    : undefined
+  if (hasRgbChange && changeVout === -1) {
+    throw new RgbFundingOutputRequiredError()
+  }
+  return {
+    psbtHex: psbt.toHex(),
+    hostVout: 0,
+    ...(recipientVout === undefined ? {} : { recipientVout }),
+    ...(changeVout === undefined ? {} : { changeVout }),
+    fee: 0,
+    feeInputCount: 0,
+    feeOutpoints: [],
+  }
+}
+
 /**
  * Construct a complete unsigned NIA OpretFirst transfer locally. It is safe
  * to persist or hand to the signing layer, but its Fascia and consignment can
@@ -89,15 +186,17 @@ export function prepareNiaOpretTransfer(input: NiaOpretTransferRequest): Prepare
   if (inputAmount < amount)
     throw new RgbServiceError('RGB selected allocations do not cover the transfer amount')
 
-  const bitcoin = createRgbOpretPsbt({
-    network: input.network,
-    selectedUtxos: input.selectedUtxos,
-    recipientSeal: input.recipientSeal,
-    feeRate: input.feeRate,
-    preserveFundingOutput: inputAmount > amount,
-    ...(input.feeFunding === undefined ? {} : { feeFunding: input.feeFunding }),
-    ...(input.witnessAmountSat === undefined ? {} : { witnessAmountSat: input.witnessAmountSat }),
-  })
+  const bitcoin = input.swapPsbt
+    ? prepareExternalSwapPsbt(input, inputAmount > amount)
+    : createRgbOpretPsbt({
+        network: input.network,
+        selectedUtxos: input.selectedUtxos,
+        recipientSeal: input.recipientSeal,
+        feeRate: input.feeRate,
+        preserveFundingOutput: inputAmount > amount,
+        ...(input.feeFunding === undefined ? {} : { feeFunding: input.feeFunding }),
+        ...(input.witnessAmountSat === undefined ? {} : { witnessAmountSat: input.witnessAmountSat }),
+      })
   const recipientSeal: NiaFungibleAssignment['seal'] =
     input.recipientSeal.type === 'confidential'
       ? { secretSeal: hex(input.recipientSeal.secretSeal) }

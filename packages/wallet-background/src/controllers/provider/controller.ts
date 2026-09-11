@@ -1,4 +1,4 @@
-import { bitcoin, verifyMessageOfBIP322Simple, verifyMessageOfECDSA } from '@unisat/wallet-bitcoin'
+import { bitcoin, scriptPkToAddress, toPsbtNetwork, verifyMessageOfBIP322Simple, verifyMessageOfECDSA } from '@unisat/wallet-bitcoin'
 import {
   RequestMethodDeriveContextHashParams,
   RequestMethodGetInscriptionsParams,
@@ -737,6 +737,189 @@ class ProviderController extends BaseController {
     if (!params.transferId) throw new Error('transferId is required')
     await assertRgbPaymentOrigin(params.transferId, origin)
     return wallet.getRgbPaymentStatus({ transferId: params.transferId })
+  }
+
+  /**
+   * Prepare a seller-side RGB/BTC swap. The local RGB encoder validates the
+   * maker template and replaces only its empty Opret host with the commitment.
+   */
+  @Reflect.metadata('APPROVAL', ['RgbPayment'])
+  prepareRgbSwap = async ({
+    data: { params },
+    session: { origin },
+  }: {
+    data: { params: { invoice: string; assetId: string; amount: string; btcReceiveAmount: string; feeRate?: number; psbt: string } }
+    session: { origin: string }
+  }) => {
+    if (!params.invoice || !params.assetId || !params.amount || !params.btcReceiveAmount || !params.psbt) {
+      throw new Error('invoice, assetId, amount, btcReceiveAmount and psbt are required')
+    }
+    let btcReceiveAmount: number
+    try {
+      btcReceiveAmount = Number(BigInt(params.btcReceiveAmount))
+    } catch {
+      throw new Error('btcReceiveAmount must be an unsigned integer')
+    }
+    if (!Number.isSafeInteger(btcReceiveAmount) || btcReceiveAmount <= 0) {
+      throw new Error('btcReceiveAmount is out of range')
+    }
+    const account = await wallet.getCurrentAccount()
+    if (!account) throw new Error('no current account')
+    const receiveScript = bitcoin.address.toOutputScript(account.address, toPsbtNetwork(wallet.getNetworkType()))
+    const makerPsbt = bitcoin.Psbt.fromHex(formatPsbtHex(params.psbt))
+    if (!makerPsbt.txOutputs.some(output => output.value >= btcReceiveAmount && output.script.equals(receiveScript))) {
+      throw new Error('RGB swap PSBT does not pay the current wallet BTC address')
+    }
+    const prepared = await wallet.createRgbSendBegin({
+      invoice: params.invoice,
+      assetId: params.assetId,
+      amount: params.amount,
+      ...(params.feeRate === undefined ? {} : { feeRate: params.feeRate }),
+      swapPsbt: params.psbt,
+      providerOrigin: origin,
+    })
+    return {
+      transferId: prepared.id,
+      coloredPsbt: prepared.psbt,
+      status: 'waiting_counterparty_signature' as const,
+    }
+  }
+
+  @Reflect.metadata('APPROVAL', [
+    'SignPsbt',
+    async req => {
+      const params = req.data.params as { transferId: string; makerSignedPsbt: string; toSignDatas?: unknown[] }
+      if (!params.transferId || !params.makerSignedPsbt) {
+        throw new Error('transferId and makerSignedPsbt are required')
+      }
+      const origin = req.session?.origin
+      if (!origin) throw new Error('missing request origin')
+      await assertRgbPaymentOrigin(params.transferId, origin)
+      params.toSignDatas = [
+        await wallet.getRgbPaymentSigningData({ transferId: params.transferId, psbt: params.makerSignedPsbt }),
+      ]
+    },
+  ])
+  finalizeRgbSwap = async ({
+    data: { params },
+    session: { origin },
+    approvalRes,
+  }: {
+    data: { params: { transferId: string; makerSignedPsbt: string; toSignDatas?: any[] } }
+    session: { origin: string }
+    approvalRes: SignPsbtResult
+  }) => {
+    await assertRgbPaymentOrigin(params.transferId, origin)
+    const account = await wallet.getCurrentAccount()
+    const toSignData = getToSignDatas(params.toSignDatas)[0]!
+    const signedPsbt = approvalRes[0]?.psbtHex
+    if (!signedPsbt) throw new Error('RGB swap signing did not return a PSBT')
+    assertReadonlySignedPsbt(account, toSignData, signedPsbt)
+    return wallet.createRgbSendEnd({ transferId: params.transferId, signedPsbt })
+  }
+
+  @Reflect.metadata('APPROVAL', ['RgbPaymentCancel'])
+  cancelRgbSwap = async ({ data: { params }, session: { origin } }: { data: { params: { transferId: string } }; session: { origin: string } }) => {
+    if (!params.transferId) throw new Error('transferId is required')
+    await assertRgbPaymentOrigin(params.transferId, origin)
+    return wallet.abortRgbVanillaTx({ txid: params.transferId })
+  }
+
+  @Reflect.metadata('SAFE', true)
+  getRgbSwapStatus = async ({ data: { params }, session: { origin } }: { data: { params: { transferId: string } }; session: { origin: string } }) => {
+    if (!params.transferId) throw new Error('transferId is required')
+    await assertRgbPaymentOrigin(params.transferId, origin)
+    return wallet.getRgbPaymentStatus({ transferId: params.transferId })
+  }
+
+  /**
+   * Buyer-side completion: the maker must have already delivered a validated
+   * consignment for the invoice, then signed every maker-controlled BTC/RGB
+   * input. The signed PSBT is returned only after the wallet has sent ACK.
+   */
+  @Reflect.metadata('APPROVAL', [
+    'SignPsbt',
+    async req => {
+      const params = req.data.params as {
+        recipientId: string
+        assetId: string
+        amount: string
+        maxBtcSpend: string
+        makerSignedPsbt: string
+        toSignDatas?: unknown[]
+      }
+      if (!params.recipientId || !params.assetId || !params.amount || !params.maxBtcSpend || !params.makerSignedPsbt) {
+        throw new Error('recipientId, assetId, amount, maxBtcSpend and makerSignedPsbt are required')
+      }
+      const receive = await wallet.getRgbBuySwapReceive({ recipientId: params.recipientId })
+      if (receive.assetId !== params.assetId || receive.amount !== params.amount) {
+        throw new Error('RGB swap receipt does not match the requested asset or amount')
+      }
+      let maxBtcSpend: number
+      try {
+        maxBtcSpend = Number(BigInt(params.maxBtcSpend))
+      } catch {
+        throw new Error('maxBtcSpend must be an unsigned integer')
+      }
+      if (!Number.isSafeInteger(maxBtcSpend) || maxBtcSpend <= 0) throw new Error('maxBtcSpend is out of range')
+
+      const psbt = bitcoin.Psbt.fromHex(formatPsbtHex(params.makerSignedPsbt))
+      const transaction = ((psbt.data.globalMap.unsignedTx as any).tx || psbt.data.globalMap.unsignedTx) as any
+      if (!transaction?.getId || transaction.getId() !== receive.txid) {
+        throw new Error('RGB swap PSBT does not match the validated consignment transaction')
+      }
+      if (transaction.locktime !== 0 || transaction.ins.some((input: any) => input.sequence !== 0xffff_ffff)) {
+        throw new Error('RGB swap PSBT must disable RBF and locktime')
+      }
+      if (psbt.data.inputs.some(input => input.sighashType !== undefined && input.sighashType !== 0 && input.sighashType !== 1)) {
+        throw new Error('RGB swap PSBT must use SIGHASH_ALL')
+      }
+      const account = await wallet.getCurrentAccount()
+      if (!account) throw new Error('no current account')
+      const networkType = wallet.getNetworkType()
+      const ownedInputs = psbt.data.inputs
+        .map((input, index) => ({ input, index }))
+        .filter(({ input }) => input.witnessUtxo && scriptPkToAddress(input.witnessUtxo.script, networkType) === account.address)
+      if (!ownedInputs.length) throw new Error('RGB buy swap has no input owned by the current wallet')
+      if (
+        psbt.data.inputs.some((input, index) => {
+          const owned = ownedInputs.some(item => item.index === index)
+          const signed = input.finalScriptSig || input.finalScriptWitness || input.tapKeySig || input.partialSig?.length || input.tapScriptSig?.length
+          return !owned && !signed
+        })
+      ) {
+        throw new Error('RGB buy swap maker inputs must be signed before wallet approval')
+      }
+      const userInputValue = ownedInputs.reduce((total, { input }) => total + input.witnessUtxo!.value, 0)
+      const userChangeValue = psbt.txOutputs
+        .filter(output => scriptPkToAddress(output.script, networkType) === account.address)
+        .reduce((total, output) => total + output.value, 0)
+      if (userInputValue - userChangeValue > maxBtcSpend) {
+        throw new Error('RGB buy swap exceeds maxBtcSpend')
+      }
+      params.toSignDatas = [
+        await wallet.getToSignData({
+          psbtHex: psbt.toHex(),
+          options: {
+            toSignInputs: ownedInputs.map(({ index }) => ({ index, address: account.address, sighashTypes: [1] })),
+            autoFinalized: true,
+          },
+        }),
+      ]
+    },
+  ])
+  completeRgbBuySwap = async ({ data: { params }, approvalRes }: {
+    data: { params: { recipientId: string; toSignDatas?: any[] } }
+    approvalRes: SignPsbtResult
+  }) => {
+    const account = await wallet.getCurrentAccount()
+    const toSignData = getToSignDatas(params.toSignDatas)[0]!
+    const signedPsbt = approvalRes[0]?.psbtHex
+    if (!signedPsbt) throw new Error('RGB buy swap signing did not return a PSBT')
+    assertReadonlySignedPsbt(account, toSignData, signedPsbt)
+    const accepted = await wallet.acceptRgbReceive({ recipientId: params.recipientId })
+    if (!accepted?.accepted) return accepted
+    return { recipientId: params.recipientId, status: 'accepted' as const, signedPsbt }
   }
 
   @Reflect.metadata('APPROVAL', [

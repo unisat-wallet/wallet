@@ -1,4 +1,4 @@
-import { Transaction } from 'bitcoinjs-lib'
+import { Psbt, Transaction } from 'bitcoinjs-lib'
 import { RgbServiceError } from '../errors'
 import type {
   RgbCompletedTransfer,
@@ -171,6 +171,7 @@ export const localNiaProtocolEncoder: RgbProtocolEncoder = {
       recipientBlinding,
       changeBlinding,
       ...(input.feeFunding === undefined ? {} : { feeFunding: input.feeFunding }),
+      ...(input.request.swapPsbt === undefined ? {} : { swapPsbt: input.request.swapPsbt }),
     })
     const feeUtxosByOutpoint = new Map(
       input.feeFunding?.utxos.map(utxo => [`${utxo.outpoint.txid}:${utxo.outpoint.vout}`, utxo]) || []
@@ -179,8 +180,8 @@ export const localNiaProtocolEncoder: RgbProtocolEncoder = {
       id: hex(prepared.transitionId),
       psbt: prepared.psbtHex,
       toSignInputs: [
-        ...input.selectedUtxos.map((utxo, index) => ({
-          index,
+        ...input.selectedUtxos.map(utxo => ({
+          index: findPsbtInputIndex(prepared.psbtHex, utxo.outpoint.txid, utxo.outpoint.vout),
           publicKey: utxo.publicKey,
           useTweakedSigner: true,
         })),
@@ -325,4 +326,14 @@ export const localNiaProtocolEncoder: RgbProtocolEncoder = {
       },
     }
   },
+}
+
+function findPsbtInputIndex(psbtHex: string, txid: string, vout: number) {
+  const psbt = Psbt.fromHex(psbtHex)
+  const transaction = ((psbt.data.globalMap.unsignedTx as any).tx || psbt.data.globalMap.unsignedTx) as any
+  const index = transaction.ins.findIndex(
+    (input: any) => Buffer.from(input.hash).reverse().toString('hex') === txid && input.index === vout
+  )
+  if (index < 0) throw new RgbServiceError('RGB prepared PSBT is missing a selected input')
+  return index
 }

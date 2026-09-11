@@ -38,6 +38,8 @@ export type RgbSendBeginParams = {
   feeRate?: number
   minConfirmations?: number
   donation?: boolean
+  /** Maker-built, unsigned swap template. It is validated and colored locally. */
+  swapPsbt?: string
   /** Trusted provider origin persisted with a dApp-created payment. */
   providerOrigin?: string
 }
@@ -64,8 +66,9 @@ export class RgbSendOperations {
         ...(params.minConfirmations === undefined
           ? {}
           : { minConfirmations: params.minConfirmations }),
+        ...(params.swapPsbt === undefined ? {} : { swapPsbt: params.swapPsbt }),
       },
-      { providerOrigin: params.providerOrigin }
+      params.providerOrigin === undefined ? {} : { providerOrigin: params.providerOrigin }
     )
     const toSignData = await this.dependencies.getToSignData({
       psbt: prepared.psbt,

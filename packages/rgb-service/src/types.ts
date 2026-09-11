@@ -90,6 +90,12 @@ export interface RgbTransferRequest {
   feeRate: number
   donation?: boolean
   minConfirmations?: number
+  /**
+   * A maker-built, unsigned Opret-first transaction template. It is accepted
+   * only by the swap path and is still checked and colored locally before any
+   * signature is requested.
+   */
+  swapPsbt?: string
 }
 
 export interface RgbTransferIntent {
