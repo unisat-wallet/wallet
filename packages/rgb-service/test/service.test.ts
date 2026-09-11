@@ -274,6 +274,26 @@ describe('RgbService', () => {
     expect(issueFunding.map(utxo => utxo.outpoint)).not.toContainEqual(receive.seal)
   })
 
+  it('persists a witness invoice without requiring a blind seal', async () => {
+    const dependencies = createDependencies()
+    const service = new RgbService(dependencies)
+    await service.open(wallet)
+    const witness = await service.createWitnessReceive({
+      scriptPubKey: '512079be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798',
+      assetId: 'rgb:asset',
+      amount: '1',
+    })
+    expect(witness.recipientType).toBe('witness')
+    expect(witness).not.toHaveProperty('seal')
+    expect(witness.proxyRecipientId).toMatch(/^[0-9a-f]{64}$/)
+
+    const reopened = new RgbService(dependencies)
+    await reopened.open(wallet)
+    expect(reopened.getPendingReceives()).toContainEqual(
+      expect.objectContaining({ proxyRecipientId: witness.proxyRecipientId, recipientType: 'witness' })
+    )
+  })
+
   it('persists locally broadcast funding UTXOs until the indexer replacement succeeds', async () => {
     const dependencies = createDependencies()
     const service = new RgbService(dependencies)

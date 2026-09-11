@@ -2656,7 +2656,7 @@ function persistState(state: RgbServiceState) {
     ...state,
     pendingReceives: state.pendingReceives?.map(receive => ({
       ...receive,
-      seal: persistBlindSeal(receive.seal),
+      ...(receive.seal ? { seal: persistBlindSeal(receive.seal) } : {}),
     })),
     receivedBlindSeals: state.receivedBlindSeals?.map(persistBlindSeal),
   }
