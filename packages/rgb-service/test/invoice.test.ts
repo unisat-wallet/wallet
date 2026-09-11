@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest'
-import { decodeRgbInvoice } from '../src'
+import {
+  appendRgbInvoiceRecipientNonce,
+  decodeRgbInvoice,
+  encodeWitnessRgbInvoice,
+} from '../src'
 
 describe('decodeRgbInvoice', () => {
   it('decodes invoice identity, amount and transport without a network request', () => {
@@ -37,5 +41,25 @@ describe('decodeRgbInvoice', () => {
     expect(() => decodeRgbInvoice('rgb:asset/schema/~/bc:tapret:recipient')).toThrow(
       'utxob or wvout'
     )
+  })
+
+  it('creates witness invoices with stable beneficiary and unique proxy routing', () => {
+    const scriptPubKey = '512079be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798'
+    const make = (nonce: number) =>
+      decodeRgbInvoice(
+        encodeWitnessRgbInvoice({
+          network: 'testnet4',
+          scriptPubKey,
+          transportEndpoints: [
+            appendRgbInvoiceRecipientNonce('rpcs://proxy.example/rgb/json-rpc', new Uint8Array(16).fill(nonce)),
+          ],
+        })
+      )
+    const first = make(1)
+    const second = make(2)
+    expect(first.recipientType).toBe('witness')
+    expect(first.recipientId).toBe(second.recipientId)
+    expect(first.proxyRecipientId).not.toBe(second.proxyRecipientId)
+    expect(first.proxyRecipientId).toMatch(/^[0-9a-f]{64}$/)
   })
 })

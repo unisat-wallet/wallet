@@ -13,6 +13,7 @@ import {
 import { useRGBListLogic } from './useRGBListLogic'
 
 export type RGBReceiveMode = 'any' | 'fixed'
+export type RGBInvoiceRecipientType = 'blind' | 'witness'
 export type RGBReceiveScreenStep = 'create_invoice' | 'pending_invoices' | 'sign_rgb_utxo'
 export type RgbAssetItem = Record<string, unknown>
 
@@ -54,6 +55,12 @@ type RgbAllocationWallet = {
 
 type RgbReceiveWallet = {
   createRgbBlindReceive(params: {
+    assetId?: string
+    amount?: number | string
+    durationSeconds?: number
+    skipSync?: boolean
+  }): Promise<unknown>
+  createRgbWitnessReceive(params: {
     assetId?: string
     amount?: number | string
     durationSeconds?: number
@@ -309,6 +316,7 @@ export function useRGBReceiveScreenLogic() {
   )
   const [assetSelectorOpen, setAssetSelectorOpen] = useState(false)
   const [mode, setModeState] = useState<RGBReceiveMode>('any')
+  const [recipientType, setRecipientType] = useState<RGBInvoiceRecipientType>('blind')
   const [amount, setAmount] = useState('')
   const [loading, setLoading] = useState(false)
   const [loadingText, setLoadingText] = useState('')
@@ -385,11 +393,14 @@ export function useRGBReceiveScreenLogic() {
     }
 
     const durationSeconds = await rgbWallet.getRgbInvoiceExpirySeconds()
-    return rgbWallet.createRgbBlindReceive({
+    const request = {
       ...params,
       ...(durationSeconds > 0 ? { durationSeconds } : {}),
       ...(skipSync ? { skipSync: true } : {})
-    })
+    }
+    return recipientType === 'witness'
+      ? rgbWallet.createRgbWitnessReceive(request)
+      : rgbWallet.createRgbBlindReceive(request)
   }
 
   const loadPendingInvoices = useCallback(async () => {
@@ -550,7 +561,7 @@ export function useRGBReceiveScreenLogic() {
 
   const onCreateInvoice = async () => {
     if (!isAmountValid) return
-    if (insufficientBtcForInvoice) return
+    if (recipientType === 'blind' && insufficientBtcForInvoice) return
     setLoading(true)
     setLoadingText('Checking RGB UTXO...')
     setError('')
@@ -558,9 +569,9 @@ export function useRGBReceiveScreenLogic() {
     setSelectedPendingInvoice(undefined)
     setInvoiceLabel(isFixedMode ? `${displayAmount} ${assetTicker}` : t('any_amount'))
     try {
-      const hadAllocation = await ensureRgbAllocation()
-      if (!hadAllocation) {
-        return
+      if (recipientType === 'blind') {
+        const hadAllocation = await ensureRgbAllocation()
+        if (!hadAllocation) return
       }
 
       try {
@@ -783,6 +794,8 @@ export function useRGBReceiveScreenLogic() {
     setAssetSelectorOpen,
     mode,
     setMode,
+    recipientType,
+    setRecipientType,
     amount,
     onAmountChange,
     normalizedAmount,

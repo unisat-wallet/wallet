@@ -61,9 +61,18 @@ function toHttpEndpoint(endpoint: string) {
   ) {
     throw new Error(`Unsupported RGB proxy endpoint: ${endpoint}`)
   }
-  // Query strings and fragments are not part of an RGB proxy endpoint and
-  // would otherwise make endpoint normalization ambiguous.
-  if (url.search || url.hash) throw new Error(`Unsupported RGB proxy endpoint: ${endpoint}`)
+  // `rid_nonce` is invoice metadata, not part of the RPC URL. It is consumed
+  // by rgb-service to derive the proxy recipient key; strip it before fetch.
+  // Reject all other query data so invoice text cannot alter the endpoint.
+  if (url.hash) throw new Error(`Unsupported RGB proxy endpoint: ${endpoint}`)
+  for (const key of [...url.searchParams.keys()]) {
+    if (key !== 'rid_nonce') throw new Error(`Unsupported RGB proxy endpoint: ${endpoint}`)
+    const value = url.searchParams.get(key)
+    if (!value || !/^[0-9a-f]+$/i.test(value) || value.length % 2 !== 0) {
+      throw new Error(`Unsupported RGB proxy endpoint: ${endpoint}`)
+    }
+    url.searchParams.delete(key)
+  }
   return `${url.origin}${url.pathname === '/' ? '' : url.pathname}`
 }
 

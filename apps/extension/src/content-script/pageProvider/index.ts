@@ -81,7 +81,7 @@ export class UnisatProvider extends EventEmitter {
   deriveContextHash = async (appName: string, context: string) => this.bitcoinAPI.deriveContextHash(appName, context);
   getBitcoinUtxos = async (cursor = 0, size = 20) => this.bitcoinAPI.getBitcoinUtxos(cursor, size);
   getRgbAssets = async (page = 1, pageSize = 50) => this.bitcoinAPI.getRgbAssets(page, pageSize);
-  createRgbReceiveInvoice = async (params: { assetId?: string; amount?: string; durationSeconds?: number }) =>
+  createRgbReceiveInvoice = async (params: { assetId?: string; amount?: string; durationSeconds?: number; recipientType?: 'blind' | 'witness' }) =>
     this.bitcoinAPI.createRgbReceiveInvoice(params);
   getRgbPendingReceives = async () => this.bitcoinAPI.getRgbPendingReceives();
   acceptRgbReceive = async (recipientId: string) => this.bitcoinAPI.acceptRgbReceive(recipientId);

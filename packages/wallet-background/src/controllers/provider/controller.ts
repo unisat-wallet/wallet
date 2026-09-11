@@ -616,13 +616,16 @@ class ProviderController extends BaseController {
   createRgbReceiveInvoice = async ({
     data: { params },
   }: {
-    data: { params: { assetId?: string; amount?: string; durationSeconds?: number } }
+    data: { params: { assetId?: string; amount?: string; durationSeconds?: number; recipientType?: 'blind' | 'witness' } }
   }) => {
-    return wallet.createRgbBlindReceive({
+    const receiveParams = {
       ...(params.assetId === undefined ? {} : { assetId: params.assetId }),
       ...(params.amount === undefined ? {} : { amount: params.amount }),
       ...(params.durationSeconds === undefined ? {} : { durationSeconds: params.durationSeconds }),
-    })
+    }
+    return params.recipientType === 'witness'
+      ? wallet.createRgbWitnessReceive(receiveParams)
+      : wallet.createRgbBlindReceive(receiveParams)
   }
 
   @Reflect.metadata('SAFE', true)

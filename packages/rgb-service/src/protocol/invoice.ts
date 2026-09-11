@@ -28,6 +28,8 @@ export interface RgbInvoice {
   assetId?: string
   amount?: string
   recipientId: string
+  /** Per-invoice transport key. Equals recipientId unless the invoice carries rid_nonce. */
+  proxyRecipientId: string
   recipientType: RgbInvoiceRecipientType
   seal: RgbInvoiceSeal
   network?: RgbNetwork
@@ -43,6 +45,10 @@ const BAID64_ALPHABET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz012
 const SECP256K1_FIELD_PRIME = 0xfffffffffffffffffffffffffffffffffffffffffffffffffffffffefffffc2fn
 const amountDecoder = new Map(AMOUNT_ALPHABET.split('').map((char, index) => [char, index]))
 const baid64Decoder = new Map(BAID64_ALPHABET.split('').map((char, index) => [char, index]))
+
+function hex(value: Uint8Array) {
+  return Buffer.from(value).toString('hex')
+}
 
 function decodePart(value: string) {
   try {
@@ -120,6 +126,70 @@ function baid64Checksum(hri: string, payload: Uint8Array) {
   const key = sha256(new TextEncoder().encode(hri))
   const digest = sha256(concat(key, payload))
   return Uint8Array.from([digest[0]!, digest[1]!, digest[1]!, digest[2]!])
+}
+
+function baid64Encode(value: Uint8Array) {
+  let buffer = 0
+  let bits = 0
+  let result = ''
+  for (const byte of value) {
+    buffer = (buffer << 8) | byte
+    bits += 8
+    while (bits >= 6) {
+      bits -= 6
+      result += BAID64_ALPHABET[(buffer >>> bits) & 0x3f]
+    }
+  }
+  if (bits) result += BAID64_ALPHABET[(buffer << (6 - bits)) & 0x3f]
+  return result
+}
+
+function baid64WithChecksum(hri: string, payload: Uint8Array) {
+  const checksum = baid64Checksum(hri, payload)
+  const encoded = baid64Encode(concat(payload, checksum))
+  return `${hri}:${encoded.slice(0, 8)}${encoded.slice(8).replace(/.{1,7}/g, value => `-${value}`)}`
+}
+
+function networkPrefix(network: RgbNetwork) {
+  switch (network) {
+    case 'mainnet':
+      return 'bc'
+    case 'signet':
+      return 'tbs'
+    case 'testnet':
+    case 'testnet4':
+      return 'tb'
+  }
+}
+
+function recipientNonce(endpoints: string[]) {
+  for (const endpoint of endpoints) {
+    try {
+      const url = new URL(endpoint.replace(/^rpcs:/, 'https:'))
+      const value = url.searchParams.get('rid_nonce')
+      if (value && /^[0-9a-f]+$/i.test(value) && value.length % 2 === 0) {
+        return Uint8Array.from(Buffer.from(value, 'hex'))
+      }
+    } catch {
+      // Endpoint validation is performed by the transport adapter. An invalid
+      // optional nonce must not make a normal invoice undecodable.
+    }
+  }
+  return undefined
+}
+
+/** Unique proxy storage key for an invoice. The beneficiary remains unchanged. */
+export function rgbInvoiceProxyRecipientId(recipientId: string, endpoints: string[]) {
+  const nonce = recipientNonce(endpoints)
+  if (!nonce?.length) return recipientId
+  return hex(sha256(concat(new TextEncoder().encode(recipientId), nonce)))
+}
+
+/** Add the per-invoice nonce to an endpoint without changing its proxy path. */
+export function appendRgbInvoiceRecipientNonce(endpoint: string, nonce: Uint8Array) {
+  if (!nonce.length) throw new RgbServiceError('RGB invoice recipient nonce is required')
+  const separator = endpoint.includes('?') ? '&' : '?'
+  return `${endpoint}${separator}rid_nonce=${hex(nonce)}`
 }
 
 /** Decode BAID64 without padding, accepting its optional chunk separators. */
@@ -281,6 +351,7 @@ export function decodeRgbInvoice(invoice: string): RgbInvoice {
     assetId: normalizeAssetId(queryAssetId || segments[0]),
     amount,
     recipientId,
+    proxyRecipientId: rgbInvoiceProxyRecipientId(recipientId, transportEndpoints),
     recipientType: seal.type === 'confidential' ? 'blind' : 'witness',
     seal,
     network: invoiceNetwork(recipientId),
@@ -289,4 +360,36 @@ export function decodeRgbInvoice(invoice: string): RgbInvoice {
     transportEndpoints,
     beneficiaryAddress,
   }
+}
+
+/**
+ * Build a witness invoice for a P2TR script controlled by the RGB funding
+ * key. A witness beneficiary is a script, never an outpoint: its txid/vout
+ * are created later by the sender's transaction.
+ */
+export function encodeWitnessRgbInvoice(input: {
+  network: RgbNetwork
+  scriptPubKey: string
+  assetId?: string
+  amount?: string
+  expirationTimestamp?: number
+  transportEndpoints: string[]
+  address?: string
+}) {
+  if (!/^(0|[1-9][0-9]*)$/.test(input.amount ?? '0'))
+    throw new RgbServiceError('RGB invoice amount is invalid')
+  if (!/^(5120)[0-9a-f]{64}$/i.test(input.scriptPubKey)) {
+    throw new RgbServiceError('RGB witness invoices currently require a P2TR funding script')
+  }
+  if (!input.transportEndpoints.length) throw new RgbServiceError('RGB proxy endpoint is not configured')
+  const pay2vout = Uint8Array.from([5, ...Buffer.from(input.scriptPubKey.slice(4), 'hex')])
+  const recipientId = `${networkPrefix(input.network)}:${baid64WithChecksum('wvout', pay2vout)}`
+  const assetId = input.assetId ? normalizeRgbAssetId(input.assetId).replace(/^rgb:/, '') : '~'
+  const query = new URLSearchParams()
+  if (input.amount !== undefined) query.set('amount', input.amount)
+  if (input.expirationTimestamp !== undefined)
+    query.set('expirationTimestamp', String(input.expirationTimestamp))
+  query.set('endpoints', input.transportEndpoints.join(','))
+  if (input.address) query.set('address', input.address)
+  return `rgb:${assetId}/~/${input.amount === undefined ? '~' : '~'}/${recipientId}?${query}`
 }

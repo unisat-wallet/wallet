@@ -634,6 +634,13 @@ export interface WalletController {
     skipSync?: boolean
   }): Promise<any>
 
+  createRgbWitnessReceive(params: {
+    assetId?: string
+    amount?: number | string
+    durationSeconds?: number
+    skipSync?: boolean
+  }): Promise<any>
+
   checkRgbInvoiceAvailability(params: { invoice: string }): Promise<{ available: true }>
 
   getRgbPendingReceiveInvoices(): Promise<{

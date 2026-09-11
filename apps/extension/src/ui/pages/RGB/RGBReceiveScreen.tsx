@@ -219,6 +219,8 @@ export default function RGBReceiveScreen() {
     setAssetSelectorOpen,
     mode,
     setMode,
+    recipientType,
+    setRecipientType,
     amount,
     onAmountChange,
     normalizedAmount,
@@ -748,6 +750,30 @@ export default function RGBReceiveScreen() {
         <Column gap="lg">
           {renderPendingSection()}
 
+          <Row gap="sm">
+            <Button
+              text="Blind"
+              preset={recipientType === 'blind' ? 'primary' : 'default'}
+              onClick={() => setRecipientType('blind')}
+              style={{ flex: 1 }}
+            />
+            <Button
+              text="Witness"
+              preset={recipientType === 'witness' ? 'primary' : 'default'}
+              onClick={() => setRecipientType('witness')}
+              style={{ flex: 1 }}
+            />
+          </Row>
+
+          {recipientType === 'witness' ? (
+            <Text
+              text="Witness invoices reuse your RGB funding address and include a small BTC output."
+              size="xs"
+              color="white_muted"
+              wrap
+            />
+          ) : null}
+
           {isAssetLocked ? renderLockedAssetHeader() : renderAssetSelector()}
 
           <Column gap="lg">
@@ -774,7 +800,7 @@ export default function RGBReceiveScreen() {
               : null}
           </Column>
 
-          {insufficientBtcForInvoice ? (
+          {recipientType === 'blind' && insufficientBtcForInvoice ? (
             <Text
               text={t('not_enough_btc_for_rgb_invoice')}
               wrap
@@ -799,7 +825,7 @@ export default function RGBReceiveScreen() {
           <Button
             text={loading ? loadingText || t('creating') : t('create_invoice')}
             preset="primary"
-            disabled={loading || !isAmountValid || insufficientBtcForInvoice}
+            disabled={loading || !isAmountValid || (recipientType === 'blind' && insufficientBtcForInvoice)}
             onClick={() => void requestWrite(onCreateInvoice)}
           />
         </Column>

@@ -119,6 +119,7 @@ import { RgbReceiveOperations } from '../rgb/RgbReceiveOperations'
 import { RgbSendOperations } from '../rgb/RgbSendOperations'
 import { RgbTransferQuery, type RgbRemoteActivity } from '../rgb/RgbTransferQuery'
 import {
+  getRgbReceiveInvoiceStatus,
   toPublicRgbPendingReceiveInvoice,
   type RgbPendingReceiveInvoice,
 } from '../rgb/rgbPresentation'
@@ -3747,6 +3748,31 @@ export class WalletController extends BaseController {
     // a cached pre-approval lease create durable receive state after handoff.
     await this.ensureRgbWriteLease(context, { forceRenew: true })
     return this.rgbReceiveOperations.createBlindReceive(params)
+  }
+
+  createRgbWitnessReceive = async (params: Omit<RgbReceiveInvoiceRequest, 'wallet'>) => {
+    const context = await this.getLocalRgbService()
+    await this.ensureRgbWriteLease(context, { forceRenew: true })
+    const funding = await this.getCurrentRgbFundingAccount()
+    const scriptPubKey = bitcoin.address
+      .toOutputScript(funding.address, toPsbtNetwork(this.getNetworkType()))
+      .toString('hex')
+    const receive = await context.service.createWitnessReceive({
+      scriptPubKey,
+      ...(params.assetId === undefined ? {} : { assetId: params.assetId }),
+      ...(params.amount === undefined ? {} : { amount: String(params.amount) }),
+      ...(params.durationSeconds === undefined ? {} : { durationSeconds: params.durationSeconds }),
+      deferRecoveryCheckpoint: true,
+    })
+    await context.service.claimPendingReceives()
+    const batchTransferIdx = context.service
+      .getPendingReceives()
+      .findIndex(item => item.proxyRecipientId === receive.proxyRecipientId)
+    return toPublicRgbPendingReceiveInvoice(
+      receive,
+      batchTransferIdx < 0 ? undefined : batchTransferIdx,
+      getRgbReceiveInvoiceStatus(context.service.getSnapshot(), {})
+    )
   }
 
   /** Wallet-only, read-only transport preflight used before presenting an RGB send signature. */

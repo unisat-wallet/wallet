@@ -269,7 +269,7 @@ export class BitcoinAPIMethods {
     return this.provider[requestMethodKey]({ method: 'getRgbAssets', params: { page, pageSize } });
   };
 
-  createRgbReceiveInvoice = async (params: { assetId?: string; amount?: string; durationSeconds?: number }) => {
+  createRgbReceiveInvoice = async (params: { assetId?: string; amount?: string; durationSeconds?: number; recipientType?: 'blind' | 'witness' }) => {
     return this.provider[requestMethodKey]({ method: 'createRgbReceiveInvoice', params });
   };
 

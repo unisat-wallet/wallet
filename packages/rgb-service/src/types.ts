@@ -200,7 +200,11 @@ export interface RgbPendingTransfer {
 
 export interface RgbPendingReceive {
   invoice: string
+  /** RGB beneficiary; for witness invoices this is the stable wvout identifier. */
   recipientId: string
+  /** Per-invoice proxy storage key. Defaults to recipientId for legacy blind invoices. */
+  proxyRecipientId?: string
+  recipientType?: 'blind' | 'witness'
   assetId?: string
   amount?: string
   /** This invoice's recipient ID has been durably registered with the recovery service. */
@@ -209,7 +213,10 @@ export interface RgbPendingReceive {
   assetMetadataIndexed?: boolean
   expirationTimestamp?: number
   createdAt: number
-  seal: import('./protocol/receive').RgbBlindSeal
+  /** Present only for blind invoices. */
+  seal?: import('./protocol/receive').RgbBlindSeal
+  /** Exact P2TR script of a locally-created witness invoice. */
+  witnessScriptPubKey?: string
   /**
    * Validated consignment waiting for the receiver to Accept/Reject in the UI.
    * ACK is intentionally deferred until acceptReceive().

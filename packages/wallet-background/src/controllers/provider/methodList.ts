@@ -56,6 +56,7 @@ export type ProviderMethodList = {
     assetId?: string
     amount?: string
     durationSeconds?: number
+    recipientType?: 'blind' | 'witness'
   }
   getRgbPendingReceives: undefined
   acceptRgbReceive: {

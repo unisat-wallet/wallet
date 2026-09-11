@@ -28,6 +28,8 @@ export function toPublicRgbPendingReceiveInvoice(
     amount?: string
     expirationTimestamp?: number
     createdAt?: number
+    recipientType?: 'blind' | 'witness'
+    proxyRecipientId?: string
     pendingAccept?: unknown
     receivedConsignment?: {
       accepted?: boolean
@@ -43,14 +45,14 @@ export function toPublicRgbPendingReceiveInvoice(
   const awaitingSenderConfirmation = item.receivedConsignment?.broadcastDetectedAt !== undefined
   return {
     invoice: item.invoice,
-    recipientId: item.recipientId,
+    recipientId: item.proxyRecipientId || item.recipientId,
     ...(item.assetId === undefined ? {} : { assetId: item.assetId }),
     ...(item.amount === undefined ? {} : { amount: item.amount }),
     ...(item.expirationTimestamp === undefined
       ? {}
       : { expirationTimestamp: item.expirationTimestamp }),
     ...(item.createdAt === undefined ? {} : { createdAt: item.createdAt }),
-    kind: 'ReceiveBlind',
+    kind: item.recipientType === 'witness' ? 'ReceiveWitness' : 'ReceiveBlind',
     status: awaitingAcceptance
       ? 'PendingAccept'
       : awaitingSenderConfirmation
@@ -68,10 +70,14 @@ export function toPublicRgbPendingReceiveInvoice(
 
 export function getRgbReceiveInvoiceStatus(
   snapshot: RgbWalletSnapshot,
-  receive: { seal: { txid: string; vout: number } }
+  receive: { seal?: { txid: string; vout: number } }
 ): 'WaitingConfirmations' | 'WaitingCounterparty' {
+  // Witness recipients receive an output created by the sender, so there is
+  // no local funding UTXO to wait for before the invoice is usable.
+  const seal = receive.seal
+  if (!seal) return 'WaitingCounterparty'
   const utxo = snapshot.utxos.find(
-    item => item.outpoint.txid === receive.seal.txid && item.outpoint.vout === receive.seal.vout
+    item => item.outpoint.txid === seal.txid && item.outpoint.vout === seal.vout
   )
   return utxo?.chainStatus === 'confirmed' ? 'WaitingCounterparty' : 'WaitingConfirmations'
 }

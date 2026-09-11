@@ -6,7 +6,11 @@ import {
   RgbTransferCanceledError,
   RgbTransferRejectedError,
 } from './errors'
-import { decodeRgbInvoice } from './protocol/invoice'
+import {
+  appendRgbInvoiceRecipientNonce,
+  decodeRgbInvoice,
+  encodeWitnessRgbInvoice,
+} from './protocol/invoice'
 import { normalizeRgbAssetId, rgbContractIdHex } from './protocol/contract-id'
 import {
   decodeNiaConsignment,
@@ -517,6 +521,71 @@ export class RgbService {
     return pending
   }
 
+  /**
+   * Create a witness invoice against the wallet's existing RGB funding script.
+   * Unlike a blind invoice, no pre-existing UTXO is reserved: the sender
+   * creates the output and its real outpoint is learned from the consignment.
+   */
+  async createWitnessReceive(input: {
+    scriptPubKey: string
+    assetId?: string
+    amount?: string
+    durationSeconds?: number
+    deferRecoveryCheckpoint?: boolean
+  }) {
+    const state = this.requireState()
+    const assetId = input.assetId ? normalizeAssetId(input.assetId) : undefined
+    if (input.amount !== undefined && !assetId) {
+      throw new RgbServiceError('A fixed RGB receive amount requires an asset ID')
+    }
+    if (input.amount !== undefined && !/^(0|[1-9][0-9]*)$/.test(input.amount)) {
+      throw new RgbServiceError('RGB receive amount must be an unsigned integer')
+    }
+    if (
+      input.durationSeconds !== undefined &&
+      (!Number.isInteger(input.durationSeconds) || input.durationSeconds <= 0)
+    ) {
+      throw new RgbServiceError('RGB receive duration must be positive')
+    }
+    const endpoints = this.dependencies.transport.getEndpoints?.() || []
+    if (!endpoints.length) throw new RgbServiceError('RGB proxy endpoint is not configured')
+    const nonce = randomBytes(16)
+    const transportEndpoints = endpoints.map(endpoint => appendRgbInvoiceRecipientNonce(endpoint, nonce))
+    const now = this.now()
+    const expirationTimestamp =
+      input.durationSeconds === undefined
+        ? undefined
+        : Math.floor(now / 1000) + input.durationSeconds
+    const invoice = encodeWitnessRgbInvoice({
+      network: state.wallet.network,
+      scriptPubKey: input.scriptPubKey,
+      assetId,
+      amount: input.amount,
+      expirationTimestamp,
+      transportEndpoints,
+      address: state.wallet.fundingAddress,
+    })
+    const decoded = decodeRgbInvoice(invoice)
+    if (decoded.recipientType !== 'witness') throw new RgbServiceError('RGB witness invoice is invalid')
+    const pending = {
+      invoice,
+      recipientId: decoded.recipientId,
+      proxyRecipientId: decoded.proxyRecipientId,
+      recipientType: 'witness' as const,
+      witnessScriptPubKey: input.scriptPubKey.toLowerCase(),
+      assetId,
+      amount: input.amount,
+      expirationTimestamp,
+      createdAt: now,
+    }
+    const rollback = snapshotState(state)
+    ;(state.pendingReceives || (state.pendingReceives = [])).push(pending)
+    await this.persistWithRecoveryRollback(rollback, {
+      skipRecovery: input.deferRecoveryCheckpoint === true,
+    })
+    return pending
+  }
+
   getPendingReceives() {
     const now = Math.floor(this.now() / 1000)
     return (this.requireState().pendingReceives || []).filter(
@@ -722,7 +791,7 @@ export class RgbService {
   getKnownBlindSeals() {
     const state = this.requireState()
     const seals = [
-      ...this.getPendingReceives().map(receive => receive.seal),
+      ...this.getPendingReceives().flatMap(receive => (receive.seal ? [receive.seal] : [])),
       ...(state.receivedBlindSeals || []),
     ]
     return seals.filter(
@@ -766,7 +835,11 @@ export class RgbService {
 
   private getPendingReceiveOutpoints() {
     return new Set(
-      this.getPendingReceives().map(receive => `${receive.seal.txid}:${receive.seal.vout}`)
+      this.getPendingReceives()
+        .filter((receive): receive is typeof receive & { seal: NonNullable<typeof receive.seal> } =>
+          !!receive.seal
+        )
+        .map(receive => `${receive.seal.txid}:${receive.seal.vout}`)
     )
   }
 
@@ -801,7 +874,7 @@ export class RgbService {
       return (receipt?.accepted || receipt?.acknowledgementPending) && receipt.payload
         ? [
             {
-              recipientId: receive.recipientId,
+              recipientId: receive.proxyRecipientId || receive.recipientId,
               payload: receipt.payload,
               txid: receipt.txid,
               endpoint: receipt.endpoint,
@@ -829,7 +902,9 @@ export class RgbService {
     }
 
     for (const item of itemsToProcess) {
-      const receiveIndex = pending.findIndex(receive => receive.recipientId === item.recipientId)
+      const receiveIndex = pending.findIndex(
+        receive => (receive.proxyRecipientId || receive.recipientId) === item.recipientId
+      )
       if (receiveIndex < 0) continue
       const receive = pending[receiveIndex]!
       try {
@@ -988,7 +1063,9 @@ export class RgbService {
   async acceptReceive(recipientId: string) {
     const state = this.requireState()
     const pending = state.pendingReceives || []
-    const receive = pending.find(item => item.recipientId === recipientId)
+    const receive = pending.find(
+      item => item.recipientId === recipientId || item.proxyRecipientId === recipientId
+    )
     if (!receive?.pendingAccept) {
       throw new RgbServiceError(`RGB receive ${recipientId} is not awaiting acceptance`)
     }
@@ -997,13 +1074,13 @@ export class RgbService {
       (await this.isReceiveCanceledBySender(receive))
     ) {
       this.recordReceiveOutcome(receive, 'canceled', receive.pendingAccept.txid)
-      state.pendingReceives = pending.filter(item => item.recipientId !== recipientId)
+      state.pendingReceives = pending.filter(item => item !== receive)
       await this.persist()
       return { accepted: false, status: 'canceled' as const }
     }
 
     const item = {
-      recipientId,
+      recipientId: receive.proxyRecipientId || receive.recipientId,
       payload: receive.pendingAccept.payload,
       txid: receive.pendingAccept.txid,
       endpoint: receive.pendingAccept.endpoint,
@@ -1037,7 +1114,7 @@ export class RgbService {
       }
       if (acknowledgement === false) {
         this.recordReceiveOutcome(receive, 'canceled', receive.pendingAccept.txid)
-        state.pendingReceives = pending.filter(item => item.recipientId !== recipientId)
+        state.pendingReceives = pending.filter(item => item !== receive)
         await this.persist()
         return { accepted: false, status: 'canceled' as const }
       }
@@ -1057,7 +1134,9 @@ export class RgbService {
   async rejectReceive(recipientId: string) {
     const state = this.requireState()
     const pending = state.pendingReceives || []
-    const receive = pending.find(item => item.recipientId === recipientId)
+    const receive = pending.find(
+      item => item.recipientId === recipientId || item.proxyRecipientId === recipientId
+    )
     if (!receive) throw new RgbServiceError(`RGB receive ${recipientId} was not found`)
     const pendingAccept = receive.pendingAccept
     if (!pendingAccept && !receive.receivedConsignment) {
@@ -1075,7 +1154,7 @@ export class RgbService {
 
     await this.acknowledgeProxyConsignment(
       {
-        recipientId,
+        recipientId: receive.proxyRecipientId || receive.recipientId,
         endpoint: pendingAccept!.endpoint,
       },
       false
@@ -1084,7 +1163,7 @@ export class RgbService {
     // Proxy recipient IDs are single-use upload keys. Once a consignment has
     // been posted, a later transfer cannot replace its file even after NACK.
     // Discard the invoice so the user creates a fresh blinded recipient ID.
-    state.pendingReceives = pending.filter(item => item.recipientId !== recipientId)
+    state.pendingReceives = pending.filter(item => item !== receive)
     await this.persist()
     return { rejected: true }
   }
@@ -1093,9 +1172,49 @@ export class RgbService {
     receive: import('./types').RgbPendingReceive,
     item: { recipientId: string; payload: string; txid?: string; endpoint?: string }
   ) {
-    const secretSeal = Buffer.from(concealBlindSeal(receive.seal)).toString('hex')
     const decoded = decodeNiaConsignment(Uint8Array.from(Buffer.from(item.payload, 'base64')))
     validateNiaConsignmentParentSpends(decoded)
+    if (receive.recipientType === 'witness') {
+      const expectedScript = receive.witnessScriptPubKey?.toLowerCase()
+      if (!expectedScript) return undefined
+      const match = decoded.witnessBundles
+        .flatMap(witness =>
+          witness.transitions.flatMap(transition =>
+            transition.assignments.map((assignment, assignmentIndex) => ({ witness, transition, assignment, assignmentIndex }))
+          )
+        )
+        .find(({ witness, assignment }) => {
+          if ('secretSeal' in assignment.seal) return false
+          const txid = assignment.seal.txid || witness.txid
+          const output = witness.outputs[assignment.seal.vout]
+          return txid === witness.txid && output?.scriptPubKey.toLowerCase() === expectedScript
+        })
+      if (
+        !match ||
+        'secretSeal' in match.assignment.seal ||
+        (item.txid !== undefined && match.witness.txid !== item.txid)
+      )
+        return undefined
+      if (
+        (receive.assetId && receive.assetId !== decoded.assetId) ||
+        (receive.amount && receive.amount !== match.assignment.amount.toString())
+      ) {
+        return undefined
+      }
+      return {
+        decoded,
+        match,
+        witness: match.witness,
+        assetId: decoded.assetId,
+        amount: match.assignment.amount.toString(),
+        txid: match.witness.txid,
+        vout: match.assignment.seal.vout,
+        opId: match.transition.opId,
+        assignmentIndex: match.assignmentIndex,
+      }
+    }
+    if (!receive.seal) return undefined
+    const secretSeal = Buffer.from(concealBlindSeal(receive.seal)).toString('hex')
     const terminalBundleIds = new Set(
       decoded.terminals
         .filter(terminal => terminal.secretSeals.includes(secretSeal))
@@ -1163,10 +1282,10 @@ export class RgbService {
     if (chain.status !== 'confirmed') return false
     if (deferConfirmedSettlement) return 'snapshot_required' as const
 
-    const utxo = state.snapshot.utxos.find(
-      candidate =>
-        candidate.outpoint.txid === receive.seal.txid &&
-        candidate.outpoint.vout === receive.seal.vout
+    const utxo = state.snapshot.utxos.find(candidate =>
+      receive.recipientType === 'witness'
+        ? candidate.outpoint.txid === validated.txid && candidate.outpoint.vout === validated.vout
+        : candidate.outpoint.txid === receive.seal?.txid && candidate.outpoint.vout === receive.seal?.vout
     )
     if (!utxo) return false
     const assetId = normalizeAssetId(validated.assetId)
@@ -1201,9 +1320,11 @@ export class RgbService {
       txid: utxo.outpoint.txid,
       outpoints: state.snapshot.utxos,
     }
-    const receivedBlindSeals = state.receivedBlindSeals || (state.receivedBlindSeals = [])
-    if (!receivedBlindSeals.some(seal => sameBlindSeal(seal, receive.seal))) {
-      receivedBlindSeals.push(receive.seal)
+    if (receive.seal) {
+      const receivedBlindSeals = state.receivedBlindSeals || (state.receivedBlindSeals = [])
+      if (!receivedBlindSeals.some(seal => sameBlindSeal(seal, receive.seal!))) {
+        receivedBlindSeals.push(receive.seal)
+      }
     }
     this.recordReceiveOutcome(receive, 'settled', validated.txid)
     if (!receive.assetMetadataIndexed) {
@@ -1219,7 +1340,7 @@ export class RgbService {
   ) {
     const state = this.requireState()
     const pendingReceiveHistory = state.pendingReceiveHistory || (state.pendingReceiveHistory = [])
-    const transferId = `receive:${receive.recipientId}`
+    const transferId = `receive:${receive.proxyRecipientId || receive.recipientId}`
     // Any Asset / Any Amount invoices intentionally omit these constraints.
     // After acceptance pendingAccept is removed, so use the durable receipt
     // which records the values actually offered by the sender.
@@ -1271,7 +1392,7 @@ export class RgbService {
     if (!endpoints.length) return undefined
     try {
       return await getAcknowledgement({
-        recipientId: receive.recipientId,
+        recipientId: receive.proxyRecipientId || receive.recipientId,
         payload: '',
         assetId: receive.assetId || '',
         opIds: [],
@@ -1290,7 +1411,10 @@ export class RgbService {
     const endpoints = decodeRgbInvoice(receive.invoice).transportEndpoints
     if (!endpoints.length) return false
     try {
-      const consignment = await getConsignment({ recipientId: receive.recipientId, endpoints })
+      const consignment = await getConsignment({
+        recipientId: receive.proxyRecipientId || receive.recipientId,
+        endpoints,
+      })
       return !consignment
     } catch {
       return false
@@ -1328,7 +1452,7 @@ export class RgbService {
 
     const results = await Promise.allSettled(
       pending.map(async receive => {
-        const claimed = await claim(state.wallet, receive.recipientId)
+        const claimed = await claim(state.wallet, receive.proxyRecipientId || receive.recipientId)
         receive.claimedAt = this.now()
         return claimed
       })
@@ -1907,10 +2031,11 @@ export class RgbService {
     // Best-effort cancel signal: post ACK=false on the proxy so the receiver
     // can surface "Canceled by sender" instead of waiting forever.
     if (pending.delivery && this.dependencies.transport.acknowledgeConsignment) {
+      const proxyRecipientId = decodeRgbInvoice(pending.request.invoice).proxyRecipientId
       for (const consignment of pending.delivery.completed.consignments) {
         try {
           await this.dependencies.transport.acknowledgeConsignment({
-            recipientId: consignment.recipientId,
+            recipientId: proxyRecipientId,
             endpoints: pending.delivery.endpoints,
             acknowledged: false,
           })
@@ -2051,8 +2176,10 @@ export class RgbService {
     const state = this.requireState()
     const delivery = pending.delivery
     if (!delivery) throw new RgbServiceError(`RGB transfer ${transferId} has not been signed`)
+    const proxyRecipientId = decodeRgbInvoice(pending.request.invoice).proxyRecipientId
     const consignments = delivery.completed.consignments.map((consignment, index) => ({
       ...consignment,
+      recipientId: proxyRecipientId,
       transportId: `${transferId}:${index}`,
       txid: delivery.completed.txid,
       endpoints: delivery.endpoints,
@@ -2196,10 +2323,11 @@ export class RgbService {
     // A terminal chain result makes it safe to supersede the earlier ACK and
     // lets the receiver release its accepted, but now impossible, invoice.
     if (this.dependencies.transport.acknowledgeConsignment) {
+      const proxyRecipientId = decodeRgbInvoice(pending.request.invoice).proxyRecipientId
       for (const consignment of delivery.completed.consignments) {
         try {
           await this.dependencies.transport.acknowledgeConsignment({
-            recipientId: consignment.recipientId,
+            recipientId: proxyRecipientId,
             endpoints: delivery.endpoints,
             acknowledged: false,
           })
@@ -2242,7 +2370,9 @@ export class RgbService {
       )
       .flatMap(receive => {
         const endpoints = decodeRgbInvoice(receive.invoice).transportEndpoints
-        return endpoints.length ? [{ recipientId: receive.recipientId, endpoints }] : []
+        return endpoints.length
+          ? [{ recipientId: receive.proxyRecipientId || receive.recipientId, endpoints }]
+          : []
       })
     if (getConsignments) return getConsignments(pending)
     if (!getConsignment) return []
@@ -2596,7 +2726,7 @@ function hydrateState(state: RgbServiceState) {
     ...state,
     pendingReceives: state.pendingReceives?.map(receive => ({
       ...receive,
-      seal: hydrateBlindSeal(receive.seal),
+      ...(receive.seal ? { seal: hydrateBlindSeal(receive.seal) } : {}),
     })),
     receivedBlindSeals: state.receivedBlindSeals?.map(hydrateBlindSeal),
   } as RgbServiceState
@@ -2755,11 +2885,16 @@ function isBelowRelayFeeBroadcastError(error: unknown) {
 }
 
 function randomU64() {
-  const bytes = new Uint8Array(8)
+  const bytes = randomBytes(8)
+  return bytes.reduce((value, byte, index) => value | (BigInt(byte) << BigInt(index * 8)), 0n)
+}
+
+function randomBytes(length: number) {
+  const bytes = new Uint8Array(length)
   if (!globalThis.crypto?.getRandomValues)
     throw new RgbServiceError('Secure random generation is unavailable')
   globalThis.crypto.getRandomValues(bytes)
-  return bytes.reduce((value, byte, index) => value | (BigInt(byte) << BigInt(index * 8)), 0n)
+  return bytes
 }
 
 function isInvoiceUnavailableUploadError(error: unknown) {
