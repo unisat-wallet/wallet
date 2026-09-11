@@ -292,6 +292,13 @@ describe('RgbService', () => {
     expect(reopened.getPendingReceives()).toContainEqual(
       expect.objectContaining({ proxyRecipientId: witness.proxyRecipientId, recipientType: 'witness' })
     )
+    expect(reopened.getUtxoInspection().invoiceReservations).toContainEqual(
+      expect.objectContaining({
+        invoice: witness.invoice,
+        recipientId: witness.recipientId,
+        proxyRecipientId: witness.proxyRecipientId,
+      })
+    )
   })
 
   it('persists locally broadcast funding UTXOs until the indexer replacement succeeds', async () => {

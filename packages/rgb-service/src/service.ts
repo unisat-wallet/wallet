@@ -1717,12 +1717,12 @@ export class RgbService {
       invoiceReservations: (state.pendingReceives || []).map(receive => ({
         invoice: receive.invoice,
         recipientId: receive.recipientId,
+        ...(receive.proxyRecipientId ? { proxyRecipientId: receive.proxyRecipientId } : {}),
         assetId: receive.assetId,
         amount: receive.amount,
         expirationTimestamp: receive.expirationTimestamp,
         createdAt: receive.createdAt,
-        txid: receive.seal.txid,
-        vout: receive.seal.vout,
+        ...(receive.seal ? { txid: receive.seal.txid, vout: receive.seal.vout } : {}),
       })),
     }
   }
