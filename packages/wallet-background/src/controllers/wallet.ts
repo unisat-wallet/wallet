@@ -3759,6 +3759,7 @@ export class WalletController extends BaseController {
       .toString('hex')
     const receive = await context.service.createWitnessReceive({
       scriptPubKey,
+      publicKey: funding.publicKey,
       ...(params.assetId === undefined ? {} : { assetId: params.assetId }),
       ...(params.amount === undefined ? {} : { amount: String(params.amount) }),
       ...(params.durationSeconds === undefined ? {} : { durationSeconds: params.durationSeconds }),

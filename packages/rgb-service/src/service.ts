@@ -528,6 +528,7 @@ export class RgbService {
    */
   async createWitnessReceive(input: {
     scriptPubKey: string
+    publicKey: string
     assetId?: string
     amount?: string
     durationSeconds?: number
@@ -573,6 +574,7 @@ export class RgbService {
       proxyRecipientId: decoded.proxyRecipientId,
       recipientType: 'witness' as const,
       witnessScriptPubKey: input.scriptPubKey.toLowerCase(),
+      witnessPublicKey: input.publicKey.toLowerCase(),
       assetId,
       amount: input.amount,
       expirationTimestamp,
@@ -1280,14 +1282,34 @@ export class RgbService {
       receive.receivedConsignment.broadcastDetectedAt = this.now()
     }
     if (chain.status !== 'confirmed') return false
-    if (deferConfirmedSettlement) return 'snapshot_required' as const
 
-    const utxo = state.snapshot.utxos.find(candidate =>
+    let utxo = state.snapshot.utxos.find(candidate =>
       receive.recipientType === 'witness'
         ? candidate.outpoint.txid === validated.txid && candidate.outpoint.vout === validated.vout
         : candidate.outpoint.txid === receive.seal?.txid && candidate.outpoint.vout === receive.seal?.vout
     )
+    if (!utxo && receive.recipientType === 'witness') {
+      const output = validated.witness.outputs[validated.vout]
+      if (!output || !receive.witnessPublicKey) return false
+      // The server deliberately indexes only client-verified observations.
+      // Register this exact confirmed output before asking it for a snapshot.
+      utxo = {
+        outpoint: { txid: validated.txid, vout: validated.vout },
+        satoshis: output.satoshis,
+        scriptPubKey: output.scriptPubKey,
+        publicKey: receive.witnessPublicKey,
+        chainStatus: 'confirmed',
+        confirmations: chain.confirmations,
+        allocations: [],
+      }
+      state.snapshot.utxos.push(utxo)
+      state.pendingUtxoSync = {
+        txid: validated.txid,
+        outpoints: state.snapshot.utxos,
+      }
+    }
     if (!utxo) return false
+    if (deferConfirmedSettlement) return 'snapshot_required' as const
     const assetId = normalizeAssetId(validated.assetId)
     // Do this before mutating the allocation/receive state. A conflicting or
     // malformed branch must reject atomically rather than leave a spendable

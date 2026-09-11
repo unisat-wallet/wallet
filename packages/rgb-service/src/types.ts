@@ -217,6 +217,8 @@ export interface RgbPendingReceive {
   seal?: import('./protocol/receive').RgbBlindSeal
   /** Exact P2TR script of a locally-created witness invoice. */
   witnessScriptPubKey?: string
+  /** Funding-key public key needed to register a witness-created UTXO. */
+  witnessPublicKey?: string
   /**
    * Validated consignment waiting for the receiver to Accept/Reject in the UI.
    * ACK is intentionally deferred until acceptReceive().

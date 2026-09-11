@@ -280,6 +280,7 @@ describe('RgbService', () => {
     await service.open(wallet)
     const witness = await service.createWitnessReceive({
       scriptPubKey: '512079be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798',
+      publicKey: `02${'11'.repeat(32)}`,
       assetId: 'rgb:asset',
       amount: '1',
     })

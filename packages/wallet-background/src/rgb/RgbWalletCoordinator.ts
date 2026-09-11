@@ -174,6 +174,10 @@ export class RgbWalletCoordinator {
       deferConfirmedSettlement: true,
     })
     if (processed.snapshotRequired) {
+      // A confirmed witness receive has just registered its sender-created
+      // output in the local outbox. The backend cannot derive it itself, so
+      // publish that verified observation before requesting a fresh snapshot.
+      await this.dependencies.syncIndexerOutbox(service, wallet)
       await this.syncSnapshot(service, wallet, 0)
       processed = await service.processClaimedReceives({ includeClaimed: false })
     }
