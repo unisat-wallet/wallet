@@ -1,5 +1,17 @@
 # @unisat/wallet-api
 
+## 1.4.0
+
+### Minor Changes
+
+- v1.7.21
+
+### Patch Changes
+
+- Updated dependencies
+  - @unisat/wallet-shared@0.8.0
+  - @unisat/wallet-storage@0.2.4
+
 ## 1.3.0
 
 ### Minor Changes

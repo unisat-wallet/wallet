@@ -1,5 +1,11 @@
 # @unisat/phishing-detect
 
+## 0.3.0
+
+### Minor Changes
+
+- v1.7.21
+
 ## 0.2.0
 
 ### Minor Changes

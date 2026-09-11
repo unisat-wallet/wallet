@@ -1,5 +1,14 @@
 # @unisat/tx-helpers
 
+## 1.4.1
+
+### Patch Changes
+
+- Updated dependencies
+  - @unisat/keyring-service@1.7.0
+  - @unisat/wallet-bitcoin@1.3.0
+  - @unisat/wallet-shared@0.8.0
+
 ## 1.4.0
 
 ### Minor Changes

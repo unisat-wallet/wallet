@@ -1,5 +1,27 @@
 # @unisat/wallet-background
 
+## 9.0.0
+
+### Minor Changes
+
+- v1.7.21
+
+### Patch Changes
+
+- Updated dependencies
+  - @unisat/rgb-service@1.0.0
+  - @unisat/keyring-service@1.7.0
+  - @unisat/permission-service@1.3.0
+  - @unisat/phishing-detect@0.3.0
+  - @unisat/preference-service@0.5.0
+  - @unisat/wallet-api@1.4.0
+  - @unisat/wallet-bitcoin@1.3.0
+  - @unisat/wallet-shared@0.8.0
+  - @unisat/tx-helpers@1.4.1
+  - @unisat/notification-service@1.1.4
+  - @unisat/approval-service@1.1.4
+  - @unisat/contact-book@1.1.3
+
 ## 8.0.0
 
 ### Minor Changes

@@ -1,6 +1,6 @@
 {
   "name": "@unisat/wallet-api",
-  "version": "1.3.0",
+  "version": "1.4.0",
   "description": "UniSat wallet API client with comprehensive Bitcoin ecosystem support",
   "main": "lib/index.js",
   "module": "lib/index.mjs",

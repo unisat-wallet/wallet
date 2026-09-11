@@ -1,5 +1,11 @@
 # @unisat/contact-book
 
+## 1.1.3
+
+### Patch Changes
+
+- @unisat/wallet-storage@0.2.4
+
 ## 1.1.2
 
 ### Patch Changes
