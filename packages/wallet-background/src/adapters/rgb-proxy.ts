@@ -116,18 +116,34 @@ function base64ToBytes(value: string) {
 }
 
 async function postConsignment(endpoint: string, consignment: RgbTransportConsignment) {
-  const form = new FormData()
-  form.set('jsonrpc', '2.0')
-  form.set('id', rpcId())
-  form.set('method', 'consignment.post')
-  form.set('params[recipient_id]', consignment.recipientId)
-  form.set('params[txid]', consignment.txid)
-  form.set(
-    'file',
-    new Blob([base64ToBytes(consignment.payload)], { type: 'application/octet-stream' }),
-    'consignment.rgb'
+  // React Native cannot create Blob from ArrayBuffer/Uint8Array. Send the
+  // same multipart fields as a binary request body, without changing bytes.
+  const boundary = `----unisat-rgb-${rpcId()}`
+  const fields = [
+    ['jsonrpc', '2.0'],
+    ['id', rpcId()],
+    ['method', 'consignment.post'],
+    ['params[recipient_id]', consignment.recipientId],
+    ['params[txid]', consignment.txid],
+  ]
+  const encoder = new TextEncoder()
+  const prefix = encoder.encode(
+    fields.map(([name, value]) =>
+      `--${boundary}\r\nContent-Disposition: form-data; name="${name}"\r\n\r\n${value}\r\n`
+    ).join('') +
+    `--${boundary}\r\nContent-Disposition: form-data; name="file"; filename="consignment.rgb"\r\nContent-Type: application/octet-stream\r\n\r\n`
   )
-  const response = await fetchWithTimeout(toHttpEndpoint(endpoint), { method: 'POST', body: form })
+  const payload = base64ToBytes(consignment.payload)
+  const suffix = encoder.encode(`\r\n--${boundary}--\r\n`)
+  const multipart = new Uint8Array(prefix.length + payload.length + suffix.length)
+  multipart.set(prefix)
+  multipart.set(payload, prefix.length)
+  multipart.set(suffix, prefix.length + payload.length)
+  const response = await fetchWithTimeout(toHttpEndpoint(endpoint), {
+    method: 'POST',
+    headers: { 'Content-Type': `multipart/form-data; boundary=${boundary}` },
+    body: multipart.buffer,
+  })
   const body = await readRpcResponse<boolean>(response)
   if (body.error)
     throw new Error(`RGB proxy consignment.post failed: ${body.error.message || body.error.code}`)

@@ -47,11 +47,16 @@ describe('RGB proxy transport', () => {
       'https://proxy.example',
       expect.objectContaining({ method: 'POST' })
     )
-    const form = fetchMock.mock.calls[0]![1].body as FormData
+    const request = fetchMock.mock.calls[0]![1]
+    expect(request.body).toBeInstanceOf(ArrayBuffer)
+    const form = await new Response(request.body, { headers: request.headers }).formData()
     expect(form.get('method')).toBe('consignment.post')
     expect(form.get('params[recipient_id]')).toBe(recipientId)
     expect(form.get('params[txid]')).toBe(consignment.txid)
-    expect(form.get('file')).toBeInstanceOf(Blob)
+    const file = form.get('file') as File
+    expect(file.name).toBe('consignment.rgb')
+    expect(file.type).toBe('application/octet-stream')
+    expect(Buffer.from(await file.arrayBuffer()).toString()).toBe('consignment')
 
     await expect(transport.getAcknowledgement?.(consignment)).resolves.toBeUndefined()
     expect(fetchMock).toHaveBeenLastCalledWith(
@@ -61,6 +66,36 @@ describe('RGB proxy transport', () => {
         body: expect.stringContaining('ack.get'),
       })
     )
+  })
+
+  it('uploads exact binary bytes when native Blob rejects ArrayBuffer parts', async () => {
+    const originalBlob = globalThis.Blob
+    class NativeBlob extends originalBlob {
+      constructor(parts: BlobPart[] = [], options?: BlobPropertyBag) {
+        if (parts.some(part => part instanceof ArrayBuffer || ArrayBuffer.isView(part))) {
+          throw new Error("Creating blobs from 'ArrayBuffer' and 'ArrayBufferView' are not supported")
+        }
+        super(parts, options)
+      }
+    }
+    vi.stubGlobal('Blob', NativeBlob)
+    fetchMock.mockResolvedValueOnce(rpcResponse(true))
+    const bytes = Buffer.from(Array.from({ length: 2048 }, (_, index) => index % 256))
+    await createRgbProxyTransport([endpoint]).publishConsignment({
+      recipientId,
+      payload: bytes.toString('base64'),
+      assetId: 'rgb:asset',
+      opIds: ['a'.repeat(64)],
+      txid: 'b'.repeat(64),
+      endpoints: [endpoint],
+    })
+    const request = fetchMock.mock.calls[0]![1]
+    expect(request.body).toBeInstanceOf(ArrayBuffer)
+    const form = await new Response(request.body, { headers: request.headers }).formData()
+    const file = form.get('file') as File
+    expect(Buffer.from(await file.arrayBuffer())).toEqual(bytes)
+    expect(form.get('jsonrpc')).toBe('2.0')
+    expect(form.get('params[recipient_id]')).toBe(recipientId)
   })
 
   it('gets a consignment and acknowledges it through the endpoint that supplied it', async () => {
