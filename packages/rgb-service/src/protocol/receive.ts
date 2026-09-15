@@ -124,5 +124,7 @@ export function encodeBlindRgbInvoice(input: {
   if (input.transportEndpoints?.length)
     query.set('endpoints', input.transportEndpoints.join(','))
   if (input.address) query.set('address', input.address)
-  return `rgb:${assetId}/~/${input.amount === undefined ? '~' : '~'}/${recipientId}${query.size ? `?${query}` : ''}`
+  // Expo's URLSearchParams polyfill supports serialization but has no size property.
+  const queryString = query.toString()
+  return `rgb:${assetId}/~/${input.amount === undefined ? '~' : '~'}/${recipientId}${queryString ? `?${queryString}` : ''}`
 }
