@@ -230,6 +230,7 @@ export const localNiaProtocolEncoder: RgbProtocolEncoder = {
       signedPsbt: input.signedPsbt,
       hostVout: parseMetadataIndex(data['hostVout'], 'RGB Opret host output'),
       commitment: bytes(data['commitment'] || '', 'RGB Opret commitment'),
+      allowIncomplete: input.allowIncomplete,
     })
     const witnessBundle = serializeNiaOpretWitnessBundle({
       witnessTx: Uint8Array.from(Buffer.from(completed.rawTx, 'hex')),

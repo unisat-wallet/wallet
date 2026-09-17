@@ -39,7 +39,8 @@ must only accept/reject the recipient ID it created or was explicitly given.
 | `signPayment` | Yes | Sign, deliver the consignment, wait for ACK, then broadcast. |
 | `cancelPayment` / `getPaymentStatus` | Yes / No | Cancel an unacknowledged payment or inspect its status. |
 | `prepareSwap` | Yes | Prepare a seller-side RGB-for-BTC atomic swap. |
-| `finalizeSwap` | Yes | Add user signatures and complete the swap delivery flow. |
+| `finalizeSwap` | Yes | Add seller signatures and publish the consignment, without broadcasting. |
+| `completeSwap` | Yes | Verify buyer's returned signed PSBT and ACK; the dApp finalizes and broadcasts it. |
 | `cancelSwap` / `getOperationStatus` | Yes / No | Cancel or inspect a swap. |
 | `completeBuySwap` | Yes | Complete a buyer-side BTC-for-RGB atomic swap. |
 
@@ -220,9 +221,10 @@ inputs for user signing, requires `SIGHASH_ALL`, disables RBF/locktime, and
 rejects a net current-account spend above `maxBtcSpend`.
 
 On approval the wallet signs its inputs, sends the RGB ACK, and returns the
-fully signed PSBT. The dApp must immediately pass that exact PSBT to the maker
-for broadcast. The wallet subsequently observes and settles the received RGB
-transfer through its normal receive sync.
+signed PSBT. Finalization and broadcast are intentionally delegated to the
+dApp; it must preserve the exact unsigned transaction and use the returned
+PSBT when constructing the final transaction. The wallet subsequently observes
+and settles the received RGB transfer through its normal receive sync.
 
 Do not call this method before the invoice is `PendingAccept`: a PSBT alone
 cannot prove the RGB amount being received.
@@ -265,16 +267,25 @@ The wallet enforces all of the following:
 
 ### `finalizeSwap(transferId, makerSignedPsbt)`
 
+This is the seller's first completion phase. It signs the seller-controlled
+inputs, publishes the RGB consignment, and returns the seller-signed PSBT to
+relay to the buyer. It never broadcasts at this point.
+
 ```ts
-const result = await rgb.finalizeSwap(prepared.transferId, makerSignedPsbt)
-// { transferId, status: 'waiting_ack' | 'broadcasted' |
-//                       'broadcast_failed', txid? }
+const published = await rgb.finalizeSwap(prepared.transferId, prepared.coloredPsbt)
+// { transferId, txid, status: 'awaiting_buyer_signature', makerSignedPsbt }
 ```
 
-The maker must sign only maker-controlled inputs before calling this method.
-The wallet rejects any change to the prepared unsigned transaction, requests
-the user signature for wallet-owned RGB inputs, publishes the consignment, and
-broadcasts only after a valid ACK. The dApp must not broadcast the PSBT.
+Once the buyer calls `completeBuySwap`, relay its returned `signedPsbt` back to
+the seller and call `completeSwap`. The wallet rechecks the committed unsigned
+transaction and verifies the buyer ACK. It does not finalize the PSBT; the
+dApp finalizes it and broadcasts the resulting transaction.
+
+```ts
+const completed = await rgb.completeSwap(prepared.transferId, buyerResult.signedPsbt)
+const finalPsbt = finalizeAllInputsInDapp(completed.signedPsbt)
+await window.unisat.pushPsbt(finalPsbt)
+```
 
 ### `getOperationStatus(transferId)` and `cancelSwap(transferId)`
 

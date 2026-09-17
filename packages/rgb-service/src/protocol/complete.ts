@@ -39,6 +39,7 @@ export function completeRgbOpretPsbt(input: {
   signedPsbt: string
   hostVout: number
   commitment: Uint8Array
+  allowIncomplete?: boolean
 }): CompletedRgbOpretPsbt {
   if (input.commitment.length !== 32)
     throw new RgbServiceError('RGB OP_RETURN commitment must be 32 bytes')
@@ -53,6 +54,15 @@ export function completeRgbOpretPsbt(input: {
     throw new RgbServiceError('Signed RGB PSBT does not preserve its OP_RETURN commitment')
   }
 
+  if (input.allowIncomplete) {
+    // RGB's OpretFirst witness commits to the unsigned transaction. This is
+    // only for seller-side swap consignment publication; it is never
+    // broadcast until the returned PSBT is fully finalized.
+    const transaction = (signed.data.globalMap.unsignedTx as any).tx || signed.data.globalMap.unsignedTx
+    if (!transaction?.toHex || !transaction?.getId)
+      throw new RgbServiceError('RGB PSBT is missing its unsigned transaction')
+    return { rawTx: transaction.toHex(), txid: transaction.getId() }
+  }
   try {
     const transaction = signed.extractTransaction()
     return { rawTx: transaction.toHex(), txid: transaction.getId() }

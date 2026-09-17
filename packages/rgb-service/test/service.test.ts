@@ -950,6 +950,27 @@ describe('RgbService', () => {
     expect(service.getPendingTransfers()).toHaveLength(1)
   })
 
+  it('reuses an unsent prepared swap and excludes its lock from displayed spendable balance', async () => {
+    const dependencies = createDependencies()
+    const service = new RgbService(dependencies)
+    await service.open(wallet)
+    await service.sync()
+    const request = {
+      assetId: 'rgb:asset',
+      amount: '60',
+      invoice: rgbInvoice(),
+      feeRate: 2,
+      swapPsbt: 'market-template-1',
+    }
+
+    const first = await service.prepareSend(request, { providerOrigin: 'https://market.example' })
+    const retried = await service.prepareSend(request, { providerOrigin: 'https://market.example' })
+
+    expect(retried).toEqual(first)
+    expect(dependencies.encoder.prepareTransfer).toHaveBeenCalledTimes(1)
+    expect(service.getLocalAssetBalance('rgb:asset')?.spendable).toBe('40')
+  })
+
   it('reserves a fee-pool input while its RGB transfer is pending', async () => {
     const dependencies = createDependencies()
     const feeUtxos = [
@@ -1722,6 +1743,54 @@ describe('RgbService', () => {
         status: 'broadcasted',
       }),
     ])
+  })
+
+  it('leaves seller swap broadcast to the dApp after buyer returns a final PSBT', async () => {
+    const dependencies = createDependencies()
+    const service = new RgbService(dependencies)
+    await service.open(wallet)
+    await service.sync()
+    await service.prepareSend({
+      assetId: 'rgb:asset',
+      amount: '60',
+      invoice: rgbInvoice(),
+      feeRate: 2,
+    })
+
+    await service.publishSwap('transfer-1', 'maker-signed-psbt')
+
+    expect(dependencies.encoder.completeTransfer).toHaveBeenLastCalledWith(
+      expect.objectContaining({ signedPsbt: 'maker-signed-psbt', allowIncomplete: true })
+    )
+    expect(dependencies.broadcaster.broadcast).not.toHaveBeenCalled()
+    expect(service.getPendingTransfers()).toEqual([
+      expect.objectContaining({
+        id: 'transfer-1',
+        delivery: expect.objectContaining({ requiresCounterpartySignature: true }),
+      }),
+    ])
+
+    // Restart/background polling cannot turn a buyer-less acknowledgement into a broadcast.
+    await service.sync()
+    expect(dependencies.broadcaster.broadcast).not.toHaveBeenCalled()
+
+    await service.completePublishedSwap('transfer-1', 'fully-signed-psbt', {
+      externalBroadcast: true,
+    })
+
+    expect(dependencies.encoder.completeTransfer).toHaveBeenLastCalledWith(
+      expect.objectContaining({ signedPsbt: 'fully-signed-psbt' })
+    )
+    expect(dependencies.broadcaster.broadcast).not.toHaveBeenCalled()
+    expect(service.getPendingTransfers()).toEqual([
+      expect.objectContaining({
+        delivery: expect.objectContaining({ externalBroadcast: true, acknowledgedAt: expect.any(Number) }),
+      }),
+    ])
+
+    dependencies.stateSource.getTransactionStatus = vi.fn().mockResolvedValue({ status: 'mempool' })
+    await service.sync()
+    expect(service.getPendingTransfers()).toEqual([])
   })
 
   it('does not re-fetch a consignment immediately after accepting it', async () => {

@@ -194,6 +194,12 @@ export interface RgbPendingTransfer {
     publishedAt?: number
     /** Set after every recipient endpoint has ACKed the consignment. */
     acknowledgedAt?: number
+    /** Do not let background sync broadcast until the counterparty returns a final PSBT. */
+    requiresCounterpartySignature?: boolean
+    /** Encrypted local copy used to ensure the returned final PSBT retains maker signatures. */
+    makerSignedPsbt?: string
+    /** Buyer-signed swap is ready; the dApp, not this wallet, broadcasts it. */
+    externalBroadcast?: boolean
     /** The last Bitcoin broadcast failure; retrying reuses the signed transaction. */
     broadcastError?: string
   }
@@ -496,6 +502,8 @@ export interface RgbProtocolEncoder {
     wallet: RgbWalletRef
     pending: RgbPendingTransfer
     signedPsbt: string
+    /** Atomic swaps may publish their consignment before buyer BTC signatures. */
+    allowIncomplete?: boolean
   }): Promise<RgbCompletedTransfer>
 }
 

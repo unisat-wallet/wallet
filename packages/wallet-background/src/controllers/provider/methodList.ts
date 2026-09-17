@@ -100,6 +100,11 @@ export type ProviderMethodList = {
     transferId: string
     makerSignedPsbt: string
   }
+  /** Validate a completed seller swap; its dApp broadcasts the final PSBT. */
+  completeRgbSwap: {
+    transferId: string
+    signedPsbt: string
+  }
   cancelRgbSwap: {
     transferId: string
   }

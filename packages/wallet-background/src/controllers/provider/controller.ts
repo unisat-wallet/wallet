@@ -133,6 +133,36 @@ function assertReadonlySignedPsbt(
   }
 }
 
+function restoreCounterpartyFinalizedInputs(
+  signedPsbt: bitcoin.Psbt,
+  sourcePsbt: bitcoin.Psbt,
+  buyerInputIndexes: Set<number>
+) {
+  for (let index = 0; index < signedPsbt.inputCount; index++) {
+    if (buyerInputIndexes.has(index)) continue
+    const source = sourcePsbt.data.inputs[index]!
+    const signed = signedPsbt.data.inputs[index]!
+    // Only restore final scripts produced locally from the exact maker PSBT;
+    // never copy buyer data and never alter the unsigned transaction.
+    if (source.finalScriptSig && !signed.finalScriptSig) signed.finalScriptSig = source.finalScriptSig
+    if (source.finalScriptWitness && !signed.finalScriptWitness) signed.finalScriptWitness = source.finalScriptWitness
+  }
+}
+
+/** bitcoinjs interprets an omitted type as DEFAULT for P2TR, ALL otherwise. */
+function effectiveInputSighashType(input: bitcoin.Psbt['data']['inputs'][number]) {
+  const script = input.witnessUtxo?.script
+  const isTaproot = Boolean(script && script.length === 34 && script[0] === 0x51 && script[1] === 0x20)
+  // A non-taproot input with an encoded zero follows bitcoinjs' `|| ALL`
+  // behavior, while a P2TR zero is the valid SIGHASH_DEFAULT value.
+  if (input.sighashType === undefined) {
+    return isTaproot ? bitcoin.Transaction.SIGHASH_DEFAULT : bitcoin.Transaction.SIGHASH_ALL
+  }
+  return input.sighashType === bitcoin.Transaction.SIGHASH_DEFAULT && !isTaproot
+    ? bitcoin.Transaction.SIGHASH_ALL
+    : input.sighashType
+}
+
 function getToSignDatas(toSignDatas?: ToSignData[]) {
   if (!toSignDatas?.length) {
     throw new Error('invalid psbt')
@@ -824,7 +854,31 @@ class ProviderController extends BaseController {
     const signedPsbt = approvalRes[0]?.psbtHex
     if (!signedPsbt) throw new Error('RGB swap signing did not return a PSBT')
     assertReadonlySignedPsbt(account, toSignData, signedPsbt)
-    return wallet.createRgbSendEnd({ transferId: params.transferId, signedPsbt })
+    const published = await wallet.publishRgbSwap({ transferId: params.transferId, signedPsbt })
+    return { ...published, makerSignedPsbt: signedPsbt }
+  }
+
+  /**
+   * The buyer has accepted the consignment and returned a fully signed PSBT.
+   * This remains origin-bound; it validates/records the RGB completion but
+   * deliberately leaves broadcast to the dApp.
+   */
+  @Reflect.metadata('APPROVAL', ['RgbPayment'])
+  completeRgbSwap = async ({
+    data: { params },
+    session: { origin },
+  }: {
+    data: { params: { transferId: string; signedPsbt: string } }
+    session: { origin: string }
+  }) => {
+    if (!params.transferId || !params.signedPsbt) {
+      throw new Error('transferId and signedPsbt are required')
+    }
+    await assertRgbPaymentOrigin(params.transferId, origin)
+    return wallet.prepareRgbSwapExternalBroadcast({
+      transferId: params.transferId,
+      signedPsbt: params.signedPsbt,
+    })
   }
 
   @Reflect.metadata('APPROVAL', ['RgbPaymentCancel'])
@@ -856,6 +910,7 @@ class ProviderController extends BaseController {
         maxBtcSpend: string
         makerSignedPsbt: string
         toSignDatas?: unknown[]
+        receiptAlreadyAccepted?: boolean
       }
       if (!params.recipientId || !params.assetId || !params.amount || !params.maxBtcSpend || !params.makerSignedPsbt) {
         throw new Error('recipientId, assetId, amount, maxBtcSpend and makerSignedPsbt are required')
@@ -864,6 +919,7 @@ class ProviderController extends BaseController {
       if (receive.assetId !== params.assetId || receive.amount !== params.amount) {
         throw new Error('RGB swap receipt does not match the requested asset or amount')
       }
+      params.receiptAlreadyAccepted = receive.accepted
       let maxBtcSpend: number
       try {
         maxBtcSpend = Number(BigInt(params.maxBtcSpend))
@@ -910,7 +966,13 @@ class ProviderController extends BaseController {
         await wallet.getToSignData({
           psbtHex: psbt.toHex(),
           options: {
-            toSignInputs: ownedInputs.map(({ index }) => ({ index, address: account.address, sighashTypes: [1] })),
+            // Honor the input's effective sighash. Omitted P2TR is DEFAULT
+            // (0), while omitted non-taproot is ALL (1).
+            toSignInputs: ownedInputs.map(({ input, index }) => ({
+              index,
+              address: account.address,
+              sighashTypes: [effectiveInputSighashType(input)],
+            })),
             autoFinalized: true,
           },
         }),
@@ -918,17 +980,30 @@ class ProviderController extends BaseController {
     },
   ])
   completeRgbBuySwap = async ({ data: { params }, approvalRes }: {
-    data: { params: { recipientId: string; toSignDatas?: any[] } }
+    data: { params: { recipientId: string; toSignDatas?: any[]; receiptAlreadyAccepted?: boolean } }
     approvalRes: SignPsbtResult
   }) => {
     const account = await wallet.getCurrentAccount()
     const toSignData = getToSignDatas(params.toSignDatas)[0]!
     const signedPsbt = approvalRes[0]?.psbtHex
     if (!signedPsbt) throw new Error('RGB buy swap signing did not return a PSBT')
-    assertReadonlySignedPsbt(account, toSignData, signedPsbt)
-    const accepted = await wallet.acceptRgbReceive({ recipientId: params.recipientId })
+    const psbt = bitcoin.Psbt.fromHex(formatPsbtHex(signedPsbt))
+    const sourcePsbt = bitcoin.Psbt.fromHex(formatPsbtHex(toSignData.psbtHex))
+    assertSameUnsignedTx(psbt, sourcePsbt)
+    restoreCounterpartyFinalizedInputs(
+      psbt,
+      sourcePsbt,
+      new Set(toSignData.toSignInputs.map(input => input.index))
+    )
+    // The dApp owns finalization and broadcast for a P2P market swap. The
+    // wallet signs only its own inputs and ACKs the validated RGB receipt;
+    // it deliberately does not require extractTransaction()/finalizeAllInputs
+    // here. Keep the unsigned transaction and required buyer signatures bound
+    // to the approved request, including for external signer wallets.
+    assertReadonlySignedPsbt(account, { ...toSignData, autoFinalized: false }, psbt.toHex())
+    const accepted = params.receiptAlreadyAccepted ? { accepted: true } : await wallet.acceptRgbReceive({ recipientId: params.recipientId })
     if (!accepted?.accepted) return accepted
-    return { recipientId: params.recipientId, status: 'accepted' as const, signedPsbt }
+    return { recipientId: params.recipientId, status: 'accepted' as const, signedPsbt: psbt.toHex() }
   }
 
   @Reflect.metadata('APPROVAL', [

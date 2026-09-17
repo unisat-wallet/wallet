@@ -78,4 +78,20 @@ describe('completeRgbOpretPsbt', () => {
       })
     ).toThrow('not fully finalized')
   })
+
+  it('can derive a consignment witness from the committed unsigned swap transaction', () => {
+    const prepared = preparedPsbt()
+    const completed = completeRgbOpretPsbt({
+      preparedPsbt: prepared.psbtHex,
+      signedPsbt: prepared.psbtHex,
+      hostVout: prepared.hostVout,
+      commitment: prepared.commitment,
+      allowIncomplete: true,
+    })
+
+    const psbt = Psbt.fromHex(prepared.psbtHex)
+    const transaction = ((psbt.data.globalMap.unsignedTx as any).tx || psbt.data.globalMap.unsignedTx) as any
+    expect(completed.txid).toBe(transaction.getId())
+    expect(completed.rawTx).toMatch(/^[0-9a-f]+$/)
+  })
 })

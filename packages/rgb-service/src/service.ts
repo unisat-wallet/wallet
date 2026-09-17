@@ -439,7 +439,10 @@ export class RgbService {
         if (!pending) return
         try {
           if (pending.broadcast) await this.syncBroadcastedTransfer(transferId, pending)
-          else if (pending.delivery) await this.advancePendingDelivery(transferId, pending)
+          else if (pending.delivery?.externalBroadcast)
+            await this.syncExternallyBroadcastTransfer(transferId, pending)
+          else if (pending.delivery && !pending.delivery.requiresCounterpartySignature)
+            await this.advancePendingDelivery(transferId, pending)
         } catch (error) {
           // A delivery awaiting its recipient is a durable local state, not a
           // wallet-wide sync failure. A rejection has already removed its
@@ -1671,6 +1674,11 @@ export class RgbService {
 
   private getLocalAssetBalances(): RgbLocalAssetBalance[] {
     const state = this.requireState()
+    const locked = new Set(
+      Object.values(state.pending).flatMap(pending =>
+        pending.prepared.lockedOutpoints.map(outpoint => `${outpoint.txid}:${outpoint.vout}`)
+      )
+    )
     const amounts = new Map<string, { settled: bigint; spendable: bigint; pending: bigint }>()
     for (const utxo of state.snapshot.utxos) {
       if (
@@ -1689,7 +1697,9 @@ export class RgbService {
         const amount = BigInt(allocation.amount)
         if (allocation.settled) current.settled += amount
         else current.pending += amount
-        if (allocation.settled && allocation.spendable) current.spendable += amount
+        if (allocation.settled && allocation.spendable && !locked.has(outpointKey(utxo))) {
+          current.spendable += amount
+        }
         amounts.set(allocation.assetId, current)
       }
     }
@@ -1888,6 +1898,22 @@ export class RgbService {
       throw new RgbServiceError('RGB invoice amount does not match the requested amount')
     }
     const resolvedRequest = { ...request, assetId: requestedAssetId, amount }
+    // A market relay can fail after the wallet has already durably prepared a
+    // seller swap. Reuse that exact template on retry so its RGB reservation
+    // is not mistaken for an insufficient balance.
+    if (request.swapPsbt) {
+      const existing = Object.values(state.pending).find(
+        pending =>
+          !pending.delivery &&
+          !pending.broadcast &&
+          pending.providerOrigin === options.providerOrigin &&
+          pending.request.assetId === requestedAssetId &&
+          pending.request.amount === amount &&
+          pending.request.invoice === request.invoice &&
+          pending.request.swapPsbt === request.swapPsbt
+      )
+      if (existing) return existing.prepared
+    }
     const selectedUtxos = this.selectUtxos(requestedAssetId, amount)
     await this.verifySelectedUtxos(state.wallet, selectedUtxos)
     const allocations = selectedUtxos.flatMap(utxo =>
@@ -2025,6 +2051,83 @@ export class RgbService {
     )
   }
 
+  /**
+   * Publish a seller-signed atomic-swap consignment without polling for ACK
+   * or broadcasting. The buyer must add their Bitcoin signatures first.
+   */
+  async publishSwap(transferId: string, makerSignedPsbt: string): Promise<RgbCompletedTransfer> {
+    return this.runPendingTransferOperation(transferId, async () => {
+      const state = this.requireState()
+      const pending = state.pending[transferId]
+      if (!pending) throw new RgbServiceError(`RGB transfer ${transferId} does not exist`)
+      if (pending.broadcast) return this.syncBroadcastedTransfer(transferId, pending)
+      if (!pending.delivery) {
+        const completed = await this.dependencies.encoder.completeTransfer({
+          wallet: state.wallet,
+          pending,
+          signedPsbt: makerSignedPsbt,
+          allowIncomplete: true,
+        })
+        const endpoints = decodeRgbInvoice(pending.request.invoice).transportEndpoints
+        if (!endpoints.length)
+          throw new RgbServiceError('RGB invoice has no proxy transport endpoint')
+        const rollback = snapshotState(state)
+        pending.delivery = {
+          completed,
+          endpoints,
+          requiresCounterpartySignature: true,
+          makerSignedPsbt,
+        }
+        await this.persistWithRecoveryRollback(rollback)
+      }
+      if (!pending.delivery.requiresCounterpartySignature) {
+        throw new RgbServiceError('RGB transfer is not awaiting a swap counterparty signature')
+      }
+      await this.publishPendingDelivery(transferId, pending)
+      return pending.delivery.completed
+    })
+  }
+
+  /**
+   * The buyer has ACKed the published consignment and returned its signed
+   * PSBT. Rebuild the exact RGB transfer from the committed unsigned
+   * transaction before allowing the dApp broadcast path to proceed.
+   */
+  async completePublishedSwap(
+    transferId: string,
+    fullySignedPsbt: string,
+    options: { externalBroadcast?: boolean } = {}
+  ): Promise<RgbCompletedTransfer> {
+    return this.runPendingTransferOperation(transferId, async () => {
+      const state = this.requireState()
+      const pending = state.pending[transferId]
+      if (!pending) throw new RgbServiceError(`RGB transfer ${transferId} does not exist`)
+      if (pending.broadcast) return this.syncBroadcastedTransfer(transferId, pending)
+      const delivery = pending.delivery
+      if (!delivery?.requiresCounterpartySignature) {
+        throw new RgbServiceError('RGB transfer is not awaiting a buyer swap PSBT')
+      }
+      const completed = await this.dependencies.encoder.completeTransfer({
+        wallet: state.wallet,
+        pending,
+        signedPsbt: fullySignedPsbt,
+        // P2P market dApps finalize and broadcast after this wallet-local RGB
+        // completion step. RGB's Opret witness commits to the unchanged
+        // unsigned transaction, so this may safely build the delivery state
+        // from a fully signed but not-yet-finalized PSBT.
+        allowIncomplete: options.externalBroadcast,
+      })
+      if (completed.txid !== delivery.completed.txid) {
+        throw new RgbServiceError('RGB swap PSBT does not match the published consignment')
+      }
+      delivery.completed = completed
+      delete delivery.requiresCounterpartySignature
+      delete delivery.makerSignedPsbt
+      await this.persist({ waitForRecovery: true })
+      return this.advancePendingDelivery(transferId, pending, !options.externalBroadcast)
+    })
+  }
+
   private async completeSendOnce(
     transferId: string,
     signedPsbt: string
@@ -2033,6 +2136,10 @@ export class RgbService {
     const pending = state.pending[transferId]
     if (!pending) throw new RgbServiceError(`RGB transfer ${transferId} does not exist`)
     if (pending.broadcast) return this.syncBroadcastedTransfer(transferId, pending)
+
+    if (pending.delivery?.requiresCounterpartySignature) {
+      throw new RgbServiceError('RGB swap is awaiting the buyer finalized PSBT')
+    }
 
     if (!pending.delivery) {
       const completed = await this.dependencies.encoder.completeTransfer({
@@ -2209,7 +2316,63 @@ export class RgbService {
     return broadcast.completed
   }
 
-  private async advancePendingDelivery(transferId: string, pending: RgbPendingTransfer) {
+  /**
+   * For dApp-broadcast swaps, only observe the chain. A wallet restart or
+   * background sync must never become an implicit broadcaster.
+   */
+  private async syncExternallyBroadcastTransfer(transferId: string, pending: RgbPendingTransfer) {
+    const state = this.requireState()
+    const delivery = pending.delivery
+    if (!delivery?.externalBroadcast) return undefined
+    const getTransactionStatus = this.dependencies.stateSource.getTransactionStatus
+    if (!getTransactionStatus) return undefined
+    const chain = await getTransactionStatus(state.wallet, delivery.completed.txid)
+    if (chain.status !== 'mempool' && chain.status !== 'confirmed') return undefined
+    this.applyFundingUpdate(delivery.completed)
+    this.retainCompletedLocalHistory(delivery.completed)
+    pending.broadcast = { completed: delivery.completed, broadcastAt: this.now() }
+    delete pending.delivery
+    await this.persist({ waitForRecovery: true })
+    return this.syncBroadcastedTransfer(transferId, pending)
+  }
+
+  /** Publish a completed consignment, but deliberately do not inspect ACK or broadcast. */
+  private async publishPendingDelivery(transferId: string, pending: RgbPendingTransfer) {
+    const state = this.requireState()
+    const delivery = pending.delivery
+    if (!delivery) throw new RgbServiceError(`RGB transfer ${transferId} has not been signed`)
+    const proxyRecipientId = decodeRgbInvoice(pending.request.invoice).proxyRecipientId
+    const consignments = delivery.completed.consignments.map((consignment, index) => ({
+      ...consignment,
+      recipientId: proxyRecipientId,
+      transportId: `${transferId}:${index}`,
+      txid: delivery.completed.txid,
+      endpoints: delivery.endpoints,
+    }))
+    for (const consignment of consignments) {
+      try {
+        await this.dependencies.transport.publishConsignment(consignment)
+      } catch (error) {
+        if (isInvoiceUnavailableUploadError(error)) {
+          delete state.pending[transferId]
+          await this.persist()
+          throw new RgbInvoiceUnavailableError()
+        }
+        throw error
+      }
+    }
+    if (!delivery.publishedAt) {
+      delivery.publishedAt = this.now()
+      await this.persist({ skipRecovery: true })
+    }
+    return consignments
+  }
+
+  private async advancePendingDelivery(
+    transferId: string,
+    pending: RgbPendingTransfer,
+    allowWalletBroadcast = true
+  ) {
     const state = this.requireState()
     const delivery = pending.delivery
     if (!delivery) throw new RgbServiceError(`RGB transfer ${transferId} has not been signed`)
@@ -2280,6 +2443,12 @@ export class RgbService {
     delivery.acknowledgedAt ||= this.now()
     delete delivery.broadcastError
     await this.persist({ waitForRecovery: true })
+
+    if (!allowWalletBroadcast) {
+      delivery.externalBroadcast = true
+      await this.persist({ waitForRecovery: true })
+      return delivery.completed
+    }
 
     let broadcastTxid: string
     try {

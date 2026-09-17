@@ -3809,13 +3809,14 @@ export class WalletController extends BaseController {
     const receive = service
       .getPendingReceives()
       .find(item => item.recipientId === params.recipientId || item.proxyRecipientId === params.recipientId)
-    const pending = receive?.pendingAccept
+    const pending = receive?.pendingAccept || receive?.receivedConsignment
     if (!receive || !pending) throw new Error('RGB receive is not awaiting acceptance')
     return {
       recipientId: receive.proxyRecipientId || receive.recipientId,
       assetId: pending.assetId,
       amount: pending.amount,
       txid: pending.txid,
+      accepted: receive.receivedConsignment?.accepted === true,
     }
   }
 
@@ -4274,6 +4275,12 @@ export class WalletController extends BaseController {
   createRgbSendEnd = (params: Omit<RgbSendEndRequest, 'wallet'>) =>
     this.rgbSendOperations.complete(params)
 
+  publishRgbSwap = (params: { transferId: string; signedPsbt: string }) =>
+    this.rgbSendOperations.publishSwap(params)
+
+  prepareRgbSwapExternalBroadcast = (params: { transferId: string; signedPsbt: string }) =>
+    this.rgbSendOperations.prepareExternalSwapBroadcast(params)
+
   /** Local provider owner for a prepared payment or its retained status history. */
   getRgbPaymentOrigin = async (params: { transferId: string }) => {
     const { service } = await this.getLocalRgbReadService()
@@ -4316,7 +4323,11 @@ export class WalletController extends BaseController {
         assetId: pending.request.assetId,
         amount: pending.request.amount,
         txid: pending.delivery?.completed.txid ?? pending.broadcast?.completed.txid,
-        status: pending.delivery?.broadcastError
+        status: pending.delivery?.requiresCounterpartySignature
+          ? 'awaiting_buyer_signature'
+          : pending.delivery?.externalBroadcast
+            ? 'ready_for_dapp_finalize'
+          : pending.delivery?.broadcastError
           ? 'broadcast_failed'
           : pending.delivery?.acknowledgedAt
             ? 'broadcasting'

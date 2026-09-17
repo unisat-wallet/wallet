@@ -317,6 +317,10 @@ export class BitcoinAPIMethods {
     return this.provider[requestMethodKey]({ method: 'finalizeRgbSwap', params: { transferId, makerSignedPsbt } });
   };
 
+  completeRgbSwap = async (transferId: string, signedPsbt: string) => {
+    return this.provider[requestMethodKey]({ method: 'completeRgbSwap', params: { transferId, signedPsbt } });
+  };
+
   cancelRgbSwap = async (transferId: string) => {
     return this.provider[requestMethodKey]({ method: 'cancelRgbSwap', params: { transferId } });
   };

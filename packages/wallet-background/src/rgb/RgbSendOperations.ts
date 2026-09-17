@@ -132,6 +132,39 @@ export class RgbSendOperations {
     }
   }
 
+  /** Signer output for a seller-side atomic swap: publish RGB only, never broadcast. */
+  async publishSwap(params: { transferId: string; signedPsbt: string }) {
+    const { service, wallet } = await this.dependencies.getContext()
+    await this.dependencies.ensureWriteLease?.({ service, wallet }, { forceRenew: true })
+    const completed = await service.publishSwap(
+      params.transferId,
+      psbtFromString(params.signedPsbt).toBase64()
+    )
+    return {
+      transferId: params.transferId,
+      txid: completed.txid,
+      status: 'awaiting_buyer_signature' as const,
+    }
+  }
+
+  /** Record buyer ACK/signatures; the dApp finalizes and broadcasts the PSBT. */
+  async prepareExternalSwapBroadcast(params: { transferId: string; signedPsbt: string }) {
+    const { service, wallet } = await this.dependencies.getContext()
+    await this.dependencies.ensureWriteLease?.({ service, wallet }, { forceRenew: true })
+    const relayedPsbt = psbtFromString(params.signedPsbt)
+    const completed = await service.completePublishedSwap(
+      params.transferId,
+      relayedPsbt.toBase64(),
+      { externalBroadcast: true }
+    )
+    return {
+      transferId: params.transferId,
+      txid: completed.txid,
+      signedPsbt: relayedPsbt.toHex(),
+      status: 'ready_for_dapp_finalize' as const,
+    }
+  }
+
   async retryBroadcast(transferId: string) {
     const { service, wallet } = await this.dependencies.getContext()
     // Retrying can broadcast a previously prepared transaction, so it needs
