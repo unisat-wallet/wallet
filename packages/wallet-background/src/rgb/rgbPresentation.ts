@@ -28,7 +28,8 @@ export function toPublicRgbPendingReceiveInvoice(
     amount?: string
     expirationTimestamp?: number
     createdAt?: number
-    recipientType?: 'blind' | 'witness'
+  recipientType?: 'blind' | 'witness'
+  witnessScriptPubKey?: string
     proxyRecipientId?: string
     pendingAccept?: unknown
     receivedConsignment?: {
@@ -53,6 +54,9 @@ export function toPublicRgbPendingReceiveInvoice(
       : { expirationTimestamp: item.expirationTimestamp }),
     ...(item.createdAt === undefined ? {} : { createdAt: item.createdAt }),
     kind: item.recipientType === 'witness' ? 'ReceiveWitness' : 'ReceiveBlind',
+    ...(item.recipientType === 'witness' && item.witnessScriptPubKey
+      ? { witnessScriptPubKey: item.witnessScriptPubKey }
+      : {}),
     status: awaitingAcceptance
       ? 'PendingAccept'
       : awaitingSenderConfirmation

@@ -109,6 +109,11 @@ const receive = await rgb.createReceiveInvoice({
 // }
 ```
 
+For a `witness` invoice, the returned receive metadata also includes
+`witnessScriptPubKey`. A P2P swap dApp must place a dust-safe output paying
+that exact script in its unsigned Bitcoin template before the seller calls
+`prepareSwap`.
+
 Use `blind` unless the sender explicitly requires a revealed/witness
 beneficiary. A blind invoice needs an available RGB funding UTXO first. A
 witness invoice does not reserve an existing UTXO; its recipient output is
