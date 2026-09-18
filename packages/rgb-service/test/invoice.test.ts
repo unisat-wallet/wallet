@@ -3,6 +3,7 @@ import {
   appendRgbInvoiceRecipientNonce,
   decodeRgbInvoice,
   encodeWitnessRgbInvoice,
+  witnessSealToScriptPubKey,
 } from '../src'
 
 describe('decodeRgbInvoice', () => {
@@ -58,6 +59,7 @@ describe('decodeRgbInvoice', () => {
     const first = make(1)
     const second = make(2)
     expect(first.recipientType).toBe('witness')
+    expect(first.seal.type === 'witness' && Buffer.from(witnessSealToScriptPubKey(first.seal)).toString('hex')).toBe(scriptPubKey)
     expect(first.recipientId).toBe(second.recipientId)
     expect(first.proxyRecipientId).not.toBe(second.proxyRecipientId)
     expect(first.proxyRecipientId).toMatch(/^[0-9a-f]{64}$/)

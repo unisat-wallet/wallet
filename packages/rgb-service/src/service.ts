@@ -1221,14 +1221,23 @@ export class RgbService {
       const match = decoded.witnessBundles
         .flatMap(witness =>
           witness.transitions.flatMap(transition =>
-            transition.assignments.map((assignment, assignmentIndex) => ({ witness, transition, assignment, assignmentIndex }))
+            transition.assignments.map((assignment, assignmentIndex) => ({
+              witness,
+              transition,
+              assignment,
+              assignmentIndex,
+            }))
           )
         )
         .find(({ witness, assignment }) => {
           if ('secretSeal' in assignment.seal) return false
           const txid = assignment.seal.txid || witness.txid
           const output = witness.outputs[assignment.seal.vout]
-          return txid === witness.txid && output?.scriptPubKey.toLowerCase() === expectedScript
+          return (
+            txid === witness.txid &&
+            output?.scriptPubKey.toLowerCase() === expectedScript &&
+            (item.txid === undefined || witness.txid === item.txid)
+          )
         })
       if (
         !match ||
