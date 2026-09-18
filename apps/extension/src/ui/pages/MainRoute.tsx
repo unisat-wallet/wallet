@@ -80,6 +80,7 @@ import NetworkTypeScreen from './Settings/NetworkTypeScreen';
 import NotificationListScreen from './Settings/NotificationListScreen';
 import RgbUtxoInspectionScreen from './Settings/RgbUtxoInspectionScreen';
 import RgbFeePoolInspectionScreen from './Settings/RgbFeePoolInspectionScreen';
+import RgbBackupScreen from './Settings/RgbBackupScreen';
 import RgbInvoiceExpiryScreen from './Settings/RgbInvoiceExpiryScreen';
 import UpgradeNoticeScreen from './Settings/UpgradeNoticeScreen';
 import CosmosSignDemo from './Test/CosmosSignDemo';
@@ -196,6 +197,10 @@ export const routes = {
   AdvancedScreen: {
     path: '/settings/advanced',
     element: <AdvancedScreen />
+  },
+  RgbBackupScreen: {
+    path: '/settings/rgb-backup',
+    element: <RgbBackupScreen />
   },
   RgbUtxoInspectionScreen: {
     path: '/settings/rgb-utxos',
@@ -573,7 +578,8 @@ const Main = () => {
           height: '00vh',
           overflowY: 'auto',
           overflowX: 'hidden'
-        }}>
+        }}
+      >
         <Content justifyCenter itemsCenter>
           <Icon>
             <LoadingOutlined />

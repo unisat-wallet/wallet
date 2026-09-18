@@ -26,9 +26,11 @@ export type RouteParamList = {
     fromColdWallet?: boolean
   }
 
-  MainScreen: {
-    rgbHomeTab?: 'assets' | 'transfers'
-  } | undefined
+  MainScreen:
+    | {
+        rgbHomeTab?: 'assets' | 'transfers'
+      }
+    | undefined
 
   // tabs
   WalletTabScreen: undefined
@@ -93,6 +95,7 @@ export type RouteParamList = {
   ConnectedSitesScreen: undefined
   AddressTypeScreen: undefined
   AdvancedScreen: undefined
+  RgbBackupScreen: undefined
   RgbUtxoInspectionScreen: undefined
   RgbFeePoolInspectionScreen: undefined
   ContactsScreen: {

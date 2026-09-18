@@ -29,6 +29,7 @@ export default function SettingsTabScreen() {
     settings_addressBook,
     settings_addressType,
     settings_advanced,
+    settings_rgbBackup,
     settings_feedback,
     settings_rateus,
     settings_aboutus,
@@ -47,14 +48,15 @@ export default function SettingsTabScreen() {
           groupTop && groupBottom
             ? '12px 12px 12px 12px'
             : groupTop
-            ? '12px 12px 0 0'
-            : groupBottom
-            ? '0 0 12px 12px'
-            : '0',
+              ? '12px 12px 0 0'
+              : groupBottom
+                ? '0 0 12px 12px'
+                : '0',
         background: 'rgba(255, 255, 255, 0.06)',
         padding: '0 16px',
         margin: 0
-      }}>
+      }}
+    >
       <Row full justifyBetween style={{ height: '100%', alignItems: 'center' }}>
         <Row style={{ minWidth: 0, alignItems: 'center' }}>
           <Icon icon={item.icon as any} size={fontSizes.logo} color="textDim" />
@@ -160,7 +162,7 @@ export default function SettingsTabScreen() {
             <Column fullX>
               {renderGroup([settings_connectedSites])}
               {renderGroup([settings_addressBook])}
-              {renderGroup([settings_addressType, settings_advanced])}
+              {renderGroup([settings_addressType, settings_advanced, settings_rgbBackup!])}
               {renderGroup([settings_feedback, settings_rateus, settings_aboutus])}
             </Column>
 

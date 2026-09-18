@@ -123,6 +123,22 @@ export function useSettingsTabScreenLogic() {
     }
   }, [t])
 
+  const settings_rgbBackup: SettingsItemType | null = useMemo(() => {
+    const rgbEnabled = Boolean(chain.rgbProxyEndpoints?.some(endpoint => endpoint.trim()))
+    if (!rgbEnabled || currentKeyring.type !== KeyringType.HdKeyring) return null
+    return {
+      key: 'settings_rgbBackup',
+      label: 'RGB Backup',
+      value: 'Export or restore encrypted RGB state',
+      desc: '',
+      right: true,
+      icon: 'wallet-info',
+      onClick: () => {
+        nav.navigate('RgbBackupScreen')
+      },
+    }
+  }, [chain.rgbProxyEndpoints, currentKeyring.type, nav])
+
   const settings_feedback = useMemo(() => {
     return {
       key: 'settings_feedback',
@@ -216,6 +232,7 @@ export function useSettingsTabScreenLogic() {
     settings_addressBook,
     settings_addressType,
     settings_advanced,
+    settings_rgbBackup,
     settings_feedback,
     settings_rateus,
     settings_aboutus,
