@@ -860,10 +860,12 @@ class ProviderController extends BaseController {
 
   /**
    * The buyer has accepted the consignment and returned a fully signed PSBT.
-   * This remains origin-bound; it validates/records the RGB completion but
-   * deliberately leaves broadcast to the dApp.
+   * The seller has already explicitly approved the exact unsigned transaction
+   * in signRgbSellSwapAndPublishConsignment. This remains origin-bound and
+   * validates/records the buyer completion, but deliberately leaves broadcast
+   * to the dApp, so no second approval is needed here.
    */
-  @Reflect.metadata('APPROVAL', ['RgbPayment'])
+  @Reflect.metadata('SAFE', true)
   confirmRgbSellSwap = async ({
     data: { params },
     session: { origin },
