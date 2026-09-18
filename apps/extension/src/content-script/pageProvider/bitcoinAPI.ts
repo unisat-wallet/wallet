@@ -313,12 +313,24 @@ export class BitcoinAPIMethods {
     return this.provider[requestMethodKey]({ method: 'prepareRgbSwap', params });
   };
 
-  finalizeRgbSwap = async (transferId: string, makerSignedPsbt: string) => {
-    return this.provider[requestMethodKey]({ method: 'finalizeRgbSwap', params: { transferId, makerSignedPsbt } });
+  signRgbSellSwapAndPublishConsignment = async (transferId: string, makerSignedPsbt: string) => {
+    return this.provider[requestMethodKey]({ method: 'signRgbSellSwapAndPublishConsignment', params: { transferId, makerSignedPsbt } });
   };
 
-  completeRgbSwap = async (transferId: string, signedPsbt: string) => {
-    return this.provider[requestMethodKey]({ method: 'completeRgbSwap', params: { transferId, signedPsbt } });
+  confirmRgbSellSwap = async (transferId: string, signedPsbt: string) => {
+    return this.provider[requestMethodKey]({ method: 'confirmRgbSellSwap', params: { transferId, signedPsbt } });
+  };
+
+  applyRgbSellSwapAbort = async (transferId: string) => {
+    return this.provider[requestMethodKey]({ method: 'applyRgbSellSwapAbort', params: { transferId } });
+  };
+
+  getRgbSellSwapAbortOrigin = async (transferId: string) => {
+    return this.provider[requestMethodKey]({ method: 'getRgbSellSwapAbortOrigin', params: { transferId } });
+  };
+
+  applyRgbBuySwapAbort = async (recipientId: string) => {
+    return this.provider[requestMethodKey]({ method: 'applyRgbBuySwapAbort', params: { recipientId } });
   };
 
   cancelRgbSwap = async (transferId: string) => {
@@ -329,8 +341,8 @@ export class BitcoinAPIMethods {
     return this.provider[requestMethodKey]({ method: 'getRgbSwapStatus', params: { transferId } });
   };
 
-  completeRgbBuySwap = async (params: { recipientId: string; assetId: string; amount: string; maxBtcSpend: string; makerSignedPsbt: string }) => {
-    return this.provider[requestMethodKey]({ method: 'completeRgbBuySwap', params });
+  signRgbBuySwapAndAcceptConsignment = async (params: { recipientId: string; assetId: string; amount: string; maxBtcSpend: string; makerSignedPsbt: string }) => {
+    return this.provider[requestMethodKey]({ method: 'signRgbBuySwapAndAcceptConsignment', params });
   };
 
 }

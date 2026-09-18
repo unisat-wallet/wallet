@@ -233,6 +233,19 @@ export class RgbSendOperations {
     return { aborted: result.aborted, local: true, status: result.status, transferId: match.id }
   }
 
+  async abortAcknowledgedSwap(txid: string) {
+    const { service, wallet } = await this.dependencies.getContext()
+    await this.dependencies.ensureWriteLease?.({ service, wallet })
+    const requestedId = String(txid).replace(/^local-send:/, '')
+    const match = service.getPendingTransfers().find(transfer => transfer.id === requestedId)
+    if (!match) return { aborted: false, local: true }
+    const result = await service.abortAcknowledgedSwap(match.id)
+    if (result.aborted && this.dependencies.getActiveTransferId(wallet.fundingAddress) === match.id) {
+      this.dependencies.clearActiveTransferId(wallet.fundingAddress)
+    }
+    return { ...result, local: true, transferId: match.id }
+  }
+
   async getPendingVanillaTxs() {
     const { service } = await this.dependencies.getContext()
     return {

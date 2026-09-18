@@ -96,14 +96,26 @@ export type ProviderMethodList = {
     feeRate?: number
     psbt: string
   }
-  finalizeRgbSwap: {
+  signRgbSellSwapAndPublishConsignment: {
     transferId: string
     makerSignedPsbt: string
   }
-  /** Validate a completed seller swap; its dApp broadcasts the final PSBT. */
-  completeRgbSwap: {
+  /** Confirm the buyer-signed seller swap; its dApp broadcasts the final PSBT. */
+  confirmRgbSellSwap: {
     transferId: string
     signedPsbt: string
+  }
+  /** Apply an already mutually agreed abort and release the seller RGB lock. */
+  applyRgbSellSwapAbort: {
+    transferId: string
+  }
+  /** Read the original dApp origin before applying a mutually agreed seller abort. */
+  getRgbSellSwapAbortOrigin: {
+    transferId: string
+  }
+  /** Mark an ACKed but mutually abandoned RGB receipt as canceled locally. */
+  applyRgbBuySwapAbort: {
+    recipientId: string
   }
   cancelRgbSwap: {
     transferId: string
@@ -111,8 +123,8 @@ export type ProviderMethodList = {
   getRgbSwapStatus: {
     transferId: string
   }
-  /** Complete a buyer-side BTC-for-RGB swap after its consignment is validated. */
-  completeRgbBuySwap: {
+  /** Sign buyer BTC inputs and accept a validated BTC-for-RGB consignment. */
+  signRgbBuySwapAndAcceptConsignment: {
     recipientId: string
     assetId: string
     amount: string

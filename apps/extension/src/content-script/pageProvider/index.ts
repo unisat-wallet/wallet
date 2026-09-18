@@ -27,10 +27,13 @@ export class UnisatProvider extends EventEmitter {
     signPayment: (transferId: string) => Promise<any>;
     cancelPayment: (transferId: string) => Promise<any>;
     getPaymentStatus: (transferId: string) => Promise<any>;
-    completeBuySwap: (params: { recipientId: string; assetId: string; amount: string; maxBtcSpend: string; makerSignedPsbt: string }) => Promise<any>;
+    signBuySwapAndAcceptConsignment: (params: { recipientId: string; assetId: string; amount: string; maxBtcSpend: string; makerSignedPsbt: string }) => Promise<any>;
     prepareSwap: (params: { invoice: string; assetId: string; amount: string; btcReceiveAmount: string; feeRate?: number; psbt: string }) => Promise<any>;
-    finalizeSwap: (transferId: string, makerSignedPsbt: string) => Promise<any>;
-    completeSwap: (transferId: string, signedPsbt: string) => Promise<any>;
+    signSellSwapAndPublishConsignment: (transferId: string, makerSignedPsbt: string) => Promise<any>;
+    confirmSellSwap: (transferId: string, signedPsbt: string) => Promise<any>;
+    applySellSwapAbort: (transferId: string) => Promise<any>;
+    getSellSwapAbortOrigin: (transferId: string) => Promise<any>;
+    applyBuySwapAbort: (recipientId: string) => Promise<any>;
     cancelSwap: (transferId: string) => Promise<any>;
     getOperationStatus: (transferId: string) => Promise<any>;
   };
@@ -54,10 +57,13 @@ export class UnisatProvider extends EventEmitter {
       signPayment: transferId => this.bitcoinAPI.signRgbPayment(transferId),
       cancelPayment: transferId => this.bitcoinAPI.cancelRgbPayment(transferId),
       getPaymentStatus: transferId => this.bitcoinAPI.getRgbPaymentStatus(transferId),
-      completeBuySwap: params => this.bitcoinAPI.completeRgbBuySwap(params),
+      signBuySwapAndAcceptConsignment: params => this.bitcoinAPI.signRgbBuySwapAndAcceptConsignment(params),
       prepareSwap: params => this.bitcoinAPI.prepareRgbSwap(params),
-      finalizeSwap: (transferId, makerSignedPsbt) => this.bitcoinAPI.finalizeRgbSwap(transferId, makerSignedPsbt),
-      completeSwap: (transferId, signedPsbt) => this.bitcoinAPI.completeRgbSwap(transferId, signedPsbt),
+      signSellSwapAndPublishConsignment: (transferId, makerSignedPsbt) => this.bitcoinAPI.signRgbSellSwapAndPublishConsignment(transferId, makerSignedPsbt),
+      confirmSellSwap: (transferId, signedPsbt) => this.bitcoinAPI.confirmRgbSellSwap(transferId, signedPsbt),
+      applySellSwapAbort: transferId => this.bitcoinAPI.applyRgbSellSwapAbort(transferId),
+      getSellSwapAbortOrigin: transferId => this.bitcoinAPI.getRgbSellSwapAbortOrigin(transferId),
+      applyBuySwapAbort: recipientId => this.bitcoinAPI.applyRgbBuySwapAbort(recipientId),
       cancelSwap: transferId => this.bitcoinAPI.cancelRgbSwap(transferId),
       getOperationStatus: transferId => this.bitcoinAPI.getRgbSwapStatus(transferId),
     };

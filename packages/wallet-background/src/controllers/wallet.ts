@@ -4251,6 +4251,12 @@ export class WalletController extends BaseController {
     return this.rgbSendOperations.abortVanillaTx(params.txid)
   }
 
+  abortRgbAcknowledgedSwap = async (params: Omit<RgbAbortVanillaTxRequest, 'wallet'>) => {
+    const context = await this.getLocalRgbService()
+    await this.ensureRgbWriteLease(context, { forceRenew: true })
+    return this.rgbSendOperations.abortAcknowledgedSwap(params.txid)
+  }
+
   acceptRgbReceive = async (params: { recipientId: string }) => {
     const context = await this.getLocalRgbService()
     await this.ensureRgbWriteLease(context, { forceRenew: true })
@@ -4261,6 +4267,12 @@ export class WalletController extends BaseController {
     const context = await this.getLocalRgbService()
     await this.ensureRgbWriteLease(context, { forceRenew: true })
     return this.rgbReceiveOperations.rejectReceive(params.recipientId)
+  }
+
+  abandonRgbAcceptedReceive = async (params: { recipientId: string }) => {
+    const context = await this.getLocalRgbService()
+    await this.ensureRgbWriteLease(context, { forceRenew: true })
+    return this.rgbReceiveOperations.abandonAcceptedReceive(params.recipientId)
   }
 
   getRgbAllocationSummary = (params: Omit<RgbAllocationSummaryRequest, 'wallet'> = {}) =>

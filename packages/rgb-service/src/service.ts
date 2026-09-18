@@ -1188,6 +1188,27 @@ export class RgbService {
     return { rejected: true }
   }
 
+  /**
+   * Cancels a receive that was ACKed for a swap which both parties have
+   * explicitly abandoned before it can settle on Bitcoin.  This is deliberately
+   * separate from rejectReceive: the proxy ACK is immutable, so retain a
+   * canceled history entry as a tombstone and never credit this receipt.
+   */
+  async abandonAcceptedReceive(recipientId: string) {
+    const state = this.requireState()
+    const pending = state.pendingReceives || []
+    const receive = pending.find(
+      item => item.recipientId === recipientId || item.proxyRecipientId === recipientId
+    )
+    if (!receive?.receivedConsignment?.accepted) {
+      throw new RgbServiceError(`RGB receive ${recipientId} is not an accepted pending receive`)
+    }
+    this.recordReceiveOutcome(receive, 'canceled', receive.receivedConsignment.txid)
+    state.pendingReceives = pending.filter(item => item !== receive)
+    await this.persist({ waitForRecovery: true })
+    return { abandoned: true, recipientId }
+  }
+
   private validateIncomingConsignment(
     receive: import('./types').RgbPendingReceive,
     item: { recipientId: string; payload: string; txid?: string; endpoint?: string }
@@ -2161,7 +2182,17 @@ export class RgbService {
     return this.runPendingTransferOperation(transferId, () => this.abortSendOnce(transferId))
   }
 
-  private async abortSendOnce(transferId: string) {
+  /**
+   * Explicit two-party recovery path for a published, non-broadcast swap.
+   * The market's bilateral abort agreement is the authority here: older
+   * wallet versions may not yet have observed the remote ACK or written the
+   * externalBroadcast marker when the dApp broadcast path failed.
+   */
+  async abortAcknowledgedSwap(transferId: string) {
+    return this.runPendingTransferOperation(transferId, () => this.abortSendOnce(transferId, true))
+  }
+
+  private async abortSendOnce(transferId: string, allowAcknowledged = false) {
     const state = this.requireState()
     const pending = state.pending[transferId]
     if (!pending) return { aborted: false }
@@ -2170,11 +2201,12 @@ export class RgbService {
     // An acknowledged consignment is committed to the receiver and is about
     // to be broadcast. It is no longer safe to signal cancellation, including
     // while the broadcast request itself is in flight.
-    if (pending.broadcast || pending.delivery?.acknowledgedAt) return { aborted: false }
+    if (pending.broadcast || (pending.delivery?.acknowledgedAt && !allowAcknowledged)) return { aborted: false }
+    if (allowAcknowledged && !pending.delivery) return { aborted: false }
 
     // Best-effort cancel signal: post ACK=false on the proxy so the receiver
     // can surface "Canceled by sender" instead of waiting forever.
-    if (pending.delivery && this.dependencies.transport.acknowledgeConsignment) {
+    if (!pending.delivery?.acknowledgedAt && pending.delivery && this.dependencies.transport.acknowledgeConsignment) {
       const proxyRecipientId = decodeRgbInvoice(pending.request.invoice).proxyRecipientId
       for (const consignment of pending.delivery.completed.consignments) {
         try {

@@ -96,6 +96,15 @@ export class RgbReceiveOperations {
     return service.rejectReceive(recipientId)
   }
 
+  async abandonAcceptedReceive(
+    recipientId: string
+  ): Promise<Awaited<ReturnType<RgbService['abandonAcceptedReceive']>>> {
+    const context = await this.dependencies.getContext()
+    const { service } = context
+    await this.dependencies.ensureWriteLease?.(context)
+    return service.abandonAcceptedReceive(recipientId)
+  }
+
   async getAllocationSummary(params: { skipSync?: boolean } = {}): Promise<{
     available: boolean
     availableAllocationCount: number

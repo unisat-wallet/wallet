@@ -839,7 +839,7 @@ class ProviderController extends BaseController {
       ]
     },
   ])
-  finalizeRgbSwap = async ({
+  signRgbSellSwapAndPublishConsignment = async ({
     data: { params },
     session: { origin },
     approvalRes,
@@ -864,7 +864,7 @@ class ProviderController extends BaseController {
    * deliberately leaves broadcast to the dApp.
    */
   @Reflect.metadata('APPROVAL', ['RgbPayment'])
-  completeRgbSwap = async ({
+  confirmRgbSellSwap = async ({
     data: { params },
     session: { origin },
   }: {
@@ -879,6 +879,38 @@ class ProviderController extends BaseController {
       transferId: params.transferId,
       signedPsbt: params.signedPsbt,
     })
+  }
+
+  @Reflect.metadata('APPROVAL', ['RgbPaymentCancel'])
+  applyRgbSellSwapAbort = async ({ data: { params }, session: { origin } }: { data: { params: { transferId: string } }; session: { origin: string } }) => {
+    if (!params.transferId) throw new Error('transferId is required')
+    // A mutually signed terminal abort intentionally remains recoverable after
+    // a dApp migration. Normal payment/swap operations stay origin-bound.
+    const createdAtOrigin = await wallet.getRgbPaymentOrigin({ transferId: params.transferId })
+    const result = await wallet.abortRgbAcknowledgedSwap({ txid: params.transferId })
+    return { ...result, createdAtOrigin, currentOrigin: origin, originMatches: createdAtOrigin === origin }
+  }
+
+  @Reflect.metadata('SAFE', true)
+  getRgbSellSwapAbortOrigin = async ({ data: { params }, session: { origin } }: { data: { params: { transferId: string } }; session: { origin: string } }) => {
+    if (!params.transferId) throw new Error('transferId is required')
+    const createdAtOrigin = await wallet.getRgbPaymentOrigin({ transferId: params.transferId })
+    return { createdAtOrigin, currentOrigin: origin, originMatches: createdAtOrigin === origin }
+  }
+
+  @Reflect.metadata('APPROVAL', [
+    'RgbReceiveReject',
+    async req => {
+      const params = req.data.params as { recipientId: string; receive?: unknown }
+      if (!params.recipientId) throw new Error('recipientId is required')
+      const { list } = await wallet.getRgbPendingReceiveInvoices()
+      const receive = list.find(item => item.recipientId === params.recipientId)
+      if (!receive) throw new Error('RGB receive is not available for swap abort')
+      params.receive = receive
+    },
+  ])
+  applyRgbBuySwapAbort = async ({ data: { params } }: { data: { params: { recipientId: string } } }) => {
+    return wallet.abandonRgbAcceptedReceive({ recipientId: params.recipientId })
   }
 
   @Reflect.metadata('APPROVAL', ['RgbPaymentCancel'])
@@ -979,7 +1011,7 @@ class ProviderController extends BaseController {
       ]
     },
   ])
-  completeRgbBuySwap = async ({ data: { params }, approvalRes }: {
+  signRgbBuySwapAndAcceptConsignment = async ({ data: { params }, approvalRes }: {
     data: { params: { recipientId: string; toSignDatas?: any[]; receiptAlreadyAccepted?: boolean } }
     approvalRes: SignPsbtResult
   }) => {

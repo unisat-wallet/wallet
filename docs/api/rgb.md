@@ -39,10 +39,11 @@ must only accept/reject the recipient ID it created or was explicitly given.
 | `signPayment` | Yes | Sign, deliver the consignment, wait for ACK, then broadcast. |
 | `cancelPayment` / `getPaymentStatus` | Yes / No | Cancel an unacknowledged payment or inspect its status. |
 | `prepareSwap` | Yes | Prepare a seller-side RGB-for-BTC atomic swap. |
-| `finalizeSwap` | Yes | Add seller signatures and publish the consignment, without broadcasting. |
-| `completeSwap` | Yes | Verify buyer's returned signed PSBT and ACK; the dApp finalizes and broadcasts it. |
+| `signSellSwapAndPublishConsignment` | Yes | Add seller signatures and publish the consignment, without broadcasting. |
+| `confirmSellSwap` | Yes | Verify the buyer's returned signed PSBT and ACK; the dApp finalizes and broadcasts it. |
+| `applySellSwapAbort` / `applyBuySwapAbort` | Yes | Apply a mutually signed, terminal swap-abort agreement to local seller/buyer RGB state. |
 | `cancelSwap` / `getOperationStatus` | Yes / No | Cancel or inspect a swap. |
-| `completeBuySwap` | Yes | Complete a buyer-side BTC-for-RGB atomic swap. |
+| `signBuySwapAndAcceptConsignment` | Yes | Sign buyer BTC inputs and accept the RGB consignment. |
 
 ## Assets
 
@@ -188,7 +189,7 @@ possible before a valid ACK or broadcast.
 The buyer first creates an RGB invoice with `createReceiveInvoice`. The maker
 must create and sign the swap transaction, publish its consignment to that
 invoice, and wait for the wallet to show the invoice as `PendingAccept`.
-`completeBuySwap` then signs the buyer's BTC inputs and sends the ACK.
+`signBuySwapAndAcceptConsignment` then signs the buyer's BTC inputs and sends the ACK.
 
 This supports both recipient forms:
 
@@ -197,13 +198,13 @@ This supports both recipient forms:
 - `witness`: the maker transaction must include the invoice's RGB receiver
   output.
 
-### `completeBuySwap(params)`
+### `signBuySwapAndAcceptConsignment(params)`
 
 ```ts
 const { list } = await rgb.getPendingReceives()
 const receive = list.find(item => item.status === 'PendingAccept')
 
-const result = await rgb.completeBuySwap({
+const result = await rgb.signBuySwapAndAcceptConsignment({
   recipientId: receive.recipientId,
   assetId: 'rgb:...',
   amount: '1000',
@@ -265,25 +266,25 @@ The wallet enforces all of the following:
   not create an output;
 - partial RGB change returns to the wallet RGB funding script.
 
-### `finalizeSwap(transferId, makerSignedPsbt)`
+### `signSellSwapAndPublishConsignment(transferId, makerSignedPsbt)`
 
 This is the seller's first completion phase. It signs the seller-controlled
 inputs, publishes the RGB consignment, and returns the seller-signed PSBT to
 relay to the buyer. It never broadcasts at this point.
 
 ```ts
-const published = await rgb.finalizeSwap(prepared.transferId, prepared.coloredPsbt)
+const published = await rgb.signSellSwapAndPublishConsignment(prepared.transferId, prepared.coloredPsbt)
 // { transferId, txid, status: 'awaiting_buyer_signature', makerSignedPsbt }
 ```
 
-Once the buyer calls `completeBuySwap`, relay its returned `signedPsbt` back to
-the seller and call `completeSwap`. The wallet rechecks the committed unsigned
+Once the buyer calls `signBuySwapAndAcceptConsignment`, relay its returned `signedPsbt` back to
+the seller and call `confirmSellSwap`. The wallet rechecks the committed unsigned
 transaction and verifies the buyer ACK. It does not finalize the PSBT; the
 dApp finalizes it and broadcasts the resulting transaction.
 
 ```ts
-const completed = await rgb.completeSwap(prepared.transferId, buyerResult.signedPsbt)
-const finalPsbt = finalizeAllInputsInDapp(completed.signedPsbt)
+const confirmed = await rgb.confirmSellSwap(prepared.transferId, buyerResult.signedPsbt)
+const finalPsbt = finalizeAllInputsInDapp(confirmed.signedPsbt)
 await window.unisat.pushPsbt(finalPsbt)
 ```
 
@@ -295,6 +296,33 @@ await rgb.cancelSwap(transferId)
 ```
 
 These have the same ownership and cancellation rules as normal payments.
+
+### Mutually agreed terminal swap abort
+
+`cancelSwap` is only for a swap that has not received a buyer ACK. If the
+buyer has signed and accepted the RGB consignment but the transaction is known
+to be terminally unbroadcastable, the market must first collect a BIP-322
+abort agreement from both participants. Only after that agreement is visible
+to both wallets may each participant apply its local recovery:
+
+```ts
+// seller: releases only this locally locked, ACKed external-broadcast swap
+await rgb.applySellSwapAbort(transferId)
+
+// buyer: records the accepted receipt as canceled history; it is never settled
+await rgb.applyBuySwapAbort(recipientId)
+```
+
+Before the seller action, `getSellSwapAbortOrigin(transferId)` returns the
+original dApp origin and whether it matches the current site. A mutually
+agreed abort is deliberately allowed from a different site after user
+approval; ordinary payment and swap operations remain origin-bound.
+
+These methods are intentionally local and idempotent. The dApp must not call
+either one before the market has verified both agreement signatures. A seller
+abort releases only a transfer that has not been broadcast; a buyer abort
+keeps a canceled receipt history entry so the same consignment is not later
+credited after a restart.
 
 ## Receiver and ACK requirements
 
