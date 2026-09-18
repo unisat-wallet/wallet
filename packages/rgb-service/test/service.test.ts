@@ -116,9 +116,16 @@ describe('RgbService', () => {
       lockedOutpoints: [{ txid: 'a'.repeat(64), vout: 0 }],
     })
 
-    await expect(service.checkInvoiceAvailability(testnetInvoice)).resolves.toEqual({ available: true })
+    await expect(service.checkInvoiceAvailability(testnetInvoice)).resolves.toEqual({
+      available: true,
+    })
     await expect(
-      service.prepareSend({ assetId: 'rgb:asset', amount: '40', invoice: testnetInvoice, feeRate: 2 })
+      service.prepareSend({
+        assetId: 'rgb:asset',
+        amount: '40',
+        invoice: testnetInvoice,
+        feeRate: 2,
+      })
     ).resolves.toMatchObject({ id: 'transfer-1' })
   })
 
@@ -187,11 +194,15 @@ describe('RgbService', () => {
       { providerOrigin: 'https://dapp.example' }
     )
 
-    await expect(service.getTransferProviderOrigin(prepared.id)).resolves.toBe('https://dapp.example')
+    await expect(service.getTransferProviderOrigin(prepared.id)).resolves.toBe(
+      'https://dapp.example'
+    )
 
     const restarted = new RgbService(dependencies)
     await restarted.open(wallet)
-    await expect(restarted.getTransferProviderOrigin(prepared.id)).resolves.toBe('https://dapp.example')
+    await expect(restarted.getTransferProviderOrigin(prepared.id)).resolves.toBe(
+      'https://dapp.example'
+    )
 
     await restarted.queueFeePoolUtxos([])
     const recovery = checkpoint.mock.calls.at(-1)?.[0] as {
@@ -200,7 +211,9 @@ describe('RgbService', () => {
     expect(recovery.pending[prepared.id]?.providerOrigin).toBeUndefined()
 
     await restarted.abortSend(prepared.id)
-    await expect(restarted.getTransferProviderOrigin(prepared.id)).resolves.toBe('https://dapp.example')
+    await expect(restarted.getTransferProviderOrigin(prepared.id)).resolves.toBe(
+      'https://dapp.example'
+    )
   })
 
   it('removes completed payment ownership after 24 hours', async () => {
@@ -222,7 +235,9 @@ describe('RgbService', () => {
     )
 
     await service.abortSend(prepared.id)
-    await expect(service.getTransferProviderOrigin(prepared.id)).resolves.toBe('https://dapp.example')
+    await expect(service.getTransferProviderOrigin(prepared.id)).resolves.toBe(
+      'https://dapp.example'
+    )
 
     now += 24 * 60 * 60 * 1000
     const restarted = new RgbService(dependencies)
@@ -291,7 +306,10 @@ describe('RgbService', () => {
     const reopened = new RgbService(dependencies)
     await reopened.open(wallet)
     expect(reopened.getPendingReceives()).toContainEqual(
-      expect.objectContaining({ proxyRecipientId: witness.proxyRecipientId, recipientType: 'witness' })
+      expect.objectContaining({
+        proxyRecipientId: witness.proxyRecipientId,
+        recipientType: 'witness',
+      })
     )
     expect(reopened.getUtxoInspection().invoiceReservations).toContainEqual(
       expect.objectContaining({
@@ -301,9 +319,11 @@ describe('RgbService', () => {
       })
     )
     ;(reopened as any).state.pendingReceives[0].witnessPublicKey = undefined
-    await expect(reopened.backfillWitnessReceivePublicKey(`02${'22'.repeat(32)}`)).resolves.toEqual({
-      changed: true,
-    })
+    await expect(reopened.backfillWitnessReceivePublicKey(`02${'22'.repeat(32)}`)).resolves.toEqual(
+      {
+        changed: true,
+      }
+    )
     expect(reopened.getPendingReceives()[0]?.witnessPublicKey).toBe(`02${'22'.repeat(32)}`)
   })
 
@@ -380,7 +400,10 @@ describe('RgbService', () => {
     await expect(service.restoreRecoveryState(recovery)).resolves.toBe(true)
     expect(service.getSnapshot().utxos).toHaveLength(1)
     await expect(
-      service.restoreRecoveryState({ ...recovery, wallet: { ...wallet, fundingAddress: 'bc1p-other' } })
+      service.restoreRecoveryState({
+        ...recovery,
+        wallet: { ...wallet, fundingAddress: 'bc1p-other' },
+      })
     ).resolves.toBe(false)
     await expect(
       service.restoreRecoveryState({ ...recovery, wallet: { ...wallet, network: 'testnet' } })
@@ -408,8 +431,13 @@ describe('RgbService', () => {
     expect(service.canFastForwardRecoveryState()).toBe(false)
     ;(service as any).state.pending = {}
     ;(service as any).state.pendingAssetMetadata = [
-      { assetId: 'rgb:asset', metadata: { ticker: 'TOK', name: 'Token', precision: 0, schema: 'NIA', issuedSupply: '1' } },
+      {
+        assetId: 'rgb:asset',
+        metadata: { ticker: 'TOK', name: 'Token', precision: 0, schema: 'NIA', issuedSupply: '1' },
+      },
     ]
+    expect(service.canFastForwardRecoveryState()).toBe(true)
+    ;(service as any).state.pendingIssues = [{ id: 'issue', createdAt: 1 }]
     expect(service.canFastForwardRecoveryState()).toBe(false)
   })
 
@@ -430,7 +458,10 @@ describe('RgbService', () => {
     await service.setRecoveryCheckpointRevision('a'.repeat(24))
     expect(service.matchesRecoveryState(recovery)).toBe(true)
     expect(
-      service.matchesRecoveryState({ ...recovery, pending: { ...recovery.pending, other: recovery.pending.transfer } })
+      service.matchesRecoveryState({
+        ...recovery,
+        pending: { ...recovery.pending, other: recovery.pending.transfer },
+      })
     ).toBe(false)
   })
 
@@ -747,7 +778,6 @@ describe('RgbService', () => {
         },
       ],
     }
-
     ;(service as any).recordReceiveOutcome(
       { recipientId: 'recipient', createdAt: 1 },
       'rejected',
@@ -908,7 +938,12 @@ describe('RgbService', () => {
     await service.sync()
 
     await expect(
-      service.prepareSend({ assetId: 'rgb:asset', amount: '40', invoice: rgbInvoice(40), feeRate: 2 })
+      service.prepareSend({
+        assetId: 'rgb:asset',
+        amount: '40',
+        invoice: rgbInvoice(40),
+        feeRate: 2,
+      })
     ).rejects.toThrow('Selected RGB allocation is no longer spendable')
     expect(dependencies.encoder.prepareTransfer).not.toHaveBeenCalled()
   })
@@ -995,22 +1030,34 @@ describe('RgbService', () => {
       }),
     }
     let nextId = 0
-    const feeFunding = vi.mocked(dependencies.encoder.prepareTransfer).mockImplementation(async input => {
-      nextId++
-      return {
-        id: `transfer-${nextId}`,
-        psbt: 'cHNidP8=',
-        toSignInputs: [],
-        lockedOutpoints: [input.selectedUtxos[0]!.outpoint],
-        feeOutpoints: [input.feeFunding!.utxos[0]!.outpoint],
-      }
-    })
+    const feeFunding = vi
+      .mocked(dependencies.encoder.prepareTransfer)
+      .mockImplementation(async input => {
+        nextId++
+        return {
+          id: `transfer-${nextId}`,
+          psbt: 'cHNidP8=',
+          toSignInputs: [],
+          lockedOutpoints: [input.selectedUtxos[0]!.outpoint],
+          feeOutpoints: [input.feeFunding!.utxos[0]!.outpoint],
+        }
+      })
     const service = new RgbService(dependencies)
     await service.open(wallet)
     await service.sync()
 
-    await service.prepareSend({ assetId: 'rgb:asset', amount: '40', invoice: rgbInvoice(40), feeRate: 2 })
-    await service.prepareSend({ assetId: 'rgb:asset', amount: '60', invoice: rgbInvoice(60), feeRate: 2 })
+    await service.prepareSend({
+      assetId: 'rgb:asset',
+      amount: '40',
+      invoice: rgbInvoice(40),
+      feeRate: 2,
+    })
+    await service.prepareSend({
+      assetId: 'rgb:asset',
+      amount: '60',
+      invoice: rgbInvoice(60),
+      feeRate: 2,
+    })
 
     expect(feeFunding.mock.calls[1]![0].feeFunding?.utxos).toEqual([feeUtxos[1]])
   })
@@ -1061,7 +1108,10 @@ describe('RgbService', () => {
     const reopened = new RgbService(dependencies)
     await reopened.open(wallet)
     expect(reopened.getPendingIssues()).toEqual([
-      expect.objectContaining({ assetId: 'rgb:issued', utxoSync: { txid: outpoints[0]!.outpoint.txid, outpoints } }),
+      expect.objectContaining({
+        assetId: 'rgb:issued',
+        utxoSync: { txid: outpoints[0]!.outpoint.txid, outpoints },
+      }),
     ])
     expect(reopened.getIssueHistory()).toEqual([
       expect.objectContaining({
@@ -1084,9 +1134,10 @@ describe('RgbService', () => {
 
   it('rolls back an issuance when its recovery checkpoint fails', async () => {
     const dependencies = createDependencies()
-    const checkpoint = vi.fn().mockResolvedValueOnce(undefined).mockRejectedValueOnce(
-      new Error('recovery unavailable')
-    )
+    const checkpoint = vi
+      .fn()
+      .mockResolvedValueOnce(undefined)
+      .mockRejectedValueOnce(new Error('recovery unavailable'))
     dependencies.onStatePersisted = checkpoint
     const service = new RgbService(dependencies)
     await service.open(wallet)
@@ -1217,32 +1268,33 @@ describe('RgbService', () => {
     let finishCheckpoint: (() => void) | undefined
     let checkpointStarted: (() => void) | undefined
     const checkpointStartedPromise = new Promise<void>(resolve => (checkpointStarted = resolve))
-    dependencies.onStatePersisted = vi.fn(
-      () => {
-        checkpointStarted?.()
-        return new Promise<void>(resolve => (finishCheckpoint = resolve))
-      }
-    )
+    dependencies.onStatePersisted = vi.fn(() => {
+      checkpointStarted?.()
+      return new Promise<void>(resolve => (finishCheckpoint = resolve))
+    })
     const service = new RgbService(dependencies)
     await service.open(wallet)
     await service.sync()
     service.enableRecoveryBackup()
 
     let completed = false
-    const creating = service.createBlindReceive({ assetId: 'rgb:asset', amount: '1' }).then(result => {
-      completed = true
-      return result
-    })
+    const creating = service
+      .createBlindReceive({ assetId: 'rgb:asset', amount: '1' })
+      .then(result => {
+        completed = true
+        return result
+      })
     await checkpointStartedPromise
 
     expect(dependencies.onStatePersisted).toHaveBeenCalledWith(
-      expect.objectContaining({ pendingReceives: [expect.objectContaining({ assetId: 'rgb:asset' })] }),
+      expect.objectContaining({
+        pendingReceives: [expect.objectContaining({ assetId: 'rgb:asset' })],
+      }),
       { reason: 'state_change' }
     )
-    const checkpointState = vi.mocked(dependencies.onStatePersisted).mock.calls.at(-1)?.[0] as Record<
-      string,
-      unknown
-    >
+    const checkpointState = vi
+      .mocked(dependencies.onStatePersisted)
+      .mock.calls.at(-1)?.[0] as Record<string, unknown>
     expect(checkpointState).not.toHaveProperty('recoveryCheckpointUpdatedAt')
     expect(checkpointState).not.toHaveProperty('recoveryCheckpointRevision')
     expect(completed).toBe(false)
@@ -1428,7 +1480,9 @@ describe('RgbService', () => {
     await service.open(wallet)
     await service.sync()
 
-    await expect(service.createBlindReceive({ assetId: 'rgb:asset', amount: '1' })).resolves.toMatchObject({
+    await expect(
+      service.createBlindReceive({ assetId: 'rgb:asset', amount: '1' })
+    ).resolves.toMatchObject({
       assetId: 'rgb:asset',
     })
     expect(service.getPendingConfirmationReceiveUtxos()).toEqual([])
@@ -1650,7 +1704,12 @@ describe('RgbService', () => {
     vi.mocked(dependencies.stateSource.getValidationHistory).mockClear()
 
     await expect(
-      reopened.prepareSend({ assetId: 'rgb:asset', amount: '100', invoice: rgbInvoice(100), feeRate: 2 })
+      reopened.prepareSend({
+        assetId: 'rgb:asset',
+        amount: '100',
+        invoice: rgbInvoice(100),
+        feeRate: 2,
+      })
     ).resolves.toMatchObject({ id: 'transfer-1' })
 
     expect(dependencies.stateSource.getValidationHistory).not.toHaveBeenCalled()
@@ -1695,7 +1754,12 @@ describe('RgbService', () => {
     })
 
     await expect(
-      service.prepareSend({ assetId: 'rgb:asset', amount: '100', invoice: rgbInvoice(100), feeRate: 2 })
+      service.prepareSend({
+        assetId: 'rgb:asset',
+        amount: '100',
+        invoice: rgbInvoice(100),
+        feeRate: 2,
+      })
     ).resolves.toMatchObject({ id: 'transfer-recovered-history' })
 
     expect(dependencies.stateSource.getValidationHistory).toHaveBeenCalledTimes(1)
@@ -1726,9 +1790,9 @@ describe('RgbService', () => {
       endpoints: [proxyEndpoint],
     })
     expect(dependencies.broadcaster.broadcast).toHaveBeenCalledWith(completed.rawTx)
-    expect(vi.mocked(dependencies.transport.publishConsignment).mock.invocationCallOrder[0]).toBeLessThan(
-      vi.mocked(dependencies.broadcaster.broadcast).mock.invocationCallOrder[0]!
-    )
+    expect(
+      vi.mocked(dependencies.transport.publishConsignment).mock.invocationCallOrder[0]
+    ).toBeLessThan(vi.mocked(dependencies.broadcaster.broadcast).mock.invocationCallOrder[0]!)
     expect(dependencies.stateSource.syncBroadcast).toHaveBeenCalledWith(
       wallet,
       'transfer-1',
@@ -1784,7 +1848,10 @@ describe('RgbService', () => {
     expect(dependencies.broadcaster.broadcast).not.toHaveBeenCalled()
     expect(service.getPendingTransfers()).toEqual([
       expect.objectContaining({
-        delivery: expect.objectContaining({ externalBroadcast: true, acknowledgedAt: expect.any(Number) }),
+        delivery: expect.objectContaining({
+          externalBroadcast: true,
+          acknowledgedAt: expect.any(Number),
+        }),
       }),
     ])
 
@@ -1819,7 +1886,10 @@ describe('RgbService', () => {
     ]
     const processClaimedReceives = vi.spyOn(service, 'processClaimedReceives')
 
-    await expect(service.acceptReceive('recipient')).resolves.toEqual({ accepted: true, status: 'accepted' })
+    await expect(service.acceptReceive('recipient')).resolves.toEqual({
+      accepted: true,
+      status: 'accepted',
+    })
     expect((service as any).state.pendingReceives[0].receivedConsignment).toMatchObject({
       assetId: 'rgb:asset',
       amount: '60',
@@ -2048,7 +2118,9 @@ describe('RgbService', () => {
     const dependencies = createDependencies()
     dependencies.transport.getConsignment = vi.fn()
     dependencies.transport.getAcknowledgement = vi.fn().mockResolvedValue(undefined)
-    dependencies.transport.acknowledgeConsignment = vi.fn().mockRejectedValue(new Error('proxy unavailable'))
+    dependencies.transport.acknowledgeConsignment = vi
+      .fn()
+      .mockRejectedValue(new Error('proxy unavailable'))
     const service = new RgbService(dependencies)
     await service.open(wallet)
     ;(service as any).state.pendingReceives = [
@@ -2139,7 +2211,10 @@ describe('RgbService', () => {
       },
     ]
 
-    await expect(service.acceptReceive('recipient')).resolves.toEqual({ accepted: true, status: 'accepted' })
+    await expect(service.acceptReceive('recipient')).resolves.toEqual({
+      accepted: true,
+      status: 'accepted',
+    })
   })
 
   it('does not reject or cancel a receive once ACK intent is durable', async () => {
@@ -2521,7 +2596,6 @@ describe('RgbService', () => {
         txid: 'c'.repeat(64),
       }),
     ])
-
   })
 
   it('discards an Any Amount invoice after rejecting a consignment', async () => {
@@ -2544,7 +2618,15 @@ describe('RgbService', () => {
       },
     ]
     ;(service as any).validateIncomingConsignment = vi.fn().mockReturnValue({
-      decoded: { metadata: { ticker: 'TOK', name: 'Token', precision: 2, schema: 'NIA', issuedSupply: '1000' } },
+      decoded: {
+        metadata: {
+          ticker: 'TOK',
+          name: 'Token',
+          precision: 2,
+          schema: 'NIA',
+          issuedSupply: '1000',
+        },
+      },
       assetId: 'rgb:asset',
       amount: '1000',
       txid: 'c'.repeat(64),
@@ -2589,7 +2671,9 @@ describe('RgbService', () => {
     const dependencies = createDependencies()
     dependencies.transport.publishConsignment = vi
       .fn()
-      .mockRejectedValue(new Error('RGB proxy consignment.post failed: Cannot change uploaded file'))
+      .mockRejectedValue(
+        new Error('RGB proxy consignment.post failed: Cannot change uploaded file')
+      )
     const service = new RgbService(dependencies)
     await service.open(wallet)
     await service.sync()
@@ -2639,7 +2723,9 @@ describe('RgbService', () => {
         },
       ],
     })
-    await expect(service.sync()).resolves.toEqual(expect.objectContaining({ utxos: expect.any(Array) }))
+    await expect(service.sync()).resolves.toEqual(
+      expect.objectContaining({ utxos: expect.any(Array) })
+    )
     await expect(service.createBlindReceive({})).resolves.toEqual(
       expect.objectContaining({ invoice: expect.stringMatching(/^rgb:/) })
     )
@@ -2665,7 +2751,9 @@ describe('RgbService', () => {
       feeRate: 2,
     })
 
-    await expect(service.completeSend('transfer-1', 'signed-psbt')).rejects.toThrow('broadcast unavailable')
+    await expect(service.completeSend('transfer-1', 'signed-psbt')).rejects.toThrow(
+      'broadcast unavailable'
+    )
     expect(service.getPendingTransfers()).toEqual([
       expect.objectContaining({
         id: 'transfer-1',
@@ -2721,7 +2809,9 @@ describe('RgbService', () => {
 
   it('treats a broadcast exception as successful when the txid is in the mempool', async () => {
     const dependencies = createDependencies()
-    vi.mocked(dependencies.broadcaster.broadcast).mockRejectedValue(new Error('broadcast request timed out'))
+    vi.mocked(dependencies.broadcaster.broadcast).mockRejectedValue(
+      new Error('broadcast request timed out')
+    )
     dependencies.stateSource.getTransactionStatus = vi.fn().mockResolvedValue({
       status: 'mempool',
       confirmations: 0,
@@ -2753,7 +2843,9 @@ describe('RgbService', () => {
   it('releases a transfer when a failed broadcast txid is not found on-chain', async () => {
     const dependencies = createDependencies()
     dependencies.transport.acknowledgeConsignment = vi.fn().mockResolvedValue(undefined)
-    vi.mocked(dependencies.broadcaster.broadcast).mockRejectedValue(new Error('broadcast unavailable'))
+    vi.mocked(dependencies.broadcaster.broadcast).mockRejectedValue(
+      new Error('broadcast unavailable')
+    )
     dependencies.stateSource.getTransactionStatus = vi.fn().mockResolvedValue({
       status: 'unknown',
       confirmations: 0,
@@ -2837,9 +2929,9 @@ describe('RgbService', () => {
       },
     }
 
-    await expect((service as any).isAcceptedReceiveTerminallyCanceled(receive, proxyEndpoint)).resolves.toBe(
-      true
-    )
+    await expect(
+      (service as any).isAcceptedReceiveTerminallyCanceled(receive, proxyEndpoint)
+    ).resolves.toBe(true)
   })
 
   it('allows the sender to abort a delivered transfer before it is broadcast', async () => {
@@ -2862,7 +2954,10 @@ describe('RgbService', () => {
       expect.objectContaining({ id: 'transfer-1', delivery: expect.any(Object) }),
     ])
 
-    await expect(service.abortSend('transfer-1')).resolves.toEqual({ aborted: true, status: 'canceled' })
+    await expect(service.abortSend('transfer-1')).resolves.toEqual({
+      aborted: true,
+      status: 'canceled',
+    })
     expect(service.getPendingTransfers()).toEqual([])
     expect(service.getPendingSendHistory()).toEqual([
       expect.objectContaining({ transferId: 'transfer-1', status: 'canceled', amount: '60' }),
@@ -2885,7 +2980,9 @@ describe('RgbService', () => {
       feeRate: 2,
     })
 
-    await expect(service.completeSend('transfer-1', 'signed-psbt')).rejects.toThrow('indexer unavailable')
+    await expect(service.completeSend('transfer-1', 'signed-psbt')).rejects.toThrow(
+      'indexer unavailable'
+    )
     expect(service.getPendingTransfers()).toEqual([
       expect.objectContaining({ id: 'transfer-1', broadcast: expect.any(Object) }),
     ])

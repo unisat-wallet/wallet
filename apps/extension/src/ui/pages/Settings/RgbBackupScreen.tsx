@@ -26,6 +26,7 @@ export default function RgbBackupScreen() {
   const [filename, setFilename] = useState<string>();
   const [preview, setPreview] = useState<BackupPreview>();
   const [confirmRestore, setConfirmRestore] = useState(false);
+  const [confirmCloudRestore, setConfirmCloudRestore] = useState(false);
 
   const exportBackup = async () => {
     setExporting(true);
@@ -85,6 +86,20 @@ export default function RgbBackupScreen() {
     }
   };
 
+  const restoreCloudCheckpoint = async () => {
+    setRestoring(true);
+    try {
+      await wallet.restoreLatestRgbRecoveryCheckpoint();
+      setConfirmCloudRestore(false);
+      tools.toastSuccess('Latest RGB cloud state restored');
+      nav.goBack();
+    } catch (error) {
+      tools.toastError(errorMessage(error));
+    } finally {
+      setRestoring(false);
+    }
+  };
+
   return (
     <Layout>
       <Header onBack={() => nav.goBack()} title="RGB Backup" />
@@ -134,6 +149,12 @@ export default function RgbBackupScreen() {
             disabled={!payload || reading || restoring}
             onClick={() => setConfirmRestore(true)}
           />
+          <Button
+            text="Recover latest cloud state"
+            preset="default"
+            disabled={restoring}
+            onClick={() => setConfirmCloudRestore(true)}
+          />
           <input
             ref={fileInput}
             type="file"
@@ -167,6 +188,35 @@ export default function RgbBackupScreen() {
                 full
                 disabled={restoring}
                 onClick={() => void restoreBackup()}
+              />
+            </Row>
+          </Column>
+        </Popover>
+      ) : null}
+      {confirmCloudRestore ? (
+        <Popover onClose={() => !restoring && setConfirmCloudRestore(false)}>
+          <Column gap="md">
+            <Text text="Recover latest cloud state?" preset="title-bold" />
+            <Text
+              text="This discards the RGB state on this device and reloads the newest encrypted checkpoint from the cloud. It does not overwrite cloud data."
+              color="textDim"
+              size="sm"
+              wrap
+            />
+            <Row fullX>
+              <Button
+                text="Cancel"
+                preset="defaultV2"
+                full
+                disabled={restoring}
+                onClick={() => setConfirmCloudRestore(false)}
+              />
+              <Button
+                text={restoring ? 'Recovering…' : 'Recover from cloud'}
+                preset="primaryV2"
+                full
+                disabled={restoring}
+                onClick={() => void restoreCloudCheckpoint()}
               />
             </Row>
           </Column>

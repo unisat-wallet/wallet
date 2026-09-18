@@ -105,9 +105,13 @@ export class RgbService {
   async open(wallet: RgbWalletRef) {
     const storageKey = this.storageKey(wallet)
     const stored = await this.dependencies.storage.get<RgbServiceState>(storageKey)
-    this.openedFromStorage = Boolean(stored && stored.wallet.fundingAddress === wallet.fundingAddress)
+    this.openedFromStorage = Boolean(
+      stored && stored.wallet.fundingAddress === wallet.fundingAddress
+    )
     this.recoveryBackupEnabled =
-      this.openedFromStorage && stored?.recoveryRemoteStateKnown !== false && !stored?.recoveryConflict
+      this.openedFromStorage &&
+      stored?.recoveryRemoteStateKnown !== false &&
+      !stored?.recoveryConflict
     this.state =
       stored && stored.wallet.fundingAddress === wallet.fundingAddress
         ? normalizeStateAssetIds(hydrateState(stored))
@@ -117,7 +121,7 @@ export class RgbService {
             recoveryRemoteStateKnown: false,
             snapshot: { utxos: [], syncedAt: 0 },
             pending: {},
-    }
+          }
     this.pruneExpiredProviderOrigins()
     this.hydrateStoredContractMetadata()
     // A local open must never upload before the controller has authenticated a
@@ -149,8 +153,9 @@ export class RgbService {
 
   /**
    * An older device may replace its state with a newer encrypted checkpoint
-   * only when it has no local work that would need a merge. The backend cannot
-   * decrypt/merge RGB state, so callers must surface a conflict otherwise.
+   * only when it has no active local operation that would need a merge. Public
+   * indexing outboxes and completed history are replayable from the recovered
+   * checkpoint, so they must not strand a secondary device in conflict mode.
    */
   canFastForwardRecoveryState() {
     const state = this.requireState()
@@ -159,12 +164,7 @@ export class RgbService {
       !state.recoveryCheckpoint?.dirty &&
       Object.keys(state.pending).length === 0 &&
       (state.pendingReceives?.length || 0) === 0 &&
-      (state.pendingReceiveHistory?.length || 0) === 0 &&
-      (state.pendingSendHistory?.length || 0) === 0 &&
-      !state.pendingUtxoSync &&
-      (state.pendingIssues?.length || 0) === 0 &&
-      (state.pendingAssetMetadata?.length || 0) === 0 &&
-      (state.pendingFeePoolUtxos?.length || 0) === 0
+      (state.pendingIssues?.length || 0) === 0
     )
   }
 
@@ -409,8 +409,7 @@ export class RgbService {
         .map(outpoint => `${outpoint.txid}:${outpoint.vout}`)
     )
     return (
-      spentOutpoints.size > 0 &&
-      snapshot.utxos.some(utxo => spentOutpoints.has(outpointKey(utxo)))
+      spentOutpoints.size > 0 && snapshot.utxos.some(utxo => spentOutpoints.has(outpointKey(utxo)))
     )
   }
 
@@ -577,7 +576,9 @@ export class RgbService {
     const endpoints = this.dependencies.transport.getEndpoints?.() || []
     if (!endpoints.length) throw new RgbServiceError('RGB proxy endpoint is not configured')
     const nonce = randomBytes(16)
-    const transportEndpoints = endpoints.map(endpoint => appendRgbInvoiceRecipientNonce(endpoint, nonce))
+    const transportEndpoints = endpoints.map(endpoint =>
+      appendRgbInvoiceRecipientNonce(endpoint, nonce)
+    )
     const now = this.now()
     const expirationTimestamp =
       input.durationSeconds === undefined
@@ -593,7 +594,8 @@ export class RgbService {
       address: state.wallet.fundingAddress,
     })
     const decoded = decodeRgbInvoice(invoice)
-    if (decoded.recipientType !== 'witness') throw new RgbServiceError('RGB witness invoice is invalid')
+    if (decoded.recipientType !== 'witness')
+      throw new RgbServiceError('RGB witness invoice is invalid')
     const pending = {
       invoice,
       recipientId: decoded.recipientId,
@@ -654,8 +656,7 @@ export class RgbService {
         receive?.receivedConsignment?.assetId ?? receive?.pendingAccept?.assetId ?? receive?.assetId
       const amount =
         receive?.receivedConsignment?.amount ?? receive?.pendingAccept?.amount ?? receive?.amount
-      const precision =
-        receive?.receivedConsignment?.precision ?? receive?.pendingAccept?.precision
+      const precision = receive?.receivedConsignment?.precision ?? receive?.pendingAccept?.precision
       return {
         ...item,
         ...(assetId ? { assetId } : {}),
@@ -682,9 +683,7 @@ export class RgbService {
           utxo.outpoint.txid === issue.txid &&
           utxo.allocations.some(allocation => allocation.assetId === issue.assetId)
       )
-      return genesisUtxo?.chainStatus
-        ? { ...issue, chainStatus: genesisUtxo.chainStatus }
-        : issue
+      return genesisUtxo?.chainStatus ? { ...issue, chainStatus: genesisUtxo.chainStatus } : issue
     })
   }
 
@@ -879,8 +878,9 @@ export class RgbService {
   private getPendingReceiveOutpoints() {
     return new Set(
       this.getPendingReceives()
-        .filter((receive): receive is typeof receive & { seal: NonNullable<typeof receive.seal> } =>
-          !!receive.seal
+        .filter(
+          (receive): receive is typeof receive & { seal: NonNullable<typeof receive.seal> } =>
+            !!receive.seal
         )
         .map(receive => `${receive.seal.txid}:${receive.seal.vout}`)
     )
@@ -965,10 +965,7 @@ export class RgbService {
           : this.queueAssetMetadata(match.assetId, match.decoded.metadata)
         changed = metadataChanged || changed
         const precision = match.decoded.metadata.precision
-        if (
-          receive.receivedConsignment &&
-          receive.receivedConsignment.precision !== precision
-        ) {
+        if (receive.receivedConsignment && receive.receivedConsignment.precision !== precision) {
           receive.receivedConsignment.precision = precision
           changed = true
         }
@@ -1357,7 +1354,8 @@ export class RgbService {
     let utxo = state.snapshot.utxos.find(candidate =>
       receive.recipientType === 'witness'
         ? candidate.outpoint.txid === validated.txid && candidate.outpoint.vout === validated.vout
-        : candidate.outpoint.txid === receive.seal?.txid && candidate.outpoint.vout === receive.seal?.vout
+        : candidate.outpoint.txid === receive.seal?.txid &&
+          candidate.outpoint.vout === receive.seal?.vout
     )
     if (!utxo && receive.recipientType === 'witness') {
       const output = validated.witness.outputs[validated.vout]
@@ -1668,7 +1666,9 @@ export class RgbService {
       canonicalPayload.length > MAX_RECOVERY_HISTORY_PAYLOAD_LENGTH ||
       history.transitionIds.length > MAX_RECOVERY_HISTORY_OPERATION_IDS
     ) {
-      throw new RgbServiceError('Received RGB Consignment history exceeds recovery checkpoint limits')
+      throw new RgbServiceError(
+        'Received RGB Consignment history exceeds recovery checkpoint limits'
+      )
     }
     contracts[input.assetId] = {
       // Keep the canonical payload in the legacy field as well, so older
@@ -1797,19 +1797,23 @@ export class RgbService {
   getUtxoInspection() {
     const state = this.requireState()
     const assetMetadata = Object.fromEntries(
-      [...new Set(state.snapshot.utxos.flatMap(utxo => utxo.allocations.map(allocation => allocation.assetId)))].map(
-        assetId => {
-          const asset = this.getLocalAssetDetail(assetId)
-          return [
-            assetId,
-            {
-              ...(asset.name ? { name: asset.name } : {}),
-              ...(asset.ticker ? { ticker: asset.ticker } : {}),
-              ...(asset.precision === undefined ? {} : { precision: asset.precision }),
-            },
-          ]
-        }
-      )
+      [
+        ...new Set(
+          state.snapshot.utxos.flatMap(utxo =>
+            utxo.allocations.map(allocation => allocation.assetId)
+          )
+        ),
+      ].map(assetId => {
+        const asset = this.getLocalAssetDetail(assetId)
+        return [
+          assetId,
+          {
+            ...(asset.name ? { name: asset.name } : {}),
+            ...(asset.ticker ? { ticker: asset.ticker } : {}),
+            ...(asset.precision === undefined ? {} : { precision: asset.precision }),
+          },
+        ]
+      })
     )
     return {
       snapshot: state.snapshot,
@@ -1849,7 +1853,8 @@ export class RgbService {
     const pending = state.pendingFeePoolUtxos || (state.pendingFeePoolUtxos = [])
     for (const utxo of utxos) {
       const index = pending.findIndex(
-        item => item.outpoint.txid === utxo.outpoint.txid && item.outpoint.vout === utxo.outpoint.vout
+        item =>
+          item.outpoint.txid === utxo.outpoint.txid && item.outpoint.vout === utxo.outpoint.vout
       )
       if (index >= 0) pending[index] = utxo
       else pending.push(utxo)
@@ -1889,7 +1894,10 @@ export class RgbService {
     ) {
       throw new RgbServiceError('RGB invoice network does not match the current wallet')
     }
-    if (invoice.expirationTimestamp && invoice.expirationTimestamp <= Math.floor(this.now() / 1000)) {
+    if (
+      invoice.expirationTimestamp &&
+      invoice.expirationTimestamp <= Math.floor(this.now() / 1000)
+    ) {
       throw new RgbServiceError('RGB invoice has expired')
     }
     if (!invoice.transportEndpoints.length) {
@@ -1921,10 +1929,7 @@ export class RgbService {
   }
 
   /** Reserve RGB allocations and persist the pending transfer as one serialized operation. */
-  private async prepareSendOnce(
-    request: RgbTransferRequest,
-    options: { providerOrigin?: string }
-  ) {
+  private async prepareSendOnce(request: RgbTransferRequest, options: { providerOrigin?: string }) {
     const state = this.requireState()
     const invoice = decodeRgbInvoice(request.invoice)
     const requestedAssetId = normalizeAssetId(request.assetId)
@@ -1978,7 +1983,9 @@ export class RgbService {
             allocation.assignmentIndex === undefined ||
             allocation.assignmentType === undefined
           ) {
-            throw new RgbServiceError('RGB allocation is missing history required for a local transfer')
+            throw new RgbServiceError(
+              'RGB allocation is missing history required for a local transfer'
+            )
           }
           return {
             outpoint: utxo.outpoint,
@@ -2003,10 +2010,7 @@ export class RgbService {
     const enrichValidationHistory = (history: RgbValidationHistory) => {
       const localContract = this.getContractConsignment(requestedAssetId)
       const localGenesis = this.getContractGenesis(requestedAssetId)
-      if (
-        localContract &&
-        !history.consignments.some(item => item.payload === localContract)
-      ) {
+      if (localContract && !history.consignments.some(item => item.payload === localContract)) {
         history.consignments.unshift({
           opId: contractOperationId(requestedAssetId),
           payload: localContract,
@@ -2233,12 +2237,17 @@ export class RgbService {
     // An acknowledged consignment is committed to the receiver and is about
     // to be broadcast. It is no longer safe to signal cancellation, including
     // while the broadcast request itself is in flight.
-    if (pending.broadcast || (pending.delivery?.acknowledgedAt && !allowAcknowledged)) return { aborted: false }
+    if (pending.broadcast || (pending.delivery?.acknowledgedAt && !allowAcknowledged))
+      return { aborted: false }
     if (allowAcknowledged && !pending.delivery) return { aborted: false }
 
     // Best-effort cancel signal: post ACK=false on the proxy so the receiver
     // can surface "Canceled by sender" instead of waiting forever.
-    if (!pending.delivery?.acknowledgedAt && pending.delivery && this.dependencies.transport.acknowledgeConsignment) {
+    if (
+      !pending.delivery?.acknowledgedAt &&
+      pending.delivery &&
+      this.dependencies.transport.acknowledgeConsignment
+    ) {
       const proxyRecipientId = decodeRgbInvoice(pending.request.invoice).proxyRecipientId
       for (const consignment of pending.delivery.completed.consignments) {
         try {
@@ -2646,9 +2655,9 @@ export class RgbService {
       })
     if (getConsignments) return getConsignments(pending)
     if (!getConsignment) return []
-    return (
-      await Promise.all(pending.map(input => getConsignment(input)))
-    ).filter((item): item is NonNullable<typeof item> => !!item)
+    return (await Promise.all(pending.map(input => getConsignment(input)))).filter(
+      (item): item is NonNullable<typeof item> => !!item
+    )
   }
 
   private async acknowledgeProxyConsignment(
@@ -2776,7 +2785,9 @@ export class RgbService {
     const shouldQueueRecovery =
       this.recoveryBackupEnabled &&
       this.dependencies.onStatePersisted &&
-      (!options.skipRecovery || state.recoveryCheckpoint?.dirty || !state.recoveryCheckpoint?.verified)
+      (!options.skipRecovery ||
+        state.recoveryCheckpoint?.dirty ||
+        !state.recoveryCheckpoint?.verified)
     if (shouldQueueRecovery) {
       state.recoveryCheckpoint = { ...state.recoveryCheckpoint, dirty: true, verified: false }
     }
@@ -2825,9 +2836,12 @@ export class RgbService {
   }
 
   private async recordRecoveryCheckpointResult(
-    result:
-      | void
-      | { verified?: boolean; checksum?: string; totalLength?: number; revision?: string }
+    result: void | {
+      verified?: boolean
+      checksum?: string
+      totalLength?: number
+      revision?: string
+    }
   ) {
     const state = this.requireState()
     const metadata = result && typeof result === 'object' ? result : undefined
@@ -2836,7 +2850,9 @@ export class RgbService {
       verified: metadata?.verified === true,
       ...(metadata?.checksum ? { checksum: metadata.checksum } : {}),
       ...(metadata?.totalLength === undefined ? {} : { totalLength: metadata.totalLength }),
-      ...(metadata?.verified === true ? {} : { lastError: 'checkpoint read-back is pending verification' }),
+      ...(metadata?.verified === true
+        ? {}
+        : { lastError: 'checkpoint read-back is pending verification' }),
     }
     await this.dependencies.storage.set(this.storageKey(state.wallet), persistState(state))
   }
@@ -2876,7 +2892,8 @@ export class RgbService {
       if (!history.providerOrigin) return
       // Records written before the TTL field existed expire relative to their
       // original history timestamp, rather than retaining an owner forever.
-      const expiresAt = history.providerOriginExpiresAt ?? history.createdAt + PROVIDER_ORIGIN_HISTORY_TTL_MS
+      const expiresAt =
+        history.providerOriginExpiresAt ?? history.createdAt + PROVIDER_ORIGIN_HISTORY_TTL_MS
       if (expiresAt > now) return
       delete history.providerOrigin
       delete history.providerOriginExpiresAt
@@ -3092,7 +3109,9 @@ function validateRecoveredState(state: RgbServiceState, currentWallet: RgbWallet
     try {
       normalizeAssetId(issue.assetId)
     } catch {
-      throw new RgbServiceError('RGB recovery checkpoint contains an invalid issue history asset ID')
+      throw new RgbServiceError(
+        'RGB recovery checkpoint contains an invalid issue history asset ID'
+      )
     }
     if (
       !/^(0|[1-9][0-9]*)$/.test(issue.amount) ||
@@ -3116,7 +3135,10 @@ function validateRecoveredState(state: RgbServiceState, currentWallet: RgbWallet
 }
 
 function isBase64(value: string) {
-  return value.length % 4 === 0 && /^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/.test(value)
+  return (
+    value.length % 4 === 0 &&
+    /^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/.test(value)
+  )
 }
 
 function hydrateBlindSeal(seal: import('./protocol/receive').RgbBlindSeal) {
@@ -3130,7 +3152,9 @@ function sameBlindSeal(
   return left.txid === right.txid && left.vout === right.vout && left.blinding === right.blinding
 }
 
-function isTerminallyReplacedTransaction(status: 'mempool' | 'confirmed' | 'pending_spend' | 'spent' | 'replaced' | 'unknown') {
+function isTerminallyReplacedTransaction(
+  status: 'mempool' | 'confirmed' | 'pending_spend' | 'spent' | 'replaced' | 'unknown'
+) {
   return status === 'spent' || status === 'replaced'
 }
 
@@ -3210,7 +3234,8 @@ function normalizeStateAssetIds(state: RgbServiceState): RgbServiceState {
   }
   state.pendingReceives?.forEach(receive => {
     if (receive.assetId) receive.assetId = normalizeAssetId(receive.assetId)
-    if (receive.pendingAccept) receive.pendingAccept.assetId = normalizeAssetId(receive.pendingAccept.assetId)
+    if (receive.pendingAccept)
+      receive.pendingAccept.assetId = normalizeAssetId(receive.pendingAccept.assetId)
     if (receive.receivedConsignment?.assetId)
       receive.receivedConsignment.assetId = normalizeAssetId(receive.receivedConsignment.assetId)
   })

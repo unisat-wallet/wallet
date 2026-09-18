@@ -663,14 +663,20 @@ export interface WalletController {
   getRgbRecoveryCheckpointStatus(): Promise<{
     dirty: boolean
     verified: boolean
+    conflicted: boolean
     lastError?: string
   }>
+
+  /** Discard local conflicted RGB state and reload the latest cloud checkpoint. */
+  restoreLatestRgbRecoveryCheckpoint(): Promise<{ restored: true; updatedAt?: number }>
 
   /** Creates a seed-bound, encrypted offline RGB recovery package. */
   exportRgbBackup(): Promise<string>
 
   /** Authenticates a package and confirms it belongs to the current RGB wallet. */
-  inspectRgbBackup(payload: string): Promise<{ createdAt: number; wallet: { fundingAddress: string; network: string } }>
+  inspectRgbBackup(
+    payload: string
+  ): Promise<{ createdAt: number; wallet: { fundingAddress: string; network: string } }>
 
   /** Explicitly replaces local and remote RGB recovery state; no state merge is performed. */
   restoreRgbBackup(params: { payload: string; replaceRemote: boolean }): Promise<{

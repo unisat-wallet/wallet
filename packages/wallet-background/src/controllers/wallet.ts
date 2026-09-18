@@ -609,7 +609,10 @@ function sameUnsignedTransaction(left: bitcoin.Psbt, right: bitcoin.Psbt) {
     left.txInputs.every((input, index) => {
       const other = right.txInputs[index]
       return Boolean(
-        other && input.hash.equals(other.hash) && input.index === other.index && input.sequence === other.sequence
+        other &&
+          input.hash.equals(other.hash) &&
+          input.index === other.index &&
+          input.sequence === other.sequence
       )
     }) &&
     left.txOutputs.every((output, index) => {
@@ -665,7 +668,9 @@ function rgbFeePoolInsufficientBtcError(input: {
   estimatedFeeSatoshis: number
   feePoolUtxoCount: number
 }): RgbFeePoolInsufficientBtcError {
-  const error = new Error('Insufficient BTC to fund the RGB fee pool') as RgbFeePoolInsufficientBtcError
+  const error = new Error(
+    'Insufficient BTC to fund the RGB fee pool'
+  ) as RgbFeePoolInsufficientBtcError
   error.code = RGB_FEE_POOL_INSUFFICIENT_BTC
   error.data = {
     ...input,
@@ -788,9 +793,10 @@ function stableRgbJson(value: unknown): string {
 /** Recovery diagnostics deliberately exclude invoices, consignments, keys, and signatures. */
 function rgbRecoveryStateSummary(state: unknown) {
   const record = state && typeof state === 'object' ? (state as Record<string, unknown>) : {}
-  const pending = record['pending'] && typeof record['pending'] === 'object'
-    ? Object.values(record['pending'] as Record<string, unknown>)
-    : []
+  const pending =
+    record['pending'] && typeof record['pending'] === 'object'
+      ? Object.values(record['pending'] as Record<string, unknown>)
+      : []
   const pendingReceives = Array.isArray(record['pendingReceives']) ? record['pendingReceives'] : []
   const pendingAssetMetadata = Array.isArray(record['pendingAssetMetadata'])
     ? record['pendingAssetMetadata']
@@ -798,14 +804,21 @@ function rgbRecoveryStateSummary(state: unknown) {
   const pendingReceiveHistory = Array.isArray(record['pendingReceiveHistory'])
     ? record['pendingReceiveHistory']
     : []
-  const snapshot = record['snapshot'] && typeof record['snapshot'] === 'object'
-    ? (record['snapshot'] as Record<string, unknown>)
-    : {}
+  const snapshot =
+    record['snapshot'] && typeof record['snapshot'] === 'object'
+      ? (record['snapshot'] as Record<string, unknown>)
+      : {}
   return {
     pendingTransfers: pending.length,
-    preparedTransfers: pending.filter(item => item && typeof item === 'object' && !('delivery' in item) && !('broadcast' in item)).length,
-    deliveredTransfers: pending.filter(item => item && typeof item === 'object' && 'delivery' in item).length,
-    broadcastTransfers: pending.filter(item => item && typeof item === 'object' && 'broadcast' in item).length,
+    preparedTransfers: pending.filter(
+      item => item && typeof item === 'object' && !('delivery' in item) && !('broadcast' in item)
+    ).length,
+    deliveredTransfers: pending.filter(
+      item => item && typeof item === 'object' && 'delivery' in item
+    ).length,
+    broadcastTransfers: pending.filter(
+      item => item && typeof item === 'object' && 'broadcast' in item
+    ).length,
     pendingReceives: pendingReceives.length,
     pendingAssetMetadata: pendingAssetMetadata.length,
     pendingReceiveHistory: pendingReceiveHistory.length,
@@ -851,7 +864,10 @@ export class WalletController extends BaseController {
   })
   private readonly rgbRecoveryRestores = new Map<string, Promise<void>>()
   private readonly rgbRecoveryBackups = new Map<string, Promise<unknown>>()
-  private readonly rgbRecoveryVersions = new Map<string, { updatedAt?: number; revision?: string }>()
+  private readonly rgbRecoveryVersions = new Map<
+    string,
+    { updatedAt?: number; revision?: string }
+  >()
   private readonly rgbWriteLeases = new Map<string, RgbControllerWriteLease>()
   /** Coalesce concurrent startup pollers that need the same writer lease. */
   private readonly rgbWriteLeaseEnsures = new Map<string, Promise<void>>()
@@ -3631,8 +3647,16 @@ export class WalletController extends BaseController {
     if (!additions.length) return page
     const list = [...additions, ...page.list].sort(
       (left, right) =>
-        Number((right as { timestamp?: number; createdAt?: number }).timestamp ?? (right as { createdAt?: number }).createdAt ?? 0) -
-        Number((left as { timestamp?: number; createdAt?: number }).timestamp ?? (left as { createdAt?: number }).createdAt ?? 0)
+        Number(
+          (right as { timestamp?: number; createdAt?: number }).timestamp ??
+            (right as { createdAt?: number }).createdAt ??
+            0
+        ) -
+        Number(
+          (left as { timestamp?: number; createdAt?: number }).timestamp ??
+            (left as { createdAt?: number }).createdAt ??
+            0
+        )
     )
     return {
       total: Math.max(page.total + additions.length, list.length),
@@ -3809,7 +3833,10 @@ export class WalletController extends BaseController {
     const { service } = await this.getLocalRgbService()
     const receive = service
       .getPendingReceives()
-      .find(item => item.recipientId === params.recipientId || item.proxyRecipientId === params.recipientId)
+      .find(
+        item =>
+          item.recipientId === params.recipientId || item.proxyRecipientId === params.recipientId
+      )
     const pending = receive?.pendingAccept || receive?.receivedConsignment
     if (!receive || !pending) throw new Error('RGB receive is not awaiting acceptance')
     return {
@@ -3822,8 +3849,38 @@ export class WalletController extends BaseController {
   }
 
   getRgbRecoveryCheckpointStatus = async () => {
-    const { service } = await this.getLocalRgbService()
-    return service.getRecoveryCheckpointStatus()
+    const { service } = await this.getLocalRgbReadService()
+    return { ...service.getRecoveryCheckpointStatus(), conflicted: service.hasRecoveryConflict() }
+  }
+
+  /**
+   * User-confirmed escape hatch for a persisted cross-device conflict. It
+   * discards this installation's state in favour of the latest authenticated
+   * cloud checkpoint; it never uploads, merges or overwrites remote state.
+   */
+  restoreLatestRgbRecoveryCheckpoint = async () => {
+    const context = await this.getLocalRgbReadService()
+    const key = `${context.wallet.network}:${context.wallet.fundingAddress}`
+    await this.restoreRgbRecoveryIfNeeded(context).catch(() => undefined)
+    const checkpoint = await getRgbApiService().getRgbRecoveryCheckpoint({ wallet: context.wallet })
+    if (!checkpoint.payload || !checkpoint.revision) {
+      throw new Error('No RGB recovery checkpoint is available')
+    }
+    const state = await decryptRgbRecoveryCheckpoint(
+      checkpoint.payload,
+      await this.rgbRecoveryKey(context.wallet)
+    )
+    if (!(await context.service.restoreRecoveryState(state))) {
+      throw new Error('RGB recovery checkpoint does not belong to this wallet')
+    }
+    this.rgbRecoveryVersions.set(key, {
+      ...(checkpoint.updatedAt === undefined ? {} : { updatedAt: checkpoint.updatedAt }),
+      revision: checkpoint.revision,
+    })
+    await context.service.setRecoveryCheckpointVersion(checkpoint.updatedAt)
+    await context.service.setRecoveryCheckpointRevision(checkpoint.revision)
+    await context.service.enableRecoveryBackup()
+    return { restored: true, updatedAt: checkpoint.updatedAt }
   }
 
   /** Export an offline, encrypted RGB recovery package for the current wallet. */
@@ -3831,11 +3888,15 @@ export class WalletController extends BaseController {
     const context = await this.getLocalRgbService()
     await this.ensureRgbWriteLease(context, { forceRenew: true })
     if (!(await context.service.retryRecoveryCheckpoint())) {
-      throw new Error('RGB recovery checkpoint is not verified; retry after synchronization completes')
+      throw new Error(
+        'RGB recovery checkpoint is not verified; retry after synchronization completes'
+      )
     }
     const status = context.service.getRecoveryCheckpointStatus()
     if (status.dirty || !status.verified) {
-      throw new Error('RGB recovery checkpoint is not verified; retry after synchronization completes')
+      throw new Error(
+        'RGB recovery checkpoint is not verified; retry after synchronization completes'
+      )
     }
     return createRgbBackupPackage(
       context.service.exportRecoveryState(),
@@ -3859,10 +3920,15 @@ export class WalletController extends BaseController {
    * next fenced checkpoint. Checkpoints are never merged.
    */
   restoreRgbBackup = async (params: { payload: string; replaceRemote: boolean }) => {
-    if (!params?.replaceRemote) throw new Error('Restoring an RGB backup requires explicit replacement confirmation')
-    if (typeof params.payload !== 'string' || !params.payload) throw new Error('RGB backup package is required')
+    if (!params?.replaceRemote)
+      throw new Error('Restoring an RGB backup requires explicit replacement confirmation')
+    if (typeof params.payload !== 'string' || !params.payload)
+      throw new Error('RGB backup package is required')
     const context = await this.getLocalRgbService()
-    const backup = await readRgbBackupPackage(params.payload, await this.rgbBackupKey(context.wallet))
+    const backup = await readRgbBackupPackage(
+      params.payload,
+      await this.rgbBackupKey(context.wallet)
+    )
     if (!context.service.canRestoreRecoveryState(backup.state)) {
       throw new Error('RGB backup package does not belong to this wallet')
     }
@@ -3892,7 +3958,11 @@ export class WalletController extends BaseController {
     })
     if (lease && !status.heldByCaller) this.rgbWriteLeases.delete(key)
     return {
-      mode: status.heldByCaller ? 'writer' as const : status.available ? 'available' as const : 'readonly' as const,
+      mode: status.heldByCaller
+        ? ('writer' as const)
+        : status.available
+          ? ('available' as const)
+          : ('readonly' as const),
       ...(status.expiresAt === undefined ? {} : { expiresAt: status.expiresAt }),
     }
   }
@@ -3971,7 +4041,10 @@ export class WalletController extends BaseController {
           satoshis: utxo.satoshis,
           scriptPubKey: utxo.scriptPubKey,
           allocations: utxo.allocations
-            .filter(allocation => allocation.assetId === assetId && allocation.settled && allocation.spendable)
+            .filter(
+              allocation =>
+                allocation.assetId === assetId && allocation.settled && allocation.spendable
+            )
             .map(allocation => ({ assetId: allocation.assetId, amount: allocation.amount })),
         })),
     }
@@ -4088,7 +4161,8 @@ export class WalletController extends BaseController {
         pubkey: feeAccount.publicKey,
         addressType: AddressType.P2TR,
       }))
-    if (!feeUtxos.length) throw new Error('No unlocked RGB fee pool UTXOs are available to withdraw')
+    if (!feeUtxos.length)
+      throw new Error('No unlocked RGB fee pool UTXOs are available to withdraw')
 
     const feeRate = params.feeRate ?? (await this.getFeeSummary()).list[1]?.feeRate
     if (!feeRate || feeRate <= 0) throw new Error('Invalid RGB fee-pool withdrawal fee rate')
@@ -4161,7 +4235,10 @@ export class WalletController extends BaseController {
     const { count } = plan
     const { psbt, toSignInputs } = await txHelpers.sendBTC({
       btcUtxos: safeBtcUtxos,
-      tos: Array.from({ length: count }, () => ({ address: status.address, satoshis: status.minimumSatoshis })),
+      tos: Array.from({ length: count }, () => ({
+        address: status.address,
+        satoshis: status.minimumSatoshis,
+      })),
       networkType: this.getNetworkType(),
       changeAddress: account.address,
       feeRate,
@@ -4192,7 +4269,10 @@ export class WalletController extends BaseController {
     const txid = await this.pushTx(transaction.toHex())
     const utxos = transaction.outs
       .map((output, vout) => ({ output, vout }))
-      .filter(({ output }) => scriptPkToAddress(output.script, this.getNetworkType()) === feeAccount.address)
+      .filter(
+        ({ output }) =>
+          scriptPkToAddress(output.script, this.getNetworkType()) === feeAccount.address
+      )
       .map(({ output, vout }) => ({
         outpoint: { txid, vout },
         satoshis: Number(output.value),
@@ -4358,7 +4438,9 @@ export class WalletController extends BaseController {
   /** Provider-facing signing data bound to a locally prepared RGB payment. */
   getRgbPaymentSigningData = async (params: { transferId: string; psbt?: string }) => {
     const { service } = await this.getLocalRgbService()
-    const pending = service.getPendingTransfers().find(transfer => transfer.id === params.transferId)
+    const pending = service
+      .getPendingTransfers()
+      .find(transfer => transfer.id === params.transferId)
     if (!pending || pending.delivery || pending.broadcast) {
       throw new Error('RGB payment is not awaiting a signature')
     }
@@ -4384,7 +4466,9 @@ export class WalletController extends BaseController {
   /** Read-only local status for a dApp-created RGB payment. */
   getRgbPaymentStatus = async (params: { transferId: string }) => {
     const { service } = await this.getLocalRgbReadService()
-    const pending = service.getPendingTransfers().find(transfer => transfer.id === params.transferId)
+    const pending = service
+      .getPendingTransfers()
+      .find(transfer => transfer.id === params.transferId)
     if (pending) {
       return {
         transferId: pending.id,
@@ -4395,18 +4479,20 @@ export class WalletController extends BaseController {
           ? 'awaiting_buyer_signature'
           : pending.delivery?.externalBroadcast
             ? 'ready_for_dapp_finalize'
-          : pending.delivery?.broadcastError
-          ? 'broadcast_failed'
-          : pending.delivery?.acknowledgedAt
-            ? 'broadcasting'
-            : pending.delivery
-              ? 'waiting_ack'
-              : pending.broadcast
-                ? 'broadcasted'
-                : 'prepared',
+            : pending.delivery?.broadcastError
+              ? 'broadcast_failed'
+              : pending.delivery?.acknowledgedAt
+                ? 'broadcasting'
+                : pending.delivery
+                  ? 'waiting_ack'
+                  : pending.broadcast
+                    ? 'broadcasted'
+                    : 'prepared',
       }
     }
-    const history = service.getPendingSendHistory().find(item => item.transferId === params.transferId)
+    const history = service
+      .getPendingSendHistory()
+      .find(item => item.transferId === params.transferId)
     if (!history) return { transferId: params.transferId, status: 'unknown' as const }
     return {
       transferId: history.transferId,
@@ -4542,9 +4628,15 @@ export class WalletController extends BaseController {
     // against the server on every such side-effecting attempt; a cached lease
     // may have been fenced by an explicit takeover on another device.
     if (!(await this.tryEnsureRgbWriteLease(context, { forceRenew: true }))) return
-    log.debug('RGB recovery: advancing restored pending transfers', rgbRecoveryServiceSummary(service))
+    log.debug(
+      'RGB recovery: advancing restored pending transfers',
+      rgbRecoveryServiceSummary(service)
+    )
     await this.rgbCoordinator.syncPendingTransfers(service)
-    log.debug('RGB recovery: pending transfer advancement completed', rgbRecoveryServiceSummary(service))
+    log.debug(
+      'RGB recovery: pending transfer advancement completed',
+      rgbRecoveryServiceSummary(service)
+    )
   }
 
   /** Exclude locally locked RGB UTXOs from the UI's spendable balance until a send completes. */
@@ -4626,8 +4718,15 @@ export class WalletController extends BaseController {
         const localRevision = service.getRecoveryCheckpointRevision()
         const revisionChanged = localRevision !== checkpoint.revision
         const remoteCheckpointMissing =
-          !checkpoint.payload && checkpoint.updatedAt === undefined && checkpoint.revision === undefined
-        if (!needsRestore && revisionChanged && remoteCheckpointMissing && localRevision !== undefined) {
+          !checkpoint.payload &&
+          checkpoint.updatedAt === undefined &&
+          checkpoint.revision === undefined
+        if (
+          !needsRestore &&
+          revisionChanged &&
+          remoteCheckpointMissing &&
+          localRevision !== undefined
+        ) {
           // An explicitly empty remote response is not a newer checkpoint. It
           // can occur when recovery data was reset server-side. Re-establish
           // the backup from the complete local state, but only after holding
@@ -4657,12 +4756,7 @@ export class WalletController extends BaseController {
           )
           return decryptedCheckpoint
         }
-        if (
-          !needsRestore &&
-          revisionChanged &&
-          !shouldFastForward &&
-          !remoteCheckpointMissing
-        ) {
+        if (!needsRestore && revisionChanged && !shouldFastForward && !remoteCheckpointMissing) {
           const matchesRemoteCheckpoint =
             Boolean(checkpoint.payload) &&
             service.matchesRecoveryState?.(await decryptCheckpoint()) === true
@@ -4759,7 +4853,10 @@ export class WalletController extends BaseController {
     const diagnostic = {
       wallet: rgbRecoveryWalletTag(wallet),
       reason: context.reason,
-      fingerprint: bitcoin.crypto.sha256(Buffer.from(stableRgbJson(state))).toString('hex').slice(0, 16),
+      fingerprint: bitcoin.crypto
+        .sha256(Buffer.from(stableRgbJson(state)))
+        .toString('hex')
+        .slice(0, 16),
       ...rgbRecoveryStateSummary(state),
     }
     log.debug('RGB recovery: checkpoint queued', diagnostic)
@@ -4942,7 +5039,9 @@ export class WalletController extends BaseController {
     return lease && lease.expiresAt > Date.now() ? lease : undefined
   }
 
-  private getRgbWriteLeaseCredential(wallet: RgbWalletRef): RgbControllerWriteLeaseCredential | undefined {
+  private getRgbWriteLeaseCredential(
+    wallet: RgbWalletRef
+  ): RgbControllerWriteLeaseCredential | undefined {
     const lease = this.getRgbActiveWriteLease(wallet)
     return lease
       ? {
@@ -5022,7 +5121,9 @@ export class WalletController extends BaseController {
             wallet: context.wallet,
           })
           const remoteCheckpointMissing =
-            !checkpoint.payload && checkpoint.updatedAt === undefined && checkpoint.revision === undefined
+            !checkpoint.payload &&
+            checkpoint.updatedAt === undefined &&
+            checkpoint.revision === undefined
           if (
             remoteCheckpointMissing &&
             context.service.getRecoveryCheckpointRevision?.() !== undefined
@@ -5060,7 +5161,9 @@ export class WalletController extends BaseController {
     this.rgbWriteLeases.set(key, { deviceId, ...lease })
   }
 
-  private async releaseRgbWriteLeaseForWallet(wallet: LocalRgbWallet): Promise<{ released: boolean }> {
+  private async releaseRgbWriteLeaseForWallet(
+    wallet: LocalRgbWallet
+  ): Promise<{ released: boolean }> {
     const key = this.rgbWriteLeaseKey(wallet)
     const lease = this.getRgbActiveWriteLease(wallet)
     if (!lease) return { released: false }
@@ -5077,24 +5180,26 @@ export class WalletController extends BaseController {
   /** Lock is best-effort: a network failure falls back to the short server TTL. */
   private async releaseAllRgbWriteLeases(): Promise<void> {
     const leases = [...this.rgbWriteLeases.entries()]
-    await Promise.all(leases.map(async ([key, lease]) => {
-      const separator = key.indexOf(':')
-      if (separator < 1) return
-      const wallet = {
-        network: key.slice(0, separator) as RgbNetwork,
-        fundingAddress: key.slice(separator + 1),
-      } as LocalRgbWallet
-      try {
-        await getRgbApiService().releaseRgbWriteLease({
-          wallet,
-          deviceId: lease.deviceId,
-          leaseId: lease.leaseId,
-          fencingToken: lease.fencingToken,
-        })
-      } catch (error) {
-        log.debug('Failed to release RGB write lease while locking', error)
-      }
-    }))
+    await Promise.all(
+      leases.map(async ([key, lease]) => {
+        const separator = key.indexOf(':')
+        if (separator < 1) return
+        const wallet = {
+          network: key.slice(0, separator) as RgbNetwork,
+          fundingAddress: key.slice(separator + 1),
+        } as LocalRgbWallet
+        try {
+          await getRgbApiService().releaseRgbWriteLease({
+            wallet,
+            deviceId: lease.deviceId,
+            leaseId: lease.leaseId,
+            fencingToken: lease.fencingToken,
+          })
+        } catch (error) {
+          log.debug('Failed to release RGB write lease while locking', error)
+        }
+      })
+    )
   }
 
   /** A lease failure makes this installation read-only; local state remains available. */
@@ -5174,7 +5279,8 @@ export class WalletController extends BaseController {
       encoder: localNiaProtocolEncoder,
       transport: createRgbProxyTransport(CHAINS_MAP[this.getChainType()]?.rgbProxyEndpoints || []),
       broadcaster: { broadcast: rawTx => this.pushTx(rawTx) },
-      onStatePersisted: (state, context) => this.queueRgbRecoveryCheckpoint(localWallet, state, context),
+      onStatePersisted: (state, context) =>
+        this.queueRgbRecoveryCheckpoint(localWallet, state, context),
     })
     return service
   }
@@ -5206,7 +5312,10 @@ export class WalletController extends BaseController {
 
   /** Add only the current account's local RGB derivation to wallet-built PSBTs. */
   private attachRgbPsbtDerivations = async (psbt: bitcoin.Psbt) => {
-    const accounts = await Promise.all([this.getCurrentRgbFundingAccount(), this.getCurrentRgbFeeAccount()])
+    const accounts = await Promise.all([
+      this.getCurrentRgbFundingAccount(),
+      this.getCurrentRgbFeeAccount(),
+    ])
     for (const account of accounts) {
       const internalKey = Buffer.from(account.publicKey, 'hex').subarray(1)
       const expectedScript = bitcoin.payments.p2tr({
@@ -5263,7 +5372,10 @@ export class WalletController extends BaseController {
       if (isSigned) return
 
       const tapDerivation = input.tapBip32Derivation?.[0]
-      if (tapDerivation?.pubkey && rgbAccounts.some(item => this.isCurrentRgbDerivation(tapDerivation, item))) {
+      if (
+        tapDerivation?.pubkey &&
+        rgbAccounts.some(item => this.isCurrentRgbDerivation(tapDerivation, item))
+      ) {
         const leafHashes = tapDerivation.leafHashes || []
         const toSignInput: ToSignInput = {
           index,
@@ -5279,7 +5391,10 @@ export class WalletController extends BaseController {
       }
 
       const derivation = input.bip32Derivation?.[0]
-      if (derivation?.pubkey && rgbAccounts.some(item => this.isCurrentRgbDerivation(derivation, item))) {
+      if (
+        derivation?.pubkey &&
+        rgbAccounts.some(item => this.isCurrentRgbDerivation(derivation, item))
+      ) {
         toSignInputs.push({
           index,
           publicKey: Buffer.from(derivation.pubkey).toString('hex'),
