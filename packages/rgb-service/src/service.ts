@@ -200,6 +200,29 @@ export class RgbService {
     }
   }
 
+  /**
+   * Return the canonical, portable part of the local RGB state.  This is the
+   * same state sent to the encrypted recovery backend, deliberately excluding
+   * installation-local delivery cursors and dApp authorization metadata.
+   */
+  exportRecoveryState() {
+    return recoverySnapshot(persistState(this.requireState()))
+  }
+
+  /** Validate a recovery candidate without changing local state. */
+  canRestoreRecoveryState(recovery: unknown) {
+    const current = this.requireState()
+    if (!isRgbServiceState(recovery) || !sameRecoveryWallet(recovery.wallet, current.wallet)) {
+      return false
+    }
+    try {
+      validateRecoveredState(normalizeStateAssetIds(hydrateState(recovery)), current.wallet)
+      return true
+    } catch {
+      return false
+    }
+  }
+
   async retryRecoveryCheckpoint() {
     const state = this.requireState()
     if (!this.recoveryBackupEnabled || !this.dependencies.onStatePersisted) return false

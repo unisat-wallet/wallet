@@ -115,6 +115,7 @@ import {
   decryptRgbRecoveryCheckpoint,
   encryptRgbRecoveryCheckpoint,
 } from '../rgb/RgbRecoveryCheckpoint'
+import { createRgbBackupPackage, readRgbBackupPackage } from '../rgb/RgbBackupPackage'
 import { RgbReceiveOperations } from '../rgb/RgbReceiveOperations'
 import { RgbSendOperations } from '../rgb/RgbSendOperations'
 import { RgbTransferQuery, type RgbRemoteActivity } from '../rgb/RgbTransferQuery'
@@ -3825,6 +3826,61 @@ export class WalletController extends BaseController {
     return service.getRecoveryCheckpointStatus()
   }
 
+  /** Export an offline, encrypted RGB recovery package for the current wallet. */
+  exportRgbBackup = async () => {
+    const context = await this.getLocalRgbService()
+    await this.ensureRgbWriteLease(context, { forceRenew: true })
+    if (!(await context.service.retryRecoveryCheckpoint())) {
+      throw new Error('RGB recovery checkpoint is not verified; retry after synchronization completes')
+    }
+    const status = context.service.getRecoveryCheckpointStatus()
+    if (status.dirty || !status.verified) {
+      throw new Error('RGB recovery checkpoint is not verified; retry after synchronization completes')
+    }
+    return createRgbBackupPackage(
+      context.service.exportRecoveryState(),
+      await this.rgbBackupKey(context.wallet)
+    )
+  }
+
+  /** Inspect a package after authenticating it with the current wallet seed. */
+  inspectRgbBackup = async (payload: string) => {
+    if (typeof payload !== 'string' || !payload) throw new Error('RGB backup package is required')
+    const context = await this.getLocalRgbService()
+    const backup = await readRgbBackupPackage(payload, await this.rgbBackupKey(context.wallet))
+    if (!context.service.canRestoreRecoveryState(backup.state)) {
+      throw new Error('RGB backup package does not belong to this wallet')
+    }
+    return { createdAt: backup.createdAt, wallet: context.wallet }
+  }
+
+  /**
+   * Explicitly replace local RGB state with a backup, then publish it as the
+   * next fenced checkpoint. Checkpoints are never merged.
+   */
+  restoreRgbBackup = async (params: { payload: string; replaceRemote: boolean }) => {
+    if (!params?.replaceRemote) throw new Error('Restoring an RGB backup requires explicit replacement confirmation')
+    if (typeof params.payload !== 'string' || !params.payload) throw new Error('RGB backup package is required')
+    const context = await this.getLocalRgbService()
+    const backup = await readRgbBackupPackage(params.payload, await this.rgbBackupKey(context.wallet))
+    if (!context.service.canRestoreRecoveryState(backup.state)) {
+      throw new Error('RGB backup package does not belong to this wallet')
+    }
+    // replaceRemote is the explicit user confirmation to discard any current
+    // local state. A backup is a replacement, never a merge mechanism.
+    await this.ensureRgbWriteLease(context, { forceRenew: true })
+    if (!(await context.service.restoreRecoveryState(backup.state))) {
+      throw new Error('RGB backup package could not be restored')
+    }
+    // The controller retains the remote revision it read before acquiring the
+    // lease. retryRecoveryCheckpoint publishes this replacement through that
+    // CAS baseline; it must not be reset to an unconditional overwrite.
+    if (!(await context.service.retryRecoveryCheckpoint())) {
+      throw new Error('RGB backup checkpoint publication failed')
+    }
+    return { restored: true, createdAt: backup.createdAt }
+  }
+
   /** Indicates whether this device may mutate RGB state; no other-device identity is exposed. */
   getRgbWriteLeaseStatus = async () => {
     const context = await this.getLocalRgbReadService()
@@ -4522,6 +4578,25 @@ export class WalletController extends BaseController {
     const keyring = await keyringService.getKeyringForAccount(account.pubkey, account.type)
     if (!keyring?.getRgbFundingAccount || !keyring.deriveRgbRecoveryKey) {
       throw new Error('Current wallet does not support RGB recovery encryption')
+    }
+    const funding = keyring.getRgbFundingAccount(this.getNetworkType(), account.index)
+    return keyring.deriveRgbRecoveryKey(
+      funding.publicKey,
+      chainTypeToCanonicalNetwork(this.getChainType()),
+      context
+    )
+  }
+
+  /** A domain-separated key for user-held files, never for backend checkpoints. */
+  private rgbBackupKey = async (wallet: LocalRgbWallet) => {
+    const context = bitcoin.crypto
+      .sha256(Buffer.from(`unisat-rgb-export-v1:${wallet.network}:${wallet.fundingAddress}`))
+      .toString('hex')
+    const account = preferenceService.getCurrentAccount()
+    if (!account) throw new Error('no current account')
+    const keyring = await keyringService.getKeyringForAccount(account.pubkey, account.type)
+    if (!keyring?.getRgbFundingAccount || !keyring.deriveRgbRecoveryKey) {
+      throw new Error('Current wallet does not support RGB backup encryption')
     }
     const funding = keyring.getRgbFundingAccount(this.getNetworkType(), account.index)
     return keyring.deriveRgbRecoveryKey(

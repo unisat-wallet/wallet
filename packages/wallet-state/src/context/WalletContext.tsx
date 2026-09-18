@@ -666,6 +666,18 @@ export interface WalletController {
     lastError?: string
   }>
 
+  /** Creates a seed-bound, encrypted offline RGB recovery package. */
+  exportRgbBackup(): Promise<string>
+
+  /** Authenticates a package and confirms it belongs to the current RGB wallet. */
+  inspectRgbBackup(payload: string): Promise<{ createdAt: number; wallet: { fundingAddress: string; network: string } }>
+
+  /** Explicitly replaces local and remote RGB recovery state; no state merge is performed. */
+  restoreRgbBackup(params: { payload: string; replaceRemote: boolean }): Promise<{
+    restored: true
+    createdAt: number
+  }>
+
   getRgbWriteLeaseStatus(): Promise<{
     mode: 'writer' | 'available' | 'readonly'
     expiresAt?: number
