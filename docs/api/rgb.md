@@ -316,7 +316,8 @@ await rgb.applyBuySwapAbort(recipientId)
 Before the seller action, `getSellSwapAbortOrigin(transferId)` returns the
 original dApp origin and whether it matches the current site. A mutually
 agreed abort is deliberately allowed from a different site after user
-approval; ordinary payment and swap operations remain origin-bound.
+approval. A pre-ACK `cancelSwap` is also allowed after cancellation approval;
+ordinary RGB payment operations remain origin-bound.
 
 These methods are intentionally local and idempotent. The dApp must not call
 either one before the market has verified both agreement signatures. A seller

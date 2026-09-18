@@ -916,8 +916,12 @@ class ProviderController extends BaseController {
   @Reflect.metadata('APPROVAL', ['RgbPaymentCancel'])
   cancelRgbSwap = async ({ data: { params }, session: { origin } }: { data: { params: { transferId: string } }; session: { origin: string } }) => {
     if (!params.transferId) throw new Error('transferId is required')
-    await assertRgbPaymentOrigin(params.transferId, origin)
-    return wallet.abortRgbVanillaTx({ txid: params.transferId })
+    // Cancelling a P2P swap is a recovery action. Keep regular RGB payments
+    // origin-bound, but let the wallet owner release this unacknowledged swap
+    // after explicit cancellation approval even if the market site migrated.
+    const createdAtOrigin = await wallet.getRgbPaymentOrigin({ transferId: params.transferId })
+    const result = await wallet.abortRgbVanillaTx({ txid: params.transferId })
+    return { ...result, createdAtOrigin, currentOrigin: origin, originMatches: createdAtOrigin === origin }
   }
 
   @Reflect.metadata('SAFE', true)
