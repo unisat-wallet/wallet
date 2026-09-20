@@ -399,6 +399,7 @@ describe('RgbService', () => {
 
     await expect(service.restoreRecoveryState(recovery)).resolves.toBe(true)
     expect(service.getSnapshot().utxos).toHaveLength(1)
+    expect(service.getRecoveryCheckpointStatus()).toEqual({ dirty: false, verified: true })
     await expect(
       service.restoreRecoveryState({
         ...recovery,
@@ -532,6 +533,38 @@ describe('RgbService', () => {
       outpoint: { txid: 'c'.repeat(64), vout: 2 },
     })
     remote.pendingReceives.push({ recipientId: 'new', createdAt: 2 })
+
+    expect(service.canFastForwardRecoveryState(remote)).toBe(true)
+  })
+
+  it('fast-forwards when the remote checkpoint appends an issued contract', async () => {
+    const dependencies = createDependencies()
+    const service = new RgbService(dependencies)
+    await service.open(wallet)
+    const remote = service.exportRecoveryState() as any
+    remote.contracts = { 'rgb:new': { consignment: 'contract' } }
+
+    expect(service.canFastForwardRecoveryState(remote)).toBe(true)
+  })
+
+  it('does not fast-forward when the remote checkpoint rewrites local state', async () => {
+    const dependencies = createDependencies()
+    const service = new RgbService(dependencies)
+    await service.open(wallet)
+    ;(service as any).state.contracts = { 'rgb:existing': { consignment: 'local' } }
+    const remote = JSON.parse(JSON.stringify(service.exportRecoveryState())) as any
+    remote.contracts['rgb:existing'].consignment = 'remote'
+
+    expect(service.canFastForwardRecoveryState(remote)).toBe(false)
+  })
+
+  it('does not treat a local issuance index outbox as conflicting wallet state', async () => {
+    const dependencies = createDependencies()
+    const service = new RgbService(dependencies)
+    await service.open(wallet)
+    ;(service as any).state.pendingIssues = [{ assetId: 'rgb:indexed' }]
+    const remote = service.exportRecoveryState() as any
+    delete remote.pendingIssues
 
     expect(service.canFastForwardRecoveryState(remote)).toBe(true)
   })

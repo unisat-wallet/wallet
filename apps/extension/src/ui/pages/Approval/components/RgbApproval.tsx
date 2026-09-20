@@ -6,6 +6,7 @@ import { formatSessionIcon, shortAddress } from '@/ui/utils';
 import type { SignedData, ToSignData } from '@unisat/wallet-shared';
 import { useApproval, useWallet } from '@unisat/wallet-state';
 
+import { useRgbWriteLeaseGuard } from '../../RGB/components/useRgbWriteLeaseGuard';
 import SignPsbt from './SignPsbt';
 
 type Receive = {
@@ -44,6 +45,7 @@ export function RgbReceive({ params: { data, session } }: Props) {
 function RgbReceiveApproval({ data, session }: { data: Props['params']['data']; session: Props['params']['session'] }) {
   const wallet = useWallet();
   const { resolveApproval, rejectApproval } = useApproval();
+  const { requestWrite, writeLeaseModal } = useRgbWriteLeaseGuard();
   const [utxoToSignData, setUtxoToSignData] = useState<ToSignData>();
   const [howItWorksExpanded, setHowItWorksExpanded] = useState(false);
   const [invoiceDetailsExpanded, setInvoiceDetailsExpanded] = useState(false);
@@ -154,11 +156,14 @@ function RgbReceiveApproval({ data, session }: { data: Props['params']['data']; 
 
   if (utxoToSignData) {
     return (
-      <SignPsbt
-        params={{ data: { toSignDatas: [utxoToSignData] }, session }}
-        handleCancel={() => setUtxoToSignData(undefined)}
-        handleConfirm={(signedDatas) => void onSignRgbUtxo(signedDatas)}
-      />
+      <>
+        <SignPsbt
+          params={{ data: { toSignDatas: [utxoToSignData] }, session }}
+          handleCancel={() => setUtxoToSignData(undefined)}
+          handleConfirm={(signedDatas) => void requestWrite(() => void onSignRgbUtxo(signedDatas))}
+        />
+        {writeLeaseModal}
+      </>
     );
   }
 
@@ -342,7 +347,7 @@ function RgbReceiveApproval({ data, session }: { data: Props['params']['data']; 
           <Button
             text={loading ? 'Preparing...' : 'Create invoice'}
             preset="primary"
-            onClick={() => void onCreateInvoice()}
+            onClick={() => void requestWrite(() => void onCreateInvoice())}
             disabled={loading}
             full
             style={{ height: 48, borderRadius: 12 }}
@@ -350,6 +355,7 @@ function RgbReceiveApproval({ data, session }: { data: Props['params']['data']; 
           />
         </Row>
       </Footer>
+      {writeLeaseModal}
     </Layout>
   );
 }
@@ -467,6 +473,7 @@ export function RgbPayment({ params: { data, session } }: Props) {
 function RgbPaymentApproval({ data, session }: { data: Props['params']['data']; session: Props['params']['session'] }) {
   const wallet = useWallet();
   const { resolveApproval, rejectApproval } = useApproval();
+  const { requestWrite, writeLeaseModal } = useRgbWriteLeaseGuard();
   const [feePoolToSignData, setFeePoolToSignData] = useState<ToSignData>();
   const [howItWorksExpanded, setHowItWorksExpanded] = useState(false);
   const [paymentDetailsExpanded, setPaymentDetailsExpanded] = useState(false);
@@ -559,11 +566,14 @@ function RgbPaymentApproval({ data, session }: { data: Props['params']['data']; 
 
   if (feePoolToSignData) {
     return (
-      <SignPsbt
-        params={{ data: { toSignDatas: [feePoolToSignData] }, session }}
-        handleCancel={() => setFeePoolToSignData(undefined)}
-        handleConfirm={(signedDatas) => void onSignFeePoolTopUp(signedDatas)}
-      />
+      <>
+        <SignPsbt
+          params={{ data: { toSignDatas: [feePoolToSignData] }, session }}
+          handleCancel={() => setFeePoolToSignData(undefined)}
+          handleConfirm={(signedDatas) => void requestWrite(() => void onSignFeePoolTopUp(signedDatas))}
+        />
+        {writeLeaseModal}
+      </>
     );
   }
 
@@ -736,7 +746,7 @@ function RgbPaymentApproval({ data, session }: { data: Props['params']['data']; 
           <Button
             text={loading ? 'Checking...' : 'Prepare payment'}
             preset="primary"
-            onClick={() => void onPreparePayment()}
+            onClick={() => void requestWrite(() => void onPreparePayment())}
             disabled={loading}
             full
             style={{ height: 48, borderRadius: 12 }}
@@ -744,6 +754,7 @@ function RgbPaymentApproval({ data, session }: { data: Props['params']['data']; 
           />
         </Row>
       </Footer>
+      {writeLeaseModal}
     </Layout>
   );
 }
@@ -785,6 +796,7 @@ function RgbApprovalLayout({
   error?: string;
 }) {
   const { resolveApproval, rejectApproval } = useApproval();
+  const { requestWrite, writeLeaseModal } = useRgbWriteLeaseGuard();
   return (
     <Layout>
       <Header>
@@ -819,15 +831,18 @@ function RgbApprovalLayout({
           <Button
             text={confirmText}
             preset={confirmPreset}
-            onClick={() => {
-              if (onConfirm) onConfirm();
-              else resolveApproval();
-            }}
+            onClick={() =>
+              void requestWrite(() => {
+                if (onConfirm) onConfirm();
+                else resolveApproval();
+              })
+            }
             disabled={confirmDisabled}
             full
           />
         </Row>
       </Footer>
+      {writeLeaseModal}
     </Layout>
   );
 }

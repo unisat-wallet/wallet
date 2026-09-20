@@ -159,11 +159,15 @@ export class RgbService {
    */
   canFastForwardRecoveryState(recovery?: unknown) {
     const state = this.requireState()
-    if (Object.keys(state.pending).length > 0 || (state.pendingIssues?.length || 0) > 0) {
+    if (Object.keys(state.pending).length > 0) {
       return false
     }
     if (recovery === undefined) {
-      return !state.recoveryCheckpoint?.dirty && this.getPendingReceives().length === 0
+      return (
+        !state.recoveryCheckpoint?.dirty &&
+        this.getPendingReceives().length === 0 &&
+        (state.pendingIssues?.length || 0) === 0
+      )
     }
     if (!isRgbServiceState(recovery) || !sameRecoveryWallet(recovery.wallet, state.wallet)) {
       return false
@@ -176,18 +180,26 @@ export class RgbService {
       const {
         pendingReceives: localReceives = [],
         snapshot: _localIndexerSnapshot,
+        pendingIssues: _localPendingIssues,
+        pendingAssetMetadata: _localPendingAssetMetadata,
+        pendingReceiveHistory: _localPendingReceiveHistory,
+        pendingUtxoSync: _localPendingUtxoSync,
         ...localWalletState
       } = localSnapshot
       const {
         pendingReceives: remoteReceives = [],
         snapshot: _remoteIndexerSnapshot,
+        pendingIssues: _remotePendingIssues,
+        pendingAssetMetadata: _remotePendingAssetMetadata,
+        pendingReceiveHistory: _remotePendingReceiveHistory,
+        pendingUtxoSync: _remotePendingUtxoSync,
         ...remoteWalletState
       } = remoteSnapshot
-      // The UTXO snapshot is a rebuildable index cache, not an independent
-      // local operation. An active device can refresh or extend it while
-      // creating an invoice, so a lagging device must adopt the remote cache
-      // together with the latest encrypted wallet state.
-      if (stableRecoveryJson(localWalletState) !== stableRecoveryJson(remoteWalletState)) {
+      // Snapshot data and index-delivery outboxes are rebuildable caches, not
+      // independent local operations. An active device can refresh or clear
+      // them while creating an invoice/issuing an asset, so a lagging device
+      // adopts the remote checkpoint and retries its own index work later.
+      if (!recoveryStateExtends(localWalletState, remoteWalletState)) {
         return false
       }
       // Receive invoices are append-only from the recovery perspective. A
@@ -356,7 +368,11 @@ export class RgbService {
       restored.recoveryRemoteStateKnown = true
       // Checkpoint delivery metadata is installation-local and must never be
       // accepted from a remote snapshot (including old snapshot formats).
-      delete restored.recoveryCheckpoint
+      // The authenticated checkpoint itself is the verification. Do not mark
+      // it dirty/unverified and immediately upload it again: a handoff may
+      // have advanced the remote revision between the read and that redundant
+      // write, falsely turning a successful restore into a CAS conflict.
+      restored.recoveryCheckpoint = { dirty: false, verified: true }
       await this.dependencies.storage.set(this.storageKey(restored.wallet), persistState(restored))
       this.state = restored
       this.openedFromStorage = true
@@ -3069,6 +3085,41 @@ function comparableRecoveryState(value: unknown) {
     ...state,
     snapshot: { ...(snapshot as Record<string, unknown>), syncedAt: 0 },
   }
+}
+
+/**
+ * Checkpoint writes are serialized by the server lease. A newer checkpoint
+ * may therefore safely add durable records (invoices, contracts, issue and
+ * receive history) to an older device's state, but it must never omit or
+ * rewrite that device's existing records.
+ */
+function recoveryStateExtends(local: unknown, remote: unknown): boolean {
+  if (local === remote) return true
+  if (
+    local === null ||
+    remote === null ||
+    typeof local !== 'object' ||
+    typeof remote !== 'object'
+  ) {
+    return false
+  }
+  if (Array.isArray(local) || Array.isArray(remote)) {
+    if (!Array.isArray(local) || !Array.isArray(remote)) return false
+    const unmatched = [...remote]
+    return local.every(item => {
+      const index = unmatched.findIndex(candidate => recoveryStateExtends(item, candidate))
+      if (index < 0) return false
+      unmatched.splice(index, 1)
+      return true
+    })
+  }
+  const localRecord = local as Record<string, unknown>
+  const remoteRecord = remote as Record<string, unknown>
+  return Object.keys(localRecord).every(
+    key =>
+      Object.prototype.hasOwnProperty.call(remoteRecord, key) &&
+      recoveryStateExtends(localRecord[key], remoteRecord[key])
+  )
 }
 
 /** JSON persistence is the state boundary; cloning it also preserves blind-seal u64 values. */

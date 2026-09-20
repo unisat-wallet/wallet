@@ -5,6 +5,7 @@ import { SignedData, ToSignData } from '@unisat/wallet-shared';
 import { useI18n, useNavigation, useTools, useWallet } from '@unisat/wallet-state';
 
 import { SignPsbt } from '../Approval/components';
+import { useRgbWriteLeaseGuard } from '../RGB/components/useRgbWriteLeaseGuard';
 
 type FeePoolInspection = Awaited<ReturnType<ReturnType<typeof useWallet>['getRgbFeePoolInspection']>>;
 
@@ -57,10 +58,10 @@ const statusPillStyle = (available: boolean, pending: boolean, locked: boolean) 
   background: locked
     ? 'rgba(255,255,255,0.10)'
     : pending
-    ? 'rgba(244,182,44,0.18)'
-    : available
-    ? 'rgba(123,224,152,0.16)'
-    : 'rgba(255,255,255,0.10)'
+      ? 'rgba(244,182,44,0.18)'
+      : available
+        ? 'rgba(123,224,152,0.16)'
+        : 'rgba(255,255,255,0.10)'
 });
 
 export default function RgbFeePoolInspectionScreen() {
@@ -68,24 +69,28 @@ export default function RgbFeePoolInspectionScreen() {
   const nav = useNavigation();
   const tools = useTools();
   const { t } = useI18n();
+  const { requestWrite, writeLeaseModal } = useRgbWriteLeaseGuard();
   const [inspection, setInspection] = useState<FeePoolInspection>();
   const [refreshing, setRefreshing] = useState(false);
   const [withdrawToSignData, setWithdrawToSignData] = useState<ToSignData>();
 
-  const refresh = useCallback(async (showSuccess = false) => {
-    setRefreshing(true);
-    try {
-      const result = await wallet.getRgbFeePoolInspection();
-      setInspection(result);
-      if (showSuccess) {
-        tools.toastSuccess(t('success'));
+  const refresh = useCallback(
+    async (showSuccess = false) => {
+      setRefreshing(true);
+      try {
+        const result = await wallet.getRgbFeePoolInspection();
+        setInspection(result);
+        if (showSuccess) {
+          tools.toastSuccess(t('success'));
+        }
+      } catch (error) {
+        tools.toastError(error instanceof Error ? error.message : String(error));
+      } finally {
+        setRefreshing(false);
       }
-    } catch (error) {
-      tools.toastError(error instanceof Error ? error.message : String(error));
-    } finally {
-      setRefreshing(false);
-    }
-  }, [t, tools, wallet]);
+    },
+    [t, tools, wallet]
+  );
 
   useEffect(() => {
     void refresh();
@@ -118,16 +123,19 @@ export default function RgbFeePoolInspectionScreen() {
 
   if (withdrawToSignData) {
     return (
-      <SignPsbt
-        header={<Header onBack={() => setWithdrawToSignData(undefined)} />}
-        params={{ data: { toSignDatas: [withdrawToSignData] } }}
-        handleCancel={() => setWithdrawToSignData(undefined)}
-        handleConfirm={completeWithdraw}
-      />
+      <>
+        <SignPsbt
+          header={<Header onBack={() => setWithdrawToSignData(undefined)} />}
+          params={{ data: { toSignDatas: [withdrawToSignData] } }}
+          handleCancel={() => setWithdrawToSignData(undefined)}
+          handleConfirm={(signedDatas) => void requestWrite(() => void completeWithdraw(signedDatas))}
+        />
+        {writeLeaseModal}
+      </>
     );
   }
 
-  const canWithdraw = inspection?.utxos.some(utxo => utxo.available && !utxo.pending);
+  const canWithdraw = inspection?.utxos.some((utxo) => utxo.available && !utxo.pending);
 
   return (
     <Layout>
@@ -168,7 +176,8 @@ export default function RgbFeePoolInspectionScreen() {
               itemsCenter
               gap="md"
               style={feeUtxoCardStyle}
-              onClick={() => nav.navToExplorerTx(utxo.txid)}>
+              onClick={() => nav.navToExplorerTx(utxo.txid)}
+            >
               <Text text={index + 1} color="textDim" size="sm" style={feeUtxoSequenceStyle} />
               <Column fullX gap="xs" style={{ minWidth: 0 }}>
                 <Row full justifyBetween itemsCenter gap="sm">
@@ -198,14 +207,13 @@ export default function RgbFeePoolInspectionScreen() {
             <Text text={t('rgb_fee_pool_empty_description')} color="textDim" size="xs" textCenter wrap />
           </Column>
         ) : null}
-
       </Content>
       <Row style={{ padding: '0 16px 16px' }}>
         <Button
           text={t('rgb_fee_pool_withdraw')}
           preset="default"
           disabled={!canWithdraw}
-          onClick={beginWithdraw}
+          onClick={() => void requestWrite(() => void beginWithdraw())}
           style={{ flex: 1 }}
         />
         <Button
@@ -216,6 +224,7 @@ export default function RgbFeePoolInspectionScreen() {
           style={{ flex: 1 }}
         />
       </Row>
+      {writeLeaseModal}
     </Layout>
   );
 }

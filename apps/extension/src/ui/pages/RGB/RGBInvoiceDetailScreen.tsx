@@ -26,6 +26,8 @@ import {
   type RgbPendingReceiveInvoice
 } from '@unisat/wallet-state';
 
+import { useRgbWriteLeaseGuard } from './components/useRgbWriteLeaseGuard';
+
 const confirmMaskStyle = {
   position: 'fixed' as const,
   inset: 0,
@@ -63,6 +65,7 @@ export default function RGBInvoiceDetailScreen() {
   const nav = useNavigation();
   const tools = useTools();
   const { t } = useI18n();
+  const { requestWrite, writeLeaseModal } = useRgbWriteLeaseGuard();
   const { recipientId, invoice: routeInvoice, initialInvoice } = nav.getRouteState<'RGBInvoiceDetailScreen'>();
   const routePendingInvoice = initialInvoice as RgbPendingReceiveInvoice | undefined;
   const [invoice, setInvoice] = useState<RgbPendingReceiveInvoice | undefined>(routePendingInvoice);
@@ -225,7 +228,7 @@ export default function RGBInvoiceDetailScreen() {
                 disabled={releasing}
                 onClick={() => {
                   setReleaseConfirmVisible(false);
-                  void release();
+                  void requestWrite(() => void release());
                 }}
                 full
                 style={{ height: 48, background: 'transparent', border: '1px solid rgba(255,255,255,0.42)' }}
@@ -244,6 +247,7 @@ export default function RGBInvoiceDetailScreen() {
           </Column>
         </div>
       ) : null}
+      {writeLeaseModal}
     </Layout>
   );
 }

@@ -353,7 +353,10 @@ export default function RGBIssueScreen() {
 
   const onIssueAssetClick = () => {
     if (!canIssue) return;
-    setReviewModalVisible(true);
+    // Acquire (or explicitly take over) the RGB writer lease before showing
+    // the review portal. Otherwise the lease modal sits behind the already
+    // open review dialog and cannot be acted on.
+    void requestWrite(() => setReviewModalVisible(true));
   };
 
   const resetRgbUtxoSignStep = () => {
@@ -551,7 +554,7 @@ export default function RGBIssueScreen() {
           loading={loading}
           error={operationError}
           onClose={() => setReviewModalVisible(false)}
-          onConfirm={() => void requestWrite(onDeploy)}
+          onConfirm={onDeploy}
           t={t}
         />
       ) : null}

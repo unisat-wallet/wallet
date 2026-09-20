@@ -626,7 +626,7 @@ export default function RGBReceiveScreen() {
               disabled={cancelLoading}
               onClick={() => {
                 setReleaseConfirmVisible(false);
-                onCancelPendingInvoice();
+                void requestWrite(() => void onCancelPendingInvoice());
               }}
               full
               style={{ height: 48, background: 'transparent', border: '1px solid rgba(255,255,255,0.42)' }}
@@ -739,6 +739,7 @@ export default function RGBReceiveScreen() {
           </Column>
         </Content>
         {renderReleaseInvoiceConfirmModal()}
+        {writeLeaseModal}
       </Layout>
     );
   }

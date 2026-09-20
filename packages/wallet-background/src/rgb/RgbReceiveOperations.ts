@@ -9,6 +9,8 @@ import {
 
 type RgbReceiveOperationsDependencies = {
   getContext: () => Promise<LocalRgbServiceContext>
+  /** Reads remain available while recovery or another device's lease is pending. */
+  getReadContext?: () => Promise<LocalRgbServiceContext>
   ensureWriteLease?: (context: LocalRgbServiceContext) => Promise<void>
   syncReceivedAllocations: () => Promise<LocalRgbServiceContext>
 }
@@ -52,9 +54,14 @@ export class RgbReceiveOperations {
   }
 
   async getPendingReceiveInvoices(): Promise<{ list: RgbPendingReceiveInvoice[] }> {
-    let { service } = await this.dependencies.getContext()
+    let { service } = await (this.dependencies.getReadContext?.() ?? this.dependencies.getContext())
     if (!service.getPendingReceives().length) return { list: [] }
-    ;({ service } = await this.dependencies.syncReceivedAllocations())
+    try {
+      ;({ service } = await this.dependencies.syncReceivedAllocations())
+    } catch {
+      // Claiming and consignment settlement need the writer lease. Keep the
+      // already restored invoice list visible and retry that work later.
+    }
     return {
       list: service
         .getPendingReceives()

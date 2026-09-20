@@ -881,7 +881,9 @@ export class WalletController extends BaseController {
     tryEnsureWriteLease: (context, options) => this.tryEnsureRgbWriteLease(context, options),
   })
   private readonly rgbTransferQuery = new RgbTransferQuery({
-    getContext: () => this.getLocalRgbService(),
+    // Activity rendering is read-only. It must remain available while a
+    // checkpoint restore is retried or another device owns the RGB lease.
+    getContext: () => this.getLocalRgbReadService(),
     syncReceiveHistory: (service, context) => this.syncRgbReceiveHistory(service, context.wallet),
     syncPendingTransfers: (service, context) => this.syncRgbPendingTransfers(service, context),
     syncReceivedAllocations: () => this.syncRgbReceivedAllocations(),
@@ -897,11 +899,15 @@ export class WalletController extends BaseController {
   })
   private readonly rgbReceiveOperations = new RgbReceiveOperations({
     getContext: () => this.getLocalRgbService(),
+    getReadContext: () => this.getLocalRgbReadService(),
     ensureWriteLease: context => this.ensureRgbWriteLease(context),
     syncReceivedAllocations: () => this.syncRgbReceivedAllocations(),
   })
   private readonly rgbIssueOperations = new RgbIssueOperations({
-    getContext: () => this.getLocalRgbService(),
+    // Issuance refreshes recovery explicitly before it can mutate state, so
+    // opening the preflight in read mode lets a stale conflict self-heal.
+    getContext: () => this.getLocalRgbReadService(),
+    refreshRecovery: context => this.refreshRgbRecoveryForWrite(context),
     ensureWriteLease: context => this.ensureRgbWriteLease(context),
     syncIndexerOutbox: context => this.syncRgbIndexerOutbox(context.service, context.wallet),
     now: () => Date.now(),
@@ -3860,8 +3866,14 @@ export class WalletController extends BaseController {
    */
   restoreLatestRgbRecoveryCheckpoint = async () => {
     const context = await this.getLocalRgbReadService()
+    return this.restoreLatestRgbRecoveryCheckpointForContext(context)
+  }
+
+  /** Explicitly adopt the current cloud checkpoint without publishing local state. */
+  private restoreLatestRgbRecoveryCheckpointForContext = async (
+    context: LocalRgbServiceContext
+  ) => {
     const key = `${context.wallet.network}:${context.wallet.fundingAddress}`
-    await this.restoreRgbRecoveryIfNeeded(context).catch(() => undefined)
     const checkpoint = await getRgbApiService().getRgbRecoveryCheckpoint({ wallet: context.wallet })
     if (!checkpoint.payload || !checkpoint.revision) {
       throw new Error('No RGB recovery checkpoint is available')
@@ -3969,7 +3981,13 @@ export class WalletController extends BaseController {
 
   /** User-confirmed activation. takeover fences the previously active device immediately. */
   activateRgbWriteLease = async (params: { takeover?: boolean } = {}) => {
-    const context = await this.getLocalRgbService()
+    // Takeover is an explicit choice to discard this installation's stale
+    // state. Establish the server's current checkpoint revision first so the
+    // acquire is not poisoned by a prior local conflict/dirty retry.
+    const context = params.takeover
+      ? await this.getLocalRgbReadService()
+      : await this.getLocalRgbService()
+    if (params.takeover) await this.restoreLatestRgbRecoveryCheckpointForContext(context)
     await this.ensureRgbWriteLease(context, { takeover: params.takeover === true })
     const lease = this.getRgbActiveWriteLease(context.wallet)
     if (!lease) throw new Error('RGB write lease is unavailable')
@@ -4850,6 +4868,20 @@ export class WalletController extends BaseController {
       await restore
     } finally {
       if (this.rgbRecoveryRestores.get(key) === restore) this.rgbRecoveryRestores.delete(key)
+    }
+  }
+
+  /**
+   * A user-initiated write must not rely on a revision cached from an earlier
+   * read. Another installation may have published a checkpoint after this
+   * background worker opened, while the cached writer lease remains valid.
+   */
+  private refreshRgbRecoveryForWrite = async (context: LocalRgbServiceContext) => {
+    const key = `${context.wallet.network}:${context.wallet.fundingAddress}`
+    this.rgbRecoveryVersions.delete(key)
+    await this.restoreRgbRecoveryIfNeeded(context)
+    if (!context.service.isRecoveryBackupEnabled()) {
+      throw new Error('RGB recovery service is unavailable; retry when the backend is reachable')
     }
   }
 

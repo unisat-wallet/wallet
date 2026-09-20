@@ -65,7 +65,14 @@ export class RgbTransferQuery {
       pageSize
     )
     if (!options?.skipSync) {
-      await this.dependencies.syncReceiveHistory(service, context)
+      try {
+        await this.dependencies.syncReceiveHistory(service, context)
+      } catch (error) {
+        this.dependencies.warn(
+          'Failed to synchronize RGB receive history while loading activity',
+          error
+        )
+      }
       if (service.getPendingTransfers().length) {
         try {
           await this.dependencies.syncPendingTransfers(service, context)
@@ -82,15 +89,25 @@ export class RgbTransferQuery {
             !hasRetryableBroadcast &&
             !hasBroadcastedTransfer
           ) {
-            throw error
+            this.dependencies.warn(
+              'Failed to synchronize pending RGB transfer while loading activity',
+              error
+            )
           }
         }
       }
       const hadPendingReceives = service.getPendingReceives().length > 0
       if (hadPendingReceives) {
-        context = await this.dependencies.syncReceivedAllocations()
-        ;({ service, wallet } = context)
-        await this.dependencies.syncReceiveHistory(service, context)
+        try {
+          context = await this.dependencies.syncReceivedAllocations()
+          ;({ service, wallet } = context)
+          await this.dependencies.syncReceiveHistory(service, context)
+        } catch (error) {
+          // Consignment/claim processing may require the writer lease. A
+          // read-only device still renders durable local and remote activity;
+          // it retries this background work on a later poll.
+          this.dependencies.warn('Failed to synchronize RGB receives while loading activity', error)
+        }
       }
     }
 

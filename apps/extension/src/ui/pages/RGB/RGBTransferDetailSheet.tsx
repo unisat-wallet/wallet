@@ -16,6 +16,8 @@ import {
   type RgbTransferItem
 } from '@unisat/wallet-state';
 
+import { useRgbWriteLeaseGuard } from './components/useRgbWriteLeaseGuard';
+
 function getStatusLabel(status: string, t: (key: string) => string, type?: RgbTransferItem['type']) {
   switch (status.toLowerCase()) {
     case 'signed':
@@ -185,6 +187,7 @@ export function RGBTransferDetailSheet({
   const { t } = useI18n();
   const wallet = useWallet();
   const tools = useTools();
+  const { requestWrite, writeLeaseModal } = useRgbWriteLeaseGuard();
   const [cancelConfirmVisible, setCancelConfirmVisible] = useState(false);
   const [cancelAcknowledged, setCancelAcknowledged] = useState(false);
   const [cancelLoading, setCancelLoading] = useState(false);
@@ -194,12 +197,15 @@ export function RGBTransferDetailSheet({
   const status = transfer?.status || 'pending';
   const ticker = transfer?.ticker || transfer?.name || 'RGB';
   const assetName = transfer?.name || transfer?.ticker || 'RGB';
-  const isCanceledReceive =
-    transfer?.type === 'receive' && ['canceled', 'cancelled'].includes(status.toLowerCase());
-  const amountPrefix = isCanceledReceive ? '' : transfer?.type === 'receive' ? '+ ' : transfer?.type === 'send' ? '- ' : '';
-  const displayAmount = transfer?.amount
-    ? toRgbDisplayAmount(transfer.amount, getRgbTokenPrecision(transfer))
-    : '--';
+  const isCanceledReceive = transfer?.type === 'receive' && ['canceled', 'cancelled'].includes(status.toLowerCase());
+  const amountPrefix = isCanceledReceive
+    ? ''
+    : transfer?.type === 'receive'
+      ? '+ '
+      : transfer?.type === 'send'
+        ? '- '
+        : '';
+  const displayAmount = transfer?.amount ? toRgbDisplayAmount(transfer.amount, getRgbTokenPrecision(transfer)) : '--';
   const amountText = amountPrefix + displayAmount;
   const description = getDescription(transfer, t);
   const canExplore =
@@ -207,8 +213,7 @@ export function RGBTransferDetailSheet({
     !['waiting_ack', 'broadcasting', 'broadcast_failed', 'pending_accept', 'rejected'].includes(status) &&
     !!onClickExploreTx;
   const canCancelSend =
-    transfer?.type === 'send' &&
-    ['signed', 'waiting_ack'].includes(String(transfer?.status || '').toLowerCase());
+    transfer?.type === 'send' && ['signed', 'waiting_ack'].includes(String(transfer?.status || '').toLowerCase());
   const canAcceptReceive =
     transfer?.type === 'receive' && String(transfer?.status || '').toLowerCase() === 'pending_accept';
   const canRetryBroadcast =
@@ -327,7 +332,8 @@ export function RGBTransferDetailSheet({
             checked={cancelAcknowledged}
             onChange={(event) => setCancelAcknowledged(event.target.checked)}
             style={{ marginTop: 20 }}
-            data-testid="rgb-cancel-transfer-checkbox">
+            data-testid="rgb-cancel-transfer-checkbox"
+          >
             <Text
               text={t('rgb_cancel_send_acknowledgement')}
               size="sm"
@@ -340,9 +346,9 @@ export function RGBTransferDetailSheet({
               text={t('cancel_transfer')}
               preset="default"
               disabled={cancelLoading || !cancelAcknowledged}
-              onClick={async () => {
-                const canceled = await onCancelSend();
-                if (canceled) setCancelConfirmVisible(false);
+              onClick={() => {
+                setCancelConfirmVisible(false);
+                void requestWrite(() => void onCancelSend());
               }}
               full
               style={{ height: 48, background: 'transparent', border: '1px solid rgba(255,255,255,0.42)' }}
@@ -368,211 +374,209 @@ export function RGBTransferDetailSheet({
   };
 
   return (
-    <BottomModal onClose={onClose} bodyStyle={{ padding: 0 }}>
-      <Column fullX gap="zero">
-        <BottomSheetHeader
-          title={getTransferTitle(transfer?.type, t)}
-          onClose={onClose}
-          inset={16}
-          height={60}
-          bottomSpacing={24}
-        />
+    <>
+      <BottomModal onClose={onClose} bodyStyle={{ padding: 0 }}>
+        <Column fullX gap="zero">
+          <BottomSheetHeader
+            title={getTransferTitle(transfer?.type, t)}
+            onClose={onClose}
+            inset={16}
+            height={60}
+            bottomSpacing={24}
+          />
 
-        <Column fullX itemsCenter style={{ paddingLeft: 16, paddingRight: 16, gap: 24 }}>
-          <Row itemsCenter justifyCenter style={{ gap: 8 }}>
-            <RGBAssetIcon
-              iconInfo={getRgbTokenIconInfo(transfer, ticker)}
-              ticker={ticker}
-              name={getRgbAssetName(transfer) || assetName}
-              size={32}
-            />
-            {!isCanceledReceive ? (
-              <>
-                <Text
-                  text={amountText}
-                  style={{
-                    fontSize: 18,
-                    fontWeight: 500,
-                    color: 'rgba(255,255,255,0.85)',
-                    lineHeight: '1.4'
-                  }}
-                />
-                <Text
-                  text={assetName}
-                  style={{
-                    fontSize: 18,
-                    fontWeight: 500,
-                    color: 'rgba(255,255,255,0.85)',
-                    lineHeight: '1.4'
-                  }}
-                />
-              </>
-            ) : null}
-            <Row
-              itemsCenter
-              justifyCenter
-              style={{
-                height: 20,
-                paddingLeft: 6,
-                paddingRight: 6,
-                borderRadius: 4,
-                backgroundColor: 'rgba(244,182,44,0.1)'
-              }}>
-              <Text
-                text="RGB"
-                style={{
-                  fontSize: 12,
-                  fontWeight: 600,
-                  color: 'rgba(244,182,44,0.85)'
-                }}
+          <Column fullX itemsCenter style={{ paddingLeft: 16, paddingRight: 16, gap: 24 }}>
+            <Row itemsCenter justifyCenter style={{ gap: 8 }}>
+              <RGBAssetIcon
+                iconInfo={getRgbTokenIconInfo(transfer, ticker)}
+                ticker={ticker}
+                name={getRgbAssetName(transfer) || assetName}
+                size={32}
               />
-            </Row>
-          </Row>
-
-          {description ? (
-            <Text text={description} color="textDim" textCenter size="xs" />
-          ) : null}
-
-          <Column fullX style={{ gap: 12 }}>
-            <DetailRow label={t('date')} value={formatDate(transfer?.timestamp || 0)} />
-            <DetailRow
-              label="Status"
-              value={getStatusLabel(status, t, transfer?.type)}
-              valueColor={getStatusColor(status)}
-            />
-            <Row fullX justifyBetween itemsCenter style={{ minHeight: 32 }}>
-              <Text
-                text={t('asset_id')}
+              {!isCanceledReceive ? (
+                <>
+                  <Text
+                    text={amountText}
+                    style={{
+                      fontSize: 18,
+                      fontWeight: 500,
+                      color: 'rgba(255,255,255,0.85)',
+                      lineHeight: '1.4'
+                    }}
+                  />
+                  <Text
+                    text={assetName}
+                    style={{
+                      fontSize: 18,
+                      fontWeight: 500,
+                      color: 'rgba(255,255,255,0.85)',
+                      lineHeight: '1.4'
+                    }}
+                  />
+                </>
+              ) : null}
+              <Row
+                itemsCenter
+                justifyCenter
                 style={{
-                  fontSize: 14,
-                  fontWeight: 500,
-                  color: 'rgba(255,255,255,0.45)',
-                  flexShrink: 0
+                  height: 20,
+                  paddingLeft: 6,
+                  paddingRight: 6,
+                  borderRadius: 4,
+                  backgroundColor: 'rgba(244,182,44,0.1)'
                 }}
-              />
-              {assetId ? (
-                <CopyableAddress address={assetId} copyPosition="after" len={10} color="ticker_color2" />
-              ) : (
+              >
                 <Text
-                  text="--"
+                  text="RGB"
                   style={{
-                    fontSize: 14,
-                    fontWeight: 500,
-                    color: 'rgba(255,255,255,0.85)'
+                    fontSize: 12,
+                    fontWeight: 600,
+                    color: 'rgba(244,182,44,0.85)'
                   }}
                 />
-              )}
+              </Row>
             </Row>
-            {status !== 'rejected' ? (
+
+            {description ? <Text text={description} color="textDim" textCenter size="xs" /> : null}
+
+            <Column fullX style={{ gap: 12 }}>
+              <DetailRow label={t('date')} value={formatDate(transfer?.timestamp || 0)} />
+              <DetailRow
+                label="Status"
+                value={getStatusLabel(status, t, transfer?.type)}
+                valueColor={getStatusColor(status)}
+              />
               <Row fullX justifyBetween itemsCenter style={{ minHeight: 32 }}>
                 <Text
-                  text={t(isIssue ? 'rgb_genesis_txid' : 'rgb_transfer_id')}
+                  text={t('asset_id')}
                   style={{
                     fontSize: 14,
                     fontWeight: 500,
-                    color: 'rgba(255,255,255,0.45)'
+                    color: 'rgba(255,255,255,0.45)',
+                    flexShrink: 0
                   }}
                 />
-                {recordId ? (
-                  <CopyableAddress
-                    address={recordId}
-                    copyPosition="after"
-                    len={10}
-                    color="ticker_color2"
-                  />
+                {assetId ? (
+                  <CopyableAddress address={assetId} copyPosition="after" len={10} color="ticker_color2" />
                 ) : (
-                  <Text text="--" color="ticker_color2" />
+                  <Text
+                    text="--"
+                    style={{
+                      fontSize: 14,
+                      fontWeight: 500,
+                      color: 'rgba(255,255,255,0.85)'
+                    }}
+                  />
                 )}
               </Row>
-            ) : null}
+              {status !== 'rejected' ? (
+                <Row fullX justifyBetween itemsCenter style={{ minHeight: 32 }}>
+                  <Text
+                    text={t(isIssue ? 'rgb_genesis_txid' : 'rgb_transfer_id')}
+                    style={{
+                      fontSize: 14,
+                      fontWeight: 500,
+                      color: 'rgba(255,255,255,0.45)'
+                    }}
+                  />
+                  {recordId ? (
+                    <CopyableAddress address={recordId} copyPosition="after" len={10} color="ticker_color2" />
+                  ) : (
+                    <Text text="--" color="ticker_color2" />
+                  )}
+                </Row>
+              ) : null}
+            </Column>
+
+            {loading ? <Text text={t('loading')} color="textDim" textCenter size="xs" /> : null}
           </Column>
 
-          {loading ? <Text text={t('loading')} color="textDim" textCenter size="xs" /> : null}
-        </Column>
-
-        <Column
-          fullX
-          style={{
-            marginTop: 32,
-            padding: 16,
-            borderTopWidth: 1,
-            borderTopColor: 'rgba(255,255,255,0.06)',
-            boxSizing: 'border-box'
-          }}>
-          {canAcceptReceive ? (
-            <Row gap="md" fullX>
+          <Column
+            fullX
+            style={{
+              marginTop: 32,
+              padding: 16,
+              borderTopWidth: 1,
+              borderTopColor: 'rgba(255,255,255,0.06)',
+              boxSizing: 'border-box'
+            }}
+          >
+            {canAcceptReceive ? (
+              <Row gap="md" fullX>
+                <Button
+                  text={t('rgb_reject_transfer')}
+                  preset="default"
+                  disabled={actionLoading}
+                  onClick={() => void requestWrite(() => void onRejectReceive())}
+                  full
+                  style={{
+                    height: 48,
+                    minHeight: 48,
+                    flex: 1,
+                    background: 'transparent',
+                    border: '1px solid rgba(255,255,255,0.42)'
+                  }}
+                  textStyle={{ color: colors.white, fontWeight: 'normal' }}
+                />
+                <Button
+                  text={t('rgb_accept_transfer')}
+                  preset="primary"
+                  disabled={actionLoading}
+                  onClick={() => void requestWrite(() => void onAcceptReceive())}
+                  full
+                  style={{ height: 48, minHeight: 48, flex: 1 }}
+                  textStyle={{ color: colors.black, fontWeight: 'normal' }}
+                />
+              </Row>
+            ) : canRetryBroadcast ? (
               <Button
-                text={t('rgb_reject_transfer')}
-                preset="default"
-                disabled={actionLoading}
-                onClick={() => void onRejectReceive()}
+                text={t('rgb_retry_broadcast')}
+                preset="primary"
+                disabled={broadcastRetryLoading}
+                onClick={() => void requestWrite(() => void onRetryBroadcast())}
                 full
+                style={{ height: 48, minHeight: 48, width: '100%' }}
+                textStyle={{ color: colors.black, fontWeight: 'normal' }}
+              />
+            ) : canCancelSend ? (
+              <Button
+                text={t('cancel_transfer')}
+                preset="default"
+                disabled={cancelLoading}
+                onClick={() => {
+                  setCancelAcknowledged(false);
+                  setCancelConfirmVisible(true);
+                }}
                 style={{
                   height: 48,
                   minHeight: 48,
-                  flex: 1,
+                  width: '100%',
+                  flex: 'none',
                   background: 'transparent',
                   border: '1px solid rgba(255,255,255,0.42)'
                 }}
                 textStyle={{ color: colors.white, fontWeight: 'normal' }}
               />
+            ) : canExplore ? (
               <Button
-                text={t('rgb_accept_transfer')}
+                text={t('view_on_uniscan')}
                 preset="primary"
-                disabled={actionLoading}
-                onClick={() => void onAcceptReceive()}
-                full
-                style={{ height: 48, minHeight: 48, flex: 1 }}
-                textStyle={{ color: colors.black, fontWeight: 'normal' }}
+                onClick={onClickExploreTx}
+                style={{ height: 48, minHeight: 48, width: '100%', flex: 'none' }}
               />
-            </Row>
-          ) : canRetryBroadcast ? (
-            <Button
-              text={t('rgb_retry_broadcast')}
-              preset="primary"
-              disabled={broadcastRetryLoading}
-              onClick={() => void onRetryBroadcast()}
-              full
-              style={{ height: 48, minHeight: 48, width: '100%' }}
-              textStyle={{ color: colors.black, fontWeight: 'normal' }}
-            />
-          ) : canCancelSend ? (
-            <Button
-              text={t('cancel_transfer')}
-              preset="default"
-              disabled={cancelLoading}
-              onClick={() => {
-                setCancelAcknowledged(false);
-                setCancelConfirmVisible(true);
-              }}
-              style={{
-                height: 48,
-                minHeight: 48,
-                width: '100%',
-                flex: 'none',
-                background: 'transparent',
-                border: '1px solid rgba(255,255,255,0.42)'
-              }}
-              textStyle={{ color: colors.white, fontWeight: 'normal' }}
-            />
-          ) : canExplore ? (
-            <Button
-              text={t('view_on_uniscan')}
-              preset="primary"
-              onClick={onClickExploreTx}
-              style={{ height: 48, minHeight: 48, width: '100%', flex: 'none' }}
-            />
-          ) : (
-            <Button
-              text={t('done')}
-              preset="primary"
-              onClick={onClose}
-              style={{ height: 48, minHeight: 48, width: '100%', flex: 'none' }}
-            />
-          )}
+            ) : (
+              <Button
+                text={t('done')}
+                preset="primary"
+                onClick={onClose}
+                style={{ height: 48, minHeight: 48, width: '100%', flex: 'none' }}
+              />
+            )}
+          </Column>
         </Column>
-      </Column>
-      {renderCancelConfirmModal()}
-    </BottomModal>
+        {renderCancelConfirmModal()}
+      </BottomModal>
+      {writeLeaseModal}
+    </>
   );
 }

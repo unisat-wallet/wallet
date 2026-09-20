@@ -11,6 +11,8 @@ const MAX_RGB_ISSUED_SUPPLY = 0xffff_ffff_ffff_ffffn
 
 type RgbIssueOperationsDependencies = {
   getContext: () => Promise<LocalRgbServiceContext>
+  /** Re-read the recovery checkpoint before constructing a new issuance. */
+  refreshRecovery?: (context: LocalRgbServiceContext) => Promise<void>
   ensureWriteLease?: (context: LocalRgbServiceContext) => Promise<void>
   syncIndexerOutbox: (context: LocalRgbServiceContext) => Promise<boolean>
   now: () => number
@@ -36,6 +38,7 @@ export class RgbIssueOperations {
   }> {
     const context = await this.dependencies.getContext()
     const { service, wallet } = context
+    await this.dependencies.refreshRecovery?.(context)
     await this.dependencies.ensureWriteLease?.(context)
     await service.sync()
     const snapshot = service.getSnapshot()
