@@ -192,13 +192,15 @@ type RgbControllerApiService = {
     payloadParts?: string[]
     expectedUpdatedAt?: number
     expectedRevision?: string
+    kind?: 'normal' | 'replacement'
     updatedAt: number
-  }) => Promise<{ saved: boolean; updatedAt: number; revision?: string }>
+  }) => Promise<{ saved: boolean; updatedAt: number; revision?: string; generation?: number; kind?: 'normal' | 'replacement' }>
   startRgbRecoveryCheckpointUpload: (params: {
     wallet: RgbWalletRef
     lease?: RgbControllerWriteLeaseCredential
     expectedUpdatedAt?: number
     expectedRevision?: string
+    kind?: 'normal' | 'replacement'
     updatedAt: number
     partCount: number
     totalLength: number
@@ -215,7 +217,7 @@ type RgbControllerApiService = {
     wallet: RgbWalletRef
     lease?: RgbControllerWriteLeaseCredential
     uploadId: string
-  }) => Promise<{ saved: boolean; updatedAt: number; revision?: string }>
+  }) => Promise<{ saved: boolean; updatedAt: number; revision?: string; generation?: number; kind?: 'normal' | 'replacement' }>
   getRgbRecoveryCheckpointUploadStatus: (params: {
     wallet: RgbWalletRef
     uploadId: string
@@ -224,12 +226,16 @@ type RgbControllerApiService = {
     saved?: boolean
     updatedAt: number
     revision?: string
+    generation?: number
+    kind?: 'normal' | 'replacement'
     receivedIndexes?: number[]
   }>
   getRgbRecoveryCheckpoint: (params: { wallet: RgbWalletRef }) => Promise<{
     payload?: string
     updatedAt?: number
     revision?: string
+    generation?: number
+    kind?: 'normal' | 'replacement'
   }>
   getRgbAssetDetail: (assetId: string) => Promise<unknown>
   getRgbAssetActivity: (
@@ -826,6 +832,87 @@ function rgbRecoveryStateSummary(state: unknown) {
   }
 }
 
+/** Safe field names only; recovery logs must never expose invoice or consignment contents. */
+function rgbRecoveryDifferenceFields(local: unknown, remote: unknown): string[] {
+  const localRecord = local && typeof local === 'object' ? (local as Record<string, unknown>) : {}
+  const remoteRecord =
+    remote && typeof remote === 'object' ? (remote as Record<string, unknown>) : {}
+  const ignored = new Set([
+    'snapshot',
+    'pendingReceives',
+    'pendingIssues',
+    'pendingAssetMetadata',
+    'pendingReceiveHistory',
+    'pendingUtxoSync',
+    'recoveryCheckpoint',
+    'recoveryCheckpointUpdatedAt',
+    'recoveryCheckpointRevision',
+    'recoveryRemoteStateKnown',
+    'recoveryConflict',
+  ])
+  return [...new Set([...Object.keys(localRecord), ...Object.keys(remoteRecord)])]
+    .filter(
+      key =>
+        !ignored.has(key) && stableRgbJson(localRecord[key]) !== stableRgbJson(remoteRecord[key])
+    )
+    .sort()
+}
+
+/** Field names/counts only; never log recipient IDs, invoices or consignments. */
+function rgbRecoveryInvoiceComparison(local: unknown, remote: unknown) {
+  const localReceives = Array.isArray(
+    (local as Record<string, unknown> | undefined)?.['pendingReceives']
+  )
+    ? ((local as Record<string, unknown>)['pendingReceives'] as Array<Record<string, unknown>>)
+    : []
+  const remoteReceives = Array.isArray(
+    (remote as Record<string, unknown> | undefined)?.['pendingReceives']
+  )
+    ? ((remote as Record<string, unknown>)['pendingReceives'] as Array<Record<string, unknown>>)
+    : []
+  const recipientKey = (receive: Record<string, unknown>) =>
+    typeof receive['proxyRecipientId'] === 'string'
+      ? receive['proxyRecipientId']
+      : typeof receive['recipientId'] === 'string'
+        ? receive['recipientId']
+        : undefined
+  const remoteByRecipient = new Map(
+    remoteReceives.flatMap(receive => {
+      const key = recipientKey(receive)
+      return key ? [[key, receive] as const] : []
+    })
+  )
+  const ignored = new Set(['claimedAt', 'assetMetadataIndexed'])
+  let missingRecipients = 0
+  let changedRecipients = 0
+  const changedFields = new Set<string>()
+  for (const localReceive of localReceives) {
+    const key = recipientKey(localReceive)
+    const remoteReceive = key ? remoteByRecipient.get(key) : undefined
+    if (!remoteReceive) {
+      missingRecipients++
+      continue
+    }
+    const fields = new Set([...Object.keys(localReceive), ...Object.keys(remoteReceive)])
+    const differences = [...fields].filter(
+      field =>
+        !ignored.has(field) &&
+        stableRgbJson(localReceive[field]) !== stableRgbJson(remoteReceive[field])
+    )
+    if (differences.length) {
+      changedRecipients++
+      differences.forEach(field => changedFields.add(field))
+    }
+  }
+  return {
+    localCount: localReceives.length,
+    remoteCount: remoteReceives.length,
+    missingRecipients,
+    changedRecipients,
+    changedFields: [...changedFields].sort(),
+  }
+}
+
 function rgbRecoveryWalletTag(wallet: Pick<LocalRgbWallet, 'network' | 'fundingAddress'>) {
   return `${wallet.network}:${wallet.fundingAddress.slice(-8)}`
 }
@@ -866,7 +953,7 @@ export class WalletController extends BaseController {
   private readonly rgbRecoveryBackups = new Map<string, Promise<unknown>>()
   private readonly rgbRecoveryVersions = new Map<
     string,
-    { updatedAt?: number; revision?: string }
+    { updatedAt?: number; revision?: string; generation?: number; kind?: 'normal' | 'replacement' }
   >()
   private readonly rgbWriteLeases = new Map<string, RgbControllerWriteLease>()
   /** Coalesce concurrent startup pollers that need the same writer lease. */
@@ -3855,7 +3942,10 @@ export class WalletController extends BaseController {
   }
 
   getRgbRecoveryCheckpointStatus = async () => {
-    const { service } = await this.getLocalRgbReadService()
+    // This is a local diagnostic read. In particular, conflict UI polling
+    // must not repeatedly start another recovery attempt after a conflict has
+    // already been recorded.
+    const { service } = await this.rgbServiceRegistry.get()
     return { ...service.getRecoveryCheckpointStatus(), conflicted: service.hasRecoveryConflict() }
   }
 
@@ -3867,6 +3957,59 @@ export class WalletController extends BaseController {
   restoreLatestRgbRecoveryCheckpoint = async () => {
     const context = await this.getLocalRgbReadService()
     return this.restoreLatestRgbRecoveryCheckpointForContext(context)
+  }
+
+  /**
+   * Explicitly keep this installation's conflicted RGB state. This is never
+   * an automatic retry: the user has chosen to replace the latest cloud
+   * checkpoint, so acquire a fenced takeover lease and publish against the
+   * revision read immediately before the takeover.
+   */
+  publishLocalRgbRecoveryConflictResolution = async () => {
+    // Do not use getLocalRgbReadService here: it starts a background recovery
+    // attempt which is intentionally expected to fail while this method is
+    // resolving the same conflict.
+    const context = await this.rgbServiceRegistry.get()
+    const { service, wallet } = context
+    if (!service.hasRecoveryConflict()) {
+      throw new Error('There is no RGB recovery conflict to resolve')
+    }
+
+    const key = `${wallet.network}:${wallet.fundingAddress}`
+    const checkpoint = await getRgbApiService().getRgbRecoveryCheckpoint({ wallet })
+    if (!checkpoint.payload || !checkpoint.revision) {
+      throw new Error('Latest RGB cloud checkpoint is unavailable')
+    }
+    const remoteState = await decryptRgbRecoveryCheckpoint(
+      checkpoint.payload,
+      await this.rgbRecoveryKey(wallet)
+    )
+    if (!service.canRestoreRecoveryState(remoteState)) {
+      throw new Error('Latest RGB cloud checkpoint does not belong to this wallet')
+    }
+
+    // The remote revision is the only valid CAS baseline for the deliberate
+    // replacement. Clear stale deduplication too: an identical local payload
+    // may have been verified for an older cloud revision.
+    this.rgbRecoveryVersions.set(key, {
+      ...(checkpoint.updatedAt === undefined ? {} : { updatedAt: checkpoint.updatedAt }),
+      revision: checkpoint.revision,
+      ...(checkpoint.generation === undefined ? {} : { generation: checkpoint.generation }),
+      ...(checkpoint.kind === undefined ? {} : { kind: checkpoint.kind }),
+    })
+    this.rgbRecoveryVerifiedFingerprints.delete(key)
+    await service.setRecoveryCheckpointVersion(checkpoint.updatedAt)
+    await service.setRecoveryCheckpointRevision(checkpoint.revision)
+    await this.ensureRgbWriteLease(context, { takeover: true, forceRenew: true })
+    await service.prepareLocalRecoveryConflictResolution()
+    if (!(await service.retryRecoveryCheckpoint('replacement'))) {
+      throw new Error('RGB local conflict resolution checkpoint publication failed')
+    }
+    const status = service.getRecoveryCheckpointStatus()
+    if (status.dirty || !status.verified || service.hasRecoveryConflict()) {
+      throw new Error('RGB local conflict resolution checkpoint was not verified')
+    }
+    return { published: true }
   }
 
   /** Explicitly adopt the current cloud checkpoint without publishing local state. */
@@ -3888,9 +4031,13 @@ export class WalletController extends BaseController {
     this.rgbRecoveryVersions.set(key, {
       ...(checkpoint.updatedAt === undefined ? {} : { updatedAt: checkpoint.updatedAt }),
       revision: checkpoint.revision,
+      ...(checkpoint.generation === undefined ? {} : { generation: checkpoint.generation }),
+      ...(checkpoint.kind === undefined ? {} : { kind: checkpoint.kind }),
     })
     await context.service.setRecoveryCheckpointVersion(checkpoint.updatedAt)
     await context.service.setRecoveryCheckpointRevision(checkpoint.revision)
+    await context.service.setRecoveryCheckpointGeneration(checkpoint.generation)
+    await context.service.setRecoveryCheckpointKind(checkpoint.kind)
     await context.service.enableRecoveryBackup()
     return { restored: true, updatedAt: checkpoint.updatedAt }
   }
@@ -3953,7 +4100,7 @@ export class WalletController extends BaseController {
     // The controller retains the remote revision it read before acquiring the
     // lease. retryRecoveryCheckpoint publishes this replacement through that
     // CAS baseline; it must not be reset to an unconditional overwrite.
-    if (!(await context.service.retryRecoveryCheckpoint())) {
+    if (!(await context.service.retryRecoveryCheckpoint('replacement', true))) {
       throw new Error('RGB backup checkpoint publication failed')
     }
     return { restored: true, createdAt: backup.createdAt }
@@ -3981,13 +4128,12 @@ export class WalletController extends BaseController {
 
   /** User-confirmed activation. takeover fences the previously active device immediately. */
   activateRgbWriteLease = async (params: { takeover?: boolean } = {}) => {
-    // Takeover is an explicit choice to discard this installation's stale
-    // state. Establish the server's current checkpoint revision first so the
-    // acquire is not poisoned by a prior local conflict/dirty retry.
-    const context = params.takeover
-      ? await this.getLocalRgbReadService()
-      : await this.getLocalRgbService()
+    // Every user-initiated write must establish the current checkpoint
+    // revision first. A cached local writer lease does not prove another
+    // installation has not already published a newer checkpoint.
+    const context = await this.getLocalRgbReadService()
     if (params.takeover) await this.restoreLatestRgbRecoveryCheckpointForContext(context)
+    else await this.refreshRgbRecoveryForWrite(context)
     await this.ensureRgbWriteLease(context, { takeover: params.takeover === true })
     const lease = this.getRgbActiveWriteLease(context.wallet)
     if (!lease) throw new Error('RGB write lease is unavailable')
@@ -4774,11 +4920,20 @@ export class WalletController extends BaseController {
           )
           return decryptedCheckpoint
         }
+        const localCheckpointGeneration = service.getRecoveryCheckpointGeneration?.()
+        const normalCheckpointAdvance =
+          !needsRestore &&
+          revisionChanged &&
+          checkpoint.kind === 'normal' &&
+          checkpoint.generation !== undefined &&
+          localCheckpointGeneration !== undefined &&
+          checkpoint.generation > localCheckpointGeneration &&
+          service.canAdoptNewerNormalRecoveryCheckpoint?.() === true
         const shouldFastForward =
           !needsRestore &&
           revisionChanged &&
           Boolean(checkpoint.payload) &&
-          service.canFastForwardRecoveryState?.(await decryptCheckpoint()) === true
+          normalCheckpointAdvance
         if (!needsRestore && revisionChanged && !shouldFastForward && !remoteCheckpointMissing) {
           const matchesRemoteCheckpoint =
             Boolean(checkpoint.payload) &&
@@ -4794,12 +4949,15 @@ export class WalletController extends BaseController {
               remoteRevisionKnown: checkpoint.revision !== undefined,
             })
           } else {
+            const localRecoveryState = service.exportRecoveryState?.()
             log.warn('RGB recovery: checkpoint revision conflicts with local state', {
               wallet: rgbRecoveryWalletTag(wallet),
               localRevisionKnown: localRevision !== undefined,
               remoteRevisionKnown: checkpoint.revision !== undefined,
               needsRestore,
               ...rgbRecoveryServiceSummary(service),
+              differences: rgbRecoveryDifferenceFields(localRecoveryState, decryptedCheckpoint),
+              invoices: rgbRecoveryInvoiceComparison(localRecoveryState, decryptedCheckpoint),
               remote: decryptedCheckpoint
                 ? rgbRecoveryStateSummary(decryptedCheckpoint)
                 : undefined,
@@ -4835,9 +4993,13 @@ export class WalletController extends BaseController {
         this.rgbRecoveryVersions.set(key, {
           ...(checkpoint.updatedAt === undefined ? {} : { updatedAt: checkpoint.updatedAt }),
           ...(checkpoint.revision === undefined ? {} : { revision: checkpoint.revision }),
+          ...(checkpoint.generation === undefined ? {} : { generation: checkpoint.generation }),
+          ...(checkpoint.kind === undefined ? {} : { kind: checkpoint.kind }),
         })
         await service.setRecoveryCheckpointVersion(checkpoint.updatedAt)
         await service.setRecoveryCheckpointRevision(checkpoint.revision)
+        await service.setRecoveryCheckpointGeneration(checkpoint.generation)
+        await service.setRecoveryCheckpointKind(checkpoint.kind)
       } catch (error) {
         log.warn('Failed to restore RGB recovery checkpoint', error)
         // Do not enable writes after an unreadable request. Otherwise a fresh
@@ -4888,30 +5050,40 @@ export class WalletController extends BaseController {
   private queueRgbRecoveryCheckpoint = (
     wallet: LocalRgbWallet,
     state: unknown,
-    context: { reason: 'state_change' | 'retry_dirty' | 'retry_unverified' }
+    context: {
+      reason: 'state_change' | 'retry_dirty' | 'retry_unverified'
+      kind: 'normal' | 'replacement'
+    }
   ) => {
     const key = `${wallet.network}:${wallet.fundingAddress}`
     const diagnostic = {
       wallet: rgbRecoveryWalletTag(wallet),
       reason: context.reason,
+      kind: context.kind,
       fingerprint: bitcoin.crypto
         .sha256(Buffer.from(stableRgbJson(state)))
         .toString('hex')
         .slice(0, 16),
       ...rgbRecoveryStateSummary(state),
     }
+    // A replacement with identical encrypted state is still a meaningful
+    // publication: it records a user-confirmed overwrite and must not be
+    // deduplicated with a prior normal checkpoint.
+    const diagnosticFingerprint = `${context.kind}:${diagnostic.fingerprint}`
     log.debug('RGB recovery: checkpoint queued', diagnostic)
     const previous = this.rgbRecoveryBackups.get(key) || Promise.resolve()
     const backup = previous
       .catch(() => undefined)
       .then(async () => {
         const verifiedFingerprint = this.rgbRecoveryVerifiedFingerprints.get(key)
-        if (verifiedFingerprint === diagnostic.fingerprint) {
+        if (verifiedFingerprint === diagnosticFingerprint) {
           const version = this.rgbRecoveryVersions.get(key)
           return {
             saved: true,
             ...(version?.updatedAt === undefined ? {} : { updatedAt: version.updatedAt }),
             ...(version?.revision ? { revision: version.revision } : {}),
+            ...(version?.generation === undefined ? {} : { generation: version.generation }),
+            ...(version?.kind === undefined ? {} : { kind: version.kind }),
             verified: true,
           }
         }
@@ -4928,7 +5100,15 @@ export class WalletController extends BaseController {
               fencingToken: activeLease.fencingToken,
             }
           : undefined
-        let result: { saved: boolean; updatedAt: number; revision?: string } | undefined
+        let result:
+          | {
+              saved: boolean
+              updatedAt: number
+              revision?: string
+              generation?: number
+              kind?: 'normal' | 'replacement'
+            }
+          | undefined
         if (payload.length <= RGB_RECOVERY_PAYLOAD_PART_SIZE) {
           // The normal checkpoint fits in one JSON request. The endpoint
           // atomically replaces the encrypted payload with the same revision
@@ -4939,6 +5119,7 @@ export class WalletController extends BaseController {
             payload,
             ...(expected?.updatedAt === undefined ? {} : { expectedUpdatedAt: expected.updatedAt }),
             ...(expected?.revision === undefined ? {} : { expectedRevision: expected.revision }),
+            kind: context.kind,
             updatedAt,
           })
         } else {
@@ -4951,6 +5132,7 @@ export class WalletController extends BaseController {
             checksum,
             ...(expected?.updatedAt === undefined ? {} : { expectedUpdatedAt: expected.updatedAt }),
             ...(expected?.revision === undefined ? {} : { expectedRevision: expected.revision }),
+            kind: context.kind,
             updatedAt,
           })
           let receivedIndexes = new Set<number>()
@@ -4994,6 +5176,8 @@ export class WalletController extends BaseController {
                   saved: status.saved === true,
                   updatedAt: status.updatedAt,
                   ...(status.revision ? { revision: status.revision } : {}),
+                  ...(status.generation === undefined ? {} : { generation: status.generation }),
+                  ...(status.kind === undefined ? {} : { kind: status.kind }),
                 }
                 break
               }
@@ -5020,21 +5204,27 @@ export class WalletController extends BaseController {
         this.rgbRecoveryVersions.set(key, {
           updatedAt: result.updatedAt,
           ...(result.revision ? { revision: result.revision } : {}),
+          ...(result.generation === undefined ? {} : { generation: result.generation }),
+          ...(result.kind === undefined ? {} : { kind: result.kind }),
         })
         if (!result.saved) return result
         // The API atomically commits the encrypted payload after its CAS (and
         // verifies the checksum for multipart uploads). Local encryption has
         // already succeeded, so a read-back only adds latency to every send.
         const verifiedRevision = result.revision
-        this.rgbRecoveryVerifiedFingerprints.set(key, diagnostic.fingerprint)
+        this.rgbRecoveryVerifiedFingerprints.set(key, diagnosticFingerprint)
         this.rgbRecoveryVersions.set(key, {
           updatedAt: result.updatedAt,
           ...(verifiedRevision ? { revision: verifiedRevision } : {}),
+          ...(result.generation === undefined ? {} : { generation: result.generation }),
+          ...(result.kind === undefined ? {} : { kind: result.kind }),
         })
         log.debug('RGB recovery: checkpoint saved', diagnostic)
         return {
           ...result,
           ...(verifiedRevision ? { revision: verifiedRevision } : {}),
+          ...(result.generation === undefined ? {} : { generation: result.generation }),
+          ...(result.kind === undefined ? {} : { kind: result.kind }),
           verified: true,
           checksum,
           totalLength: payload.length,

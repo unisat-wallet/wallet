@@ -147,82 +147,27 @@ export class RgbService {
     return this.requireState().recoveryCheckpointRevision
   }
 
-  hasRecoveryConflict() {
-    return this.requireState().recoveryConflict === true
+  getRecoveryCheckpointGeneration() {
+    return this.requireState().recoveryCheckpointGeneration
   }
 
-  /**
-   * An older device may replace its state with a newer encrypted checkpoint
-   * only when it has no active local operation that would need a merge. Public
-   * indexing outboxes and completed history are replayable from the recovered
-   * checkpoint, so they must not strand a secondary device in conflict mode.
-   */
-  canFastForwardRecoveryState(recovery?: unknown) {
+  getRecoveryCheckpointKind() {
+    return this.requireState().recoveryCheckpointKind
+  }
+
+  /** A verified normal checkpoint has no local state that needs a snapshot merge. */
+  canAdoptNewerNormalRecoveryCheckpoint() {
     const state = this.requireState()
-    if (Object.keys(state.pending).length > 0) {
-      return false
-    }
-    if (recovery === undefined) {
-      return (
-        !state.recoveryCheckpoint?.dirty &&
-        this.getPendingReceives().length === 0 &&
-        (state.pendingIssues?.length || 0) === 0
-      )
-    }
-    if (!isRgbServiceState(recovery) || !sameRecoveryWallet(recovery.wallet, state.wallet)) {
-      return false
-    }
-    try {
-      const candidate = normalizeStateAssetIds(hydrateState(recovery))
-      validateRecoveredState(candidate, state.wallet)
-      const localSnapshot = recoverySnapshot(persistState(state))
-      const remoteSnapshot = recoverySnapshot(persistState(candidate))
-      const {
-        pendingReceives: localReceives = [],
-        snapshot: _localIndexerSnapshot,
-        pendingIssues: _localPendingIssues,
-        pendingAssetMetadata: _localPendingAssetMetadata,
-        pendingReceiveHistory: _localPendingReceiveHistory,
-        pendingUtxoSync: _localPendingUtxoSync,
-        ...localWalletState
-      } = localSnapshot
-      const {
-        pendingReceives: remoteReceives = [],
-        snapshot: _remoteIndexerSnapshot,
-        pendingIssues: _remotePendingIssues,
-        pendingAssetMetadata: _remotePendingAssetMetadata,
-        pendingReceiveHistory: _remotePendingReceiveHistory,
-        pendingUtxoSync: _remotePendingUtxoSync,
-        ...remoteWalletState
-      } = remoteSnapshot
-      // Snapshot data and index-delivery outboxes are rebuildable caches, not
-      // independent local operations. An active device can refresh or clear
-      // them while creating an invoice/issuing an asset, so a lagging device
-      // adopts the remote checkpoint and retries its own index work later.
-      if (!recoveryStateExtends(localWalletState, remoteWalletState)) {
-        return false
-      }
-      // Receive invoices are append-only from the recovery perspective. A
-      // remote checkpoint may contain the exact local reservations plus new
-      // invoices created on another device, but it must not rewrite or drop a
-      // still-valid local reservation.
-      const activeReceiveIds = new Set(
-        this.getPendingReceives().map(receive => receive.recipientId)
-      )
-      return localReceives
-        .filter(local =>
-          activeReceiveIds.has((local as { recipientId?: string }).recipientId || '')
-        )
-        .every(local =>
-          remoteReceives.some(
-            remote =>
-              stableRecoveryJson(comparableRecoveryReceive(remote)) ===
-              stableRecoveryJson(comparableRecoveryReceive(local))
-          )
-        )
-    } catch {
-      return false
-    }
+    return (
+      state.recoveryCheckpoint?.dirty !== true &&
+      state.recoveryCheckpoint?.verified === true &&
+      state.recoveryConflict !== true &&
+      state.recoveryCheckpointGeneration !== undefined
+    )
+  }
+
+  hasRecoveryConflict() {
+    return this.requireState().recoveryConflict === true
   }
 
   /**
@@ -280,11 +225,14 @@ export class RgbService {
     }
   }
 
-  async retryRecoveryCheckpoint() {
+  async retryRecoveryCheckpoint(
+    kind: 'normal' | 'replacement' = 'normal',
+    force = false
+  ) {
     const state = this.requireState()
     if (!this.recoveryBackupEnabled || !this.dependencies.onStatePersisted) return false
-    if (!state.recoveryCheckpoint?.dirty && state.recoveryCheckpoint?.verified) return true
-    await this.persist({ waitForRecovery: true })
+    if (!force && !state.recoveryCheckpoint?.dirty && state.recoveryCheckpoint?.verified) return true
+    await this.persist({ waitForRecovery: true, recoveryCheckpointKind: kind })
     return this.requireState().recoveryCheckpoint?.verified === true
   }
 
@@ -297,6 +245,22 @@ export class RgbService {
     const state = this.requireState()
     if (state.recoveryCheckpointRevision === revision) return
     state.recoveryCheckpointRevision = revision
+    await this.dependencies.storage.set(this.storageKey(state.wallet), persistState(state))
+  }
+
+  async setRecoveryCheckpointGeneration(generation: number | undefined) {
+    if (generation === undefined) return
+    const state = this.requireState()
+    if (state.recoveryCheckpointGeneration === generation) return
+    state.recoveryCheckpointGeneration = generation
+    await this.dependencies.storage.set(this.storageKey(state.wallet), persistState(state))
+  }
+
+  async setRecoveryCheckpointKind(kind: 'normal' | 'replacement' | undefined) {
+    if (kind === undefined) return
+    const state = this.requireState()
+    if (state.recoveryCheckpointKind === kind) return
+    state.recoveryCheckpointKind = kind
     await this.dependencies.storage.set(this.storageKey(state.wallet), persistState(state))
   }
 
@@ -328,6 +292,26 @@ export class RgbService {
     const state = this.requireState()
     this.recoveryBackupEnabled = false
     state.recoveryConflict = true
+    await this.dependencies.storage.set(this.storageKey(state.wallet), persistState(state))
+  }
+
+  /**
+   * Prepare an explicitly user-approved local state to replace a conflicting
+   * cloud checkpoint. The controller must acquire a fenced writer lease and
+   * set the latest remote revision before calling this method; this only
+   * clears the local safety fence and makes the next checkpoint write dirty.
+   */
+  async prepareLocalRecoveryConflictResolution() {
+    const state = this.requireState()
+    state.recoveryRemoteStateKnown = true
+    state.recoveryConflict = undefined
+    state.recoveryCheckpoint = {
+      ...state.recoveryCheckpoint,
+      dirty: true,
+      verified: false,
+      lastError: undefined,
+    }
+    this.recoveryBackupEnabled = true
     await this.dependencies.storage.set(this.storageKey(state.wallet), persistState(state))
   }
 
@@ -1491,6 +1475,7 @@ export class RgbService {
     txid: string
   ) {
     const state = this.requireState()
+    this.recordReleasedReceiveRecipient(receive.recipientId)
     const pendingReceiveHistory = state.pendingReceiveHistory || (state.pendingReceiveHistory = [])
     const transferId = `receive:${receive.proxyRecipientId || receive.recipientId}`
     // Any Asset / Any Amount invoices intentionally omit these constraints.
@@ -1636,9 +1621,22 @@ export class RgbService {
     ) {
       return { cancelled: false }
     }
+    const rollback = snapshotState(state)
     receives.splice(index, 1)
-    await this.persist()
+    this.recordReleasedReceiveRecipient(recipientId)
+    // Releasing a blind seal changes durable wallet ownership. Do not report
+    // it as released until its checkpoint is safely published; otherwise a
+    // stale device can show a locally removed invoice while the cloud retains
+    // it and later enters a recovery conflict.
+    await this.persistWithRecoveryRollback(rollback)
     return { cancelled: true }
+  }
+
+  /** Keep a checkpoint-portable proof that this recipient is no longer pending. */
+  private recordReleasedReceiveRecipient(recipientId: string) {
+    const state = this.requireState()
+    const released = state.releasedReceiveRecipientIds || (state.releasedReceiveRecipientIds = [])
+    if (!released.includes(recipientId)) released.push(recipientId)
   }
 
   async storeContract(assetId: string, consignment: Uint8Array, genesis?: Uint8Array) {
@@ -2838,7 +2836,13 @@ export class RgbService {
     return Boolean(state.pendingUtxoSync || state.pendingIssues?.length)
   }
 
-  private async persist(options: { waitForRecovery?: boolean; skipRecovery?: boolean } = {}) {
+  private async persist(
+    options: {
+      waitForRecovery?: boolean
+      skipRecovery?: boolean
+      recoveryCheckpointKind?: 'normal' | 'replacement'
+    } = {}
+  ) {
     const state = this.requireState()
     this.pruneExpiredProviderOrigins()
     // A dirty or unverified checkpoint must still retry during a later sync,
@@ -2861,7 +2865,10 @@ export class RgbService {
           ? 'retry_dirty'
           : 'retry_unverified'
       const recovery = Promise.resolve(
-        this.dependencies.onStatePersisted(recoverySnapshot(persisted), { reason })
+        this.dependencies.onStatePersisted(recoverySnapshot(persisted), {
+          reason,
+          kind: options.recoveryCheckpointKind || 'normal',
+        })
       )
       if (options.waitForRecovery) {
         const result = await recovery
@@ -2874,6 +2881,12 @@ export class RgbService {
         )
         await this.setRecoveryCheckpointRevision(
           result && typeof result === 'object' ? result.revision : undefined
+        )
+        await this.setRecoveryCheckpointGeneration(
+          result && typeof result === 'object' ? result.generation : undefined
+        )
+        await this.setRecoveryCheckpointKind(
+          result && typeof result === 'object' ? result.kind : undefined
         )
         await this.recordRecoveryCheckpointResult(result)
       } else {
@@ -2888,6 +2901,12 @@ export class RgbService {
             )
             await this.setRecoveryCheckpointRevision(
               result && typeof result === 'object' ? result.revision : undefined
+            )
+            await this.setRecoveryCheckpointGeneration(
+              result && typeof result === 'object' ? result.generation : undefined
+            )
+            await this.setRecoveryCheckpointKind(
+              result && typeof result === 'object' ? result.kind : undefined
             )
             await this.recordRecoveryCheckpointResult(result)
           })
@@ -3006,7 +3025,7 @@ function persistState(state: RgbServiceState) {
       ...receive,
       ...(receive.seal ? { seal: persistBlindSeal(receive.seal) } : {}),
     })),
-    receivedBlindSeals: state.receivedBlindSeals?.map(persistBlindSeal),
+    ...(state.receivedBlindSeals ? { receivedBlindSeals: state.receivedBlindSeals.map(persistBlindSeal) } : {}),
   }
 }
 
@@ -3016,6 +3035,8 @@ function recoverySnapshot(state: ReturnType<typeof persistState>) {
     recoveryCheckpoint: _recoveryCheckpoint,
     recoveryCheckpointUpdatedAt: _recoveryCheckpointUpdatedAt,
     recoveryCheckpointRevision: _recoveryCheckpointRevision,
+    recoveryCheckpointGeneration: _recoveryCheckpointGeneration,
+    recoveryCheckpointKind: _recoveryCheckpointKind,
     recoveryRemoteStateKnown: _recoveryRemoteStateKnown,
     recoveryConflict: _recoveryConflict,
     pending,
@@ -3064,17 +3085,6 @@ function stableRecoveryJson(value: unknown): string {
     .join(',')}}`
 }
 
-/** These fields are installation-local delivery/index cursors, not wallet state. */
-function comparableRecoveryReceive(value: unknown) {
-  if (!value || typeof value !== 'object') return value
-  const {
-    claimedAt: _claimedAt,
-    assetMetadataIndexed: _assetMetadataIndexed,
-    ...receive
-  } = value as Record<string, unknown>
-  return receive
-}
-
 /** Snapshot polling timestamps are local freshness metadata, not wallet state. */
 function comparableRecoveryState(value: unknown) {
   if (!value || typeof value !== 'object') return value
@@ -3085,41 +3095,6 @@ function comparableRecoveryState(value: unknown) {
     ...state,
     snapshot: { ...(snapshot as Record<string, unknown>), syncedAt: 0 },
   }
-}
-
-/**
- * Checkpoint writes are serialized by the server lease. A newer checkpoint
- * may therefore safely add durable records (invoices, contracts, issue and
- * receive history) to an older device's state, but it must never omit or
- * rewrite that device's existing records.
- */
-function recoveryStateExtends(local: unknown, remote: unknown): boolean {
-  if (local === remote) return true
-  if (
-    local === null ||
-    remote === null ||
-    typeof local !== 'object' ||
-    typeof remote !== 'object'
-  ) {
-    return false
-  }
-  if (Array.isArray(local) || Array.isArray(remote)) {
-    if (!Array.isArray(local) || !Array.isArray(remote)) return false
-    const unmatched = [...remote]
-    return local.every(item => {
-      const index = unmatched.findIndex(candidate => recoveryStateExtends(item, candidate))
-      if (index < 0) return false
-      unmatched.splice(index, 1)
-      return true
-    })
-  }
-  const localRecord = local as Record<string, unknown>
-  const remoteRecord = remote as Record<string, unknown>
-  return Object.keys(localRecord).every(
-    key =>
-      Object.prototype.hasOwnProperty.call(remoteRecord, key) &&
-      recoveryStateExtends(localRecord[key], remoteRecord[key])
-  )
 }
 
 /** JSON persistence is the state boundary; cloning it also preserves blind-seal u64 values. */
@@ -3171,6 +3146,16 @@ function validateRecoveredState(state: RgbServiceState, currentWallet: RgbWallet
   }
   if (!Number.isSafeInteger(state.snapshot.syncedAt) || state.snapshot.syncedAt < 0) {
     throw new RgbServiceError('RGB recovery checkpoint snapshot is invalid')
+  }
+  if (
+    state.releasedReceiveRecipientIds !== undefined &&
+    (!Array.isArray(state.releasedReceiveRecipientIds) ||
+      state.releasedReceiveRecipientIds.length > 65_535 ||
+      !state.releasedReceiveRecipientIds.every(
+        recipientId => typeof recipientId === 'string' && recipientId.length > 0 && recipientId.length <= 2_048
+      ))
+  ) {
+    throw new RgbServiceError('RGB recovery checkpoint contains invalid receive release records')
   }
   for (const utxo of state.snapshot.utxos) {
     if (

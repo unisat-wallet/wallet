@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { HashRouter, Route, Routes, useNavigate as useNavigateOrigin } from 'react-router-dom';
 
 import { LoadingOutlined } from '@ant-design/icons';
@@ -62,6 +62,7 @@ import RGBSendCompleteScreen from './RGB/RGBSendCompleteScreen';
 import RGBTransferDetailScreen from './RGB/RGBTransferDetailScreen';
 import RGBTokenScreen from './RGB/RGBTokenScreen';
 import SendRGBScreen from './RGB/SendRGBScreen';
+import { RgbRecoveryConflictModal } from './RGB/components/RgbRecoveryConflictModal';
 import RunesTokenScreen from './Runes/RunesTokenScreen';
 import SendRunesScreen from './Runes/SendRunesScreen';
 import AboutUsScreen from './Settings/AboutUsScreen';
@@ -472,6 +473,7 @@ const Main = () => {
 
   const isReady = useIsReady();
   const isUnlocked = useIsUnlocked();
+  const [rgbRecoveryGeneration, setRgbRecoveryGeneration] = useState(0);
 
   const selfRef = useRef({
     settingsLoaded: false,
@@ -568,6 +570,12 @@ const Main = () => {
     init();
   }, [init]);
 
+  useEffect(() => {
+    const refreshRgbRoutes = () => setRgbRecoveryGeneration(generation => generation + 1);
+    window.addEventListener('rgb-recovery-resolved', refreshRgbRoutes);
+    return () => window.removeEventListener('rgb-recovery-resolved', refreshRgbRoutes);
+  }, []);
+
   if (!isReady) {
     return (
       <div
@@ -593,13 +601,14 @@ const Main = () => {
     <HashRouter>
       <NavigationProvider>
         <ApprovalProvider>
-          <Routes>
+          <Routes key={rgbRecoveryGeneration}>
             {Object.keys(routes)
               .map((v) => routes[v])
               .map((v) => (
                 <Route key={v.path} path={v.path} element={<ErrorBoundary>{v.element}</ErrorBoundary>} />
               ))}
           </Routes>
+          <RgbRecoveryConflictModal />
         </ApprovalProvider>
       </NavigationProvider>
     </HashRouter>

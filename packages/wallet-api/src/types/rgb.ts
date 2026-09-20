@@ -336,6 +336,8 @@ export interface RgbRecoveryCheckpointSaveRequest {
   expectedUpdatedAt?: number
   /** Immutable server revision observed during the authenticated recovery read. */
   expectedRevision?: string
+  /** Normal writer progression vs an explicit user-approved replacement. */
+  kind?: 'normal' | 'replacement'
   updatedAt: number
 }
 
@@ -344,6 +346,8 @@ export interface RgbRecoveryCheckpointSaveResult {
   saved: boolean
   updatedAt: number
   revision?: string
+  generation?: number
+  kind?: 'normal' | 'replacement'
 }
 
 export interface RgbRecoveryCheckpointUploadStartRequest {
@@ -351,6 +355,7 @@ export interface RgbRecoveryCheckpointUploadStartRequest {
   lease?: RgbWriteLeaseCredential
   expectedUpdatedAt?: number
   expectedRevision?: string
+  kind?: 'normal' | 'replacement'
   updatedAt: number
   partCount: number
   totalLength: number
@@ -394,6 +399,8 @@ export interface RgbRecoveryCheckpointReadResult {
   payload?: string
   updatedAt?: number
   revision?: string
+  generation?: number
+  kind?: 'normal' | 'replacement'
 }
 
 export interface RgbReceiveInvoiceRequest {

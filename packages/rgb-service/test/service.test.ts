@@ -263,6 +263,54 @@ describe('RgbService', () => {
     expect(service.getPendingReceives()).toHaveLength(1)
   })
 
+  it('records a release tombstone in the recovery state', async () => {
+    const dependencies = createDependencies()
+    const service = new RgbService(dependencies)
+    await service.open(wallet)
+    ;(service as any).state.pendingReceives = [{ recipientId: 'released-recipient', createdAt: 1 }]
+
+    await expect(service.cancelBlindReceive('released-recipient')).resolves.toEqual({ cancelled: true })
+    expect(service.exportRecoveryState()).toMatchObject({
+      pendingReceives: [],
+      releasedReceiveRecipientIds: ['released-recipient'],
+    })
+  })
+
+  it('records a terminal receive tombstone after settlement is abandoned', async () => {
+    const dependencies = createDependencies()
+    const service = new RgbService(dependencies)
+    await service.open(wallet)
+    ;(service as any).state.pendingReceives = [
+      {
+        recipientId: 'settled-on-another-device',
+        createdAt: 1,
+        receivedConsignment: { txid: 'a'.repeat(64), receivedAt: 1, accepted: true },
+      },
+    ]
+
+    await expect(service.abandonAcceptedReceive('settled-on-another-device')).resolves.toEqual({
+      abandoned: true,
+      recipientId: 'settled-on-another-device',
+    })
+    expect(service.exportRecoveryState()).toMatchObject({
+      pendingReceives: [],
+      releasedReceiveRecipientIds: ['settled-on-another-device'],
+    })
+  })
+
+  it('rolls back an invoice release when its recovery checkpoint cannot be saved', async () => {
+    const dependencies = createDependencies()
+    const service = new RgbService(dependencies)
+    await service.open(wallet)
+    await service.enableRecoveryBackup()
+    ;(service as any).state.pendingReceives = [{ recipientId: 'recipient-id', createdAt: 1 }]
+    dependencies.onStatePersisted = vi.fn().mockRejectedValue(new Error('recovery unavailable'))
+
+    await expect(service.cancelBlindReceive('recipient-id')).rejects.toThrow('recovery unavailable')
+    expect(service.getPendingReceives()).toHaveLength(1)
+    expect(service.exportRecoveryState()).not.toHaveProperty('releasedReceiveRecipientIds')
+  })
+
   it('excludes active blind-invoice seals from NIA issuance funding UTXOs', async () => {
     const dependencies = createDependencies()
     const fundingUtxos = Array.from({ length: 5 }, (_, vout) => ({
@@ -420,153 +468,16 @@ describe('RgbService', () => {
     ).resolves.toBe(false)
   })
 
-  it('allows recovery fast-forward only when no local RGB work is pending', async () => {
+  it('adopts a newer normal checkpoint without interpreting its RGB state machine', async () => {
     const dependencies = createDependencies()
     const service = new RgbService(dependencies)
     await service.open(wallet)
+    ;(service as any).state.recoveryCheckpoint = { dirty: false, verified: true }
+    ;(service as any).state.recoveryCheckpointGeneration = 4
 
-    expect(service.canFastForwardRecoveryState()).toBe(true)
-    ;(service as any).state.pending = {
-      transfer: { request: {}, prepared: {}, createdAt: 1 },
-    }
-    expect(service.canFastForwardRecoveryState()).toBe(false)
-    ;(service as any).state.pending = {}
-    ;(service as any).state.pendingAssetMetadata = [
-      {
-        assetId: 'rgb:asset',
-        metadata: { ticker: 'TOK', name: 'Token', precision: 0, schema: 'NIA', issuedSupply: '1' },
-      },
-    ]
-    expect(service.canFastForwardRecoveryState()).toBe(true)
-    ;(service as any).state.pendingIssues = [{ id: 'issue', createdAt: 1 }]
-    expect(service.canFastForwardRecoveryState()).toBe(false)
-  })
-
-  it('allows a clean device to fast-forward after a stale recovery conflict', async () => {
-    const dependencies = createDependencies()
-    const service = new RgbService(dependencies)
-    await service.open(wallet)
-
-    await service.markRecoveryConflict()
-
-    // A conflict is a local fence set after observing a changed remote
-    // checkpoint. It is not itself an operation that needs merging. When no
-    // writes remain locally, the controller may safely replace this stale
-    // installation with the latest encrypted checkpoint.
-    expect(service.canFastForwardRecoveryState()).toBe(true)
-  })
-
-  it('does not let an expired receive reservation block recovery fast-forward', async () => {
-    const dependencies = createDependencies()
-    const service = new RgbService(dependencies)
-    await service.open(wallet)
-    ;(service as any).state.pendingReceives = [
-      { recipientId: 'expired', createdAt: 1, expirationTimestamp: 1 },
-    ]
-
-    expect(service.canFastForwardRecoveryState()).toBe(true)
-  })
-
-  it('fast-forwards when the remote checkpoint appends an invoice', async () => {
-    const dependencies = createDependencies()
-    const service = new RgbService(dependencies)
-    await service.open(wallet)
-    ;(service as any).state.pendingReceives = [
-      { recipientId: 'existing', createdAt: 1, expirationTimestamp: undefined },
-    ]
-    const remote = service.exportRecoveryState() as any
-    remote.pendingReceives = [
-      ...remote.pendingReceives,
-      { recipientId: 'new', createdAt: 2, expirationTimestamp: undefined },
-    ]
-
-    expect(service.canFastForwardRecoveryState()).toBe(false)
-    expect(service.canFastForwardRecoveryState(remote)).toBe(true)
-  })
-
-  it('ignores local receive claim and index cursors while fast-forwarding', async () => {
-    const dependencies = createDependencies()
-    const service = new RgbService(dependencies)
-    await service.open(wallet)
-    ;(service as any).state.pendingReceives = [
-      {
-        recipientId: 'existing',
-        createdAt: 1,
-        claimedAt: 10,
-        assetMetadataIndexed: true,
-      },
-    ]
-    const remote = service.exportRecoveryState() as any
-    delete remote.pendingReceives[0].claimedAt
-    delete remote.pendingReceives[0].assetMetadataIndexed
-    remote.pendingReceives.push({ recipientId: 'new', createdAt: 2 })
-
-    expect(service.canFastForwardRecoveryState(remote)).toBe(true)
-  })
-
-  it('ignores snapshot polling timestamps while fast-forwarding', async () => {
-    const dependencies = createDependencies()
-    const service = new RgbService(dependencies)
-    await service.open(wallet)
-    await service.sync()
-    ;(service as any).state.pendingReceives = [{ recipientId: 'existing', createdAt: 1 }]
-    ;(service as any).state.snapshot.syncedAt = 10
-    const remote = service.exportRecoveryState() as any
-    remote.snapshot.syncedAt = 20
-    remote.pendingReceives.push({ recipientId: 'new', createdAt: 2 })
-
-    expect(service.canFastForwardRecoveryState(remote)).toBe(true)
-    expect(service.matchesRecoveryState(remote)).toBe(false)
-    remote.pendingReceives.pop()
-    expect(service.matchesRecoveryState(remote)).toBe(true)
-  })
-
-  it('fast-forwards when the remote checkpoint has a newer index snapshot', async () => {
-    const dependencies = createDependencies()
-    const service = new RgbService(dependencies)
-    await service.open(wallet)
-    await service.sync()
-    ;(service as any).state.pendingReceives = [{ recipientId: 'existing', createdAt: 1 }]
-    const remote = service.exportRecoveryState() as any
-    remote.snapshot.utxos.push({
-      ...remote.snapshot.utxos[0],
-      outpoint: { txid: 'c'.repeat(64), vout: 2 },
-    })
-    remote.pendingReceives.push({ recipientId: 'new', createdAt: 2 })
-
-    expect(service.canFastForwardRecoveryState(remote)).toBe(true)
-  })
-
-  it('fast-forwards when the remote checkpoint appends an issued contract', async () => {
-    const dependencies = createDependencies()
-    const service = new RgbService(dependencies)
-    await service.open(wallet)
-    const remote = service.exportRecoveryState() as any
-    remote.contracts = { 'rgb:new': { consignment: 'contract' } }
-
-    expect(service.canFastForwardRecoveryState(remote)).toBe(true)
-  })
-
-  it('does not fast-forward when the remote checkpoint rewrites local state', async () => {
-    const dependencies = createDependencies()
-    const service = new RgbService(dependencies)
-    await service.open(wallet)
-    ;(service as any).state.contracts = { 'rgb:existing': { consignment: 'local' } }
-    const remote = JSON.parse(JSON.stringify(service.exportRecoveryState())) as any
-    remote.contracts['rgb:existing'].consignment = 'remote'
-
-    expect(service.canFastForwardRecoveryState(remote)).toBe(false)
-  })
-
-  it('does not treat a local issuance index outbox as conflicting wallet state', async () => {
-    const dependencies = createDependencies()
-    const service = new RgbService(dependencies)
-    await service.open(wallet)
-    ;(service as any).state.pendingIssues = [{ assetId: 'rgb:indexed' }]
-    const remote = service.exportRecoveryState() as any
-    delete remote.pendingIssues
-
-    expect(service.canFastForwardRecoveryState(remote)).toBe(true)
+    expect(service.canAdoptNewerNormalRecoveryCheckpoint()).toBe(true)
+    ;(service as any).state.recoveryCheckpoint.dirty = true
+    expect(service.canAdoptNewerNormalRecoveryCheckpoint()).toBe(false)
   })
 
   it('recognizes an identical remote checkpoint despite local recovery metadata', async () => {

@@ -357,6 +357,10 @@ export interface RgbServiceState {
   /** Version of the remote checkpoint from which this local state was restored/saved. */
   recoveryCheckpointUpdatedAt?: number
   recoveryCheckpointRevision?: string
+  /** Server-assigned order of the checkpoint currently represented locally. */
+  recoveryCheckpointGeneration?: number
+  /** Explicit replacement checkpoints require user confirmation on other devices. */
+  recoveryCheckpointKind?: 'normal' | 'replacement'
   /** Local-only checkpoint delivery state; intentionally excluded from the encrypted remote snapshot. */
   recoveryCheckpoint?: {
     dirty: boolean
@@ -370,6 +374,12 @@ export interface RgbServiceState {
   snapshot: RgbWalletSnapshot
   pending: Record<string, RgbPendingTransfer>
   pendingReceives?: RgbPendingReceive[]
+  /**
+   * Durable terminal-receive tombstones. They are included in the encrypted
+   * checkpoint so an older installation can safely discard an invoice that a
+   * lease holder released, canceled, rejected, or settled on another device.
+   */
+  releasedReceiveRecipientIds?: string[]
   pendingReceiveHistory?: RgbPendingReceiveHistory[]
   pendingSendHistory?: RgbPendingSendHistory[]
   pendingUtxoSync?: RgbPendingUtxoSync
@@ -522,12 +532,17 @@ export interface RgbServiceDependencies {
    */
   onStatePersisted?: (
     state: unknown,
-    context: { reason: 'state_change' | 'retry_dirty' | 'retry_unverified' }
+    context: {
+      reason: 'state_change' | 'retry_dirty' | 'retry_unverified'
+      kind: 'normal' | 'replacement'
+    }
   ) =>
     | void
     | {
         updatedAt?: number
         revision?: string
+        generation?: number
+        kind?: 'normal' | 'replacement'
         saved?: boolean
         verified?: boolean
         checksum?: string
@@ -538,6 +553,8 @@ export interface RgbServiceDependencies {
         | {
             updatedAt?: number
             revision?: string
+            generation?: number
+            kind?: 'normal' | 'replacement'
             saved?: boolean
             verified?: boolean
             checksum?: string

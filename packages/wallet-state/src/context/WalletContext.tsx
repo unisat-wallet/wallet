@@ -670,6 +670,9 @@ export interface WalletController {
   /** Discard local conflicted RGB state and reload the latest cloud checkpoint. */
   restoreLatestRgbRecoveryCheckpoint(): Promise<{ restored: true; updatedAt?: number }>
 
+  /** Keep this device's conflicted state and explicitly replace the cloud checkpoint. */
+  publishLocalRgbRecoveryConflictResolution(): Promise<{ published: true }>
+
   /** Creates a seed-bound, encrypted offline RGB recovery package. */
   exportRgbBackup(): Promise<string>
 
