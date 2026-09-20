@@ -157,15 +157,60 @@ export class RgbService {
    * indexing outboxes and completed history are replayable from the recovered
    * checkpoint, so they must not strand a secondary device in conflict mode.
    */
-  canFastForwardRecoveryState() {
+  canFastForwardRecoveryState(recovery?: unknown) {
     const state = this.requireState()
-    return (
-      !state.recoveryConflict &&
-      !state.recoveryCheckpoint?.dirty &&
-      Object.keys(state.pending).length === 0 &&
-      (state.pendingReceives?.length || 0) === 0 &&
-      (state.pendingIssues?.length || 0) === 0
-    )
+    if (Object.keys(state.pending).length > 0 || (state.pendingIssues?.length || 0) > 0) {
+      return false
+    }
+    if (recovery === undefined) {
+      return !state.recoveryCheckpoint?.dirty && this.getPendingReceives().length === 0
+    }
+    if (!isRgbServiceState(recovery) || !sameRecoveryWallet(recovery.wallet, state.wallet)) {
+      return false
+    }
+    try {
+      const candidate = normalizeStateAssetIds(hydrateState(recovery))
+      validateRecoveredState(candidate, state.wallet)
+      const localSnapshot = recoverySnapshot(persistState(state))
+      const remoteSnapshot = recoverySnapshot(persistState(candidate))
+      const {
+        pendingReceives: localReceives = [],
+        snapshot: _localIndexerSnapshot,
+        ...localWalletState
+      } = localSnapshot
+      const {
+        pendingReceives: remoteReceives = [],
+        snapshot: _remoteIndexerSnapshot,
+        ...remoteWalletState
+      } = remoteSnapshot
+      // The UTXO snapshot is a rebuildable index cache, not an independent
+      // local operation. An active device can refresh or extend it while
+      // creating an invoice, so a lagging device must adopt the remote cache
+      // together with the latest encrypted wallet state.
+      if (stableRecoveryJson(localWalletState) !== stableRecoveryJson(remoteWalletState)) {
+        return false
+      }
+      // Receive invoices are append-only from the recovery perspective. A
+      // remote checkpoint may contain the exact local reservations plus new
+      // invoices created on another device, but it must not rewrite or drop a
+      // still-valid local reservation.
+      const activeReceiveIds = new Set(
+        this.getPendingReceives().map(receive => receive.recipientId)
+      )
+      return localReceives
+        .filter(local =>
+          activeReceiveIds.has((local as { recipientId?: string }).recipientId || '')
+        )
+        .every(local =>
+          remoteReceives.some(
+            remote =>
+              stableRecoveryJson(comparableRecoveryReceive(remote)) ===
+              stableRecoveryJson(comparableRecoveryReceive(local))
+          )
+        )
+    } catch {
+      return false
+    }
   }
 
   /**
@@ -183,8 +228,8 @@ export class RgbService {
       const candidate = normalizeStateAssetIds(hydrateState(recovery))
       validateRecoveredState(candidate, current.wallet)
       return (
-        stableRecoveryJson(recoverySnapshot(persistState(current))) ===
-        stableRecoveryJson(recoverySnapshot(persistState(candidate)))
+        stableRecoveryJson(comparableRecoveryState(recoverySnapshot(persistState(current)))) ===
+        stableRecoveryJson(comparableRecoveryState(recoverySnapshot(persistState(candidate))))
       )
     } catch {
       return false
@@ -3001,6 +3046,29 @@ function stableRecoveryJson(value: unknown): string {
     .sort()
     .map(key => `${JSON.stringify(key)}:${stableRecoveryJson(record[key])}`)
     .join(',')}}`
+}
+
+/** These fields are installation-local delivery/index cursors, not wallet state. */
+function comparableRecoveryReceive(value: unknown) {
+  if (!value || typeof value !== 'object') return value
+  const {
+    claimedAt: _claimedAt,
+    assetMetadataIndexed: _assetMetadataIndexed,
+    ...receive
+  } = value as Record<string, unknown>
+  return receive
+}
+
+/** Snapshot polling timestamps are local freshness metadata, not wallet state. */
+function comparableRecoveryState(value: unknown) {
+  if (!value || typeof value !== 'object') return value
+  const state = value as Record<string, unknown>
+  const snapshot = state['snapshot']
+  if (!snapshot || typeof snapshot !== 'object') return value
+  return {
+    ...state,
+    snapshot: { ...(snapshot as Record<string, unknown>), syncedAt: 0 },
+  }
 }
 
 /** JSON persistence is the state boundary; cloning it also preserves blind-seal u64 values. */

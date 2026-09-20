@@ -75,8 +75,13 @@ export class RgbWalletCoordinator {
   }
 
   async syncListState(): Promise<void> {
-    const context = await this.dependencies.getContext()
+    // This is initiated by a list render. Recovery may still be restoring or
+    // intentionally read-only after a conflict, neither of which should turn
+    // into a user-visible indexer error. Use local read state first and only
+    // escalate to a writer after recovery has established a safe baseline.
+    const context = await (this.dependencies.getReadContext?.() ?? this.dependencies.getContext())
     const { service, wallet } = context
+    if (!service.isRecoveryBackupEnabled()) return
     const snapshot = service.getSnapshot()
     if (!snapshot.utxos.some(utxo => utxo.allocations.length > 0)) return
     const key = walletKey(wallet)
@@ -108,9 +113,8 @@ export class RgbWalletCoordinator {
   }
 
   async getPendingLockedAmounts(): Promise<Map<string, bigint>> {
-    const { service } = await (
-      this.dependencies.getReadContext?.() ?? this.dependencies.getContext()
-    )
+    const { service } = await (this.dependencies.getReadContext?.() ??
+      this.dependencies.getContext())
     const snapshot = service.getSnapshot?.()
     if (!snapshot) return new Map<string, bigint>()
     const lockedAmounts = new Map<string, bigint>()

@@ -4511,7 +4511,12 @@ export class WalletController extends BaseController {
     const funding = await this.getCurrentRgbFundingAccount()
     // This only migrates a missing key on invoices created by the first
     // witness-invoice build; acquire the normal writer fence before persisting.
-    await this.ensureRgbWriteLease(context, { forceRenew: true })
+    // A different device may still hold the lease immediately after handoff.
+    // Reads must remain available in that window; the next receive poll will
+    // retry the claim/index writes after the lease expires or is released.
+    if (!(await this.tryEnsureRgbWriteLease(context, { forceRenew: true }))) {
+      return context
+    }
     await context.service.backfillWitnessReceivePublicKey(funding.publicKey)
     return this.rgbCoordinator.syncReceivedAllocations()
   }
@@ -4742,11 +4747,6 @@ export class WalletController extends BaseController {
             wallet: rgbRecoveryWalletTag(wallet),
           })
         }
-        const shouldFastForward =
-          !needsRestore &&
-          revisionChanged &&
-          Boolean(checkpoint.payload) &&
-          service.canFastForwardRecoveryState?.() === true
         let decryptedCheckpoint: unknown
         const decryptCheckpoint = async () => {
           if (decryptedCheckpoint !== undefined) return decryptedCheckpoint
@@ -4756,6 +4756,11 @@ export class WalletController extends BaseController {
           )
           return decryptedCheckpoint
         }
+        const shouldFastForward =
+          !needsRestore &&
+          revisionChanged &&
+          Boolean(checkpoint.payload) &&
+          service.canFastForwardRecoveryState?.(await decryptCheckpoint()) === true
         if (!needsRestore && revisionChanged && !shouldFastForward && !remoteCheckpointMissing) {
           const matchesRemoteCheckpoint =
             Boolean(checkpoint.payload) &&
@@ -4776,6 +4781,10 @@ export class WalletController extends BaseController {
               localRevisionKnown: localRevision !== undefined,
               remoteRevisionKnown: checkpoint.revision !== undefined,
               needsRestore,
+              ...rgbRecoveryServiceSummary(service),
+              remote: decryptedCheckpoint
+                ? rgbRecoveryStateSummary(decryptedCheckpoint)
+                : undefined,
             })
             await service.markRecoveryConflict()
             throw new Error('RGB recovery checkpoint has changed on another installation')
