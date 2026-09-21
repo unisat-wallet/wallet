@@ -433,7 +433,7 @@ export function useRGBReceiveScreenLogic() {
   }, [hasPendingInvoiceAwaitingUpdate, loadPendingInvoices])
 
   const finishCreateInvoice = async (skipSync = false) => {
-    setLoadingText('Creating invoice...')
+    setLoadingText(t('rgb_creating_invoice'))
     const value = await createReceiveInvoice(skipSync)
     const invoice = getInvoiceText(value)
     const pendingInvoice = getRecordPayload(value)
@@ -475,7 +475,7 @@ export function useRGBReceiveScreenLogic() {
   }
 
   const startCreateRgbUtxoSign = async () => {
-    setLoadingText('Preparing RGB UTXO...')
+    setLoadingText(t('rgb_preparing_utxo'))
     const beginResult = await wallet.createRgbUtxosBegin({
       upTo: true,
       // One funding transaction amortizes several future blind invoices.
@@ -489,7 +489,7 @@ export function useRGBReceiveScreenLogic() {
     const toSignData = beginResultRecord.toSignData
 
     if (!toSignData) {
-      throw new Error('RGB UTXO creation did not return signing data')
+      throw new Error(t('rgb_utxo_signing_data_missing'))
     }
 
     setUtxoToSignData(toSignData)
@@ -499,7 +499,7 @@ export function useRGBReceiveScreenLogic() {
   }
 
   const ensureRgbAllocation = async () => {
-    setLoadingText('Checking RGB UTXO...')
+    setLoadingText(t('rgb_checking_utxo'))
     const summary = await rgbWallet.getRgbAllocationSummary({ skipSync: false })
     if (hasReusableRgbAllocation(summary)) {
       return true
@@ -512,7 +512,7 @@ export function useRGBReceiveScreenLogic() {
   const onCreateInvoice = async () => {
     if (!isAmountValid) return
     setLoading(true)
-    setLoadingText('Checking RGB UTXO...')
+    setLoadingText(t('rgb_checking_utxo'))
     setError('')
     setInsufficientBtcForInvoice(false)
     setInvoice('')
@@ -533,7 +533,7 @@ export function useRGBReceiveScreenLogic() {
           setError('')
           return
         }
-        setLoadingText('Checking RGB UTXO...')
+        setLoadingText(t('rgb_checking_utxo'))
         const summary = await rgbWallet.getRgbAllocationSummary({ skipSync: false })
         if (hasReusableRgbAllocation(summary)) {
           setError(getErrorMessage(invoiceError))
@@ -569,12 +569,12 @@ export function useRGBReceiveScreenLogic() {
   const onSignRgbUtxoHandleConfirm = async (signedDatas: SignedData[]) => {
     tools.showLoading(true)
     setLoading(true)
-    setLoadingText('Creating RGB UTXO...')
+    setLoadingText(t('rgb_creating_utxo'))
     setError('')
     try {
       const signedPsbt = signedDatas[0]?.psbtHex
       if (!signedPsbt) {
-        throw new Error('RGB UTXO PSBT signing did not return psbtHex')
+        throw new Error(t('rgb_psbt_signing_missing_result'))
       }
 
       await wallet.createRgbUtxosEnd({ signedPsbt })

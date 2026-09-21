@@ -2,7 +2,7 @@ import { type ChangeEvent, useRef, useState } from 'react';
 
 import { Button, Card, Column, Content, Header, Layout, Row, Text } from '@/ui/components';
 import { Popover } from '@/ui/components/Popover';
-import { useNavigation, useTools, useWallet } from '@unisat/wallet-state';
+import { useI18n, useNavigation, useTools, useWallet } from '@unisat/wallet-state';
 
 type BackupPreview = Awaited<ReturnType<ReturnType<typeof useWallet>['inspectRgbBackup']>>;
 
@@ -18,6 +18,7 @@ export default function RgbBackupScreen() {
   const wallet = useWallet();
   const nav = useNavigation();
   const tools = useTools();
+  const { t } = useI18n();
   const fileInput = useRef<HTMLInputElement>(null);
   const [exporting, setExporting] = useState(false);
   const [reading, setReading] = useState(false);
@@ -39,7 +40,7 @@ export default function RgbBackupScreen() {
       anchor.click();
       // Give the browser a turn to start the download before releasing it.
       setTimeout(() => URL.revokeObjectURL(url), 0);
-      tools.toastSuccess('RGB backup downloaded');
+      tools.toastSuccess(t('rgb_backup_downloaded'));
     } catch (error) {
       tools.toastError(errorMessage(error));
     } finally {
@@ -62,7 +63,7 @@ export default function RgbBackupScreen() {
       setPayload(nextPayload);
       setFilename(file.name);
       setPreview(nextPreview);
-      tools.toastSuccess('RGB backup verified');
+      tools.toastSuccess(t('rgb_backup_verified'));
     } catch (error) {
       setFilename(undefined);
       tools.toastError(errorMessage(error));
@@ -77,7 +78,7 @@ export default function RgbBackupScreen() {
     try {
       await wallet.restoreRgbBackup({ payload, replaceRemote: true });
       setConfirmRestore(false);
-      tools.toastSuccess('RGB backup restored');
+      tools.toastSuccess(t('rgb_backup_restored'));
       nav.goBack();
     } catch (error) {
       tools.toastError(errorMessage(error));
@@ -91,7 +92,7 @@ export default function RgbBackupScreen() {
     try {
       await wallet.restoreLatestRgbRecoveryCheckpoint();
       setConfirmCloudRestore(false);
-      tools.toastSuccess('Latest RGB cloud state restored');
+      tools.toastSuccess(t('rgb_cloud_state_restored'));
       nav.goBack();
     } catch (error) {
       tools.toastError(errorMessage(error));
@@ -102,55 +103,55 @@ export default function RgbBackupScreen() {
 
   return (
     <Layout>
-      <Header onBack={() => nav.goBack()} title="RGB Backup" />
+      <Header onBack={() => nav.goBack()} title={t('rgb_backup')} />
       <Content>
         <Column gap="lg">
           <Card style={{ flexDirection: 'column', alignItems: 'stretch', gap: 8 }}>
-            <Text text="Download a seed-bound encrypted copy of your RGB wallet state." color="white" size="sm" />
+            <Text text={t('rgb_backup_download_description')} color="white" size="sm" />
             <Text
-              text="It does not contain your recovery phrase or private keys. Keep the file with your wallet recovery material."
+              text={t('rgb_backup_safety_description')}
               color="textDim"
               size="xs"
               wrap
             />
           </Card>
           <Button
-            text="Download backup file"
+            text={t('rgb_download_backup_file')}
             preset="primary"
             disabled={exporting}
             onClick={() => void exportBackup()}
           />
 
           <Card style={{ flexDirection: 'column', alignItems: 'stretch', gap: 8 }}>
-            <Text text="Restore from backup" color="white" preset="bold" size="sm" />
+            <Text text={t('rgb_restore_from_backup')} color="white" preset="bold" size="sm" />
             <Text
-              text="Restoring replaces the current RGB state and its cloud recovery checkpoint. It never merges two states."
+              text={t('rgb_restore_replaces_state_description')}
               color="textDim"
               size="xs"
               wrap
             />
             {preview ? (
               <Column gap="xs" style={{ marginTop: 8 }}>
-                <Text text={`File: ${filename}`} color="white" size="xs" />
-                <Text text={`Created: ${new Date(preview.createdAt).toLocaleString()}`} color="textDim" size="xs" />
-                <Text text={`Network: ${preview.wallet.network}`} color="textDim" size="xs" />
+                <Text text={t('rgb_backup_file', { filename: filename || '' })} color="white" size="xs" />
+                <Text text={t('rgb_backup_created', { date: new Date(preview.createdAt).toLocaleString() })} color="textDim" size="xs" />
+                <Text text={t('rgb_backup_network', { network: preview.wallet.network })} color="textDim" size="xs" />
               </Column>
             ) : null}
           </Card>
           <Button
-            text={reading ? 'Verifying backup…' : 'Choose backup file'}
+            text={t(reading ? 'rgb_verifying_backup' : 'rgb_choose_backup_file')}
             preset="default"
             disabled={reading}
             onClick={selectBackup}
           />
           <Button
-            text="Restore selected backup"
+            text={t('rgb_restore_selected_backup')}
             preset="primary"
             disabled={!payload || reading || restoring}
             onClick={() => setConfirmRestore(true)}
           />
           <Button
-            text="Recover latest cloud state"
+            text={t('rgb_recover_latest_cloud_state')}
             preset="default"
             disabled={restoring}
             onClick={() => setConfirmCloudRestore(true)}
@@ -167,23 +168,23 @@ export default function RgbBackupScreen() {
       {confirmRestore ? (
         <Popover onClose={() => !restoring && setConfirmRestore(false)}>
           <Column gap="md">
-            <Text text="Replace RGB state?" preset="title-bold" />
+            <Text text={t('rgb_replace_state_title')} preset="title-bold" />
             <Text
-              text="This permanently replaces the RGB state on this device and in the recovery checkpoint with the selected backup. This cannot be merged or undone."
+              text={t('rgb_replace_state_description')}
               color="textDim"
               size="sm"
               wrap
             />
             <Row fullX>
               <Button
-                text="Cancel"
+                text={t('cancel')}
                 preset="defaultV2"
                 full
                 disabled={restoring}
                 onClick={() => setConfirmRestore(false)}
               />
               <Button
-                text={restoring ? 'Restoring…' : 'Replace and restore'}
+                text={t(restoring ? 'restoring_rgb' : 'rgb_replace_and_restore')}
                 preset="primaryV2"
                 full
                 disabled={restoring}
@@ -196,23 +197,23 @@ export default function RgbBackupScreen() {
       {confirmCloudRestore ? (
         <Popover onClose={() => !restoring && setConfirmCloudRestore(false)}>
           <Column gap="md">
-            <Text text="Recover latest cloud state?" preset="title-bold" />
+            <Text text={t('rgb_recover_cloud_title')} preset="title-bold" />
             <Text
-              text="This discards the RGB state on this device and reloads the newest encrypted checkpoint from the cloud. It does not overwrite cloud data."
+              text={t('rgb_recover_cloud_description')}
               color="textDim"
               size="sm"
               wrap
             />
             <Row fullX>
               <Button
-                text="Cancel"
+                text={t('cancel')}
                 preset="defaultV2"
                 full
                 disabled={restoring}
                 onClick={() => setConfirmCloudRestore(false)}
               />
               <Button
-                text={restoring ? 'Recovering…' : 'Recover from cloud'}
+                text={t(restoring ? 'rgb_recovering' : 'rgb_recover_from_cloud')}
                 preset="primaryV2"
                 full
                 disabled={restoring}

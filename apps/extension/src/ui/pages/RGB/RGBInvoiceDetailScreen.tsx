@@ -171,7 +171,11 @@ export default function RGBInvoiceDetailScreen() {
             valuePrefix={
               invoice ? (
                 <div style={recipientTypeTagStyle}>
-                  <Text text={recipientType === 'witness' ? 'Witness' : 'Blind'} color="textDim" size="xxs" />
+                  <Text
+                    text={t(recipientType === 'witness' ? 'rgb_invoice_witness' : 'rgb_invoice_blind')}
+                    color="textDim"
+                    size="xxs"
+                  />
                 </div>
               ) : undefined
             }

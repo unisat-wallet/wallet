@@ -601,7 +601,7 @@ export default function RGBReceiveScreen() {
             <Row itemsCenter gap="sm" style={{ minWidth: 0 }}>
               <div style={invoiceTypeTagStyle}>
                 <Text
-                  text={invoiceType === 'witness' ? 'Witness' : 'Blind'}
+                  text={t(invoiceType === 'witness' ? 'rgb_invoice_witness' : 'rgb_invoice_blind')}
                   color="textDim"
                   size="xxs"
                 />
@@ -781,13 +781,13 @@ export default function RGBReceiveScreen() {
 
           <Row gap="sm">
             <Button
-              text="Blind"
+              text={t('rgb_invoice_blind')}
               preset={recipientType === 'blind' ? 'primary' : 'default'}
               onClick={() => setRecipientType('blind')}
               style={{ flex: 1 }}
             />
             <Button
-              text="Witness"
+              text={t('rgb_invoice_witness')}
               preset={recipientType === 'witness' ? 'primary' : 'default'}
               onClick={() => setRecipientType('witness')}
               style={{ flex: 1 }}
@@ -796,7 +796,7 @@ export default function RGBReceiveScreen() {
 
           {recipientType === 'witness' ? (
             <Text
-              text="Witness invoices reuse your RGB funding address and include a small BTC output."
+              text={t('rgb_witness_invoice_description')}
               size="xs"
               color="white_muted"
               wrap

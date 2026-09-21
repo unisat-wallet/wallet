@@ -444,7 +444,7 @@ export function RGBTransferDetailSheet({
             <Column fullX style={{ gap: 12 }}>
               <DetailRow label={t('date')} value={formatDate(transfer?.timestamp || 0)} />
               <DetailRow
-                label="Status"
+                label={t('status')}
                 value={getStatusLabel(status, t, transfer?.type)}
                 valueColor={getStatusColor(status)}
               />

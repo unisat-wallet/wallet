@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 
 import { Button, Column, Row, Text } from '@/ui/components';
 import { BottomModal } from '@/ui/components/BottomModal';
-import { useTools, useWallet } from '@unisat/wallet-state';
+import { useI18n, useTools, useWallet } from '@unisat/wallet-state';
 
 function errorMessage(error: unknown) {
   return error instanceof Error ? error.message : String(error);
@@ -16,6 +16,7 @@ function errorMessage(error: unknown) {
 export function RgbRecoveryConflictModal() {
   const wallet = useWallet();
   const tools = useTools();
+  const { t } = useI18n();
   const [conflicted, setConflicted] = useState(false);
   const [resolving, setResolving] = useState<'cloud' | 'local'>();
 
@@ -41,10 +42,10 @@ export function RgbRecoveryConflictModal() {
       try {
         if (strategy === 'cloud') {
           await wallet.restoreLatestRgbRecoveryCheckpoint();
-          tools.toastSuccess('Latest RGB cloud state restored');
+          tools.toastSuccess(t('rgb_cloud_state_restored'));
         } else {
           await wallet.publishLocalRgbRecoveryConflictResolution();
-          tools.toastSuccess('Local RGB state published to cloud');
+          tools.toastSuccess(t('rgb_local_state_published'));
         }
         await refreshStatus();
         window.dispatchEvent(new Event('rgb-recovery-resolved'));
@@ -54,7 +55,7 @@ export function RgbRecoveryConflictModal() {
         setResolving(undefined);
       }
     },
-    [refreshStatus, tools, wallet]
+    [refreshStatus, t, tools, wallet]
   );
 
   if (!conflicted) return null;
@@ -62,40 +63,40 @@ export function RgbRecoveryConflictModal() {
   return (
     <BottomModal>
       <Column gap="lg">
-        <Text text="RGB wallet state conflict" color="white" size="lg" textCenter />
+        <Text text={t('rgb_state_conflict_title')} color="white" size="lg" textCenter />
         <Text
-          text="This device and the cloud contain different RGB invoice state. They cannot be safely merged. Choose one state to keep."
+          text={t('rgb_state_conflict_description')}
           color="white_muted2"
           size="sm"
           wrap
         />
         <Column gap="xs">
-          <Text text="1. Use latest cloud state" color="white" size="sm" />
+          <Text text={t('rgb_use_cloud_state_option')} color="white" size="sm" />
           <Text
-            text="Discard this device's unique invoices. Cloud data is not changed."
+            text={t('rgb_use_cloud_state_description')}
             color="textDim"
             size="xs"
             wrap
           />
         </Column>
         <Column gap="xs">
-          <Text text="2. Keep local state and take over" color="white" size="sm" />
+          <Text text={t('rgb_keep_local_state_option')} color="white" size="sm" />
           <Text
-            text="Immediately take the RGB write lease and replace cloud-only state with this device's invoices."
+            text={t('rgb_keep_local_state_description')}
             color="danger"
             size="xs"
             wrap
           />
         </Column>
         <Text
-          text="This choice cannot be undone. Check that no RGB send or receive is in progress on another device."
+          text={t('rgb_state_conflict_warning')}
           color="gold"
           size="xs"
           wrap
         />
         <Row gap="sm" fullX>
           <Button
-            text={resolving === 'cloud' ? 'Restoring...' : 'Use cloud state'}
+            text={t(resolving === 'cloud' ? 'restoring_rgb' : 'rgb_use_cloud_state')}
             preset="default"
             disabled={Boolean(resolving)}
             onClick={() => void resolve('cloud')}
@@ -103,7 +104,7 @@ export function RgbRecoveryConflictModal() {
             max2Lines
           />
           <Button
-            text={resolving === 'local' ? 'Publishing...' : 'Keep local & take over'}
+            text={t(resolving === 'local' ? 'rgb_publishing' : 'rgb_keep_local_and_take_over')}
             preset="danger"
             disabled={Boolean(resolving)}
             onClick={() => void resolve('local')}

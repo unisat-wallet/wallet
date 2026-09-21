@@ -37,6 +37,7 @@ type RgbAllocationSummary = {
   pendingAllocationCount?: number;
 };
 type IssueFormErrors = Partial<Record<IssueField, string>>;
+type Translate = ReturnType<typeof useI18n>['t'];
 
 const TICKER_MAX_BYTES = 8;
 const NAME_MAX_BYTES = 40;
@@ -50,13 +51,13 @@ const formatMaxRgbSupply = (precision: number) => {
   return `${padded.slice(0, -precision)}.${padded.slice(-precision)}`;
 };
 
-const getErrorMessage = (error: unknown) => {
+const getErrorMessage = (error: unknown, fallback: string) => {
   if (error && typeof error === 'object') {
     const value = error as { message?: unknown; msg?: unknown };
     if (typeof value.msg === 'string') return value.msg;
     if (typeof value.message === 'string') return value.message;
   }
-  return String(error || 'An unknown error occurred');
+  return String(error || fallback);
 };
 
 const getAvailableAllocationCount = (summary: RgbAllocationSummary) => {
@@ -76,18 +77,18 @@ const getAssetId = (value: unknown) => {
   return typeof assetId === 'string' ? assetId : '';
 };
 
-const getFormErrors = (ticker: string, name: string, amount: string, precision: string): IssueFormErrors => {
+const getFormErrors = (ticker: string, name: string, amount: string, precision: string, t: Translate): IssueFormErrors => {
   const errors: IssueFormErrors = {};
   const tickerBytes = new TextEncoder().encode(ticker).length;
   if (!ticker) errors.ticker = 'required';
-  else if (tickerBytes > TICKER_MAX_BYTES) errors.ticker = `Use up to ${TICKER_MAX_BYTES} characters`;
+  else if (tickerBytes > TICKER_MAX_BYTES) errors.ticker = t('rgb_use_up_to_characters', { count: TICKER_MAX_BYTES });
   const nameBytes = new TextEncoder().encode(name).length;
   if (!name) errors.name = 'required';
-  else if (nameBytes > NAME_MAX_BYTES) errors.name = `Use up to ${NAME_MAX_BYTES} characters`;
+  else if (nameBytes > NAME_MAX_BYTES) errors.name = t('rgb_use_up_to_characters', { count: NAME_MAX_BYTES });
   if (!precision) errors.precision = 'required';
-  else if (!/^\d+$/.test(precision)) errors.precision = 'Enter a valid integer';
+  else if (!/^\d+$/.test(precision)) errors.precision = t('rgb_enter_valid_integer');
   else if (Number(precision) > PRECISION_MAX) {
-    errors.precision = `Enter an integer between 0 and ${PRECISION_MAX}`;
+    errors.precision = t('rgb_enter_integer_range', { max: PRECISION_MAX });
   }
   const parsedPrecision = Number(precision);
   if (!amount) {
@@ -96,9 +97,9 @@ const getFormErrors = (ticker: string, name: string, amount: string, precision: 
     !isValidRgbDecimalAmount(amount, parsedPrecision) ||
     !/[1-9]/.test(toRgbAtomicAmount(amount, parsedPrecision))
   ) {
-    errors.amount = 'Enter a valid supply';
+    errors.amount = t('rgb_enter_valid_supply');
   } else if (BigInt(toRgbAtomicAmount(amount, parsedPrecision)) > MAX_RGB_ISSUED_SUPPLY) {
-    errors.amount = `Maximum supply is ${formatMaxRgbSupply(parsedPrecision)}`;
+    errors.amount = t('rgb_maximum_supply', { amount: formatMaxRgbSupply(parsedPrecision) });
   }
   return errors;
 };
@@ -230,8 +231,8 @@ export default function RGBIssueScreen() {
   const [reviewModalVisible, setReviewModalVisible] = useState(false);
 
   const formErrors = useMemo(
-    () => getFormErrors(ticker.trim(), name.trim(), amount.trim(), precision.trim()),
-    [amount, name, precision, ticker]
+    () => getFormErrors(ticker.trim(), name.trim(), amount.trim(), precision.trim(), t),
+    [amount, name, precision, t, ticker]
   );
   const isFormValid = Object.keys(formErrors).length === 0;
   const nameError = getVisibleFieldError(name, formErrors.name);
@@ -272,11 +273,11 @@ export default function RGBIssueScreen() {
     } catch (e: unknown) {
       setFundingAddress('');
       setAvailableIssueUtxoCount(undefined);
-      setOperationError(getErrorMessage(e));
+      setOperationError(getErrorMessage(e, t('unknown_error')));
     } finally {
       setFundingLoading(false);
     }
-  }, [wallet]);
+  }, [t, wallet]);
 
   useEffect(() => {
     setIssueResult(undefined);
@@ -297,7 +298,7 @@ export default function RGBIssueScreen() {
       });
       const assetId = getAssetId(value);
       if (!assetId) {
-        throw new Error('RGB issuance did not return an asset ID');
+        throw new Error(t('rgb_issuance_missing_asset_id'));
       }
       const result = value && typeof value === 'object' ? (value as { pendingConfirmation?: unknown }) : {};
       setReviewModalVisible(false);
@@ -308,14 +309,14 @@ export default function RGBIssueScreen() {
       void refreshFundingState();
       return true;
     } catch (e: unknown) {
-      const message = getErrorMessage(e);
+      const message = getErrorMessage(e, t('unknown_error'));
       setOperationError(message);
       tools.toastError(message);
       return false;
     } finally {
       setLoading(false);
     }
-  }, [assetPrecision, atomicSupply, name, refreshFundingState, ticker, tools, wallet]);
+  }, [assetPrecision, atomicSupply, name, refreshFundingState, t, ticker, tools, wallet]);
 
   const startCreateRgbUtxo = useCallback(async () => {
     if (!isFeeRateValid) return;
@@ -331,18 +332,18 @@ export default function RGBIssueScreen() {
         feeRate
       });
       const toSignData = beginResult?.toSignData as ToSignData | undefined;
-      if (!toSignData) throw new Error('RGB UTXO creation did not return signing data');
+      if (!toSignData) throw new Error(t('rgb_utxo_signing_data_missing'));
       setReviewModalVisible(false);
       setUtxoToSignData(toSignData);
       setStep('sign_rgb_utxo');
     } catch (e: unknown) {
-      const message = getErrorMessage(e);
+      const message = getErrorMessage(e, t('unknown_error'));
       setOperationError(message);
       tools.toastError(message);
     } finally {
       setLoading(false);
     }
-  }, [feeRate, isFeeRateValid, tools, wallet]);
+  }, [feeRate, isFeeRateValid, t, tools, wallet]);
 
   const onDeploy = () => {
     if (!canIssue) return;
@@ -359,7 +360,7 @@ export default function RGBIssueScreen() {
         }
         await startCreateRgbUtxo();
       } catch (e: unknown) {
-        const message = getErrorMessage(e);
+        const message = getErrorMessage(e, t('unknown_error'));
         setOperationError(message);
         tools.toastError(message);
       } finally {
@@ -388,7 +389,7 @@ export default function RGBIssueScreen() {
     setOperationError('');
     try {
       const signedPsbt = signedDatas[0]?.psbtHex;
-      if (!signedPsbt) throw new Error('RGB UTXO PSBT signing did not return psbtHex');
+      if (!signedPsbt) throw new Error(t('rgb_psbt_signing_missing_result'));
       const endResult = await wallet.createRgbUtxosEnd({ signedPsbt });
       setFundingTxid(typeof endResult?.txid === 'string' ? endResult.txid : '');
       const issued = await issueAsset();
@@ -399,7 +400,7 @@ export default function RGBIssueScreen() {
       setUtxoToSignData(undefined);
       setStep('issue');
     } catch (e: unknown) {
-      const message = getErrorMessage(e);
+      const message = getErrorMessage(e, t('unknown_error'));
       setOperationError(message);
       tools.toastError(message);
       resetRgbUtxoSignStep();
@@ -418,7 +419,7 @@ export default function RGBIssueScreen() {
               <IssueStatusMark pending={issueResult.pendingConfirmation} />
             </div>
             <span className="rgb-issue-eyebrow">
-              {issueResult.pendingConfirmation ? 'ASSET ISSUED - UNCONFIRMED' : 'ASSET DEPLOYED'}
+              {t(issueResult.pendingConfirmation ? 'rgb_asset_issued_unconfirmed' : 'rgb_asset_deployed')}
             </span>
             <h1>{name.trim() || assetTicker}</h1>
             <section className="rgb-issue-section rgb-issue-result-card">
@@ -427,7 +428,7 @@ export default function RGBIssueScreen() {
               <ReviewRow label={t('total_supply')} value={displaySupply} />
               <ReviewRow label={t('precision_rgb')} value={precision.trim()} />
               <ReviewRow
-                label="Status"
+                label={t('status')}
                 value={issueResult.pendingConfirmation ? t('unconfirmed') : t('rgb_status_confirmed')}
                 tone={issueResult.pendingConfirmation ? 'pending' : 'confirmed'}
               />
@@ -436,7 +437,7 @@ export default function RGBIssueScreen() {
         </Content>
         <div className="rgb-issue-bottom-action">
           <button className="rgb-issue-deploy-button" type="button" onClick={() => nav.goBack()}>
-            Done
+            {t('done')}
           </button>
         </div>
       </Layout>
