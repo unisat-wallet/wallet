@@ -3027,6 +3027,7 @@
   "rgb_asset_deployed": { "message": "ACTIVO DESPLEGADO" },
   "rgb_creating_invoice": { "message": "Creando factura…" },
   "rgb_preparing_utxo": { "message": "Preparando UTXO RGB…" },
+  "rgb_preparing_transfer": { "message": "Preparando transferencia RGB…" },
   "rgb_checking_utxo": { "message": "Comprobando UTXO RGB…" },
   "rgb_creating_utxo": { "message": "Creando UTXO RGB…" },
   "rgb_use_up_to_characters": { "message": "Usa hasta $count caracteres" },

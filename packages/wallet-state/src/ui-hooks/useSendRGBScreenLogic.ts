@@ -37,11 +37,6 @@ export type RgbFeePoolRequirement = {
   feePoolUtxoCount: number
 }
 
-export type RgbFeePoolTopUp = {
-  count: number
-  amount: number
-}
-
 function getRgbFeePoolRequirement(error: unknown): RgbFeePoolRequirement | undefined {
   const record = error && typeof error === 'object' ? (error as Record<string, unknown>) : undefined
   if (record?.['code'] !== RGB_FEE_POOL_INSUFFICIENT_BTC_ERROR_CODE) return undefined
@@ -190,14 +185,13 @@ export function useSendRGBScreenLogic() {
   const [blockingSendStatus, setBlockingSendStatus] = useState<string>()
   const [invoiceAvailability, setInvoiceAvailability] = useState<InvoiceAvailability>('idle')
   const [invoiceAvailabilityError, setInvoiceAvailabilityError] = useState('')
-  const [feePoolTopUp, setFeePoolTopUp] = useState<RgbFeePoolTopUp>()
+  const feePoolTransitionStarted = useRef(false)
+  const prepareRgbSendRef = useRef<() => Promise<void>>(async () => undefined)
   const transferData = useRef<{
     toSignData?: any
     beginResult?: any
     pendingVanillaTxid?: string
     feePoolTopUp?: boolean
-    feePoolTopUpCount?: number
-    feePoolTopUpAmount?: number
   }>({})
 
   const ticker = tokenBalance?.ticker || 'RGB'
@@ -415,8 +409,6 @@ export function useSendRGBScreenLogic() {
         transferData.current = {
           toSignData: topUp.toSignData,
           feePoolTopUp: true,
-          feePoolTopUpCount: Number(topUp.count) || 0,
-          feePoolTopUpAmount: Number(topUp.amount) || 0,
         }
         setSignRequestVersion(version => version + 1)
         setStep(SendRGBScreenStep.SIGN_TX)
@@ -457,11 +449,8 @@ export function useSendRGBScreenLogic() {
       }
       if (transferData.current.feePoolTopUp) {
         await wallet.createRgbFeePoolTopUpEnd({ signedPsbt })
-        setFeePoolTopUp({
-          count: transferData.current.feePoolTopUpCount || 0,
-          amount: transferData.current.feePoolTopUpAmount || 0,
-        })
         transferData.current = {}
+        feePoolTransitionStarted.current = false
         setStep(SendRGBScreenStep.FEE_POOL_COMPLETED)
         return
       }
@@ -538,12 +527,13 @@ export function useSendRGBScreenLogic() {
     setStep(SendRGBScreenStep.CREATE_TX)
   }
 
-  const onContinueAfterFeePoolTopUp = async () => {
-    tools.showLoading(true)
+  prepareRgbSendRef.current = prepareRgbSend
+
+  useEffect(() => {
+    if (step !== SendRGBScreenStep.FEE_POOL_COMPLETED || feePoolTransitionStarted.current) return
+    feePoolTransitionStarted.current = true
     setError('')
-    try {
-      await prepareRgbSend()
-    } catch (e) {
+    void prepareRgbSendRef.current().catch(e => {
       setStep(SendRGBScreenStep.CREATE_TX)
       setError(
         getSendErrorMessage(
@@ -553,10 +543,8 @@ export function useSendRGBScreenLogic() {
           t
         )
       )
-    } finally {
-      tools.showLoading(false)
-    }
-  }
+    })
+  }, [step, t])
 
   return {
     step,
@@ -596,7 +584,6 @@ export function useSendRGBScreenLogic() {
     signRequestVersion,
     error,
     feePoolRequirement,
-    feePoolTopUp,
     dismissFeePoolRequirement: () => setFeePoolRequirement(undefined),
     disabled,
     onClickBack,
@@ -605,6 +592,5 @@ export function useSendRGBScreenLogic() {
     onSignPsbtHandleConfirm,
     onSignPsbtHandleCancel,
     onSignPsbtHandleBack,
-    onContinueAfterFeePoolTopUp,
   }
 }

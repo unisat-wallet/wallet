@@ -3036,6 +3036,7 @@
   "rgb_asset_deployed": { "message": "資産をデプロイしました" },
   "rgb_creating_invoice": { "message": "インボイスを作成中…" },
   "rgb_preparing_utxo": { "message": "RGB UTXOを準備中…" },
+  "rgb_preparing_transfer": { "message": "RGB送金を準備中…" },
   "rgb_checking_utxo": { "message": "RGB UTXOを確認中…" },
   "rgb_creating_utxo": { "message": "RGB UTXOを作成中…" },
   "rgb_use_up_to_characters": { "message": "$count文字以内で入力してください" },

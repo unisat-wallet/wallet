@@ -3036,6 +3036,7 @@
   "rgb_asset_deployed": { "message": "АКТИВ РАЗВЁРНУТ" },
   "rgb_creating_invoice": { "message": "Создание счёта…" },
   "rgb_preparing_utxo": { "message": "Подготовка RGB UTXO…" },
+  "rgb_preparing_transfer": { "message": "Подготовка перевода RGB…" },
   "rgb_checking_utxo": { "message": "Проверка RGB UTXO…" },
   "rgb_creating_utxo": { "message": "Создание RGB UTXO…" },
   "rgb_use_up_to_characters": { "message": "Используйте не более $count символов" },

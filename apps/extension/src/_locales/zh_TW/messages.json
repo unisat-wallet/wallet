@@ -3096,6 +3096,7 @@
   "rgb_asset_deployed": { "message": "資產已部署" },
   "rgb_creating_invoice": { "message": "正在建立發票…" },
   "rgb_preparing_utxo": { "message": "正在準備 RGB UTXO…" },
+  "rgb_preparing_transfer": { "message": "正在準備 RGB 轉帳…" },
   "rgb_checking_utxo": { "message": "正在檢查 RGB UTXO…" },
   "rgb_creating_utxo": { "message": "正在建立 RGB UTXO…" },
   "rgb_use_up_to_characters": { "message": "最多可輸入 $count 個字元" },

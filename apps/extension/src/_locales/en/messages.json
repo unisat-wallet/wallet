@@ -3099,6 +3099,7 @@
   "rgb_asset_deployed": { "message": "ASSET DEPLOYED" },
   "rgb_creating_invoice": { "message": "Creating invoice…" },
   "rgb_preparing_utxo": { "message": "Preparing RGB UTXO…" },
+  "rgb_preparing_transfer": { "message": "Preparing RGB transfer…" },
   "rgb_checking_utxo": { "message": "Checking RGB UTXO…" },
   "rgb_creating_utxo": { "message": "Creating RGB UTXO…" },
   "rgb_use_up_to_characters": { "message": "Use up to $count characters" },
