@@ -2,7 +2,6 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 
 import { Card, Column, Content, Footer, Header, Icon, Layout, Row, Text } from '@/ui/components';
 import AccountSelect from '@/ui/components/AccountSelect';
-import { spacingGap } from '@/ui/theme/spacing';
 import { FeeRateIcon } from '@/ui/components/FeeRateIcon';
 import LoadingPage from '@/ui/components/LoadingPage';
 import { NavTabBar } from '@/ui/components/NavTabBar';
@@ -10,6 +9,7 @@ import { NoticePopover } from '@/ui/components/NoticePopover';
 import { SwitchNetworkBar } from '@/ui/components/SwitchNetworkBar';
 import { Tabs } from '@/ui/components/Tabs';
 import { VersionNotice } from '@/ui/components/VersionNotice';
+import { spacingGap } from '@/ui/theme/spacing';
 import { getCurrentTab } from '@/ui/web/tabs';
 import { KeyringType } from '@unisat/keyring-service/types';
 import { VersionDetail } from '@unisat/wallet-shared';
@@ -17,6 +17,7 @@ import '@unisat/wallet-state';
 import {
   AssetTabKey,
   MoreAssetTabKey,
+  WalletView,
   uiActions,
   useAppDispatch,
   useAssetTabKey,
@@ -27,22 +28,21 @@ import {
   useIsUnlocked,
   useMoreAssetTabKey,
   useNavigation,
-  useSupportedAssets,
-  useVersionInfo,
-  useWalletView,
   useRGBListLogic,
   useRGBTransfersLogic,
-  WalletView,
-  useWallet
+  useSupportedAssets,
+  useVersionInfo,
+  useWallet,
+  useWalletView
 } from '@unisat/wallet-state';
 
 import { useNavigate } from '../../MainRoute';
+import { RGBTransferNotificationPanel } from '../../RGB/components/RGBTransferNotificationPanel';
 import { SwitchChainModal } from '../../Settings/SwitchChainModal';
 import { MoreActionSheet } from './MoreActionSheet';
 import { MoreTab } from './MoreTab';
 import { OrdinalsTab } from './OrdinalsTab';
 import { RGBHomeTabs } from './RGBHomeTabs';
-import { RGBTransferNotificationPanel } from '../../RGB/components/RGBTransferNotificationPanel';
 import { RunesList } from './RunesList';
 import { SidePanelExpand } from './SidePanelExpand';
 import { AnnouncementCard } from './components/AnnouncementCard';
@@ -305,7 +305,7 @@ export default function WalletTabScreen() {
         RightComponent={
           <Row itemsCenter style={{ gap: 8 }}>
             <FeeRateIcon />
-            {!isRgbView ? <SwitchNetworkBar /> : null}
+            <SwitchNetworkBar />
             <SidePanelExpand />
           </Row>
         }
