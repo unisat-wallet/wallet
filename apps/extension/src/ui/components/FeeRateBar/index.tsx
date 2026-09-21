@@ -53,7 +53,7 @@ function FeeRateValue({ feeRate }: { feeRate: number }) {
   );
 }
 
-export function FeeRateBar({ readonly, disableLowFeeMode }: { readonly?: boolean; disableLowFeeMode?: boolean }) {
+export function FeeRateBar({ readonly }: { readonly?: boolean }) {
   const {
     feeOptions,
     feeOptionIndex,
@@ -69,8 +69,7 @@ export function FeeRateBar({ readonly, disableLowFeeMode }: { readonly?: boolean
     showLowFeeModeTipsPopover,
     setShowLowFeeModeTipsPopover
   } = useFeeRateBarLogic({
-    readonly,
-    disableLowFeeMode
+    readonly
   });
 
   const { t } = useI18n();

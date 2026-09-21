@@ -151,13 +151,7 @@ function buildPlaceholderFeeOptions(
   return list
 }
 
-export function useFeeRateBarLogic({
-  readonly,
-  disableLowFeeMode = false,
-}: {
-  readonly?: boolean
-  disableLowFeeMode?: boolean
-}) {
+export function useFeeRateBarLogic({ readonly }: { readonly?: boolean }) {
   const wallet = useWallet()
   const [feeOptions, setFeeOptions] = useState<FeeOption[]>([])
   const feeRateBarState = useFeeRateBar()
@@ -172,8 +166,7 @@ export function useFeeRateBarLogic({
 
   const [showLowFeeModeTipsPopover, setShowLowFeeModeTipsPopover] = useState(false)
 
-  const supportLowFeeMode = (chain.enableLowFeeMode ?? false) && !disableLowFeeMode
-  const minimumFeeRate = supportLowFeeMode ? 0.1 : 1
+  const supportLowFeeMode = chain.enableLowFeeMode ?? false
 
   const placeholderFeeOptions = useMemo(
     () =>
@@ -181,9 +174,9 @@ export function useFeeRateBarLogic({
         supportLowFeeMode,
         readonly,
         t,
-        feeRate > 0 ? Math.max(feeRate, minimumFeeRate) : DEFAULT_FEE_RATE
+        feeRate > 0 ? feeRate : DEFAULT_FEE_RATE
       ),
-    [supportLowFeeMode, readonly, t, feeRate, minimumFeeRate]
+    [supportLowFeeMode, readonly, t, feeRate]
   )
 
   const hasLoadedFeeOptions = feeOptions.length > 0
@@ -209,19 +202,13 @@ export function useFeeRateBarLogic({
       }
     }
 
-    const normalizedList = supportLowFeeMode
-      ? feeSummary.list
-      : feeSummary.list.map((option) => ({
-          ...option,
-          feeRate: Math.max(option.feeRate, minimumFeeRate),
-        }))
-    const translatedList = formatFeeRateTextKey(normalizedList, isFractal, supportLowFeeMode, t)
+    const translatedList = formatFeeRateTextKey(feeSummary.list, isFractal, supportLowFeeMode, t)
     const options = readonly
       ? translatedList
       : [...translatedList, { type: FeeRateType.CUSTOM, title: t('custom'), feeRate: 0 }]
 
     setFeeOptions(options)
-  }, [wallet, isFractal, t, supportLowFeeMode, readonly, minimumFeeRate])
+  }, [wallet, isFractal, t, supportLowFeeMode, readonly])
 
   // Memoize default value to avoid repeated calculations
   const defaultFeeRate = useMemo(
@@ -242,17 +229,6 @@ export function useFeeRateBarLogic({
       val = resolvedFeeOptions[feeOptionIndex]?.feeRate ?? defaultFeeRate
     }
 
-    if (val < minimumFeeRate) {
-      // Clamp the effective fee without replacing a draft the user is still typing.
-      updateFeeRateBar({
-        feeRate: minimumFeeRate,
-        ...(feeOptionIndex === FeeRateType.CUSTOM && !isIntermediateFeeRateInput(feeRateInputVal)
-          ? { feeRateInputVal: minimumFeeRate.toString() }
-          : {}),
-      })
-      return
-    }
-
     if (val.toString() == feeRate.toString()) {
       return
     }
@@ -262,7 +238,7 @@ export function useFeeRateBarLogic({
     }
 
     updateFeeRateBar({ feeRate: val })
-  }, [resolvedFeeOptions, feeOptionIndex, feeRateInputVal, defaultFeeRate, feeRate, minimumFeeRate])
+  }, [resolvedFeeOptions, feeOptionIndex, feeRateInputVal, defaultFeeRate, feeRate])
 
   const adjustFeeRateInput = useCallback(
     (inputVal: string) => {
@@ -310,8 +286,10 @@ export function useFeeRateBarLogic({
         updateFeeRateBar({ feeRateInputVal: defaultFeeRate.toString() })
       } else if (val > MAX_FEE_RATE) {
         updateFeeRateBar({ feeRateInputVal: MAX_FEE_RATE.toString() })
-      } else if (val < minimumFeeRate) {
-        updateFeeRateBar({ feeRateInputVal: minimumFeeRate.toString() })
+      } else if (val < 1 && supportLowFeeMode == false) {
+        updateFeeRateBar({ feeRateInputVal: '1' })
+      } else if (val < 0.1) {
+        updateFeeRateBar({ feeRateInputVal: '0.1' })
       } else {
         updateFeeRateBar({ feeRateInputVal: inputVal })
       }
@@ -322,7 +300,7 @@ export function useFeeRateBarLogic({
       feeOptionIndex,
       resolvedFeeOptions,
       hasLoadedFeeOptions,
-      minimumFeeRate,
+      supportLowFeeMode,
     ]
   )
 
