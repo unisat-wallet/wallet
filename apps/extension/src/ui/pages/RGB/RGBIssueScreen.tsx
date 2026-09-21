@@ -547,13 +547,13 @@ export default function RGBIssueScreen() {
                 <div className="rgb-issue-fee-section">
                   <FeeRateBar />
                 </div>
-                <Text
-                  text={t('rgb_utxo_recommended_balance')}
-                  wrap
-                  style={{ color: 'rgba(235,185,76,0.85)', fontSize: 12, fontWeight: 500 }}
-                />
                 {insufficientBtcForFunding ? (
-                  <Text text={t('not_enough_btc_for_rgb_utxo')} wrap size="xs" color="danger" />
+                  <Text
+                    text={`${t('not_enough_btc_for_rgb_utxo')} ${t('rgb_utxo_recommended_balance')}`}
+                    wrap
+                    size="xs"
+                    color="danger"
+                  />
                 ) : null}
               </>
             ) : null}
