@@ -1955,6 +1955,89 @@ describe('RgbService', () => {
     })
   })
 
+  it('serializes acceptance of multiple witness invoices without waiting for confirmation', async () => {
+    const dependencies = createDependencies()
+    let activeAcknowledgements = 0
+    let maximumActiveAcknowledgements = 0
+    dependencies.transport.acknowledgeConsignment = vi.fn().mockImplementation(async () => {
+      activeAcknowledgements++
+      maximumActiveAcknowledgements = Math.max(
+        maximumActiveAcknowledgements,
+        activeAcknowledgements
+      )
+      await Promise.resolve()
+      activeAcknowledgements--
+    })
+    const service = new RgbService(dependencies)
+    await service.open(wallet)
+    ;(service as any).state.pendingReceives = ['first', 'second'].map((recipientId, index) => ({
+      invoice: rgbInvoice(),
+      recipientId,
+      proxyRecipientId: `proxy-${recipientId}`,
+      recipientType: 'witness',
+      assetId: 'rgb:asset',
+      amount: String(60 + index),
+      createdAt: index + 1,
+      pendingAccept: {
+        payload: `consignment-${recipientId}`,
+        txid: String(index + 1).repeat(64),
+        endpoint: proxyEndpoint,
+        assetId: 'rgb:asset',
+        amount: String(60 + index),
+        precision: 2,
+        discoveredAt: index + 1,
+      },
+    }))
+
+    await expect(
+      Promise.all([service.acceptReceive('proxy-first'), service.acceptReceive('proxy-second')])
+    ).resolves.toEqual([
+      { accepted: true, status: 'accepted' },
+      { accepted: true, status: 'accepted' },
+    ])
+
+    expect(maximumActiveAcknowledgements).toBe(1)
+    expect(service.getPendingReceives()).toEqual([
+      expect.objectContaining({
+        recipientId: 'first',
+        receivedConsignment: expect.objectContaining({ accepted: true }),
+      }),
+      expect.objectContaining({
+        recipientId: 'second',
+        receivedConsignment: expect.objectContaining({ accepted: true }),
+      }),
+    ])
+  })
+
+  it('treats a repeated accept for an already accepted witness invoice as success', async () => {
+    const dependencies = createDependencies()
+    dependencies.transport.acknowledgeConsignment = vi.fn()
+    const service = new RgbService(dependencies)
+    await service.open(wallet)
+    ;(service as any).state.pendingReceives = [
+      {
+        invoice: rgbInvoice(),
+        recipientId: 'recipient',
+        proxyRecipientId: 'proxy-recipient',
+        recipientType: 'witness',
+        createdAt: 1,
+        receivedConsignment: {
+          txid: 'c'.repeat(64),
+          receivedAt: 1,
+          accepted: true,
+          payload: 'consignment',
+          endpoint: proxyEndpoint,
+        },
+      },
+    ]
+
+    await expect(service.acceptReceive('proxy-recipient')).resolves.toEqual({
+      accepted: true,
+      status: 'accepted',
+    })
+    expect(dependencies.transport.acknowledgeConsignment).not.toHaveBeenCalled()
+  })
+
   it('records the actual asset and amount for an accepted Any Asset invoice', async () => {
     const dependencies = createDependencies()
     const service = new RgbService(dependencies)

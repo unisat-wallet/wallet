@@ -102,6 +102,8 @@ export class RgbService {
   private prepareSendInFlight?: Promise<void>
   /** Serialize mutation of each durable send state machine. */
   private readonly pendingTransferOperations = new Map<string, Promise<void>>()
+  /** Receive polling and user actions mutate the same durable invoice list. */
+  private pendingReceiveOperation: Promise<void> = Promise.resolve()
   private openedFromStorage = false
   private recoveryBackupEnabled = false
 
@@ -948,6 +950,18 @@ export class RgbService {
     includeClaimed = true,
     deferConfirmedSettlement = false,
   }: { includeClaimed?: boolean; deferConfirmedSettlement?: boolean } = {}) {
+    return this.runPendingReceiveOperation(() =>
+      this.processClaimedReceivesOnce({ includeClaimed, deferConfirmedSettlement })
+    )
+  }
+
+  private async processClaimedReceivesOnce({
+    includeClaimed,
+    deferConfirmedSettlement,
+  }: {
+    includeClaimed: boolean
+    deferConfirmedSettlement: boolean
+  }) {
     const state = this.requireState()
     const rollback = snapshotState(state)
     const getClaimed = this.dependencies.stateSource.getClaimedConsignments
@@ -1159,11 +1173,21 @@ export class RgbService {
   }
 
   async acceptReceive(recipientId: string) {
+    return this.runPendingReceiveOperation(() => this.acceptReceiveOnce(recipientId))
+  }
+
+  private async acceptReceiveOnce(recipientId: string) {
     const state = this.requireState()
     const pending = state.pendingReceives || []
     const receive = pending.find(
       item => item.recipientId === recipientId || item.proxyRecipientId === recipientId
     )
+    // A stale detail sheet or a retried RPC can repeat Accept after the durable
+    // ACK transition completed. Treat that as success instead of reopening the
+    // action or reporting a misleading "not awaiting acceptance" error.
+    if (receive?.receivedConsignment?.accepted) {
+      return { accepted: true, status: 'accepted' as const }
+    }
     if (!receive?.pendingAccept) {
       throw new RgbServiceError(`RGB receive ${recipientId} is not awaiting acceptance`)
     }
@@ -1230,6 +1254,10 @@ export class RgbService {
   }
 
   async rejectReceive(recipientId: string) {
+    return this.runPendingReceiveOperation(() => this.rejectReceiveOnce(recipientId))
+  }
+
+  private async rejectReceiveOnce(recipientId: string) {
     const state = this.requireState()
     const pending = state.pendingReceives || []
     const receive = pending.find(
@@ -1273,6 +1301,10 @@ export class RgbService {
    * canceled history entry as a tombstone and never credit this receipt.
    */
   async abandonAcceptedReceive(recipientId: string) {
+    return this.runPendingReceiveOperation(() => this.abandonAcceptedReceiveOnce(recipientId))
+  }
+
+  private async abandonAcceptedReceiveOnce(recipientId: string) {
     const state = this.requireState()
     const pending = state.pendingReceives || []
     const receive = pending.find(
@@ -1620,6 +1652,10 @@ export class RgbService {
   }
 
   async cancelBlindReceive(recipientId: string) {
+    return this.runPendingReceiveOperation(() => this.cancelBlindReceiveOnce(recipientId))
+  }
+
+  private async cancelBlindReceiveOnce(recipientId: string) {
     const state = this.requireState()
     const receives = state.pendingReceives || []
     const index = receives.findIndex(item => item.recipientId === recipientId)
@@ -2777,6 +2813,20 @@ export class RgbService {
         this.pendingTransferOperations.delete(transferId)
       }
     })
+    return current
+  }
+
+  /**
+   * Polling, Accept and Reject all update `pendingReceives` and may each write
+   * two recovery checkpoints. Keep those transitions ordered so one invoice
+   * cannot persist a stale snapshot over another invoice's ACK state.
+   */
+  private runPendingReceiveOperation<T>(operation: () => Promise<T>) {
+    const current = this.pendingReceiveOperation.catch(() => undefined).then(operation)
+    this.pendingReceiveOperation = current.then(
+      () => undefined,
+      () => undefined
+    )
     return current
   }
 

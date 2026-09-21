@@ -18,6 +18,14 @@ type RGBTransfersListProps = {
   transfers: ReturnType<typeof useRGBTransfersLogic>;
 };
 
+function getTransferId(transfer: RgbTransferItem) {
+  return transfer.transferId || transfer.id;
+}
+
+function isPendingReceive(transfer: RgbTransferItem) {
+  return transfer.type === 'receive' && transfer.status.toLowerCase() === 'pending_accept';
+}
+
 export function RGBTransfersList({ transfers }: RGBTransfersListProps) {
   const { t } = useI18n();
   const nav = useNavigation();
@@ -28,20 +36,33 @@ export function RGBTransfersList({ transfers }: RGBTransfersListProps) {
   useEffect(() => {
     if (selectedTransfer) return;
     const transfer = items.find(
-      (item) =>
-        item.type === 'receive' &&
-        item.status.toLowerCase() === 'pending_accept' &&
-        !dismissedTransferIds.has(item.transferId || item.id)
+      (item) => isPendingReceive(item) && !dismissedTransferIds.has(getTransferId(item))
     );
     if (transfer) setSelectedTransfer(transfer);
   }, [dismissedTransferIds, items, selectedTransfer]);
 
   const closeTransferDetail = () => {
-    if (selectedTransfer?.status.toLowerCase() === 'pending_accept') {
-      const transferId = selectedTransfer.transferId || selectedTransfer.id;
+    if (selectedTransfer && isPendingReceive(selectedTransfer)) {
+      const transferId = getTransferId(selectedTransfer);
       setDismissedTransferIds((current) => new Set(current).add(transferId));
     }
     setSelectedTransfer(undefined);
+  };
+
+  const advanceToNextPendingReceive = () => {
+    const handledTransferId = selectedTransfer ? getTransferId(selectedTransfer) : '';
+    const excludedIds = new Set(dismissedTransferIds);
+    if (handledTransferId) excludedIds.add(handledTransferId);
+    setDismissedTransferIds(excludedIds);
+
+    // Use the current list immediately so the next invoice opens without
+    // waiting for the refresh triggered below. The effect remains as a
+    // fallback when the next invoice arrives in the refreshed first page.
+    const nextTransfer = items.find(
+      (item) => isPendingReceive(item) && !excludedIds.has(getTransferId(item))
+    );
+    setSelectedTransfer(nextTransfer);
+    void transfers.onRefresh({ showLoading: false });
   };
 
   return (
@@ -73,9 +94,7 @@ export function RGBTransfersList({ transfers }: RGBTransfersListProps) {
           transfer={selectedTransfer}
           transferId={selectedTransfer.transferId || selectedTransfer.id}
           onClose={closeTransferDetail}
-          onCanceled={() => {
-            void transfers.onRefresh();
-          }}
+          onCanceled={advanceToNextPendingReceive}
           onClickExploreTx={
             selectedTransfer.txid
               ? () => {
