@@ -113,7 +113,6 @@ export function encodeBlindRgbInvoice(input: {
   amount?: string
   expirationTimestamp?: number
   transportEndpoints?: string[]
-  address?: string
 }) {
   if (input.amount !== undefined && !/^(0|[1-9][0-9]*)$/.test(input.amount))
     throw new RgbServiceError('RGB invoice amount is invalid')
@@ -127,7 +126,6 @@ export function encodeBlindRgbInvoice(input: {
     query.set('expirationTimestamp', String(input.expirationTimestamp))
   if (input.transportEndpoints?.length)
     query.set('endpoints', input.transportEndpoints.join(','))
-  if (input.address) query.set('address', input.address)
   // Expo's URLSearchParams polyfill supports serialization but has no size property.
   const queryString = query.toString()
   return `rgb:${assetId}/~/${input.amount === undefined ? '~' : '~'}/${recipientId}${queryString ? `?${queryString}` : ''}`

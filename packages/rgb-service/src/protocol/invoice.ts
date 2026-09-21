@@ -35,8 +35,6 @@ export interface RgbInvoice {
   network?: RgbNetwork
   expirationTimestamp?: number
   transportEndpoints: string[]
-  /** Receiver RGB funding address, when advertised as an invoice query param. */
-  beneficiaryAddress?: string
 }
 
 const OMITTED = '~'
@@ -342,7 +340,6 @@ export function decodeRgbInvoice(invoice: string): RgbInvoice {
       .map(endpoint => endpoint.trim())
       .filter(Boolean)
   )
-  const [beneficiaryAddress] = getQueryValues(query, 'address')
   const amount = queryAmount || decodeFast32Amount(segments[2])
   if (amount !== undefined && !/^(0|[1-9][0-9]*)$/.test(amount)) {
     throw new Error('Invalid RGB invoice amount')
@@ -360,7 +357,6 @@ export function decodeRgbInvoice(invoice: string): RgbInvoice {
     expirationTimestamp:
       expiration && /^(0|[1-9][0-9]*)$/.test(expiration) ? Number(expiration) : undefined,
     transportEndpoints,
-    beneficiaryAddress,
   }
 }
 
@@ -376,7 +372,6 @@ export function encodeWitnessRgbInvoice(input: {
   amount?: string
   expirationTimestamp?: number
   transportEndpoints: string[]
-  address?: string
 }) {
   if (!/^(0|[1-9][0-9]*)$/.test(input.amount ?? '0'))
     throw new RgbServiceError('RGB invoice amount is invalid')
@@ -394,6 +389,5 @@ export function encodeWitnessRgbInvoice(input: {
   if (input.expirationTimestamp !== undefined)
     query.set('expirationTimestamp', String(input.expirationTimestamp))
   query.set('endpoints', input.transportEndpoints.join(','))
-  if (input.address) query.set('address', input.address)
   return `rgb:${assetId}/~/${input.amount === undefined ? '~' : '~'}/${recipientId}?${query}`
 }

@@ -22,7 +22,6 @@ export interface DecodedRgbInvoice {
   pathSegments: string[]
   needsAssetId: boolean
   needsAmount: boolean
-  beneficiaryAddress?: string
   raw: {
     body: string
     path: string
@@ -308,7 +307,6 @@ export function decodeRgbInvoice(invoice: string): DecodedRgbInvoice {
     network: getNetwork(recipientId),
     expirationTimestamp,
     transportEndpoints: getQueryTransportEndpoints(query),
-    beneficiaryAddress: getQueryValue(query, 'address'),
     query,
     pathSegments,
     needsAssetId: !assetId,

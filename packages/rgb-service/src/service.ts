@@ -583,7 +583,6 @@ export class RgbService {
       amount: input.amount,
       expirationTimestamp,
       transportEndpoints,
-      address: state.wallet.fundingAddress,
     })
     const recipientId = decodeRgbInvoice(invoice).recipientId
     const pending = {
@@ -651,7 +650,6 @@ export class RgbService {
       amount: input.amount,
       expirationTimestamp,
       transportEndpoints,
-      address: state.wallet.fundingAddress,
     })
     const decoded = decodeRgbInvoice(invoice)
     if (decoded.recipientType !== 'witness')

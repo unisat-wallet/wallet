@@ -36,14 +36,6 @@ describe('rgb invoice utils', () => {
     )
   })
 
-  it('reads the receiver address from an invoice query param', () => {
-    const invoice = 'rgb:~/~/~/bc:utxob:test?address=bc1qxy2kgdygjrsqtzq2n0yrf2493p83kkfjhx0wlh'
-
-    expect(decodeRgbInvoice(invoice).beneficiaryAddress).toBe(
-      'bc1qxy2kgdygjrsqtzq2n0yrf2493p83kkfjhx0wlh'
-    )
-  })
-
   it('keeps contract id as the asset id when the invoice includes one', () => {
     const invoice =
       'rgb:5ChCCSqU-hID5wGR-L9jArK6-S71gdZ7-WBaQV1R-EKctNjo/~/~/bc:utxob:test?endpoints=rpc://proxy'

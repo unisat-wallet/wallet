@@ -14,7 +14,6 @@ describe('blind RGB receive', () => {
       amount,
       expirationTimestamp: 1_800_000_000,
       transportEndpoints: ['rpcs://proxy.example.test/json-rpc'],
-      address: 'bc1qxy2kgdygjrsqtzq2n0yrf2493p83kkfjhx0wlh',
     }
     const expected = encodeBlindRgbInvoice(input)
     class WithoutSize extends URLSearchParams {}
@@ -29,7 +28,6 @@ describe('blind RGB receive', () => {
         amount,
         expirationTimestamp: input.expirationTimestamp,
         transportEndpoints: input.transportEndpoints,
-        beneficiaryAddress: input.address,
       })
       const emptyQuery = encodeBlindRgbInvoice({ network: input.network, seal: input.seal })
       expect(emptyQuery).not.toContain('?')
@@ -69,16 +67,5 @@ describe('blind RGB receive', () => {
     expect(
       decoded.seal.type === 'confidential' && Buffer.from(decoded.seal.secretSeal).toString('hex')
     ).toBe(Buffer.from(concealBlindSeal(seal)).toString('hex'))
-  })
-
-  it('advertises the receiver funding address as an invoice query param', () => {
-    const invoice = encodeBlindRgbInvoice({
-      network: 'mainnet',
-      seal: { txid: '11'.repeat(32), vout: 2, blinding: 3n },
-      address: 'bc1qxy2kgdygjrsqtzq2n0yrf2493p83kkfjhx0wlh',
-    })
-    const decoded = decodeRgbInvoice(invoice)
-
-    expect(decoded.beneficiaryAddress).toBe('bc1qxy2kgdygjrsqtzq2n0yrf2493p83kkfjhx0wlh')
   })
 })
