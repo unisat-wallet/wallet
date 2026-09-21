@@ -5,7 +5,7 @@ import { BottomModal } from '@/ui/components/BottomModal';
 import { PlatformEnv } from '@unisat/wallet-shared';
 
 const RGB_TERMS_OF_USE_URL = 'https://link.unisat.space/rgb-terms-of-use';
-const RGB_TERMS_OF_USE_APP_URL = 'https://link.unisat.space/rgb-terms-of-use-app-user';
+const RGB_TERMS_OF_USE_APP_URL = 'https://link.unisat.space/rgb-terms-of-use-app';
 
 function rgbTermsOfUseUrl() {
   return PlatformEnv.PLATFORM === 'ios' || PlatformEnv.PLATFORM === 'android'
