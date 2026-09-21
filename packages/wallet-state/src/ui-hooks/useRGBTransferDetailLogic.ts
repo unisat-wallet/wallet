@@ -15,9 +15,18 @@ function isInProgress(transfer?: RgbTransferItem) {
   }
   return (
     transfer.local ||
-    ['signed', 'waiting_ack', 'broadcasting', 'broadcasted', 'broadcast_failed', 'pending_accept', 'confirming', 'waiting_receive', 'pending', 'unconfirmed'].includes(
-      transfer.status.toLowerCase()
-    )
+    [
+      'signed',
+      'waiting_ack',
+      'broadcasting',
+      'broadcasted',
+      'broadcast_failed',
+      'pending_accept',
+      'confirming',
+      'waiting_receive',
+      'pending',
+      'unconfirmed',
+    ].includes(transfer.status.toLowerCase())
   )
 }
 
@@ -71,8 +80,6 @@ export function useRGBTransferDetailLogic() {
           assetId: current?.assetId ?? latest.assetId,
           ticker: latest.ticker || current?.ticker,
           name: latest.name || current?.name,
-          from: latest.from || current?.from,
-          to: latest.to || current?.to,
           precision: latest.precision ?? current?.precision,
         }
       })
@@ -116,7 +123,8 @@ export function useRGBTransferDetailLogic() {
   const canCancelSend =
     transfer?.type === 'send' && String(transfer?.status || '').toLowerCase() === 'waiting_ack'
   const canAcceptReceive =
-    transfer?.type === 'receive' && String(transfer?.status || '').toLowerCase() === 'pending_accept'
+    transfer?.type === 'receive' &&
+    String(transfer?.status || '').toLowerCase() === 'pending_accept'
   const canRetryBroadcast =
     transfer?.type === 'send' && String(transfer?.status || '').toLowerCase() === 'broadcast_failed'
 
@@ -126,10 +134,20 @@ export function useRGBTransferDetailLogic() {
       transfer?.type === 'send' &&
       previousStatus.current === 'waiting_ack' &&
       status &&
-      ['broadcasting', 'broadcasted', 'confirming', 'pending', 'unconfirmed', 'settled', 'confirmed'].includes(status)
+      [
+        'broadcasting',
+        'broadcasted',
+        'confirming',
+        'pending',
+        'unconfirmed',
+        'settled',
+        'confirmed',
+      ].includes(status)
         ? 'broadcasted'
         : transfer?.type === 'receive' &&
-            ['confirming', 'waiting_receive', 'pending', 'unconfirmed'].includes(previousStatus.current || '') &&
+            ['confirming', 'waiting_receive', 'pending', 'unconfirmed'].includes(
+              previousStatus.current || ''
+            ) &&
             ['settled', 'confirmed'].includes(status || '')
           ? 'receive_confirmed'
           : undefined
@@ -169,7 +187,9 @@ export function useRGBTransferDetailLogic() {
               status: 'canceled',
               local: true,
               transferId:
-                typeof result['transferId'] === 'string' ? result['transferId'] : current.transferId,
+                typeof result['transferId'] === 'string'
+                  ? result['transferId']
+                  : current.transferId,
             }
           : current
       )
@@ -192,12 +212,16 @@ export function useRGBTransferDetailLogic() {
       const result = await wallet.acceptRgbReceive({ recipientId })
       if (result?.status === 'canceled') {
         tools.toastError(t('rgb_status_canceled_by_sender'))
-        setTransfer(current => (current ? { ...current, status: 'canceled', local: true } : current))
+        setTransfer(current =>
+          current ? { ...current, status: 'canceled', local: true } : current
+        )
         return false
       }
       if (!result?.accepted) throw new Error(t('rgb_accept_transfer_failed'))
       tools.toastSuccess(t('rgb_accept_transfer_success'))
-      setTransfer(current => (current ? { ...current, status: 'waiting_receive', local: true } : current))
+      setTransfer(current =>
+        current ? { ...current, status: 'waiting_receive', local: true } : current
+      )
       return true
     } catch (e: unknown) {
       const message = e instanceof Error && e.message ? e.message : t('rgb_accept_transfer_failed')

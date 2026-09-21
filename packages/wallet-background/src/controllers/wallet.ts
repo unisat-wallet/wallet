@@ -13,10 +13,7 @@ import { ColdWalletKeyring, KeystoneKeyring } from '@unisat/keyring-service'
 import { DisplayedKeyring, Keyring, KeyringType, ToSignInput } from '@unisat/keyring-service/types'
 import {
   RgbService as LocalRgbService,
-  decodeRgbInvoice,
-  invoiceSealToScriptPubKey,
   localNiaProtocolEncoder,
-  niaConsignmentSpendableOutputScripts,
   type RgbNetwork,
 } from '@unisat/rgb-service'
 import * as txHelpers from '@unisat/tx-helpers'
@@ -194,7 +191,13 @@ type RgbControllerApiService = {
     expectedRevision?: string
     kind?: 'normal' | 'replacement'
     updatedAt: number
-  }) => Promise<{ saved: boolean; updatedAt: number; revision?: string; generation?: number; kind?: 'normal' | 'replacement' }>
+  }) => Promise<{
+    saved: boolean
+    updatedAt: number
+    revision?: string
+    generation?: number
+    kind?: 'normal' | 'replacement'
+  }>
   startRgbRecoveryCheckpointUpload: (params: {
     wallet: RgbWalletRef
     lease?: RgbControllerWriteLeaseCredential
@@ -217,7 +220,13 @@ type RgbControllerApiService = {
     wallet: RgbWalletRef
     lease?: RgbControllerWriteLeaseCredential
     uploadId: string
-  }) => Promise<{ saved: boolean; updatedAt: number; revision?: string; generation?: number; kind?: 'normal' | 'replacement' }>
+  }) => Promise<{
+    saved: boolean
+    updatedAt: number
+    revision?: string
+    generation?: number
+    kind?: 'normal' | 'replacement'
+  }>
   getRgbRecoveryCheckpointUploadStatus: (params: {
     wallet: RgbWalletRef
     uploadId: string
@@ -448,7 +457,6 @@ type RgbControllerApiService = {
     amount: string
     txid: string
     createdAt: number
-    from?: string
   }) => Promise<void>
 }
 
@@ -609,20 +617,6 @@ async function rgbRecoveryPayloadChecksum(payload: string) {
   return Buffer.from(digest).toString('hex')
 }
 
-function rgbInvoiceDestinationAddress(invoice: string | undefined, networkType: NetworkType) {
-  if (!invoice) return undefined
-  try {
-    const decoded = decodeRgbInvoice(invoice)
-    if (decoded.beneficiaryAddress) return decoded.beneficiaryAddress
-    const script = invoiceSealToScriptPubKey(decoded.seal)
-    if (!script) return undefined
-    const address = scriptPkToAddress(Buffer.from(script).toString('hex'), networkType)
-    return address || undefined
-  } catch {
-    return undefined
-  }
-}
-
 function sameUnsignedTransaction(left: bitcoin.Psbt, right: bitcoin.Psbt) {
   return (
     left.txInputs.length === right.txInputs.length &&
@@ -643,26 +637,6 @@ function sameUnsignedTransaction(left: bitcoin.Psbt, right: bitcoin.Psbt) {
   )
 }
 
-function rgbCounterpartyAddress(
-  scripts: string[] | undefined,
-  networkType: NetworkType,
-  selfAddress: string
-) {
-  for (const script of scripts || []) {
-    const address = scriptPkToAddress(script, networkType)
-    if (address && address !== selfAddress) return address
-  }
-  return undefined
-}
-
-function rgbConsignmentOutputScripts(payload?: string) {
-  if (!payload || typeof niaConsignmentSpendableOutputScripts !== 'function') return undefined
-  try {
-    return niaConsignmentSpendableOutputScripts(payload)
-  } catch {
-    return undefined
-  }
-}
 const RGB_FUNDING_UTXO_DUST = 330
 const RGB_FEE_POOL_UTXO_SATS = 3_000
 const RGB_FEE_POOL_TARGET_UTXOS = 3
@@ -993,10 +967,6 @@ export class WalletController extends BaseController {
       const result = await this.getAddressRgbActivity(address, currentPage, pageSize)
       return { total: result.total, list: result.list as RgbRemoteActivity[] }
     },
-    getNetworkType: () => this.getNetworkType(),
-    getInvoiceDestination: rgbInvoiceDestinationAddress,
-    getCounterpartyAddress: rgbCounterpartyAddress,
-    getConsignmentOutputScripts: rgbConsignmentOutputScripts,
     warn: (message, error) => console.warn(message, error),
   })
   private readonly rgbReceiveOperations = new RgbReceiveOperations({
@@ -3740,8 +3710,6 @@ export class WalletController extends BaseController {
           txid: issue.txid,
           timestamp: issue.createdAt,
           status: rgbIssueActivityStatus(latestChainStatus ?? issue.chainStatus),
-          from: wallet.fundingAddress,
-          to: wallet.fundingAddress,
           ticker: issue.asset.ticker,
           name: issue.asset.name,
           precision: issue.asset.precision,
@@ -3799,7 +3767,11 @@ export class WalletController extends BaseController {
       // already has an encrypted recovery checkpoint on the backend.
       try {
         const recovery = await getRgbApiService().getRgbRecoveryCheckpointMetadata({ wallet })
-        return { enabled: false, supported: true, remoteRecoveryAvailable: recovery.exists === true }
+        return {
+          enabled: false,
+          supported: true,
+          remoteRecoveryAvailable: recovery.exists === true,
+        }
       } catch (error) {
         // Activation remains available when offline or while an older backend
         // is rolling out. enableRgbFeature will perform the authoritative
@@ -3836,7 +3808,9 @@ export class WalletController extends BaseController {
     return { enabled: true }
   }
 
-  private rgbFeatureStorageKey(wallet: Pick<RgbWalletRef, 'walletId' | 'network' | 'fundingAddress'>) {
+  private rgbFeatureStorageKey(
+    wallet: Pick<RgbWalletRef, 'walletId' | 'network' | 'fundingAddress'>
+  ) {
     // walletId is `unisat-<master fingerprint>-<account index>`. Consent is
     // deliberately shared by all accounts derived from the same HD wallet.
     const walletScope = wallet.walletId?.replace(/-\d+$/, '')
@@ -3845,10 +3819,15 @@ export class WalletController extends BaseController {
   }
 
   private isRgbFeatureConsent(value: unknown): value is true | RgbFeatureConsent {
-    return value === true || (typeof value === 'object' && value !== null && (value as RgbFeatureConsent).enabled === true)
+    return (
+      value === true ||
+      (typeof value === 'object' && value !== null && (value as RgbFeatureConsent).enabled === true)
+    )
   }
 
-  private async isRgbFeatureEnabled(wallet: Pick<RgbWalletRef, 'walletId' | 'network' | 'fundingAddress'>) {
+  private async isRgbFeatureEnabled(
+    wallet: Pick<RgbWalletRef, 'walletId' | 'network' | 'fundingAddress'>
+  ) {
     const consent = await keyringService.getEncryptedStorageItem<boolean | RgbFeatureConsent>(
       RGB_ENCRYPTED_STORAGE_NAMESPACE,
       this.rgbFeatureStorageKey(wallet)
@@ -4852,11 +4831,6 @@ export class WalletController extends BaseController {
     receive: import('@unisat/rgb-service').RgbPendingReceiveHistory,
     wallet: LocalRgbWallet
   ) => {
-    const from = rgbCounterpartyAddress(
-      receive.counterpartyScriptPubKeys,
-      this.getNetworkType(),
-      wallet.fundingAddress
-    )
     const lease = this.getRgbWriteLeaseCredential(wallet)
     await getRgbApiService().syncRgbReceiveTransfer({
       wallet,
@@ -4866,7 +4840,6 @@ export class WalletController extends BaseController {
       amount: receive.amount,
       txid: receive.txid,
       createdAt: receive.createdAt,
-      ...(from ? { from } : {}),
     })
   }
 
@@ -5036,10 +5009,7 @@ export class WalletController extends BaseController {
           checkpoint.generation > localCheckpointGeneration &&
           service.canAdoptNewerNormalRecoveryCheckpoint?.() === true
         const shouldFastForward =
-          !needsRestore &&
-          revisionChanged &&
-          Boolean(checkpoint.payload) &&
-          normalCheckpointAdvance
+          !needsRestore && revisionChanged && Boolean(checkpoint.payload) && normalCheckpointAdvance
         if (!needsRestore && revisionChanged && !shouldFastForward && !remoteCheckpointMissing) {
           const matchesRemoteCheckpoint =
             Boolean(checkpoint.payload) &&
@@ -5580,8 +5550,6 @@ export class WalletController extends BaseController {
       },
       stateSource: createRgbBackendAdapter({
         api: getRgbApiService() as RgbBackendApi,
-        getNetworkType: () => this.getNetworkType(),
-        getInvoiceDestination: rgbInvoiceDestinationAddress,
         getActiveWriteLease: wallet => this.getRgbActiveWriteLease(wallet),
       }),
       feeSource: {

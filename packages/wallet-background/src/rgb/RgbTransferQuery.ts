@@ -3,8 +3,6 @@ import {
   RgbTransferAwaitingAckError,
   RgbTransferRejectedError,
 } from '@unisat/rgb-service'
-import type { NetworkType } from '@unisat/wallet-types'
-
 import type { LocalRgbServiceContext } from './RgbWalletCoordinator'
 
 export type RgbRemoteActivity = {
@@ -16,8 +14,6 @@ export type RgbRemoteActivity = {
   timestamp?: number
   createdAt?: number
   status?: string
-  from?: string
-  to?: string
   ticker?: string
   name?: string
   precision?: number
@@ -33,17 +29,6 @@ type RgbTransferQueryDependencies = {
     currentPage: number,
     pageSize: number
   ) => Promise<{ total: number; list: RgbRemoteActivity[] }>
-  getNetworkType: () => NetworkType
-  getInvoiceDestination: (
-    invoice: string | undefined,
-    networkType: NetworkType
-  ) => string | undefined
-  getCounterpartyAddress: (
-    scriptPubKeys: string[] | undefined,
-    networkType: NetworkType,
-    ownAddress: string
-  ) => string | undefined
-  getConsignmentOutputScripts: (payload?: string) => string[] | undefined
   warn: (message: string, error: unknown) => void
 }
 
@@ -52,11 +37,7 @@ export class RgbTransferQuery {
   constructor(private readonly dependencies: RgbTransferQueryDependencies) {}
 
   // eslint-disable-next-line @typescript-eslint/explicit-function-return-type -- preserve the precise merged activity response.
-  async getTransfers(
-    currentPage: number,
-    pageSize: number,
-    options?: { skipSync?: boolean }
-  ) {
+  async getTransfers(currentPage: number, pageSize: number, options?: { skipSync?: boolean }) {
     let context = await this.dependencies.getContext()
     let { service, wallet } = context
     const activityPromise = this.dependencies.getRemoteActivity(
@@ -111,7 +92,6 @@ export class RgbTransferQuery {
       }
     }
 
-    const networkType = this.dependencies.getNetworkType()
     const [activity, pendingTransfers] = await Promise.all([
       activityPromise,
       Promise.resolve(service.getPendingTransfers()),
@@ -134,8 +114,6 @@ export class RgbTransferQuery {
               ? 'broadcasted'
               : 'signed',
       local: true,
-      from: wallet.fundingAddress,
-      to: this.dependencies.getInvoiceDestination(transfer.request.invoice, networkType),
     }))
     const localSendHistory = (service.getPendingSendHistory?.() || []).map(send => ({
       id: `local-send:${send.transferId}`,
@@ -147,8 +125,6 @@ export class RgbTransferQuery {
       timestamp: send.createdAt,
       status: send.status,
       local: true,
-      from: wallet.fundingAddress,
-      to: this.dependencies.getInvoiceDestination(send.invoice, networkType),
     }))
     const localIssues = (service.getIssueHistory?.() || []).map(issue => ({
       id: `local-issue:${issue.assetId}`,
@@ -159,8 +135,6 @@ export class RgbTransferQuery {
       timestamp: issue.createdAt,
       status: rgbIssueActivityStatus(issue.chainStatus),
       local: true,
-      from: wallet.fundingAddress,
-      to: wallet.fundingAddress,
       ticker: issue.asset.ticker,
       name: issue.asset.name,
       precision: issue.asset.precision,
@@ -171,8 +145,7 @@ export class RgbTransferQuery {
         receivedConsignment?.assetId ?? receive.pendingAccept?.assetId ?? receive.assetId
       const receivedAmount =
         receivedConsignment?.amount ?? receive.pendingAccept?.amount ?? receive.amount
-      const receivedPrecision =
-        receivedConsignment?.precision ?? receive.pendingAccept?.precision
+      const receivedPrecision = receivedConsignment?.precision ?? receive.pendingAccept?.precision
       const acknowledgementPending =
         (receivedConsignment as { acknowledgementPending?: boolean } | undefined)
           ?.acknowledgementPending === true
@@ -191,14 +164,6 @@ export class RgbTransferQuery {
             timestamp: receivedConsignment.receivedAt,
             status: 'waiting_receive',
             local: true,
-            from: this.dependencies.getCounterpartyAddress(
-              receive.pendingAccept?.counterpartyScriptPubKeys?.length
-                ? receive.pendingAccept.counterpartyScriptPubKeys
-                : receivedConsignment.counterpartyScriptPubKeys,
-              networkType,
-              wallet.fundingAddress
-            ),
-            to: wallet.fundingAddress,
           },
         ]
       }
@@ -216,15 +181,6 @@ export class RgbTransferQuery {
             timestamp: receive.pendingAccept.discoveredAt || receive.createdAt,
             status: 'pending_accept',
             local: true,
-            from: this.dependencies.getCounterpartyAddress(
-              receive.pendingAccept.counterpartyScriptPubKeys?.length
-                ? receive.pendingAccept.counterpartyScriptPubKeys
-                : (this.dependencies.getConsignmentOutputScripts(receive.pendingAccept.payload) ??
-                    []),
-              networkType,
-              wallet.fundingAddress
-            ),
-            to: wallet.fundingAddress,
           },
         ]
       }
@@ -242,12 +198,6 @@ export class RgbTransferQuery {
             timestamp: receivedConsignment.receivedAt,
             status: 'pending_accept',
             local: true,
-            from: this.dependencies.getCounterpartyAddress(
-              receivedConsignment.counterpartyScriptPubKeys,
-              networkType,
-              wallet.fundingAddress
-            ),
-            to: wallet.fundingAddress,
           },
         ]
       }
@@ -263,12 +213,6 @@ export class RgbTransferQuery {
           timestamp: receivedConsignment.receivedAt,
           status: receivedConsignment.broadcastDetectedAt ? 'confirming' : 'waiting_receive',
           local: true,
-          from: this.dependencies.getCounterpartyAddress(
-            receivedConsignment.counterpartyScriptPubKeys,
-            networkType,
-            wallet.fundingAddress
-          ),
-          to: wallet.fundingAddress,
         },
       ]
     })
@@ -283,18 +227,7 @@ export class RgbTransferQuery {
       timestamp: receive.createdAt,
       status: receive.status ?? 'settled',
       local: receive.status === 'canceled' || receive.status === 'rejected',
-      from: this.dependencies.getCounterpartyAddress(
-        receive.counterpartyScriptPubKeys,
-        networkType,
-        wallet.fundingAddress
-      ),
-      to: wallet.fundingAddress,
     }))
-    const activityByTxid = new Map(
-      activity.list
-        .filter((item): item is RgbRemoteActivity & { txid: string } => !!item.txid)
-        .map(item => [item.txid, item] as const)
-    )
     const confirmedActivityTxids = new Set(
       activity.list
         .filter(item => ['confirmed', 'settled'].includes(String(item.status ?? '').toLowerCase()))
@@ -313,13 +246,6 @@ export class RgbTransferQuery {
         this.dependencies.warn('Failed to clear confirmed RGB send history', error)
       }
     }
-    const withActivityAddresses = <T>(item: T): T => {
-      const current = item as T & { txid?: string; from?: string; to?: string }
-      if (!current.txid) return item
-      const matched = activityByTxid.get(current.txid)
-      if (!matched) return item
-      return { ...current, from: current.from ?? matched.from, to: current.to ?? matched.to } as T
-    }
     const includeLocalTransfers = currentPage === 1
     const visibleLocalSends = includeLocalTransfers ? localSends : []
     const visibleLocalIssues = includeLocalTransfers ? localIssues : []
@@ -329,9 +255,7 @@ export class RgbTransferQuery {
     // all new records.
     const visibleLocalReceiveHistory = includeLocalTransfers
       ? localReceiveHistory.map(receive =>
-          receive.status === 'rejected' &&
-          receive.txid &&
-          confirmedActivityTxids.has(receive.txid)
+          receive.status === 'rejected' && receive.txid && confirmedActivityTxids.has(receive.txid)
             ? { ...receive, status: 'settled', local: false }
             : receive
         )
@@ -368,8 +292,6 @@ export class RgbTransferQuery {
         type: item.type === 'send' || item.type === 'receive' ? item.type : 'issue',
         amount: item.amount === null || item.amount === undefined ? undefined : String(item.amount),
         txid: item.txid,
-        from: item.from,
-        to: item.to,
         ticker: item.ticker,
         name: item.name,
         precision: item.precision,
@@ -383,11 +305,11 @@ export class RgbTransferQuery {
             : (item.status ?? 'settled'),
       }))
     const list = [
-      ...visibleLocalSends.map(withActivityAddresses),
-      ...visibleLocalIssues.map(withActivityAddresses),
-      ...visibleLocalHistory.map(withActivityAddresses),
-      ...visibleLocalReceives.map(withActivityAddresses),
-      ...visibleLocalReceiveHistory.map(withActivityAddresses),
+      ...visibleLocalSends,
+      ...visibleLocalIssues,
+      ...visibleLocalHistory,
+      ...visibleLocalReceives,
+      ...visibleLocalReceiveHistory,
       ...remoteItems,
     ].sort((left, right) => right.timestamp - left.timestamp)
     const localOnlyTransferKeys = new Set(

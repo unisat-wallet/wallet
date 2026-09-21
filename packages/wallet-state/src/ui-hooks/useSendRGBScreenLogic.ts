@@ -499,7 +499,6 @@ export function useSendRGBScreenLogic() {
                     ? 'canceled'
                     : 'broadcasted',
           local: true,
-          to: decodedInvoice.beneficiaryAddress,
         },
       })
       transferData.current = {}

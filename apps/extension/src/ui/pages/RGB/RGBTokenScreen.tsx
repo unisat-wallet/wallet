@@ -91,6 +91,7 @@ export default function RGBTokenScreen() {
         activityHasMore={activityHasMore}
         onLoadMoreActivity={onLoadMoreActivity}
         onRefreshActivity={onRefreshActivity}
+        showDirectionIcon
       />
     );
   }, [

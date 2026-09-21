@@ -57,8 +57,6 @@ export interface RgbActivityItem {
   name?: string
   type: RgbActivityType
   status: string
-  from: string
-  to: string
   amount: string
   txid: string
   timestamp: number
@@ -271,8 +269,6 @@ export interface RgbTransferSyncRequest {
   amount: string
   /** Local creation time in milliseconds, retained for stable history ordering. */
   createdAt: number
-  /** Receiver funding address derived from the locally created invoice, when available. */
-  to?: string
   /** RGB funding outpoints consumed by the already-broadcast transaction. */
   spentOutpoints: Array<{ txid: string; vout: number }>
   consignments: Array<{
@@ -293,8 +289,6 @@ export interface RgbReceiveTransferSyncRequest {
   amount: string
   txid: string
   createdAt: number
-  /** Sender funding address derived from the validated consignment, when available. */
-  from?: string
 }
 
 /** Transport endpoint for a locally-created consignment. */
@@ -319,9 +313,17 @@ export interface RgbConsignmentClaimResult {
   claimed: number
 }
 
-export interface RgbClaimedConsignmentsRequest { wallet: RgbWalletRef }
+export interface RgbClaimedConsignmentsRequest {
+  wallet: RgbWalletRef
+}
 export interface RgbClaimedConsignmentsResult {
-  consignments: Array<{ recipientId: string; payload: string; assetId?: string; opIds: string[]; createdAt: number }>
+  consignments: Array<{
+    recipientId: string
+    payload: string
+    assetId?: string
+    opIds: string[]
+    createdAt: number
+  }>
 }
 
 /** Opaque ciphertext produced locally from the RGB service state. */

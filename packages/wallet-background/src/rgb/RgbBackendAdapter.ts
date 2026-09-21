@@ -4,7 +4,6 @@ import type {
   RgbWalletRef,
   RgbWalletSnapshot,
 } from '@unisat/rgb-service'
-import type { NetworkType } from '@unisat/wallet-types'
 
 type RgbIndexedUtxo = {
   txid: string
@@ -55,7 +54,6 @@ export type RgbBackendApi = {
     txid: string
     amount: string
     createdAt: number
-    to?: string
     spentOutpoints: Array<{ txid: string; vout: number }>
     consignments: Array<{
       recipientId: string
@@ -106,11 +104,6 @@ export type RgbBackendApi = {
 
 type RgbBackendAdapterDependencies = {
   api: RgbBackendApi
-  getNetworkType: () => NetworkType
-  getInvoiceDestination: (
-    invoice: string | undefined,
-    networkType: NetworkType
-  ) => string | undefined
   getActiveWriteLease: (wallet: RgbWalletRef) => RgbActiveWriteLease | undefined
 }
 
@@ -141,7 +134,6 @@ export function createRgbBackendAdapter(
         })),
       }),
     syncBroadcast: async (wallet, transferId, transfer, snapshot, metadata) => {
-      const to = dependencies.getInvoiceDestination(metadata.invoice, dependencies.getNetworkType())
       const lease = dependencies.getActiveWriteLease(wallet)
       await api.syncRgbTransfer({
         wallet,
@@ -150,7 +142,6 @@ export function createRgbBackendAdapter(
         txid: transfer.txid,
         amount: metadata.amount,
         createdAt: metadata.createdAt,
-        ...(to ? { to } : {}),
         spentOutpoints: transfer.fundingUpdate?.spentOutpoints ?? [],
         consignments: transfer.consignments.map((consignment, index) => ({
           ...consignment,

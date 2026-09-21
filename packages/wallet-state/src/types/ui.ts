@@ -73,8 +73,6 @@ export interface RgbActivityItem {
   precision?: number
   type: RgbActivityType
   status: string
-  from: string
-  to: string
   amount: string
   txid: string
   timestamp: number
@@ -102,10 +100,6 @@ export interface RgbTransferItem {
   type: 'send' | 'receive' | 'issue'
   amount?: string
   txid?: string
-  /** Counterparty funding address when known (receive source). */
-  from?: string
-  /** Counterparty funding address when known (send destination). */
-  to?: string
   timestamp: number
   status: RgbTransferStatus
   local?: boolean

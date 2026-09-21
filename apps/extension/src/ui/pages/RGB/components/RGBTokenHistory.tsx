@@ -1,124 +1,32 @@
-import { Column, Icon, InfiniteList, Row, Text } from '@/ui/components';
+import { useState } from 'react';
+
+import { Column, InfiniteList, Text } from '@/ui/components';
 import { Empty } from '@/ui/components/Empty';
-import type { IconTypes } from '@/ui/components/Icon';
-import { colors } from '@/ui/theme/colors';
-import { shortAddress } from '@/ui/utils';
-import type { RgbActivityItem } from '@unisat/wallet-state';
-import { toRgbDisplayAmount, useI18n, useNavigation } from '@unisat/wallet-state';
+import type { RgbActivityItem, RgbTransferItem } from '@unisat/wallet-state';
+import { useI18n, useNavigation } from '@unisat/wallet-state';
 
-function getActivityIcon(type: string): IconTypes {
-  if (type === 'send') {
-    return 'history_send';
-  }
+import { RGBTransferDetailSheet } from '../RGBTransferDetailSheet';
+import { getRgbTransferDateKey, RGBTransferListItem } from './RGBTransferListItem';
 
-  if (type === 'receive') {
-    return 'history_receive';
-  }
-
-  if (type === 'issue') {
-    return 'history_inscribe';
-  }
-
-  return 'history';
-}
-
-function formatActivityTime(timestamp: number) {
-  if (!timestamp) {
-    return '';
-  }
-
-  const time = timestamp > 1000000000000 ? timestamp : timestamp * 1000;
-  return new Date(time).toLocaleString();
-}
-
-function getActivityTitle(type: string, t: (key: string) => string) {
-  if (!type) {
-    return t('activity');
-  }
-
-  if (type === 'send') {
-    return t('send');
-  }
-
-  if (type === 'receive') {
-    return t('receive');
-  }
-
-  if (type === 'issue') {
-    return t('issue');
-  }
-
-  return type.charAt(0).toUpperCase() + type.slice(1);
-}
-
-function isPending(status?: string) {
-  return (
-    typeof status === 'string' &&
-    ['pending', 'unconfirmed', 'waitingconfirmations', 'waitingcounterparty'].includes(status.toLowerCase())
-  );
-}
-
-function RGBActivityItem({
-  item,
-  ticker,
-  precision,
-  showAssetTicker
-}: {
-  item: RgbActivityItem;
-  ticker: string;
-  precision?: number;
-  showAssetTicker?: boolean;
-}) {
-  const nav = useNavigation();
-  const { t } = useI18n();
-  const type = item.type.toLowerCase();
-  const amount = toRgbDisplayAmount(item.amount, item.precision ?? precision ?? 0);
-  const txid = item.txid;
-  const time = formatActivityTime(item.timestamp);
-  const subTitle = time || txid;
-  const pending = isPending(item.status);
-  const extendedItem = item as RgbActivityItem & { ticker?: string; name?: string };
-  const displayTicker = showAssetTicker
-    ? extendedItem.ticker || extendedItem.name || item.assetId?.slice(0, 8) || ticker
-    : ticker;
-
-  return (
-    <Row fullX justifyBetween justifyCenter py="md" style={{ borderBottomWidth: 1, borderColor: colors.border2 }}>
-      <Row itemsCenter>
-        <Row
-          onClick={() => {
-            if (txid !== '--') {
-              nav.navToExplorerTx(txid);
-            }
-          }}>
-          <Icon icon={getActivityIcon(type)} size={32} />
-        </Row>
-
-        <Column>
-          <Row style={{ alignItems: 'start' }}>
-            <Text text={getActivityTitle(type, t)} />
-
-            {pending ? (
-              <Row style={{ backgroundColor: 'rgba(244, 182, 44, 0.15)', borderRadius: 4 }} px="md" py="xs">
-                <Text text={t('history_pending')} style={{ color: 'rgba(244, 182, 44, 0.85)' }} size="xs" />
-              </Row>
-            ) : null}
-          </Row>
-
-          <Row>
-            <Text text={shortAddress(subTitle, 10)} preset="sub" />
-          </Row>
-        </Column>
-      </Row>
-
-      {amount !== '0' && amount !== '--' ? (
-        <Row itemsCenter>
-          <Text text={amount} />
-          <Text text={displayTicker} preset="sub" />
-        </Row>
-      ) : null}
-    </Row>
-  );
+function toTransferItem(
+  item: RgbActivityItem,
+  fallbackTicker: string,
+  fallbackName: string,
+  fallbackPrecision?: number
+): RgbTransferItem {
+  const type = item.type === 'send' || item.type === 'receive' ? item.type : 'issue';
+  return {
+    id: item.id || item.txid,
+    assetId: item.assetId,
+    ticker: item.ticker || fallbackTicker,
+    name: item.name || fallbackName,
+    precision: item.precision ?? fallbackPrecision,
+    type,
+    status: item.status,
+    amount: item.amount,
+    txid: item.txid,
+    timestamp: item.timestamp
+  };
 }
 
 export function RGBTokenHistory(props: {
@@ -132,8 +40,11 @@ export function RGBTokenHistory(props: {
   onLoadMoreActivity?: () => void;
   onRefreshActivity?: () => void;
   showAssetTicker?: boolean;
+  showDirectionIcon?: boolean;
 }) {
   const { t } = useI18n();
+  const nav = useNavigation();
+  const [selectedTransfer, setSelectedTransfer] = useState<RgbTransferItem>();
   const {
     ticker,
     displayName,
@@ -144,7 +55,8 @@ export function RGBTokenHistory(props: {
     activityHasMore = false,
     onLoadMoreActivity,
     onRefreshActivity,
-    showAssetTicker = false
+    showAssetTicker = false,
+    showDirectionIcon = false
   } = props;
   const tokenName = displayName || ticker;
 
@@ -165,19 +77,54 @@ export function RGBTokenHistory(props: {
   }
 
   return (
-    <Column fullX>
-      <InfiniteList
-        data={activityItems}
-        total={activityTotal}
-        keyExtractor={(item, index) => item.id || item.txid || index.toString()}
-        renderItem={({ item }) => (
-          <RGBActivityItem item={item} ticker={tokenName} precision={precision} showAssetTicker={showAssetTicker} />
-        )}
-        onLoadMore={onLoadMoreActivity || (() => undefined)}
-        onRefresh={onRefreshActivity || (() => undefined)}
-        hasMore={activityHasMore}
-        loading={activityLoading}
-      />
-    </Column>
+    <>
+      <Column fullX>
+        <InfiniteList
+          data={activityItems}
+          total={activityTotal}
+          keyExtractor={(item, index) => item.id || item.txid || index.toString()}
+          renderItem={({ item }) => {
+            const itemIndex = activityItems.indexOf(item);
+            const date = getRgbTransferDateKey(item.timestamp);
+            const previousDate =
+              itemIndex > 0 ? getRgbTransferDateKey(activityItems[itemIndex - 1]?.timestamp) : '';
+            const transfer = toTransferItem(item, ticker, tokenName, precision);
+            const assetLabel = showAssetTicker
+              ? item.ticker || item.name || item.assetId?.slice(0, 8) || ticker
+              : tokenName;
+            return (
+              <RGBTransferListItem
+                item={transfer}
+                assetLabel={assetLabel}
+                showDate={Boolean(date && date !== previousDate)}
+                showDirectionIcon={showDirectionIcon}
+                onClick={() => setSelectedTransfer(transfer)}
+              />
+            );
+          }}
+          onLoadMore={onLoadMoreActivity || (() => undefined)}
+          onRefresh={onRefreshActivity || (() => undefined)}
+          hasMore={activityHasMore}
+          loading={activityLoading}
+          rowGap={0}
+        />
+      </Column>
+
+      {selectedTransfer ? (
+        <RGBTransferDetailSheet
+          transfer={selectedTransfer}
+          transferId={selectedTransfer.id}
+          onClose={() => setSelectedTransfer(undefined)}
+          onCanceled={() => onRefreshActivity?.()}
+          onClickExploreTx={
+            selectedTransfer.txid
+              ? () => {
+                  if (selectedTransfer.txid) nav.navToExplorerTx(selectedTransfer.txid);
+                }
+              : undefined
+          }
+        />
+      ) : null}
+    </>
   );
 }
