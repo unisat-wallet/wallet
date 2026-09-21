@@ -10,15 +10,18 @@ const rgb = window.unisat.rgb
 RGB is available only when the currently selected wallet chain has RGB enabled.
 The dApp must first connect with `window.unisat.requestAccounts()`. Payment
 and swap operations are bound to the connected origin; an operation created by
-one origin cannot be queried, signed, finalized, or cancelled by another
-origin. Receive invoices are currently wallet-wide pending state, so a dApp
-must only accept/reject the recipient ID it created or was explicitly given.
+one origin cannot normally be queried, signed, or finalized by another origin.
+The explicitly approved swap-recovery methods described below are exceptions.
+Receive invoices are currently wallet-wide pending state, so a dApp must only
+accept/reject the recipient ID it created or was explicitly given.
 
 ## Conventions
 
 - `assetId` is a canonical RGB contract ID, for example `rgb:...`.
-- RGB values and satoshi values are unsigned decimal strings in atomic units.
-  Never use JavaScript `number` for an asset amount.
+- RGB asset amounts and public request parameters representing satoshi amounts
+  are unsigned decimal strings in atomic units. Never use JavaScript `number`
+  for an asset amount. Returned UTXO `satoshis` fields and `feeRate` parameters
+  are JavaScript numbers.
 - An invoice is one-time. A blind invoice reserves an existing RGB funding
   outpoint; a witness invoice requires the sender transaction to create its
   receiver output.
@@ -40,8 +43,9 @@ must only accept/reject the recipient ID it created or was explicitly given.
 | `cancelPayment` / `getPaymentStatus` | Yes / No | Cancel an unacknowledged payment or inspect its status. |
 | `prepareSwap` | Yes | Prepare a seller-side RGB-for-BTC atomic swap. |
 | `signSellSwapAndPublishConsignment` | Yes | Add seller signatures and publish the consignment, without broadcasting. |
-| `confirmSellSwap` | Yes | Verify the buyer's returned signed PSBT and ACK; the dApp finalizes and broadcasts it. |
+| `confirmSellSwap` | No | Verify the buyer's returned signed PSBT and ACK; the dApp finalizes and broadcasts it. |
 | `applySellSwapAbort` / `applyBuySwapAbort` | Yes | Apply a mutually signed, terminal swap-abort agreement to local seller/buyer RGB state. |
+| `getSellSwapAbortOrigin` | No | Inspect the seller operation's original dApp origin before recovery. |
 | `cancelSwap` / `getOperationStatus` | Yes / No | Cancel or inspect a swap. |
 | `signBuySwapAndAcceptConsignment` | Yes | Sign buyer BTC inputs and accept the RGB consignment. |
 
@@ -63,10 +67,10 @@ and always pass transfer amounts as atomic-unit strings.
 ### `getFundingUtxos(assetId)` and `getFeeUtxos()`
 
 These methods expose the minimum unlocked input information needed to build a
-seller-side swap template. Funding UTXOs are confirmed; fee-pool availability
-follows the wallet's fee-pool source. They are candidate queries, not a
-reservation: `prepareSwap` independently rechecks ownership, confirmation and
-lock state before it writes the commitment.
+seller-side swap template. RGB funding UTXOs are confirmed; fee-pool
+availability follows the wallet's Bitcoin UTXO source. They are candidate
+queries, not a reservation: `prepareSwap` independently rechecks ownership,
+confirmation and lock state before it writes the commitment.
 
 ```ts
 const { utxos: rgbInputs } = await rgb.getFundingUtxos('rgb:...')
@@ -169,8 +173,11 @@ Keep `prepared.id` as the payment `transferId`.
 
 ```ts
 const result = await rgb.signPayment(prepared.id)
+// While delivery is incomplete:
 // { transferId, status: 'waiting_ack' | 'rejected' | 'canceled' |
-//                       'broadcast_failed', txid? }
+//                       'broadcast_failed', txid?, error? }
+// When ACK and broadcast complete in this request:
+// { txid, rawTx, consignments, fundingUpdate? }
 ```
 
 The wallet signs its own inputs, publishes the consignment, waits for a valid
@@ -184,10 +191,11 @@ const status = await rgb.getPaymentStatus(transferId)
 await rgb.cancelPayment(transferId)
 ```
 
-Status includes `transferId`, `assetId`, `amount`, optional `txid`, and one of
-`prepared`, `waiting_ack`, `broadcasting`, `broadcasted`,
-`broadcast_failed`, `canceled`, `rejected`, or `unknown`. Cancellation is only
-possible before a valid ACK or broadcast.
+Payment status includes `transferId`, optional `assetId`, `amount`, and `txid`,
+and one of `prepared`, `waiting_ack`, `broadcasting`, `broadcasted`,
+`broadcast_failed`, `canceled`, `rejected`, or `unknown`. Swap operations may
+additionally report `awaiting_buyer_signature` or `ready_for_dapp_finalize`.
+Cancellation is only possible before a valid ACK or broadcast.
 
 ## RGB/BTC atomic swap: buy RGB with BTC
 
@@ -289,6 +297,7 @@ dApp finalizes it and broadcasts the resulting transaction.
 
 ```ts
 const confirmed = await rgb.confirmSellSwap(prepared.transferId, buyerResult.signedPsbt)
+// { transferId, txid, signedPsbt, status: 'ready_for_dapp_finalize' }
 const finalPsbt = finalizeAllInputsInDapp(confirmed.signedPsbt)
 await window.unisat.pushPsbt(finalPsbt)
 ```
