@@ -73,6 +73,7 @@ export {
 export { useRGBSendCompleteScreenLogic } from './useRGBSendCompleteScreenLogic'
 export { useRGBBalanceCardLogic, type RGBBalanceCardProps } from './useRGBBalanceCardLogic'
 export { useRGBUsdtBalanceCardLogic } from './useRGBUsdtBalanceCardLogic'
+export { RgbUsdtEnabled, useRgbHomeDisplayMode } from './useRgbHomeDisplayMode'
 export { useRGBHistoryScreenLogic } from './useRGBHistoryScreenLogic'
 
 export { useBRC20BalanceCardLogic, type BRC20BalanceCardProps } from './useBRC20BalanceCardLogic'

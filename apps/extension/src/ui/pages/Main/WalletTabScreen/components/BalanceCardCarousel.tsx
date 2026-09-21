@@ -11,6 +11,7 @@ import {
   useI18n,
   useRGBListLogic,
   useRGBUsdtBalanceCardLogic,
+  useRgbHomeDisplayMode,
   useSupportedAssets,
   useTools,
   useWallet,
@@ -719,8 +720,7 @@ export function BalanceCardCarousel({
   const canShowRgbCard = supportedAssets.assets.rgbCard;
   const isUnsupportedRgbCard = canShowRgbCard && !isRgbFullySupported;
   const isInactiveRgbCard = canShowRgbCard && isRgbFullySupported && !rgbFeatureEnabled;
-  // Temporarily keep the generic RGB card on every network until RGB USDT launches.
-  const useGenericRgbCard = true;
+  const { useGenericRgbCard } = useRgbHomeDisplayMode();
   const activeIndex = isRgbFeatureActive ? (walletView === WalletView.RGB ? 1 : 0) : unsupportedPreviewIndex;
 
   const setActiveIndex = useCallback(

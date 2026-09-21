@@ -12,6 +12,7 @@ import {
   useNavigation,
   useResetFeeRateBar,
   useResetUiTxCreateScreen,
+  useRgbHomeDisplayMode,
   useWallet,
   useWalletConfig,
   WalletView
@@ -84,7 +85,7 @@ export const WalletActions = ({ chain, walletView = WalletView.BITCOIN }: Wallet
   const { t } = useI18n();
   const accountCapabilities = useCurrentAccountCapabilities();
   const isRgbView = walletView === WalletView.RGB;
-  const canSendRgbUsdtToken = chain.enum === ChainType.BITCOIN_MAINNET;
+  const { canSendRgbUsdtToken } = useRgbHomeDisplayMode();
 
   const handleUtxoClick = () => {
     nav.navToUtxoTools();
