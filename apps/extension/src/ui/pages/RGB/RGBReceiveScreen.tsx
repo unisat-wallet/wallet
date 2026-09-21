@@ -180,6 +180,18 @@ const amountPillTextStyle = {
   whiteSpace: 'nowrap' as const
 };
 
+const invoiceTypeTagStyle = {
+  height: 18,
+  padding: '0 5px',
+  borderRadius: 3,
+  background: 'rgba(255,255,255,0.12)',
+  border: '1px solid rgba(255,255,255,0.16)',
+  display: 'inline-flex',
+  alignItems: 'center',
+  boxSizing: 'border-box' as const,
+  flexShrink: 0
+};
+
 const confirmMaskStyle = {
   position: 'fixed' as const,
   inset: 0,
@@ -571,6 +583,8 @@ export default function RGBReceiveScreen() {
     const awaitingSenderConfirmation = isRgbPendingInvoiceAwaitingSenderConfirmation(item);
     const invoiceInUse = awaitingAcceptance || awaitingSenderBroadcast || awaitingSenderConfirmation;
     const expiryText = formatRgbInvoiceExpiryTime(item.expirationTimestamp, locale, t);
+    const invoiceType =
+      item.kind === 'ReceiveWitness' || item.transferKind === 'ReceiveWitness' ? 'witness' : 'blind';
 
     return (
       <Row
@@ -583,7 +597,16 @@ export default function RGBReceiveScreen() {
           {renderPendingInvoiceIcon(item)}
           <Column gap="xs" style={{ minWidth: 0, flex: 1, overflow: 'hidden' }}>
             {renderPendingInvoiceTitle(item)}
-            <Text text={expiryText} color="white_muted" size="xs" />
+            <Row itemsCenter gap="sm" style={{ minWidth: 0 }}>
+              <div style={invoiceTypeTagStyle}>
+                <Text
+                  text={invoiceType === 'witness' ? 'Witness' : 'Blind'}
+                  color="textDim"
+                  size="xxs"
+                />
+              </div>
+              <Text text={expiryText} color="white_muted" size="xs" ellipsis style={{ minWidth: 0 }} />
+            </Row>
             {awaitingAcceptance ? <Text text={t('rgb_status_pending_accept')} color="gold" size="xs" /> : null}
             {awaitingSenderBroadcast ? <Text text={t('rgb_status_waiting_receive')} color="gold" size="xs" /> : null}
             {awaitingSenderConfirmation ? <Text text={t('rgb_status_confirming')} color="gold" size="xs" /> : null}
