@@ -10,6 +10,24 @@ export enum RGBTokenScreenTabKey {
   HISTORY = 'history',
 }
 
+const LOCAL_ACTIVITY_STATUSES = new Set([
+  'signed',
+  'waiting_ack',
+  'broadcasting',
+  'broadcasted',
+  'broadcast_failed',
+  'pending_accept',
+  'confirming',
+  'waiting_receive',
+  'pending',
+  'unconfirmed',
+])
+
+function isSameRgbAssetId(left?: string, right?: string) {
+  const normalize = (value?: string) => value?.replace(/^rgb:/, '')
+  return !!left && !!right && normalize(left) === normalize(right)
+}
+
 function hasPositiveAmount(value?: string | number | null) {
   if (value === undefined || value === null || value === '') {
     return false
@@ -90,14 +108,44 @@ export function useRGBTokenScreenLogic() {
         return { list: [], total: 0 }
       }
 
-      const { list, total } = await wallet.getRGBAssetActivity(
-        '',
-        assetId,
-        page,
-        pageSize,
-        activityType
+      const activity = await wallet.getRGBAssetActivity('', assetId, page, pageSize, activityType)
+      if (page !== 1) return activity
+
+      // The indexer does not expose a newly prepared transfer yet. Reuse the
+      // transfer-list projection of local state until the indexed row appears.
+      const transfers = await wallet.getRgbTransfers(1, 50, { skipSync: true })
+      const localItems: RgbActivityItem[] = transfers.list
+        .filter(
+          transfer =>
+            transfer.local &&
+            isSameRgbAssetId(transfer.assetId, assetId) &&
+            (!activityType || transfer.type === activityType) &&
+            LOCAL_ACTIVITY_STATUSES.has(String(transfer.status).toLowerCase())
+        )
+        .map(transfer => ({
+          id: transfer.id,
+          assetId: transfer.assetId ?? assetId,
+          ticker: transfer.ticker,
+          name: transfer.name,
+          precision: transfer.precision,
+          type: transfer.type,
+          status: transfer.status,
+          amount: transfer.amount ?? '',
+          txid: transfer.txid ?? '',
+          timestamp: transfer.timestamp,
+        }))
+      const localTxids = new Set(localItems.map(item => item.txid).filter(Boolean))
+      const localIds = new Set(localItems.map(item => item.id))
+      const remoteItems = activity.list.filter(
+        item => !localIds.has(item.id) && (!item.txid || !localTxids.has(item.txid))
       )
-      return { list, total }
+      const list = [...localItems, ...remoteItems].sort(
+        (left, right) => right.timestamp - left.timestamp
+      )
+      return {
+        list,
+        total: Math.max(activity.total + localItems.length, list.length),
+      }
     },
     dependencies: [assetId, activityType],
   })

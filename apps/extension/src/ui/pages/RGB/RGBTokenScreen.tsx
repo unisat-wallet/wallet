@@ -20,7 +20,6 @@ import {
   getRgbTokenPrecision,
   RGBTokenScreenTabKey,
   toRgbDisplayAmount,
-  useNavigation,
   useRGBTokenScreenLogic
 } from '@unisat/wallet-state';
 
@@ -29,7 +28,6 @@ import { RGBTokenHistory } from './components/RGBTokenHistory';
 import { useRgbWriteLeaseGuard } from './components/useRgbWriteLeaseGuard';
 
 export default function RGBTokenScreen() {
-  const nav = useNavigation();
   const { requestWrite, writeLeaseModal } = useRgbWriteLeaseGuard();
   const {
     tokenSummary,
@@ -168,15 +166,6 @@ export default function RGBTokenScreen() {
                 color="white"
                 style={{ width: '100%', overflowWrap: 'anywhere' }}
               />
-              {lockedAmount ? (
-                <Text
-                  text={t('rgb_locked_balance_hint')}
-                  size="xs"
-                  color="gold"
-                  onClick={() => nav.navigate('MainScreen', { rgbHomeTab: 'transfers' })}
-                  style={{ cursor: 'pointer', marginTop: 6 }}
-                />
-              ) : null}
             </Column>
           </Column>
 

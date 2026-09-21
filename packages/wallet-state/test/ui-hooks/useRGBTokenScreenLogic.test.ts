@@ -130,4 +130,59 @@ describe('useRGBTokenScreenLogic', () => {
       expect(result.current.tokenBalance).toEqual({ ...fetchedBalance, precision: 8 })
     })
   })
+
+  it('includes a local pending transfer in token history before it is indexed', async () => {
+    const { wrapper, wallet } = createHookTestHarness({ routeState: { assetId } })
+    wallet.getRGBAssetDetail.mockResolvedValue(detail)
+    wallet.getRGBAssetBalance.mockResolvedValue(fetchedBalance)
+    wallet.getRGBAssetActivity.mockResolvedValue({
+      total: 1,
+      list: [
+        {
+          id: 'indexed-transfer',
+          assetId,
+          type: 'send',
+          status: 'confirmed',
+          amount: '5',
+          txid: 'indexed-txid',
+          timestamp: 1,
+        },
+      ],
+    })
+    wallet.getRgbTransfers.mockResolvedValue({
+      total: 2,
+      list: [
+        {
+          id: 'local-send:pending-transfer',
+          transferId: 'pending-transfer',
+          assetId,
+          type: 'send',
+          status: 'waiting_ack',
+          amount: '7',
+          timestamp: 2,
+          local: true,
+        },
+        {
+          id: 'local-send:other-asset',
+          assetId: 'rgb:other-asset',
+          type: 'send',
+          status: 'waiting_ack',
+          amount: '9',
+          timestamp: 3,
+          local: true,
+        },
+      ],
+    })
+
+    const { result } = renderHook(() => useRGBTokenScreenLogic(), { wrapper })
+
+    await waitFor(() => {
+      expect(result.current.activityItems).toEqual([
+        expect.objectContaining({ id: 'local-send:pending-transfer', status: 'waiting_ack' }),
+        expect.objectContaining({ id: 'indexed-transfer', status: 'confirmed' }),
+      ])
+    })
+    expect(result.current.activityTotal).toBe(2)
+    expect(wallet.getRgbTransfers).toHaveBeenCalledWith(1, 50, { skipSync: true })
+  })
 })
