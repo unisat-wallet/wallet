@@ -1288,6 +1288,16 @@ describe('RgbService', () => {
     )
   })
 
+  it('rejects a fixed receive amount above the RGB u64 maximum', async () => {
+    const dependencies = createDependencies()
+    const service = new RgbService(dependencies)
+    await service.open(wallet)
+
+    await expect(
+      service.createBlindReceive({ assetId: 'rgb:asset', amount: '18446744073709551616' })
+    ).rejects.toThrow('exceeds the maximum u64 value')
+  })
+
   it('waits for a recovery checkpoint before returning a new blind invoice', async () => {
     const dependencies = createDependencies()
     vi.mocked(dependencies.stateSource.getSnapshot).mockResolvedValue({

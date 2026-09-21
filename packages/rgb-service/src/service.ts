@@ -44,6 +44,7 @@ import type {
 } from './types'
 
 const STORAGE_PREFIX = 'rgb-service:v1:'
+const MAX_RGB_AMOUNT = 0xffff_ffff_ffff_ffffn
 const PROVIDER_ORIGIN_HISTORY_TTL_MS = 24 * 60 * 60 * 1000
 // Keep these in sync with recovery checkpoint validation. Canonical history is
 // wallet state, so accepting a history that cannot be restored would make the
@@ -543,6 +544,9 @@ export class RgbService {
     if (input.amount !== undefined && !/^(0|[1-9][0-9]*)$/.test(input.amount)) {
       throw new RgbServiceError('RGB receive amount must be an unsigned integer')
     }
+    if (input.amount !== undefined && BigInt(input.amount) > MAX_RGB_AMOUNT) {
+      throw new RgbServiceError('RGB receive amount exceeds the maximum u64 value')
+    }
     const now = this.now()
     const expirationTimestamp =
       input.durationSeconds === undefined
@@ -611,6 +615,9 @@ export class RgbService {
     }
     if (input.amount !== undefined && !/^(0|[1-9][0-9]*)$/.test(input.amount)) {
       throw new RgbServiceError('RGB receive amount must be an unsigned integer')
+    }
+    if (input.amount !== undefined && BigInt(input.amount) > MAX_RGB_AMOUNT) {
+      throw new RgbServiceError('RGB receive amount exceeds the maximum u64 value')
     }
     if (
       input.durationSeconds !== undefined &&

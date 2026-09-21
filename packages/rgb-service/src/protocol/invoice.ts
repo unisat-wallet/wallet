@@ -378,6 +378,8 @@ export function encodeWitnessRgbInvoice(input: {
 }) {
   if (!/^(0|[1-9][0-9]*)$/.test(input.amount ?? '0'))
     throw new RgbServiceError('RGB invoice amount is invalid')
+  if (input.amount !== undefined && BigInt(input.amount) > 0xffff_ffff_ffff_ffffn)
+    throw new RgbServiceError('RGB invoice amount exceeds the maximum u64 value')
   if (!/^(5120)[0-9a-f]{64}$/i.test(input.scriptPubKey)) {
     throw new RgbServiceError('RGB witness invoices currently require a P2TR funding script')
   }

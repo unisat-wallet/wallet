@@ -2933,6 +2933,9 @@
   "enter_amount_greater_than_0": {
     "message": "Enter an amount greater than 0."
   },
+  "rgb_invoice_maximum_amount": {
+    "message": "Maximum amount is $amount$."
+  },
   "rgb_amount_precision_invalid": {
     "message": "Enter an amount with up to $precision decimal places."
   },

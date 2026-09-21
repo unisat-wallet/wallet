@@ -1,5 +1,16 @@
 export { toRgbDisplayAmount } from '@unisat/wallet-shared'
 
+export const MAX_RGB_ATOMIC_AMOUNT = 0xffff_ffff_ffff_ffffn
+
+export function formatMaxRgbDisplayAmount(precision: number) {
+  const atomic = MAX_RGB_ATOMIC_AMOUNT.toString()
+  const padded = precision > 0 ? atomic.padStart(precision + 1, '0') : atomic
+  const integerPart = precision > 0 ? padded.slice(0, -precision) : padded
+  const decimalPart = precision > 0 ? padded.slice(-precision) : ''
+  const formattedInteger = integerPart.replace(/\B(?=(\d{3})+(?!\d))/g, ',')
+  return decimalPart ? `${formattedInteger}.${decimalPart}` : formattedInteger
+}
+
 export function isValidRgbDecimalAmount(value: string, precision: number) {
   if (!value) return false
   const decimalPattern = precision > 0 ? `(?:\\.\\d{0,${precision}})?` : ''

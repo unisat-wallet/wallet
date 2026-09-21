@@ -3,10 +3,12 @@ import { useCallback, useEffect, useState } from 'react'
 import { useI18n, useNavigation, useTools, useWallet } from 'src/context'
 import { useAccountBalance, useFeeRateBar } from 'src/hooks'
 import {
+  formatMaxRgbDisplayAmount,
   getRgbIconShortName,
   getRgbTokenPrecision,
   isValidRgbDecimalAmount,
   normalizeRgbAmountInput,
+  MAX_RGB_ATOMIC_AMOUNT,
   toRgbAtomicAmount,
   toRgbDisplayAmount,
 } from 'src/utils/rgb-amount-utils'
@@ -348,9 +350,12 @@ export function useRGBReceiveScreenLogic() {
   const displayAmount = amount.trim()
   const isFixedMode = mode === 'fixed' && canSetFixedAmount
   const normalizedAmount = isFixedMode ? toRgbAtomicAmount(displayAmount, assetPrecision) : ''
+  const isAmountFormatValid = isValidRgbDecimalAmount(displayAmount, assetPrecision)
+  const amountExceedsMaximum =
+    isFixedMode && isAmountFormatValid && BigInt(normalizedAmount) > MAX_RGB_ATOMIC_AMOUNT
   const isAmountValid =
     !isFixedMode ||
-    (isValidRgbDecimalAmount(displayAmount, assetPrecision) && /[1-9]/.test(normalizedAmount))
+    (isAmountFormatValid && /[1-9]/.test(normalizedAmount) && !amountExceedsMaximum)
   const amountInvalidVisible =
     isFixedMode && displayAmount.length > 0 && !isAmountValid
 
@@ -790,6 +795,8 @@ export function useRGBReceiveScreenLogic() {
     isFixedMode,
     isAmountValid,
     amountInvalidVisible,
+    amountExceedsMaximum,
+    maximumDisplayAmount: formatMaxRgbDisplayAmount(assetPrecision),
     loading,
     loadingText,
     invoice,

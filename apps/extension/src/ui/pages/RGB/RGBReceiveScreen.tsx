@@ -239,6 +239,8 @@ export default function RGBReceiveScreen() {
     isFixedMode,
     isAmountValid,
     amountInvalidVisible,
+    amountExceedsMaximum,
+    maximumDisplayAmount,
     loading,
     loadingText,
     invoice,
@@ -844,7 +846,16 @@ export default function RGBReceiveScreen() {
 
           {error ? <Text text={error} size="xs" color="danger" wrap /> : null}
           {amountInvalidVisible ? (
-            <Text text={t('enter_amount_greater_than_0')} size="xs" color="danger" />
+            <Text
+              text={
+                amountExceedsMaximum
+                  ? t('rgb_invoice_maximum_amount', { amount: maximumDisplayAmount })
+                  : t('enter_amount_greater_than_0')
+              }
+              size="xs"
+              color="danger"
+              wrap
+            />
           ) : null}
         </Column>
       </Content>

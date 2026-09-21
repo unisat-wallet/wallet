@@ -62,7 +62,9 @@ export {
 } from './utils/rgb-invoice-utils'
 export { useAsyncEffect } from './utils/ui-utils'
 export {
+  formatMaxRgbDisplayAmount,
   isValidRgbDecimalAmount,
+  MAX_RGB_ATOMIC_AMOUNT,
   getRgbIconShortName,
   getRgbTokenPrecision,
   normalizeRgbAmountInput,
