@@ -408,7 +408,7 @@ export default function RGBIssueScreen() {
               <ReviewRow label={t('asset_id')} value={issueResult.assetId} copyable />
               <ReviewRow label={t('ticker_label')} value={assetTicker} />
               <ReviewRow label={t('total_supply')} value={displaySupply} />
-              <ReviewRow label={t('decimal_places_label')} value={precision.trim()} />
+              <ReviewRow label={t('precision_rgb')} value={precision.trim()} />
               <ReviewRow
                 label="Status"
                 value={issueResult.pendingConfirmation ? t('unconfirmed') : t('rgb_status_confirmed')}
@@ -492,7 +492,7 @@ export default function RGBIssueScreen() {
             </FormField>
 
             <FormField
-              label={t('decimal_places_label')}
+              label={t('precision_rgb')}
               labelExtra={
                 <Tooltip
                   title={t('decimal_places_tooltip')}

@@ -95,7 +95,7 @@ export function IssueReviewModal(props: {
           <ReviewRow label={t('name_label')} value={name} />
           <ReviewRow label={t('ticker_label')} value={ticker} />
           <ReviewRow label={t('total_supply')} value={supply} />
-          <ReviewRow label={t('decimal_places_label')} value={precision} />
+          <ReviewRow label={t('precision_rgb')} value={precision} />
         </div>
 
         {error ? (
