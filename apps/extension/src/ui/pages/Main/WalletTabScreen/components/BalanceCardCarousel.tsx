@@ -683,7 +683,9 @@ export function BalanceCardCarousel({
   const toggleDetailExpanded = useToggleBalanceCardDetailExpanded();
 
   const isRgbFullySupported = supportedAssets.assets.rgb;
-  const isRgbFeatureActive = isRgbFullySupported && rgbFeatureEnabled;
+  // Preserve a previously selected RGB view while the feature status is being
+  // restored asynchronously after returning to the wallet tab.
+  const isRgbFeatureActive = isRgbFullySupported && (rgbFeatureEnabled || walletView === WalletView.RGB);
   const canShowRgbCard = supportedAssets.assets.rgbCard;
   const isUnsupportedRgbCard = canShowRgbCard && !isRgbFullySupported;
   const isInactiveRgbCard = canShowRgbCard && isRgbFullySupported && !rgbFeatureEnabled;
@@ -750,12 +752,6 @@ export function BalanceCardCarousel({
   const onSwitchWallet = useCallback(() => {
     navigate('SwitchKeyringScreen');
   }, [navigate]);
-
-  useEffect(() => {
-    if (!isRgbFeatureActive && walletView === WalletView.RGB) {
-      dispatch(uiActions.setWalletView(WalletView.BITCOIN));
-    }
-  }, [dispatch, isRgbFeatureActive, walletView]);
 
   const onEnableRgb = useCallback(async () => {
     setActivationLoading(true);
