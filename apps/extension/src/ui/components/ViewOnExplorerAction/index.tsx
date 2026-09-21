@@ -21,10 +21,6 @@ export function ViewOnExplorerAction({
 
   const chain = useChain();
 
-  if (!chain.unisatExplorerUrl) {
-    return null;
-  }
-
   return (
     <Row
       justifyCenter
@@ -39,7 +35,11 @@ export function ViewOnExplorerAction({
         gap: 10,
         ...style
       }}>
-      <Text text={t('view_on_uniscan')} size="sm" style={{ color: 'rgba(255,255,255,0.65)' }} />
+      <Text
+        text={t(chain.unisatExplorerUrl ? 'view_on_uniscan' : 'view_on_explorer')}
+        size="sm"
+        style={{ color: 'rgba(255,255,255,0.65)' }}
+      />
       <Icon icon="right" size={12} color="textDim" />
     </Row>
   );

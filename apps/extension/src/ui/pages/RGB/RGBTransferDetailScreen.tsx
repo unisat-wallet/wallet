@@ -5,6 +5,7 @@ import { spacing } from '@/ui/theme/spacing';
 import {
   getRgbTokenPrecision,
   toRgbDisplayAmount,
+  useChain,
   useRGBTransferDetailLogic,
   type RgbTransferItem
 } from '@unisat/wallet-state';
@@ -72,6 +73,7 @@ function isFailedStatus(status: string) {
 }
 
 export default function RGBTransferDetailScreen() {
+  const chain = useChain();
   const {
     transfer,
     transferId,
@@ -174,7 +176,11 @@ export default function RGBTransferDetailScreen() {
         {canExplore ? (
           <Row justifyCenter itemsCenter onClick={onClickExploreTx} gap="sm">
             <Icon icon="eye" color="textDim" />
-            <Text preset="regular-bold" text={t('view_on_uniscan')} color="textDim" />
+            <Text
+              preset="regular-bold"
+              text={t(chain.unisatExplorerUrl ? 'view_on_uniscan' : 'view_on_explorer')}
+              color="textDim"
+            />
           </Row>
         ) : null}
         {loading ? <Text text={t('loading')} color="textDim" textCenter /> : null}

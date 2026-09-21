@@ -2663,6 +2663,9 @@
   "view_on_uniscan": {
     "message": "UniScanで見る"
   },
+  "view_on_explorer": {
+    "message": "エクスプローラーで表示"
+  },
   "wallet_name": {
     "message": "ウォレット名"
   },

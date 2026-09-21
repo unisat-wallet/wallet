@@ -10,6 +10,7 @@ import {
   getRgbTokenIconInfo,
   getRgbTokenPrecision,
   toRgbDisplayAmount,
+  useChain,
   useI18n,
   useTools,
   useWallet,
@@ -185,6 +186,7 @@ export function RGBTransferDetailSheet({
   onCanceled
 }: RGBTransferDetailSheetProps) {
   const { t } = useI18n();
+  const chain = useChain();
   const wallet = useWallet();
   const tools = useTools();
   const { requestWrite, writeLeaseModal } = useRgbWriteLeaseGuard();
@@ -559,7 +561,7 @@ export function RGBTransferDetailSheet({
               />
             ) : canExplore ? (
               <Button
-                text={t('view_on_uniscan')}
+                text={t(chain.unisatExplorerUrl ? 'view_on_uniscan' : 'view_on_explorer')}
                 preset="primary"
                 onClick={onClickExploreTx}
                 style={{ height: 48, minHeight: 48, width: '100%', flex: 'none' }}

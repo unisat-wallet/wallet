@@ -2663,6 +2663,9 @@
   "view_on_uniscan": {
     "message": "Смотреть на UniScan"
   },
+  "view_on_explorer": {
+    "message": "Посмотреть в обозревателе"
+  },
   "wallet_name": {
     "message": "Имя кошелька"
   },

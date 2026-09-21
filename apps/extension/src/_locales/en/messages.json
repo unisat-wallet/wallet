@@ -2669,6 +2669,9 @@
   "view_on_uniscan": {
     "message": "View on UniScan"
   },
+  "view_on_explorer": {
+    "message": "View on Explorer"
+  },
   "wallet_name": {
     "message": "Wallet name"
   },

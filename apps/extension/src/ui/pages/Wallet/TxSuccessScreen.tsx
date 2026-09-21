@@ -1,6 +1,6 @@
 import { Button, Column, Content, Footer, Header, Icon, Layout, Row, Text } from '@/ui/components';
 import { spacing } from '@/ui/theme/spacing';
-import { useTxSuccessScreenLogic } from '@unisat/wallet-state';
+import { useChain, useTxSuccessScreenLogic } from '@unisat/wallet-state';
 
 const TEXT_COLOR = 'rgba(255, 255, 255, 0.85)';
 
@@ -21,6 +21,7 @@ const footerButtonTextStyle = {
 
 export default function TxSuccessScreen() {
   const { onClickExploreTx, onClickDone, t } = useTxSuccessScreenLogic();
+  const chain = useChain();
 
   return (
     <Layout>
@@ -43,7 +44,7 @@ export default function TxSuccessScreen() {
           <Button
             full
             preset="default"
-            text={t('view_on_uniscan')}
+            text={t(chain.unisatExplorerUrl ? 'view_on_uniscan' : 'view_on_explorer')}
             onClick={onClickExploreTx}
             style={footerButtonStyle}
             textStyle={footerButtonTextStyle}
