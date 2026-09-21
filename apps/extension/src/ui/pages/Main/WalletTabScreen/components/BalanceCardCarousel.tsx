@@ -13,7 +13,6 @@ import {
   useRGBListLogic,
   useRGBUsdtBalanceCardLogic,
   useSupportedAssets,
-  useToggleBalanceCardDetailExpanded,
   useTools,
   useWallet,
   useWalletView
@@ -119,17 +118,7 @@ function UsdtAmountDisplay({
   );
 }
 
-function RGBUsdtBalanceCard({
-  isDetailExpanded,
-  onExpandToggle,
-  suppressClickRef,
-  rgbList
-}: {
-  isDetailExpanded: boolean;
-  onExpandToggle: () => void;
-  suppressClickRef: React.MutableRefObject<boolean>;
-  rgbList: ReturnType<typeof useRGBListLogic>;
-}) {
+function RGBUsdtBalanceCard({ rgbList }: { rgbList: ReturnType<typeof useRGBListLogic> }) {
   const {
     mainPart,
     subPart,
@@ -153,19 +142,10 @@ function RGBUsdtBalanceCard({
         padding: '12px 12px 16px',
         position: 'relative',
         overflow: 'hidden',
-        minHeight: isDetailExpanded ? EXPANDED_CARD_MIN_HEIGHT : COLLAPSED_CARD_MIN_HEIGHT,
+        minHeight: COLLAPSED_CARD_MIN_HEIGHT,
         height: '100%',
         boxSizing: 'border-box',
         justifyContent: 'space-between'
-      }}
-      onClick={(event) => {
-        if (suppressClickRef.current) {
-          return;
-        }
-        if (isCardActionTarget(event.target)) {
-          return;
-        }
-        onExpandToggle();
       }}>
       <div
         style={{
@@ -198,13 +178,10 @@ function RGBUsdtBalanceCard({
 
       <Column style={{ flex: 1, position: 'relative', zIndex: 1 }} gap="md">
         <Row itemsCenter gap="md">
-          <Row itemsCenter gap="sm">
-            <Text size="sm" text="USDT" style={{ color: 'rgba(0,0,0,0.55)', fontWeight: 600 }} />
-            <div style={rgbBadgeStyle}>
-              <Icon icon="rgb" size={14} />
-              <Text text="RGB" size="xs" style={{ color: 'rgba(0,0,0,0.55)', fontWeight: 600 }} />
-            </div>
-          </Row>
+          <div style={rgbBadgeStyle}>
+            <Icon icon="rgb" size={14} />
+            <Text text="RGB" size="xs" style={{ color: 'rgba(0,0,0,0.55)', fontWeight: 600 }} />
+          </div>
           <div data-card-action="true">
             <Row itemsCenter gap="sm">
               <Row
@@ -222,7 +199,6 @@ function RGBUsdtBalanceCard({
 
         <Row itemsCenter>
           <UsdtAmountDisplay mainPart={mainPart} subPart={subPart} hideBalance={isBalanceHidden} />
-          <Icon color="black_muted" size={16} icon={isDetailExpanded ? 'up' : 'down'} />
         </Row>
 
         {chain.showPrice ? (
@@ -237,17 +213,7 @@ function RGBUsdtBalanceCard({
   );
 }
 
-function RGBAssetsBalanceCard({
-  isDetailExpanded,
-  onExpandToggle,
-  suppressClickRef,
-  rgbList
-}: {
-  isDetailExpanded: boolean;
-  onExpandToggle: () => void;
-  suppressClickRef: React.MutableRefObject<boolean>;
-  rgbList: ReturnType<typeof useRGBListLogic>;
-}) {
+function RGBAssetsBalanceCard({ rgbList }: { rgbList: ReturnType<typeof useRGBListLogic> }) {
   const {
     assetCount,
     isBalanceHidden,
@@ -266,27 +232,47 @@ function RGBAssetsBalanceCard({
       style={{
         background: 'linear-gradient(131deg, #7467E8 1.38%, #584AC7 47.46%, #342E80 94.19%)',
         borderRadius: 16,
-        padding: '12px 12px 16px',
+        padding: 8,
         position: 'relative',
         overflow: 'hidden',
-        minHeight: isDetailExpanded ? EXPANDED_CARD_MIN_HEIGHT : COLLAPSED_CARD_MIN_HEIGHT,
+        minHeight: COLLAPSED_CARD_MIN_HEIGHT,
         height: '100%',
         boxSizing: 'border-box',
         justifyContent: 'space-between'
-      }}
-      onClick={(event) => {
-        if (suppressClickRef.current || isCardActionTarget(event.target)) return;
-        onExpandToggle();
       }}>
-      <Column style={{ flex: 1, position: 'relative', zIndex: 1 }} gap="md">
-        <Row itemsCenter justifyBetween gap="sm">
-          <Row itemsCenter gap="sm">
-            <Text size="sm" text={t('rgb_assets')} style={{ color: 'rgba(255,255,255,0.72)', fontWeight: 600 }} />
-            <div style={{ ...rgbBadgeStyle, backgroundColor: 'rgba(255,255,255,0.16)' }}>
-              <Icon icon="rgb" size={14} color="white" />
-              <Text text="RGB" size="xs" style={{ color: 'rgba(255,255,255,0.8)', fontWeight: 600 }} />
-            </div>
-          </Row>
+      <div
+        style={{
+          position: 'absolute',
+          inset: 0,
+          overflow: 'hidden',
+          pointerEvents: 'none',
+          borderRadius: 16
+        }}>
+        <img
+          src="./images/icons/artifacts/balance-bg-rgb-lines.png"
+          alt=""
+          style={{ width: '100%', height: '100%', objectFit: 'cover', opacity: 0.04 }}
+        />
+      </div>
+      <div
+        style={{
+          position: 'absolute',
+          top: 8,
+          right: 8,
+          width: 64,
+          height: 64,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          opacity: 0.14,
+          pointerEvents: 'none'
+        }}>
+        <Icon icon="rgb" color="white" size={64} />
+      </div>
+
+      <Column style={{ padding: 8, position: 'relative', zIndex: 1 }} gap="md">
+        <Row itemsCenter>
+          <Text size="sm" text={t('rgb_assets')} style={{ color: 'rgba(255,255,255,0.72)' }} />
           <div data-card-action="true">
             <Row itemsCenter gap="sm">
               <Row
@@ -295,28 +281,24 @@ function RGBAssetsBalanceCard({
                   stopCardToggle(event);
                   handleHiddenToggle();
                 }}>
-                <Icon color="white" icon={isBalanceHidden ? 'balance-eyes-closed' : 'balance-eyes'} size={20} />
+                <Icon color="white_muted" icon={isBalanceHidden ? 'balance-eyes-closed' : 'balance-eyes'} size={20} />
               </Row>
-              <RefreshButton onClick={refreshBalance as any} hideText iconColor="rgba(255,255,255,0.8)" />
+              <RefreshButton onClick={refreshBalance as any} hideText iconColor="rgba(255, 255, 255, 0.5)" />
             </Row>
           </div>
         </Row>
 
         <Row itemsCenter>
-          <Row itemsCenter>
-            <Text
-              text={isBalanceHidden ? '****' : String(assetCount)}
-              preset="title-bold"
-              style={{ fontSize: 28, color: '#fff' }}
-            />
-            <Text
-              text={t('assets')}
-              preset="title-bold"
-              style={{ fontSize: 18, color: 'rgba(255,255,255,0.72)', marginLeft: 4, marginBottom: 2 }}
-            />
-          </Row>
-
-          <Icon color="white" size={16} icon={isDetailExpanded ? 'up' : 'down'} />
+          <Text
+            text={isBalanceHidden ? '****' : String(assetCount)}
+            preset="title-bold"
+            style={{ fontSize: 28, color: '#fff' }}
+          />
+          <Text
+            text={t('assets')}
+            preset="title-bold"
+            style={{ fontSize: 18, color: 'rgba(255,255,255,0.72)', marginLeft: 4, marginBottom: 2 }}
+          />
         </Row>
       </Column>
 
@@ -478,43 +460,86 @@ function InactiveRGBBalanceCard({
       style={{
         background: 'linear-gradient(131deg, #7467E8 1.38%, #584AC7 47.46%, #342E80 94.19%)',
         borderRadius: 16,
-        padding: 12,
+        padding: 8,
         position: 'relative',
         overflow: 'hidden',
         minHeight: COLLAPSED_CARD_MIN_HEIGHT,
         height: '100%',
         boxSizing: 'border-box',
         justifyContent: 'center',
-        alignItems: 'center',
-        gap: 8
+        alignItems: 'center'
       }}
       onClick={(event) => {
         if (suppressClickRef.current) return;
         event.stopPropagation();
         onEnable();
       }}>
-      <Icon
-        icon="rgb"
-        color="white"
-        size={72}
-        style={{ position: 'absolute', top: -2, right: 8, opacity: 0.18, pointerEvents: 'none' }}
-      />
-      <Row itemsCenter gap="sm" style={{ position: 'absolute', top: 12, left: 12 }}>
-        <Text text={t('rgb_assets')} size="sm" style={{ color: 'rgba(255,255,255,0.72)', fontWeight: 600 }} />
-        <div style={{ ...rgbBadgeStyle, backgroundColor: 'rgba(255,255,255,0.16)' }}>
-          <Icon icon="rgb" size={14} color="white" />
-          <Text text="RGB" size="xs" style={{ color: 'rgba(255,255,255,0.8)', fontWeight: 600 }} />
-        </div>
-      </Row>
-      <Text
-        text={recoveryAvailable ? 'RGB wallet backup found' : 'Enable RGB to manage RGB assets'}
-        textCenter
-        size="sm"
-        style={{ color: 'rgba(255,255,255,0.78)', fontWeight: 600 }}
-      />
-      <div onClick={(event) => event.stopPropagation()}>
-        <Button text={recoveryAvailable ? 'Restore RGB' : 'Enable RGB'} preset="primary" onClick={onEnable} />
+      <div
+        style={{
+          position: 'absolute',
+          inset: 0,
+          overflow: 'hidden',
+          pointerEvents: 'none',
+          borderRadius: 16
+        }}>
+        <img
+          src="./images/icons/artifacts/balance-bg-rgb-lines.png"
+          alt=""
+          style={{ width: '100%', height: '100%', objectFit: 'cover', opacity: 0.04 }}
+        />
       </div>
+      <div
+        style={{
+          position: 'absolute',
+          top: 8,
+          right: 8,
+          width: 64,
+          height: 64,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          opacity: 0.14,
+          pointerEvents: 'none'
+        }}>
+        <Icon icon="rgb" color="white" size={64} />
+      </div>
+      <Text
+        text={t('rgb_assets')}
+        size="sm"
+        style={{ position: 'absolute', top: 16, left: 16, color: 'rgba(255,255,255,0.72)' }}
+      />
+      <Column
+        itemsCenter
+        gap="sm"
+        style={{ position: 'absolute', top: 42, left: 8, right: 8, zIndex: 1 }}>
+        {recoveryAvailable ? (
+          <Text
+            text={t('rgb_wallet_backup_found')}
+            textCenter
+            size="sm"
+            style={{ color: 'rgba(255,255,255,0.62)', fontWeight: 600 }}
+          />
+        ) : null}
+        <Button
+          text={t(recoveryAvailable ? 'restore_rgb' : 'enable_rgb')}
+          preset="defaultV2"
+          style={{
+            minHeight: 36,
+            height: 36,
+            alignSelf: 'auto',
+            borderRadius: 8,
+            padding: '0 16px',
+            background: 'rgba(255,255,255,0.14)',
+            border: '1px solid rgba(255,255,255,0.24)',
+            boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.08)'
+          }}
+          textStyle={{ color: '#fff', fontSize: 13, fontWeight: 600 }}
+          onClick={(event) => {
+            event.stopPropagation();
+            onEnable();
+          }}
+        />
+      </Column>
     </Column>
   );
 }
@@ -689,7 +714,6 @@ export function BalanceCardCarousel({
   const [enableTransition, setEnableTransition] = useState(false);
 
   const isDetailExpanded = useBalanceCardDetailExpanded();
-  const toggleDetailExpanded = useToggleBalanceCardDetailExpanded();
 
   const isRgbFullySupported = supportedAssets.assets.rgb;
   // Preserve a previously selected RGB view while the feature status is being
@@ -781,6 +805,12 @@ export function BalanceCardCarousel({
     }
   }, [canShowRgbCard]);
 
+  useLayoutEffect(() => {
+    if (walletView === WalletView.RGB && isDetailExpanded) {
+      dispatch((uiActions as any).setBalanceDetailExpanded(false));
+    }
+  }, [dispatch, isDetailExpanded, walletView]);
+
   if (!canShowRgbCard) {
     return <BalanceCard />;
   }
@@ -834,19 +864,9 @@ export function BalanceCardCarousel({
               generic={useGenericRgbCard}
             />
           ) : useGenericRgbCard ? (
-            <RGBAssetsBalanceCard
-              isDetailExpanded={isDetailExpanded}
-              onExpandToggle={toggleDetailExpanded}
-              suppressClickRef={suppressClickRef}
-              rgbList={rgbList}
-            />
+            <RGBAssetsBalanceCard rgbList={rgbList} />
           ) : (
-            <RGBUsdtBalanceCard
-              isDetailExpanded={isDetailExpanded}
-              onExpandToggle={toggleDetailExpanded}
-              suppressClickRef={suppressClickRef}
-              rgbList={rgbList}
-            />
+            <RGBUsdtBalanceCard rgbList={rgbList} />
           )}
         </div>
       </div>

@@ -2960,6 +2960,15 @@
   "rgb_assets": {
     "message": "RGB資産"
   },
+  "rgb_wallet_backup_found": {
+    "message": "ウォレットのバックアップが見つかりました"
+  },
+  "enable_rgb": {
+    "message": "RGBを有効にする"
+  },
+  "restore_rgb": {
+    "message": "RGBを復元"
+  },
   "pending_rgb_invoices": {
     "message": "保留中のRGBインボイス"
   },

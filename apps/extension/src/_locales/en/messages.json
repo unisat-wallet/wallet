@@ -3023,6 +3023,15 @@
   "rgb_assets": {
     "message": "RGB Assets"
   },
+  "rgb_wallet_backup_found": {
+    "message": "Wallet backup found"
+  },
+  "enable_rgb": {
+    "message": "Enable RGB"
+  },
+  "restore_rgb": {
+    "message": "Restore RGB"
+  },
   "pending_rgb_invoices": {
     "message": "Pending RGB Invoices"
   },

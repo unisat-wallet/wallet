@@ -210,8 +210,6 @@ const iconImgList: Array<IconTypes> = [
   'history',
   'utxo',
   'balance-right',
-  'balance-eyes',
-  'balance-eyes-closed',
   'balance-question',
   'balance-unlock-right',
   'brc20-single-step',

@@ -2951,6 +2951,15 @@
   "rgb_assets": {
     "message": "Activos RGB"
   },
+  "rgb_wallet_backup_found": {
+    "message": "Copia de seguridad de la cartera encontrada"
+  },
+  "enable_rgb": {
+    "message": "Habilitar RGB"
+  },
+  "restore_rgb": {
+    "message": "Restaurar RGB"
+  },
   "pending_rgb_invoices": {
     "message": "Facturas RGB pendientes"
   },

@@ -2960,6 +2960,15 @@
   "rgb_assets": {
     "message": "RGB активы"
   },
+  "rgb_wallet_backup_found": {
+    "message": "Найдена резервная копия кошелька"
+  },
+  "enable_rgb": {
+    "message": "Включить RGB"
+  },
+  "restore_rgb": {
+    "message": "Восстановить RGB"
+  },
   "pending_rgb_invoices": {
     "message": "Ожидающие RGB счета"
   },

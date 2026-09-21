@@ -3020,6 +3020,15 @@
   "rgb_assets": {
     "message": "RGB 資產"
   },
+  "rgb_wallet_backup_found": {
+    "message": "已找到錢包備份"
+  },
+  "enable_rgb": {
+    "message": "啟用 RGB"
+  },
+  "restore_rgb": {
+    "message": "恢復 RGB"
+  },
   "pending_rgb_invoices": {
     "message": "待處理 RGB 發票"
   },

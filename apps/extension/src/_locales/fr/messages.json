@@ -2960,6 +2960,15 @@
   "rgb_assets": {
     "message": "Actifs RGB"
   },
+  "rgb_wallet_backup_found": {
+    "message": "Sauvegarde du portefeuille trouvée"
+  },
+  "enable_rgb": {
+    "message": "Activer RGB"
+  },
+  "restore_rgb": {
+    "message": "Restaurer RGB"
+  },
   "pending_rgb_invoices": {
     "message": "Factures RGB en attente"
   },
