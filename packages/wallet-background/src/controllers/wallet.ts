@@ -723,7 +723,7 @@ export function planRgbFeePoolTopUp(input: {
   }
 }
 
-export const chainTypeToRgbNetwork = (chainType: ChainType): string => {
+export const chainTypeToRgbNetwork = (chainType: ChainType): RgbNetwork => {
   const enabled = CHAINS_MAP[chainType]?.rgbProxyEndpoints?.some(endpoint => endpoint.trim())
   if (!enabled) throw new Error(`RGB is not enabled for wallet chain "${chainType}"`)
 
@@ -736,6 +736,10 @@ export const chainTypeToRgbNetwork = (chainType: ChainType): string => {
       return 'testnet4'
     case ChainType.BITCOIN_SIGNET:
       return 'signet'
+    case ChainType.FRACTAL_BITCOIN_MAINNET:
+      return 'fractal-mainnet'
+    case ChainType.FRACTAL_BITCOIN_TESTNET:
+      return 'fractal-test'
     default:
       throw new Error(`wallet chain "${chainType}" is not supported by RGB`)
   }
@@ -2047,7 +2051,7 @@ export class WalletController extends BaseController {
     const account = preferenceService.getCurrentAccount()
     if (!account) throw new Error('no current account')
     // chainTypeToCanonicalNetwork throws WalletError(UNSUPPORTED_NETWORK) for
-    // Fractal / unmapped chains; surface it unchanged to the dApp.
+    // unmapped chains; surface it unchanged to the dApp.
     const canonicalNetwork = chainTypeToCanonicalNetwork(preferenceService.getChainType())
     const keyring = await keyringService.getKeyringForAccount(account.pubkey, account.type)
     if (!keyring.deriveContextHash) {

@@ -76,8 +76,14 @@ function isCompatibleInvoiceNetwork(
   invoiceNetwork: RgbWalletRef['network'],
   walletNetwork: RgbWalletRef['network']
 ) {
+  const mainnetInvoiceNetworks: RgbWalletRef['network'][] = [
+    'mainnet',
+    'fractal-mainnet',
+    'fractal-test'
+  ]
   return (
     invoiceNetwork === walletNetwork ||
+    (mainnetInvoiceNetworks.includes(invoiceNetwork) && mainnetInvoiceNetworks.includes(walletNetwork)) ||
     ((invoiceNetwork === 'testnet' || invoiceNetwork === 'testnet4') &&
       (walletNetwork === 'testnet' || walletNetwork === 'testnet4'))
   )

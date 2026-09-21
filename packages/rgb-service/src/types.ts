@@ -1,4 +1,4 @@
-export type RgbNetwork = 'mainnet' | 'testnet' | 'testnet4' | 'signet'
+export type RgbNetwork = 'mainnet' | 'testnet' | 'testnet4' | 'signet' | 'fractal-mainnet' | 'fractal-test'
 
 export interface RgbWalletRef {
   walletId: string

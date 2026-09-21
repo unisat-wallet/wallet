@@ -81,6 +81,8 @@ function baid64WithChecksum(hri: string, payload: Uint8Array) {
 function networkPrefix(network: RgbNetwork) {
   switch (network) {
     case 'mainnet':
+    case 'fractal-mainnet':
+    case 'fractal-test':
       return 'bc'
     case 'signet':
       return 'tbs'

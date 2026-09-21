@@ -10,6 +10,10 @@ export const chainTypeToCanonicalNetwork = (chainType: ChainType): string => {
       return 'bitcoin-testnet'
     case ChainType.BITCOIN_SIGNET:
       return 'bitcoin-signet'
+    case ChainType.FRACTAL_BITCOIN_MAINNET:
+      return 'fractal-mainnet'
+    case ChainType.FRACTAL_BITCOIN_TESTNET:
+      return 'fractal-testnet'
     default:
       throw new WalletError(
         ErrorCodes.UNSUPPORTED_NETWORK,

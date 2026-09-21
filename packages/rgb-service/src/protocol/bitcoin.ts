@@ -97,7 +97,9 @@ function estimateSegwitVsize(inputScripts: Uint8Array[], outputScripts: Uint8Arr
 }
 
 function bitcoinNetwork(network: RgbNetwork) {
-  return network === 'mainnet' ? networks.bitcoin : networks.testnet
+  return network === 'mainnet' || network === 'fractal-mainnet' || network === 'fractal-test'
+    ? networks.bitcoin
+    : networks.testnet
 }
 
 function validateRequest(input: RgbOpretPsbtRequest) {

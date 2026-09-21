@@ -123,6 +123,8 @@ function merklize(leaves: Uint8Array[], depth = 0, width = leaves.length): Uint8
 function chainNet(network: RgbNetwork) {
   switch (network) {
     case 'mainnet':
+    case 'fractal-mainnet':
+    case 'fractal-test':
       return 0
     case 'testnet':
       return 1

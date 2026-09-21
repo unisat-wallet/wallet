@@ -170,10 +170,28 @@ describe('WalletController keyring recovery', () => {
 })
 
 describe('chainTypeToRgbNetwork', () => {
+  const withRgbProxyEndpoints = (
+    chainType: ChainType,
+    endpoints: string[] | undefined,
+    assertion: () => void
+  ) => {
+    const chains = CHAINS_MAP as Record<string, { rgbProxyEndpoints?: string[] }>
+    const previousChain = chains[chainType]
+    chains[chainType] = { ...previousChain, rgbProxyEndpoints: endpoints }
+    try {
+      assertion()
+    } finally {
+      if (previousChain) chains[chainType] = previousChain
+      else delete chains[chainType]
+    }
+  }
+
   it('rejects Bitcoin mainnet while its RGB proxy is disabled', () => {
-    expect(() => chainTypeToRgbNetwork(ChainType.BITCOIN_MAINNET)).toThrow(
-      'RGB is not enabled for wallet chain'
-    )
+    withRgbProxyEndpoints(ChainType.BITCOIN_MAINNET, undefined, () => {
+      expect(() => chainTypeToRgbNetwork(ChainType.BITCOIN_MAINNET)).toThrow(
+        'RGB is not enabled for wallet chain'
+      )
+    })
   })
 
   it.each([
@@ -182,35 +200,36 @@ describe('chainTypeToRgbNetwork', () => {
     ChainType.FRACTAL_BITCOIN_MAINNET,
     ChainType.FRACTAL_BITCOIN_TESTNET,
   ])('rejects disabled chain %s', chainType => {
-    expect(() => chainTypeToRgbNetwork(chainType)).toThrow('RGB is not enabled for wallet chain')
+    withRgbProxyEndpoints(chainType, undefined, () => {
+      expect(() => chainTypeToRgbNetwork(chainType)).toThrow('RGB is not enabled for wallet chain')
+    })
   })
 
   it('maps Bitcoin Testnet4', () => {
-    expect(chainTypeToRgbNetwork(ChainType.BITCOIN_TESTNET4)).toBe('testnet4')
+    withRgbProxyEndpoints(ChainType.BITCOIN_TESTNET4, ['rpcs://rgb-testnet4.example/json-rpc'], () => {
+      expect(chainTypeToRgbNetwork(ChainType.BITCOIN_TESTNET4)).toBe('testnet4')
+    })
   })
 
   it('enables a supported test chain when its RGB proxy endpoint is configured', () => {
-    const chain = CHAINS_MAP[ChainType.BITCOIN_TESTNET]!
-    const previousEndpoints = chain.rgbProxyEndpoints
-    chain.rgbProxyEndpoints = ['rpcs://rgb-testnet.example/json-rpc']
-
-    try {
+    withRgbProxyEndpoints(ChainType.BITCOIN_TESTNET, ['rpcs://rgb-testnet.example/json-rpc'], () => {
       expect(chainTypeToRgbNetwork(ChainType.BITCOIN_TESTNET)).toBe('testnet')
-    } finally {
-      chain.rgbProxyEndpoints = previousEndpoints
-    }
+    })
   })
 
   it('maps Bitcoin mainnet when its RGB proxy endpoint is configured', () => {
-    const chain = CHAINS_MAP[ChainType.BITCOIN_MAINNET]!
-    const previousEndpoints = chain.rgbProxyEndpoints
-    chain.rgbProxyEndpoints = ['rpcs://rgb-mainnet.example/json-rpc']
-
-    try {
+    withRgbProxyEndpoints(ChainType.BITCOIN_MAINNET, ['rpcs://rgb-mainnet.example/json-rpc'], () => {
       expect(chainTypeToRgbNetwork(ChainType.BITCOIN_MAINNET)).toBe('mainnet')
-    } finally {
-      chain.rgbProxyEndpoints = previousEndpoints
-    }
+    })
+  })
+
+  it.each([
+    [ChainType.FRACTAL_BITCOIN_MAINNET, 'fractal-mainnet'],
+    [ChainType.FRACTAL_BITCOIN_TESTNET, 'fractal-test'],
+  ] as const)('maps supported Fractal chain %s to %s', (chainType, expected) => {
+    withRgbProxyEndpoints(chainType, ['rpcs://rgb-fractal.example/json-rpc'], () => {
+      expect(chainTypeToRgbNetwork(chainType)).toBe(expected)
+    })
   })
 })
 

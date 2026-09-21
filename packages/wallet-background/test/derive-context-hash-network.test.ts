@@ -18,12 +18,12 @@ describe('chainTypeToCanonicalNetwork', () => {
     expect(chainTypeToCanonicalNetwork(ChainType.BITCOIN_SIGNET)).toBe('bitcoin-signet')
   })
 
-  it('throws for Fractal mainnet', () => {
-    expect(() => chainTypeToCanonicalNetwork(ChainType.FRACTAL_BITCOIN_MAINNET)).toThrow(WalletError)
+  it('maps Fractal mainnet to an isolated network domain', () => {
+    expect(chainTypeToCanonicalNetwork(ChainType.FRACTAL_BITCOIN_MAINNET)).toBe('fractal-mainnet')
   })
 
-  it('throws for Fractal testnet', () => {
-    expect(() => chainTypeToCanonicalNetwork(ChainType.FRACTAL_BITCOIN_TESTNET)).toThrow(WalletError)
+  it('maps Fractal testnet to an isolated network domain', () => {
+    expect(chainTypeToCanonicalNetwork(ChainType.FRACTAL_BITCOIN_TESTNET)).toBe('fractal-testnet')
   })
 
   it('throws for unknown chain', () => {
@@ -32,12 +32,12 @@ describe('chainTypeToCanonicalNetwork', () => {
 
   it('thrown error has code 4901 and identifies the chain', () => {
     try {
-      chainTypeToCanonicalNetwork(ChainType.FRACTAL_BITCOIN_MAINNET)
+      chainTypeToCanonicalNetwork('NOT_A_CHAIN' as ChainType)
       throw new Error('did not throw')
     } catch (e) {
       expect(e).toBeInstanceOf(WalletError)
       expect((e as WalletError).code).toBe(ErrorCodes.UNSUPPORTED_NETWORK)
-      expect((e as Error).message).toContain('FRACTAL_BITCOIN_MAINNET')
+      expect((e as Error).message).toContain('NOT_A_CHAIN')
     }
   })
 })
