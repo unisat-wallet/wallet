@@ -36,21 +36,19 @@ export default function RGBBalanceCard(props: RGBBalanceCardProps) {
         title={<RunesTicker tick={name} truncate />}
         quantity={
           pendingOnly ? (
-            <Text text={`${pendingBalanceStr} ${t('pending')}`} size="xs" color="gold" />
+            <Row itemsCenter gap="sm">
+              <Text text={pendingBalanceStr} size="xs" color="gold" digital />
+              <Text text={`(${t('pending')})`} size="xxs" color="gold" />
+            </Row>
           ) : (
-            <Row itemsCenter gap="zero">
-              <Text text={displayedBalance} size="xs" />
-              <Text text={ticker} size="xs" mx="sm" />
+            <Row itemsCenter gap="sm">
+              <Text text={displayedBalance} size="xs" digital />
               {hasPendingBalance ? (
-                <Text text={`(${pendingBalanceStr} ${t('pending')})`} size="xxs" color="gold" />
+                <Text text={`(${t('pending')})`} size="xxs" color="gold" />
               ) : null}
               {hasLockedBalance ? (
                 <Text
-                  text={
-                    balance.isZero()
-                      ? `(${t('rgb_amount_locking')})`
-                      : `(${lockedBalanceStr} ${t('rgb_amount_locking')})`
-                  }
+                  text={`(${t('rgb_amount_locking')})`}
                   size="xxs"
                   color="gold"
                 />

@@ -1,4 +1,5 @@
 import { Column, Icon, RGBAssetIcon, Row, Text } from '@/ui/components';
+import { HistoryAmount } from '@/ui/components/HistoryAmount';
 import type { IconTypes } from '@/ui/components/Icon';
 import { getRgbAssetName } from '@/ui/components/RGBAssetIcon';
 import { colors } from '@/ui/theme/colors';
@@ -89,7 +90,7 @@ export function RGBTransferListItem({
   onClick?: () => void;
 }) {
   const { t } = useI18n();
-  const resolvedAssetLabel = assetLabel || item.name || item.ticker || 'RGB';
+  const resolvedAssetLabel = assetLabel || item.ticker || item.name || 'RGB';
   const status = item.status.toLowerCase();
   const pending = isPending(item.status);
   const isReceive = item.type === 'receive';
@@ -98,6 +99,8 @@ export function RGBTransferListItem({
   const sign = item.type === 'issue' ? '' : isReceive ? '+' : '-';
   const transferTime = formatTransferTime(item.timestamp);
   const date = getRgbTransferDateKey(item.timestamp);
+  const displayAmount = item.amount ? toRgbDisplayAmount(item.amount, getRgbTokenPrecision(item)) : '--';
+  const signedDisplayAmount = displayAmount === '--' ? displayAmount : `${sign}${displayAmount}`;
 
   return (
     <Column fullX gap="zero">
@@ -116,7 +119,7 @@ export function RGBTransferListItem({
           paddingBottom: 12,
           cursor: onClick ? 'pointer' : undefined
         }}>
-        <Row itemsCenter gap="md">
+        <Row itemsCenter gap="md" style={{ minWidth: 0, flex: 1, overflow: 'hidden' }}>
           {showDirectionIcon ? (
             <Icon icon={getTransferIcon(item.type)} size={32} />
           ) : (
@@ -127,9 +130,9 @@ export function RGBTransferListItem({
               size={32}
             />
           )}
-          <Column gap="xs">
-            <Row itemsCenter>
-              <Text text={getTransferTitle(item.type, t)} />
+          <Column gap="xs" style={{ minWidth: 0, overflow: 'hidden' }}>
+            <Row itemsCenter style={{ minWidth: 0, overflow: 'hidden' }}>
+              <Text text={getTransferTitle(item.type, t)} style={{ flexShrink: 0 }} />
               {pending || ['canceled', 'cancelled', 'rejected'].includes(status) ? (
                 <Row
                   style={{
@@ -141,6 +144,7 @@ export function RGBTransferListItem({
                   <Text
                     text={getStatusLabel(item.status, t, item.type)}
                     size="xs"
+                    ellipsis
                     style={{ color: pending ? 'rgba(244, 182, 44, 0.85)' : '#EE344C' }}
                   />
                 </Row>
@@ -150,19 +154,9 @@ export function RGBTransferListItem({
           </Column>
         </Row>
         {!isCanceledReceive ? (
-          <Column itemsEnd gap="zero">
-            <Row gap="sm" itemsCenter justifyEnd>
-              {sign ? <Text text={sign} style={{ fontSize: 14, lineHeight: '20px', color: amountColor }} /> : null}
-              <Text
-                text={item.amount ? toRgbDisplayAmount(item.amount, getRgbTokenPrecision(item)) : '--'}
-                style={{ fontSize: 14, lineHeight: '20px', color: amountColor }}
-              />
-              <Text
-                text={resolvedAssetLabel}
-                style={{ fontSize: 14, lineHeight: '20px', color: amountColor }}
-              />
-            </Row>
-          </Column>
+          <Row itemsCenter style={{ flexShrink: 0, marginLeft: 12 }}>
+            <HistoryAmount amount={signedDisplayAmount} color={amountColor} />
+          </Row>
         ) : null}
       </Row>
     </Column>

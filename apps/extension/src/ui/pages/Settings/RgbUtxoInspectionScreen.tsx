@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 
 import { Button, Card, Column, Content, CopyableAddress, Header, Icon, Layout, Row, Text } from '@/ui/components';
+import { HistoryAmount } from '@/ui/components/HistoryAmount';
 import { toRgbDisplayAmount, useI18n, useNavigation, useTools, useWallet } from '@unisat/wallet-state';
 
 type UtxoInspection = Awaited<ReturnType<ReturnType<typeof useWallet>['getRgbUtxoInspection']>>;
@@ -227,7 +228,6 @@ export default function RgbUtxoInspectionScreen() {
                       {utxo.allocations.map((allocation, index) => {
                         const asset = inspection?.assetMetadata[allocation.assetId];
                         const name = asset?.name || shortTxid(allocation.assetId);
-                        const ticker = asset?.ticker || 'RGB';
                         const amount = toRgbDisplayAmount(allocation.amount, asset?.precision || 0);
                         return (
                           <Row
@@ -237,10 +237,10 @@ export default function RgbUtxoInspectionScreen() {
                             justifyBetween
                             gap="sm"
                             style={assetAllocationCardStyle}>
-                            <Row itemsCenter gap="sm" style={{ flex: 1, minWidth: 0 }}>
+                            <Row itemsCenter gap="sm" style={{ flex: 1, minWidth: 0, overflow: 'hidden' }}>
                               <Icon icon="rgb" color="ticker_color2" size={20} />
-                              <Column gap="xs" style={{ minWidth: 0 }}>
-                                <Text text={name} color="white" size="xs" ellipsis style={{ maxWidth: 130 }} />
+                              <Column gap="xs" style={{ minWidth: 0, flex: 1, overflow: 'hidden' }}>
+                                <Text text={name} color="white" size="xs" ellipsis style={{ width: '100%' }} />
                                 <CopyableAddress
                                   address={allocation.assetId}
                                   copyPosition="after"
@@ -249,7 +249,9 @@ export default function RgbUtxoInspectionScreen() {
                                 />
                               </Column>
                             </Row>
-                            <Text text={`${amount} ${ticker}`} color="white" preset="bold" size="xs" />
+                            <Row style={{ flexShrink: 0, marginLeft: 8 }}>
+                              <HistoryAmount amount={amount} color="white" />
+                            </Row>
                           </Row>
                         );
                       })}

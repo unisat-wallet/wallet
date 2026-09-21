@@ -91,7 +91,7 @@ export function RGBTokenHistory(props: {
             const transfer = toTransferItem(item, ticker, tokenName, precision);
             const assetLabel = showAssetTicker
               ? item.ticker || item.name || item.assetId?.slice(0, 8) || ticker
-              : tokenName;
+              : ticker;
             return (
               <RGBTransferListItem
                 item={transfer}

@@ -38,19 +38,24 @@ export function RGBTokenDetail(props: {
     >
       <Section title={t('asset_id')} value={assetId} showCopyIcon />
       <Line />
-      <Section title={t('name_label')} value={name} />
+      <Section title={t('name_label')} value={name} maxLength={Number.POSITIVE_INFINITY} wrapValue />
       <Line />
-      <Section title={t('ticker')} value={ticker} />
+      <Section title={t('ticker')} value={ticker} maxLength={Number.POSITIVE_INFINITY} wrapValue />
       <Line />
       <Section title={t('precision_rgb')} value={formatValue(tokenInfo?.precision)} />
       <Line />
-      <Section title={t('issued_supply_rgb')} value={formatNumber(tokenInfo?.issuedSupply)} />
+      <Section
+        title={t('issued_supply_rgb')}
+        value={formatNumber(tokenInfo?.issuedSupply)}
+        maxLength={Number.POSITIVE_INFINITY}
+        wrapValue
+      />
       <Line />
       <Section title={t('schema_rgb')} value={formatValue(tokenInfo?.schema)} />
       <Line />
-      <Section title={t('settled')} value={settled} />
+      <Section title={t('settled')} value={settled} maxLength={Number.POSITIVE_INFINITY} wrapValue />
       <Line />
-      <Section title={t('pending')} value={pending} />
+      <Section title={t('pending')} value={pending} maxLength={Number.POSITIVE_INFINITY} wrapValue />
     </Column>
   );
 }

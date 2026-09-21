@@ -66,6 +66,7 @@ export default function RGBTokenScreen() {
         ? `${lockedAmount} (${t('rgb_amount_locking')})`
         : `${spendable} (${lockedAmount} ${t('rgb_amount_locking')})`
       : spendable;
+  const balanceSize = displayBalance.length > 24 ? 'lg' : displayBalance.length > 16 ? 'xl' : 'xxl';
 
   const renderTabChildren = useMemo(() => {
     if (activeTab === RGBTokenScreenTabKey.DETAILS) {
@@ -144,13 +145,29 @@ export default function RGBTokenScreen() {
                 size="sm"
                 color="ticker_color2"
                 textCenter
-                wrap
+                max2Lines
                 style={{ width: '100%' }}
               />
-              <Text text={`(ticker: ${ticker})`} size="xs" color="textDim" textCenter />
+              <Text
+                text={`(ticker: ${ticker})`}
+                size="xs"
+                color="textDim"
+                textCenter
+                ellipsis
+                style={{ width: '100%' }}
+              />
             </Column>
             <Column itemsCenter fullX justifyCenter>
-              <Text text={displayBalance} preset="bold" textCenter size="xxl" wrap digital color="white" />
+              <Text
+                text={displayBalance}
+                preset="bold"
+                textCenter
+                size={balanceSize}
+                max2Lines
+                digital
+                color="white"
+                style={{ width: '100%', overflowWrap: 'anywhere' }}
+              />
               {lockedAmount ? (
                 <Text
                   text={t('rgb_locked_balance_hint')}

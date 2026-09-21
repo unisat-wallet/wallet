@@ -12,6 +12,7 @@ export function Section({
   onClick,
   showCopyIcon,
   maxLength = 20,
+  wrapValue = false,
   rightComponent
 }: {
   value: string | number;
@@ -20,6 +21,7 @@ export function Section({
   onClick?: () => void;
   showCopyIcon?: boolean;
   maxLength?: number;
+  wrapValue?: boolean;
   rightComponent?: React.ReactNode;
 }) {
   const tools = useTools();
@@ -33,7 +35,7 @@ export function Section({
   return (
     <Row
       justifyBetween
-      itemsCenter
+      itemsCenter={!wrapValue}
       px="md"
       style={{
         minHeight: 25
@@ -43,6 +45,7 @@ export function Section({
         rightComponent
       ) : (
         <Row
+          style={{ minWidth: 0, maxWidth: '68%', justifyContent: 'flex-end' }}
           onClick={() => {
             if (onClick) {
               onClick();
@@ -54,7 +57,14 @@ export function Section({
               });
             }
           }}>
-          <Text text={displayText} preset={link || onClick ? 'link' : 'regular'} size="xs" wrap />
+          <Text
+            text={displayText}
+            preset={link || onClick ? 'link' : 'regular'}
+            size="xs"
+            wrap={wrapValue}
+            textEnd
+            style={{ minWidth: 0 }}
+          />
           {showCopyIcon && <CopyOutlined style={{ color: '#888', fontSize: 14 }} />}
         </Row>
       )}

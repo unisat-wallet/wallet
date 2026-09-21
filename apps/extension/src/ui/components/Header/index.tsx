@@ -44,7 +44,7 @@ export function Header(props: HeaderProps) {
     if (children) {
       return children;
     } else if (title) {
-      return <Text text={title} preset="regular-bold" />;
+      return <Text text={title} preset="regular-bold" ellipsis style={{ maxWidth: 240 }} />;
     } else {
       return;
     }
@@ -81,7 +81,7 @@ export function Header(props: HeaderProps) {
         </Column>
       </Row>
 
-      <Row itemsCenter>{CenterComponent}</Row>
+      <Row itemsCenter style={{ minWidth: 0 }}>{CenterComponent}</Row>
 
       <Row full justifyEnd>
         <Column selfItemsCenter>{RightComponent}</Column>

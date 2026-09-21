@@ -448,18 +448,36 @@ export default function RGBReceiveScreen() {
   const renderAssetNameWithAmountTag = (
     assetName: string,
     amountText: string,
-    options?: { centered?: boolean }
+    options?: { centered?: boolean; truncateName?: boolean }
   ) => {
     return (
       <Row
         gap="md"
         itemsCenter
         justifyCenter={options?.centered}
-        style={{ minWidth: 0, flexWrap: 'wrap' }}
+        style={{ minWidth: 0, width: '100%', flexWrap: options?.truncateName ? 'nowrap' : 'wrap' }}
       >
-        <Text text={assetName} color="white" size="sm" wrap textCenter={options?.centered} />
-        <div style={amountPillStyle}>
-          <span style={amountPillTextStyle}>{amountText}</span>
+        <Text
+          text={assetName}
+          color="white"
+          size="sm"
+          wrap={!options?.truncateName}
+          ellipsis={options?.truncateName}
+          textCenter={options?.centered}
+          style={{ minWidth: 0, flex: options?.truncateName ? 1 : undefined }}
+        />
+        <div
+          style={{
+            ...amountPillStyle,
+            ...(options?.truncateName ? { maxWidth: '45%', minWidth: 0, overflow: 'hidden' } : {})
+          }}>
+          <span
+            style={{
+              ...amountPillTextStyle,
+              ...(options?.truncateName ? { overflow: 'hidden', textOverflow: 'ellipsis' } : {})
+            }}>
+            {amountText}
+          </span>
         </div>
       </Row>
     );
@@ -482,7 +500,8 @@ export default function RGBReceiveScreen() {
     const displayName = isAnyRgbAsset ? t('any_rgb_asset') : getRgbAssetName(invoiceAsset) || ticker;
     return renderAssetNameWithAmountTag(
       displayName,
-      getRgbPendingAmountTagText(item.amount, getPendingInvoicePrecision(item))
+      getRgbPendingAmountTagText(item.amount, getPendingInvoicePrecision(item)),
+      { truncateName: true }
     );
   };
 
@@ -562,7 +581,7 @@ export default function RGBReceiveScreen() {
         onClick={() => onSelectPendingInvoice(item)}>
         <Row gap="md" itemsCenter style={{ minWidth: 0, flex: 1, paddingRight: 12 }}>
           {renderPendingInvoiceIcon(item)}
-          <Column gap="xs" style={{ minWidth: 0 }}>
+          <Column gap="xs" style={{ minWidth: 0, flex: 1, overflow: 'hidden' }}>
             {renderPendingInvoiceTitle(item)}
             <Text text={expiryText} color="white_muted" size="xs" />
             {awaitingAcceptance ? <Text text={t('rgb_status_pending_accept')} color="gold" size="xs" /> : null}
