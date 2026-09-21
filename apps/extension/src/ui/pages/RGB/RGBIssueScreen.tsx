@@ -216,6 +216,7 @@ export default function RGBIssueScreen() {
   const [precision, setPrecision] = useState('0');
   const [loading, setLoading] = useState(false);
   const [fundingLoading, setFundingLoading] = useState(true);
+  const [availableIssueUtxoCount, setAvailableIssueUtxoCount] = useState<number>();
   const [operationError, setOperationError] = useState('');
   const [step, setStep] = useState<RGBIssueScreenStep>('issue');
   const [utxoToSignData, setUtxoToSignData] = useState<ToSignData>();
@@ -247,14 +248,17 @@ export default function RGBIssueScreen() {
 
   const refreshFundingState = useCallback(async () => {
     setFundingLoading(true);
+    setAvailableIssueUtxoCount(undefined);
     try {
-      const [funding] = await Promise.all([
+      const [funding, summary] = await Promise.all([
         wallet.getRgbFundingAddress(),
         wallet.getRgbAllocationSummary({ skipSync: false })
       ]);
       setFundingAddress(funding.address);
+      setAvailableIssueUtxoCount(getAvailableAllocationCount(summary as RgbAllocationSummary));
     } catch (e: unknown) {
       setFundingAddress('');
+      setAvailableIssueUtxoCount(undefined);
       setOperationError(getErrorMessage(e));
     } finally {
       setFundingLoading(false);
@@ -525,9 +529,11 @@ export default function RGBIssueScreen() {
               />
             </FormField>
 
-            <div className="rgb-issue-fee-section">
-              <FeeRateBar />
-            </div>
+            {availableIssueUtxoCount === 0 ? (
+              <div className="rgb-issue-fee-section">
+                <FeeRateBar />
+              </div>
+            ) : null}
           </Column>
 
           {fundingTxid ? <div className="rgb-issue-txid">Transaction ID: {fundingTxid}</div> : null}
