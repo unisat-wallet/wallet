@@ -24,16 +24,19 @@ describe('getSupportedAssets', () => {
     expect(p2tr.tabKeys).not.toContain(AssetTabKey.RGB)
   })
 
-  it('does not expose RGB for keyrings without an HD root on an RGB-enabled network', () => {
-    const assets = getSupportedAssets(
-      ChainType.BITCOIN_TESTNET4,
-      'tb1p5cyxnuxmeuwuvkwfem96llyxf9xq9tm9s2h2zs',
-      { keyringType: KeyringType.SimpleKeyring }
-    )
+  it.each([KeyringType.SimpleKeyring, KeyringType.KeystoneKeyring, KeyringType.ColdWalletKeyring])(
+    'does not expose RGB or its asset card for unsupported keyring %s',
+    keyringType => {
+      const assets = getSupportedAssets(
+        ChainType.BITCOIN_TESTNET4,
+        'tb1p5cyxnuxmeuwuvkwfem96llyxf9xq9tm9s2h2zs',
+        { keyringType }
+      )
 
-    expect(assets.assets.rgb).toBe(false)
-    expect(assets.assets.rgbCard).toBe(true)
-  })
+      expect(assets.assets.rgb).toBe(false)
+      expect(assets.assets.rgbCard).toBe(false)
+    }
+  )
 
   it('hides RGB on Bitcoin Mainnet while its production proxy is disabled', () => {
     const assets = getSupportedAssets(

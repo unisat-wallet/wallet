@@ -208,7 +208,7 @@ export function getSupportedAssets(
     runes: false,
     alkanes: false,
     rgb: false,
-    /** Chain supports showing the RGB USDT card (even when keyring cannot use RGB). */
+    /** Current network and keyring support showing the RGB asset card. */
     rgbCard: false,
     brc20Prog: false,
   }
@@ -226,12 +226,9 @@ export function getSupportedAssets(
 
   const isRgbNetwork = Boolean(chain.rgbProxyEndpoints?.some(endpoint => endpoint.trim()))
 
-  if (isRgbNetwork) {
-    assets.rgbCard = true
-  }
-
   if (isRgbNetwork && opts?.keyringType === KeyringType.HdKeyring) {
     assets.rgb = true
+    assets.rgbCard = true
   }
 
   if (chainType === ChainType.BITCOIN_MAINNET || chainType === ChainType.BITCOIN_SIGNET) {
