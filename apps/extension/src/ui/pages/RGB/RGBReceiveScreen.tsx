@@ -22,7 +22,6 @@ import { shortAddress } from '@/ui/utils';
 import {
   ANY_RGB_ASSET,
   ANY_RGB_ASSET_ID,
-  formatRgbPendingTime,
   getRgbAssetId,
   getRgbTokenIconInfo,
   getRgbTokenPrecision,
@@ -40,6 +39,7 @@ import {
 
 import { SignPsbt } from '../Approval/components';
 import { useRgbWriteLeaseGuard } from './components/useRgbWriteLeaseGuard';
+import { formatRgbInvoiceExpiryTime } from './rgbInvoicePresentation';
 
 const GOLD = '#F4B62C';
 
@@ -150,6 +150,14 @@ const pendingCopyButtonStyle = {
   cursor: 'pointer'
 };
 
+const emptyStateCardStyle = {
+  padding: '32px 16px',
+  borderRadius: 8,
+  boxSizing: 'border-box' as const,
+  background: 'rgba(255,255,255,0.04)',
+  border: '1px solid rgba(255,255,255,0.08)'
+};
+
 const amountPillStyle = {
   height: 20,
   padding: '0 4px',
@@ -170,14 +178,6 @@ const amountPillTextStyle = {
   fontFamily: typography.primary.regular,
   letterSpacing: 'normal',
   whiteSpace: 'nowrap' as const
-};
-
-const emptyStateCardStyle = {
-  padding: '32px 16px',
-  borderRadius: 8,
-  boxSizing: 'border-box' as const,
-  background: 'rgba(255,255,255,0.04)',
-  border: '1px solid rgba(255,255,255,0.08)'
 };
 
 const confirmMaskStyle = {
@@ -202,7 +202,7 @@ const confirmModalStyle = {
 };
 
 export default function RGBReceiveScreen() {
-  const { t } = useI18n();
+  const { t, locale } = useI18n();
   const { requestWrite, writeLeaseModal } = useRgbWriteLeaseGuard();
   const [releaseConfirmVisible, setReleaseConfirmVisible] = useState(false);
   const {
@@ -474,15 +474,11 @@ export default function RGBReceiveScreen() {
     return getRgbTokenPrecision({ ...invoiceAsset, tokenInfo: item, assetInfo: selectedAssetMetadata });
   };
 
-  const renderPendingInvoiceTitle = (item: {
-    assetId?: string | null;
-    amount?: number | string;
-  }) => {
+  const renderPendingInvoiceTitle = (item: { assetId?: string | null; amount?: number | string }) => {
     const invoiceAsset = getPendingInvoiceAsset(item);
     const isAnyRgbAsset = !item.assetId;
     const ticker = isAnyRgbAsset ? t('any_rgb_asset') : getRgbTokenTicker(invoiceAsset);
     const displayName = isAnyRgbAsset ? t('any_rgb_asset') : getRgbAssetName(invoiceAsset) || ticker;
-
     return renderAssetNameWithAmountTag(
       displayName,
       getRgbPendingAmountTagText(item.amount, getPendingInvoicePrecision(item))
@@ -543,55 +539,43 @@ export default function RGBReceiveScreen() {
           <Icon icon="invoice" color="white" size={22} />
           <Text text={`${t('pending_invoices')} (${pendingInvoices.length})`} color="white" />
         </Row>
-        <Row gap="sm" itemsCenter>
-          <Text text={t('view_all')} size="sm" style={{ color: GOLD }} />
-          <Icon icon="right" color="gold" size={14} />
-        </Row>
+        <Icon icon="right" color="gold" size={14} />
       </div>
     );
   };
 
   const renderPendingInvoiceListItem = (item: (typeof pendingInvoices)[number], index: number) => {
-    const itemKey = item.recipientId || item.invoice || String(index);
-    const timeText = formatRgbPendingTime(item.createdAt || item.expirationTimestamp);
     const awaitingAcceptance = isRgbPendingInvoiceAwaitingAcceptance(item);
     const awaitingConfirmation = isRgbPendingInvoiceAwaitingConfirmation(item);
     const awaitingSenderBroadcast = isRgbPendingInvoiceAwaitingSenderBroadcast(item);
     const awaitingSenderConfirmation = isRgbPendingInvoiceAwaitingSenderConfirmation(item);
     const invoiceInUse = awaitingAcceptance || awaitingSenderBroadcast || awaitingSenderConfirmation;
+    const expiryText = formatRgbInvoiceExpiryTime(item.expirationTimestamp, locale, t);
 
     return (
       <Row
-        key={itemKey}
+        key={item.recipientId || item.invoice || String(index)}
         itemsCenter
         justifyBetween
         style={pendingInvoiceCardStyle}
-        onClick={() => onSelectPendingInvoice(item)}
-      >
+        onClick={() => onSelectPendingInvoice(item)}>
         <Row gap="md" itemsCenter style={{ minWidth: 0, flex: 1, paddingRight: 12 }}>
           {renderPendingInvoiceIcon(item)}
           <Column gap="xs" style={{ minWidth: 0 }}>
             {renderPendingInvoiceTitle(item)}
-            {timeText ? <Text text={timeText} color="white_muted" size="xs" /> : null}
-            {awaitingAcceptance ? (
-              <Text text={t('rgb_status_pending_accept')} color="gold" size="xs" />
-            ) : awaitingSenderBroadcast ? (
-              <Text text={t('rgb_status_waiting_receive')} color="gold" size="xs" />
-            ) : awaitingSenderConfirmation ? (
-              <Text text={t('rgb_status_confirming')} color="gold" size="xs" />
-            ) : awaitingConfirmation ? (
-              <Text text={t('transaction_unconfirmed')} color="gold" size="xs" />
-            ) : null}
+            <Text text={expiryText} color="white_muted" size="xs" />
+            {awaitingAcceptance ? <Text text={t('rgb_status_pending_accept')} color="gold" size="xs" /> : null}
+            {awaitingSenderBroadcast ? <Text text={t('rgb_status_waiting_receive')} color="gold" size="xs" /> : null}
+            {awaitingSenderConfirmation ? <Text text={t('rgb_status_confirming')} color="gold" size="xs" /> : null}
+            {awaitingConfirmation ? <Text text={t('transaction_unconfirmed')} color="gold" size="xs" /> : null}
           </Column>
         </Row>
-
         <div
           style={{ ...pendingCopyButtonStyle, opacity: invoiceInUse ? 0.45 : 1 }}
-          onClick={(e) => {
-            e.stopPropagation();
+          onClick={(event) => {
+            event.stopPropagation();
             if (!invoiceInUse) onCopyPendingInvoice(item);
-          }}
-        >
+          }}>
           <Icon icon="copy" color="white_muted" size={14} />
         </div>
       </Row>
@@ -664,7 +648,7 @@ export default function RGBReceiveScreen() {
         <Header onBack={onClosePendingInvoices} title={t('pending_invoices')} />
         <Content>
           <Column gap="md">
-            {pendingInvoices.length > 0 ? (
+            {pendingInvoices.length ? (
               pendingInvoices.map(renderPendingInvoiceListItem)
             ) : (
               <Column fullX itemsCenter gap="sm" style={emptyStateCardStyle}>

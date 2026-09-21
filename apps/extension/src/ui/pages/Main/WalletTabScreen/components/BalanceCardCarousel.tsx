@@ -57,11 +57,6 @@ const rgbBadgeStyle: CSSProperties = {
   backgroundColor: '#65ddb7'
 };
 
-const pendingFooterStyle: CSSProperties = {
-  width: '100%',
-  minHeight: 20
-};
-
 function UsdtAmountDisplay({
   mainPart,
   subPart,
@@ -139,12 +134,9 @@ function RGBUsdtBalanceCard({
     mainPart,
     subPart,
     usdValue,
-    pendingInvoiceCount,
     isBalanceHidden,
     handleHiddenToggle,
     refreshBalance,
-    onViewPendingInvoices,
-    t,
     chain
   } = useRGBUsdtBalanceCardLogic(rgbList);
 
@@ -241,33 +233,6 @@ function RGBUsdtBalanceCard({
         ) : null}
       </Column>
 
-      {isDetailExpanded ? (
-        <div data-card-action="true" style={{ position: 'relative', zIndex: 1 }}>
-          <Row
-            fullX
-            justifyBetween
-            itemsCenter
-            style={pendingFooterStyle}
-            onClick={(event) => {
-              stopCardToggle(event);
-              onViewPendingInvoices(event);
-            }}>
-            <Row itemsCenter gap="zero">
-              <Text text={t('pending_invoices')} style={{ color: 'rgba(0,0,0,0.65)', fontSize: 13, fontWeight: 600 }} />
-              <Text
-                text={` (${pendingInvoiceCount})`}
-                style={{ color: 'rgba(0,0,0,0.85)', fontSize: 14, fontWeight: 600 }}
-              />
-            </Row>
-            {pendingInvoiceCount > 0 ? (
-              <Row itemsCenter gap="sm">
-                <Text text={t('view_all')} style={{ color: 'rgba(0,0,0,0.65)', fontSize: 13, fontWeight: 600 }} />
-                <Icon icon="right" color="black_muted" size={11} />
-              </Row>
-            ) : null}
-          </Row>
-        </div>
-      ) : null}
     </Column>
   );
 }
@@ -285,11 +250,9 @@ function RGBAssetsBalanceCard({
 }) {
   const {
     assetCount,
-    pendingInvoiceCount,
     isBalanceHidden,
     handleHiddenToggle,
     refreshBalance,
-    onViewPendingInvoices,
     t
   } = useRGBUsdtBalanceCardLogic(rgbList);
 
@@ -357,33 +320,6 @@ function RGBAssetsBalanceCard({
         </Row>
       </Column>
 
-      {isDetailExpanded ? (
-        <div data-card-action="true" style={{ position: 'relative', zIndex: 1 }}>
-          <Row
-            fullX
-            justifyBetween
-            itemsCenter
-            style={{ ...pendingFooterStyle, borderTop: '1px solid rgba(255,255,255,0.16)', paddingTop: 12 }}
-            onClick={(event) => {
-              stopCardToggle(event);
-              onViewPendingInvoices(event);
-            }}>
-            <Row itemsCenter gap="zero">
-              <Text
-                text={t('pending_invoices')}
-                style={{ color: 'rgba(255,255,255,0.72)', fontSize: 13, fontWeight: 600 }}
-              />
-              <Text text={` (${pendingInvoiceCount})`} style={{ color: '#fff', fontSize: 14, fontWeight: 600 }} />
-            </Row>
-            {pendingInvoiceCount > 0 ? (
-              <Row itemsCenter gap="sm">
-                <Text text={t('view_all')} style={{ color: 'rgba(255,255,255,0.72)', fontSize: 13, fontWeight: 600 }} />
-                <Icon icon="right" color="white" size={11} />
-              </Row>
-            ) : null}
-          </Row>
-        </div>
-      ) : null}
     </Column>
   );
 }

@@ -309,7 +309,6 @@ export function useRGBReceiveScreenLogic() {
   const routeAssetId = routeState?.assetId || ''
   const isAssetLocked = !!routeAssetId
   const enteredViaPendingInvoices = routeState?.initialStep === 'pending_invoices'
-
   const [selectedAssetId, setSelectedAssetId] = useState(routeAssetId)
   const [selectedTokenBalance, setSelectedTokenBalance] = useState<RgbAssetItem | undefined>(
     routeState?.tokenBalance as RgbAssetItem | undefined
@@ -674,26 +673,20 @@ export function useRGBReceiveScreenLogic() {
           type: 'receive',
           ...(item.amount === undefined ? {} : { amount: String(item.amount) }),
           timestamp: item.createdAt || Date.now(),
-          status: awaitingAcceptance
-            ? 'pending_accept'
-            : awaitingSenderConfirmation
-              ? 'confirming'
-              : 'waiting_receive',
+          status: awaitingAcceptance ? 'pending_accept' : awaitingSenderConfirmation ? 'confirming' : 'waiting_receive',
           local: true,
         },
       })
       return
     }
     setError('')
-    setInvoiceLabel(
-      formatRgbPendingAmount(item.amount, assetTicker, t('any_amount'), assetPrecision)
-    )
+    setInvoiceLabel(formatRgbPendingAmount(item.amount, assetTicker, t('any_amount'), assetPrecision))
     setSelectedPendingInvoice(item)
     setInvoice(item.invoice)
   }
 
   const onOpenPendingInvoices = () => {
-    nav.navigate('RGBInvoiceListScreen', assetId ? { assetId } : {})
+    setStep('pending_invoices')
   }
 
   const onClosePendingInvoices = () => {
@@ -766,7 +759,6 @@ export function useRGBReceiveScreenLogic() {
       setStep('pending_invoices')
       return
     }
-
     setSelectedPendingInvoice(undefined)
     setStep('create_invoice')
   }

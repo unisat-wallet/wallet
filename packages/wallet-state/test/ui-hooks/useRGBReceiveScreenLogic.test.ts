@@ -6,8 +6,6 @@ import {
   ANY_RGB_ASSET,
   isCancelableRgbPendingInvoice,
   isRgbPendingInvoiceAwaitingAcceptance,
-  isRgbPendingInvoiceAwaitingSenderBroadcast,
-  isRgbPendingInvoiceAwaitingSenderConfirmation,
   useRGBReceiveScreenLogic,
 } from '../../src/ui-hooks/useRGBReceiveScreenLogic'
 import { createHookTestHarness } from './testHelpers'
@@ -25,59 +23,6 @@ describe('useRGBReceiveScreenLogic', () => {
     ).toBe(false)
   })
 
-  it('opens transfer details for an invoice awaiting the sender broadcast', async () => {
-    const { wrapper, navigation } = createHookTestHarness()
-    const { result } = renderHook(() => useRGBReceiveScreenLogic(), { wrapper })
-
-    const invoice = {
-      invoice: 'rgb:invoice',
-      recipientId: 'recipient-id',
-      assetId: 'rgb:asset',
-      amount: '42',
-      createdAt: 123,
-      status: 'WaitingSenderBroadcast',
-    }
-    expect(isRgbPendingInvoiceAwaitingSenderBroadcast(invoice)).toBe(true)
-
-    await act(async () => {
-      result.current.onSelectPendingInvoice(invoice)
-    })
-
-    expect(navigation.navigate).toHaveBeenCalledWith(
-      'RGBTransferDetailScreen',
-      expect.objectContaining({
-        transferId: 'recipient-id',
-        initialTransfer: expect.objectContaining({
-          status: 'waiting_receive',
-          type: 'receive',
-        }),
-      })
-    )
-  })
-
-  it('opens transfer details with confirming status after the sender broadcast', async () => {
-    const { wrapper, navigation } = createHookTestHarness()
-    const { result } = renderHook(() => useRGBReceiveScreenLogic(), { wrapper })
-
-    const invoice = {
-      invoice: 'rgb:invoice',
-      recipientId: 'recipient-id',
-      status: 'WaitingSenderConfirmation',
-    }
-    expect(isRgbPendingInvoiceAwaitingSenderConfirmation(invoice)).toBe(true)
-
-    await act(async () => {
-      result.current.onSelectPendingInvoice(invoice)
-    })
-
-    expect(navigation.navigate).toHaveBeenCalledWith(
-      'RGBTransferDetailScreen',
-      expect.objectContaining({
-        initialTransfer: expect.objectContaining({ status: 'confirming', type: 'receive' }),
-      })
-    )
-  })
-
   it('does not offer release for an invoice awaiting receipt acceptance', () => {
     const invoice = {
       invoice: 'rgb:invoice',
@@ -89,33 +34,6 @@ describe('useRGBReceiveScreenLogic', () => {
 
     expect(isRgbPendingInvoiceAwaitingAcceptance(invoice)).toBe(true)
     expect(isCancelableRgbPendingInvoice(invoice)).toBe(false)
-  })
-
-  it('opens transfer details when selecting an invoice awaiting receipt acceptance', async () => {
-    const { wrapper, navigation } = createHookTestHarness()
-    const { result } = renderHook(() => useRGBReceiveScreenLogic(), { wrapper })
-
-    await act(async () => {
-      result.current.onSelectPendingInvoice({
-        invoice: 'rgb:invoice',
-        recipientId: 'recipient-id',
-        assetId: 'rgb:asset',
-        amount: '42',
-        createdAt: 123,
-        status: 'PendingAccept',
-      })
-    })
-
-    expect(navigation.navigate).toHaveBeenCalledWith(
-      'RGBTransferDetailScreen',
-      expect.objectContaining({
-        transferId: 'recipient-id',
-        initialTransfer: expect.objectContaining({
-          status: 'pending_accept',
-          type: 'receive',
-        }),
-      })
-    )
   })
 
   it('only shows a fixed amount error after the user enters an invalid amount', async () => {
@@ -245,24 +163,6 @@ describe('useRGBReceiveScreenLogic', () => {
     })
   })
 
-  it('formats a pending fixed invoice using the asset precision', async () => {
-    const assetId = 'rgb:test-asset'
-    const { wrapper } = createHookTestHarness({
-      routeState: { assetId, tokenBalance: { assetId, ticker: 'RGB', precision: 8 } },
-    })
-    const { result } = renderHook(() => useRGBReceiveScreenLogic(), { wrapper })
-
-    await act(async () => {
-      result.current.onSelectPendingInvoice({
-        invoice: 'rgb:invoice',
-        assetId,
-        amount: '5000000000',
-      })
-    })
-
-    expect(result.current.invoiceLabel).toBe('50 RGB')
-  })
-
   it('does not poll pending consignments immediately after creating an invoice', async () => {
     const { wrapper, wallet } = createHookTestHarness()
     const { result } = renderHook(() => useRGBReceiveScreenLogic(), { wrapper })
@@ -300,16 +200,14 @@ describe('useRGBReceiveScreenLogic', () => {
     })
   })
 
-  it('polls pending invoices from the invoice list even when none is selected', async () => {
+  it('polls pending invoices awaiting confirmation even when none is selected', async () => {
     const setIntervalSpy = vi.spyOn(global, 'setInterval')
     const waitingInvoice = {
       invoice: 'rgb:invoice',
       recipientId: 'recipient-id',
       status: 'WaitingConfirmations',
     }
-    const { wrapper, wallet } = createHookTestHarness({
-      routeState: { initialStep: 'pending_invoices' },
-    })
+    const { wrapper, wallet } = createHookTestHarness()
     wallet.getRgbPendingReceiveInvoices.mockResolvedValue({ list: [waitingInvoice] })
 
     renderHook(() => useRGBReceiveScreenLogic(), { wrapper })

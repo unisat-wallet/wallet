@@ -55,7 +55,6 @@ import SplitOrdinalsInscriptionScreen from './Ordinals/SplitOrdinalsInscriptionS
 import PhishingScreen from './Phishing/PhishingScreen';
 import RGBHistoryScreen from './RGB/RGBHistoryScreen';
 import RGBInvoiceDetailScreen from './RGB/RGBInvoiceDetailScreen';
-import RGBInvoiceListScreen from './RGB/RGBInvoiceListScreen';
 import RGBIssueScreen from './RGB/RGBIssueScreen';
 import RGBReceiveScreen from './RGB/RGBReceiveScreen';
 import RGBSendCompleteScreen from './RGB/RGBSendCompleteScreen';
@@ -317,10 +316,6 @@ export const routes = {
   RGBReceiveScreen: {
     path: '/rgb/receive',
     element: <RGBReceiveScreen />
-  },
-  RGBInvoiceListScreen: {
-    path: '/rgb/invoices',
-    element: <RGBInvoiceListScreen />
   },
   RGBInvoiceDetailScreen: {
     path: '/rgb/invoice',
