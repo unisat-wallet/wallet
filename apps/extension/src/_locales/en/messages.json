@@ -2975,8 +2975,11 @@
   "creating": {
     "message": "Creating..."
   },
-  "not_enough_btc_for_rgb_invoice": {
-    "message": "Not enough BTC in the selected address to create an RGB invoice. Switch address types to continue."
+  "rgb_utxo_recommended_balance": {
+    "message": "Keep at least 3,000 sats available to create 5 RGB UTXOs. More may be required when network fees are high."
+  },
+  "not_enough_btc_for_rgb_utxo": {
+    "message": "Available BTC is below the estimated amount required for this transaction."
   },
   "create_invoice": {
     "message": "Create Invoice"

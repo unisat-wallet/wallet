@@ -237,6 +237,7 @@ export default function RGBReceiveScreen() {
     pendingLoading,
     pendingInvoices,
     insufficientBtcForInvoice,
+    needsRgbUtxoFunding,
     onOpenPendingInvoices,
     onClosePendingInvoices,
     onCopyPendingInvoice,
@@ -785,9 +786,9 @@ export default function RGBReceiveScreen() {
               : null}
           </Column>
 
-          {recipientType === 'blind' && insufficientBtcForInvoice ? (
+          {recipientType === 'blind' && needsRgbUtxoFunding ? (
             <Text
-              text={t('not_enough_btc_for_rgb_invoice')}
+              text={t('rgb_utxo_recommended_balance')}
               wrap
               style={{
                 color: 'rgba(235,185,76,0.85)',

@@ -69,3 +69,9 @@ export {
   toRgbAtomicAmount,
   toRgbDisplayAmount,
 } from './utils/rgb-amount-utils'
+export {
+  estimateRgbUtxoCreateMinSats,
+  RGB_UTXO_CREATE_COUNT,
+  RGB_UTXO_DUST_SATS,
+  RGB_UTXO_RECOMMENDED_BALANCE_SATS,
+} from './utils/rgb-utxo-utils'

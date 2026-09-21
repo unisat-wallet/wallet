@@ -2912,8 +2912,11 @@
   "creating": {
     "message": "作成中..."
   },
-  "not_enough_btc_for_rgb_invoice": {
-    "message": "選択中のアドレスの BTC が不足しているため、RGB invoice を作成できません。アドレスタイプを切り替えてください。"
+  "rgb_utxo_recommended_balance": {
+    "message": "5 個の RGB UTXO を作成するには、少なくとも 3,000 sats の残高を推奨します。ネットワーク手数料が高い場合はさらに必要です。"
+  },
+  "not_enough_btc_for_rgb_utxo": {
+    "message": "利用可能な BTC が、この取引に必要な推定額を下回っています。"
   },
   "create_invoice": {
     "message": "インボイスを作成"

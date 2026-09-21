@@ -10,6 +10,7 @@ import {
   toRgbAtomicAmount,
   toRgbDisplayAmount,
 } from 'src/utils/rgb-amount-utils'
+import { estimateRgbUtxoCreateMinSats } from 'src/utils/rgb-utxo-utils'
 import { useRGBListLogic } from './useRGBListLogic'
 
 export type RGBReceiveMode = 'any' | 'fixed'
@@ -92,16 +93,6 @@ export const ANY_RGB_ASSET = {
 }
 
 const DEFAULT_ASSET_TICKER = 'RGB Assets'
-/** Matches wallet-background RGB_FUNDING_UTXO_DUST. */
-const RGB_UTXO_DUST_SATS = 330
-/** Conservative vsize for 1-in / 2-out taproot funding tx. */
-const RGB_UTXO_CREATE_VBYTES = 200
-
-const estimateRgbUtxoCreateMinSats = (feeRate: number) => {
-  const rate = Number.isFinite(feeRate) && feeRate > 0 ? feeRate : 1
-  return RGB_UTXO_DUST_SATS + Math.ceil(rate * RGB_UTXO_CREATE_VBYTES)
-}
-
 const readStringPath = (value: unknown, path: string[]): string | undefined => {
   let current: unknown = value
   for (const key of path) {
@@ -331,6 +322,7 @@ export function useRGBReceiveScreenLogic() {
   const [utxoPendingVanillaTxid, setUtxoPendingVanillaTxid] = useState('')
   const [resumeCreateInvoiceAfterSign, setResumeCreateInvoiceAfterSign] = useState(false)
   const [insufficientBtcForInvoice, setInsufficientBtcForInvoice] = useState(false)
+  const [needsRgbUtxoFunding, setNeedsRgbUtxoFunding] = useState<boolean>()
 
   const selectedRgbItem =
     selectedAssetId === ANY_RGB_ASSET_ID
@@ -453,6 +445,7 @@ export function useRGBReceiveScreenLogic() {
     if (step !== 'create_invoice') return undefined
 
     let cancelled = false
+    setNeedsRgbUtxoFunding(undefined)
 
     const refreshFundingHint = async () => {
       const minRequired = estimateRgbUtxoCreateMinSats(feeRate)
@@ -463,13 +456,16 @@ export function useRGBReceiveScreenLogic() {
         if (cancelled) return
 
         if (hasReusableRgbAllocation(summary) || hasPendingRgbAllocationConfirmation(summary)) {
+          setNeedsRgbUtxoFunding(false)
           setInsufficientBtcForInvoice(false)
           return
         }
 
+        setNeedsRgbUtxoFunding(true)
         setInsufficientBtcForInvoice(btcTooLow)
       } catch {
         if (!cancelled) {
+          setNeedsRgbUtxoFunding(true)
           setInsufficientBtcForInvoice(btcTooLow)
         }
       }
@@ -805,6 +801,7 @@ export function useRGBReceiveScreenLogic() {
     pendingLoading,
     pendingInvoices,
     insufficientBtcForInvoice,
+    needsRgbUtxoFunding,
     loadPendingInvoices,
     onOpenPendingInvoices,
     onClosePendingInvoices,

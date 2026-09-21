@@ -6,6 +6,7 @@ import LoadingPage from '@/ui/components/LoadingPage';
 import type { SignedData, SignPsbtParams, ToSignData } from '@unisat/wallet-shared';
 import {
   useCurrentAccount,
+  useAccountBalance,
   useFeeRateBar,
   useI18n,
   useNavigation,
@@ -13,7 +14,9 @@ import {
   useWallet,
   isValidRgbDecimalAmount,
   normalizeRgbAmountInput,
-  toRgbAtomicAmount
+  toRgbAtomicAmount,
+  estimateRgbUtxoCreateMinSats,
+  RGB_UTXO_CREATE_COUNT
 } from '@unisat/wallet-state';
 
 import { copyToClipboard, shortAddress } from '@/ui/utils';
@@ -208,6 +211,7 @@ export default function RGBIssueScreen() {
   const tools = useTools();
   const { t } = useI18n();
   const currentAccount = useCurrentAccount();
+  const accountBalance = useAccountBalance();
   const { requestWrite, writeLeaseModal } = useRgbWriteLeaseGuard();
   const { feeRate } = useFeeRateBar();
   const [ticker, setTicker] = useState('');
@@ -242,7 +246,16 @@ export default function RGBIssueScreen() {
   const atomicSupply = toRgbAtomicAmount(amount.trim(), assetPrecision);
   const isFormLocked = loading;
   const isFeeRateValid = Number.isFinite(feeRate) && feeRate > 0;
-  const canIssue = !isFormLocked && !fundingLoading && !!fundingAddress && isFormValid && isFeeRateValid;
+  const estimatedFundingSats = estimateRgbUtxoCreateMinSats(feeRate);
+  const insufficientBtcForFunding =
+    availableIssueUtxoCount === 0 && accountBalance.availableBalance < estimatedFundingSats;
+  const canIssue =
+    !isFormLocked &&
+    !fundingLoading &&
+    !!fundingAddress &&
+    isFormValid &&
+    isFeeRateValid &&
+    !insufficientBtcForFunding;
   const assetTicker = ticker.trim() || 'ASSET';
   const displaySupply = formatSupply(amount.trim() || '0', assetTicker);
 
@@ -314,7 +327,7 @@ export default function RGBIssueScreen() {
       const beginResult = await wallet.createRgbUtxosBegin({
         // The issuance consumes one funding UTXO; retain the other four for
         // subsequent invoices or issuances without another split transaction.
-        num: 5,
+        num: RGB_UTXO_CREATE_COUNT,
         feeRate
       });
       const toSignData = beginResult?.toSignData as ToSignData | undefined;
@@ -530,9 +543,19 @@ export default function RGBIssueScreen() {
             </FormField>
 
             {availableIssueUtxoCount === 0 ? (
-              <div className="rgb-issue-fee-section">
-                <FeeRateBar />
-              </div>
+              <>
+                <div className="rgb-issue-fee-section">
+                  <FeeRateBar />
+                </div>
+                <Text
+                  text={t('rgb_utxo_recommended_balance')}
+                  wrap
+                  style={{ color: 'rgba(235,185,76,0.85)', fontSize: 12, fontWeight: 500 }}
+                />
+                {insufficientBtcForFunding ? (
+                  <Text text={t('not_enough_btc_for_rgb_utxo')} wrap size="xs" color="danger" />
+                ) : null}
+              </>
             ) : null}
           </Column>
 
