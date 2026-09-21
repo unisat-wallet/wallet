@@ -1,5 +1,5 @@
 import { Button, Card, Column, Text } from '@/ui/components';
-import { DecodedPsbt, TickPriceItem } from '@unisat/wallet-shared';
+import { DecodedPsbt, TickPriceItem, ToSignData } from '@unisat/wallet-shared';
 import { useI18n } from '@unisat/wallet-state';
 
 import { InputItem } from './InputItem';
@@ -7,11 +7,13 @@ import { useIncrementalList } from './useIncrementalList';
 
 export function OutputsList({
   decodedPsbt,
+  toSignData,
   runesPriceMap,
   resetKey,
   setContractPopoverData
 }: {
   decodedPsbt: DecodedPsbt;
+  toSignData: ToSignData;
   runesPriceMap: { [key: string]: TickPriceItem } | undefined;
   resetKey: string;
   setContractPopoverData: (data: any) => void;
@@ -38,6 +40,7 @@ export function OutputsList({
                 outputInfo={v}
                 index={index}
                 decodedPsbt={decodedPsbt}
+                toSignData={toSignData}
                 runesPriceMap={runesPriceMap}
                 setContractPopoverData={setContractPopoverData}
               />

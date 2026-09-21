@@ -9,9 +9,10 @@ import { ActionOverviewSectionProps, useActionOverviewSectionLogic, useBTCUnit, 
 function DetailItemRow({ detail, decodedPsbt }: { detail: PsbtActionDetail; decodedPsbt: DecodedPsbt }) {
   const btcUnit = useBTCUnit();
   const { t } = useI18n();
+  const label = detail.labelKey ? t(detail.labelKey) : detail.label;
   const LabelCom = (
     <Text
-      text={detail.label}
+      text={label}
       preset="regular"
       color="textDim"
       size="sm"

@@ -1484,6 +1484,9 @@
   "my_address": {
     "message": "Mi dirección"
   },
+  "my_rgb_fee_address": {
+    "message": "Mi dirección de comisiones RGB"
+  },
   "n_inscriptions": {
     "message": "$1 inscripciones"
   },

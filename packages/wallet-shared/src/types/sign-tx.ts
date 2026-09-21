@@ -92,6 +92,7 @@ export enum PsbtActionDetailType {
 
 export interface PsbtActionDetail {
   label: string // label, e.g., "Lockup Period", "Fee Rate"
+  labelKey?: string // optional i18n key used by the UI instead of the fallback label
   value: any // value, e.g., "10 days", "0.5%"
   type?: PsbtActionDetailType
   highlight?: boolean // whether to highlight

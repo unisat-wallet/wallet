@@ -4573,7 +4573,12 @@ export class WalletController extends BaseController {
         description: '',
         details: [
           { label: 'RGB Fee UTXOs', type: PsbtActionDetailType.TEXT, value: String(count) },
-          { label: 'RGB Fee Address', type: PsbtActionDetailType.ADDRESS, value: status.address },
+          {
+            label: 'My RGB Fee Address',
+            labelKey: 'my_rgb_fee_address',
+            type: PsbtActionDetailType.ADDRESS,
+            value: status.address,
+          },
         ],
         type: PsbtActionType.CUSTOM,
       },

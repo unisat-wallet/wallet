@@ -1487,6 +1487,9 @@
   "my_address": {
     "message": "我的地址"
   },
+  "my_rgb_fee_address": {
+    "message": "我的 RGB 手續費地址"
+  },
   "n_inscriptions": {
     "message": "$1 銘文"
   },

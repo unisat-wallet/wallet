@@ -1490,6 +1490,9 @@
   "my_address": {
     "message": "My Address"
   },
+  "my_rgb_fee_address": {
+    "message": "My RGB Fee Address"
+  },
   "n_inscriptions": {
     "message": "$1 inscriptions"
   },

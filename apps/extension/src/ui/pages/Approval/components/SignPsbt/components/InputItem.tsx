@@ -10,6 +10,7 @@ import {
   DecodedPsbtInput,
   DecodedPsbtOutput,
   Inscription,
+  PsbtActionDetailType,
   TickPriceItem,
   ToSignData
 } from '@unisat/wallet-shared';
@@ -30,6 +31,8 @@ export function InputItem(props: {
   const { index, inputInfo, outputInfo, decodedPsbt, toSignData } = props;
   const currentAddress = useCurrentAddress();
   const wallet = useWallet();
+  const btcUnit = useBTCUnit();
+  const { t } = useI18n();
   const [rgbFundingAddress, setRgbFundingAddress] = useState('');
   const itemInfo = (inputInfo || outputInfo)!;
 
@@ -39,9 +42,20 @@ export function InputItem(props: {
   const alkanes = itemInfo.alkanes || [];
   const isMyAddress = itemInfo.address === currentAddress;
   const isRgbAddress = Boolean(rgbFundingAddress && itemInfo.address === rgbFundingAddress);
-  const btcUnit = useBTCUnit();
-  const { t } = useI18n();
-  const highLightAddress = isToSign || isMyAddress || isRgbAddress;
+  const actionAddressDetail = outputInfo
+    ? toSignData?.action?.details?.find(
+        (detail) =>
+          detail.labelKey === 'my_rgb_fee_address' &&
+          detail.type === PsbtActionDetailType.ADDRESS &&
+          detail.value === itemInfo.address
+      )
+    : undefined;
+  const actionAddressLabel = actionAddressDetail
+    ? actionAddressDetail.labelKey
+      ? t(actionAddressDetail.labelKey)
+      : actionAddressDetail.label
+    : undefined;
+  const highLightAddress = isToSign || isMyAddress || isRgbAddress || Boolean(actionAddressLabel);
 
   useEffect(() => {
     let cancelled = false;
@@ -97,6 +111,12 @@ export function InputItem(props: {
               <AddressText address={itemInfo.address} color={highLightAddress ? 'ticker_color2' : 'textDim'} />
 
               {isRgbAddress && <RgbAddressBadge />}
+
+              {actionAddressLabel && (
+                <Row style={{ padding: '2px 4px', backgroundColor: 'rgba(37,160,121,0.15)', borderRadius: 4 }}>
+                  <Text text={actionAddressLabel} style={{ color: '#25a079' }} size="xxs" />
+                </Row>
+              )}
 
               {isMyAddress && (
                 <Row style={{ padding: 2, backgroundColor: colors.bg2, borderRadius: 5 }}>

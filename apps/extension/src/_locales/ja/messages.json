@@ -1484,6 +1484,9 @@
   "my_address": {
     "message": "私のアドレス"
   },
+  "my_rgb_fee_address": {
+    "message": "私の RGB 手数料アドレス"
+  },
   "n_inscriptions": {
     "message": "$1 インスクリプション"
   },

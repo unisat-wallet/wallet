@@ -1484,6 +1484,9 @@
   "my_address": {
     "message": "Мой адрес"
   },
+  "my_rgb_fee_address": {
+    "message": "Мой адрес комиссии RGB"
+  },
   "n_inscriptions": {
     "message": "$1 надписей"
   },

@@ -319,6 +319,7 @@ export default function SignPsbt(props: SignPsbtProps) {
 
                 <OutputsList
                   decodedPsbt={currentDecodedPsbt}
+                  toSignData={currentToSignData}
                   runesPriceMap={runesPriceMap}
                   resetKey={listResetKey}
                   setContractPopoverData={setContractPopoverData}

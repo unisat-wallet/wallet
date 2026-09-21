@@ -1484,6 +1484,9 @@
   "my_address": {
     "message": "Mon Adresse"
   },
+  "my_rgb_fee_address": {
+    "message": "Mon adresse de frais RGB"
+  },
   "n_inscriptions": {
     "message": "$1 inscriptions"
   },
