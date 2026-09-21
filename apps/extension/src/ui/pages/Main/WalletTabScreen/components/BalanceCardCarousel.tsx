@@ -8,7 +8,6 @@ import {
   uiActions,
   useAppDispatch,
   useBalanceCardDetailExpanded,
-  useChain,
   useI18n,
   useRGBListLogic,
   useRGBUsdtBalanceCardLogic,
@@ -17,7 +16,6 @@ import {
   useWallet,
   useWalletView
 } from '@unisat/wallet-state';
-import { ChainType } from '@unisat/wallet-types';
 
 import { useNavigate } from '../../../MainRoute';
 import { BalanceCard } from './BalanceCard';
@@ -699,7 +697,6 @@ export function BalanceCardCarousel({
   onRgbFeatureEnabled: () => void;
 }) {
   const supportedAssets = useSupportedAssets();
-  const chain = useChain();
   const walletView = useWalletView();
   const dispatch = useAppDispatch();
   const wallet = useWallet();
@@ -722,7 +719,8 @@ export function BalanceCardCarousel({
   const canShowRgbCard = supportedAssets.assets.rgbCard;
   const isUnsupportedRgbCard = canShowRgbCard && !isRgbFullySupported;
   const isInactiveRgbCard = canShowRgbCard && isRgbFullySupported && !rgbFeatureEnabled;
-  const useGenericRgbCard = chain.enum !== ChainType.BITCOIN_MAINNET;
+  // Temporarily keep the generic RGB card on every network until RGB USDT launches.
+  const useGenericRgbCard = true;
   const activeIndex = isRgbFeatureActive ? (walletView === WalletView.RGB ? 1 : 0) : unsupportedPreviewIndex;
 
   const setActiveIndex = useCallback(
