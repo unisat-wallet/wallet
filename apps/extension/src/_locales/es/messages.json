@@ -2960,6 +2960,30 @@
   "restore_rgb": {
     "message": "Restaurar RGB"
   },
+  "rgb_enable_description": {
+    "message": "Habilita RGB para emitir, recibir y transferir activos RGB con esta cartera. El estado se guarda localmente y se respalda de forma cifrada."
+  },
+  "rgb_restore_description": {
+    "message": "Se encontró una copia de seguridad RGB cifrada para esta cartera. Restáurala en este dispositivo para seguir usando tus activos RGB."
+  },
+  "rgb_single_device_warning": {
+    "message": "Usa RGB en un solo dispositivo a la vez. Crear facturas o transacciones en varios dispositivos puede causar conflictos de sincronización."
+  },
+  "i_have_read_and_agree_to": {
+    "message": "He leído y acepto los"
+  },
+  "rgb_terms_of_use": {
+    "message": "Términos de uso de RGB"
+  },
+  "not_now": {
+    "message": "Ahora no"
+  },
+  "enabling_rgb": {
+    "message": "Habilitando..."
+  },
+  "restoring_rgb": {
+    "message": "Restaurando..."
+  },
   "pending_rgb_invoices": {
     "message": "Facturas RGB pendientes"
   },

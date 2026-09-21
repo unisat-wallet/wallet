@@ -3032,6 +3032,30 @@
   "restore_rgb": {
     "message": "Restore RGB"
   },
+  "rgb_enable_description": {
+    "message": "Enable RGB for this wallet to issue, receive, and transfer RGB assets. Wallet state is stored locally and backed up in encrypted form."
+  },
+  "rgb_restore_description": {
+    "message": "An encrypted RGB backup was found for this wallet. Restore it on this device to continue using your RGB assets."
+  },
+  "rgb_single_device_warning": {
+    "message": "Use RGB on one device at a time. Creating invoices or transactions on multiple devices may cause sync conflicts."
+  },
+  "i_have_read_and_agree_to": {
+    "message": "I have read and agree to the"
+  },
+  "rgb_terms_of_use": {
+    "message": "RGB Terms of Use"
+  },
+  "not_now": {
+    "message": "Not now"
+  },
+  "enabling_rgb": {
+    "message": "Enabling..."
+  },
+  "restoring_rgb": {
+    "message": "Restoring..."
+  },
   "pending_rgb_invoices": {
     "message": "Pending RGB Invoices"
   },

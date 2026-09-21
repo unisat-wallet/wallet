@@ -2969,6 +2969,30 @@
   "restore_rgb": {
     "message": "RGBを復元"
   },
+  "rgb_enable_description": {
+    "message": "このウォレットでRGB資産の発行、受取、送金を行えるようにします。ウォレットの状態は端末に保存され、暗号化してバックアップされます。"
+  },
+  "rgb_restore_description": {
+    "message": "このウォレットの暗号化されたRGBバックアップが見つかりました。RGB資産を引き続き使用するには、この端末に復元してください。"
+  },
+  "rgb_single_device_warning": {
+    "message": "RGBは一度に1台の端末で使用してください。複数の端末でインボイスやトランザクションを作成すると、同期の競合が発生する可能性があります。"
+  },
+  "i_have_read_and_agree_to": {
+    "message": "以下を読み、同意します："
+  },
+  "rgb_terms_of_use": {
+    "message": "RGB利用規約"
+  },
+  "not_now": {
+    "message": "後で"
+  },
+  "enabling_rgb": {
+    "message": "有効化中..."
+  },
+  "restoring_rgb": {
+    "message": "復元中..."
+  },
   "pending_rgb_invoices": {
     "message": "保留中のRGBインボイス"
   },

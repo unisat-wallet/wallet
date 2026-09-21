@@ -3029,6 +3029,30 @@
   "restore_rgb": {
     "message": "恢復 RGB"
   },
+  "rgb_enable_description": {
+    "message": "為此錢包啟用 RGB，以發行、接收及轉移 RGB 資產。錢包狀態會儲存在本機，並以加密形式備份。"
+  },
+  "rgb_restore_description": {
+    "message": "已找到此錢包的加密 RGB 備份。請將其恢復至此裝置，以繼續使用 RGB 資產。"
+  },
+  "rgb_single_device_warning": {
+    "message": "請一次只在一台裝置上使用 RGB。在多台裝置上建立發票或交易可能造成同步衝突。"
+  },
+  "i_have_read_and_agree_to": {
+    "message": "我已閱讀並同意"
+  },
+  "rgb_terms_of_use": {
+    "message": "RGB 使用條款"
+  },
+  "not_now": {
+    "message": "暫時不要"
+  },
+  "enabling_rgb": {
+    "message": "正在啟用..."
+  },
+  "restoring_rgb": {
+    "message": "正在恢復..."
+  },
   "pending_rgb_invoices": {
     "message": "待處理 RGB 發票"
   },

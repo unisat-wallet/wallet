@@ -3,6 +3,7 @@ import { useState } from 'react';
 import { Button, Checkbox, Column, Row, Text } from '@/ui/components';
 import { BottomModal } from '@/ui/components/BottomModal';
 import { PlatformEnv } from '@unisat/wallet-shared';
+import { useI18n } from '@unisat/wallet-state';
 
 const RGB_TERMS_OF_USE_URL = 'https://link.unisat.space/rgb-terms-of-use';
 const RGB_TERMS_OF_USE_APP_URL = 'https://link.unisat.space/rgb-terms-of-use-app';
@@ -26,24 +27,21 @@ export function RgbFeatureActivationModal({
   onEnable: () => void;
 }) {
   const [termsAccepted, setTermsAccepted] = useState(false);
+  const { t } = useI18n();
   const openTerms = () => window.open(rgbTermsOfUseUrl(), '_blank', 'noopener,noreferrer');
 
   return (
     <BottomModal onClose={loading ? undefined : onClose}>
       <Column gap="lg">
-        <Text text={recoveryAvailable ? 'Restore RGB wallet' : 'Enable RGB'} color="white" size="lg" textCenter />
+        <Text text={t(recoveryAvailable ? 'restore_rgb' : 'enable_rgb')} color="white" size="lg" textCenter />
         <Text
-          text={
-            recoveryAvailable
-              ? 'Encrypted RGB wallet data was found for this wallet. After you accept the terms, it will be restored to this device automatically.'
-              : 'RGB assets use additional local wallet state, encrypted recovery data, and RGB network services. Enabling it will set up RGB for this wallet on this device.'
-          }
+          text={t(recoveryAvailable ? 'rgb_restore_description' : 'rgb_enable_description')}
           color="white_muted2"
           size="sm"
           wrap
         />
         <Text
-          text="You can view the same wallet on multiple devices, but only one device should create invoices, transfer, receive, release, or issue RGB assets at a time. Restoring an old state can cause sync conflicts."
+          text={t('rgb_single_device_warning')}
           color="gold"
           size="xs"
           wrap
@@ -54,7 +52,7 @@ export function RgbFeatureActivationModal({
           onChange={(event) => setTermsAccepted(event.target.checked)}
           style={{ lineHeight: '20px' }}>
           <span style={{ color: 'rgba(255, 255, 255, 0.72)', fontSize: 13 }}>
-            I have read and agree to the{' '}
+            {t('i_have_read_and_agree_to')}{' '}
             <span
               role="link"
               tabIndex={0}
@@ -69,15 +67,18 @@ export function RgbFeatureActivationModal({
                 event.preventDefault();
                 openTerms();
               }}>
-              RGB Terms of Use
+              {t('rgb_terms_of_use')}
             </span>
-            .
           </span>
         </Checkbox>
         <Row gap="sm" fullX>
-          <Button text="Not now" preset="default" disabled={loading} onClick={onClose} style={{ flex: 1 }} />
+          <Button text={t('not_now')} preset="default" disabled={loading} onClick={onClose} style={{ flex: 1 }} />
           <Button
-            text={loading ? (recoveryAvailable ? 'Restoring...' : 'Enabling...') : recoveryAvailable ? 'I understand, restore RGB' : 'I understand, enable RGB'}
+            text={
+              loading
+                ? t(recoveryAvailable ? 'restoring_rgb' : 'enabling_rgb')
+                : t(recoveryAvailable ? 'restore_rgb' : 'enable_rgb')
+            }
             preset="primary"
             disabled={loading || !termsAccepted}
             onClick={onEnable}

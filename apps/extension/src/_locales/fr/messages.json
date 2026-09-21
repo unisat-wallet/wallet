@@ -2969,6 +2969,30 @@
   "restore_rgb": {
     "message": "Restaurer RGB"
   },
+  "rgb_enable_description": {
+    "message": "Activez RGB pour émettre, recevoir et transférer des actifs RGB avec ce portefeuille. L’état est stocké localement et sauvegardé sous forme chiffrée."
+  },
+  "rgb_restore_description": {
+    "message": "Une sauvegarde RGB chiffrée a été trouvée pour ce portefeuille. Restaurez-la sur cet appareil pour continuer à utiliser vos actifs RGB."
+  },
+  "rgb_single_device_warning": {
+    "message": "Utilisez RGB sur un seul appareil à la fois. Créer des factures ou des transactions sur plusieurs appareils peut provoquer des conflits de synchronisation."
+  },
+  "i_have_read_and_agree_to": {
+    "message": "J’ai lu et j’accepte les"
+  },
+  "rgb_terms_of_use": {
+    "message": "Conditions d’utilisation de RGB"
+  },
+  "not_now": {
+    "message": "Pas maintenant"
+  },
+  "enabling_rgb": {
+    "message": "Activation..."
+  },
+  "restoring_rgb": {
+    "message": "Restauration..."
+  },
   "pending_rgb_invoices": {
     "message": "Factures RGB en attente"
   },
