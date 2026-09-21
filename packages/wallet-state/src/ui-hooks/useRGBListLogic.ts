@@ -64,6 +64,7 @@ export function useRGBListLogic({
     total,
     loading,
     showLoading,
+    hasLoaded,
     hasMore,
     onRefresh: refreshList,
     onLoadMore,
@@ -95,7 +96,7 @@ export function useRGBListLogic({
     if (alreadyRefreshed) return
 
     refreshFundingAddress()
-    refreshList()
+    refreshList({ showLoading: false })
     lastRefreshTimeRef.current = walletTabFocusRefresh
   }, [enabled, walletTabFocusRefresh, isFocus, refreshList, refreshFundingAddress])
 
@@ -114,7 +115,7 @@ export function useRGBListLogic({
     const handleRgbAssetsChanged = () => {
       if (!enabled || !isFocus || !isRgbSupported) return
       refreshFundingAddress()
-      refreshList()
+      refreshList({ showLoading: false })
     }
 
     uiEventBus.addEventListener(BUS_METHODS.RGB_ASSETS_CHANGED, handleRgbAssetsChanged)
@@ -142,6 +143,7 @@ export function useRGBListLogic({
     total,
     loading,
     showLoading,
+    hasLoaded,
     hasMore,
     fundingAddress,
     fundingBalance,

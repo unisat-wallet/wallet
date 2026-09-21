@@ -19,6 +19,7 @@ export function useInfiniteList<T>({
   const [total, setTotal] = useState(0)
   const [loading, _setLoading] = useState(false)
   const [showLoading, setShowLoading] = useState(false)
+  const [hasLoaded, setHasLoaded] = useState(false)
   const [hasMore, setHasMore] = useState(true)
   const [page, _setPage] = useState(1)
 
@@ -50,8 +51,8 @@ export function useInfiniteList<T>({
     loadingRef.current = true
     setLoading(true)
     setShowLoading(showLoadingOverlay)
+    const requestVersion = requestVersionRef.current
     try {
-      const requestVersion = requestVersionRef.current
       const pageToLoad = isRefresh ? 1 : pageRef.current
       const { list, total } = await fetcherRef.current(pageToLoad, pageSizeRef.current)
 
@@ -66,12 +67,14 @@ export function useInfiniteList<T>({
       setData(nextData)
 
       setHasMore(nextData.length < total)
+      setHasLoaded(true)
 
       const nextPage = isRefresh ? 2 : pageToLoad + 1
       pageRef.current = nextPage
       setPage(nextPage)
     } catch (e) {
       console.error(e)
+      if (requestVersion === requestVersionRef.current) setHasLoaded(true)
     } finally {
       loadingRef.current = false
       setLoading(false)
@@ -107,6 +110,7 @@ export function useInfiniteList<T>({
     // reset
     dataRef.current = []
     setData([])
+    setHasLoaded(false)
     setPage(1)
     setHasMore(true)
 
@@ -125,6 +129,7 @@ export function useInfiniteList<T>({
     total,
     loading,
     showLoading,
+    hasLoaded,
     hasMore,
     page,
     onRefresh,

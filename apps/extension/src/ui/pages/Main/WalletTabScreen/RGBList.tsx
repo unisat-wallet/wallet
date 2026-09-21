@@ -12,7 +12,7 @@ type RGBListProps = {
 
 export function RGBList({ list }: RGBListProps) {
   const { t } = useI18n();
-  const { onRefresh, items, total, onLoadMore, onClickItem, loading, showLoading, hasMore } = list;
+  const { onRefresh, items, total, onLoadMore, onClickItem, loading, showLoading, hasLoaded, hasMore } = list;
 
   return (
     <Column>
@@ -28,8 +28,8 @@ export function RGBList({ list }: RGBListProps) {
         onLoadMore={onLoadMore}
         onRefresh={onRefresh}
         hasMore={hasMore}
-        loading={loading}
-        showLoading={showLoading}
+        loading={loading && !hasLoaded}
+        showLoading={showLoading && !hasLoaded}
         emptyText={t('assets_no_assets')}
         emptyPreset="assets"
       />
