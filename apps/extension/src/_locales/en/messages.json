@@ -3023,6 +3023,24 @@
   "rgb_assets": {
     "message": "RGB Assets"
   },
+  "rgb_settings": {
+    "message": "RGB Settings"
+  },
+  "rgb_settings_description": {
+    "message": "Backup, preferences, and advanced tools"
+  },
+  "rgb_backup": {
+    "message": "RGB Backup"
+  },
+  "rgb_backup_description": {
+    "message": "Export or restore encrypted RGB state"
+  },
+  "backup_and_recovery": {
+    "message": "Backup & Recovery"
+  },
+  "preferences": {
+    "message": "Preferences"
+  },
   "rgb_wallet_backup_found": {
     "message": "Wallet backup found"
   },

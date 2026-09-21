@@ -2960,6 +2960,24 @@
   "rgb_assets": {
     "message": "RGB активы"
   },
+  "rgb_settings": {
+    "message": "Настройки RGB"
+  },
+  "rgb_settings_description": {
+    "message": "Резервное копирование, параметры и расширенные инструменты"
+  },
+  "rgb_backup": {
+    "message": "Резервная копия RGB"
+  },
+  "rgb_backup_description": {
+    "message": "Экспорт или восстановление зашифрованного состояния RGB"
+  },
+  "backup_and_recovery": {
+    "message": "Резервное копирование и восстановление"
+  },
+  "preferences": {
+    "message": "Параметры"
+  },
   "rgb_wallet_backup_found": {
     "message": "Найдена резервная копия кошелька"
   },

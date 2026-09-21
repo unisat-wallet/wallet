@@ -95,6 +95,7 @@ export type RouteParamList = {
   ConnectedSitesScreen: undefined
   AddressTypeScreen: undefined
   AdvancedScreen: undefined
+  RgbSettingsScreen: undefined
   RgbBackupScreen: undefined
   RgbUtxoInspectionScreen: undefined
   RgbFeePoolInspectionScreen: undefined

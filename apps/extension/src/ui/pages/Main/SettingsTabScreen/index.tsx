@@ -29,7 +29,7 @@ export default function SettingsTabScreen() {
     settings_addressBook,
     settings_addressType,
     settings_advanced,
-    settings_rgbBackup,
+    settings_rgbSettings,
     settings_feedback,
     settings_rateus,
     settings_aboutus,
@@ -82,18 +82,19 @@ export default function SettingsTabScreen() {
     </Card>
   );
 
-  const renderGroup = (items: SettingsItemType[]) => (
-    <div>
-      {items
-        .filter((v) => v)
-        .map((item, index) => (
+  const renderGroup = (items: Array<SettingsItemType | null | undefined>) => {
+    const visibleItems = items.filter((item): item is SettingsItemType => Boolean(item));
+    return (
+      <div>
+        {visibleItems.map((item, index) => (
           <React.Fragment key={item.key}>
-            {renderSettingsItem(item, index === 0, index === items.length - 1)}
-            {index < items.length - 1 && <Divider />}
+            {renderSettingsItem(item, index === 0, index === visibleItems.length - 1)}
+            {index < visibleItems.length - 1 && <Divider />}
           </React.Fragment>
         ))}
-    </div>
-  );
+      </div>
+    );
+  };
 
   const renderButtons = (items: SettingsItemType[]) => {
     return (
@@ -162,7 +163,7 @@ export default function SettingsTabScreen() {
             <Column fullX>
               {renderGroup([settings_connectedSites])}
               {renderGroup([settings_addressBook])}
-              {renderGroup([settings_addressType, settings_advanced, settings_rgbBackup!])}
+              {renderGroup([settings_addressType, settings_rgbSettings, settings_advanced])}
               {renderGroup([settings_feedback, settings_rateus, settings_aboutus])}
             </Column>
 

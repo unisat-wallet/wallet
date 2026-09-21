@@ -3020,6 +3020,24 @@
   "rgb_assets": {
     "message": "RGB 資產"
   },
+  "rgb_settings": {
+    "message": "RGB 設定"
+  },
+  "rgb_settings_description": {
+    "message": "備份、偏好設定與進階工具"
+  },
+  "rgb_backup": {
+    "message": "RGB 備份"
+  },
+  "rgb_backup_description": {
+    "message": "匯出或恢復加密的 RGB 狀態"
+  },
+  "backup_and_recovery": {
+    "message": "備份與恢復"
+  },
+  "preferences": {
+    "message": "偏好設定"
+  },
   "rgb_wallet_backup_found": {
     "message": "已找到錢包備份"
   },

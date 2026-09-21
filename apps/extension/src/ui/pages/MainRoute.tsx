@@ -82,6 +82,7 @@ import RgbUtxoInspectionScreen from './Settings/RgbUtxoInspectionScreen';
 import RgbFeePoolInspectionScreen from './Settings/RgbFeePoolInspectionScreen';
 import RgbBackupScreen from './Settings/RgbBackupScreen';
 import RgbInvoiceExpiryScreen from './Settings/RgbInvoiceExpiryScreen';
+import RgbSettingsScreen from './Settings/RgbSettingsScreen';
 import UpgradeNoticeScreen from './Settings/UpgradeNoticeScreen';
 import CosmosSignDemo from './Test/CosmosSignDemo';
 import TestScreen from './Test/TestScreen';
@@ -197,6 +198,10 @@ export const routes = {
   AdvancedScreen: {
     path: '/settings/advanced',
     element: <AdvancedScreen />
+  },
+  RgbSettingsScreen: {
+    path: '/settings/rgb',
+    element: <RgbSettingsScreen />
   },
   RgbBackupScreen: {
     path: '/settings/rgb-backup',

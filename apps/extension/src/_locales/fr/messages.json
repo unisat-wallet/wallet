@@ -2960,6 +2960,24 @@
   "rgb_assets": {
     "message": "Actifs RGB"
   },
+  "rgb_settings": {
+    "message": "Paramètres RGB"
+  },
+  "rgb_settings_description": {
+    "message": "Sauvegarde, préférences et outils avancés"
+  },
+  "rgb_backup": {
+    "message": "Sauvegarde RGB"
+  },
+  "rgb_backup_description": {
+    "message": "Exporter ou restaurer l’état RGB chiffré"
+  },
+  "backup_and_recovery": {
+    "message": "Sauvegarde et récupération"
+  },
+  "preferences": {
+    "message": "Préférences"
+  },
   "rgb_wallet_backup_found": {
     "message": "Sauvegarde du portefeuille trouvée"
   },

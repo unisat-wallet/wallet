@@ -2960,6 +2960,24 @@
   "rgb_assets": {
     "message": "RGB資産"
   },
+  "rgb_settings": {
+    "message": "RGB設定"
+  },
+  "rgb_settings_description": {
+    "message": "バックアップ、環境設定、高度なツール"
+  },
+  "rgb_backup": {
+    "message": "RGBバックアップ"
+  },
+  "rgb_backup_description": {
+    "message": "暗号化されたRGB状態をエクスポートまたは復元"
+  },
+  "backup_and_recovery": {
+    "message": "バックアップと復元"
+  },
+  "preferences": {
+    "message": "環境設定"
+  },
   "rgb_wallet_backup_found": {
     "message": "ウォレットのバックアップが見つかりました"
   },

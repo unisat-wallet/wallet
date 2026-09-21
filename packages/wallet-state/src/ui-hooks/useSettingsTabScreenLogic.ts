@@ -6,7 +6,7 @@ import {
   PlatformEnv,
   getAccountCapabilities,
 } from '@unisat/wallet-shared'
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useDevice, useI18n, useNavigation, useTools, useWallet } from 'src/context'
 import { useChain, useCurrentAccount, useCurrentKeyring, useVersionInfo } from 'src/hooks'
 
@@ -33,6 +33,30 @@ export function useSettingsTabScreenLogic() {
   const versionInfo = useVersionInfo()
   const hasUpdate = versionInfo.hasUpdate
   const { t } = useI18n()
+  const [rgbFeatureEnabled, setRgbFeatureEnabled] = useState(false)
+
+  useEffect(() => {
+    let active = true
+    const rgbSupported = Boolean(chain.rgbProxyEndpoints?.some(endpoint => endpoint.trim()))
+    if (!rgbSupported || currentKeyring.type !== KeyringType.HdKeyring) {
+      setRgbFeatureEnabled(false)
+      return () => {
+        active = false
+      }
+    }
+    setRgbFeatureEnabled(false)
+    void wallet
+      .getRgbFeatureStatus()
+      .then(status => {
+        if (active) setRgbFeatureEnabled(status.enabled && status.supported)
+      })
+      .catch(() => {
+        if (active) setRgbFeatureEnabled(false)
+      })
+    return () => {
+      active = false
+    }
+  }, [chain.enum, chain.rgbProxyEndpoints, currentAccount.key, currentKeyring.key, currentKeyring.type, wallet])
 
   const { isExtensionInExpandView } = useDevice()
 
@@ -123,21 +147,21 @@ export function useSettingsTabScreenLogic() {
     }
   }, [t])
 
-  const settings_rgbBackup: SettingsItemType | null = useMemo(() => {
+  const settings_rgbSettings: SettingsItemType | null = useMemo(() => {
     const rgbEnabled = Boolean(chain.rgbProxyEndpoints?.some(endpoint => endpoint.trim()))
-    if (!rgbEnabled || currentKeyring.type !== KeyringType.HdKeyring) return null
+    if (!rgbEnabled || !rgbFeatureEnabled || currentKeyring.type !== KeyringType.HdKeyring) return null
     return {
-      key: 'settings_rgbBackup',
-      label: 'RGB Backup',
-      value: 'Export or restore encrypted RGB state',
+      key: 'settings_rgbSettings',
+      label: t('rgb_settings'),
+      value: t('rgb_settings_description'),
       desc: '',
       right: true,
-      icon: 'wallet-info',
+      icon: 'rgb-settings',
       onClick: () => {
-        nav.navigate('RgbBackupScreen')
+        nav.navigate('RgbSettingsScreen')
       },
     }
-  }, [chain.rgbProxyEndpoints, currentKeyring.type, nav])
+  }, [chain.rgbProxyEndpoints, currentKeyring.type, nav, rgbFeatureEnabled, t])
 
   const settings_feedback = useMemo(() => {
     return {
@@ -232,7 +256,7 @@ export function useSettingsTabScreenLogic() {
     settings_addressBook,
     settings_addressType,
     settings_advanced,
-    settings_rgbBackup,
+    settings_rgbSettings,
     settings_feedback,
     settings_rateus,
     settings_aboutus,

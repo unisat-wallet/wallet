@@ -85,6 +85,7 @@ export const svgRegistry = {
   addressBook: '/images/icons/settings/address-book.svg',
   addressBookEmpty: '/images/icons/settings/address-book-empty.svg',
   advance: '/images/icons/settings/advance.svg',
+  'rgb-settings': '/images/icons/settings/rgb-settings.svg',
   connectedSites: '/images/icons/settings/connected-sites.svg',
   network: '/images/icons/settings/network.svg',
   changePassword: '/images/icons/settings/change-password.svg',

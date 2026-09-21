@@ -2951,6 +2951,24 @@
   "rgb_assets": {
     "message": "Activos RGB"
   },
+  "rgb_settings": {
+    "message": "Ajustes de RGB"
+  },
+  "rgb_settings_description": {
+    "message": "Copia de seguridad, preferencias y herramientas avanzadas"
+  },
+  "rgb_backup": {
+    "message": "Copia de seguridad RGB"
+  },
+  "rgb_backup_description": {
+    "message": "Exporta o restaura el estado RGB cifrado"
+  },
+  "backup_and_recovery": {
+    "message": "Copia de seguridad y recuperación"
+  },
+  "preferences": {
+    "message": "Preferencias"
+  },
   "rgb_wallet_backup_found": {
     "message": "Copia de seguridad de la cartera encontrada"
   },
