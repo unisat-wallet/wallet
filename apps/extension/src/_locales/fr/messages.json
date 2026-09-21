@@ -2871,7 +2871,7 @@
     "message": "Saisissez un montant supérieur à 0."
   },
   "rgb_invoice_maximum_amount": {
-    "message": "Le montant maximal est de $amount$."
+    "message": "Le montant maximal est de $amount."
   },
   "rgb_amount_precision_invalid": {
     "message": "Saisissez un montant comportant au maximum $precision décimales."

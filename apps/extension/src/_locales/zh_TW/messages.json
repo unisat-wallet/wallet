@@ -2931,7 +2931,7 @@
     "message": "請輸入大於 0 的數量。"
   },
   "rgb_invoice_maximum_amount": {
-    "message": "最大數量為 $amount$。"
+    "message": "最大數量為 $amount。"
   },
   "rgb_amount_precision_invalid": {
     "message": "請輸入最多 $precision 位小數的金額。"

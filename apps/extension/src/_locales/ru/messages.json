@@ -2871,7 +2871,7 @@
     "message": "Введите сумму больше 0."
   },
   "rgb_invoice_maximum_amount": {
-    "message": "Максимальная сумма: $amount$."
+    "message": "Максимальная сумма: $amount."
   },
   "rgb_amount_precision_invalid": {
     "message": "Введите сумму не более чем с $precision знаками после запятой."

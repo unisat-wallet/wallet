@@ -2862,7 +2862,7 @@
     "message": "Introduce un importe mayor que 0."
   },
   "rgb_invoice_maximum_amount": {
-    "message": "El importe máximo es $amount$."
+    "message": "El importe máximo es $amount."
   },
   "rgb_amount_precision_invalid": {
     "message": "Introduce un importe con hasta $precision decimales."
