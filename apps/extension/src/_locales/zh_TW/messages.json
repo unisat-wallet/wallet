@@ -3065,9 +3065,6 @@
   "rgb_fee_pool_title": {
     "message": "RGB 手續費資金池"
   },
-  "rgb_fee_address": {
-    "message": "RGB 手續費地址"
-  },
   "rgb_asset_address": {
     "message": "RGB 資產地址"
   },
@@ -3093,14 +3090,29 @@
   "rgb_invoice_expiry_24h": { "message": "24 小時" },
   "rgb_invoice_expiry_7d": { "message": "7 天" },
   "rgb_invoice_expiry_never": { "message": "永不過期" },
-  "rgb_fee_address_description": {
-    "message": "查看 RGB 手續費 UTXO 並提回未使用 BTC"
+  "rgb_fee_pool_description": {
+    "message": "查看 RGB 手續費 UTXO，並將未使用的 BTC 轉回錢包"
   },
   "rgb_fee_pool_locked": {
     "message": "已鎖定"
   },
-  "rgb_fee_pool_withdraw": {
-    "message": "提回 BTC 錢包"
+  "rgb_fee_pool_transfer_to_wallet": {
+    "message": "轉入 BTC 錢包"
+  },
+  "rgb_fee_pool_transfer_history": {
+    "message": "轉帳記錄"
+  },
+  "rgb_fee_pool_transferred_to_wallet": {
+    "message": "已轉入 BTC 錢包"
+  },
+  "rgb_fee_pool_utxos": {
+    "message": "UTXO"
+  },
+  "rgb_fee_pool_no_transfers": {
+    "message": "暫無轉帳記錄"
+  },
+  "rgb_fee_pool_local_history_notice": {
+    "message": "轉帳記錄僅儲存於此裝置，最多顯示最近 20 筆。"
   },
   "rgb_fee_pool_empty": {
     "message": "找不到 RGB 手續費 UTXO"

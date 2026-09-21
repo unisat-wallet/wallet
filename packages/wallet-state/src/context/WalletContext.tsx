@@ -839,6 +839,12 @@ export interface WalletController {
       locked: boolean
       available: boolean
     }>
+    withdrawals: Array<{
+      txid: string
+      amount: number
+      destination: string
+      createdAt: number
+    }>
   }>
 
   createRgbFeePoolWithdrawBegin(params?: { feeRate?: number }): Promise<{

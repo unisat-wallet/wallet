@@ -3005,9 +3005,6 @@
   "rgb_fee_pool_title": {
     "message": "Пул комиссий RGB"
   },
-  "rgb_fee_address": {
-    "message": "Адрес комиссии RGB"
-  },
   "rgb_asset_address": {
     "message": "Адрес RGB-активов"
   },
@@ -3033,14 +3030,29 @@
   "rgb_invoice_expiry_24h": { "message": "24 часа" },
   "rgb_invoice_expiry_7d": { "message": "7 дней" },
   "rgb_invoice_expiry_never": { "message": "Без срока действия" },
-  "rgb_fee_address_description": {
-    "message": "Просмотр UTXO комиссий RGB и вывод неиспользованных BTC"
+  "rgb_fee_pool_description": {
+    "message": "Просмотр UTXO комиссий RGB и перевод неиспользованных BTC в ваш кошелёк"
   },
   "rgb_fee_pool_locked": {
     "message": "Заблокировано"
   },
-  "rgb_fee_pool_withdraw": {
-    "message": "Вывести в BTC-кошелёк"
+  "rgb_fee_pool_transfer_to_wallet": {
+    "message": "Перевести в BTC-кошелёк"
+  },
+  "rgb_fee_pool_transfer_history": {
+    "message": "История переводов"
+  },
+  "rgb_fee_pool_transferred_to_wallet": {
+    "message": "Переведено в BTC-кошелёк"
+  },
+  "rgb_fee_pool_utxos": {
+    "message": "UTXO"
+  },
+  "rgb_fee_pool_no_transfers": {
+    "message": "История переводов отсутствует"
+  },
+  "rgb_fee_pool_local_history_notice": {
+    "message": "История переводов хранится локально на этом устройстве. Показаны последние 20 записей."
   },
   "rgb_fee_pool_empty": {
     "message": "UTXO для комиссий RGB не найдены"

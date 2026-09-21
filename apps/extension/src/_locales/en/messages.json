@@ -3068,9 +3068,6 @@
   "rgb_fee_pool_title": {
     "message": "RGB Fee Pool"
   },
-  "rgb_fee_address": {
-    "message": "RGB Fee Address"
-  },
   "rgb_asset_address": {
     "message": "RGB Asset Address"
   },
@@ -3104,14 +3101,29 @@
   "rgb_invoice_expiry_never": {
     "message": "Never expires"
   },
-  "rgb_fee_address_description": {
-    "message": "View RGB Fee UTXOs and withdraw unused BTC"
+  "rgb_fee_pool_description": {
+    "message": "View RGB Fee UTXOs and transfer unused BTC to your wallet"
   },
   "rgb_fee_pool_locked": {
     "message": "Locked"
   },
-  "rgb_fee_pool_withdraw": {
-    "message": "Withdraw to BTC wallet"
+  "rgb_fee_pool_transfer_to_wallet": {
+    "message": "Transfer to BTC Wallet"
+  },
+  "rgb_fee_pool_transfer_history": {
+    "message": "Transfer History"
+  },
+  "rgb_fee_pool_transferred_to_wallet": {
+    "message": "Transferred to BTC Wallet"
+  },
+  "rgb_fee_pool_utxos": {
+    "message": "UTXOs"
+  },
+  "rgb_fee_pool_no_transfers": {
+    "message": "No transfer history"
+  },
+  "rgb_fee_pool_local_history_notice": {
+    "message": "Transfer history is stored locally on this device. The latest 20 records are shown."
   },
   "rgb_fee_pool_empty": {
     "message": "No RGB Fee UTXOs found"

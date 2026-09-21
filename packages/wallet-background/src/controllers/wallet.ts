@@ -465,6 +465,15 @@ const getRgbApiService = () => (walletApiService as unknown as { rgb: RgbControl
 const RGB_DEVICE_ID_STORAGE_KEY = 'rgb-device-id:v1'
 const RGB_FEATURE_STORAGE_KEY_PREFIX = 'rgb-feature-enabled:v1'
 const RGB_FEATURE_TERMS_VERSION = 'rgb-terms-v1'
+const RGB_LOCAL_HISTORY_STORAGE_NAMESPACE = 'rgb-local-history-v1'
+const RGB_FEE_POOL_WITHDRAWAL_HISTORY_LIMIT = 20
+
+type RgbFeePoolWithdrawalHistoryItem = {
+  txid: string
+  amount: number
+  destination: string
+  createdAt: number
+}
 
 type RgbWalletRef = {
   walletId?: string
@@ -4326,8 +4335,55 @@ export class WalletController extends BaseController {
     }
   }
 
+  private rgbFeePoolWithdrawalHistoryKey(wallet: LocalRgbWallet) {
+    return `${wallet.network}:${wallet.walletId}`
+  }
+
+  private async getRgbFeePoolWithdrawalHistory(
+    wallet: LocalRgbWallet
+  ): Promise<RgbFeePoolWithdrawalHistoryItem[]> {
+    const stored = await keyringService.getEncryptedStorageItem<unknown>(
+      RGB_LOCAL_HISTORY_STORAGE_NAMESPACE,
+      this.rgbFeePoolWithdrawalHistoryKey(wallet)
+    )
+    if (!Array.isArray(stored)) return []
+    return stored
+      .filter((item): item is RgbFeePoolWithdrawalHistoryItem => {
+        if (!item || typeof item !== 'object') return false
+        const record = item as Partial<RgbFeePoolWithdrawalHistoryItem>
+        return (
+          typeof record.txid === 'string' &&
+          /^[0-9a-f]{64}$/i.test(record.txid) &&
+          typeof record.amount === 'number' &&
+          Number.isSafeInteger(record.amount) &&
+          record.amount >= 0 &&
+          typeof record.destination === 'string' &&
+          typeof record.createdAt === 'number' &&
+          Number.isFinite(record.createdAt)
+        )
+      })
+      .sort((a, b) => b.createdAt - a.createdAt)
+      .slice(0, RGB_FEE_POOL_WITHDRAWAL_HISTORY_LIMIT)
+  }
+
+  private async addRgbFeePoolWithdrawalHistory(
+    wallet: LocalRgbWallet,
+    item: RgbFeePoolWithdrawalHistoryItem
+  ): Promise<void> {
+    const current = await this.getRgbFeePoolWithdrawalHistory(wallet)
+    const next = [item, ...current.filter(existing => existing.txid !== item.txid)].slice(
+      0,
+      RGB_FEE_POOL_WITHDRAWAL_HISTORY_LIMIT
+    )
+    await keyringService.setEncryptedStorageItem(
+      RGB_LOCAL_HISTORY_STORAGE_NAMESPACE,
+      this.rgbFeePoolWithdrawalHistoryKey(wallet),
+      next
+    )
+  }
+
   getRgbFeePoolInspection = async (params: { feeRate?: number } = {}) => {
-    const { service } = await this.getLocalRgbService()
+    const { service, wallet } = await this.getLocalRgbService()
     const feeAccount = await this.getCurrentRgbFeeAccount()
     const remoteUtxos = await walletApiService.bitcoin.getBTCUtxos(feeAccount.address)
     const locked = new Set(
@@ -4366,6 +4422,7 @@ export class WalletController extends BaseController {
       }))
       .sort((a, b) => a.txid.localeCompare(b.txid) || a.vout - b.vout)
     const availableCount = utxos.filter(utxo => utxo.available).length
+    const withdrawals = await this.getRgbFeePoolWithdrawalHistory(wallet)
     return {
       address: feeAccount.address,
       derivationPath: feeAccount.derivationPath,
@@ -4374,6 +4431,7 @@ export class WalletController extends BaseController {
       targetCount: RGB_FEE_POOL_TARGET_UTXOS,
       ready: availableCount > 0,
       utxos,
+      withdrawals,
     }
   }
 
@@ -4449,6 +4507,20 @@ export class WalletController extends BaseController {
     await this.ensureRgbWriteLease({ service, wallet }, { forceRenew: true })
     const txid = await this.pushTx(transaction.toHex())
     await service.removeFeePoolUtxos(spentOutpoints)
+    const account = preferenceService.getCurrentAccount()
+    const amount = transaction.outs.reduce((total, output) => total + output.value, 0)
+    if (account) {
+      try {
+        await this.addRgbFeePoolWithdrawalHistory(wallet, {
+          txid,
+          amount,
+          destination: account.address,
+          createdAt: Date.now(),
+        })
+      } catch (error) {
+        console.warn('Failed to save local RGB fee-pool withdrawal history', error)
+      }
+    }
     return { txid }
   }
 

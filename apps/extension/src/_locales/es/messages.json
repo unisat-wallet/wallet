@@ -2996,9 +2996,6 @@
   "rgb_fee_pool_title": {
     "message": "Fondo de comisiones RGB"
   },
-  "rgb_fee_address": {
-    "message": "Dirección de tarifas RGB"
-  },
   "rgb_asset_address": {
     "message": "Dirección de activos RGB"
   },
@@ -3024,14 +3021,29 @@
   "rgb_invoice_expiry_24h": { "message": "24 horas" },
   "rgb_invoice_expiry_7d": { "message": "7 días" },
   "rgb_invoice_expiry_never": { "message": "No vence" },
-  "rgb_fee_address_description": {
-    "message": "Ver UTXO de comisiones RGB y retirar BTC no usado"
+  "rgb_fee_pool_description": {
+    "message": "Ver UTXO de comisiones RGB y transferir BTC no usado a tu monedero"
   },
   "rgb_fee_pool_locked": {
     "message": "Bloqueado"
   },
-  "rgb_fee_pool_withdraw": {
-    "message": "Retirar a la billetera BTC"
+  "rgb_fee_pool_transfer_to_wallet": {
+    "message": "Transferir a la billetera BTC"
+  },
+  "rgb_fee_pool_transfer_history": {
+    "message": "Historial de transferencias"
+  },
+  "rgb_fee_pool_transferred_to_wallet": {
+    "message": "Transferido a la billetera BTC"
+  },
+  "rgb_fee_pool_utxos": {
+    "message": "UTXOs"
+  },
+  "rgb_fee_pool_no_transfers": {
+    "message": "No hay historial de transferencias"
+  },
+  "rgb_fee_pool_local_history_notice": {
+    "message": "El historial de transferencias se guarda localmente en este dispositivo. Se muestran los 20 registros más recientes."
   },
   "rgb_fee_pool_empty": {
     "message": "No se encontraron UTXO de comisiones RGB"

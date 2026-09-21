@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 
 import { Button, Card, Column, Content, CopyableAddress, Header, Icon, Layout, Row, Text } from '@/ui/components';
+import { Tabs } from '@/ui/components/Tabs';
 import { SignedData, ToSignData } from '@unisat/wallet-shared';
 import { useI18n, useNavigation, useTools, useWallet } from '@unisat/wallet-state';
 
@@ -8,6 +9,7 @@ import { SignPsbt } from '../Approval/components';
 import { useRgbWriteLeaseGuard } from '../RGB/components/useRgbWriteLeaseGuard';
 
 type FeePoolInspection = Awaited<ReturnType<ReturnType<typeof useWallet>['getRgbFeePoolInspection']>>;
+type FeePoolTabKey = 'utxos' | 'withdrawals';
 
 const shortValue = (value: string) => (value.length > 18 ? `${value.slice(0, 10)}…${value.slice(-6)}` : value);
 
@@ -73,6 +75,7 @@ export default function RgbFeePoolInspectionScreen() {
   const [inspection, setInspection] = useState<FeePoolInspection>();
   const [refreshing, setRefreshing] = useState(false);
   const [withdrawToSignData, setWithdrawToSignData] = useState<ToSignData>();
+  const [activeTab, setActiveTab] = useState<FeePoolTabKey>('utxos');
 
   const refresh = useCallback(
     async (showSuccess = false) => {
@@ -139,7 +142,7 @@ export default function RgbFeePoolInspectionScreen() {
 
   return (
     <Layout>
-      <Header onBack={() => window.history.go(-1)} title={t('rgb_fee_address')} />
+      <Header onBack={() => window.history.go(-1)} title={t('rgb_fee_pool_title')} />
       <Content>
         <Card style={accountInfoCardStyle}>
           <Column fullX gap="zero">
@@ -167,63 +170,137 @@ export default function RgbFeePoolInspectionScreen() {
           </Column>
         </Card>
 
-        {inspection?.utxos.map((utxo, index) => {
-          const status = utxo.locked ? t('rgb_fee_pool_locked') : utxo.pending ? t('pending') : t('available');
-          const statusColor = utxo.locked ? 'textDim' : utxo.pending ? 'gold' : 'success';
-          return (
-            <Row
-              key={`${utxo.txid}:${utxo.vout}`}
-              itemsCenter
-              gap="md"
-              style={feeUtxoCardStyle}
-              onClick={() => nav.navToExplorerTx(utxo.txid)}
-            >
-              <Text text={index + 1} color="textDim" size="sm" style={feeUtxoSequenceStyle} />
-              <Column fullX gap="xs" style={{ minWidth: 0 }}>
-                <Row full justifyBetween itemsCenter gap="sm">
-                  <Text
-                    text={`${shortValue(utxo.txid)}:${utxo.vout}`}
-                    color="white"
-                    preset="bold"
-                    size="sm"
-                    style={{ flex: 1, minWidth: 0 }}
-                  />
-                  <Row itemsCenter gap="sm">
-                    <div style={statusPillStyle(utxo.available, utxo.pending, utxo.locked)}>
-                      <Text text={status} color={statusColor} size="xxs" />
-                    </div>
-                    <Icon icon="right" color="textDim" size={14} />
-                  </Row>
-                </Row>
-                <Text text={`${utxo.satoshis.toLocaleString()} sats`} color="textDim" size="xs" />
-              </Column>
-            </Row>
-          );
-        })}
-        {inspection && !inspection.utxos.length ? (
-          <Column fullX itemsCenter gap="sm" style={emptyStateCardStyle}>
-            <Icon icon="emptyBox" color="textDim" size={32} />
-            <Text text={t('rgb_fee_pool_empty')} color="white" size="sm" />
-            <Text text={t('rgb_fee_pool_empty_description')} color="textDim" size="xs" textCenter wrap />
-          </Column>
-        ) : null}
+        <Tabs
+          defaultActiveKey="utxos"
+          activeKey={activeTab}
+          onTabClick={(key) => setActiveTab(key as FeePoolTabKey)}
+          items={[
+            {
+              key: 'utxos',
+              label: (
+                <Text
+                  text={`${t('rgb_fee_pool_utxos')} (${inspection?.utxos.length || 0})`}
+                  size="sm"
+                  color={activeTab === 'utxos' ? 'gold' : 'textDim'}
+                />
+              ),
+              children: (
+                <Column fullX gap="sm">
+                  {inspection?.utxos.map((utxo, index) => {
+                    const status = utxo.locked
+                      ? t('rgb_fee_pool_locked')
+                      : utxo.pending
+                        ? t('pending')
+                        : t('available');
+                    const statusColor = utxo.locked ? 'textDim' : utxo.pending ? 'gold' : 'success';
+                    return (
+                      <Row
+                        key={`${utxo.txid}:${utxo.vout}`}
+                        itemsCenter
+                        gap="md"
+                        style={feeUtxoCardStyle}
+                        onClick={() => nav.navToExplorerTx(utxo.txid)}>
+                        <Text text={index + 1} color="textDim" size="sm" style={feeUtxoSequenceStyle} />
+                        <Column fullX gap="xs" style={{ minWidth: 0 }}>
+                          <Row full justifyBetween itemsCenter gap="sm">
+                            <Text
+                              text={`${shortValue(utxo.txid)}:${utxo.vout}`}
+                              color="white"
+                              preset="bold"
+                              size="sm"
+                              style={{ flex: 1, minWidth: 0 }}
+                            />
+                            <Row itemsCenter gap="sm">
+                              <div style={statusPillStyle(utxo.available, utxo.pending, utxo.locked)}>
+                                <Text text={status} color={statusColor} size="xxs" />
+                              </div>
+                              <Icon icon="right" color="textDim" size={14} />
+                            </Row>
+                          </Row>
+                          <Text text={`${utxo.satoshis.toLocaleString()} sats`} color="textDim" size="xs" />
+                        </Column>
+                      </Row>
+                    );
+                  })}
+                  {inspection && !inspection.utxos.length ? (
+                    <Column fullX itemsCenter gap="sm" style={emptyStateCardStyle}>
+                      <Icon icon="emptyBox" color="textDim" size={32} />
+                      <Text text={t('rgb_fee_pool_empty')} color="white" size="sm" />
+                      <Text text={t('rgb_fee_pool_empty_description')} color="textDim" size="xs" textCenter wrap />
+                    </Column>
+                  ) : null}
+                </Column>
+              )
+            },
+            {
+              key: 'withdrawals',
+              label: (
+                <Text
+                  text={`${t('rgb_fee_pool_transfer_history')} (${inspection?.withdrawals.length || 0})`}
+                  size="sm"
+                  color={activeTab === 'withdrawals' ? 'gold' : 'textDim'}
+                />
+              ),
+              children: (
+                <Column fullX gap="sm">
+                  {inspection?.withdrawals.map((withdrawal) => (
+                    <Row
+                      key={withdrawal.txid}
+                      itemsCenter
+                      justifyBetween
+                      gap="md"
+                      style={feeUtxoCardStyle}
+                      onClick={() => nav.navToExplorerTx(withdrawal.txid)}>
+                      <Column gap="xs" style={{ minWidth: 0 }}>
+                        <Text text={t('rgb_fee_pool_transferred_to_wallet')} color="white" preset="bold" size="sm" />
+                        <Text text={shortValue(withdrawal.txid)} color="textDim" size="xs" />
+                        <Text text={new Date(withdrawal.createdAt).toLocaleString()} color="textDim" size="xs" />
+                      </Column>
+                      <Row itemsCenter gap="sm" style={{ flexShrink: 0 }}>
+                        <Text text={`${withdrawal.amount.toLocaleString()} sats`} color="white" size="sm" />
+                        <Icon icon="right" color="textDim" size={14} />
+                      </Row>
+                    </Row>
+                  ))}
+                  {inspection && !inspection.withdrawals.length ? (
+                    <Column fullX itemsCenter gap="sm" style={emptyStateCardStyle}>
+                      <Icon icon="emptyBox" color="textDim" size={32} />
+                      <Text text={t('rgb_fee_pool_no_transfers')} color="textDim" size="sm" textCenter wrap />
+                    </Column>
+                  ) : null}
+                </Column>
+              )
+            }
+          ]}
+        />
       </Content>
-      <Row style={{ padding: '0 16px 16px' }}>
-        <Button
-          text={t('rgb_fee_pool_withdraw')}
-          preset="default"
-          disabled={!canWithdraw}
-          onClick={() => void requestWrite(() => void beginWithdraw())}
-          style={{ flex: 1 }}
+      {activeTab === 'utxos' ? (
+        <Row style={{ padding: '0 16px 16px' }}>
+          <Button
+            text={t('rgb_fee_pool_transfer_to_wallet')}
+            preset="default"
+            disabled={!canWithdraw}
+            onClick={() => void requestWrite(() => void beginWithdraw())}
+            style={{ flex: 1 }}
+          />
+          <Button
+            text={t('refresh')}
+            preset="primary"
+            disabled={refreshing}
+            onClick={() => void refresh(true)}
+            style={{ flex: 1 }}
+          />
+        </Row>
+      ) : (
+        <Text
+          text={t('rgb_fee_pool_local_history_notice')}
+          color="textDim"
+          size="xs"
+          textCenter
+          wrap
+          style={{ padding: '8px 28px 16px' }}
         />
-        <Button
-          text={t('refresh')}
-          preset="primary"
-          disabled={refreshing}
-          onClick={() => void refresh(true)}
-          style={{ flex: 1 }}
-        />
-      </Row>
+      )}
       {writeLeaseModal}
     </Layout>
   );

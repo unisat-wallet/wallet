@@ -3005,9 +3005,6 @@
   "rgb_fee_pool_title": {
     "message": "Pool de frais RGB"
   },
-  "rgb_fee_address": {
-    "message": "Adresse des frais RGB"
-  },
   "rgb_asset_address": {
     "message": "Adresse d’actifs RGB"
   },
@@ -3033,14 +3030,29 @@
   "rgb_invoice_expiry_24h": { "message": "24 heures" },
   "rgb_invoice_expiry_7d": { "message": "7 jours" },
   "rgb_invoice_expiry_never": { "message": "N’expire jamais" },
-  "rgb_fee_address_description": {
-    "message": "Voir les UTXO de frais RGB et retirer les BTC inutilisés"
+  "rgb_fee_pool_description": {
+    "message": "Voir les UTXO de frais RGB et transférer les BTC inutilisés vers votre portefeuille"
   },
   "rgb_fee_pool_locked": {
     "message": "Verrouillé"
   },
-  "rgb_fee_pool_withdraw": {
-    "message": "Retirer vers le portefeuille BTC"
+  "rgb_fee_pool_transfer_to_wallet": {
+    "message": "Transférer vers le portefeuille BTC"
+  },
+  "rgb_fee_pool_transfer_history": {
+    "message": "Historique des transferts"
+  },
+  "rgb_fee_pool_transferred_to_wallet": {
+    "message": "Transféré vers le portefeuille BTC"
+  },
+  "rgb_fee_pool_utxos": {
+    "message": "UTXOs"
+  },
+  "rgb_fee_pool_no_transfers": {
+    "message": "Aucun historique de transfert"
+  },
+  "rgb_fee_pool_local_history_notice": {
+    "message": "L’historique des transferts est enregistré localement sur cet appareil. Les 20 enregistrements les plus récents sont affichés."
   },
   "rgb_fee_pool_empty": {
     "message": "Aucun UTXO de frais RGB trouvé"

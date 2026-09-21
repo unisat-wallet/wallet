@@ -58,8 +58,8 @@ export function RgbCard() {
         <Row gap="md" itemsCenter style={{ minWidth: 0 }}>
           <Icon icon="btc" color="gold" size={20} />
           <Column gap="xs" style={{ minWidth: 0 }}>
-            <Text text={t('rgb_fee_address')} color="white" size="sm" />
-            <Text text={t('rgb_fee_address_description')} color="textDim" size="xs" />
+            <Text text={t('rgb_fee_pool_title')} color="white" size="sm" />
+            <Text text={t('rgb_fee_pool_description')} color="textDim" size="xs" />
           </Column>
         </Row>
         <Icon icon="right" size={fontSizes.lg} color="textDim" />

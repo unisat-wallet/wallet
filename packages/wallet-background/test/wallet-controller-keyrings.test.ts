@@ -34,6 +34,8 @@ vi.mock('../src/services', () => ({
     createTmpKeyring: vi.fn(),
     displayForKeyring: vi.fn(),
     importPublicKeyOnly: vi.fn(),
+    getEncryptedStorageItem: vi.fn(),
+    setEncryptedStorageItem: vi.fn(),
     keyrings: [],
   },
   preferenceService: {
@@ -278,6 +280,7 @@ describe('RGB fee-pool inspection', () => {
 
     expect(inspection.ready).toBe(true)
     expect(inspection.availableCount).toBe(2)
+    expect(inspection.withdrawals).toEqual([])
     expect(inspection.utxos).toEqual(
       expect.arrayContaining([
         expect.objectContaining({ txid: 'a'.repeat(64), vout: 0, available: true, locked: false }),
@@ -958,6 +961,7 @@ describe('RGB wallet references', () => {
     })
     const service = { removeFeePoolUtxos: vi.fn().mockResolvedValue(undefined) }
     const localWallet = { fundingAddress: feeAddress, network: 'mainnet', walletId: 'rgb-wallet' }
+    vi.mocked(preferenceService.getCurrentAccount).mockReturnValue({ address: feeAddress } as any)
     vi.spyOn(wallet as any, 'getLocalRgbService').mockResolvedValue({ service, wallet: localWallet })
     const ensureLease = vi.spyOn(wallet as any, 'ensureRgbWriteLease').mockResolvedValue(undefined)
     const pushTx = vi.spyOn(wallet, 'pushTx').mockResolvedValue('d'.repeat(64))
@@ -968,6 +972,17 @@ describe('RGB wallet references', () => {
     expect(ensureLease).toHaveBeenCalledWith({ service, wallet: localWallet }, { forceRenew: true })
     expect(ensureLease.mock.invocationCallOrder[0]).toBeLessThan(pushTx.mock.invocationCallOrder[0])
     expect(service.removeFeePoolUtxos).toHaveBeenCalledWith([{ txid: 'c'.repeat(64), vout: 2 }])
+    expect(keyringService.setEncryptedStorageItem).toHaveBeenCalledWith(
+      'rgb-local-history-v1',
+      'mainnet:rgb-wallet',
+      [
+        expect.objectContaining({
+          txid: 'd'.repeat(64),
+          amount: 9_000,
+          destination: feeAddress,
+        }),
+      ]
+    )
   })
 
   it('persists broadcast RGB funding UTXOs before retrying indexer synchronization', async () => {
