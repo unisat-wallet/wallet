@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 
 import { Card, Column, Content, Footer, Header, Icon, Layout, Row, Text } from '@/ui/components';
 import AccountSelect from '@/ui/components/AccountSelect';
@@ -132,7 +132,49 @@ export default function WalletTabScreen() {
   }, []);
 
   const supportedAssets = useSupportedAssets();
-  const isRgbView = walletView === WalletView.RGB && supportedAssets.assets.rgb;
+  const [rgbFeatureEnabled, setRgbFeatureEnabled] = useState(false);
+  const [rgbFeatureReady, setRgbFeatureReady] = useState(false);
+
+  useEffect(() => {
+    let active = true;
+    if (!supportedAssets.assets.rgb) {
+      setRgbFeatureEnabled(false);
+      setRgbFeatureReady(true);
+      return () => {
+        active = false;
+      };
+    }
+    setRgbFeatureReady(false);
+    void wallet
+      .getRgbFeatureStatus()
+      .then((status) => {
+        if (!active) return;
+        setRgbFeatureEnabled(status.enabled && status.supported);
+      })
+      .catch(() => {
+        if (active) setRgbFeatureEnabled(false);
+      })
+      .finally(() => {
+        if (active) setRgbFeatureReady(true);
+      });
+    return () => {
+      active = false;
+    };
+  }, [chain.enum, currentAccount?.key, currentKeyring?.key, supportedAssets.assets.rgb, wallet]);
+
+  useEffect(() => {
+    if (rgbFeatureReady && !rgbFeatureEnabled && walletView === WalletView.RGB) {
+      dispatch(uiActions.setWalletView(WalletView.BITCOIN));
+    }
+  }, [dispatch, rgbFeatureEnabled, rgbFeatureReady, walletView]);
+
+  const onRgbFeatureEnabled = useCallback(() => {
+    setRgbFeatureEnabled(true);
+    setRgbFeatureReady(true);
+    dispatch(uiActions.setWalletView(WalletView.RGB));
+  }, [dispatch]);
+
+  const isRgbView = walletView === WalletView.RGB && supportedAssets.assets.rgb && rgbFeatureEnabled;
   const rgbList = useRGBListLogic({ autoRefresh: true, enabled: isRgbView });
   const rgbTransfers = useRGBTransfersLogic({ enabled: isRgbView });
 
@@ -196,7 +238,11 @@ export default function WalletTabScreen() {
         <Column gap="lg2">
           <HomeTips />
 
-          <BalanceCardCarousel rgbList={rgbList} />
+          <BalanceCardCarousel
+            rgbList={rgbList}
+            rgbFeatureEnabled={rgbFeatureEnabled}
+            onRgbFeatureEnabled={onRgbFeatureEnabled}
+          />
           <WalletActions chain={chain} walletView={isRgbView ? WalletView.RGB : WalletView.BITCOIN} />
 
           {!isRgbView ? <AnnouncementCard /> : null}

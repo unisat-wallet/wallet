@@ -448,12 +448,20 @@ type RgbControllerApiService = {
 const getRgbApiService = () => (walletApiService as unknown as { rgb: RgbControllerApiService }).rgb
 
 const RGB_DEVICE_ID_STORAGE_KEY = 'rgb-device-id:v1'
+const RGB_FEATURE_STORAGE_KEY_PREFIX = 'rgb-feature-enabled:v1'
+const RGB_FEATURE_TERMS_VERSION = 'rgb-terms-v1'
 
 type RgbWalletRef = {
   walletId?: string
   fundingAddress: string
   network?: string
   transportEndpoint?: string
+}
+
+type RgbFeatureConsent = {
+  enabled: true
+  agreementVersion: string
+  acceptedAt: number
 }
 
 type RgbReceiveInvoiceRequest = {
@@ -3513,7 +3521,7 @@ export class WalletController extends BaseController {
   }
 
   getRgbAssetList = async (_address: string, currentPage: number, pageSize: number) => {
-    this.assertRgbEnabled()
+    await this.assertRgbEnabled()
     const { service } = await this.getLocalRgbReadService()
     const { total, list } = service.getLocalAssetList(currentPage, pageSize)
     return {
@@ -3552,7 +3560,7 @@ export class WalletController extends BaseController {
   }
 
   getRgbAssetBalance = async (_address: string, assetId: string) => {
-    this.assertRgbEnabled()
+    await this.assertRgbEnabled()
     const { service } = await this.getLocalRgbReadService()
     return service.getLocalAssetBalance(assetId)
   }
@@ -3566,7 +3574,7 @@ export class WalletController extends BaseController {
   }
 
   getRgbAssetDetail = async (assetId: string) => {
-    this.assertRgbEnabled()
+    await this.assertRgbEnabled()
     const { service } = await this.getLocalRgbReadService()
     return service.getLocalAssetDetail(assetId)
   }
@@ -3588,7 +3596,8 @@ export class WalletController extends BaseController {
     address?: string,
     type?: RgbActivityType
   ) => {
-    this.assertRgbEnabled()
+    await this.assertRgbEnabled()
+    await this.assertRgbFeatureEnabled()
     const page = currentPage
     const params: {
       page: number
@@ -3646,7 +3655,8 @@ export class WalletController extends BaseController {
     assetId?: string,
     type?: RgbActivityType
   ) => {
-    this.assertRgbEnabled()
+    await this.assertRgbEnabled()
+    await this.assertRgbFeatureEnabled()
     const page = currentPage
     const params: {
       page: number
@@ -3762,8 +3772,66 @@ export class WalletController extends BaseController {
     pageSize: number,
     options?: { skipSync?: boolean }
   ) => {
-    this.assertRgbEnabled()
+    await this.assertRgbEnabled()
     return this.rgbTransferQuery.getTransfers(currentPage, pageSize, options)
+  }
+
+  /** RGB activation is local to this installation and applies to the whole HD wallet. */
+  getRgbFeatureStatus = async (): Promise<{ enabled: boolean; supported: boolean }> => {
+    try {
+      const wallet = await this.getCurrentRgbWalletRef()
+      return { enabled: await this.isRgbFeatureEnabled(wallet), supported: true }
+    } catch (error) {
+      if (String(error).includes('RGB is not enabled for wallet chain')) {
+        return { enabled: false, supported: false }
+      }
+      throw error
+    }
+  }
+
+  /** User consent is required before opening local RGB state or contacting RGB services. */
+  enableRgbFeature = async (): Promise<{ enabled: true }> => {
+    const wallet = await this.getCurrentRgbWalletRef()
+    await keyringService.setEncryptedStorageItem(
+      RGB_ENCRYPTED_STORAGE_NAMESPACE,
+      this.rgbFeatureStorageKey(wallet),
+      {
+        enabled: true,
+        agreementVersion: RGB_FEATURE_TERMS_VERSION,
+        acceptedAt: Date.now(),
+      } satisfies RgbFeatureConsent
+    )
+    // First enable is intentionally the first point at which recovery is
+    // opened. This prevents an inactive RGB card from reading cloud state.
+    await this.getLocalRgbService()
+    return { enabled: true }
+  }
+
+  private rgbFeatureStorageKey(wallet: Pick<RgbWalletRef, 'walletId' | 'network' | 'fundingAddress'>) {
+    // walletId is `unisat-<master fingerprint>-<account index>`. Consent is
+    // deliberately shared by all accounts derived from the same HD wallet.
+    const walletScope = wallet.walletId?.replace(/-\d+$/, '')
+    if (!walletScope) throw new Error('RGB wallet identity is unavailable')
+    return `${RGB_FEATURE_STORAGE_KEY_PREFIX}:${walletScope}`
+  }
+
+  private isRgbFeatureConsent(value: unknown): value is true | RgbFeatureConsent {
+    return value === true || (typeof value === 'object' && value !== null && (value as RgbFeatureConsent).enabled === true)
+  }
+
+  private async isRgbFeatureEnabled(wallet: Pick<RgbWalletRef, 'walletId' | 'network' | 'fundingAddress'>) {
+    const consent = await keyringService.getEncryptedStorageItem<boolean | RgbFeatureConsent>(
+      RGB_ENCRYPTED_STORAGE_NAMESPACE,
+      this.rgbFeatureStorageKey(wallet)
+    )
+    return this.isRgbFeatureConsent(consent)
+  }
+
+  private async assertRgbFeatureEnabled() {
+    const wallet = await this.getCurrentRgbWalletRef()
+    if (!(await this.isRgbFeatureEnabled(wallet))) {
+      throw new Error('RGB is not enabled for this wallet. Enable RGB before continuing.')
+    }
   }
 
   private assertRgbEnabled = () => {
@@ -3803,7 +3871,8 @@ export class WalletController extends BaseController {
     path: string
     body: unknown
   }) => {
-    this.assertRgbEnabled()
+    await this.assertRgbEnabled()
+    await this.assertRgbFeatureEnabled()
     const account = preferenceService.getCurrentAccount()
     if (!account) throw new Error('no current account')
     assertCanCreateSigningRequest(account)
@@ -3847,7 +3916,8 @@ export class WalletController extends BaseController {
     derivationPath: string
     masterFingerprint: string
   }> => {
-    this.assertRgbEnabled()
+    await this.assertRgbEnabled()
+    await this.assertRgbFeatureEnabled()
     const account = preferenceService.getCurrentAccount()
     if (!account) throw new Error('no current account')
     assertCanCreateSigningRequest(account)
@@ -3866,7 +3936,8 @@ export class WalletController extends BaseController {
     derivationPath: string
     masterFingerprint: string
   }> => {
-    this.assertRgbEnabled()
+    await this.assertRgbEnabled()
+    await this.assertRgbFeatureEnabled()
     const account = preferenceService.getCurrentAccount()
     if (!account) throw new Error('no current account')
     assertCanCreateSigningRequest(account)
@@ -5239,6 +5310,7 @@ export class WalletController extends BaseController {
 
   /** Open encrypted local RGB state for read-only UI queries. */
   private getLocalRgbReadService = async (): Promise<LocalRgbServiceContext> => {
+    await this.assertRgbFeatureEnabled()
     const context = await this.rgbServiceRegistry.get()
     // Recovery authenticates remote state before enabling writes, but must
     // never hold up a local list, balance, or detail response.
@@ -5250,6 +5322,7 @@ export class WalletController extends BaseController {
 
   /** Open RGB state for operations that may mutate it or write to the backend. */
   private getLocalRgbService = async (): Promise<LocalRgbServiceContext> => {
+    await this.assertRgbFeatureEnabled()
     const context = await this.rgbServiceRegistry.get()
     // Unlike UI reads, mutations must wait until recovery has established the
     // checkpoint revision used for safe writes.

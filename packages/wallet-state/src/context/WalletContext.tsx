@@ -601,6 +601,10 @@ export interface WalletController {
     options?: { skipSync?: boolean }
   ): Promise<{ currentPage: number; pageSize: number; total: number; list: RgbBalance[] }>
 
+  /** RGB is opt-in per device, wallet, and network. */
+  getRgbFeatureStatus(): Promise<{ enabled: boolean; supported: boolean }>
+  enableRgbFeature(): Promise<{ enabled: true }>
+
   getRGBAssetBalance(address: string, assetId: string): Promise<RgbBalance | undefined>
 
   getRGBAssetDetail(address: string, assetId: string): Promise<RgbAssetDetail>

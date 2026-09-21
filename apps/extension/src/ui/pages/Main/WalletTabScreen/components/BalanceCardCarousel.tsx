@@ -1,7 +1,8 @@
 import React, { CSSProperties, useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 
-import { Column, Icon, Image, Row, Text } from '@/ui/components';
+import { Button, Column, Icon, Image, Row, Text } from '@/ui/components';
 import { RefreshButton } from '@/ui/components/RefreshButton';
+import { RgbFeatureActivationModal } from '@/ui/pages/RGB/components/RgbFeatureActivationModal';
 import {
   WalletView,
   uiActions,
@@ -13,6 +14,8 @@ import {
   useRGBUsdtBalanceCardLogic,
   useSupportedAssets,
   useToggleBalanceCardDetailExpanded,
+  useTools,
+  useWallet,
   useWalletView
 } from '@unisat/wallet-state';
 import { ChainType } from '@unisat/wallet-types';
@@ -523,6 +526,56 @@ function UnsupportedRGBBalanceCard({
   );
 }
 
+function InactiveRGBBalanceCard({
+  suppressClickRef,
+  onEnable
+}: {
+  suppressClickRef: React.MutableRefObject<boolean>;
+  onEnable: () => void;
+}) {
+  const { t } = useI18n();
+  return (
+    <Column
+      fullX
+      style={{
+        background: 'linear-gradient(131deg, #7467E8 1.38%, #584AC7 47.46%, #342E80 94.19%)',
+        borderRadius: 16,
+        padding: 12,
+        position: 'relative',
+        overflow: 'hidden',
+        minHeight: COLLAPSED_CARD_MIN_HEIGHT,
+        height: '100%',
+        boxSizing: 'border-box',
+        justifyContent: 'center',
+        alignItems: 'center',
+        gap: 8
+      }}
+      onClick={(event) => {
+        if (suppressClickRef.current) return;
+        event.stopPropagation();
+        onEnable();
+      }}>
+      <Icon
+        icon="rgb"
+        color="white"
+        size={72}
+        style={{ position: 'absolute', top: -2, right: 8, opacity: 0.18, pointerEvents: 'none' }}
+      />
+      <Row itemsCenter gap="sm" style={{ position: 'absolute', top: 12, left: 12 }}>
+        <Text text={t('rgb_assets')} size="sm" style={{ color: 'rgba(255,255,255,0.72)', fontWeight: 600 }} />
+        <div style={{ ...rgbBadgeStyle, backgroundColor: 'rgba(255,255,255,0.16)' }}>
+          <Icon icon="rgb" size={14} color="white" />
+          <Text text="RGB" size="xs" style={{ color: 'rgba(255,255,255,0.8)', fontWeight: 600 }} />
+        </div>
+      </Row>
+      <Text text="Enable RGB to manage RGB assets" textCenter size="sm" style={{ color: 'rgba(255,255,255,0.78)', fontWeight: 600 }} />
+      <div onClick={(event) => event.stopPropagation()}>
+        <Button text="Enable RGB" preset="primary" onClick={onEnable} />
+      </div>
+    </Column>
+  );
+}
+
 function isCardActionTarget(target: EventTarget | null) {
   return target instanceof Element && Boolean(target.closest('[data-card-action]'));
 }
@@ -666,15 +719,27 @@ function SyncedBalanceCard({
   );
 }
 
-export function BalanceCardCarousel({ rgbList }: { rgbList: ReturnType<typeof useRGBListLogic> }) {
+export function BalanceCardCarousel({
+  rgbList,
+  rgbFeatureEnabled,
+  onRgbFeatureEnabled
+}: {
+  rgbList: ReturnType<typeof useRGBListLogic>;
+  rgbFeatureEnabled: boolean;
+  onRgbFeatureEnabled: () => void;
+}) {
   const supportedAssets = useSupportedAssets();
   const chain = useChain();
   const walletView = useWalletView();
   const dispatch = useAppDispatch();
+  const wallet = useWallet();
+  const tools = useTools();
   const navigate = useNavigate();
   const containerRef = useRef<HTMLDivElement>(null);
   const [containerWidth, setContainerWidth] = useState(0);
   const [unsupportedPreviewIndex, setUnsupportedPreviewIndex] = useState(0);
+  const [activationOpen, setActivationOpen] = useState(false);
+  const [activationLoading, setActivationLoading] = useState(false);
   // Avoid animating from BTC → USDT when remounting after navigation back.
   const [enableTransition, setEnableTransition] = useState(false);
 
@@ -682,21 +747,23 @@ export function BalanceCardCarousel({ rgbList }: { rgbList: ReturnType<typeof us
   const toggleDetailExpanded = useToggleBalanceCardDetailExpanded();
 
   const isRgbFullySupported = supportedAssets.assets.rgb;
+  const isRgbFeatureActive = isRgbFullySupported && rgbFeatureEnabled;
   const canShowRgbCard = supportedAssets.assets.rgbCard;
   const isUnsupportedRgbCard = canShowRgbCard && !isRgbFullySupported;
+  const isInactiveRgbCard = canShowRgbCard && isRgbFullySupported && !rgbFeatureEnabled;
   const useGenericRgbCard = chain.enum !== ChainType.BITCOIN_MAINNET;
-  const activeIndex = isRgbFullySupported ? (walletView === WalletView.RGB ? 1 : 0) : unsupportedPreviewIndex;
+  const activeIndex = isRgbFeatureActive ? (walletView === WalletView.RGB ? 1 : 0) : unsupportedPreviewIndex;
 
   const setActiveIndex = useCallback(
     (index: number) => {
-      if (isRgbFullySupported) {
+      if (isRgbFeatureActive) {
         dispatch(uiActions.setWalletView(index === 1 ? WalletView.RGB : WalletView.BITCOIN));
         return;
       }
       // Single / non-HD wallets keep BTC actions + asset list while previewing the USDT card.
       setUnsupportedPreviewIndex(index);
     },
-    [dispatch, isRgbFullySupported]
+    [dispatch, isRgbFeatureActive]
   );
 
   useLayoutEffect(() => {
@@ -749,10 +816,23 @@ export function BalanceCardCarousel({ rgbList }: { rgbList: ReturnType<typeof us
   }, [navigate]);
 
   useEffect(() => {
-    if (!isRgbFullySupported && walletView === WalletView.RGB) {
+    if (!isRgbFeatureActive && walletView === WalletView.RGB) {
       dispatch(uiActions.setWalletView(WalletView.BITCOIN));
     }
-  }, [dispatch, isRgbFullySupported, walletView]);
+  }, [dispatch, isRgbFeatureActive, walletView]);
+
+  const onEnableRgb = useCallback(async () => {
+    setActivationLoading(true);
+    try {
+      await wallet.enableRgbFeature();
+      setActivationOpen(false);
+      onRgbFeatureEnabled();
+    } catch (error) {
+      tools.toastError(error instanceof Error ? error.message : String(error));
+    } finally {
+      setActivationLoading(false);
+    }
+  }, [onRgbFeatureEnabled, tools, wallet]);
 
   useEffect(() => {
     if (!canShowRgbCard) {
@@ -768,7 +848,8 @@ export function BalanceCardCarousel({ rgbList }: { rgbList: ReturnType<typeof us
   const translateX = containerWidth > 0 ? -(snapOffset - dragOffset) : 0;
 
   return (
-    <div ref={containerRef} style={carouselContainerStyle}>
+    <>
+      <div ref={containerRef} style={carouselContainerStyle}>
       <div
         style={{
           ...carouselTrackStyle,
@@ -799,7 +880,12 @@ export function BalanceCardCarousel({ rgbList }: { rgbList: ReturnType<typeof us
             cursor: activeIndex === 1 ? undefined : 'pointer'
           }}
           onClickCapture={handlePeekCardClickCapture(1)}>
-          {isUnsupportedRgbCard ? (
+          {isInactiveRgbCard ? (
+            <InactiveRGBBalanceCard
+              suppressClickRef={suppressClickRef}
+              onEnable={() => setActivationOpen(true)}
+            />
+          ) : isUnsupportedRgbCard ? (
             <UnsupportedRGBBalanceCard
               suppressClickRef={suppressClickRef}
               onSwitchWallet={onSwitchWallet}
@@ -822,6 +908,14 @@ export function BalanceCardCarousel({ rgbList }: { rgbList: ReturnType<typeof us
           )}
         </div>
       </div>
-    </div>
+      </div>
+      {activationOpen ? (
+        <RgbFeatureActivationModal
+          loading={activationLoading}
+          onClose={() => setActivationOpen(false)}
+          onEnable={() => void onEnableRgb()}
+        />
+      ) : null}
+    </>
   );
 }

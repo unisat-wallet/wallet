@@ -132,6 +132,8 @@ export function createWalletMock() {
     getRGBAssetDetail: vi.fn(),
     getRGBAssetActivity: vi.fn(),
     getRGBList: vi.fn().mockResolvedValue({ list: [], total: 0 }),
+    getRgbFeatureStatus: vi.fn().mockResolvedValue({ enabled: true, supported: true }),
+    enableRgbFeature: vi.fn().mockResolvedValue({ enabled: true }),
     getRgbFundingAddress: vi.fn().mockResolvedValue({ address: 'bc1p-rgb-funding' }),
     getRgbTransfers: vi.fn().mockResolvedValue({ list: [], total: 0 }),
     checkRgbInvoiceAvailability: vi.fn().mockResolvedValue({ available: true }),
