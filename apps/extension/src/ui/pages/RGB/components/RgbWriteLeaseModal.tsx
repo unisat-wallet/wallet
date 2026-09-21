@@ -17,26 +17,26 @@ export function RgbWriteLeaseModal({
   return (
     <BottomModal onClose={loading ? undefined : onClose}>
       <Column gap="lg">
-        <Text text="RGB wallet in use" color="white" size="lg" textCenter />
+        <Text text="Another device is using RGB" color="white" size="lg" textCenter />
         <Text
           text={
             expires
-              ? `Another device is writing to this RGB wallet until about ${expires}. You can still view assets and activity.`
-              : 'Another device is writing to this RGB wallet. You can still view assets and activity.'
+              ? `It currently holds this wallet's RGB write permission until about ${expires}. You can still safely view assets and activity here.`
+              : 'It currently holds this wallet\'s RGB write permission. You can still safely view assets and activity here.'
           }
           color="white_muted2"
           size="sm"
           wrap
         />
         <Text
-          text="Take over only after the other device has stopped. Its in-flight RGB operation will be rejected."
+          text="Only take over after the other device has stopped. Taking over immediately blocks its in-progress Invoice, transfer, receive, release, or issuance operation; any unsynced operation there may fail and must be reopened after it syncs."
           color="gold"
           size="xs"
           wrap
         />
         <Row gap="sm" fullX>
           <Button text="Keep read-only" preset="default" disabled={loading} onClick={onClose} style={{ flex: 1 }} />
-          <Button text={loading ? 'Taking over...' : 'Take over'} preset="primary" disabled={loading} onClick={onTakeover} style={{ flex: 1 }} />
+          <Button text={loading ? 'Taking over...' : 'Take over writing'} preset="primary" disabled={loading} onClick={onTakeover} style={{ flex: 1 }} />
         </Row>
       </Column>
     </BottomModal>
