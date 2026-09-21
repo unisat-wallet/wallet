@@ -403,6 +403,14 @@ export interface RgbRecoveryCheckpointReadResult {
   kind?: 'normal' | 'replacement'
 }
 
+export interface RgbRecoveryCheckpointMetadataResult {
+  exists: boolean
+  updatedAt?: number
+  revision?: string
+  generation?: number
+  kind?: 'normal' | 'replacement'
+}
+
 export interface RgbReceiveInvoiceRequest {
   wallet: RgbWalletRef
   assetId?: string

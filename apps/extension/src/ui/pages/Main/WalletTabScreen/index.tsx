@@ -134,11 +134,13 @@ export default function WalletTabScreen() {
   const supportedAssets = useSupportedAssets();
   const [rgbFeatureEnabled, setRgbFeatureEnabled] = useState(false);
   const [rgbFeatureReady, setRgbFeatureReady] = useState(false);
+  const [rgbRemoteRecoveryAvailable, setRgbRemoteRecoveryAvailable] = useState(false);
 
   useEffect(() => {
     let active = true;
     if (!supportedAssets.assets.rgb) {
       setRgbFeatureEnabled(false);
+      setRgbRemoteRecoveryAvailable(false);
       setRgbFeatureReady(true);
       return () => {
         active = false;
@@ -150,9 +152,13 @@ export default function WalletTabScreen() {
       .then((status) => {
         if (!active) return;
         setRgbFeatureEnabled(status.enabled && status.supported);
+        setRgbRemoteRecoveryAvailable(!status.enabled && status.supported && status.remoteRecoveryAvailable);
       })
       .catch(() => {
-        if (active) setRgbFeatureEnabled(false);
+        if (active) {
+          setRgbFeatureEnabled(false);
+          setRgbRemoteRecoveryAvailable(false);
+        }
       })
       .finally(() => {
         if (active) setRgbFeatureReady(true);
@@ -171,6 +177,7 @@ export default function WalletTabScreen() {
   const onRgbFeatureEnabled = useCallback(() => {
     setRgbFeatureEnabled(true);
     setRgbFeatureReady(true);
+    setRgbRemoteRecoveryAvailable(false);
     dispatch(uiActions.setWalletView(WalletView.RGB));
   }, [dispatch]);
 
@@ -241,6 +248,7 @@ export default function WalletTabScreen() {
           <BalanceCardCarousel
             rgbList={rgbList}
             rgbFeatureEnabled={rgbFeatureEnabled}
+            rgbRemoteRecoveryAvailable={rgbRemoteRecoveryAvailable}
             onRgbFeatureEnabled={onRgbFeatureEnabled}
           />
           <WalletActions chain={chain} walletView={isRgbView ? WalletView.RGB : WalletView.BITCOIN} />

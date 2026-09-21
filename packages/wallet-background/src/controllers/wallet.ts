@@ -237,6 +237,13 @@ type RgbControllerApiService = {
     generation?: number
     kind?: 'normal' | 'replacement'
   }>
+  getRgbRecoveryCheckpointMetadata: (params: { wallet: RgbWalletRef }) => Promise<{
+    exists: boolean
+    updatedAt?: number
+    revision?: string
+    generation?: number
+    kind?: 'normal' | 'replacement'
+  }>
   getRgbAssetDetail: (assetId: string) => Promise<unknown>
   getRgbAssetActivity: (
     assetId: string,
@@ -3777,13 +3784,35 @@ export class WalletController extends BaseController {
   }
 
   /** RGB activation is local to this installation and applies to the whole HD wallet. */
-  getRgbFeatureStatus = async (): Promise<{ enabled: boolean; supported: boolean }> => {
+  getRgbFeatureStatus = async (): Promise<{
+    enabled: boolean
+    supported: boolean
+    remoteRecoveryAvailable: boolean
+  }> => {
     try {
       const wallet = await this.getCurrentRgbWalletRef()
-      return { enabled: await this.isRgbFeatureEnabled(wallet), supported: true }
+      const enabled = await this.isRgbFeatureEnabled(wallet)
+      if (enabled) return { enabled: true, supported: true, remoteRecoveryAvailable: false }
+
+      // Do not open, download, or decrypt RGB state before consent. The
+      // metadata endpoint only tells the activation UI whether this wallet
+      // already has an encrypted recovery checkpoint on the backend.
+      try {
+        const recovery = await getRgbApiService().getRgbRecoveryCheckpointMetadata({ wallet })
+        return { enabled: false, supported: true, remoteRecoveryAvailable: recovery.exists === true }
+      } catch (error) {
+        // Activation remains available when offline or while an older backend
+        // is rolling out. enableRgbFeature will perform the authoritative
+        // recovery read after the user accepts the terms.
+        log.debug('RGB recovery: unable to check activation metadata', {
+          wallet: `${wallet.network || 'unknown'}:${wallet.fundingAddress.slice(-8)}`,
+          error: String(error),
+        })
+        return { enabled: false, supported: true, remoteRecoveryAvailable: false }
+      }
     } catch (error) {
       if (String(error).includes('RGB is not enabled for wallet chain')) {
-        return { enabled: false, supported: false }
+        return { enabled: false, supported: false, remoteRecoveryAvailable: false }
       }
       throw error
     }
@@ -3872,7 +3901,13 @@ export class WalletController extends BaseController {
     body: unknown
   }) => {
     await this.assertRgbEnabled()
-    await this.assertRgbFeatureEnabled()
+    // This endpoint deliberately exposes only whether an encrypted checkpoint
+    // exists. It must be signed by the funding key, but is allowed before
+    // local RGB consent so a restored wallet is not presented as first-time
+    // activation. All payload/state endpoints remain consent-gated.
+    if (request.path !== '/v5/rgb/recovery/checkpoint/metadata') {
+      await this.assertRgbFeatureEnabled()
+    }
     const account = preferenceService.getCurrentAccount()
     if (!account) throw new Error('no current account')
     assertCanCreateSigningRequest(account)

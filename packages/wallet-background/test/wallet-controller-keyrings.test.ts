@@ -401,7 +401,11 @@ describe('RGB wallet references', () => {
     await expect((wallet as any).getLocalRgbReadService()).rejects.toThrow(
       'RGB is not enabled for this wallet'
     )
-    await expect(wallet.getRgbFeatureStatus()).resolves.toEqual({ enabled: false, supported: true })
+    await expect(wallet.getRgbFeatureStatus()).resolves.toEqual({
+      enabled: false,
+      supported: true,
+      remoteRecoveryAvailable: false,
+    })
 
     const openService = vi.spyOn(wallet as any, 'getLocalRgbService').mockResolvedValue(undefined)
     await expect(wallet.enableRgbFeature()).resolves.toEqual({ enabled: true })
@@ -431,7 +435,37 @@ describe('RGB wallet references', () => {
       fundingAddress: 'bc1p-rgb-account-1',
     })
 
-    await expect(wallet.getRgbFeatureStatus()).resolves.toEqual({ enabled: true, supported: true })
+    await expect(wallet.getRgbFeatureStatus()).resolves.toEqual({
+      enabled: true,
+      supported: true,
+      remoteRecoveryAvailable: false,
+    })
+  })
+
+  it('detects an existing encrypted RGB recovery checkpoint without opening RGB state', async () => {
+    const wallet = new WalletController()
+    const walletRef = {
+      walletId: 'rgb-wallet',
+      network: 'mainnet',
+      fundingAddress: 'bc1p-rgb-funding',
+    }
+    ;(keyringService as any).getEncryptedStorageItem = vi.fn().mockResolvedValue(undefined)
+    vi.spyOn(wallet, 'getCurrentRgbWalletRef').mockResolvedValue(walletRef)
+    const getRgbRecoveryCheckpointMetadata = vi.fn().mockResolvedValue({ exists: true, generation: 2 })
+    const openReadService = vi.spyOn(wallet as any, 'getLocalRgbReadService')
+    const originalRgb = (walletApiService as any).rgb
+    ;(walletApiService as any).rgb = { getRgbRecoveryCheckpointMetadata }
+    try {
+      await expect(wallet.getRgbFeatureStatus()).resolves.toEqual({
+        enabled: false,
+        supported: true,
+        remoteRecoveryAvailable: true,
+      })
+      expect(getRgbRecoveryCheckpointMetadata).toHaveBeenCalledWith({ wallet: walletRef })
+      expect(openReadService).not.toHaveBeenCalled()
+    } finally {
+      ;(walletApiService as any).rgb = originalRgb
+    }
   })
 
   it('clears recovery cache entries when encrypted wallet state is discarded', () => {

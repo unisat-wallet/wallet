@@ -27,6 +27,7 @@ import type {
   RgbReceiveTransferSyncRequest,
   RgbRecoveryCheckpointReadRequest,
   RgbRecoveryCheckpointReadResult,
+  RgbRecoveryCheckpointMetadataResult,
   RgbRecoveryCheckpointSaveRequest,
   RgbRecoveryCheckpointSaveResult,
   RgbRecoveryCheckpointUploadCompleteRequest,
@@ -110,6 +111,12 @@ export class RgbService {
     params: RgbRecoveryCheckpointReadRequest
   ): Promise<RgbRecoveryCheckpointReadResult> {
     return this.privatePost('/v5/rgb/recovery/checkpoint/read', params)
+  }
+
+  async getRgbRecoveryCheckpointMetadata(
+    params: RgbRecoveryCheckpointReadRequest
+  ): Promise<RgbRecoveryCheckpointMetadataResult> {
+    return this.privatePost('/v5/rgb/recovery/checkpoint/metadata', params)
   }
 
   async startRgbRecoveryCheckpointUpload(

@@ -464,9 +464,11 @@ function UnsupportedRGBBalanceCard({
 
 function InactiveRGBBalanceCard({
   suppressClickRef,
+  recoveryAvailable,
   onEnable
 }: {
   suppressClickRef: React.MutableRefObject<boolean>;
+  recoveryAvailable: boolean;
   onEnable: () => void;
 }) {
   const { t } = useI18n();
@@ -504,9 +506,14 @@ function InactiveRGBBalanceCard({
           <Text text="RGB" size="xs" style={{ color: 'rgba(255,255,255,0.8)', fontWeight: 600 }} />
         </div>
       </Row>
-      <Text text="Enable RGB to manage RGB assets" textCenter size="sm" style={{ color: 'rgba(255,255,255,0.78)', fontWeight: 600 }} />
+      <Text
+        text={recoveryAvailable ? 'RGB wallet backup found' : 'Enable RGB to manage RGB assets'}
+        textCenter
+        size="sm"
+        style={{ color: 'rgba(255,255,255,0.78)', fontWeight: 600 }}
+      />
       <div onClick={(event) => event.stopPropagation()}>
-        <Button text="Enable RGB" preset="primary" onClick={onEnable} />
+        <Button text={recoveryAvailable ? 'Restore RGB' : 'Enable RGB'} preset="primary" onClick={onEnable} />
       </div>
     </Column>
   );
@@ -658,10 +665,12 @@ function SyncedBalanceCard({
 export function BalanceCardCarousel({
   rgbList,
   rgbFeatureEnabled,
+  rgbRemoteRecoveryAvailable,
   onRgbFeatureEnabled
 }: {
   rgbList: ReturnType<typeof useRGBListLogic>;
   rgbFeatureEnabled: boolean;
+  rgbRemoteRecoveryAvailable: boolean;
   onRgbFeatureEnabled: () => void;
 }) {
   const supportedAssets = useSupportedAssets();
@@ -815,6 +824,7 @@ export function BalanceCardCarousel({
           {isInactiveRgbCard ? (
             <InactiveRGBBalanceCard
               suppressClickRef={suppressClickRef}
+              recoveryAvailable={rgbRemoteRecoveryAvailable}
               onEnable={() => setActivationOpen(true)}
             />
           ) : isUnsupportedRgbCard ? (
@@ -844,6 +854,7 @@ export function BalanceCardCarousel({
       {activationOpen ? (
         <RgbFeatureActivationModal
           loading={activationLoading}
+          recoveryAvailable={rgbRemoteRecoveryAvailable}
           onClose={() => setActivationOpen(false)}
           onEnable={() => void onEnableRgb()}
         />

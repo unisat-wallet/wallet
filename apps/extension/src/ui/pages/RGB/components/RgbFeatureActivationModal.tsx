@@ -13,13 +13,15 @@ function rgbTermsOfUseUrl() {
     : RGB_TERMS_OF_USE_URL;
 }
 
-/** The initial RGB consent is device-local; it is intentionally separate from recovery. */
+/** Consent is local, while encrypted RGB recovery state is wallet-scoped in the backend. */
 export function RgbFeatureActivationModal({
   loading,
+  recoveryAvailable,
   onClose,
   onEnable
 }: {
   loading?: boolean;
+  recoveryAvailable?: boolean;
   onClose: () => void;
   onEnable: () => void;
 }) {
@@ -29,9 +31,13 @@ export function RgbFeatureActivationModal({
   return (
     <BottomModal onClose={loading ? undefined : onClose}>
       <Column gap="lg">
-        <Text text="Enable RGB" color="white" size="lg" textCenter />
+        <Text text={recoveryAvailable ? 'Restore RGB wallet' : 'Enable RGB'} color="white" size="lg" textCenter />
         <Text
-          text="RGB assets use additional local wallet state, encrypted recovery data, and RGB network services. Enabling it will set up RGB for this wallet on this device and restore existing encrypted RGB state if one is available."
+          text={
+            recoveryAvailable
+              ? 'Encrypted RGB wallet data was found for this wallet. After you accept the terms, it will be restored to this device automatically.'
+              : 'RGB assets use additional local wallet state, encrypted recovery data, and RGB network services. Enabling it will set up RGB for this wallet on this device.'
+          }
           color="white_muted2"
           size="sm"
           wrap
@@ -71,7 +77,7 @@ export function RgbFeatureActivationModal({
         <Row gap="sm" fullX>
           <Button text="Not now" preset="default" disabled={loading} onClick={onClose} style={{ flex: 1 }} />
           <Button
-            text={loading ? 'Enabling...' : 'I understand, enable RGB'}
+            text={loading ? (recoveryAvailable ? 'Restoring...' : 'Enabling...') : recoveryAvailable ? 'I understand, restore RGB' : 'I understand, enable RGB'}
             preset="primary"
             disabled={loading || !termsAccepted}
             onClick={onEnable}
