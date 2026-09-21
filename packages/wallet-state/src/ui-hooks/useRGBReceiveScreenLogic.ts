@@ -680,6 +680,14 @@ export function useRGBReceiveScreenLogic() {
       })
       return
     }
+    if (item.invoice) {
+      nav.navigate('RGBInvoiceDetailScreen', {
+        recipientId: item.recipientId,
+        invoice: item.invoice,
+        initialInvoice: item,
+      })
+      return
+    }
     setError('')
     setInvoiceLabel(formatRgbPendingAmount(item.amount, assetTicker, t('any_amount'), assetPrecision))
     setSelectedPendingInvoice(item)

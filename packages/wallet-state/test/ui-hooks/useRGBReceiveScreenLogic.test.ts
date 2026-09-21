@@ -200,6 +200,27 @@ describe('useRGBReceiveScreenLogic', () => {
     })
   })
 
+  it('opens a reusable pending invoice in the dedicated detail screen', () => {
+    const pendingInvoice = {
+      invoice: 'rgb:pending-invoice',
+      recipientId: 'pending-recipient-id',
+      status: 'WaitingConfirmations',
+      kind: 'ReceiveBlind',
+    }
+    const { wrapper, navigation } = createHookTestHarness()
+    const { result } = renderHook(() => useRGBReceiveScreenLogic(), { wrapper })
+
+    act(() => {
+      result.current.onSelectPendingInvoice(pendingInvoice)
+    })
+
+    expect(navigation.navigate).toHaveBeenCalledWith('RGBInvoiceDetailScreen', {
+      recipientId: 'pending-recipient-id',
+      invoice: 'rgb:pending-invoice',
+      initialInvoice: pendingInvoice,
+    })
+  })
+
   it('polls pending invoices awaiting confirmation even when none is selected', async () => {
     const setIntervalSpy = vi.spyOn(global, 'setInterval')
     const waitingInvoice = {

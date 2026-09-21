@@ -10,17 +10,25 @@ import {
   Icon,
   Layout,
   ReceiveQRCodeCard,
+  RGBAssetIcon,
   Row,
   Text
 } from '@/ui/components';
 import { BottomModal } from '@/ui/components/BottomModal';
+import { getRgbAssetName } from '@/ui/components/RGBAssetIcon';
 import { colors } from '@/ui/theme/colors';
 import {
+  ANY_RGB_ASSET,
+  ANY_RGB_ASSET_ID,
+  getRgbAssetId,
+  getRgbTokenIconInfo,
+  getRgbTokenTicker,
   isCancelableRgbPendingInvoice,
   isRgbPendingInvoiceAwaitingSenderBroadcast,
   isRgbPendingInvoiceAwaitingSenderConfirmation,
   useI18n,
   useNavigation,
+  useRGBListLogic,
   useTools,
   useWallet,
   type RgbPendingReceiveInvoice
@@ -49,22 +57,23 @@ const confirmModalStyle = {
   position: 'relative' as const
 };
 
-const recipientTypeTagStyle = (type: 'blind' | 'witness') => ({
+const recipientTypeTagStyle = {
   minHeight: 20,
   padding: '2px 6px',
   borderRadius: 3,
-  background: type === 'witness' ? 'rgba(113, 108, 255, 0.2)' : 'rgba(255,255,255,0.12)',
-  border: `1px solid ${type === 'witness' ? 'rgba(145, 140, 255, 0.5)' : 'rgba(255,255,255,0.16)'}`,
+  background: 'rgba(255,255,255,0.12)',
+  border: '1px solid rgba(255,255,255,0.16)',
   display: 'inline-flex',
   alignItems: 'center',
   boxSizing: 'border-box' as const
-});
+};
 
 export default function RGBInvoiceDetailScreen() {
   const wallet = useWallet();
   const nav = useNavigation();
   const tools = useTools();
   const { t } = useI18n();
+  const { items: rgbItems = [] } = useRGBListLogic();
   const { requestWrite, writeLeaseModal } = useRgbWriteLeaseGuard();
   const { recipientId, invoice: routeInvoice, initialInvoice } = nav.getRouteState<'RGBInvoiceDetailScreen'>();
   const routePendingInvoice = initialInvoice as RgbPendingReceiveInvoice | undefined;
@@ -126,6 +135,12 @@ export default function RGBInvoiceDetailScreen() {
     invoice?.kind === 'ReceiveWitness' || invoice?.transferKind === 'ReceiveWitness'
       ? 'witness'
       : 'blind';
+  const invoiceAsset = invoice?.assetId
+    ? rgbItems.find((item) => getRgbAssetId(item) === invoice.assetId) || { assetId: invoice.assetId }
+    : ANY_RGB_ASSET;
+  const isAnyRgbAsset = !invoice?.assetId || getRgbAssetId(invoiceAsset) === ANY_RGB_ASSET_ID;
+  const invoiceTicker = isAnyRgbAsset ? t('any_rgb_asset') : getRgbTokenTicker(invoiceAsset);
+  const invoiceName = isAnyRgbAsset ? t('any_rgb_asset') : getRgbAssetName(invoiceAsset) || invoiceTicker;
 
   return (
     <Layout>
@@ -139,22 +154,27 @@ export default function RGBInvoiceDetailScreen() {
         }
       />
       <Content>
-        {invoice ? (
-          <Row fullX justifyCenter style={{ marginBottom: 12 }}>
-            <div style={recipientTypeTagStyle(recipientType)}>
-              <Text
-                text={recipientType === 'witness' ? 'Witness invoice' : 'Blind invoice'}
-                color={recipientType === 'witness' ? 'gold' : 'textDim'}
-                size="xxs"
-              />
-            </div>
-          </Row>
-        ) : null}
         {invoiceText && !invoiceInUse ? (
           <ReceiveQRCodeCard
-            title={t('receiving_invoice')}
             value={invoiceText}
-            valueLabel={t('receiving_invoice')}
+            qrCenter={
+              invoice ? (
+                <RGBAssetIcon
+                  iconInfo={getRgbTokenIconInfo(invoiceAsset, invoiceTicker)}
+                  ticker={invoiceTicker}
+                  name={invoiceName}
+                  size={30}
+                  isAnyRgbAsset={isAnyRgbAsset}
+                />
+              ) : undefined
+            }
+            valuePrefix={
+              invoice ? (
+                <div style={recipientTypeTagStyle}>
+                  <Text text={recipientType === 'witness' ? 'Witness' : 'Blind'} color="textDim" size="xxs" />
+                </div>
+              ) : undefined
+            }
             accentColor="#F4B62C"
           />
         ) : null}

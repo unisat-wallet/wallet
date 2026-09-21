@@ -12,7 +12,8 @@ type ReceiveQRCodeCardProps = {
   title?: ReactNode;
   description?: string;
   value: string;
-  valueLabel: string;
+  valueLabel?: string;
+  valuePrefix?: ReactNode;
   copyValue?: string;
   copyText?: string;
   copiedText?: string;
@@ -28,6 +29,7 @@ export function ReceiveQRCodeCard(props: ReceiveQRCodeCardProps) {
     description,
     value,
     valueLabel,
+    valuePrefix,
     copyValue = value,
     copyText,
     copiedText,
@@ -134,7 +136,8 @@ export function ReceiveQRCodeCard(props: ReceiveQRCodeCardProps) {
           overflow: 'hidden'
         }}>
         <Column itemsCenter gap="sm" style={{ width: '100%', padding: '14px 12px' }}>
-          <Text text={valueLabel} size="xs" color="white_muted" textCenter />
+          {valueLabel ? <Text text={valueLabel} size="xs" color="white_muted" textCenter /> : null}
+          {valuePrefix}
           <Text text={value} size="sm" color="white" textCenter wrap selectText />
         </Column>
         <div style={{ width: '100%', height: 1, background: 'rgba(255,255,255,0.12)' }} />
