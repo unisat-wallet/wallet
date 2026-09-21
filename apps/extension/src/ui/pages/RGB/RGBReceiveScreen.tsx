@@ -251,7 +251,6 @@ export default function RGBReceiveScreen() {
     pendingLoading,
     pendingInvoices,
     insufficientBtcForInvoice,
-    needsRgbUtxoFunding,
     onOpenPendingInvoices,
     onClosePendingInvoices,
     onCopyPendingInvoice,
@@ -830,17 +829,12 @@ export default function RGBReceiveScreen() {
               : null}
           </Column>
 
-          {recipientType === 'blind' && needsRgbUtxoFunding ? (
+          {recipientType === 'blind' && insufficientBtcForInvoice ? (
             <Text
-              text={t('rgb_utxo_recommended_balance')}
+              text={`${t('not_enough_btc_for_rgb_utxo')} ${t('rgb_utxo_recommended_balance')}`}
               wrap
-              style={{
-                color: 'rgba(235,185,76,0.85)',
-                fontSize: 12,
-                fontWeight: 500,
-                lineHeight: 'normal',
-                marginTop: 4
-              }}
+              size="xs"
+              color="danger"
             />
           ) : null}
 
@@ -864,7 +858,7 @@ export default function RGBReceiveScreen() {
           <Button
             text={loading ? loadingText || t('creating') : t('create_invoice')}
             preset="primary"
-            disabled={loading || !isAmountValid || (recipientType === 'blind' && insufficientBtcForInvoice)}
+            disabled={loading || !isAmountValid}
             onClick={() => void requestWrite(onCreateInvoice)}
           />
         </Column>

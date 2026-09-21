@@ -1,7 +1,6 @@
 import { act, renderHook, waitFor } from '@testing-library/react'
 import { describe, expect, it } from 'vitest'
 
-import { accountActions } from '../../src/reducers/accounts'
 import {
   ANY_RGB_ASSET,
   isCancelableRgbPendingInvoice,
@@ -365,34 +364,14 @@ describe('useRGBReceiveScreenLogic', () => {
     expect(wallet.createRgbUtxosBegin).not.toHaveBeenCalled()
   })
 
-  it('flags insufficient BTC when creating an invoice needs a new RGB UTXO', async () => {
-    const { wrapper, wallet, store } = createHookTestHarness()
-    wallet.getRgbAllocationSummary.mockResolvedValue({ available: false })
-    store.dispatch(
-      accountActions.setBalanceV2({
-        address: 'bc1qxy2kgdygjrsqtzq2n0yrf2493p83kkfjhx0wlh',
-        balance: {
-          availableBalance: 100,
-          unavailableBalance: 0,
-          totalBalance: 100,
-          chainType: 'BITCOIN_MAINNET' as any,
-        },
-      })
-    )
-
-    const { result } = renderHook(() => useRGBReceiveScreenLogic(), { wrapper })
-
-    await waitFor(() => {
-      expect(result.current.insufficientBtcForInvoice).toBe(true)
-    })
-  })
-
   it('shows the RGB invoice funding hint when creating a UTXO fails for insufficient BTC', async () => {
     const { wrapper, wallet } = createHookTestHarness()
     wallet.getRgbAllocationSummary.mockResolvedValue({ available: false })
     wallet.createRgbUtxosBegin.mockRejectedValue(new Error('Insufficient balance.'))
 
     const { result } = renderHook(() => useRGBReceiveScreenLogic(), { wrapper })
+
+    expect(result.current.insufficientBtcForInvoice).toBe(false)
 
     await act(async () => {
       await result.current.onCreateInvoice()

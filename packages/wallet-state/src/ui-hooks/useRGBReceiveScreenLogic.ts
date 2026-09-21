@@ -1,7 +1,7 @@
 import type { SignPsbtParams, SignedData, ToSignData } from '@unisat/wallet-shared'
 import { useCallback, useEffect, useState } from 'react'
 import { useI18n, useNavigation, useTools, useWallet } from 'src/context'
-import { useAccountBalance, useFeeRateBar } from 'src/hooks'
+import { useFeeRateBar } from 'src/hooks'
 import {
   formatMaxRgbDisplayAmount,
   getRgbIconShortName,
@@ -12,7 +12,6 @@ import {
   toRgbAtomicAmount,
   toRgbDisplayAmount,
 } from 'src/utils/rgb-amount-utils'
-import { estimateRgbUtxoCreateMinSats } from 'src/utils/rgb-utxo-utils'
 import { useRGBListLogic } from './useRGBListLogic'
 
 export type RGBReceiveMode = 'any' | 'fixed'
@@ -165,17 +164,6 @@ const hasReusableRgbAllocation = (summary: unknown) => {
   return Number.isFinite(pendingAllocationCount) && pendingAllocationCount > 0
 }
 
-const hasPendingRgbAllocationConfirmation = (summary: unknown) => {
-  const value = getRecordPayload(summary)
-  if (!value) return false
-
-  return Boolean(
-    value['pendingConfirmation'] ??
-      value['pending_confirmation'] ??
-      value['hasPendingConfirmation']
-  )
-}
-
 export const getRgbAssetId = (value: unknown) => {
   return readStringPath(value, ['assetId']) || readStringPath(value, ['id']) || ''
 }
@@ -295,7 +283,6 @@ export function useRGBReceiveScreenLogic() {
   const tools = useTools()
   const { t } = useI18n()
   const { feeRate } = useFeeRateBar()
-  const accountBalance = useAccountBalance()
   const { items: rgbItems = [], loading: rgbLoading } = useRGBListLogic()
   const rgbWallet = wallet as typeof wallet & RgbAllocationWallet & RgbReceiveWallet
   const routeState = nav.getRouteState<'RGBReceiveScreen'>() as RGBReceiveRouteState
@@ -324,7 +311,6 @@ export function useRGBReceiveScreenLogic() {
   const [utxoPendingVanillaTxid, setUtxoPendingVanillaTxid] = useState('')
   const [resumeCreateInvoiceAfterSign, setResumeCreateInvoiceAfterSign] = useState(false)
   const [insufficientBtcForInvoice, setInsufficientBtcForInvoice] = useState(false)
-  const [needsRgbUtxoFunding, setNeedsRgbUtxoFunding] = useState<boolean>()
 
   const selectedRgbItem =
     selectedAssetId === ANY_RGB_ASSET_ID
@@ -446,42 +432,6 @@ export function useRGBReceiveScreenLogic() {
     return () => clearInterval(intervalId)
   }, [hasPendingInvoiceAwaitingUpdate, loadPendingInvoices])
 
-  useEffect(() => {
-    if (step !== 'create_invoice') return undefined
-
-    let cancelled = false
-    setNeedsRgbUtxoFunding(undefined)
-
-    const refreshFundingHint = async () => {
-      const minRequired = estimateRgbUtxoCreateMinSats(feeRate)
-      const btcTooLow = accountBalance.availableBalance < minRequired
-
-      try {
-        const summary = await rgbWallet.getRgbAllocationSummary({ skipSync: true })
-        if (cancelled) return
-
-        if (hasReusableRgbAllocation(summary) || hasPendingRgbAllocationConfirmation(summary)) {
-          setNeedsRgbUtxoFunding(false)
-          setInsufficientBtcForInvoice(false)
-          return
-        }
-
-        setNeedsRgbUtxoFunding(true)
-        setInsufficientBtcForInvoice(btcTooLow)
-      } catch {
-        if (!cancelled) {
-          setNeedsRgbUtxoFunding(true)
-          setInsufficientBtcForInvoice(btcTooLow)
-        }
-      }
-    }
-
-    refreshFundingHint()
-    return () => {
-      cancelled = true
-    }
-  }, [accountBalance.availableBalance, feeRate, step, wallet])
-
   const finishCreateInvoice = async (skipSync = false) => {
     setLoadingText('Creating invoice...')
     const value = await createReceiveInvoice(skipSync)
@@ -561,10 +511,10 @@ export function useRGBReceiveScreenLogic() {
 
   const onCreateInvoice = async () => {
     if (!isAmountValid) return
-    if (recipientType === 'blind' && insufficientBtcForInvoice) return
     setLoading(true)
     setLoadingText('Checking RGB UTXO...')
     setError('')
+    setInsufficientBtcForInvoice(false)
     setInvoice('')
     setSelectedPendingInvoice(undefined)
     setInvoiceLabel(isFixedMode ? `${displayAmount} ${assetTicker}` : t('any_amount'))
@@ -816,7 +766,6 @@ export function useRGBReceiveScreenLogic() {
     pendingLoading,
     pendingInvoices,
     insufficientBtcForInvoice,
-    needsRgbUtxoFunding,
     loadPendingInvoices,
     onOpenPendingInvoices,
     onClosePendingInvoices,
