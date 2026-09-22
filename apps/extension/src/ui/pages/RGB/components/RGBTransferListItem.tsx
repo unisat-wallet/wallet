@@ -93,6 +93,7 @@ export function RGBTransferListItem({
   const resolvedAssetLabel = assetLabel || item.ticker || item.name || 'RGB';
   const status = item.status.toLowerCase();
   const pending = isPending(item.status);
+  const showStatus = item.type !== 'issue' && (pending || ['canceled', 'cancelled', 'rejected'].includes(status));
   const isReceive = item.type === 'receive';
   const isCanceledReceive = isReceive && ['canceled', 'cancelled'].includes(status);
   const amountColor = isReceive ? 'rgba(124, 219, 152, 0.85)' : 'rgba(255, 255, 255, 0.85)';
@@ -133,7 +134,7 @@ export function RGBTransferListItem({
           <Column gap="xs" style={{ minWidth: 0, overflow: 'hidden' }}>
             <Row itemsCenter style={{ minWidth: 0, overflow: 'hidden' }}>
               <Text text={getTransferTitle(item.type, t)} style={{ flexShrink: 0 }} />
-              {pending || ['canceled', 'cancelled', 'rejected'].includes(status) ? (
+              {showStatus ? (
                 <Row
                   style={{
                     backgroundColor: pending ? 'rgba(244, 182, 44, 0.15)' : 'rgba(238, 52, 76, 0.15)',

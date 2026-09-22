@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 
 import { Column, InfiniteList, Text } from '@/ui/components';
 import { Empty } from '@/ui/components/Empty';
@@ -12,6 +12,11 @@ function getActivityTimestamp(item?: RgbActivityItem) {
   if (!item) return 0;
   const createdAt = (item as RgbActivityItem & { createdAt?: number }).createdAt;
   return item.timestamp || createdAt || 0;
+}
+
+function getActivityTimestampMs(item?: RgbActivityItem) {
+  const timestamp = getActivityTimestamp(item);
+  return timestamp > 0 && timestamp < 1_000_000_000_000 ? timestamp * 1000 : timestamp;
 }
 
 function toTransferItem(
@@ -65,6 +70,10 @@ export function RGBTokenHistory(props: {
     showDirectionIcon = false
   } = props;
   const tokenName = displayName || ticker;
+  const sortedActivityItems = useMemo(
+    () => [...activityItems].sort((left, right) => getActivityTimestampMs(right) - getActivityTimestampMs(left)),
+    [activityItems]
+  );
 
   if (activityLoading && activityItems.length === 0) {
     return (
@@ -86,14 +95,16 @@ export function RGBTokenHistory(props: {
     <>
       <Column fullX>
         <InfiniteList
-          data={activityItems}
+          data={sortedActivityItems}
           total={activityTotal}
           keyExtractor={(item, index) => item.id || item.txid || index.toString()}
           renderItem={({ item }) => {
-            const itemIndex = activityItems.indexOf(item);
+            const itemIndex = sortedActivityItems.indexOf(item);
             const date = getRgbTransferDateKey(getActivityTimestamp(item));
             const previousDate =
-              itemIndex > 0 ? getRgbTransferDateKey(getActivityTimestamp(activityItems[itemIndex - 1])) : '';
+              itemIndex > 0
+                ? getRgbTransferDateKey(getActivityTimestamp(sortedActivityItems[itemIndex - 1]))
+                : '';
             const transfer = toTransferItem(item, ticker, tokenName, precision);
             const assetLabel = showAssetTicker
               ? item.ticker || item.name || item.assetId?.slice(0, 8) || ticker
