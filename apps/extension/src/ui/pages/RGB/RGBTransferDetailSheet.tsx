@@ -113,6 +113,13 @@ function resolveReceiveRecipientId(transfer?: RgbTransferItem, transferId?: stri
   return '';
 }
 
+function getTransferActionErrorMessage(error: unknown, fallback: string) {
+  if (error instanceof Error && error.message) return error.message;
+  if (!error || typeof error !== 'object') return fallback;
+  const message = (error as Record<string, unknown>)['message'];
+  return typeof message === 'string' && message ? message : fallback;
+}
+
 function DetailRow({
   label,
   value,
@@ -219,7 +226,9 @@ export function RGBTransferDetailSheet({
   const canCancelSend =
     transfer?.type === 'send' && ['signed', 'waiting_ack'].includes(String(transfer?.status || '').toLowerCase());
   const canAcceptReceive =
-    transfer?.type === 'receive' && String(transfer?.status || '').toLowerCase() === 'pending_accept';
+    transfer?.type === 'receive' &&
+    transfer.local === true &&
+    String(transfer?.status || '').toLowerCase() === 'pending_accept';
   const canRetryBroadcast =
     transfer?.type === 'send' && String(transfer?.status || '').toLowerCase() === 'broadcast_failed';
   const assetId = transfer?.assetId?.trim();
@@ -245,7 +254,7 @@ export function RGBTransferDetailSheet({
       onCanceled?.();
       return true;
     } catch (e: unknown) {
-      const message = e instanceof Error && e.message ? e.message : t('rgb_cancel_send_failed');
+      const message = getTransferActionErrorMessage(e, t('rgb_cancel_send_failed'));
       tools.toastError(message);
       return false;
     } finally {
@@ -270,7 +279,7 @@ export function RGBTransferDetailSheet({
       onClose();
       onCanceled?.();
     } catch (e: unknown) {
-      const message = e instanceof Error && e.message ? e.message : t('rgb_accept_transfer_failed');
+      const message = getTransferActionErrorMessage(e, t('rgb_accept_transfer_failed'));
       tools.toastError(message);
     } finally {
       setActionLoading(false);
@@ -287,7 +296,7 @@ export function RGBTransferDetailSheet({
       onClose();
       onCanceled?.();
     } catch (e: unknown) {
-      const message = e instanceof Error && e.message ? e.message : t('rgb_reject_transfer_failed');
+      const message = getTransferActionErrorMessage(e, t('rgb_reject_transfer_failed'));
       tools.toastError(message);
     } finally {
       setActionLoading(false);
@@ -305,7 +314,7 @@ export function RGBTransferDetailSheet({
       onClose();
       onCanceled?.();
     } catch (e: unknown) {
-      const message = e instanceof Error && e.message ? e.message : t('rgb_retry_broadcast_failed');
+      const message = getTransferActionErrorMessage(e, t('rgb_retry_broadcast_failed'));
       tools.toastError(message);
     } finally {
       setBroadcastRetryLoading(false);

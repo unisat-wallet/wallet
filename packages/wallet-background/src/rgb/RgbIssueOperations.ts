@@ -16,6 +16,7 @@ type RgbIssueOperationsDependencies = {
   ensureWriteLease?: (context: LocalRgbServiceContext) => Promise<void>
   syncIndexerOutbox: (context: LocalRgbServiceContext) => Promise<boolean>
   now: () => number
+  assertContext?: (context: LocalRgbServiceContext) => Promise<void>
 }
 
 export type RgbIssueNiaParams = {
@@ -40,7 +41,9 @@ export class RgbIssueOperations {
     const { service, wallet } = context
     await this.dependencies.refreshRecovery?.(context)
     await this.dependencies.ensureWriteLease?.(context)
+    await this.dependencies.assertContext?.(context)
     await service.sync()
+    await this.dependencies.assertContext?.(context)
     const snapshot = service.getSnapshot()
     const amounts = params.amounts.map(value => toPositiveAtomicAmount(value))
     if (!amounts.length) throw new Error('RGB issuance requires at least one allocation')

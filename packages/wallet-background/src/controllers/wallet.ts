@@ -99,6 +99,8 @@ import { ContactBookItem } from '../services/contactBook'
 import BaseController from './base'
 import { createRgbProxyTransport } from '../adapters/rgb-proxy'
 import {
+  isSameRgbWallet,
+  RgbWalletContextChangedError,
   RgbWalletCoordinator,
   type LocalRgbServiceContext,
   type LocalRgbWallet,
@@ -1006,12 +1008,15 @@ export class WalletController extends BaseController {
   private readonly rgbWriteLeaseEnsures = new Map<string, Promise<void>>()
   /** Last content successfully round-tripped to recovery for each funding wallet. */
   private readonly rgbRecoveryVerifiedFingerprints = new Map<string, string>()
+  /** Wallet identity captured while building RGB-related Bitcoin signing requests. */
+  private readonly rgbPendingBitcoinOperations = new Map<string, LocalRgbWallet>()
   private readonly rgbCoordinator = new RgbWalletCoordinator({
     getContext: () => this.getLocalRgbService(),
     getReadContext: () => this.getLocalRgbReadService(),
     syncIndexerOutbox: (service, wallet) => this.syncRgbIndexerOutbox(service, wallet),
     syncReceiveHistory: (service, wallet) => this.syncRgbReceiveHistory(service, wallet),
     tryEnsureWriteLease: (context, options) => this.tryEnsureRgbWriteLease(context, options),
+    assertContext: context => this.assertActiveRgbWallet(context.wallet),
   })
   private readonly rgbTransferQuery = new RgbTransferQuery({
     // Activity rendering is read-only. It must remain available while a
@@ -1031,6 +1036,7 @@ export class WalletController extends BaseController {
     getReadContext: () => this.getLocalRgbReadService(),
     ensureWriteLease: context => this.ensureRgbWriteLease(context),
     syncReceivedAllocations: () => this.syncRgbReceivedAllocations(),
+    assertContext: context => this.assertActiveRgbWallet(context.wallet),
   })
   private readonly rgbIssueOperations = new RgbIssueOperations({
     // Issuance refreshes recovery explicitly before it can mutate state, so
@@ -1040,13 +1046,15 @@ export class WalletController extends BaseController {
     ensureWriteLease: context => this.ensureRgbWriteLease(context),
     syncIndexerOutbox: context => this.syncRgbIndexerOutbox(context.service, context.wallet),
     now: () => Date.now(),
+    assertContext: context => this.assertActiveRgbWallet(context.wallet),
   })
   private readonly rgbSendOperations = new RgbSendOperations({
     getContext: () => this.getLocalRgbService(),
     ensureWriteLease: (context, options) => this.ensureRgbWriteLease(context, options),
     getFeeRate: async () => (await this.getFeeSummary()).list[1]?.feeRate,
-    getToSignData: ({ psbt, toSignInputs, amountDisplay, actionName }) =>
+    getToSignData: ({ wallet, psbt, toSignInputs, amountDisplay, actionName }) =>
       this.getRgbToSignData({
+        expectedWallet: wallet,
         psbt,
         toSignInputs,
         action: {
@@ -1067,6 +1075,7 @@ export class WalletController extends BaseController {
     setActiveTransferId: (address, transferId) =>
       this.rgbCoordinator.setActiveTransferId(address, transferId),
     clearActiveTransferId: address => this.rgbCoordinator.clearActiveTransferId(address),
+    assertContext: context => this.assertActiveRgbWallet(context.wallet),
   })
 
   constructor() {
@@ -1078,6 +1087,7 @@ export class WalletController extends BaseController {
       void this.releaseAllRgbWriteLeases()
       this.rgbServiceRegistry.clear()
       this.rgbCoordinator.clear()
+      this.rgbPendingBitcoinOperations.clear()
       this.rgbRecoveryRestores.clear()
       this.rgbRecoveryBackups.clear()
       this.clearRgbRecoveryCaches()
@@ -4027,15 +4037,18 @@ export class WalletController extends BaseController {
     // This may run only after a dApp approval has been held open. Do not let
     // a cached pre-approval lease create durable receive state after handoff.
     await this.ensureRgbWriteLease(context, { forceRenew: true })
-    return this.rgbReceiveOperations.createBlindReceive(params)
+    return this.rgbReceiveOperations.createBlindReceive(params, context)
   }
 
   createRgbWitnessReceive = async (params: Omit<RgbReceiveInvoiceRequest, 'wallet'>) => {
     const context = await this.getLocalRgbService()
     await this.ensureRgbWriteLease(context, { forceRenew: true })
+    await this.assertActiveRgbWallet(context.wallet)
     const funding = await this.getCurrentRgbFundingAccount()
+    await this.assertActiveRgbWallet(context.wallet)
+    const networkType = this.getNetworkType()
     const scriptPubKey = bitcoin.address
-      .toOutputScript(funding.address, toPsbtNetwork(this.getNetworkType()))
+      .toOutputScript(funding.address, toPsbtNetwork(networkType))
       .toString('hex')
     const receive = await context.service.createWitnessReceive({
       scriptPubKey,
@@ -4305,7 +4318,7 @@ export class WalletController extends BaseController {
   cancelRgbReceiveInvoice = async (params: Omit<RgbCancelReceiveInvoiceRequest, 'wallet'>) => {
     const context = await this.getLocalRgbService()
     await this.ensureRgbWriteLease(context, { forceRenew: true })
-    return this.rgbReceiveOperations.cancelReceiveInvoice(params.batchTransferIdx)
+    return this.rgbReceiveOperations.cancelReceiveInvoice(params.batchTransferIdx, context)
   }
 
   getRgbFundingAddress = async () => {
@@ -4532,6 +4545,7 @@ export class WalletController extends BaseController {
     })
     const amount = psbt.txOutputs[0]?.value
     const toSignData = await this.getRgbToSignData({
+      expectedWallet: context.wallet,
       psbt: psbt.toHex(),
       action: {
         name: 'Withdraw RGB Fee Pool',
@@ -4543,19 +4557,37 @@ export class WalletController extends BaseController {
         type: PsbtActionType.CUSTOM,
       },
     })
+    await this.assertActiveRgbWallet(context.wallet)
+    this.rgbPendingBitcoinOperations.set('fee-pool-withdraw', context.wallet)
     return { toSignData, amount }
   }
 
   createRgbFeePoolWithdrawEnd = async (params: { signedPsbt: string }) => {
+    const expectedWallet = this.rgbPendingBitcoinOperations.get('fee-pool-withdraw')
+    if (expectedWallet) await this.assertActiveRgbWallet(expectedWallet)
     const signedPsbt = psbtFromString(params.signedPsbt)
+    const feeAccount = await this.getCurrentRgbFeeAccount()
+    const feeScript = bitcoin.address.toOutputScript(
+      feeAccount.address,
+      toPsbtNetwork(this.getNetworkType())
+    )
+    const inputScripts = signedPsbt.data.inputs.map(input => input.witnessUtxo?.script)
+    if (!inputScripts.length || inputScripts.some(script => !script?.equals(feeScript))) {
+      throw new RgbWalletContextChangedError()
+    }
     const transaction = signedPsbt.extractTransaction(true)
     const spentOutpoints = transaction.ins.map(input => ({
       txid: Buffer.from(input.hash).reverse().toString('hex'),
       vout: input.index,
     }))
     const { service, wallet } = await this.getLocalRgbService()
+    if (expectedWallet && !isSameRgbWallet(wallet, expectedWallet)) {
+      throw new RgbWalletContextChangedError()
+    }
     await this.ensureRgbWriteLease({ service, wallet }, { forceRenew: true })
+    if (expectedWallet) await this.assertActiveRgbWallet(expectedWallet)
     const txid = await this.pushTx(transaction.toHex())
+    this.rgbPendingBitcoinOperations.delete('fee-pool-withdraw')
     await service.removeFeePoolUtxos(spentOutpoints)
     const account = preferenceService.getCurrentAccount()
     const amount = transaction.outs.reduce((total, output) => total + output.value, 0)
@@ -4633,22 +4665,33 @@ export class WalletController extends BaseController {
         type: PsbtActionType.CUSTOM,
       },
     })
+    await this.assertActiveRgbWallet(context.wallet)
+    this.rgbPendingBitcoinOperations.set('fee-pool-top-up', context.wallet)
     return { psbtHex: toSignData.psbtHex, toSignData, count, amount: status.minimumSatoshis }
   }
 
   createRgbFeePoolTopUpEnd = async (params: { signedPsbt: string }) => {
+    const expectedWallet = this.rgbPendingBitcoinOperations.get('fee-pool-top-up')
+    if (expectedWallet) await this.assertActiveRgbWallet(expectedWallet)
     const signedPsbt = psbtFromString(params.signedPsbt)
     const transaction = signedPsbt.extractTransaction(true)
     const feeAccount = await this.getCurrentRgbFeeAccount()
+    const networkType = this.getNetworkType()
+    const hasCurrentFeeOutput = transaction.outs.some(
+      output => scriptPkToAddress(output.script, networkType) === feeAccount.address
+    )
+    if (!hasCurrentFeeOutput) throw new RgbWalletContextChangedError()
     const { service, wallet } = await this.getLocalRgbService()
+    if (expectedWallet && !isSameRgbWallet(wallet, expectedWallet)) {
+      throw new RgbWalletContextChangedError()
+    }
     await this.ensureRgbWriteLease({ service, wallet }, { forceRenew: true })
+    if (expectedWallet) await this.assertActiveRgbWallet(expectedWallet)
     const txid = await this.pushTx(transaction.toHex())
+    this.rgbPendingBitcoinOperations.delete('fee-pool-top-up')
     const utxos = transaction.outs
       .map((output, vout) => ({ output, vout }))
-      .filter(
-        ({ output }) =>
-          scriptPkToAddress(output.script, this.getNetworkType()) === feeAccount.address
-      )
+      .filter(({ output }) => scriptPkToAddress(output.script, networkType) === feeAccount.address)
       .map(({ output, vout }) => ({
         outpoint: { txid, vout },
         satoshis: Number(output.value),
@@ -4668,6 +4711,7 @@ export class WalletController extends BaseController {
     const account = preferenceService.getCurrentAccount()
     if (!account) throw new Error('no current account')
     assertCanCreateSigningRequest(account)
+    const expectedWallet = await this.getCurrentLocalRgbWallet()
 
     const num = params.num ?? 5
     const size = params.size ?? RGB_FUNDING_UTXO_DUST
@@ -4712,24 +4756,37 @@ export class WalletController extends BaseController {
       },
     })
 
+    await this.assertActiveRgbWallet(expectedWallet)
+    this.rgbPendingBitcoinOperations.set('create-utxos', expectedWallet)
+
     return { local: true, psbtHex: toSignData.psbtHex, toSignData }
   }
 
   createRgbUtxosEnd = async (params: Omit<RgbCreateUtxosEndRequest, 'wallet'>) => {
+    const expectedWallet = this.rgbPendingBitcoinOperations.get('create-utxos')
+    if (expectedWallet) await this.assertActiveRgbWallet(expectedWallet)
     const signedPsbt = psbtFromString(params.signedPsbt)
     const transaction = signedPsbt.extractTransaction(true)
     const funding = await this.getCurrentRgbFundingAccount()
+    const networkType = this.getNetworkType()
+    const hasCurrentFundingOutput = transaction.outs.some(
+      output => scriptPkToAddress(output.script, networkType) === funding.address
+    )
+    if (!hasCurrentFundingOutput) throw new RgbWalletContextChangedError()
     const { service, wallet } = await this.getLocalRgbService()
+    if (expectedWallet && !isSameRgbWallet(wallet, expectedWallet)) {
+      throw new RgbWalletContextChangedError()
+    }
     // The user may have spent time in an external signer. Renew immediately
     // before broadcast so a device that was fenced during signing cannot
     // publish this funding transaction.
     await this.ensureRgbWriteLease({ service, wallet }, { forceRenew: true })
+    if (expectedWallet) await this.assertActiveRgbWallet(expectedWallet)
     const txid = await this.pushTx(transaction.toHex())
+    this.rgbPendingBitcoinOperations.delete('create-utxos')
     const outpoints = transaction.outs
       .map((output, vout) => ({ output, vout }))
-      .filter(
-        ({ output }) => scriptPkToAddress(output.script, this.getNetworkType()) === funding.address
-      )
+      .filter(({ output }) => scriptPkToAddress(output.script, networkType) === funding.address)
       .map(({ output, vout }) => ({
         txid,
         vout,
@@ -4760,25 +4817,66 @@ export class WalletController extends BaseController {
   abortRgbVanillaTx = async (params: Omit<RgbAbortVanillaTxRequest, 'wallet'>) => {
     const context = await this.getLocalRgbService()
     await this.ensureRgbWriteLease(context, { forceRenew: true })
-    return this.rgbSendOperations.abortVanillaTx(params.txid)
+    return this.rgbSendOperations.abortVanillaTx(params.txid, context)
   }
 
   abortRgbAcknowledgedSwap = async (params: Omit<RgbAbortVanillaTxRequest, 'wallet'>) => {
     const context = await this.getLocalRgbService()
     await this.ensureRgbWriteLease(context, { forceRenew: true })
-    return this.rgbSendOperations.abortAcknowledgedSwap(params.txid)
+    return this.rgbSendOperations.abortAcknowledgedSwap(params.txid, context)
   }
 
   acceptRgbReceive = async (params: { recipientId: string }) => {
-    const context = await this.getLocalRgbService()
-    await this.ensureRgbWriteLease(context, { forceRenew: true })
-    return this.rgbReceiveOperations.acceptReceive(params.recipientId)
+    log.info('[RGB accept] Starting receive acceptance')
+    try {
+      const context = await this.getLocalRgbService()
+      log.info('[RGB accept] Recovery state is ready')
+      await this.ensureRgbWriteLease(context, { forceRenew: true })
+      log.info('[RGB accept] Write permission acquired')
+      const receive = context.service
+        .getPendingReceives?.()
+        ?.find(
+          item =>
+            item.recipientId === params.recipientId || item.proxyRecipientId === params.recipientId
+        )
+      log.warn('[RGB accept] Local receive state', {
+        found: Boolean(receive),
+        matchedByProxyRecipient: receive?.proxyRecipientId === params.recipientId,
+        hasPendingAccept: Boolean(receive?.pendingAccept),
+        hasReceivedConsignment: Boolean(receive?.receivedConsignment),
+        accepted: receive?.receivedConsignment?.accepted,
+        acknowledgementPending: receive?.receivedConsignment?.acknowledgementPending,
+        recipientType: receive?.recipientType,
+      })
+      const result = await this.rgbReceiveOperations.acceptReceive(params.recipientId, context)
+      if (!result?.accepted) {
+        log.error('[RGB accept] Receive acceptance returned an unexpected result', {
+          accepted: result?.accepted,
+          status: result?.status,
+        })
+      } else {
+        log.info('[RGB accept] Receive acceptance completed', { status: result.status })
+      }
+      return result
+    } catch (error) {
+      const record = error && typeof error === 'object' ? (error as Record<string, unknown>) : {}
+      log.error('[RGB accept] Receive acceptance failed', {
+        name: typeof record['name'] === 'string' ? record['name'] : undefined,
+        message: typeof record['message'] === 'string' ? record['message'] : String(error),
+        code:
+          typeof record['code'] === 'string' || typeof record['code'] === 'number'
+            ? record['code']
+            : undefined,
+        stack: typeof record['stack'] === 'string' ? record['stack'] : undefined,
+      })
+      throw error
+    }
   }
 
   rejectRgbReceive = async (params: { recipientId: string }) => {
     const context = await this.getLocalRgbService()
     await this.ensureRgbWriteLease(context, { forceRenew: true })
-    return this.rgbReceiveOperations.rejectReceive(params.recipientId)
+    return this.rgbReceiveOperations.rejectReceive(params.recipientId, context)
   }
 
   abandonRgbAcceptedReceive = async (params: { recipientId: string }) => {
@@ -4885,6 +4983,8 @@ export class WalletController extends BaseController {
   private syncRgbReceivedAllocations = async () => {
     const context = await this.getLocalRgbService()
     const funding = await this.getCurrentRgbFundingAccount()
+    await this.assertActiveRgbWallet(context.wallet)
+    if (funding.address !== context.wallet.fundingAddress) throw new RgbWalletContextChangedError()
     // This only migrates a missing key on invoices created by the first
     // witness-invoice build; acquire the normal writer fence before persisting.
     // A different device may still hold the lease immediately after handoff.
@@ -4894,7 +4994,7 @@ export class WalletController extends BaseController {
       return context
     }
     await context.service.backfillWitnessReceivePublicKey(funding.publicKey)
-    return this.rgbCoordinator.syncReceivedAllocations()
+    return this.rgbCoordinator.syncReceivedAllocations(context)
   }
 
   /** Deliver confirmed receive history through a durable, idempotent local outbox. */
@@ -5171,10 +5271,7 @@ export class WalletController extends BaseController {
               normalCheckpointAdvance,
               ...rgbRecoveryServiceSummary(service),
               differences: rgbRecoveryDifferenceFields(localRecoveryState, decryptedCheckpoint),
-              changedSections: rgbRecoveryChangedSections(
-                localRecoveryState,
-                decryptedCheckpoint
-              ),
+              changedSections: rgbRecoveryChangedSections(localRecoveryState, decryptedCheckpoint),
               invoices: rgbRecoveryInvoiceComparison(localRecoveryState, decryptedCheckpoint),
               remote: decryptedCheckpoint
                 ? rgbRecoveryStateSummary(decryptedCheckpoint)
@@ -5681,7 +5778,31 @@ export class WalletController extends BaseController {
     }
   }
 
+  /** Stop stale asynchronous work before it can borrow another wallet's keys or network. */
+  private assertActiveRgbWallet = async (expected: LocalRgbWallet): Promise<void> => {
+    if (!isWalletUnlocked()) throw new RgbWalletLockedError()
+    let active: LocalRgbWallet
+    try {
+      active = await this.getCurrentLocalRgbWallet()
+    } catch (error) {
+      if (!isWalletUnlocked()) throw new RgbWalletLockedError()
+      throw error
+    }
+    // Some compatibility hosts expose only a funding address. Production
+    // contexts include all three fields, so every available identity field is
+    // still checked without weakening older embeddings.
+    if (
+      active.fundingAddress !== expected.fundingAddress ||
+      (expected.walletId && active.walletId !== expected.walletId) ||
+      (expected.network && active.network !== expected.network)
+    ) {
+      throw new RgbWalletContextChangedError()
+    }
+  }
+
   private createLocalRgbService = (localWallet: LocalRgbWallet): LocalRgbService => {
+    const networkType = this.getNetworkType()
+    const chainType = this.getChainType()
     let service: LocalRgbService | undefined
     service = createRgbService({
       storage: {
@@ -5697,8 +5818,11 @@ export class WalletController extends BaseController {
       }),
       feeSource: {
         getFeeFunding: async () => {
+          await this.assertActiveRgbWallet(localWallet)
           const feeAccount = await this.getCurrentRgbFeeAccount()
+          await this.assertActiveRgbWallet(localWallet)
           const remoteUtxos = await walletApiService.bitcoin.getBTCUtxos(feeAccount.address)
+          await this.assertActiveRgbWallet(localWallet)
           const pendingUtxos = service?.getPendingFeePoolUtxos() || []
           const feeUtxosByOutpoint = new Map(
             remoteUtxos
@@ -5720,15 +5844,22 @@ export class WalletController extends BaseController {
           return {
             utxos: [...feeUtxosByOutpoint.values()],
             changeScriptPubKey: bitcoin.address
-              .toOutputScript(feeAccount.address, toPsbtNetwork(this.getNetworkType()))
+              .toOutputScript(feeAccount.address, toPsbtNetwork(networkType))
               .toString('hex'),
             changeDustLimit: decodeAddress(feeAccount.address).dust,
           }
         },
       },
       encoder: localNiaProtocolEncoder,
-      transport: createRgbProxyTransport(CHAINS_MAP[this.getChainType()]?.rgbProxyEndpoints || []),
-      broadcaster: { broadcast: rawTx => this.pushTx(rawTx) },
+      transport: createRgbProxyTransport(CHAINS_MAP[chainType]?.rgbProxyEndpoints || []),
+      broadcaster: {
+        broadcast: async rawTx => {
+          await this.assertActiveRgbWallet(localWallet)
+          const txid = await this.pushTx(rawTx)
+          await this.assertActiveRgbWallet(localWallet)
+          return txid
+        },
+      },
       onStatePersisted: (state, context) =>
         this.queueRgbRecoveryCheckpoint(localWallet, state, context),
     })
@@ -5739,9 +5870,15 @@ export class WalletController extends BaseController {
     psbt,
     toSignInputs,
     action,
-  }: RgbSignPsbtRequest & { action?: PsbtActionInfo }): Promise<ToSignData> => {
-    const parsedPsbt = await this.attachRgbPsbtDerivations(psbtFromString(psbt))
+    expectedWallet,
+  }: RgbSignPsbtRequest & {
+    action?: PsbtActionInfo
+    expectedWallet?: LocalRgbWallet
+  }): Promise<ToSignData> => {
+    if (expectedWallet) await this.assertActiveRgbWallet(expectedWallet)
+    const parsedPsbt = await this.attachRgbPsbtDerivations(psbtFromString(psbt), expectedWallet)
     const resolvedToSignInputs = toSignInputs || (await this.getRgbToSignInputs(parsedPsbt))
+    if (expectedWallet) await this.assertActiveRgbWallet(expectedWallet)
     if (resolvedToSignInputs.length === 0) {
       throw new Error('No RGB PSBT inputs can be signed by this wallet')
     }
@@ -5761,16 +5898,22 @@ export class WalletController extends BaseController {
   }
 
   /** Add only the current account's local RGB derivation to wallet-built PSBTs. */
-  private attachRgbPsbtDerivations = async (psbt: bitcoin.Psbt) => {
+  private attachRgbPsbtDerivations = async (
+    psbt: bitcoin.Psbt,
+    expectedWallet?: LocalRgbWallet
+  ) => {
+    if (expectedWallet) await this.assertActiveRgbWallet(expectedWallet)
     const accounts = await Promise.all([
       this.getCurrentRgbFundingAccount(),
       this.getCurrentRgbFeeAccount(),
     ])
+    if (expectedWallet) await this.assertActiveRgbWallet(expectedWallet)
+    const networkType = this.getNetworkType()
     for (const account of accounts) {
       const internalKey = Buffer.from(account.publicKey, 'hex').subarray(1)
       const expectedScript = bitcoin.payments.p2tr({
         internalPubkey: internalKey,
-        network: toPsbtNetwork(this.getNetworkType()),
+        network: toPsbtNetwork(networkType),
       }).output
       if (!expectedScript) throw new Error('Unable to derive RGB signing script')
 

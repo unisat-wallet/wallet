@@ -48,6 +48,13 @@ function resolveReceiveRecipientId(transfer?: RgbTransferItem, transferId?: stri
   return ''
 }
 
+function getTransferActionErrorMessage(error: unknown, fallback: string) {
+  if (error instanceof Error && error.message) return error.message
+  if (!error || typeof error !== 'object') return fallback
+  const message = (error as Record<string, unknown>)['message']
+  return typeof message === 'string' && message ? message : fallback
+}
+
 export function useRGBTransferDetailLogic() {
   const nav = useNavigation()
   const wallet = useWallet()
@@ -124,6 +131,7 @@ export function useRGBTransferDetailLogic() {
     transfer?.type === 'send' && String(transfer?.status || '').toLowerCase() === 'waiting_ack'
   const canAcceptReceive =
     transfer?.type === 'receive' &&
+    transfer.local === true &&
     String(transfer?.status || '').toLowerCase() === 'pending_accept'
   const canRetryBroadcast =
     transfer?.type === 'send' && String(transfer?.status || '').toLowerCase() === 'broadcast_failed'
@@ -195,7 +203,7 @@ export function useRGBTransferDetailLogic() {
       )
       return true
     } catch (e: unknown) {
-      const message = e instanceof Error && e.message ? e.message : t('rgb_cancel_send_failed')
+      const message = getTransferActionErrorMessage(e, t('rgb_cancel_send_failed'))
       tools.toastError(message)
       return false
     } finally {
@@ -224,7 +232,7 @@ export function useRGBTransferDetailLogic() {
       )
       return true
     } catch (e: unknown) {
-      const message = e instanceof Error && e.message ? e.message : t('rgb_accept_transfer_failed')
+      const message = getTransferActionErrorMessage(e, t('rgb_accept_transfer_failed'))
       tools.toastError(message)
       return false
     } finally {
@@ -244,7 +252,7 @@ export function useRGBTransferDetailLogic() {
       setTransfer(current => (current ? { ...current, status: 'rejected', local: true } : current))
       return true
     } catch (e: unknown) {
-      const message = e instanceof Error && e.message ? e.message : t('rgb_reject_transfer_failed')
+      const message = getTransferActionErrorMessage(e, t('rgb_reject_transfer_failed'))
       tools.toastError(message)
       return false
     } finally {
@@ -272,7 +280,7 @@ export function useRGBTransferDetailLogic() {
       )
       throw new Error(result.error || t('rgb_retry_broadcast_failed'))
     } catch (e: unknown) {
-      const message = e instanceof Error && e.message ? e.message : t('rgb_retry_broadcast_failed')
+      const message = getTransferActionErrorMessage(e, t('rgb_retry_broadcast_failed'))
       tools.toastError(message)
       return false
     } finally {

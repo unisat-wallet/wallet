@@ -18,6 +18,7 @@ type RgbSendOperationsDependencies = {
   ) => Promise<void>
   getFeeRate: () => Promise<number | undefined>
   getToSignData: (params: {
+    wallet: LocalRgbServiceContext['wallet']
     psbt: string
     toSignInputs: ToSignInput[]
     amountDisplay: string
@@ -26,6 +27,7 @@ type RgbSendOperationsDependencies = {
   getActiveTransferId: (fundingAddress: string) => string | undefined
   setActiveTransferId: (fundingAddress: string, transferId: string) => void
   clearActiveTransferId: (fundingAddress: string) => void
+  assertContext?: (context: LocalRgbServiceContext) => Promise<void>
 }
 
 export type RgbSendBeginParams = {
@@ -52,10 +54,13 @@ export class RgbSendOperations {
   async begin(params: RgbSendBeginParams) {
     const { service, wallet } = await this.dependencies.getContext()
     await this.dependencies.ensureWriteLease?.({ service, wallet })
+    await this.dependencies.assertContext?.({ service, wallet })
     const feeRate = params.feeRate ?? (await this.dependencies.getFeeRate())
+    await this.dependencies.assertContext?.({ service, wallet })
     if (!feeRate || feeRate <= 0) throw new Error('Invalid RGB transaction fee rate')
 
     await service.sync()
+    await this.dependencies.assertContext?.({ service, wallet })
     const prepared = await service.prepareSend(
       {
         assetId: params.assetId,
@@ -70,7 +75,9 @@ export class RgbSendOperations {
       },
       params.providerOrigin === undefined ? {} : { providerOrigin: params.providerOrigin }
     )
+    await this.dependencies.assertContext?.({ service, wallet })
     const toSignData = await this.dependencies.getToSignData({
+      wallet,
       psbt: prepared.psbt,
       toSignInputs: prepared.toSignInputs,
       amountDisplay: getAmountDisplay(params),
@@ -90,6 +97,7 @@ export class RgbSendOperations {
     // A signer may be open long enough for another device to take over. Do
     // not complete delivery or broadcast using a locally cached lease.
     await this.dependencies.ensureWriteLease?.({ service, wallet }, { forceRenew: true })
+    await this.dependencies.assertContext?.({ service, wallet })
     const pending = service.getPendingTransfers()
     const transferId =
       params.transferId ??
@@ -209,9 +217,10 @@ export class RgbSendOperations {
     return { broadcast: true, status: 'confirming' as const }
   }
 
-  async abortVanillaTx(txid: string) {
-    const { service, wallet } = await this.dependencies.getContext()
+  async abortVanillaTx(txid: string, boundContext?: LocalRgbServiceContext) {
+    const { service, wallet } = boundContext ?? (await this.dependencies.getContext())
     await this.dependencies.ensureWriteLease?.({ service, wallet })
+    await this.dependencies.assertContext?.({ service, wallet })
     const requestedId = String(txid).replace(/^local-send:/, '')
     const match = service
       .getPendingTransfers()
@@ -233,14 +242,18 @@ export class RgbSendOperations {
     return { aborted: result.aborted, local: true, status: result.status, transferId: match.id }
   }
 
-  async abortAcknowledgedSwap(txid: string) {
-    const { service, wallet } = await this.dependencies.getContext()
+  async abortAcknowledgedSwap(txid: string, boundContext?: LocalRgbServiceContext) {
+    const { service, wallet } = boundContext ?? (await this.dependencies.getContext())
     await this.dependencies.ensureWriteLease?.({ service, wallet })
+    await this.dependencies.assertContext?.({ service, wallet })
     const requestedId = String(txid).replace(/^local-send:/, '')
     const match = service.getPendingTransfers().find(transfer => transfer.id === requestedId)
     if (!match) return { aborted: false, local: true }
     const result = await service.abortAcknowledgedSwap(match.id)
-    if (result.aborted && this.dependencies.getActiveTransferId(wallet.fundingAddress) === match.id) {
+    if (
+      result.aborted &&
+      this.dependencies.getActiveTransferId(wallet.fundingAddress) === match.id
+    ) {
       this.dependencies.clearActiveTransferId(wallet.fundingAddress)
     }
     return { ...result, local: true, transferId: match.id }

@@ -13,6 +13,7 @@ type RgbReceiveOperationsDependencies = {
   getReadContext?: () => Promise<LocalRgbServiceContext>
   ensureWriteLease?: (context: LocalRgbServiceContext) => Promise<void>
   syncReceivedAllocations: () => Promise<LocalRgbServiceContext>
+  assertContext?: (context: LocalRgbServiceContext) => Promise<void>
 }
 
 export type RgbBlindReceiveParams = {
@@ -26,10 +27,14 @@ export type RgbBlindReceiveParams = {
 export class RgbReceiveOperations {
   constructor(private readonly dependencies: RgbReceiveOperationsDependencies) {}
 
-  async createBlindReceive(params: RgbBlindReceiveParams): Promise<RgbPendingReceiveInvoice> {
-    const context = await this.dependencies.getContext()
+  async createBlindReceive(
+    params: RgbBlindReceiveParams,
+    boundContext?: LocalRgbServiceContext
+  ): Promise<RgbPendingReceiveInvoice> {
+    const context = boundContext ?? (await this.dependencies.getContext())
     const { service } = context
     await this.dependencies.ensureWriteLease?.(context)
+    await this.dependencies.assertContext?.(context)
     if (!params.skipSync) await service.sync()
     const receive = await service.createBlindReceive({
       ...(params.assetId === undefined ? {} : { assetId: params.assetId }),
@@ -79,31 +84,39 @@ export class RgbReceiveOperations {
     }
   }
 
-  async cancelReceiveInvoice(batchTransferIdx: number): Promise<{ changed: boolean }> {
-    const context = await this.dependencies.getContext()
+  async cancelReceiveInvoice(
+    batchTransferIdx: number,
+    boundContext?: LocalRgbServiceContext
+  ): Promise<{ changed: boolean }> {
+    const context = boundContext ?? (await this.dependencies.getContext())
     const { service } = context
     const pending = service.getPendingReceives()[batchTransferIdx]
     if (!pending) return { changed: false }
     await this.dependencies.ensureWriteLease?.(context)
+    await this.dependencies.assertContext?.(context)
     const result = await service.removePendingReceive(pending.recipientId)
     return { changed: result.cancelled }
   }
 
   async acceptReceive(
-    recipientId: string
+    recipientId: string,
+    boundContext?: LocalRgbServiceContext
   ): Promise<Awaited<ReturnType<RgbService['acceptReceive']>>> {
-    const context = await this.dependencies.getContext()
+    const context = boundContext ?? (await this.dependencies.getContext())
     const { service } = context
     await this.dependencies.ensureWriteLease?.(context)
+    await this.dependencies.assertContext?.(context)
     return service.acceptReceive(recipientId)
   }
 
   async rejectReceive(
-    recipientId: string
+    recipientId: string,
+    boundContext?: LocalRgbServiceContext
   ): Promise<Awaited<ReturnType<RgbService['rejectReceive']>>> {
-    const context = await this.dependencies.getContext()
+    const context = boundContext ?? (await this.dependencies.getContext())
     const { service } = context
     await this.dependencies.ensureWriteLease?.(context)
+    await this.dependencies.assertContext?.(context)
     return service.rejectReceive(recipientId)
   }
 
@@ -113,6 +126,7 @@ export class RgbReceiveOperations {
     const context = await this.dependencies.getContext()
     const { service } = context
     await this.dependencies.ensureWriteLease?.(context)
+    await this.dependencies.assertContext?.(context)
     return service.abandonAcceptedReceive(recipientId)
   }
 

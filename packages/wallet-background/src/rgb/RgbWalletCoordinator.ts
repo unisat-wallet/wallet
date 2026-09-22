@@ -7,6 +7,24 @@ export type LocalRgbServiceContext = {
   wallet: LocalRgbWallet
 }
 
+export class RgbWalletContextChangedError extends Error {
+  constructor() {
+    super('RGB operation canceled because the active wallet or network changed')
+    this.name = 'RgbWalletContextChangedError'
+  }
+}
+
+export function isSameRgbWallet(
+  left: Pick<LocalRgbWallet, 'walletId' | 'fundingAddress' | 'network'>,
+  right: Pick<LocalRgbWallet, 'walletId' | 'fundingAddress' | 'network'>
+): boolean {
+  return (
+    left.walletId === right.walletId &&
+    left.fundingAddress === right.fundingAddress &&
+    left.network === right.network
+  )
+}
+
 type RgbWalletCoordinatorDependencies = {
   getContext: () => Promise<LocalRgbServiceContext>
   /** Read-only local context; available even while recovery/index APIs are down. */
@@ -18,6 +36,7 @@ type RgbWalletCoordinatorDependencies = {
     context: LocalRgbServiceContext,
     options?: { forceRenew?: boolean }
   ) => Promise<boolean>
+  assertContext?: (context: LocalRgbServiceContext) => Promise<void>
 }
 
 const LIST_SNAPSHOT_SYNC_INTERVAL = 60_000
@@ -53,8 +72,10 @@ export class RgbWalletCoordinator {
     this.activeTransferIds.delete(fundingAddress)
   }
 
-  async syncReceivedAllocations(): Promise<LocalRgbServiceContext> {
-    const context = await this.dependencies.getContext()
+  async syncReceivedAllocations(
+    boundContext?: LocalRgbServiceContext
+  ): Promise<LocalRgbServiceContext> {
+    const context = boundContext ?? (await this.dependencies.getContext())
     const key = walletKey(context.wallet)
     const activePolling = this.receivePolling.get(key)
     if (activePolling) return activePolling
@@ -162,21 +183,26 @@ export class RgbWalletCoordinator {
     const canWrite =
       (await this.dependencies.tryEnsureWriteLease?.(context, { forceRenew: true })) ?? true
     if (!canWrite) return context
+    await this.dependencies.assertContext?.(context)
     // Claims are durable recipient-to-address bindings. Retrying them here
     // covers invoices created while the recovery endpoint was unavailable.
     await service.claimPendingReceives?.()
+    await this.dependencies.assertContext?.(context)
     await this.dependencies.syncIndexerOutbox(service, wallet)
+    await this.dependencies.assertContext?.(context)
     // Invoice availability depends on its funding UTXO being confirmed. This
     // operation is already rate-limited by RECEIVE_POLL_INTERVAL, so force a
     // fresh snapshot for unresolved invoices instead of leaving their local
     // chainStatus at mempool forever.
     if (this.hasUnconfirmedInvoiceFunding(service)) {
       await this.syncSnapshot(service, wallet, 0)
+      await this.dependencies.assertContext?.(context)
     }
     let processed = await service.processClaimedReceives({
       includeClaimed: false,
       deferConfirmedSettlement: true,
     })
+    await this.dependencies.assertContext?.(context)
     if (processed.snapshotRequired) {
       // A confirmed witness receive has just registered its sender-created
       // output in the local outbox. The backend cannot derive it itself, so

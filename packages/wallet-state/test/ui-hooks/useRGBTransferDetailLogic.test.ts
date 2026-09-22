@@ -50,6 +50,37 @@ describe('useRGBTransferDetailLogic', () => {
     expect(result.current.transfer?.status).toBe('waiting_receive')
   })
 
+  it('does not offer accept for remote activity without a local consignment', async () => {
+    const { wrapper } = createHookTestHarness({
+      routeState: {
+        transferId: 'recipient-id',
+        initialTransfer: { ...pendingReceive, local: false },
+      },
+    })
+
+    const { result } = renderHook(() => useRGBTransferDetailLogic(), { wrapper })
+
+    await waitFor(() => expect(result.current.transfer).toBeDefined())
+    expect(result.current.canAcceptReceive).toBe(false)
+  })
+
+  it('shows an error message returned through the extension message bridge', async () => {
+    const { wrapper, wallet, tools } = createHookTestHarness({
+      routeState: { transferId: 'recipient-id', initialTransfer: pendingReceive },
+    })
+    wallet.acceptRgbReceive.mockRejectedValue({
+      message: 'RGB receive is not awaiting acceptance',
+    })
+
+    const { result } = renderHook(() => useRGBTransferDetailLogic(), { wrapper })
+
+    await act(async () => {
+      await result.current.onAcceptReceive()
+    })
+
+    expect(tools.toastError).toHaveBeenCalledWith('RGB receive is not awaiting acceptance')
+  })
+
   it('rejects a pending receive using its recipient ID', async () => {
     const { wrapper, wallet } = createHookTestHarness({
       routeState: { transferId: 'recipient-id', initialTransfer: pendingReceive },

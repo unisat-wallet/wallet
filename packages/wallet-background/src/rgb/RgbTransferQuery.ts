@@ -186,6 +186,15 @@ export class RgbTransferQuery {
       }
       if (!receivedConsignment?.accepted) {
         if (!receivedConsignment) return []
+        this.dependencies.warn(
+          'RGB activity exposed a local receive without pending acceptance data',
+          {
+            hasPendingAccept: Boolean(receive.pendingAccept),
+            accepted: receivedConsignment.accepted,
+            acknowledgementPending: receivedConsignment.acknowledgementPending,
+            recipientType: receive.recipientType,
+          }
+        )
         return [
           {
             id: `local-receive:${receive.recipientId}`,
@@ -276,6 +285,17 @@ export class RgbTransferQuery {
     const pendingAcceptCount = visibleLocalReceives.filter(
       item => item.status === 'pending_accept'
     ).length
+    const remotePendingAcceptCount = activity.list.filter(
+      item =>
+        item.type === 'receive' &&
+        String(item.status ?? '').toLowerCase() === 'pending_accept'
+    ).length
+    if (remotePendingAcceptCount > 0) {
+      this.dependencies.warn('RGB remote activity contains pending-accept receives', {
+        count: remotePendingAcceptCount,
+        localPendingAcceptCount: pendingAcceptCount,
+      })
+    }
     const remoteItems = activity.list
       .filter(item => {
         if (item.txid && localTxids.has(item.txid)) return false

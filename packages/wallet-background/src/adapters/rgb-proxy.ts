@@ -3,6 +3,7 @@ import type {
   RgbTransport,
   RgbTransportConsignment,
 } from '@unisat/rgb-service'
+import log from 'loglevel'
 
 type JsonRpcResponse<T> = {
   result?: T
@@ -21,6 +22,10 @@ type ProxyBatchConsignment = ProxyConsignment & {
 const NOT_FOUND_CODES = new Set([-302, -400])
 const RGB_PROXY_REQUEST_TIMEOUT_MS = 10_000
 const MAX_CONSIGNMENT_GET_MANY_RECIPIENTS = 100
+
+function recipientTag(recipientId: string) {
+  return recipientId.slice(-8)
+}
 
 function normalizeEndpoints(endpoints: string[]) {
   return endpoints
@@ -147,6 +152,10 @@ async function postConsignment(endpoint: string, consignment: RgbTransportConsig
   const body = await readRpcResponse<boolean>(response)
   if (body.error)
     throw new Error(`RGB proxy consignment.post failed: ${body.error.message || body.error.code}`)
+  log.warn('[RGB proxy] consignment.post completed', {
+    recipientTag: recipientTag(consignment.recipientId),
+    endpoint: toHttpEndpoint(endpoint),
+  })
 }
 
 async function tryEndpoints<T>(endpoints: string[], request: (endpoint: string) => Promise<T>) {
@@ -174,12 +183,23 @@ async function getConsignmentFromEndpoints({
         recipient_id: recipientId,
       })
       if (body.error) {
-        if (NOT_FOUND_CODES.has(body.error.code || 0)) continue
+        if (NOT_FOUND_CODES.has(body.error.code || 0)) {
+          log.warn('[RGB proxy] consignment.get not found', {
+            recipientTag: recipientTag(recipientId),
+            endpoint: toHttpEndpoint(endpoint),
+            code: body.error.code,
+          })
+          continue
+        }
         throw new Error(`RGB proxy consignment.get failed: ${body.error.message || body.error.code}`)
       }
       if (!body.result?.consignment || !body.result.txid) {
         throw new Error('RGB proxy returned an incomplete consignment')
       }
+      log.warn('[RGB proxy] consignment.get completed', {
+        recipientTag: recipientTag(recipientId),
+        endpoint: toHttpEndpoint(endpoint),
+      })
       return {
         recipientId,
         payload: body.result.consignment,
