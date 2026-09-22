@@ -191,6 +191,7 @@ const iconImgList: Array<IconTypes> = [
   'addressType',
   'addressBook',
   'advance',
+  'rgb-settings',
   'connectedSites',
   'network',
   'changePassword',
@@ -308,8 +309,7 @@ export function Icon(props: IconProps) {
           $imageStyleOverride || {},
           onClick ? { cursor: 'pointer' } : {}
         )}
-        data-testid={dataTestId}
-      >
+        data-testid={dataTestId}>
         {children}
       </div>
     );
