@@ -613,7 +613,7 @@ const Main = () => {
                 <Route key={v.path} path={v.path} element={<ErrorBoundary>{v.element}</ErrorBoundary>} />
               ))}
           </Routes>
-          <RgbRecoveryConflictModal />
+          {isUnlocked ? <RgbRecoveryConflictModal /> : null}
         </ApprovalProvider>
       </NavigationProvider>
     </HashRouter>
