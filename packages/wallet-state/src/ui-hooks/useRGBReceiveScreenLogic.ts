@@ -261,6 +261,19 @@ export const isCancelableRgbPendingInvoice = (item?: RgbPendingReceiveInvoice) =
   )
 }
 
+export const isDeletableRgbWitnessInvoice = (item?: RgbPendingReceiveInvoice) => {
+  if (!item) return false
+
+  const type = String(item.kind || item.transferKind || '').toLowerCase()
+  const status = String(item.status || '').toLowerCase()
+  return (
+    type === 'receivewitness' &&
+    item.canCancel !== false &&
+    status === 'waitingcounterparty' &&
+    getRgbBatchTransferIdx(item) !== undefined
+  )
+}
+
 export const isRgbPendingInvoiceAwaitingConfirmation = (item?: RgbPendingReceiveInvoice) => {
   return String(item?.status || '').toLowerCase() === 'waitingconfirmations'
 }
@@ -306,7 +319,9 @@ export function useRGBReceiveScreenLogic() {
   const [cancelLoading, setCancelLoading] = useState(false)
   const [pendingLoading, setPendingLoading] = useState(true)
   const [pendingInvoices, setPendingInvoices] = useState<RgbPendingReceiveInvoice[]>([])
-  const [step, setStep] = useState<RGBReceiveScreenStep>(routeState?.initialStep || 'create_invoice')
+  const [step, setStep] = useState<RGBReceiveScreenStep>(
+    routeState?.initialStep || 'create_invoice'
+  )
   const [utxoToSignData, setUtxoToSignData] = useState<ToSignData>()
   const [utxoPendingVanillaTxid, setUtxoPendingVanillaTxid] = useState('')
   const [resumeCreateInvoiceAfterSign, setResumeCreateInvoiceAfterSign] = useState(false)
@@ -340,10 +355,8 @@ export function useRGBReceiveScreenLogic() {
   const amountExceedsMaximum =
     isFixedMode && isAmountFormatValid && BigInt(normalizedAmount) > MAX_RGB_ATOMIC_AMOUNT
   const isAmountValid =
-    !isFixedMode ||
-    (isAmountFormatValid && /[1-9]/.test(normalizedAmount) && !amountExceedsMaximum)
-  const amountInvalidVisible =
-    isFixedMode && displayAmount.length > 0 && !isAmountValid
+    !isFixedMode || (isAmountFormatValid && /[1-9]/.test(normalizedAmount) && !amountExceedsMaximum)
+  const amountInvalidVisible = isFixedMode && displayAmount.length > 0 && !isAmountValid
 
   const onAmountChange = (value: string) => {
     if (!canSetFixedAmount) return
@@ -378,7 +391,7 @@ export function useRGBReceiveScreenLogic() {
     const request = {
       ...params,
       ...(durationSeconds > 0 ? { durationSeconds } : {}),
-      ...(skipSync ? { skipSync: true } : {})
+      ...(skipSync ? { skipSync: true } : {}),
     }
     return recipientType === 'witness'
       ? rgbWallet.createRgbWitnessReceive(request)
@@ -447,7 +460,8 @@ export function useRGBReceiveScreenLogic() {
       return
     }
     setInvoice(invoice)
-    if (pendingInvoice?.['invoice']) setSelectedPendingInvoice(pendingInvoice as RgbPendingReceiveInvoice)
+    if (pendingInvoice?.['invoice'])
+      setSelectedPendingInvoice(pendingInvoice as RgbPendingReceiveInvoice)
     setStep('create_invoice')
   }
 
@@ -614,7 +628,10 @@ export function useRGBReceiveScreenLogic() {
     const awaitingAcceptance = isRgbPendingInvoiceAwaitingAcceptance(item)
     const awaitingSenderBroadcast = isRgbPendingInvoiceAwaitingSenderBroadcast(item)
     const awaitingSenderConfirmation = isRgbPendingInvoiceAwaitingSenderConfirmation(item)
-    if ((awaitingAcceptance || awaitingSenderBroadcast || awaitingSenderConfirmation) && item.recipientId) {
+    if (
+      (awaitingAcceptance || awaitingSenderBroadcast || awaitingSenderConfirmation) &&
+      item.recipientId
+    ) {
       nav.navigate('RGBTransferDetailScreen', {
         transferId: item.recipientId,
         initialTransfer: {
@@ -624,7 +641,11 @@ export function useRGBReceiveScreenLogic() {
           type: 'receive',
           ...(item.amount === undefined ? {} : { amount: String(item.amount) }),
           timestamp: item.createdAt || Date.now(),
-          status: awaitingAcceptance ? 'pending_accept' : awaitingSenderConfirmation ? 'confirming' : 'waiting_receive',
+          status: awaitingAcceptance
+            ? 'pending_accept'
+            : awaitingSenderConfirmation
+              ? 'confirming'
+              : 'waiting_receive',
           local: true,
         },
       })
@@ -639,7 +660,9 @@ export function useRGBReceiveScreenLogic() {
       return
     }
     setError('')
-    setInvoiceLabel(formatRgbPendingAmount(item.amount, assetTicker, t('any_amount'), assetPrecision))
+    setInvoiceLabel(
+      formatRgbPendingAmount(item.amount, assetTicker, t('any_amount'), assetPrecision)
+    )
     setSelectedPendingInvoice(item)
     setInvoice(item.invoice)
   }
@@ -664,7 +687,7 @@ export function useRGBReceiveScreenLogic() {
 
   const onCancelPendingInvoice = async () => {
     const batchTransferIdx = getRgbBatchTransferIdx(selectedPendingInvoice)
-    if (batchTransferIdx === undefined || cancelLoading) return
+    if (batchTransferIdx === undefined || cancelLoading) return false
 
     setCancelLoading(true)
     setError('')
@@ -678,12 +701,14 @@ export function useRGBReceiveScreenLogic() {
       // The service can refuse a stale release request after a consignment is
       // accepted. Keep the refreshed selection visible instead of presenting
       // that as a successful invoice removal.
-      if (!result.changed) return
+      if (!result.changed) return false
       setInvoice('')
       setSelectedPendingInvoice(undefined)
       setStep('pending_invoices')
+      return true
     } catch (e: unknown) {
       setError(getErrorMessage(e))
+      return false
     } finally {
       setCancelLoading(false)
     }

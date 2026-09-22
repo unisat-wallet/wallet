@@ -27,6 +27,7 @@ import {
   getRgbTokenPrecision,
   getRgbTokenTicker,
   isCancelableRgbPendingInvoice,
+  isDeletableRgbWitnessInvoice,
   isRgbPendingInvoiceAwaitingAcceptance,
   isRgbPendingInvoiceAwaitingConfirmation,
   isRgbPendingInvoiceAwaitingSenderBroadcast,
@@ -302,7 +303,8 @@ export default function RGBReceiveScreen() {
           minHeight: 48,
           padding: '10px 16px',
           cursor: 'default'
-        }}>
+        }}
+      >
         <Row gap="md" itemsCenter style={{ flex: 1, minWidth: 0 }}>
           {renderAssetIcon(selectedRgbItem, 28)}
           <Column gap="xs" style={{ minWidth: 0, flex: 1 }}>
@@ -324,7 +326,8 @@ export default function RGBReceiveScreen() {
             minHeight: 48,
             padding: '10px 16px'
           }}
-          onClick={() => setAssetSelectorOpen(true)}>
+          onClick={() => setAssetSelectorOpen(true)}
+        >
           <Row gap="md" itemsCenter style={{ flex: 1, minWidth: 0 }}>
             {renderAssetIcon(selectedRgbItem, 28)}
             <Column gap="xs" style={{ minWidth: 0, flex: 1 }}>
@@ -483,12 +486,14 @@ export default function RGBReceiveScreen() {
           style={{
             ...amountPillStyle,
             ...(options?.truncateName ? { maxWidth: '45%', minWidth: 0, overflow: 'hidden' } : {})
-          }}>
+          }}
+        >
           <span
             style={{
               ...amountPillTextStyle,
               ...(options?.truncateName ? { overflow: 'hidden', textOverflow: 'ellipsis' } : {})
-            }}>
+            }}
+          >
             {amountText}
           </span>
         </div>
@@ -496,13 +501,9 @@ export default function RGBReceiveScreen() {
     );
   };
 
-  const getPendingInvoicePrecision = (item: {
-    assetId?: string | null;
-    amount?: number | string;
-  }) => {
+  const getPendingInvoicePrecision = (item: { assetId?: string | null; amount?: number | string }) => {
     const invoiceAsset = getPendingInvoiceAsset(item);
-    const selectedAssetMetadata =
-      getRgbAssetId(selectedRgbItem) === item.assetId ? selectedRgbItem : undefined;
+    const selectedAssetMetadata = getRgbAssetId(selectedRgbItem) === item.assetId ? selectedRgbItem : undefined;
     return getRgbTokenPrecision({ ...invoiceAsset, tokenInfo: item, assetInfo: selectedAssetMetadata });
   };
 
@@ -527,10 +528,7 @@ export default function RGBReceiveScreen() {
 
       return renderAssetNameWithAmountTag(
         displayName,
-        getRgbPendingAmountTagText(
-          selectedPendingInvoice.amount,
-          getPendingInvoicePrecision(selectedPendingInvoice)
-        ),
+        getRgbPendingAmountTagText(selectedPendingInvoice.amount, getPendingInvoicePrecision(selectedPendingInvoice)),
         { centered: true }
       );
     }
@@ -584,8 +582,7 @@ export default function RGBReceiveScreen() {
     const awaitingSenderConfirmation = isRgbPendingInvoiceAwaitingSenderConfirmation(item);
     const invoiceInUse = awaitingAcceptance || awaitingSenderBroadcast || awaitingSenderConfirmation;
     const expiryText = formatRgbInvoiceExpiryTime(item.expirationTimestamp, locale, t);
-    const invoiceType =
-      item.kind === 'ReceiveWitness' || item.transferKind === 'ReceiveWitness' ? 'witness' : 'blind';
+    const invoiceType = item.kind === 'ReceiveWitness' || item.transferKind === 'ReceiveWitness' ? 'witness' : 'blind';
 
     return (
       <Row
@@ -593,7 +590,8 @@ export default function RGBReceiveScreen() {
         itemsCenter
         justifyBetween
         style={pendingInvoiceCardStyle}
-        onClick={() => onSelectPendingInvoice(item)}>
+        onClick={() => onSelectPendingInvoice(item)}
+      >
         <Row gap="md" itemsCenter style={{ minWidth: 0, flex: 1, paddingRight: 12 }}>
           {renderPendingInvoiceIcon(item)}
           <Column gap="xs" style={{ minWidth: 0, flex: 1, overflow: 'hidden' }}>
@@ -619,7 +617,8 @@ export default function RGBReceiveScreen() {
           onClick={(event) => {
             event.stopPropagation();
             if (!invoiceInUse) onCopyPendingInvoice(item);
-          }}>
+          }}
+        >
           <Icon icon="copy" color="white_muted" size={14} />
         </div>
       </Row>
@@ -628,6 +627,7 @@ export default function RGBReceiveScreen() {
 
   const renderReleaseInvoiceConfirmModal = () => {
     if (!releaseConfirmVisible) return null;
+    const isWitnessInvoice = isDeletableRgbWitnessInvoice(selectedPendingInvoice);
 
     return (
       <div style={confirmMaskStyle}>
@@ -636,12 +636,19 @@ export default function RGBReceiveScreen() {
             icon="close"
             color="white_muted2"
             size={12}
-            onClick={() => setReleaseConfirmVisible(false)}
-            containerStyle={{ position: 'absolute', top: 30, right: 22 }}
+            onClick={cancelLoading ? undefined : () => setReleaseConfirmVisible(false)}
+            containerStyle={{ position: 'absolute', top: 30, right: 22, opacity: cancelLoading ? 0.45 : 1 }}
           />
-          <Text text={t('release_invoice_confirm_title')} color="white" size="md" textCenter />
           <Text
-            text={t('release_invoice_confirm_description')}
+            text={t(isWitnessInvoice ? 'delete_witness_invoice_confirm_title' : 'release_invoice_confirm_title')}
+            color="white"
+            size="md"
+            textCenter
+          />
+          <Text
+            text={t(
+              isWitnessInvoice ? 'delete_witness_invoice_confirm_description' : 'release_invoice_confirm_description'
+            )}
             color="white_muted2"
             size="sm"
             wrap
@@ -649,16 +656,27 @@ export default function RGBReceiveScreen() {
           />
           <Row gap="md" fullX style={{ marginTop: 24 }}>
             <Button
-              text={t('release_invoice')}
-              preset="default"
+              text={
+                cancelLoading
+                  ? t(isWitnessInvoice ? 'deleting_invoice' : 'releasing_invoice')
+                  : t(isWitnessInvoice ? 'delete_invoice' : 'release_invoice')
+              }
+              preset={isWitnessInvoice ? 'danger' : 'default'}
               disabled={cancelLoading}
               onClick={() => {
-                setReleaseConfirmVisible(false);
-                void requestWrite(() => void onCancelPendingInvoice());
+                void requestWrite(() => {
+                  void onCancelPendingInvoice().then((removed) => {
+                    if (removed) setReleaseConfirmVisible(false);
+                  });
+                });
               }}
               full
-              style={{ height: 48, background: 'transparent', border: '1px solid rgba(255,255,255,0.42)' }}
-              textStyle={{ color: colors.white, fontWeight: 'normal' }}
+              style={
+                isWitnessInvoice
+                  ? { height: 48 }
+                  : { height: 48, background: 'transparent', border: '1px solid rgba(255,255,255,0.42)' }
+              }
+              textStyle={isWitnessInvoice ? undefined : { color: colors.white, fontWeight: 'normal' }}
             />
             <Button
               text={t('keep_invoice')}
@@ -696,9 +714,13 @@ export default function RGBReceiveScreen() {
               pendingInvoices.map(renderPendingInvoiceListItem)
             ) : (
               <Column fullX itemsCenter gap="sm" style={emptyStateCardStyle}>
-                {pendingLoading ? <Text text={t('loading_pending_invoices')} color="textDim" size="sm" textCenter /> : null}
+                {pendingLoading ? (
+                  <Text text={t('loading_pending_invoices')} color="textDim" size="sm" textCenter />
+                ) : null}
                 {!pendingLoading ? <Icon icon="emptyBox" color="textDim" size={32} /> : null}
-                {!pendingLoading ? <Text text={t('no_pending_blind_invoices')} color="white" size="sm" textCenter /> : null}
+                {!pendingLoading ? (
+                  <Text text={t('no_pending_blind_invoices')} color="white" size="sm" textCenter />
+                ) : null}
               </Column>
             )}
           </Column>
@@ -715,9 +737,7 @@ export default function RGBReceiveScreen() {
           <Column gap="lg">
             <ReceiveQRCodeCard
               title={renderInvoiceTitle()}
-              description={
-                t('use_this_invoice_to_receive', { ticker: assetDisplayName })
-              }
+              description={t('use_this_invoice_to_receive', { ticker: assetDisplayName })}
               value={invoice}
               valueLabel={t('receiving_invoice')}
               qrCenter={
@@ -741,10 +761,19 @@ export default function RGBReceiveScreen() {
             />
 
             <Row justifyBetween>
-              {isCancelableRgbPendingInvoice(selectedPendingInvoice) ? (
+              {isCancelableRgbPendingInvoice(selectedPendingInvoice) ||
+              isDeletableRgbWitnessInvoice(selectedPendingInvoice) ? (
                 <Button
-                  text={cancelLoading ? t('releasing_invoice') : t('release_invoice')}
-                  preset="default"
+                  text={
+                    cancelLoading
+                      ? t(
+                          isDeletableRgbWitnessInvoice(selectedPendingInvoice)
+                            ? 'deleting_invoice'
+                            : 'releasing_invoice'
+                        )
+                      : t(isDeletableRgbWitnessInvoice(selectedPendingInvoice) ? 'delete_invoice' : 'release_invoice')
+                  }
+                  preset={isDeletableRgbWitnessInvoice(selectedPendingInvoice) ? 'danger' : 'default'}
                   disabled={cancelLoading}
                   onClick={() => setReleaseConfirmVisible(true)}
                   full
@@ -795,12 +824,7 @@ export default function RGBReceiveScreen() {
           </Row>
 
           {recipientType === 'witness' ? (
-            <Text
-              text={t('rgb_witness_invoice_description')}
-              size="xs"
-              color="white_muted"
-              wrap
-            />
+            <Text text={t('rgb_witness_invoice_description')} size="xs" color="white_muted" wrap />
           ) : null}
 
           {isAssetLocked ? renderLockedAssetHeader() : renderAssetSelector()}

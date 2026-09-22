@@ -3448,5 +3448,9 @@
   "rgb_approval_not_provided": { "message": "Not provided" },
   "rgb_approval_cancel_payment_title": { "message": "Cancel RGB payment" },
   "rgb_approval_cancel_payment_description": { "message": "Cancel only if the recipient has not acknowledged the consignment and the transaction has not been broadcast." },
-  "rgb_approval_cancel_payment": { "message": "Cancel payment" }
+  "rgb_approval_cancel_payment": { "message": "Cancel payment" },
+  "delete_invoice": { "message": "Supprimer la facture" },
+  "deleting_invoice": { "message": "Suppression de la facture…" },
+  "delete_witness_invoice_confirm_title": { "message": "Supprimer la facture witness ?" },
+  "delete_witness_invoice_confirm_description": { "message": "Après sa suppression, votre portefeuille cessera de surveiller cette facture. Si quelqu’un l’utilise pour envoyer des actifs, vous risquez de ne pas les recevoir." }
 }

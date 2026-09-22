@@ -3444,5 +3444,9 @@
   "rgb_approval_not_provided": { "message": "Not provided" },
   "rgb_approval_cancel_payment_title": { "message": "Cancel RGB payment" },
   "rgb_approval_cancel_payment_description": { "message": "Cancel only if the recipient has not acknowledged the consignment and the transaction has not been broadcast." },
-  "rgb_approval_cancel_payment": { "message": "Cancel payment" }
+  "rgb_approval_cancel_payment": { "message": "Cancel payment" },
+  "delete_invoice": { "message": "Удалить инвойс" },
+  "deleting_invoice": { "message": "Удаление инвойса…" },
+  "delete_witness_invoice_confirm_title": { "message": "Удалить witness-инвойс?" },
+  "delete_witness_invoice_confirm_description": { "message": "После удаления кошелёк перестанет отслеживать этот инвойс. Если кто-то отправит с его помощью активы, вы можете не получить их." }
 }

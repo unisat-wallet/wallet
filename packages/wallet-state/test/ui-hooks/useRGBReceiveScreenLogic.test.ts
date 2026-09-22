@@ -4,6 +4,7 @@ import { describe, expect, it } from 'vitest'
 import {
   ANY_RGB_ASSET,
   isCancelableRgbPendingInvoice,
+  isDeletableRgbWitnessInvoice,
   isRgbPendingInvoiceAwaitingAcceptance,
   useRGBReceiveScreenLogic,
 } from '../../src/ui-hooks/useRGBReceiveScreenLogic'
@@ -33,6 +34,27 @@ describe('useRGBReceiveScreenLogic', () => {
 
     expect(isRgbPendingInvoiceAwaitingAcceptance(invoice)).toBe(true)
     expect(isCancelableRgbPendingInvoice(invoice)).toBe(false)
+  })
+
+  it('only allows deleting an unused witness invoice', () => {
+    expect(
+      isDeletableRgbWitnessInvoice({
+        invoice: 'rgb:witness',
+        kind: 'ReceiveWitness',
+        status: 'WaitingCounterparty',
+        batchTransferIdx: 0,
+        canCancel: true,
+      })
+    ).toBe(true)
+    expect(
+      isDeletableRgbWitnessInvoice({
+        invoice: 'rgb:witness',
+        kind: 'ReceiveWitness',
+        status: 'PendingAccept',
+        batchTransferIdx: 0,
+        canCancel: false,
+      })
+    ).toBe(false)
   })
 
   it('only shows a fixed amount error after the user enters an invalid amount', async () => {
@@ -75,7 +97,10 @@ describe('useRGBReceiveScreenLogic', () => {
       await result.current.onCreateInvoice()
     })
 
-    expect(wallet.createRgbBlindReceive).toHaveBeenCalledWith({ durationSeconds: 86_400, skipSync: true })
+    expect(wallet.createRgbBlindReceive).toHaveBeenCalledWith({
+      durationSeconds: 86_400,
+      skipSync: true,
+    })
   })
 
   it('clears a fixed amount when switching back to Any Asset', async () => {
@@ -275,7 +300,9 @@ describe('useRGBReceiveScreenLogic', () => {
       await result.current.onCreateInvoice()
     })
 
-    expect(result.current.error).toBe('amount must be an unsigned integer or unsigned integer string')
+    expect(result.current.error).toBe(
+      'amount must be an unsigned integer or unsigned integer string'
+    )
   })
 
   it('does not abort unrelated pending RGB UTXO vanilla transactions before creating a new one', async () => {

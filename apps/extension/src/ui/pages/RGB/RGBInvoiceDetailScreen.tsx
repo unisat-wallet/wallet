@@ -24,6 +24,7 @@ import {
   getRgbTokenIconInfo,
   getRgbTokenTicker,
   isCancelableRgbPendingInvoice,
+  isDeletableRgbWitnessInvoice,
   isRgbPendingInvoiceAwaitingSenderBroadcast,
   isRgbPendingInvoiceAwaitingSenderConfirmation,
   useI18n,
@@ -103,13 +104,17 @@ export default function RGBInvoiceDetailScreen() {
     // The create-invoice response is already a complete public invoice view.
     // Do not re-fetch it immediately, but keep it current so a claimed
     // invoice stops being shown as reusable once the sender is ready to broadcast.
+    // Pause polling while removing the invoice so the QR card stays stable
+    // until the durable state update finishes and navigation can complete.
+    if (releasing) return undefined;
     if (!routePendingInvoice) void loadInvoice();
     const intervalId = setInterval(() => void loadInvoice(), 10_000);
     return () => clearInterval(intervalId);
-  }, [loadInvoice, routePendingInvoice]);
+  }, [loadInvoice, releasing, routePendingInvoice]);
 
-  const release = async () => {
-    if (!invoice || !isCancelableRgbPendingInvoice(invoice) || releasing) return;
+  const removeInvoice = async () => {
+    if (!invoice || (!isCancelableRgbPendingInvoice(invoice) && !isDeletableRgbWitnessInvoice(invoice)) || releasing)
+      return;
     const batchTransferIdx = invoice.batchTransferIdx;
     if (typeof batchTransferIdx !== 'number') return;
     setReleasing(true);
@@ -119,7 +124,26 @@ export default function RGBInvoiceDetailScreen() {
         nav.goBack();
         return;
       }
-      await loadInvoice();
+      // A concurrent sync can remove the same invoice before the cancellation
+      // result is returned. Treat an already-missing target as success instead
+      // of leaving this screen in an empty state until the next poll.
+      const refreshed = await wallet.getRgbPendingReceiveInvoices();
+      const stillExists = (refreshed.list || []).some(
+        (candidate) =>
+          (recipientId && candidate.recipientId === recipientId) ||
+          (routeInvoice && candidate.invoice === routeInvoice)
+      );
+      if (!stillExists) {
+        nav.goBack();
+        return;
+      }
+      setInvoice(
+        (refreshed.list || []).find(
+          (candidate) =>
+            (recipientId && candidate.recipientId === recipientId) ||
+            (routeInvoice && candidate.invoice === routeInvoice)
+        ) as RgbPendingReceiveInvoice | undefined
+      );
     } catch (error) {
       tools.toastError(error instanceof Error ? error.message : String(error));
     } finally {
@@ -132,9 +156,9 @@ export default function RGBInvoiceDetailScreen() {
   const awaitingSenderConfirmation = isRgbPendingInvoiceAwaitingSenderConfirmation(invoice);
   const invoiceInUse = awaitingSenderBroadcast || awaitingSenderConfirmation;
   const recipientType =
-    invoice?.kind === 'ReceiveWitness' || invoice?.transferKind === 'ReceiveWitness'
-      ? 'witness'
-      : 'blind';
+    invoice?.kind === 'ReceiveWitness' || invoice?.transferKind === 'ReceiveWitness' ? 'witness' : 'blind';
+  const canRemoveInvoice = isCancelableRgbPendingInvoice(invoice) || isDeletableRgbWitnessInvoice(invoice);
+  const isWitnessInvoice = recipientType === 'witness';
   const invoiceAsset = invoice?.assetId
     ? rgbItems.find((item) => getRgbAssetId(item) === invoice.assetId) || { assetId: invoice.assetId }
     : ANY_RGB_ASSET;
@@ -148,7 +172,7 @@ export default function RGBInvoiceDetailScreen() {
         onBack={() => nav.goBack()}
         title={t('receiving_invoice')}
         RightComponent={
-          isCancelableRgbPendingInvoice(invoice) ? (
+          canRemoveInvoice ? (
             <Icon icon="more" color="textDim" size={20} onClick={() => setActionMenuVisible(true)} />
           ) : null
         }
@@ -221,8 +245,9 @@ export default function RGBInvoiceDetailScreen() {
                 setActionMenuVisible(false);
                 setReleaseConfirmVisible(true);
               }}
-              style={{ padding: '0 20px 24px', boxSizing: 'border-box' }}>
-              <Text text={t('release_invoice')} size="sm" />
+              style={{ padding: '0 20px 24px', boxSizing: 'border-box' }}
+            >
+              <Text text={t(isWitnessInvoice ? 'delete_invoice' : 'release_invoice')} size="sm" />
             </Row>
           </Column>
         </BottomModal>
@@ -234,12 +259,19 @@ export default function RGBInvoiceDetailScreen() {
               icon="close"
               color="white_muted2"
               size={12}
-              onClick={() => setReleaseConfirmVisible(false)}
-              containerStyle={{ position: 'absolute', top: 30, right: 22 }}
+              onClick={releasing ? undefined : () => setReleaseConfirmVisible(false)}
+              containerStyle={{ position: 'absolute', top: 30, right: 22, opacity: releasing ? 0.45 : 1 }}
             />
-            <Text text={t('release_invoice_confirm_title')} color="white" size="md" textCenter />
             <Text
-              text={t('release_invoice_confirm_description')}
+              text={t(isWitnessInvoice ? 'delete_witness_invoice_confirm_title' : 'release_invoice_confirm_title')}
+              color="white"
+              size="md"
+              textCenter
+            />
+            <Text
+              text={t(
+                isWitnessInvoice ? 'delete_witness_invoice_confirm_description' : 'release_invoice_confirm_description'
+              )}
               color="white_muted2"
               size="sm"
               wrap
@@ -247,16 +279,23 @@ export default function RGBInvoiceDetailScreen() {
             />
             <Row gap="md" fullX style={{ marginTop: 24 }}>
               <Button
-                text={releasing ? t('releasing_invoice') : t('release_invoice')}
-                preset="default"
+                text={
+                  releasing
+                    ? t(isWitnessInvoice ? 'deleting_invoice' : 'releasing_invoice')
+                    : t(isWitnessInvoice ? 'delete_invoice' : 'release_invoice')
+                }
+                preset={isWitnessInvoice ? 'danger' : 'default'}
                 disabled={releasing}
                 onClick={() => {
-                  setReleaseConfirmVisible(false);
-                  void requestWrite(() => void release());
+                  void requestWrite(() => void removeInvoice());
                 }}
                 full
-                style={{ height: 48, background: 'transparent', border: '1px solid rgba(255,255,255,0.42)' }}
-                textStyle={{ color: colors.white, fontWeight: 'normal' }}
+                style={
+                  isWitnessInvoice
+                    ? { height: 48 }
+                    : { height: 48, background: 'transparent', border: '1px solid rgba(255,255,255,0.42)' }
+                }
+                textStyle={isWitnessInvoice ? undefined : { color: colors.white, fontWeight: 'normal' }}
               />
               <Button
                 text={t('keep_invoice')}

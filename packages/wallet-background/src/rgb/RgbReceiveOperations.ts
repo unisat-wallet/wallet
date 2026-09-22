@@ -81,7 +81,7 @@ export class RgbReceiveOperations {
     const pending = service.getPendingReceives()[batchTransferIdx]
     if (!pending) return { changed: false }
     await this.dependencies.ensureWriteLease?.(context)
-    const result = await service.cancelBlindReceive(pending.recipientId)
+    const result = await service.removePendingReceive(pending.recipientId)
     return { changed: result.cancelled }
   }
 

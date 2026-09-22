@@ -284,10 +284,29 @@ describe('RgbService', () => {
     await service.open(wallet)
     ;(service as any).state.pendingReceives = [{ recipientId: 'released-recipient', createdAt: 1 }]
 
-    await expect(service.cancelBlindReceive('released-recipient')).resolves.toEqual({ cancelled: true })
+    await expect(service.cancelBlindReceive('released-recipient')).resolves.toEqual({
+      cancelled: true,
+    })
     expect(service.exportRecoveryState()).toMatchObject({
       pendingReceives: [],
       releasedReceiveRecipientIds: ['released-recipient'],
+    })
+  })
+
+  it('deletes an unused witness invoice and records a recovery tombstone', async () => {
+    const dependencies = createDependencies()
+    const service = new RgbService(dependencies)
+    await service.open(wallet)
+    ;(service as any).state.pendingReceives = [
+      { recipientId: 'witness-recipient', recipientType: 'witness', createdAt: 1 },
+    ]
+
+    await expect(service.removePendingReceive('witness-recipient')).resolves.toEqual({
+      cancelled: true,
+    })
+    expect(service.exportRecoveryState()).toMatchObject({
+      pendingReceives: [],
+      releasedReceiveRecipientIds: ['witness-recipient'],
     })
   })
 

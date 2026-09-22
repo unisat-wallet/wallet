@@ -80,11 +80,12 @@ function isCompatibleInvoiceNetwork(
   const mainnetInvoiceNetworks: RgbWalletRef['network'][] = [
     'mainnet',
     'fractal-mainnet',
-    'fractal-test'
+    'fractal-test',
   ]
   return (
     invoiceNetwork === walletNetwork ||
-    (mainnetInvoiceNetworks.includes(invoiceNetwork) && mainnetInvoiceNetworks.includes(walletNetwork)) ||
+    (mainnetInvoiceNetworks.includes(invoiceNetwork) &&
+      mainnetInvoiceNetworks.includes(walletNetwork)) ||
     ((invoiceNetwork === 'testnet' || invoiceNetwork === 'testnet4') &&
       (walletNetwork === 'testnet' || walletNetwork === 'testnet4'))
   )
@@ -235,13 +236,11 @@ export class RgbService {
     }
   }
 
-  async retryRecoveryCheckpoint(
-    kind: 'normal' | 'replacement' = 'normal',
-    force = false
-  ) {
+  async retryRecoveryCheckpoint(kind: 'normal' | 'replacement' = 'normal', force = false) {
     const state = this.requireState()
     if (!this.recoveryBackupEnabled || !this.dependencies.onStatePersisted) return false
-    if (!force && !state.recoveryCheckpoint?.dirty && state.recoveryCheckpoint?.verified) return true
+    if (!force && !state.recoveryCheckpoint?.dirty && state.recoveryCheckpoint?.verified)
+      return true
     await this.persist({ waitForRecovery: true, recoveryCheckpointKind: kind })
     return this.requireState().recoveryCheckpoint?.verified === true
   }
@@ -1651,10 +1650,14 @@ export class RgbService {
   }
 
   async cancelBlindReceive(recipientId: string) {
-    return this.runPendingReceiveOperation(() => this.cancelBlindReceiveOnce(recipientId))
+    return this.removePendingReceive(recipientId)
   }
 
-  private async cancelBlindReceiveOnce(recipientId: string) {
+  async removePendingReceive(recipientId: string) {
+    return this.runPendingReceiveOperation(() => this.removePendingReceiveOnce(recipientId))
+  }
+
+  private async removePendingReceiveOnce(recipientId: string) {
     const state = this.requireState()
     const receives = state.pendingReceives || []
     const index = receives.findIndex(item => item.recipientId === recipientId)
@@ -1672,10 +1675,9 @@ export class RgbService {
     const rollback = snapshotState(state)
     receives.splice(index, 1)
     this.recordReleasedReceiveRecipient(recipientId)
-    // Releasing a blind seal changes durable wallet ownership. Do not report
-    // it as released until its checkpoint is safely published; otherwise a
-    // stale device can show a locally removed invoice while the cloud retains
-    // it and later enters a recovery conflict.
+    // Releasing a blind seal or deleting a witness invoice changes durable
+    // wallet state. Do not report it as removed until its checkpoint is safely
+    // published; otherwise another device can restore the stale invoice.
     await this.persistWithRecoveryRollback(rollback)
     return { cancelled: true }
   }
@@ -3103,7 +3105,9 @@ function persistState(state: RgbServiceState) {
       ...receive,
       ...(receive.seal ? { seal: persistBlindSeal(receive.seal) } : {}),
     })),
-    ...(state.receivedBlindSeals ? { receivedBlindSeals: state.receivedBlindSeals.map(persistBlindSeal) } : {}),
+    ...(state.receivedBlindSeals
+      ? { receivedBlindSeals: state.receivedBlindSeals.map(persistBlindSeal) }
+      : {}),
   }
 }
 
@@ -3230,7 +3234,8 @@ function validateRecoveredState(state: RgbServiceState, currentWallet: RgbWallet
     (!Array.isArray(state.releasedReceiveRecipientIds) ||
       state.releasedReceiveRecipientIds.length > 65_535 ||
       !state.releasedReceiveRecipientIds.every(
-        recipientId => typeof recipientId === 'string' && recipientId.length > 0 && recipientId.length <= 2_048
+        recipientId =>
+          typeof recipientId === 'string' && recipientId.length > 0 && recipientId.length <= 2_048
       ))
   ) {
     throw new RgbServiceError('RGB recovery checkpoint contains invalid receive release records')
