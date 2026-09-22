@@ -1778,6 +1778,23 @@ describe('RGB wallet references', () => {
     })
   })
 
+  it('cancels a queued RGB list refresh after the wallet is locked', async () => {
+    const wallet = new WalletController()
+    const syncListState = vi.spyOn((wallet as any).rgbCoordinator, 'syncListState')
+    ;(keyringService as any).memStore = { getState: () => ({ isUnlocked: false }) }
+    try {
+      await (wallet as any).syncRgbListState({
+        currentPage: 1,
+        pageSize: 20,
+        total: 0,
+        list: [],
+      })
+      expect(syncListState).not.toHaveBeenCalled()
+    } finally {
+      delete (keyringService as any).memStore
+    }
+  })
+
   it('shares a snapshot refresh across sequential RGB list and receive polling', async () => {
     const wallet = new WalletController()
     const service = {

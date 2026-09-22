@@ -935,6 +935,27 @@ function rgbIssueActivityStatus(chainStatus?: string) {
   return 'unconfirmed'
 }
 
+class RgbWalletLockedError extends Error {
+  constructor() {
+    super('RGB operation canceled because the wallet is locked')
+    this.name = 'RgbWalletLockedError'
+  }
+}
+
+function isWalletUnlocked() {
+  return keyringService.memStore?.getState?.().isUnlocked !== false
+}
+
+function isRgbWalletLockCancellation(error: unknown) {
+  if (error instanceof RgbWalletLockedError) return true
+  if (isWalletUnlocked()) return false
+  const message = error instanceof Error ? error.message : String(error)
+  return (
+    message.includes('No keyring found for the requested account') ||
+    message.includes('no current account')
+  )
+}
+
 export class WalletController extends BaseController {
   timer: any = null
 
@@ -3539,6 +3560,7 @@ export class WalletController extends BaseController {
       // observations in the background, so recovery or indexer timeouts do
       // not delay the encrypted local view.
       void this.syncRgbListState(result).catch(error => {
+        if (isRgbWalletLockCancellation(error)) return
         log.warn('Failed to refresh RGB indexer snapshot while loading local assets', error)
       })
     }
@@ -4931,6 +4953,7 @@ export class WalletController extends BaseController {
     total: number
     list: unknown
   }) => {
+    if (!isWalletUnlocked()) return
     await this.rgbCoordinator.syncListState()
     if (!previousList) return
 
@@ -4991,6 +5014,7 @@ export class WalletController extends BaseController {
   }
 
   private rgbRecoveryKey = async (wallet: LocalRgbWallet) => {
+    if (!isWalletUnlocked()) throw new RgbWalletLockedError()
     const context = bitcoin.crypto
       .sha256(Buffer.from(`unisat-rgb-recovery-v2:${wallet.network}:${wallet.fundingAddress}`))
       .toString('hex')
@@ -5389,6 +5413,7 @@ export class WalletController extends BaseController {
       })
     this.rgbRecoveryBackups.set(key, backup)
     void backup.catch(error => {
+      if (isRgbWalletLockCancellation(error)) return
       log.warn('RGB recovery: checkpoint save failed', diagnostic, error)
     })
     return backup
