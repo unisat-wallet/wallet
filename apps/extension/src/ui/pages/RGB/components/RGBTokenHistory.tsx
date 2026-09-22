@@ -8,6 +8,12 @@ import { useI18n, useNavigation } from '@unisat/wallet-state';
 import { RGBTransferDetailSheet } from '../RGBTransferDetailSheet';
 import { getRgbTransferDateKey, RGBTransferListItem } from './RGBTransferListItem';
 
+function getActivityTimestamp(item?: RgbActivityItem) {
+  if (!item) return 0;
+  const createdAt = (item as RgbActivityItem & { createdAt?: number }).createdAt;
+  return item.timestamp || createdAt || 0;
+}
+
 function toTransferItem(
   item: RgbActivityItem,
   fallbackTicker: string,
@@ -25,7 +31,7 @@ function toTransferItem(
     status: item.status,
     amount: item.amount,
     txid: item.txid,
-    timestamp: item.timestamp
+    timestamp: getActivityTimestamp(item)
   };
 }
 
@@ -85,9 +91,9 @@ export function RGBTokenHistory(props: {
           keyExtractor={(item, index) => item.id || item.txid || index.toString()}
           renderItem={({ item }) => {
             const itemIndex = activityItems.indexOf(item);
-            const date = getRgbTransferDateKey(item.timestamp);
+            const date = getRgbTransferDateKey(getActivityTimestamp(item));
             const previousDate =
-              itemIndex > 0 ? getRgbTransferDateKey(activityItems[itemIndex - 1]?.timestamp) : '';
+              itemIndex > 0 ? getRgbTransferDateKey(getActivityTimestamp(activityItems[itemIndex - 1])) : '';
             const transfer = toTransferItem(item, ticker, tokenName, precision);
             const assetLabel = showAssetTicker
               ? item.ticker || item.name || item.assetId?.slice(0, 8) || ticker

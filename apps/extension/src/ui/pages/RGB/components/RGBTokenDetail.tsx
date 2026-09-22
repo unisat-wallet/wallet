@@ -1,4 +1,4 @@
-import { Column } from '@/ui/components';
+import { Column, Tooltip } from '@/ui/components';
 import { Line } from '@/ui/components/Line';
 import { Section } from '@/ui/components/Section';
 import { showLongNumber } from '@/ui/utils';
@@ -36,7 +36,9 @@ export function RGBTokenDetail(props: {
         borderRadius: 15
       }}
     >
-      <Section title={t('asset_id')} value={assetId} showCopyIcon />
+      <Tooltip title={assetId} block>
+        <Section title={t('asset_id')} value={assetId} showCopyIcon />
+      </Tooltip>
       <Line />
       <Section title={t('name_label')} value={name} maxLength={Number.POSITIVE_INFINITY} wrapValue />
       <Line />
