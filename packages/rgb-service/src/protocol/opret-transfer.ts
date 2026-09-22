@@ -77,6 +77,18 @@ function outpointKey(txid: string, vout: number) {
   return `${txid}:${vout}`
 }
 
+/** Bitcoin inputs committed by a market-provided swap template. */
+export function getSwapPsbtInputOutpoints(value: string) {
+  const psbt = parsePsbt(value)
+  const transaction = ((psbt.data.globalMap.unsignedTx as any).tx ||
+    psbt.data.globalMap.unsignedTx) as any
+  return new Set<string>(
+    transaction.ins.map((txin: any) =>
+      outpointKey(Buffer.from(txin.hash).reverse().toString('hex'), txin.index)
+    )
+  )
+}
+
 /**
  * Validate the Bitcoin side of a swap before RGB commits to it. This does not
  * interpret maker business metadata: wallet-owned RGB inputs, the Opret host,
@@ -112,9 +124,7 @@ function prepareExternalSwapPsbt(input: NiaOpretTransferRequest, hasRgbChange: b
   const expectedInputs = new Set(
     input.selectedUtxos.map(utxo => outpointKey(utxo.outpoint.txid, utxo.outpoint.vout))
   )
-  const actualInputs = new Set(
-    transaction.ins.map((txin: any) => outpointKey(Buffer.from(txin.hash).reverse().toString('hex'), txin.index))
-  )
+  const actualInputs = getSwapPsbtInputOutpoints(input.swapPsbt || '')
   if (![...expectedInputs].every(key => actualInputs.has(key))) {
     throw new RgbServiceError('RGB swap PSBT does not contain every reserved RGB input')
   }

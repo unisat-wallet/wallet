@@ -1,3 +1,4 @@
+import { Psbt } from 'bitcoinjs-lib'
 import { describe, expect, it, vi } from 'vitest'
 import type {
   RgbCompletedTransfer,
@@ -18,6 +19,20 @@ const blindRecipient = 'bc:utxob:xDfmDF9g-yNOjriV-6Anbe6H-MLJ__g6-lo7Dd4f-dhWBW8
 const proxyEndpoint = 'rpcs://proxy.example/json-rpc'
 const rgbInvoice = (amount = 60) =>
   `rgb:asset/schema/~/${blindRecipient}?amount=${amount}&endpoints=${encodeURIComponent(proxyEndpoint)}`
+
+function swapPsbt(outpoints: Array<{ txid: string; vout: number }>) {
+  const psbt = new Psbt()
+  for (const outpoint of outpoints) {
+    psbt.addInput({
+      hash: outpoint.txid,
+      index: outpoint.vout,
+      sequence: 0xffff_ffff,
+      witnessUtxo: { value: 1_000, script: Buffer.from(`5120${'11'.repeat(32)}`, 'hex') },
+    })
+  }
+  psbt.addOutput({ script: Buffer.from([0x6a]), value: 0 })
+  return psbt.toHex()
+}
 
 function createDependencies(): RgbServiceDependencies {
   const stored = new Map<string, unknown>()
@@ -1034,7 +1049,7 @@ describe('RgbService', () => {
       amount: '60',
       invoice: rgbInvoice(),
       feeRate: 2,
-      swapPsbt: 'market-template-1',
+      swapPsbt: swapPsbt([{ txid: 'b'.repeat(64), vout: 1 }]),
     }
 
     const first = await service.prepareSend(request, { providerOrigin: 'https://market.example' })
@@ -1043,6 +1058,116 @@ describe('RgbService', () => {
     expect(retried).toEqual(first)
     expect(dependencies.encoder.prepareTransfer).toHaveBeenCalledTimes(1)
     expect(service.getLocalAssetBalance('rgb:asset')?.spendable).toBe('40')
+  })
+
+  it('selects RGB allocations only from inputs committed by a swap PSBT', async () => {
+    const dependencies = createDependencies()
+    vi.mocked(dependencies.stateSource.getSnapshot).mockResolvedValue({
+      syncedAt: 1,
+      utxos: [
+        {
+          outpoint: { txid: 'a'.repeat(64), vout: 0 },
+          satoshis: 1_000,
+          scriptPubKey: `5120${'11'.repeat(32)}`,
+          publicKey: `02${'11'.repeat(32)}`,
+          allocations: [
+            {
+              assetId: 'rgb:asset',
+              amount: '20',
+              settled: true,
+              spendable: true,
+              opId: '1'.repeat(64),
+              assignmentIndex: 0,
+              assignmentType: 4000,
+            },
+          ],
+        },
+        {
+          outpoint: { txid: 'b'.repeat(64), vout: 1 },
+          satoshis: 1_000,
+          scriptPubKey: `5120${'22'.repeat(32)}`,
+          publicKey: `02${'22'.repeat(32)}`,
+          allocations: [
+            {
+              assetId: 'rgb:asset',
+              amount: '60',
+              settled: true,
+              spendable: true,
+              opId: '2'.repeat(64),
+              assignmentIndex: 0,
+              assignmentType: 4000,
+            },
+          ],
+        },
+        {
+          outpoint: { txid: 'c'.repeat(64), vout: 2 },
+          satoshis: 1_000,
+          scriptPubKey: `5120${'33'.repeat(32)}`,
+          publicKey: `02${'33'.repeat(32)}`,
+          allocations: [
+            {
+              assetId: 'rgb:asset',
+              amount: '40',
+              settled: true,
+              spendable: true,
+              opId: '3'.repeat(64),
+              assignmentIndex: 0,
+              assignmentType: 4000,
+            },
+          ],
+        },
+      ],
+    })
+    vi.mocked(dependencies.encoder.prepareTransfer).mockResolvedValueOnce({
+      id: 'transfer-swap-subset',
+      psbt: 'cHNidP8=',
+      toSignInputs: [],
+      lockedOutpoints: [
+        { txid: 'a'.repeat(64), vout: 0 },
+        { txid: 'c'.repeat(64), vout: 2 },
+      ],
+    })
+    const service = new RgbService(dependencies)
+    await service.open(wallet)
+    await service.sync()
+
+    await service.prepareSend({
+      assetId: 'rgb:asset',
+      amount: '60',
+      invoice: rgbInvoice(),
+      feeRate: 2,
+      swapPsbt: swapPsbt([
+        { txid: 'a'.repeat(64), vout: 0 },
+        { txid: 'c'.repeat(64), vout: 2 },
+      ]),
+    })
+
+    expect(dependencies.encoder.prepareTransfer).toHaveBeenCalledWith(
+      expect.objectContaining({
+        selectedUtxos: [
+          expect.objectContaining({ outpoint: { txid: 'a'.repeat(64), vout: 0 } }),
+          expect.objectContaining({ outpoint: { txid: 'c'.repeat(64), vout: 2 } }),
+        ],
+      })
+    )
+  })
+
+  it('rejects a swap PSBT whose committed RGB inputs do not cover the amount', async () => {
+    const dependencies = createDependencies()
+    const service = new RgbService(dependencies)
+    await service.open(wallet)
+    await service.sync()
+
+    await expect(
+      service.prepareSend({
+        assetId: 'rgb:asset',
+        amount: '60',
+        invoice: rgbInvoice(),
+        feeRate: 2,
+        swapPsbt: swapPsbt([{ txid: 'a'.repeat(64), vout: 0 }]),
+      })
+    ).rejects.toBeInstanceOf(RgbInsufficientBalanceError)
+    expect(dependencies.encoder.prepareTransfer).not.toHaveBeenCalled()
   })
 
   it('reserves a fee-pool input while its RGB transfer is pending', async () => {

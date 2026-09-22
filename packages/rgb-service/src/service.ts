@@ -21,6 +21,7 @@ import {
 import { mergeNiaConsignmentHistory } from './protocol/nia-history'
 import { encodeNiaTransferConsignment } from './protocol/nia-contract'
 import { concealBlindSeal, encodeBlindRgbInvoice } from './protocol/receive'
+import { getSwapPsbtInputOutpoints } from './protocol/opret-transfer'
 import { planFungibleTransition } from './protocol/transition'
 import type {
   RgbCompletedTransfer,
@@ -2078,7 +2079,13 @@ export class RgbService {
       )
       if (existing) return existing.prepared
     }
-    const selectedUtxos = this.selectUtxos(requestedAssetId, amount)
+    // A market constructs the Bitcoin template before the wallet reserves RGB
+    // allocations. Select only from carrier inputs already committed by that
+    // template, instead of requiring the market to reproduce wallet coin selection.
+    const swapInputOutpoints = request.swapPsbt
+      ? getSwapPsbtInputOutpoints(request.swapPsbt)
+      : undefined
+    const selectedUtxos = this.selectUtxos(requestedAssetId, amount, swapInputOutpoints)
     await this.verifySelectedUtxos(state.wallet, selectedUtxos)
     const allocations = selectedUtxos.flatMap(utxo =>
       utxo.allocations
@@ -2828,7 +2835,7 @@ export class RgbService {
     return current
   }
 
-  private selectUtxos(assetId: string, amount: string) {
+  private selectUtxos(assetId: string, amount: string, allowedOutpoints?: Set<string>) {
     const state = this.requireState()
     let required: bigint
     try {
@@ -2851,11 +2858,21 @@ export class RgbService {
           (utxo.chainStatus === undefined ||
             utxo.chainStatus === 'confirmed' ||
             utxo.chainStatus === 'mempool') &&
+          (allowedOutpoints === undefined || allowedOutpoints.has(outpointKey(utxo))) &&
           !locked.has(outpointKey(utxo))
       )
       .map(utxo => ({ utxo, amount: getSpendableAmount(utxo, assetId) }))
       .filter(candidate => candidate.amount > 0n)
       .sort((a, b) => (a.amount === b.amount ? 0 : a.amount < b.amount ? -1 : 1))
+
+    if (allowedOutpoints !== undefined) {
+      const total = candidates.reduce((sum, candidate) => sum + candidate.amount, 0n)
+      if (total < required) throw new RgbInsufficientBalanceError(assetId, amount)
+      // Every RGB carrier already present in the Bitcoin transaction must be
+      // represented in the transition; selecting only a smaller subset would
+      // spend the remaining carrier without moving its RGB allocations.
+      return candidates.map(candidate => candidate.utxo)
+    }
 
     const exact = candidates.find(candidate => candidate.amount === required)
     if (exact) return [exact.utxo]
