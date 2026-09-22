@@ -62,7 +62,6 @@ import RGBSendCompleteScreen from './RGB/RGBSendCompleteScreen';
 import RGBTransferDetailScreen from './RGB/RGBTransferDetailScreen';
 import RGBTokenScreen from './RGB/RGBTokenScreen';
 import SendRGBScreen from './RGB/SendRGBScreen';
-import { RgbRecoveryConflictModal } from './RGB/components/RgbRecoveryConflictModal';
 import RunesTokenScreen from './Runes/RunesTokenScreen';
 import SendRunesScreen from './Runes/SendRunesScreen';
 import AboutUsScreen from './Settings/AboutUsScreen';
@@ -613,7 +612,6 @@ const Main = () => {
                 <Route key={v.path} path={v.path} element={<ErrorBoundary>{v.element}</ErrorBoundary>} />
               ))}
           </Routes>
-          {isUnlocked ? <RgbRecoveryConflictModal /> : null}
         </ApprovalProvider>
       </NavigationProvider>
     </HashRouter>

@@ -37,6 +37,7 @@ import {
 } from '@unisat/wallet-state';
 
 import { useNavigate } from '../../MainRoute';
+import { RgbRecoveryConflictModal } from '../../RGB/components/RgbRecoveryConflictModal';
 import { RGBTransferNotificationPanel } from '../../RGB/components/RGBTransferNotificationPanel';
 import { SwitchChainModal } from '../../Settings/SwitchChainModal';
 import { MoreActionSheet } from './MoreActionSheet';
@@ -337,6 +338,10 @@ export default function WalletTabScreen() {
             }}
           />
         ) : null}
+        <RgbRecoveryConflictModal
+          key={`${chain.enum}:${currentAccount.address}`}
+          enabled={isRgbView}
+        />
         {!isRgbView && moreSheetOpen ? (
           <MoreActionSheet
             currentSelection={moreSheetSelection}

@@ -3,15 +3,17 @@ import { useCallback, useState } from 'react';
 import { useWallet } from '@unisat/wallet-state';
 
 import { RgbWriteLeaseModal } from './RgbWriteLeaseModal';
+import { RgbRecoveryConflictModal } from './RgbRecoveryConflictModal';
 
 /** Gate user-initiated RGB writes, while leaving all RGB reads available on secondary devices. */
 export function useRgbWriteLeaseGuard() {
   const wallet = useWallet();
   const [leaseModal, setLeaseModal] = useState<{ expiresAt?: number }>();
+  const [recoveryConflictModal, setRecoveryConflictModal] = useState(false);
   const [leaseLoading, setLeaseLoading] = useState(false);
   const [pendingWrite, setPendingWrite] = useState<(() => void) | undefined>();
 
-  const requestWrite = useCallback(async (action: () => void) => {
+  const requestLeaseAndWrite = useCallback(async (action: () => void) => {
     try {
       const status = await wallet.getRgbWriteLeaseStatus();
       if (status.mode === 'readonly') {
@@ -38,6 +40,21 @@ export function useRgbWriteLeaseGuard() {
     }
   }, [wallet]);
 
+  const requestWrite = useCallback(async (action: () => void) => {
+    try {
+      const recoveryStatus = await wallet.getRgbRecoveryCheckpointStatus();
+      if (recoveryStatus.conflicted) {
+        setPendingWrite(() => action);
+        setRecoveryConflictModal(true);
+        return;
+      }
+    } catch {
+      // Let the operation retain its existing error handling when the
+      // diagnostic status cannot be read.
+    }
+    await requestLeaseAndWrite(action);
+  }, [requestLeaseAndWrite, wallet]);
+
   const onTakeover = useCallback(async () => {
     if (!pendingWrite) return;
     setLeaseLoading(true);
@@ -54,16 +71,35 @@ export function useRgbWriteLeaseGuard() {
 
   return {
     requestWrite,
-    writeLeaseModal: leaseModal ? (
-      <RgbWriteLeaseModal
-        expiresAt={leaseModal.expiresAt}
-        loading={leaseLoading}
-        onClose={() => {
-          setLeaseModal(undefined);
-          setPendingWrite(undefined);
-        }}
-        onTakeover={() => void onTakeover()}
-      />
-    ) : null
+    writeLeaseModal: (
+      <>
+        {recoveryConflictModal ? (
+          <RgbRecoveryConflictModal
+            forceVisible
+            onClose={() => {
+              setRecoveryConflictModal(false);
+              setPendingWrite(undefined);
+            }}
+            onResolved={() => {
+              const action = pendingWrite;
+              setRecoveryConflictModal(false);
+              setPendingWrite(undefined);
+              if (action) void requestLeaseAndWrite(action);
+            }}
+          />
+        ) : null}
+        {leaseModal ? (
+          <RgbWriteLeaseModal
+            expiresAt={leaseModal.expiresAt}
+            loading={leaseLoading}
+            onClose={() => {
+              setLeaseModal(undefined);
+              setPendingWrite(undefined);
+            }}
+            onTakeover={() => void onTakeover()}
+          />
+        ) : null}
+      </>
+    )
   };
 }
