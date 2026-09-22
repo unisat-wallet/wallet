@@ -86,6 +86,10 @@ export default function RGBInvoiceDetailScreen() {
   const [releaseConfirmVisible, setReleaseConfirmVisible] = useState(false);
   const [actionMenuVisible, setActionMenuVisible] = useState(false);
 
+  const closeInvoice = () => {
+    nav.goBack();
+  };
+
   const loadInvoice = useCallback(async () => {
     setLoading(true);
     try {
@@ -123,7 +127,7 @@ export default function RGBInvoiceDetailScreen() {
     try {
       const result = await wallet.cancelRgbReceiveInvoice({ batchTransferIdx, skipSync: false });
       if (result.changed) {
-        nav.goBack();
+        closeInvoice();
         return;
       }
       // A concurrent sync can remove the same invoice before the cancellation
@@ -136,7 +140,7 @@ export default function RGBInvoiceDetailScreen() {
           (routeInvoice && candidate.invoice === routeInvoice)
       );
       if (!stillExists) {
-        nav.goBack();
+        closeInvoice();
         return;
       }
       setInvoice(
@@ -178,7 +182,7 @@ export default function RGBInvoiceDetailScreen() {
   return (
     <Layout>
       <Header
-        onBack={() => nav.goBack()}
+        onBack={closeInvoice}
         title={t('receiving_invoice')}
         RightComponent={
           canRemoveInvoice ? (
@@ -248,7 +252,7 @@ export default function RGBInvoiceDetailScreen() {
           <Button
             text={t('close')}
             preset="default"
-            onClick={() => nav.goBack()}
+            onClick={closeInvoice}
             full
             style={{ background: 'transparent' }}
             textStyle={{ color: colors.white, fontWeight: 'normal' }}

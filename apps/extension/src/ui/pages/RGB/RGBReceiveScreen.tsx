@@ -35,7 +35,8 @@ import {
   toRgbDisplayAmount,
   useI18n,
   useRGBReceiveScreenLogic,
-  type RGBReceiveMode
+  type RGBReceiveMode,
+  type RGBReceiveScreenStep
 } from '@unisat/wallet-state';
 
 import { SignPsbt } from '../Approval/components';
@@ -214,7 +215,11 @@ const confirmModalStyle = {
   position: 'relative' as const
 };
 
-export default function RGBReceiveScreen() {
+export default function RGBReceiveScreen({
+  initialStep = 'create_invoice'
+}: {
+  initialStep?: RGBReceiveScreenStep;
+}) {
   const { t, locale } = useI18n();
   const { requestWrite, writeLeaseModal } = useRgbWriteLeaseGuard();
   const [releaseConfirmVisible, setReleaseConfirmVisible] = useState(false);
@@ -265,7 +270,7 @@ export default function RGBReceiveScreen() {
     onBackToCreate,
     onCloseInvoice,
     onClickBack
-  } = useRGBReceiveScreenLogic();
+  } = useRGBReceiveScreenLogic(initialStep);
   const assetDisplayTicker = assetId ? assetTicker : t('any_rgb_asset');
   const assetDisplayName = assetId ? getRgbAssetName(selectedRgbItem) || assetTicker : t('any_rgb_asset');
 

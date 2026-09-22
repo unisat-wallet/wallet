@@ -247,6 +247,24 @@ describe('useRGBReceiveScreenLogic', () => {
     })
   })
 
+  it('opens pending invoices as a separate screen', () => {
+    const assetId = 'rgb:test-asset'
+    const tokenBalance = { ticker: 'RGB', precision: 8 }
+    const { wrapper, navigation } = createHookTestHarness({
+      routeState: { assetId, tokenBalance },
+    })
+    const { result } = renderHook(() => useRGBReceiveScreenLogic(), { wrapper })
+
+    act(() => {
+      result.current.onOpenPendingInvoices()
+    })
+
+    expect(navigation.navigate).toHaveBeenCalledWith('RGBInvoiceListScreen', {
+      assetId,
+      tokenBalance,
+    })
+  })
+
   it('polls pending invoices awaiting confirmation even when none is selected', async () => {
     const setIntervalSpy = vi.spyOn(global, 'setInterval')
     const waitingInvoice = {

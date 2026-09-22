@@ -292,7 +292,9 @@ export const isRgbPendingInvoiceAwaitingSenderConfirmation = (item?: RgbPendingR
   return String(item?.status || '').toLowerCase() === 'waitingsenderconfirmation'
 }
 
-export function useRGBReceiveScreenLogic() {
+export function useRGBReceiveScreenLogic(
+  defaultInitialStep: RGBReceiveScreenStep = 'create_invoice'
+) {
   const nav = useNavigation()
   const wallet = useWallet()
   const tools = useTools()
@@ -303,7 +305,10 @@ export function useRGBReceiveScreenLogic() {
   const routeState = nav.getRouteState<'RGBReceiveScreen'>() as RGBReceiveRouteState
   const routeAssetId = routeState?.assetId || ''
   const isAssetLocked = !!routeAssetId
-  const enteredViaPendingInvoices = routeState?.initialStep === 'pending_invoices'
+  const [initialStep] = useState<RGBReceiveScreenStep>(
+    () => routeState?.initialStep || defaultInitialStep
+  )
+  const enteredViaPendingInvoices = initialStep === 'pending_invoices'
   const [selectedAssetId, setSelectedAssetId] = useState(routeAssetId)
   const [selectedTokenBalance, setSelectedTokenBalance] = useState<RgbAssetItem | undefined>(
     routeState?.tokenBalance as RgbAssetItem | undefined
@@ -321,9 +326,7 @@ export function useRGBReceiveScreenLogic() {
   const [cancelLoading, setCancelLoading] = useState(false)
   const [pendingLoading, setPendingLoading] = useState(true)
   const [pendingInvoices, setPendingInvoices] = useState<RgbPendingReceiveInvoice[]>([])
-  const [step, setStep] = useState<RGBReceiveScreenStep>(
-    routeState?.initialStep || 'create_invoice'
-  )
+  const [step, setStep] = useState<RGBReceiveScreenStep>(initialStep)
   const [utxoToSignData, setUtxoToSignData] = useState<ToSignData>()
   const [utxoPendingVanillaTxid, setUtxoPendingVanillaTxid] = useState('')
   const [resumeCreateInvoiceAfterSign, setResumeCreateInvoiceAfterSign] = useState(false)
@@ -678,7 +681,10 @@ export function useRGBReceiveScreenLogic() {
   }
 
   const onOpenPendingInvoices = () => {
-    setStep('pending_invoices')
+    nav.navigate('RGBInvoiceListScreen', {
+      ...(assetId ? { assetId } : {}),
+      ...(selectedTokenBalance ? { tokenBalance: selectedTokenBalance } : {}),
+    })
   }
 
   const onClosePendingInvoices = () => {
