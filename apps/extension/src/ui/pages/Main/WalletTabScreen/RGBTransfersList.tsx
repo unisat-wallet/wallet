@@ -32,14 +32,18 @@ export function RGBTransfersList({ transfers }: RGBTransfersListProps) {
   const { items, total, loading, hasMore, onRefresh, onLoadMore } = transfers;
   const [selectedTransfer, setSelectedTransfer] = useState<RgbTransferItem | undefined>();
   const [dismissedTransferIds, setDismissedTransferIds] = useState<Set<string>>(() => new Set());
+  const [acceptedTransferIds, setAcceptedTransferIds] = useState<Set<string>>(() => new Set());
 
   useEffect(() => {
     if (selectedTransfer) return;
     const transfer = items.find(
-      (item) => isPendingReceive(item) && !dismissedTransferIds.has(getTransferId(item))
+      (item) =>
+        isPendingReceive(item) &&
+        !dismissedTransferIds.has(getTransferId(item)) &&
+        !acceptedTransferIds.has(getTransferId(item))
     );
     if (transfer) setSelectedTransfer(transfer);
-  }, [dismissedTransferIds, items, selectedTransfer]);
+  }, [acceptedTransferIds, dismissedTransferIds, items, selectedTransfer]);
 
   const closeTransferDetail = () => {
     if (selectedTransfer && isPendingReceive(selectedTransfer)) {
@@ -59,7 +63,10 @@ export function RGBTransfersList({ transfers }: RGBTransfersListProps) {
     // waiting for the refresh triggered below. The effect remains as a
     // fallback when the next invoice arrives in the refreshed first page.
     const nextTransfer = items.find(
-      (item) => isPendingReceive(item) && !excludedIds.has(getTransferId(item))
+      (item) =>
+        isPendingReceive(item) &&
+        !excludedIds.has(getTransferId(item)) &&
+        !acceptedTransferIds.has(getTransferId(item))
     );
     setSelectedTransfer(nextTransfer);
     void transfers.onRefresh({ showLoading: false });
@@ -79,12 +86,20 @@ export function RGBTransfersList({ transfers }: RGBTransfersListProps) {
         emptyPreset="assets"
         rowGap={0}
         renderItem={({ item }) => {
+          const displayItem: RgbTransferItem =
+            acceptedTransferIds.has(getTransferId(item)) && isPendingReceive(item)
+              ? { ...item, status: 'waiting_receive' }
+              : item;
           const itemIndex = items.indexOf(item);
           const date = getRgbTransferDateKey(item.timestamp);
           const previousDate = itemIndex > 0 ? getRgbTransferDateKey(items[itemIndex - 1]?.timestamp) : '';
           const showDate = Boolean(date && date !== previousDate);
           return (
-            <RGBTransferListItem item={item} showDate={showDate} onClick={() => setSelectedTransfer(item)} />
+            <RGBTransferListItem
+              item={displayItem}
+              showDate={showDate}
+              onClick={() => setSelectedTransfer(displayItem)}
+            />
           );
         }}
       />
@@ -94,6 +109,10 @@ export function RGBTransfersList({ transfers }: RGBTransfersListProps) {
           transfer={selectedTransfer}
           transferId={selectedTransfer.transferId || selectedTransfer.id}
           onClose={closeTransferDetail}
+          onAccepted={() => {
+            const transferId = getTransferId(selectedTransfer);
+            setAcceptedTransferIds((current) => new Set(current).add(transferId));
+          }}
           onCanceled={advanceToNextPendingReceive}
           onClickExploreTx={
             selectedTransfer.txid

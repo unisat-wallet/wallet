@@ -175,6 +175,7 @@ export type RGBTransferDetailSheetProps = {
   onClose: () => void;
   onClickExploreTx?: () => void;
   onCanceled?: () => void;
+  onAccepted?: () => void;
 };
 
 export function RGBTransferDetailSheet({
@@ -183,7 +184,8 @@ export function RGBTransferDetailSheet({
   loading,
   onClose,
   onClickExploreTx,
-  onCanceled
+  onCanceled,
+  onAccepted
 }: RGBTransferDetailSheetProps) {
   const { t } = useI18n();
   const chain = useChain();
@@ -263,6 +265,7 @@ export function RGBTransferDetailSheet({
         throw new Error(t('rgb_accept_transfer_failed'));
       } else {
         tools.toastSuccess(t('rgb_accept_transfer_success'));
+        onAccepted?.();
       }
       onClose();
       onCanceled?.();
