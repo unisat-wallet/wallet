@@ -3441,5 +3441,6 @@
   "delete_invoice": { "message": "Eliminar factura" },
   "deleting_invoice": { "message": "Eliminando factura…" },
   "delete_witness_invoice_confirm_title": { "message": "¿Eliminar la factura witness?" },
-  "delete_witness_invoice_confirm_description": { "message": "Después de eliminarla, tu cartera dejará de supervisar esta factura. Si alguien envía activos mediante ella, es posible que no puedas recibirlos." }
+  "delete_witness_invoice_confirm_description": { "message": "Después de eliminarla, tu cartera dejará de supervisar esta factura. Si alguien envía activos mediante ella, es posible que no puedas recibirlos." },
+  "use_this_invoice_to_receive_any_rgb_asset": { "message": "Usa esta factura para recibir cualquier activo RGB." }
 }

@@ -21,6 +21,7 @@ type ReceiveQRCodeCardProps = {
   qrCenter?: ReactNode;
   accentColor?: string;
   copyDisabled?: boolean;
+  qrTopSpacing?: number;
 };
 
 export function ReceiveQRCodeCard(props: ReceiveQRCodeCardProps) {
@@ -36,7 +37,8 @@ export function ReceiveQRCodeCard(props: ReceiveQRCodeCardProps) {
     qrIconSrc,
     qrCenter,
     accentColor = GOLD,
-    copyDisabled = false
+    copyDisabled = false,
+    qrTopSpacing = 12
   } = props;
   const [copied, setCopied] = useState(false);
 
@@ -81,7 +83,7 @@ export function ReceiveQRCodeCard(props: ReceiveQRCodeCardProps) {
         itemsCenter
         justifyCenter
         style={{
-          marginTop: 12,
+          marginTop: qrTopSpacing,
           width: sizes.qrcode + 20,
           height: sizes.qrcode + 20,
           background: '#fff',

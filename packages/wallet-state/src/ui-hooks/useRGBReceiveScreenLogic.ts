@@ -68,7 +68,9 @@ type RgbReceiveWallet = {
     durationSeconds?: number
     skipSync?: boolean
   }): Promise<unknown>
-  getRgbPendingReceiveInvoices(): Promise<RgbPendingReceiveInvoicesResult>
+  getRgbPendingReceiveInvoices(params?: {
+    skipSync?: boolean
+  }): Promise<RgbPendingReceiveInvoicesResult>
   cancelRgbReceiveInvoice(params: {
     batchTransferIdx: number
     skipSync?: boolean
@@ -401,21 +403,29 @@ export function useRGBReceiveScreenLogic() {
   const loadPendingInvoices = useCallback(async () => {
     setPendingLoading(true)
     try {
-      const value = await rgbWallet.getRgbPendingReceiveInvoices()
-      const list = getPendingInvoiceList(value).filter(
-        item => item.invoice && isInvoiceForAsset(item, assetId)
-      )
-      setPendingInvoices(list)
-      setSelectedPendingInvoice(current => {
-        if (!current) return current
-        return (
-          list.find(
-            item =>
-              (current.recipientId && item.recipientId === current.recipientId) ||
-              item.invoice === current.invoice
-          ) || current
+      const applyPendingInvoices = (value: RgbPendingReceiveInvoicesResult) => {
+        const list = getPendingInvoiceList(value).filter(
+          item => item.invoice && isInvoiceForAsset(item, assetId)
         )
-      })
+        setPendingInvoices(list)
+        setSelectedPendingInvoice(current => {
+          if (!current) return current
+          return (
+            list.find(
+              item =>
+                (current.recipientId && item.recipientId === current.recipientId) ||
+                item.invoice === current.invoice
+            ) || current
+          )
+        })
+      }
+
+      const localValue = await rgbWallet.getRgbPendingReceiveInvoices({ skipSync: true })
+      applyPendingInvoices(localValue)
+      setPendingLoading(false)
+
+      const syncedValue = await rgbWallet.getRgbPendingReceiveInvoices()
+      applyPendingInvoices(syncedValue)
     } catch (e: unknown) {
       setError(getErrorMessage(e))
     } finally {

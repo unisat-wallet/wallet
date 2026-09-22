@@ -3448,5 +3448,6 @@
   "delete_invoice": { "message": "Удалить инвойс" },
   "deleting_invoice": { "message": "Удаление инвойса…" },
   "delete_witness_invoice_confirm_title": { "message": "Удалить witness-инвойс?" },
-  "delete_witness_invoice_confirm_description": { "message": "После удаления кошелёк перестанет отслеживать этот инвойс. Если кто-то отправит с его помощью активы, вы можете не получить их." }
+  "delete_witness_invoice_confirm_description": { "message": "После удаления кошелёк перестанет отслеживать этот инвойс. Если кто-то отправит с его помощью активы, вы можете не получить их." },
+  "use_this_invoice_to_receive_any_rgb_asset": { "message": "Используйте этот инвойс для получения любого RGB-актива." }
 }

@@ -3529,5 +3529,6 @@
   "delete_invoice": { "message": "Delete invoice" },
   "deleting_invoice": { "message": "Deleting invoice…" },
   "delete_witness_invoice_confirm_title": { "message": "Delete witness invoice?" },
-  "delete_witness_invoice_confirm_description": { "message": "After deletion, your wallet will stop monitoring this invoice. If someone sends assets using it, you may not be able to receive them." }
+  "delete_witness_invoice_confirm_description": { "message": "After deletion, your wallet will stop monitoring this invoice. If someone sends assets using it, you may not be able to receive them." },
+  "use_this_invoice_to_receive_any_rgb_asset": { "message": "Use this invoice to receive any RGB asset." }
 }

@@ -53,14 +53,18 @@ export class RgbReceiveOperations {
     )
   }
 
-  async getPendingReceiveInvoices(): Promise<{ list: RgbPendingReceiveInvoice[] }> {
+  async getPendingReceiveInvoices(
+    params: { skipSync?: boolean } = {}
+  ): Promise<{ list: RgbPendingReceiveInvoice[] }> {
     let { service } = await (this.dependencies.getReadContext?.() ?? this.dependencies.getContext())
     if (!service.getPendingReceives().length) return { list: [] }
-    try {
-      ;({ service } = await this.dependencies.syncReceivedAllocations())
-    } catch {
-      // Claiming and consignment settlement need the writer lease. Keep the
-      // already restored invoice list visible and retry that work later.
+    if (!params.skipSync) {
+      try {
+        ;({ service } = await this.dependencies.syncReceivedAllocations())
+      } catch {
+        // Claiming and consignment settlement need the writer lease. Keep the
+        // already restored invoice list visible and retry that work later.
+      }
     }
     return {
       list: service

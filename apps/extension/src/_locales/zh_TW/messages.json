@@ -3518,5 +3518,6 @@
   "delete_invoice": { "message": "刪除 Invoice" },
   "deleting_invoice": { "message": "正在刪除 Invoice…" },
   "delete_witness_invoice_confirm_title": { "message": "刪除 Witness Invoice？" },
-  "delete_witness_invoice_confirm_description": { "message": "刪除後，錢包將停止監聽此 Invoice。如果其他人仍使用它傳送資產，你可能無法收到這些資產。" }
+  "delete_witness_invoice_confirm_description": { "message": "刪除後，錢包將停止監聽此 Invoice。如果其他人仍使用它傳送資產，你可能無法收到這些資產。" },
+  "use_this_invoice_to_receive_any_rgb_asset": { "message": "使用此 Invoice 接收任意 RGB 資產。" }
 }

@@ -4039,7 +4039,8 @@ export class WalletController extends BaseController {
     return service.checkInvoiceAvailability(params.invoice)
   }
 
-  getRgbPendingReceiveInvoices = () => this.rgbReceiveOperations.getPendingReceiveInvoices()
+  getRgbPendingReceiveInvoices = (params: { skipSync?: boolean } = {}) =>
+    this.rgbReceiveOperations.getPendingReceiveInvoices(params)
 
   /** Internal provider preflight for a buyer-side RGB/BTC swap. */
   getRgbBuySwapReceive = async (params: { recipientId: string }) => {

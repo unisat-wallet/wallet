@@ -3454,5 +3454,6 @@
   "delete_invoice": { "message": "Invoiceを削除" },
   "deleting_invoice": { "message": "Invoiceを削除中…" },
   "delete_witness_invoice_confirm_title": { "message": "Witness Invoiceを削除しますか？" },
-  "delete_witness_invoice_confirm_description": { "message": "削除すると、ウォレットはこのInvoiceの監視を停止します。誰かがこのInvoiceを使用して資産を送信した場合、受け取れない可能性があります。" }
+  "delete_witness_invoice_confirm_description": { "message": "削除すると、ウォレットはこのInvoiceの監視を停止します。誰かがこのInvoiceを使用して資産を送信した場合、受け取れない可能性があります。" },
+  "use_this_invoice_to_receive_any_rgb_asset": { "message": "このInvoiceを使用して任意のRGB資産を受け取ります。" }
 }

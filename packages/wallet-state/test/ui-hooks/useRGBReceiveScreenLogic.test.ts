@@ -192,14 +192,16 @@ describe('useRGBReceiveScreenLogic', () => {
     const { result } = renderHook(() => useRGBReceiveScreenLogic(), { wrapper })
 
     await waitFor(() => {
-      expect(wallet.getRgbPendingReceiveInvoices).toHaveBeenCalledTimes(1)
+      expect(wallet.getRgbPendingReceiveInvoices).toHaveBeenCalledTimes(2)
     })
+    expect(wallet.getRgbPendingReceiveInvoices).toHaveBeenNthCalledWith(1, { skipSync: true })
+    expect(wallet.getRgbPendingReceiveInvoices).toHaveBeenNthCalledWith(2)
 
     await act(async () => {
       await result.current.onCreateInvoice()
     })
 
-    expect(wallet.getRgbPendingReceiveInvoices).toHaveBeenCalledTimes(1)
+    expect(wallet.getRgbPendingReceiveInvoices).toHaveBeenCalledTimes(2)
   })
 
   it('opens a waiting invoice in the dedicated detail screen after creation', async () => {

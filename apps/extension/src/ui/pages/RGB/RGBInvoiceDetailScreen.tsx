@@ -20,8 +20,10 @@ import { colors } from '@/ui/theme/colors';
 import {
   ANY_RGB_ASSET,
   ANY_RGB_ASSET_ID,
+  formatRgbPendingAmountTag,
   getRgbAssetId,
   getRgbTokenIconInfo,
+  getRgbTokenPrecision,
   getRgbTokenTicker,
   isCancelableRgbPendingInvoice,
   isDeletableRgbWitnessInvoice,
@@ -165,6 +167,13 @@ export default function RGBInvoiceDetailScreen() {
   const isAnyRgbAsset = !invoice?.assetId || getRgbAssetId(invoiceAsset) === ANY_RGB_ASSET_ID;
   const invoiceTicker = isAnyRgbAsset ? t('any_rgb_asset') : getRgbTokenTicker(invoiceAsset);
   const invoiceName = isAnyRgbAsset ? t('any_rgb_asset') : getRgbAssetName(invoiceAsset) || invoiceTicker;
+  const invoicePrecision = getRgbTokenPrecision(invoiceAsset);
+  const invoiceAmount = invoice
+    ? formatRgbPendingAmountTag(invoice.amount, t('any_amount'), invoicePrecision)
+    : t('any_amount');
+  const invoiceDescription = isAnyRgbAsset
+    ? t('use_this_invoice_to_receive_any_rgb_asset')
+    : t('use_this_invoice_to_receive', { ticker: invoiceName });
 
   return (
     <Layout>
@@ -181,6 +190,30 @@ export default function RGBInvoiceDetailScreen() {
         {invoiceText && !invoiceInUse ? (
           <ReceiveQRCodeCard
             value={invoiceText}
+            title={
+              invoice ? (
+                <Column fullX itemsCenter gap="sm">
+                  <Row itemsCenter justifyCenter gap="sm" fullX>
+                    <Text
+                      text={isAnyRgbAsset ? invoiceAmount : `${invoiceAmount} ${invoiceTicker}`}
+                      color="gold"
+                      size="md"
+                      preset="bold"
+                      textCenter
+                    />
+                    <div style={recipientTypeTagStyle}>
+                      <Text
+                        text={t(recipientType === 'witness' ? 'rgb_invoice_witness' : 'rgb_invoice_blind')}
+                        color="textDim"
+                        size="xxs"
+                      />
+                    </div>
+                  </Row>
+                  <Text text={invoiceDescription} color="white_muted2" size="xs" textCenter />
+                </Column>
+              ) : undefined
+            }
+            qrTopSpacing={0}
             qrCenter={
               invoice ? (
                 <RGBAssetIcon
@@ -190,17 +223,6 @@ export default function RGBInvoiceDetailScreen() {
                   size={30}
                   isAnyRgbAsset={isAnyRgbAsset}
                 />
-              ) : undefined
-            }
-            valuePrefix={
-              invoice ? (
-                <div style={recipientTypeTagStyle}>
-                  <Text
-                    text={t(recipientType === 'witness' ? 'rgb_invoice_witness' : 'rgb_invoice_blind')}
-                    color="textDim"
-                    size="xxs"
-                  />
-                </div>
               ) : undefined
             }
             accentColor="#F4B62C"
