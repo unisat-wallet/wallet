@@ -1,10 +1,10 @@
 import { type ReactNode, useEffect, useState } from 'react';
 
-import { Button, Card, Column, Content, Footer, Header, Icon, Image, Layout, Row, Text } from '@/ui/components';
+import { Button, Card, Column, Content, Footer, Header, Icon, Layout, RGBAssetIcon, Row, Text } from '@/ui/components';
 import WebsiteBar from '@/ui/components/WebsiteBar';
-import { formatSessionIcon, shortAddress } from '@/ui/utils';
+import { shortAddress } from '@/ui/utils';
 import type { SignedData, ToSignData } from '@unisat/wallet-shared';
-import { useApproval, useWallet } from '@unisat/wallet-state';
+import { getRgbTokenIconInfo, useApproval, useI18n, useWallet } from '@unisat/wallet-state';
 
 import { useRgbWriteLeaseGuard } from '../../RGB/components/useRgbWriteLeaseGuard';
 import SignPsbt from './SignPsbt';
@@ -18,6 +18,11 @@ type Receive = {
 type RgbAssetMetadata = {
   name?: string;
   ticker?: string;
+  iconInfo?: {
+    iconShortName?: string;
+    iconUrl?: string;
+  };
+  iconUrl?: string;
 };
 
 interface Props {
@@ -44,6 +49,7 @@ export function RgbReceive({ params: { data, session } }: Props) {
 
 function RgbReceiveApproval({ data, session }: { data: Props['params']['data']; session: Props['params']['session'] }) {
   const wallet = useWallet();
+  const { t } = useI18n();
   const { resolveApproval, rejectApproval } = useApproval();
   const { requestWrite, writeLeaseModal } = useRgbWriteLeaseGuard();
   const [utxoToSignData, setUtxoToSignData] = useState<ToSignData>();
@@ -53,16 +59,15 @@ function RgbReceiveApproval({ data, session }: { data: Props['params']['data']; 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
-  const amount = data.amount?.trim() || 'Any amount';
+  const amount = data.amount?.trim() || t('rgb_approval_any_amount');
   const ticker = assetMetadata?.ticker?.trim();
   const assetName = assetMetadata?.name?.trim();
-  const amountLabel = ticker && amount !== 'Any amount' ? `${amount} ${ticker}` : amount;
+  const amountLabel = ticker && data.amount?.trim() ? `${amount} ${ticker}` : amount;
   const assetLabel = data.assetId
     ? [ticker, assetName && assetName !== ticker ? assetName : ''].filter(Boolean).join(' · ') ||
-      `RGB asset · ${shortAddress(data.assetId, 6)}`
-    : 'Any RGB asset';
-  const expiry = formatRgbInvoiceExpiry(data.durationSeconds);
-  const siteName = session.name?.split('|')[0].trim() || session.origin;
+      `${t('rgb_approval_rgb_asset')} · ${shortAddress(data.assetId, 6)}`
+    : t('rgb_approval_any_rgb_asset');
+  const expiry = formatRgbInvoiceExpiry(data.durationSeconds, t);
 
   useEffect(() => {
     let active = true;
@@ -77,7 +82,12 @@ function RgbReceiveApproval({ data, session }: { data: Props['params']['data']; 
       .getRGBAssetDetail('', data.assetId)
       .then((asset) => {
         if (!active) return;
-        setAssetMetadata({ name: asset.name, ticker: asset.ticker });
+        setAssetMetadata({
+          name: asset.name,
+          ticker: asset.ticker,
+          iconInfo: asset.iconInfo,
+          iconUrl: asset.iconUrl
+        });
       })
       .catch(() => {
         if (active) setAssetMetadata(undefined);
@@ -105,7 +115,7 @@ function RgbReceiveApproval({ data, session }: { data: Props['params']['data']; 
     if (value && typeof value === 'object' && 'message' in value && typeof value.message === 'string') {
       return value.message;
     }
-    return String(value || 'Unable to create RGB UTXO');
+    return String(value || t('rgb_approval_create_utxo_failed'));
   };
 
   const onCreateInvoice = async () => {
@@ -124,7 +134,7 @@ function RgbReceiveApproval({ data, session }: { data: Props['params']['data']; 
         upTo: true
       });
       const toSignData = result?.toSignData as ToSignData | undefined;
-      if (!toSignData) throw new Error('RGB UTXO creation did not return signing data');
+      if (!toSignData) throw new Error(t('rgb_approval_create_utxo_no_signing_data'));
       setUtxoToSignData(toSignData);
     } catch (e) {
       setError(getErrorMessage(e));
@@ -136,7 +146,7 @@ function RgbReceiveApproval({ data, session }: { data: Props['params']['data']; 
   const onSignRgbUtxo = async (signedDatas: SignedData[]) => {
     const signedPsbt = signedDatas[0]?.psbtHex;
     if (!signedPsbt) {
-      setError('RGB UTXO PSBT signing did not return psbtHex');
+      setError(t('rgb_approval_create_utxo_no_signed_psbt'));
       setUtxoToSignData(undefined);
       return;
     }
@@ -168,79 +178,28 @@ function RgbReceiveApproval({ data, session }: { data: Props['params']['data']; 
   }
 
   return (
-    <Layout style={{ background: '#090A0D' }}>
+    <Layout>
+      <Header>
+        <WebsiteBar session={session} />
+      </Header>
       <Content>
-        <Column
-          mt="md"
-          gap="md"
-          style={{ width: '100%', maxWidth: 520, alignSelf: 'center', padding: '0 14px 14px', boxSizing: 'border-box' }}
-        >
-          <Column itemsCenter gap="xs" style={{ paddingTop: 4 }}>
-            <div
-              style={{
-                width: 52,
-                height: 52,
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                borderRadius: 16,
-                background: 'linear-gradient(135deg, rgba(255,255,255,0.10), rgba(255,255,255,0.03))',
-                border: '1px solid rgba(255,255,255,0.22)',
-                overflow: 'hidden'
-              }}
-            >
-              <Image
-                src={formatSessionIcon(session)}
-                fallbackSrc="./images/icons/artifacts/unknown.png"
-                size={38}
-                style={{ borderRadius: 11 }}
-              />
-            </div>
-            <Text text={siteName} size="lg" preset="title-bold" textCenter />
-            <Row itemsCenter gap="xs">
-              <Icon icon="link" color="textDim" size={11} />
-              <Text text={session.origin} size="xs" color="textDim" textCenter />
-            </Row>
-            <Text
-              text="wants to create an RGB receive invoice"
-              size="lg"
-              preset="title-bold"
-              textCenter
-              style={{ marginTop: 8 }}
-            />
-            <Text text="Create an invoice to receive RGB assets." size="sm" textCenter color="textDim" />
-          </Column>
+        <Column mt="lg" gap="md">
+          <Text text={t('rgb_approval_create_invoice_title')} preset="title-bold" textCenter />
+          <Text text={t('rgb_approval_create_invoice_description')} preset="sub" textCenter />
 
-          <Card
-            style={{
-              display: 'block',
-              padding: 14,
-              borderRadius: 14,
-              border: '1px solid rgba(148, 160, 190, 0.20)',
-              background: 'linear-gradient(135deg, rgba(30, 33, 44, 0.94), rgba(16, 17, 23, 0.94))',
-              boxShadow: '0 12px 34px rgba(0,0,0,0.22)'
-            }}
-          >
-            <Column gap="md">
-              <Row justifyBetween gap="md" style={{ alignItems: 'flex-start' }}>
+          <Card style={{ display: 'block' }}>
+            <Column gap="md" fullX>
+              <Row justifyBetween gap="md" fullX style={{ alignItems: 'flex-start' }}>
                 <Row gap="md" itemsCenter style={{ minWidth: 0, flex: 1 }}>
-                  <div
-                    style={{
-                      width: 58,
-                      height: 58,
-                      flex: '0 0 58px',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      borderRadius: 16,
-                      background: 'radial-gradient(circle at 30% 25%, #7B4DFF 0%, #4A36D6 42%, #F49B37 100%)',
-                      boxShadow: 'inset 0 0 0 1px rgba(255,255,255,0.14)'
-                    }}
-                  >
-                    <Icon icon="rgb" size={30} />
-                  </div>
+                  <RGBAssetIcon
+                    iconInfo={getRgbTokenIconInfo(assetMetadata, ticker || assetName || 'RGB')}
+                    ticker={ticker}
+                    name={assetName}
+                    size={52}
+                    isAnyRgbAsset={!data.assetId}
+                  />
                   <Column gap="xs" style={{ minWidth: 0, flex: 1 }}>
-                    <Text text="Receive" size="sm" color="textDim" />
+                    <Text text={t('receive')} size="sm" color="textDim" />
                     <Text text={amountLabel} size="xxl" preset="title-bold" style={{ wordBreak: 'break-word' }} />
                     <Text text={assetLabel} size="sm" color="textDim" />
                   </Column>
@@ -258,7 +217,7 @@ function RgbReceiveApproval({ data, session }: { data: Props['params']['data']; 
                 >
                   <Icon icon="rgb" size={12} />
                   <Text
-                    text={data.recipientType === 'witness' ? 'Witness' : 'Blind'}
+                    text={data.recipientType === 'witness' ? t('rgb_approval_witness') : t('rgb_approval_blind')}
                     size="xxs"
                     color={data.recipientType === 'witness' ? 'gold' : 'textDim'}
                   />
@@ -272,52 +231,46 @@ function RgbReceiveApproval({ data, session }: { data: Props['params']['data']; 
             </Column>
           </Card>
 
-          <Card
-            style={{
-              display: 'block',
-              padding: 0,
-              borderRadius: 14,
-              border: '1px solid rgba(148, 160, 190, 0.18)',
-              background: 'linear-gradient(135deg, rgba(24, 26, 35, 0.94), rgba(14, 15, 20, 0.94))'
-            }}
-          >
+          <Card style={{ display: 'block', padding: 0 }}>
             <RgbApprovalAccordion
-              title="How this works"
-              description="A brief overview of what will happen."
+              title={t('rgb_approval_how_it_works')}
+              description={t('rgb_approval_create_how_it_works_description')}
               expanded={howItWorksExpanded}
               onClick={() => setHowItWorksExpanded((value) => !value)}
             >
               <Row itemsCenter gap="sm">
                 <Icon icon="utxo" color="gold" size={20} />
-                <Text text="Your wallet creates an invoice for this site." size="xs" color="textDim" />
+                <Text text={t('rgb_approval_create_step_invoice')} size="xs" color="textDim" />
               </Row>
               <Text
-                text="If wallet setup requires a Bitcoin transaction, its recipients and network fee will be shown on the next screen before you sign."
+                text={t('rgb_approval_create_step_setup')}
                 size="xs"
                 color="textDim"
                 style={{ lineHeight: '18px' }}
               />
-              <Text text="No RGB assets leave your wallet when creating this invoice." size="xs" color="success" />
+              <Text text={t('rgb_approval_create_step_no_assets_leave')} size="xs" color="success" />
             </RgbApprovalAccordion>
             <RgbApprovalAccordion
-              title="Invoice details"
-              description="Asset ID, recipient and expiry information."
+              title={t('rgb_approval_invoice_details')}
+              description={t('rgb_approval_invoice_details_description')}
               expanded={invoiceDetailsExpanded}
               onClick={() => setInvoiceDetailsExpanded((value) => !value)}
               bordered
             >
               <Column gap="sm">
-                {data.assetId ? <RgbReceiveDetail label="Asset" value={assetLabel} /> : null}
+                {data.assetId ? <RgbReceiveDetail label={t('asset')} value={assetLabel} /> : null}
                 <RgbReceiveDetail
-                  label="Asset ID"
-                  value={data.assetId ? shortAddress(data.assetId, 10) : 'Any RGB asset'}
+                  label={t('asset_id')}
+                  value={data.assetId ? shortAddress(data.assetId, 10) : t('rgb_approval_any_rgb_asset')}
                 />
-                <RgbReceiveDetail label="Amount" value={amount} />
+                <RgbReceiveDetail label={t('amount')} value={amount} />
                 <RgbReceiveDetail
-                  label="Recipient"
-                  value={data.recipientType === 'witness' ? 'Witness seal' : 'Blind seal'}
+                  label={t('recipient')}
+                  value={
+                    data.recipientType === 'witness' ? t('rgb_approval_witness_seal') : t('rgb_approval_blind_seal')
+                  }
                 />
-                <RgbReceiveDetail label="Expiry" value={expiry} />
+                <RgbReceiveDetail label={t('rgb_approval_expiry')} value={expiry} />
               </Column>
             </RgbApprovalAccordion>
           </Card>
@@ -332,26 +285,15 @@ function RgbReceiveApproval({ data, session }: { data: Props['params']['data']; 
           )}
         </Column>
       </Content>
-      <Footer
-        style={{ padding: '10px 14px 16px', borderTop: '1px solid rgba(255,255,255,0.08)', background: '#090A0D' }}
-      >
-        <Row full gap="md">
+      <Footer>
+        <Row full>
+          <Button text={t('cancel')} preset="default" onClick={() => rejectApproval()} full />
           <Button
-            text="Cancel"
-            preset="default"
-            onClick={() => rejectApproval()}
-            full
-            style={{ height: 48, borderRadius: 12, background: 'transparent', borderColor: 'rgba(255,255,255,0.32)' }}
-            textStyle={{ fontSize: 14, fontWeight: 700 }}
-          />
-          <Button
-            text={loading ? 'Preparing...' : 'Create invoice'}
+            text={loading ? t('rgb_approval_preparing') : t('create_invoice')}
             preset="primary"
             onClick={() => void requestWrite(() => void onCreateInvoice())}
             disabled={loading}
             full
-            style={{ height: 48, borderRadius: 12 }}
-            textStyle={{ fontSize: 14, fontWeight: 700 }}
           />
         </Row>
       </Footer>
@@ -424,43 +366,54 @@ function RgbApprovalAccordion({
   );
 }
 
-function formatRgbInvoiceExpiry(durationSeconds?: number) {
-  if (!durationSeconds || durationSeconds <= 0) return 'No expiry';
-  if (durationSeconds < 60) return `Expires in ${durationSeconds} sec`;
-  if (durationSeconds < 3600) return `Expires in ${Math.ceil(durationSeconds / 60)} min`;
-  if (durationSeconds < 86_400) return `Expires in ${Math.ceil(durationSeconds / 3600)} hr`;
-  return `Expires in ${Math.ceil(durationSeconds / 86_400)} day${durationSeconds >= 172_800 ? 's' : ''}`;
+function formatRgbInvoiceExpiry(
+  durationSeconds: number | undefined,
+  t: (key: string, substitutions?: Record<string, string>) => string
+) {
+  if (!durationSeconds || durationSeconds <= 0) return t('rgb_no_expiry');
+  if (durationSeconds < 60) {
+    return t('rgb_expires_in_seconds', { count: String(durationSeconds) });
+  }
+  if (durationSeconds < 3600) {
+    return t('rgb_expires_in_minutes', { count: String(Math.ceil(durationSeconds / 60)) });
+  }
+  if (durationSeconds < 86_400) {
+    return t('rgb_expires_in_hours', { count: String(Math.ceil(durationSeconds / 3600)) });
+  }
+  return t('rgb_expires_in_days', { count: String(Math.ceil(durationSeconds / 86_400)) });
 }
 
 export function RgbReceiveAccept({ params: { data, session } }: Props) {
+  const { t } = useI18n();
   const receive = data.receive || {};
   return (
     <RgbApprovalLayout
       session={session}
-      title="Accept RGB receive"
-      description="Accepting sends an acknowledgement to the sender. The sender may then broadcast the Bitcoin transaction."
+      title={t('rgb_approval_accept_receive_title')}
+      description={t('rgb_approval_accept_receive_description')}
       rows={[
-        ['Asset', receive.assetId || 'Unknown asset'],
-        ['Amount', String(receive.amount ?? 'Unknown amount')],
-        ['Status', receive.status || 'Pending acceptance']
+        [t('asset'), receive.assetId || t('rgb_approval_unknown_asset')],
+        [t('amount'), String(receive.amount ?? t('rgb_approval_unknown_amount'))],
+        [t('status'), receive.status || t('rgb_approval_pending_acceptance')]
       ]}
-      confirmText="Accept RGB"
+      confirmText={t('rgb_approval_accept_rgb')}
     />
   );
 }
 
 export function RgbReceiveReject({ params: { data, session } }: Props) {
+  const { t } = useI18n();
   const receive = data.receive || {};
   return (
     <RgbApprovalLayout
       session={session}
-      title="Reject RGB receive"
-      description="Rejecting declines this one-time invoice. The sender must not broadcast this RGB transfer."
+      title={t('rgb_approval_reject_receive_title')}
+      description={t('rgb_approval_reject_receive_description')}
       rows={[
-        ['Asset', receive.assetId || 'Unknown asset'],
-        ['Amount', String(receive.amount ?? 'Unknown amount')]
+        [t('asset'), receive.assetId || t('rgb_approval_unknown_asset')],
+        [t('amount'), String(receive.amount ?? t('rgb_approval_unknown_amount'))]
       ]}
-      confirmText="Reject receive"
+      confirmText={t('rgb_approval_reject_receive')}
       confirmPreset="danger"
     />
   );
@@ -472,6 +425,7 @@ export function RgbPayment({ params: { data, session } }: Props) {
 
 function RgbPaymentApproval({ data, session }: { data: Props['params']['data']; session: Props['params']['session'] }) {
   const wallet = useWallet();
+  const { t } = useI18n();
   const { resolveApproval, rejectApproval } = useApproval();
   const { requestWrite, writeLeaseModal } = useRgbWriteLeaseGuard();
   const [feePoolToSignData, setFeePoolToSignData] = useState<ToSignData>();
@@ -481,15 +435,14 @@ function RgbPaymentApproval({ data, session }: { data: Props['params']['data']; 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
-  const amount = data.amount?.trim() || 'Use invoice amount';
+  const amount = data.amount?.trim() || t('rgb_approval_use_invoice_amount');
   const ticker = assetMetadata?.ticker?.trim();
   const assetName = assetMetadata?.name?.trim();
-  const amountLabel = ticker && amount !== 'Use invoice amount' ? `${amount} ${ticker}` : amount;
+  const amountLabel = ticker && data.amount?.trim() ? `${amount} ${ticker}` : amount;
   const assetLabel = data.assetId
     ? [ticker, assetName && assetName !== ticker ? assetName : ''].filter(Boolean).join(' · ') ||
-      `RGB asset · ${shortAddress(data.assetId, 6)}`
-    : 'RGB asset from invoice';
-  const siteName = session.name?.split('|')[0].trim() || session.origin;
+      `${t('rgb_approval_rgb_asset')} · ${shortAddress(data.assetId, 6)}`
+    : t('rgb_approval_asset_from_invoice');
 
   useEffect(() => {
     let active = true;
@@ -504,7 +457,12 @@ function RgbPaymentApproval({ data, session }: { data: Props['params']['data']; 
       .getRGBAssetDetail('', data.assetId)
       .then((asset) => {
         if (!active) return;
-        setAssetMetadata({ name: asset.name, ticker: asset.ticker });
+        setAssetMetadata({
+          name: asset.name,
+          ticker: asset.ticker,
+          iconInfo: asset.iconInfo,
+          iconUrl: asset.iconUrl
+        });
       })
       .catch(() => {
         if (active) setAssetMetadata(undefined);
@@ -519,7 +477,7 @@ function RgbPaymentApproval({ data, session }: { data: Props['params']['data']; 
     if (value && typeof value === 'object' && 'message' in value && typeof value.message === 'string') {
       return value.message;
     }
-    return String(value || 'Unable to fund the RGB fee pool');
+    return String(value || t('rgb_approval_fund_fee_pool_failed'));
   };
 
   const onPreparePayment = async () => {
@@ -534,7 +492,7 @@ function RgbPaymentApproval({ data, session }: { data: Props['params']['data']; 
 
       const result = await wallet.createRgbFeePoolTopUpBegin();
       const toSignData = result?.toSignData as ToSignData | undefined;
-      if (!toSignData) throw new Error('RGB fee-pool top-up did not return signing data');
+      if (!toSignData) throw new Error(t('rgb_approval_fee_pool_no_signing_data'));
       setFeePoolToSignData(toSignData);
     } catch (e) {
       setError(getErrorMessage(e));
@@ -546,7 +504,7 @@ function RgbPaymentApproval({ data, session }: { data: Props['params']['data']; 
   const onSignFeePoolTopUp = async (signedDatas: SignedData[]) => {
     const signedPsbt = signedDatas[0]?.psbtHex;
     if (!signedPsbt) {
-      setError('RGB fee-pool PSBT signing did not return psbtHex');
+      setError(t('rgb_approval_fee_pool_no_signed_psbt'));
       setFeePoolToSignData(undefined);
       return;
     }
@@ -578,144 +536,103 @@ function RgbPaymentApproval({ data, session }: { data: Props['params']['data']; 
   }
 
   return (
-    <Layout style={{ background: '#090A0D' }}>
+    <Layout>
+      <Header>
+        <WebsiteBar session={session} />
+      </Header>
       <Content>
-        <Column
-          mt="md"
-          gap="md"
-          style={{ width: '100%', maxWidth: 520, alignSelf: 'center', padding: '0 14px 14px', boxSizing: 'border-box' }}
-        >
-          <Column itemsCenter gap="xs" style={{ paddingTop: 4 }}>
-            <div
-              style={{
-                width: 52,
-                height: 52,
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                borderRadius: 16,
-                background: 'linear-gradient(135deg, rgba(255,255,255,0.10), rgba(255,255,255,0.03))',
-                border: '1px solid rgba(255,255,255,0.22)',
-                overflow: 'hidden'
-              }}
-            >
-              <Image
-                src={formatSessionIcon(session)}
-                fallbackSrc="./images/icons/artifacts/unknown.png"
-                size={38}
-                style={{ borderRadius: 11 }}
-              />
-            </div>
-            <Text text={siteName} size="lg" preset="title-bold" textCenter />
-            <Row itemsCenter gap="xs">
-              <Icon icon="link" color="textDim" size={11} />
-              <Text text={session.origin} size="xs" color="textDim" textCenter />
-            </Row>
-            <Text
-              text="wants to prepare an RGB payment"
-              size="lg"
-              preset="title-bold"
-              textCenter
-              style={{ marginTop: 8 }}
-            />
-            <Text text="Review the payment details before continuing." size="sm" textCenter color="textDim" />
-          </Column>
+        <Column mt="lg" gap="md">
+          <Text text={t('rgb_approval_prepare_payment_title')} preset="title-bold" textCenter />
+          <Text text={t('rgb_approval_prepare_payment_description')} preset="sub" textCenter />
 
-          <Card
-            style={{
-              display: 'block',
-              padding: 14,
-              borderRadius: 14,
-              border: '1px solid rgba(148, 160, 190, 0.20)',
-              background: 'linear-gradient(135deg, rgba(30, 33, 44, 0.94), rgba(16, 17, 23, 0.94))',
-              boxShadow: '0 12px 34px rgba(0,0,0,0.22)'
-            }}
-          >
-            <Row justifyBetween gap="md" style={{ alignItems: 'flex-start' }}>
-              <Row gap="md" itemsCenter style={{ minWidth: 0, flex: 1 }}>
+          <Card style={{ display: 'block' }}>
+            <Column gap="md" fullX>
+              <Row justifyBetween gap="md" fullX style={{ alignItems: 'flex-start' }}>
+                <Row gap="md" itemsCenter style={{ minWidth: 0, flex: 1 }}>
+                  <RGBAssetIcon
+                    iconInfo={getRgbTokenIconInfo(assetMetadata, ticker || assetName || 'RGB')}
+                    ticker={ticker}
+                    name={assetName}
+                    size={52}
+                  />
+                  <Column gap="xs" style={{ minWidth: 0, flex: 1 }}>
+                    <Text text={t('rgb_approval_pay')} size="sm" color="textDim" />
+                    <Text text={amountLabel} size="xxl" preset="title-bold" style={{ wordBreak: 'break-word' }} />
+                    <Text text={assetLabel} size="sm" color="textDim" max2Lines style={{ wordBreak: 'break-word' }} />
+                  </Column>
+                </Row>
                 <div
                   style={{
-                    width: 58,
-                    height: 58,
-                    flex: '0 0 58px',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
-                    borderRadius: 16,
-                    background: 'radial-gradient(circle at 30% 25%, #7B4DFF 0%, #4A36D6 42%, #F49B37 100%)',
-                    boxShadow: 'inset 0 0 0 1px rgba(255,255,255,0.14)'
+                    width: 72,
+                    minHeight: 28,
+                    flex: '0 0 72px'
                   }}
                 >
-                  <Icon icon="send" color="white" size={30} />
+                  {data.recipientType ? (
+                    <Row
+                      itemsCenter
+                      gap="xs"
+                      style={{
+                        padding: '6px 8px',
+                        borderRadius: 8,
+                        background:
+                          data.recipientType === 'witness' ? 'rgba(235, 185, 76, 0.14)' : 'rgba(255,255,255,0.08)'
+                      }}
+                    >
+                      <Icon icon="rgb" size={12} />
+                      <Text
+                        text={data.recipientType === 'witness' ? t('rgb_approval_witness') : t('rgb_approval_blind')}
+                        size="xxs"
+                        color={data.recipientType === 'witness' ? 'gold' : 'textDim'}
+                      />
+                    </Row>
+                  ) : null}
                 </div>
-                <Column gap="xs" style={{ minWidth: 0, flex: 1 }}>
-                  <Text text="Pay" size="sm" color="textDim" />
-                  <Text text={amountLabel} size="xxl" preset="title-bold" style={{ wordBreak: 'break-word' }} />
-                  <Text text={assetLabel} size="sm" color="textDim" />
-                </Column>
               </Row>
-              <div
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 6,
-                  flex: '0 0 auto',
-                  padding: '6px 8px',
-                  borderRadius: 8,
-                  background: 'rgba(255, 123, 33, 0.14)'
-                }}
-              >
-                <Icon icon="send" color="orange" size={12} />
-                <Text text="Payment" size="xxs" color="orange" />
-              </div>
-            </Row>
+              <div style={{ height: 1, background: 'rgba(255,255,255,0.10)' }} />
+              <Column gap="xs" fullX style={{ minWidth: 0, alignItems: 'flex-start' }}>
+                <Text text={t('asset_id')} size="xs" color="textDim" />
+                <Text
+                  text={data.assetId ? shortAddress(data.assetId, 10) : t('rgb_approval_from_invoice')}
+                  size="sm"
+                  style={{ maxWidth: '100%', wordBreak: 'break-all' }}
+                />
+              </Column>
+            </Column>
           </Card>
 
-          <Card
-            style={{
-              display: 'block',
-              padding: 0,
-              borderRadius: 14,
-              border: '1px solid rgba(148, 160, 190, 0.18)',
-              background: 'linear-gradient(135deg, rgba(24, 26, 35, 0.94), rgba(14, 15, 20, 0.94))'
-            }}
-          >
+          <Card style={{ display: 'block', padding: 0 }}>
             <RgbApprovalAccordion
-              title="How this works"
-              description="The next steps needed to prepare this payment."
+              title={t('rgb_approval_how_it_works')}
+              description={t('rgb_approval_payment_how_it_works_description')}
               expanded={howItWorksExpanded}
               onClick={() => setHowItWorksExpanded((value) => !value)}
             >
+              <Text text={t('rgb_approval_payment_step_check_fee_pool')} size="xs" color="textDim" />
               <Text
-                text="Your wallet checks the RGB fee pool before preparing this payment."
-                size="xs"
-                color="textDim"
-              />
-              <Text
-                text="If a Bitcoin funding transaction is required, its recipients and network fee will be shown on the next screen before you sign."
+                text={t('rgb_approval_payment_step_funding')}
                 size="xs"
                 color="textDim"
                 style={{ lineHeight: '18px' }}
               />
-              <Text
-                text="You will review the final RGB payment transaction before signing."
-                size="xs"
-                color="success"
-              />
+              <Text text={t('rgb_approval_payment_step_review')} size="xs" color="success" />
             </RgbApprovalAccordion>
             <RgbApprovalAccordion
-              title="Payment details"
-              description="Asset, amount and recipient invoice information."
+              title={t('rgb_approval_payment_details')}
+              description={t('rgb_approval_payment_details_description')}
               expanded={paymentDetailsExpanded}
               onClick={() => setPaymentDetailsExpanded((value) => !value)}
               bordered
             >
               <Column gap="sm">
-                <RgbReceiveDetail label="Asset" value={assetLabel} />
-                <RgbReceiveDetail label="Amount" value={amountLabel} />
+                <RgbReceiveDetail label={t('asset')} value={assetLabel} />
+                <RgbReceiveDetail label={t('amount')} value={amountLabel} />
                 <RgbReceiveDetail
-                  label="Recipient invoice"
-                  value={data.invoice ? shortAddress(data.invoice, 10) : 'Not provided'}
+                  label={t('rgb_approval_recipient_invoice')}
+                  value={data.invoice ? shortAddress(data.invoice, 10) : t('rgb_approval_not_provided')}
                 />
               </Column>
             </RgbApprovalAccordion>
@@ -731,26 +648,15 @@ function RgbPaymentApproval({ data, session }: { data: Props['params']['data']; 
           )}
         </Column>
       </Content>
-      <Footer
-        style={{ padding: '10px 14px 16px', borderTop: '1px solid rgba(255,255,255,0.08)', background: '#090A0D' }}
-      >
-        <Row full gap="md">
+      <Footer>
+        <Row full>
+          <Button text={t('cancel')} preset="default" onClick={() => rejectApproval()} full />
           <Button
-            text="Cancel"
-            preset="default"
-            onClick={() => rejectApproval()}
-            full
-            style={{ height: 48, borderRadius: 12, background: 'transparent', borderColor: 'rgba(255,255,255,0.32)' }}
-            textStyle={{ fontSize: 14, fontWeight: 700 }}
-          />
-          <Button
-            text={loading ? 'Checking...' : 'Prepare payment'}
+            text={loading ? t('rgb_approval_checking') : t('rgb_approval_prepare_payment')}
             preset="primary"
             onClick={() => void requestWrite(() => void onPreparePayment())}
             disabled={loading}
             full
-            style={{ height: 48, borderRadius: 12 }}
-            textStyle={{ fontSize: 14, fontWeight: 700 }}
           />
         </Row>
       </Footer>
@@ -760,13 +666,14 @@ function RgbPaymentApproval({ data, session }: { data: Props['params']['data']; 
 }
 
 export function RgbPaymentCancel({ params: { session } }: Props) {
+  const { t } = useI18n();
   return (
     <RgbApprovalLayout
       session={session}
-      title="Cancel RGB payment"
-      description="Cancel only if the recipient has not acknowledged the consignment and the transaction has not been broadcast."
+      title={t('rgb_approval_cancel_payment_title')}
+      description={t('rgb_approval_cancel_payment_description')}
       rows={[]}
-      confirmText="Cancel payment"
+      confirmText={t('rgb_approval_cancel_payment')}
       confirmPreset="danger"
     />
   );
@@ -796,6 +703,7 @@ function RgbApprovalLayout({
   error?: string;
 }) {
   const { resolveApproval, rejectApproval } = useApproval();
+  const { t } = useI18n();
   const { requestWrite, writeLeaseModal } = useRgbWriteLeaseGuard();
   return (
     <Layout>
@@ -820,7 +728,7 @@ function RgbApprovalLayout({
       <Footer>
         <Row full>
           <Button
-            text="Cancel"
+            text={t('cancel')}
             preset="default"
             onClick={() => {
               if (onCancel) onCancel();
