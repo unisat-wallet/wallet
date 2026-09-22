@@ -860,6 +860,21 @@ function rgbRecoveryDifferenceFields(local: unknown, remote: unknown): string[] 
     .sort()
 }
 
+/** Recovery section names only; never log the encrypted state contents themselves. */
+function rgbRecoveryChangedSections(local: unknown, remote: unknown): string[] {
+  const localRecord = local && typeof local === 'object' ? (local as Record<string, unknown>) : {}
+  const remoteRecord =
+    remote && typeof remote === 'object' ? (remote as Record<string, unknown>) : {}
+  return [
+    'snapshot',
+    'pendingReceives',
+    'pendingIssues',
+    'pendingAssetMetadata',
+    'pendingReceiveHistory',
+    'pendingUtxoSync',
+  ].filter(field => stableRgbJson(localRecord[field]) !== stableRgbJson(remoteRecord[field]))
+}
+
 /** Field names/counts only; never log recipient IDs, invoices or consignments. */
 function rgbRecoveryInvoiceComparison(local: unknown, remote: unknown) {
   const localReceives = Array.isArray(
@@ -882,6 +897,12 @@ function rgbRecoveryInvoiceComparison(local: unknown, remote: unknown) {
     remoteReceives.flatMap(receive => {
       const key = recipientKey(receive)
       return key ? [[key, receive] as const] : []
+    })
+  )
+  const localRecipientKeys = new Set(
+    localReceives.flatMap(receive => {
+      const key = recipientKey(receive)
+      return key ? [key] : []
     })
   )
   const ignored = new Set(['claimedAt', 'assetMetadataIndexed'])
@@ -910,6 +931,8 @@ function rgbRecoveryInvoiceComparison(local: unknown, remote: unknown) {
     localCount: localReceives.length,
     remoteCount: remoteReceives.length,
     missingRecipients,
+    remoteOnlyRecipients: [...remoteByRecipient.keys()].filter(key => !localRecipientKeys.has(key))
+      .length,
     changedRecipients,
     changedFields: [...changedFields].sort(),
   }
@@ -5106,6 +5129,8 @@ export class WalletController extends BaseController {
           return decryptedCheckpoint
         }
         const localCheckpointGeneration = service.getRecoveryCheckpointGeneration?.()
+        const canAdoptNewerNormalCheckpoint =
+          service.canAdoptNewerNormalRecoveryCheckpoint?.() === true
         const normalCheckpointAdvance =
           !needsRestore &&
           revisionChanged &&
@@ -5113,7 +5138,7 @@ export class WalletController extends BaseController {
           checkpoint.generation !== undefined &&
           localCheckpointGeneration !== undefined &&
           checkpoint.generation > localCheckpointGeneration &&
-          service.canAdoptNewerNormalRecoveryCheckpoint?.() === true
+          canAdoptNewerNormalCheckpoint
         const shouldFastForward =
           !needsRestore && revisionChanged && Boolean(checkpoint.payload) && normalCheckpointAdvance
         if (!needsRestore && revisionChanged && !shouldFastForward && !remoteCheckpointMissing) {
@@ -5137,8 +5162,19 @@ export class WalletController extends BaseController {
               localRevisionKnown: localRevision !== undefined,
               remoteRevisionKnown: checkpoint.revision !== undefined,
               needsRestore,
+              localGeneration: localCheckpointGeneration,
+              remoteGeneration: checkpoint.generation,
+              localCheckpointKind: service.getRecoveryCheckpointKind?.(),
+              remoteCheckpointKind: checkpoint.kind,
+              localCheckpoint: service.getRecoveryCheckpointStatus?.(),
+              canAdoptNewerNormalCheckpoint,
+              normalCheckpointAdvance,
               ...rgbRecoveryServiceSummary(service),
               differences: rgbRecoveryDifferenceFields(localRecoveryState, decryptedCheckpoint),
+              changedSections: rgbRecoveryChangedSections(
+                localRecoveryState,
+                decryptedCheckpoint
+              ),
               invoices: rgbRecoveryInvoiceComparison(localRecoveryState, decryptedCheckpoint),
               remote: decryptedCheckpoint
                 ? rgbRecoveryStateSummary(decryptedCheckpoint)

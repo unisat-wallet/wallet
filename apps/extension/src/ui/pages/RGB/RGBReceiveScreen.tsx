@@ -609,7 +609,9 @@ export default function RGBReceiveScreen({
                   size="xxs"
                 />
               </div>
-              <Text text={expiryText} color="white_muted" size="xs" ellipsis style={{ minWidth: 0 }} />
+              {!invoiceInUse ? (
+                <Text text={expiryText} color="white_muted" size="xs" ellipsis style={{ minWidth: 0 }} />
+              ) : null}
             </Row>
             {awaitingAcceptance ? <Text text={t('rgb_status_pending_accept')} color="gold" size="xs" /> : null}
             {awaitingSenderBroadcast ? <Text text={t('rgb_status_waiting_receive')} color="gold" size="xs" /> : null}
