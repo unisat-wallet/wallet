@@ -140,6 +140,10 @@ export class RgbTransferQuery {
       precision: issue.asset.precision,
     }))
     const localReceives = service.getPendingReceives().flatMap(receive => {
+      // Witness invoices created by the same account share the beneficiary
+      // script recipient ID. The nonce-derived proxy recipient is the unique
+      // transport/action identity for each invoice.
+      const receiveId = receive.proxyRecipientId || receive.recipientId
       const receivedConsignment = receive.receivedConsignment
       const receivedAssetId =
         receivedConsignment?.assetId ?? receive.pendingAccept?.assetId ?? receive.assetId
@@ -154,8 +158,8 @@ export class RgbTransferQuery {
       if (receivedConsignment && acknowledgementPending) {
         return [
           {
-            id: `local-receive:${receive.recipientId}`,
-            transferId: receive.recipientId,
+            id: `local-receive:${receiveId}`,
+            transferId: receiveId,
             assetId: receivedAssetId,
             type: 'receive' as const,
             amount: receivedAmount,
@@ -171,8 +175,8 @@ export class RgbTransferQuery {
       if (awaitingAccept && receive.pendingAccept) {
         return [
           {
-            id: `local-receive:${receive.recipientId}`,
-            transferId: receive.recipientId,
+            id: `local-receive:${receiveId}`,
+            transferId: receiveId,
             assetId: receivedAssetId,
             type: 'receive' as const,
             amount: receivedAmount,
@@ -197,8 +201,8 @@ export class RgbTransferQuery {
         )
         return [
           {
-            id: `local-receive:${receive.recipientId}`,
-            transferId: receive.recipientId,
+            id: `local-receive:${receiveId}`,
+            transferId: receiveId,
             assetId: receivedAssetId,
             type: 'receive' as const,
             amount: receivedAmount,
@@ -212,8 +216,8 @@ export class RgbTransferQuery {
       }
       return [
         {
-          id: `local-receive:${receive.recipientId}`,
-          transferId: receive.recipientId,
+          id: `local-receive:${receiveId}`,
+          transferId: receiveId,
           assetId: receivedAssetId,
           type: 'receive' as const,
           amount: receivedAmount,
