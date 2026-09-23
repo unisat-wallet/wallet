@@ -627,6 +627,7 @@ describe('RGB wallet references', () => {
 
   it('publishes a replacement checkpoint even when its state matches a verified normal checkpoint', async () => {
     const wallet = new WalletController()
+    vi.spyOn(wallet as any, 'assertActiveRgbWallet').mockResolvedValue(undefined)
     const walletRef = {
       walletId: 'rgb-wallet',
       network: 'mainnet',
@@ -666,6 +667,47 @@ describe('RGB wallet references', () => {
       'normal',
       'replacement',
     ])
+  })
+
+  it('refreshes the current cloud version before publishing a replacement', async () => {
+    const wallet = new WalletController()
+    vi.spyOn(wallet as any, 'assertActiveRgbWallet').mockResolvedValue(undefined)
+    const walletRef = {
+      walletId: 'rgb-wallet',
+      network: 'mainnet',
+      fundingAddress: 'bc1p-rgb-funding',
+    }
+    const saveRgbRecoveryCheckpoint = vi.fn().mockResolvedValue({
+      saved: true,
+      updatedAt: 11,
+      revision: 'b'.repeat(24),
+      generation: 4,
+      kind: 'replacement',
+    })
+    ;(walletApiService as any).rgb = {
+      getRgbRecoveryCheckpoint: vi.fn().mockResolvedValue({
+        updatedAt: 10,
+        revision: 'a'.repeat(24),
+        generation: 3,
+        kind: 'normal',
+      }),
+      saveRgbRecoveryCheckpoint,
+    }
+    vi.spyOn(wallet as any, 'rgbRecoveryKey').mockResolvedValue('11'.repeat(32))
+
+    await (wallet as any).queueRgbRecoveryCheckpoint(
+      walletRef,
+      { version: 1, wallet: walletRef, snapshot: { syncedAt: 1, utxos: [] } },
+      { reason: 'state_change', kind: 'replacement' }
+    )
+
+    expect(saveRgbRecoveryCheckpoint).toHaveBeenCalledWith(
+      expect.objectContaining({
+        kind: 'replacement',
+        expectedUpdatedAt: 10,
+        expectedRevision: 'a'.repeat(24),
+      })
+    )
   })
 
   it('does not expose local blind-seal bigint values through wallet responses', () => {

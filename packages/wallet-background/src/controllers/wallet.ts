@@ -981,6 +981,10 @@ function isRgbWalletLockCancellation(error: unknown) {
   )
 }
 
+function isRgbWalletContextCancellation(error: unknown) {
+  return error instanceof RgbWalletContextChangedError || isRgbWalletLockCancellation(error)
+}
+
 export class WalletController extends BaseController {
   timer: any = null
 
@@ -5390,6 +5394,7 @@ export class WalletController extends BaseController {
     const backup = previous
       .catch(() => undefined)
       .then(async () => {
+        await this.assertActiveRgbWallet(wallet)
         const verifiedFingerprint = this.rgbRecoveryVerifiedFingerprints.get(key)
         if (verifiedFingerprint === diagnosticFingerprint) {
           const version = this.rgbRecoveryVersions.get(key)
@@ -5404,7 +5409,30 @@ export class WalletController extends BaseController {
         }
         const payload = await encryptRgbRecoveryCheckpoint(state, await this.rgbRecoveryKey(wallet))
         const checksum = await rgbRecoveryPayloadChecksum(payload)
-        const expected = this.rgbRecoveryVersions.get(key)
+        await this.assertActiveRgbWallet(wallet)
+        let expected = this.rgbRecoveryVersions.get(key)
+        // The backend deliberately rejects a replacement without a CAS
+        // baseline. The cached version may have been cleared by a background
+        // restart or lock while an explicit conflict/backup replacement was
+        // queued, so refresh it immediately before publishing.
+        if (
+          context.kind === 'replacement' &&
+          expected?.revision === undefined &&
+          expected?.updatedAt === undefined
+        ) {
+          const checkpoint = await getRgbApiService().getRgbRecoveryCheckpoint({ wallet })
+          await this.assertActiveRgbWallet(wallet)
+          if (checkpoint.revision === undefined && checkpoint.updatedAt === undefined) {
+            throw new Error('RGB recovery replacement requires an existing cloud checkpoint')
+          }
+          expected = {
+            ...(checkpoint.updatedAt === undefined ? {} : { updatedAt: checkpoint.updatedAt }),
+            ...(checkpoint.revision === undefined ? {} : { revision: checkpoint.revision }),
+            ...(checkpoint.generation === undefined ? {} : { generation: checkpoint.generation }),
+            ...(checkpoint.kind === undefined ? {} : { kind: checkpoint.kind }),
+          }
+          this.rgbRecoveryVersions.set(key, expected)
+        }
         const updatedAt = Math.max(Date.now(), (expected?.updatedAt ?? -1) + 1)
         const api = getRgbApiService()
         const activeLease = this.getRgbActiveWriteLease(wallet)
@@ -5547,7 +5575,7 @@ export class WalletController extends BaseController {
       })
     this.rgbRecoveryBackups.set(key, backup)
     void backup.catch(error => {
-      if (isRgbWalletLockCancellation(error)) return
+      if (isRgbWalletContextCancellation(error)) return
       log.warn('RGB recovery: checkpoint save failed', diagnostic, error)
     })
     return backup
