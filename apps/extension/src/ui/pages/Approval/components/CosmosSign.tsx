@@ -10,6 +10,7 @@ import { useApproval, useBabylonConfig, useCurrentAccount, useI18n, useWallet } 
 
 interface Props {
   params: {
+    method: 'cosmos_signDirect' | 'cosmos_signArbitrary';
     data: {
       signerAddress: string;
       signDoc?: any;
@@ -26,7 +27,7 @@ interface Props {
   requestDefer?: any;
 }
 
-export default function CosmosSign({ params: { data, session }, origin }: Props) {
+export default function CosmosSign({ params: { method, data, session }, origin }: Props) {
   const { resolveApproval, rejectApproval } = useApproval();
   const account = useCurrentAccount();
   const [isKeystoneSigning, setIsKeystoneSigning] = useState(false);
@@ -40,7 +41,8 @@ export default function CosmosSign({ params: { data, session }, origin }: Props)
   const babylonChainId = babylonConfig.chainId;
   const wallet = useWallet();
 
-  const keystoneSignType = data.signDoc ? KeystoneSignEnum.COSMOS_DIRECT : KeystoneSignEnum.COSMOS_ARBITRARY;
+  const isDirect = method === 'cosmos_signDirect';
+  const keystoneSignType = isDirect ? KeystoneSignEnum.COSMOS_DIRECT : KeystoneSignEnum.COSMOS_ARBITRARY;
 
   useEffect(() => {
     wallet.getBabylonAddress(babylonChainId).then((address) => {
@@ -111,21 +113,22 @@ export default function CosmosSign({ params: { data, session }, origin }: Props)
                 wordBreak: 'break-word',
                 flexWrap: 'wrap'
               }}>
-              {data.data ||
-                (data.signDoc
-                  ? JSON.stringify(
-                      Object.assign({}, data.signDoc, {
-                        bodyBytes: data.signDoc.bodyBytes
-                          ? Buffer.from(objToUint8Array(data.signDoc.bodyBytes)).toString('hex')
-                          : undefined,
-                        authInfoBytes: data.signDoc.authInfoBytes
-                          ? Buffer.from(objToUint8Array(data.signDoc.authInfoBytes)).toString('hex')
-                          : undefined
-                      }),
-                      null,
-                      2
-                    )
-                  : '')}
+              {isDirect
+                ? JSON.stringify(
+                    Object.assign({}, data.signDoc, {
+                      bodyBytes: data.signDoc.bodyBytes
+                        ? Buffer.from(objToUint8Array(data.signDoc.bodyBytes)).toString('hex')
+                        : undefined,
+                      authInfoBytes: data.signDoc.authInfoBytes
+                        ? Buffer.from(objToUint8Array(data.signDoc.authInfoBytes)).toString('hex')
+                        : undefined
+                    }),
+                    null,
+                    2
+                  )
+                : method === 'cosmos_signArbitrary'
+                  ? data.data
+                  : ''}
             </div>
           </Card>
         </Column>

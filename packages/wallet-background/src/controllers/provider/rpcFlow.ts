@@ -105,7 +105,7 @@ const flowContext = flow
     // check need approval
     const {
       request: {
-        data: { params, method },
+        data: { method },
         session: { origin, name, icon },
       },
       mapMethod,
@@ -125,7 +125,8 @@ const flowContext = flow
           approvalComponent: approvalType,
           params: {
             method,
-            data: params,
+            // Approval hooks may replace untrusted params with a sanitized payload.
+            data: ctx.request.data.params,
             session: { origin, name, icon },
           },
           origin,

@@ -826,8 +826,20 @@ class ProviderController extends BaseController {
   @Reflect.metadata('APPROVAL', [
     'CosmosSign',
     async req => {
-      const signDoc = req.data.params.signDoc
-      req.data.params.signBytesHex = directSignDocToBytesHex(signDoc)
+      const { signerAddress, signDoc: input } = req.data.params
+      if (!input || typeof input !== 'object' || Array.isArray(input)) {
+        throw new Error('Invalid Cosmos signDoc')
+      }
+      // Only these fields enter the approval and the signed response. Never forward
+      // caller-supplied display text or signing bytes for a Direct request.
+      const signDoc = {
+        bodyBytes: input.bodyBytes,
+        authInfoBytes: input.authInfoBytes,
+        chainId: input.chainId,
+        accountNumber: input.accountNumber,
+      }
+      const signBytesHex = directSignDocToBytesHex(signDoc)
+      req.data.params = { signerAddress, signDoc, signBytesHex }
     },
   ])
   cosmosSignDirect = async ({ data: { params: msg }, approvalRes }) => {
@@ -851,9 +863,9 @@ class ProviderController extends BaseController {
   @Reflect.metadata('APPROVAL', [
     'CosmosSign',
     async req => {
-      const signerAddress = req.data.params.signerAddress
-      const data = req.data.params.data
-      req.data.params.signBytesHex = arbitrarySignDocToBytesHex(signerAddress, data)
+      const { signerAddress, data } = req.data.params
+      const signBytesHex = arbitrarySignDocToBytesHex(signerAddress, data)
+      req.data.params = { signerAddress, data, signBytesHex }
     },
   ])
   cosmosSignArbitrary = async ({ data: { params: msg }, approvalRes }) => {
