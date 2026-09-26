@@ -28,7 +28,7 @@ const $viewPresets = {
   }) as CSSProperties,
 
   success: Object.assign({}, $baseViewStyle, {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: colors.green,
     height: 32,
     display: 'flex',
     alignItems: 'center',
@@ -47,7 +47,6 @@ const $viewPresets = {
 
 export function Toast(props: ToastProps) {
   const { preset, content, onClose } = props;
-  const textColor = preset === 'success' ? 'rgba(0, 0, 0, 0.85)' : colors.white;
   useEffect(() => {
     setTimeout(() => {
       onClose();
@@ -57,7 +56,7 @@ export function Toast(props: ToastProps) {
   return (
     <div className="action-container">
       <div className="toast" style={$viewPresets[preset]}>
-        <Text text={content} preset="regular" textCenter style={{ color: textColor }} />
+        <Text text={content} preset="regular" color="white" textCenter />
       </div>
     </div>
   );
