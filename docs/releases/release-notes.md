@@ -1,5 +1,13 @@
 # UniSat Wallet Release Notes
 
+## v1.7.22
+
+### Bug Fixes
+
+- Fixed sends being allowed when a custom fee rate was empty.
+- Fixed Cosmos approval content display to use the correct payload for `cosmos_signDirect` and `cosmos_signArbitrary` requests.
+- Restored the success toast styling with a green background and white text.
+
 ## v1.7.21
 
 ### New Features
