@@ -196,6 +196,8 @@ export function useBRC20SendScreenLogicStep2({
   }, [contextData.receiver, feeRateBar.feeRate])
 
   const onStep2ClickNext = async () => {
+    if (!Number.isFinite(feeRateBar.feeRate) || feeRateBar.feeRate <= 0) return
+
     try {
       tools.showLoading(true)
       const inscriptionIds = Array.from(contextData.inscriptionIdSet)

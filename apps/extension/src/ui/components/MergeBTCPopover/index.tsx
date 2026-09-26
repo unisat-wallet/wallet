@@ -44,6 +44,7 @@ export const MergeBTCPopover = ({ onClose }: { onClose: () => void }) => {
   }, []);
 
   const { feeRate } = useFeeRateBar();
+  const isFeeRateValid = Number.isFinite(feeRate) && feeRate > 0;
   const [enableRBF, setEnableRBF] = useState(true);
   const wallet = useWallet();
 
@@ -61,6 +62,8 @@ export const MergeBTCPopover = ({ onClose }: { onClose: () => void }) => {
   const chain = useChain();
   const nav = useNavigation();
   const onConfirm = async () => {
+    if (!isFeeRateValid) return;
+
     try {
       const toSignData = await prepareSendBTC({
         toAddressInfo: {
@@ -111,6 +114,7 @@ export const MergeBTCPopover = ({ onClose }: { onClose: () => void }) => {
 
           <Button
             text={t('confirm')}
+            disabled={!isFeeRateValid}
             full
             preset="primary"
             onClick={(e) => {

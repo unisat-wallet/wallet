@@ -27,6 +27,10 @@ const MAX_FEE_RATE = 10000
 const DEFAULT_FEE_RATE = 1
 const AVG_OPTION_INDEX = 1
 
+function isIntermediateFeeRateInput(value: string) {
+  return value === '' || value === '0' || value.endsWith('.')
+}
+
 // Fee rate display rules:
 // if (Fast = Avg = Slow) -> show Fast time (30s) for all
 // if (Fast = Avg) -> show Fast time (30s) for both
@@ -229,14 +233,22 @@ export function useFeeRateBarLogic({
     let val = defaultFeeRate
     if (feeOptionIndex === FeeRateType.CUSTOM) {
       val = parseFloat(feeRateInputVal) || 0
+      // Zero marks an unfinished custom fee so send screens disable submission.
+      if (val <= 0) {
+        if (feeRate !== 0) updateFeeRateBar({ feeRate: 0 })
+        return
+      }
     } else if (resolvedFeeOptions.length > 0) {
       val = resolvedFeeOptions[feeOptionIndex]?.feeRate ?? defaultFeeRate
     }
 
     if (val < minimumFeeRate) {
+      // Clamp the effective fee without replacing a draft the user is still typing.
       updateFeeRateBar({
         feeRate: minimumFeeRate,
-        ...(feeOptionIndex === FeeRateType.CUSTOM ? { feeRateInputVal: minimumFeeRate.toString() } : {}),
+        ...(feeOptionIndex === FeeRateType.CUSTOM && !isIntermediateFeeRateInput(feeRateInputVal)
+          ? { feeRateInputVal: minimumFeeRate.toString() }
+          : {}),
       })
       return
     }
@@ -287,9 +299,9 @@ export function useFeeRateBarLogic({
         return
       }
 
-      // Low-fee mode permits typing 0.1; otherwise keep the input relay-safe.
-      if (inputVal === '0' || inputVal.endsWith('.')) {
-        updateFeeRateBar({ feeRateInputVal: supportLowFeeMode ? inputVal : '1' })
+      // Preserve intermediate text for both regular and low-fee decimal input.
+      if (isIntermediateFeeRateInput(inputVal)) {
+        updateFeeRateBar({ feeRateInputVal: inputVal })
         return
       }
 
@@ -310,7 +322,6 @@ export function useFeeRateBarLogic({
       feeOptionIndex,
       resolvedFeeOptions,
       hasLoadedFeeOptions,
-      supportLowFeeMode,
       minimumFeeRate,
     ]
   )

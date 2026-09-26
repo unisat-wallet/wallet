@@ -2,13 +2,20 @@ import { describe, expect, it, vi } from 'vitest'
 import { act, renderHook, waitFor } from '@testing-library/react'
 
 import { useBRC20InscribeTransferLogicStep1 } from '../../src/ui-hooks/useBRC20InscribeTransferLogic'
-import { BRC20SendTabKey, useBRC20SendScreenLogic } from '../../src/ui-hooks/useBRC20SendScreenLogic'
+import {
+  BRC20SendTabKey,
+  useBRC20SendScreenLogic,
+} from '../../src/ui-hooks/useBRC20SendScreenLogic'
 import { useFeeRateBarLogic } from '../../src/ui-hooks/useFeeRateBarLogic'
 import { useSendAlkanesNFTScreenLogic } from '../../src/ui-hooks/useSendAlkanesNFTScreenLogic'
 import { useSendAlkanesScreenLogic } from '../../src/ui-hooks/useSendAlkanesScreenLogic'
 import { useSendOrdinalsInscriptionScreenLogic } from '../../src/ui-hooks/useSendOrdinalsInscriptionScreenLogic'
 import { useSendRunesScreenLogic } from '../../src/ui-hooks/useSendRunesScreenLogic'
 import { useSplitOrdinalsInscriptionScreenLogic } from '../../src/ui-hooks/useSplitOrdinalsInscriptionScreenLogic'
+import { uiActions } from '../../src/reducers/ui'
+import { useBRC20SingleStepScreenLogic } from '../../src/ui-hooks/useBRC20SingleStepScreenLogic'
+import { useBRC20SendScreenLogicStep2 } from '../../src/ui-hooks/useBRC20SendScreenLogic'
+import { useSendRGBScreenLogic } from '../../src/ui-hooks/useSendRGBScreenLogic'
 import { createHookTestHarness, testInscription } from './testHelpers'
 
 const tokenBalance = {
@@ -126,7 +133,8 @@ describe('high-risk screen logic effects', () => {
       tokenInfo,
     }
     const { rerender } = renderHook(
-      () => useBRC20InscribeTransferLogicStep1({ contextData: contextData as any, updateContextData }),
+      () =>
+        useBRC20InscribeTransferLogicStep1({ contextData: contextData as any, updateContextData }),
       { wrapper }
     )
 
@@ -204,7 +212,10 @@ describe('high-risk screen logic effects', () => {
     })
 
     act(() => {
-      result.current.setToInfo({ address: 'bc1qxy2kgdygjrsqtzq2n0yrf2493p83kkfjhx0wlh', domain: '' })
+      result.current.setToInfo({
+        address: 'bc1qxy2kgdygjrsqtzq2n0yrf2493p83kkfjhx0wlh',
+        domain: '',
+      })
     })
 
     await waitFor(() => {
@@ -259,4 +270,165 @@ describe('high-risk screen logic effects', () => {
     expect(wallet.getEnableRBF).toHaveBeenCalledTimes(1)
     expect(wallet.getInscriptionUtxoDetail).toHaveBeenCalledTimes(1)
   })
+})
+
+const recipient = { address: '1BoatSLRHtKNngkdXEeobR76b53LETtpyT', domain: '' }
+const transferContext = {
+  step: 0,
+  ticker: 'ordi',
+  amount: '1',
+  isApproval: false,
+  enableRBF: true,
+  tokenBalance,
+  tokenInfo,
+  receiver: recipient.address,
+  inscriptionIdSet: new Set(['inscription-1']),
+}
+
+describe('fee clearing across send screens', () => {
+  const cases = [
+    {
+      name: 'Runes',
+      hook: useSendRunesScreenLogic,
+      route: { runeBalance, runeInfo },
+      fill: (s: any) => {
+        s.setToInfo(recipient)
+        s.setInputAmount('1')
+      },
+      submit: 'onClickNext',
+    },
+    {
+      name: 'Alkanes tokens',
+      hook: useSendAlkanesScreenLogic,
+      route: { tokenBalance: alkanesTokenBalance, tokenInfo: alkanesTokenInfo },
+      fill: (s: any) => {
+        s.setToInfo(recipient)
+        s.setInputAmount('1')
+      },
+      submit: 'onClickNext',
+    },
+    {
+      name: 'Alkanes NFT',
+      hook: useSendAlkanesNFTScreenLogic,
+      route: { alkanesInfo: alkanesNftInfo },
+      fill: (s: any) => s.setToInfo(recipient),
+      submit: 'onCreateTxHandleConfirm',
+    },
+    {
+      name: 'Ordinals send',
+      hook: useSendOrdinalsInscriptionScreenLogic,
+      route: { inscription: testInscription },
+      fill: (s: any) => s.onAddressInputChange(recipient),
+      submit: 'onClickNext',
+    },
+    {
+      name: 'Ordinals split',
+      hook: useSplitOrdinalsInscriptionScreenLogic,
+      route: { inscription: testInscription },
+      fill: () => {},
+      submit: 'onClickNext',
+    },
+    {
+      name: 'BRC20 single step',
+      hook: useBRC20SingleStepScreenLogic,
+      route: { tokenBalance, tokenInfo },
+      fill: (s: any) => {
+        s.setToInfo(recipient)
+        s.setInputAmount('1')
+      },
+      submit: 'onClickConfirmStep1',
+    },
+    {
+      name: 'BRC20 transfer inscription',
+      hook: () =>
+        useBRC20InscribeTransferLogicStep1({
+          contextData: transferContext as any,
+          updateContextData: () => {},
+        }),
+      route: {},
+      fill: () => {},
+      submit: 'onClickInscribe',
+    },
+    {
+      name: 'BRC20 send',
+      hook: () =>
+        useBRC20SendScreenLogicStep2({
+          contextData: transferContext as any,
+          updateContextData: () => {},
+        }),
+      route: {},
+      fill: () => {},
+      submit: 'onStep2ClickNext',
+    },
+    {
+      name: 'RGB send',
+      hook: useSendRGBScreenLogic,
+      route: {
+        assetId: 'rgb:test-asset',
+        tokenBalance: {
+          assetId: 'rgb:test-asset',
+          ticker: 'RGB',
+          precision: 8,
+          spendable: '150000000',
+        },
+      },
+      fill: (s: any) =>
+        s.onInvoiceChange('rgb:test-asset/~/~/bc:utxob:test?amount=1&endpoints=rpc://proxy'),
+      submit: 'onClickNext',
+    },
+  ]
+
+  it.each(cases)(
+    '$name disables submission for an empty fee and recovers after typing',
+    async ({ name, hook, route, fill, submit }) => {
+      const harness = createHookTestHarness({ routeState: route })
+      const { wallet, wrapper, store, navigation } = harness
+      wallet.getAssetUtxosRunes.mockResolvedValue([{ runes: [{ runeid: '1:1', amount: '10' }] }])
+      Object.assign(wallet, {
+        getAddressAlkanesTokenSummary: vi
+          .fn()
+          .mockResolvedValue({ tokenBalance: { available: '10' } }),
+        createSendAlkanesPsbt: vi.fn(),
+        singleStepTransferBRC20Step1: vi.fn(),
+        inscribeBRC20Transfer: vi.fn(),
+        createRgbSendBegin: vi.fn(),
+        createRgbFeePoolTopUpBegin: vi.fn(),
+      })
+      store.dispatch(
+        uiActions.updateFeeRateBar({ feeOptionIndex: 3, feeRateInputVal: '3', feeRate: 3 })
+      )
+      const { result, unmount } = renderHook(
+        () => ({
+          fee: useFeeRateBarLogic({ disableLowFeeMode: name === 'RGB send' }),
+          screen: hook() as any,
+        }),
+        { wrapper }
+      )
+      await waitFor(() => expect(result.current.fee.feeOptionsLoading).toBe(false))
+      act(() => fill(result.current.screen))
+      await waitFor(() => expect(result.current.screen.disabled).toBe(false))
+      act(() => result.current.fee.adjustFeeRateInput(''))
+      expect(result.current.fee.feeRateInputVal).toBe('')
+      expect(result.current.screen.disabled).toBe(true)
+      await act(async () => result.current.screen[submit]())
+      for (const method of [
+        'createSendRunesPsbt',
+        'createSendAlkanesPsbt',
+        'createSendInscriptionPsbt',
+        'createSendMultipleInscriptionsPsbt',
+        'createSplitInscriptionPsbt',
+        'singleStepTransferBRC20Step1',
+        'inscribeBRC20Transfer',
+        'createRgbSendBegin',
+        'createRgbFeePoolTopUpBegin',
+      ]) {
+        expect((wallet as any)[method]).not.toHaveBeenCalled()
+      }
+      expect(navigation.navigate).not.toHaveBeenCalled()
+      act(() => result.current.fee.adjustFeeRateInput('2.5'))
+      expect(result.current.screen.disabled).toBe(false)
+      expect(store.getState().ui.feeRateBar.feeRate).toBe(2.5)
+      unmount()
+    }
+  )
 })

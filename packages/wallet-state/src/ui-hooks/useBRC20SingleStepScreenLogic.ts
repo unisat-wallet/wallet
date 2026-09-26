@@ -119,6 +119,8 @@ export function useBRC20SingleStepScreenLogic() {
   }
 
   const onClickConfirmStep1 = async () => {
+    if (!Number.isFinite(feeRate) || feeRate <= 0) return
+
     tools.showLoading(true)
     try {
       const step1 = await wallet.singleStepTransferBRC20Step1({

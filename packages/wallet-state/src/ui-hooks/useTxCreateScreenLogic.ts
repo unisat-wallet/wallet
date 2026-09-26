@@ -133,6 +133,8 @@ export function useTxCreateScreenLogic() {
   }
 
   const onClickNext = () => {
+    if (disabled) return
+
     prepareSendBTC({ toAddressInfo: toInfo, toAmount: toSatoshis, feeRate, enableRBF })
       .then(toSignData => {
         nav.navigate('TxConfirmScreen', {

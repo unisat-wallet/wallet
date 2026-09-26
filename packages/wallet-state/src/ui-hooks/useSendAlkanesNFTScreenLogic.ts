@@ -77,6 +77,8 @@ export function useSendAlkanesNFTScreenLogic() {
   const pushBitcoinTx = usePushBitcoinTxCallback()
 
   const onCreateTxHandleConfirm = async () => {
+    if (!Number.isFinite(feeRate) || feeRate <= 0) return
+
     tools.showLoading(true)
     try {
       const toSignData = await prepareSendAlkanes(

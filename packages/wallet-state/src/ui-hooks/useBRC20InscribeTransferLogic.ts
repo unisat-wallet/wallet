@@ -202,6 +202,8 @@ export function useBRC20InscribeTransferLogicStep1(params: BRC20InscribeTransfer
   }, [])
 
   const onClickInscribe = async () => {
+    if (!Number.isFinite(feeRateBarState.feeRate) || feeRateBarState.feeRate <= 0) return
+
     try {
       tools.showLoading(true)
       const amount = inputAmount

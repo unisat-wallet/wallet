@@ -382,6 +382,8 @@ export function useSendRGBScreenLogic() {
   }
 
   const onClickNext = async () => {
+    if (!Number.isFinite(feeRate) || feeRate <= 0) return
+
     setError('')
     setFeePoolRequirement(undefined)
     tools.showLoading(true)

@@ -83,6 +83,8 @@ export function useSplitOrdinalsInscriptionScreenLogic() {
   }
 
   const onClickNext = () => {
+    if (!Number.isFinite(feeRate) || feeRate <= 0) return
+
     createSplitTx({ inscriptionId: inscription.inscriptionId, feeRate, outputValue, enableRBF })
       .then(toSignData => {
         nav.navigate('TxConfirmScreen', { toSignData })

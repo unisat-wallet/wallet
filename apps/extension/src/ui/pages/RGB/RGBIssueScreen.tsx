@@ -240,7 +240,8 @@ export default function RGBIssueScreen() {
       : 0;
   const atomicSupply = toRgbAtomicAmount(amount.trim(), assetPrecision);
   const isFormLocked = loading;
-  const canIssue = !isFormLocked && !fundingLoading && !!fundingAddress && isFormValid;
+  const isFeeRateValid = Number.isFinite(feeRate) && feeRate > 0;
+  const canIssue = !isFormLocked && !fundingLoading && !!fundingAddress && isFormValid && isFeeRateValid;
   const assetTicker = ticker.trim() || 'ASSET';
   const displaySupply = formatSupply(amount.trim() || '0', assetTicker);
 
@@ -300,6 +301,8 @@ export default function RGBIssueScreen() {
   }, [assetPrecision, atomicSupply, name, refreshFundingState, ticker, tools, wallet]);
 
   const startCreateRgbUtxo = useCallback(async () => {
+    if (!isFeeRateValid) return;
+
     setFundingTxid('');
     setLoading(true);
     setOperationError('');
@@ -308,7 +311,7 @@ export default function RGBIssueScreen() {
         // The issuance consumes one funding UTXO; retain the other four for
         // subsequent invoices or issuances without another split transaction.
         num: 5,
-        ...(feeRate > 0 ? { feeRate } : {})
+        feeRate
       });
       const toSignData = beginResult?.toSignData as ToSignData | undefined;
       if (!toSignData) throw new Error('RGB UTXO creation did not return signing data');
@@ -322,9 +325,11 @@ export default function RGBIssueScreen() {
     } finally {
       setLoading(false);
     }
-  }, [feeRate, tools, wallet]);
+  }, [feeRate, isFeeRateValid, tools, wallet]);
 
   const onDeploy = () => {
+    if (!canIssue) return;
+
     void (async () => {
       setLoading(true);
       setOperationError('');
@@ -347,7 +352,7 @@ export default function RGBIssueScreen() {
   };
 
   const onIssueAssetClick = () => {
-    if (!isFormValid) return;
+    if (!canIssue) return;
     setReviewModalVisible(true);
   };
 

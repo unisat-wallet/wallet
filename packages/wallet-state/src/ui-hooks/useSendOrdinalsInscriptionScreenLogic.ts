@@ -114,6 +114,8 @@ export function useSendOrdinalsInscriptionScreenLogic() {
   }
 
   const onClickNext = () => {
+    if (!Number.isFinite(feeRate) || feeRate <= 0) return
+
     prepareSendOrdinalsInscription({
       toAddressInfo: toInfo,
       inscriptionId: inscription.inscriptionId,

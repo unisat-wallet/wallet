@@ -145,6 +145,8 @@ export function useSendRunesScreenLogic() {
   }
 
   const onClickNext = () => {
+    if (!Number.isFinite(feeRate) || feeRate <= 0) return
+
     const runeAmount = bnUtils.fromDecimalAmount(inputAmount, runeInfo.divisibility)
     prepareSendRunes({
       toAddressInfo: toInfo,
