@@ -91,8 +91,6 @@ export const WalletActions = ({ chain, rgbEnabled = false }: WalletActionsProps)
     nav.navigate('ReceiveScreen');
   };
 
-  const onRgbReceiveClick = () => nav.navigate('RGBReceiveScreen', {});
-
   const onRgbSendClick = async () => {
     const fallbackToken = {
       assetId: '',
@@ -125,10 +123,6 @@ export const WalletActions = ({ chain, rgbEnabled = false }: WalletActionsProps)
     nav.navigate('HistoryScreen');
   };
 
-  const onIssueClick = () => {
-    nav.navigate('RGBIssueScreen');
-  };
-
   const buyDisabled = chainType !== ChainType.BITCOIN_MAINNET && chainType !== ChainType.FRACTAL_BITCOIN_MAINNET;
 
   const actionItems = useMemo<WalletActionItem[]>(() => {
@@ -153,42 +147,16 @@ export const WalletActions = ({ chain, rgbEnabled = false }: WalletActionsProps)
     ];
 
     if (rgbEnabled) {
-      items.push({
-        key: 'receive-rgb',
-        label: t('receive_rgb'),
-        icon: 'rgb',
-        onClick: onRgbReceiveClick,
-        priority: 3,
-        dataTestId: 'receive-rgb-button'
-      });
       if (canSendRgbUsdtToken) {
         items.push({
           key: 'send-usdt',
           label: t('send_usdt'),
           icon: 'usdt',
           onClick: onRgbSendClick,
-          priority: 4,
+          priority: 3,
           dataTestId: 'send-usdt-button'
         });
       }
-      items.push({
-        key: 'issue',
-        label: t('issue'),
-        icon: 'issue',
-        onClick: onIssueClick,
-        priority: 6,
-        overflowPreset: 'homeGold',
-        dataTestId: 'issue-button'
-      });
-      items.push({
-        key: 'rgb-history',
-        label: t('rgb_history'),
-        icon: 'history',
-        onClick: () => nav.navigate('RGBHistoryScreen'),
-        priority: 7,
-        overflowPreset: 'homeGold',
-        dataTestId: 'rgb-history-button'
-      });
     }
 
     items.push({
@@ -234,7 +202,6 @@ export const WalletActions = ({ chain, rgbEnabled = false }: WalletActionsProps)
     isFractal,
     rgbEnabled,
     onHistoryClick,
-    onIssueClick,
     onReceiveClick,
     onSendClick,
     t,

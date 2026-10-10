@@ -228,7 +228,12 @@ export default function WalletTabScreen({ screen = 'home' }: { screen?: 'home' |
         key: AssetTabKey.RGB,
         label: t('rgb'),
         children: isRgbActive ? (
-          <RGBHomeTabs initialTab={rgbHomeTab} transfers={rgbTransfers} list={rgbList} />
+          <RGBHomeTabs
+            key={`${chain.enum}:${currentAccount.key}`}
+            initialTab={rgbHomeTab}
+            transfers={rgbTransfers}
+            list={rgbList}
+          />
         ) : (
           <Column itemsCenter gap="md">
             <Text text={t('rgb_assets')} color="white_muted" />
