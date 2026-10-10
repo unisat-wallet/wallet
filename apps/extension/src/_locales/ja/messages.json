@@ -3151,6 +3151,10 @@
   "rgb_default_invoice_expiry": {
     "message": "インボイスのデフォルト有効期限"
   },
+  "rgb_invoice_expiry": { "message": "インボイスの有効期限" },
+  "invoice_options": { "message": "設定" },
+  "invoice_type": { "message": "インボイスタイプ" },
+  "change": { "message": "変更" },
   "rgb_invoice_expiry_description": {
     "message": "新しいインボイスのデフォルト有効期限を設定"
   },

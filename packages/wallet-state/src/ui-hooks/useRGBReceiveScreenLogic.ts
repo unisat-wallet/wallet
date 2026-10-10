@@ -313,9 +313,9 @@ export function useRGBReceiveScreenLogic(
   const [selectedTokenBalance, setSelectedTokenBalance] = useState<RgbAssetItem | undefined>(
     routeState?.tokenBalance as RgbAssetItem | undefined
   )
-  const [assetSelectorOpen, setAssetSelectorOpen] = useState(false)
   const [mode, setModeState] = useState<RGBReceiveMode>('any')
   const [recipientType, setRecipientType] = useState<RGBInvoiceRecipientType>('blind')
+  const [invoiceExpirySeconds, setInvoiceExpirySeconds] = useState(24 * 60 * 60)
   const [amount, setAmount] = useState('')
   const [loading, setLoading] = useState(false)
   const [loadingText, setLoadingText] = useState('')
@@ -331,6 +331,13 @@ export function useRGBReceiveScreenLogic(
   const [utxoPendingVanillaTxid, setUtxoPendingVanillaTxid] = useState('')
   const [resumeCreateInvoiceAfterSign, setResumeCreateInvoiceAfterSign] = useState(false)
   const [insufficientBtcForInvoice, setInsufficientBtcForInvoice] = useState(false)
+
+  useEffect(() => {
+    rgbWallet
+      .getRgbInvoiceExpirySeconds()
+      .then(setInvoiceExpirySeconds)
+      .catch(() => undefined)
+  }, [rgbWallet])
 
   const selectedRgbItem =
     selectedAssetId === ANY_RGB_ASSET_ID
@@ -392,10 +399,9 @@ export function useRGBReceiveScreenLogic(
       params.amount = normalizedAmount
     }
 
-    const durationSeconds = await rgbWallet.getRgbInvoiceExpirySeconds()
     const request = {
       ...params,
-      ...(durationSeconds > 0 ? { durationSeconds } : {}),
+      ...(invoiceExpirySeconds > 0 ? { durationSeconds: invoiceExpirySeconds } : {}),
       ...(skipSync ? { skipSync: true } : {}),
     }
     return recipientType === 'witness'
@@ -464,17 +470,10 @@ export function useRGBReceiveScreenLogic(
     const invoice = getInvoiceText(value)
     const pendingInvoice = getRecordPayload(value)
     const recipientId = readStringPath(pendingInvoice, ['recipientId'])
-    if (recipientId && invoice) {
-      nav.navigate('RGBInvoiceDetailScreen', {
-        recipientId,
-        invoice,
-        ...(pendingInvoice ? { initialInvoice: pendingInvoice } : {}),
-      })
-      return
-    }
     setInvoice(invoice)
-    if (pendingInvoice?.['invoice'])
+    if (recipientId || pendingInvoice?.['invoice']) {
       setSelectedPendingInvoice(pendingInvoice as RgbPendingReceiveInvoice)
+    }
     setStep('create_invoice')
   }
 
@@ -744,23 +743,11 @@ export function useRGBReceiveScreenLogic(
     } else {
       setAmount(currentAmount => normalizeRgbAmountInput(currentAmount, itemPrecision))
     }
-    setAssetSelectorOpen(false)
     setInvoice('')
     setSelectedPendingInvoice(undefined)
     setPendingInvoices([])
     setStep('create_invoice')
     setError('')
-  }
-
-  const onBackToCreate = () => {
-    setInvoice('')
-    if (selectedPendingInvoice) {
-      setSelectedPendingInvoice(undefined)
-      setStep('pending_invoices')
-      return
-    }
-    setSelectedPendingInvoice(undefined)
-    setStep('create_invoice')
   }
 
   const onCloseInvoice = () => {
@@ -782,12 +769,12 @@ export function useRGBReceiveScreenLogic(
     assetTicker,
     assetPrecision,
     canSetFixedAmount,
-    assetSelectorOpen,
-    setAssetSelectorOpen,
     mode,
     setMode,
     recipientType,
     setRecipientType,
+    invoiceExpirySeconds,
+    setInvoiceExpirySeconds,
     amount,
     onAmountChange,
     normalizedAmount,
@@ -818,7 +805,6 @@ export function useRGBReceiveScreenLogic(
     onSelectPendingInvoice,
     onCancelPendingInvoice,
     onSelectAsset,
-    onBackToCreate,
     onCloseInvoice,
     onClickBack,
   }

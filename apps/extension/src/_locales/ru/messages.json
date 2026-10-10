@@ -3151,6 +3151,10 @@
   "rgb_default_invoice_expiry": {
     "message": "Срок действия инвойса по умолчанию"
   },
+  "rgb_invoice_expiry": { "message": "Срок действия инвойса" },
+  "invoice_options": { "message": "Параметры" },
+  "invoice_type": { "message": "Тип инвойса" },
+  "change": { "message": "Изменить" },
   "rgb_invoice_expiry_description": {
     "message": "Установить срок действия для новых инвойсов"
   },

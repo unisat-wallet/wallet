@@ -187,6 +187,20 @@ describe('useRGBReceiveScreenLogic', () => {
     })
   })
 
+  it('uses the expiry selected for the current invoice', async () => {
+    const { wrapper, wallet } = createHookTestHarness()
+    const { result } = renderHook(() => useRGBReceiveScreenLogic(), { wrapper })
+
+    await waitFor(() => expect(result.current.invoiceExpirySeconds).toBe(86_400))
+    act(() => result.current.setInvoiceExpirySeconds(0))
+
+    await act(async () => {
+      await result.current.onCreateInvoice()
+    })
+
+    expect(wallet.createRgbBlindReceive).toHaveBeenCalledWith({ skipSync: true })
+  })
+
   it('does not poll pending consignments immediately after creating an invoice', async () => {
     const { wrapper, wallet } = createHookTestHarness()
     const { result } = renderHook(() => useRGBReceiveScreenLogic(), { wrapper })
@@ -204,7 +218,7 @@ describe('useRGBReceiveScreenLogic', () => {
     expect(wallet.getRgbPendingReceiveInvoices).toHaveBeenCalledTimes(2)
   })
 
-  it('opens a waiting invoice in the dedicated detail screen after creation', async () => {
+  it('keeps a newly created invoice in the creation flow for the completion step', async () => {
     const waitingInvoice = {
       invoice: 'rgb:invoice',
       recipientId: 'recipient-id',
@@ -219,11 +233,12 @@ describe('useRGBReceiveScreenLogic', () => {
       await result.current.onCreateInvoice()
     })
 
-    expect(navigation.navigate).toHaveBeenCalledWith('RGBInvoiceDetailScreen', {
-      recipientId: 'recipient-id',
-      invoice: 'rgb:invoice',
-      initialInvoice: waitingInvoice,
-    })
+    expect(result.current.invoice).toBe('rgb:invoice')
+    expect(result.current.selectedPendingInvoice).toEqual(waitingInvoice)
+    expect(navigation.navigate).not.toHaveBeenCalledWith(
+      'RGBInvoiceDetailScreen',
+      expect.anything()
+    )
   })
 
   it('opens a reusable pending invoice in the dedicated detail screen', () => {

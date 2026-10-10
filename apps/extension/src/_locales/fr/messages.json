@@ -3151,6 +3151,10 @@
   "rgb_default_invoice_expiry": {
     "message": "Expiration par défaut de la facture"
   },
+  "rgb_invoice_expiry": { "message": "Expiration de la facture" },
+  "invoice_options": { "message": "Options" },
+  "invoice_type": { "message": "Type de facture" },
+  "change": { "message": "Modifier" },
   "rgb_invoice_expiry_description": {
     "message": "Définir l’expiration par défaut des nouvelles factures"
   },

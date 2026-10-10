@@ -3214,6 +3214,10 @@
   "rgb_default_invoice_expiry": {
     "message": "Default invoice expiry"
   },
+  "rgb_invoice_expiry": { "message": "Invoice expiry" },
+  "invoice_options": { "message": "Options" },
+  "invoice_type": { "message": "Invoice Type" },
+  "change": { "message": "Change" },
   "rgb_invoice_expiry_description": {
     "message": "Set the default expiry for new invoices"
   },

@@ -15,6 +15,7 @@ import { RGBTransferDetailSheet } from '../../RGB/RGBTransferDetailSheet';
 import { RGBTransferListItem } from '../../RGB/components/RGBTransferListItem';
 import { RGBList } from './RGBList';
 import { RGBTransfersList } from './RGBTransfersList';
+import { RgbReceiveSelectorModal } from './RgbReceiveSelectorModal';
 
 type RGBHomeTabKey = 'assets' | 'transfers';
 
@@ -28,6 +29,7 @@ export function RGBHomeTabs({ initialTab = 'assets', transfers, list }: RGBHomeT
   const { t } = useI18n();
   const nav = useNavigation();
   const [activeKey, setActiveKey] = useState<RGBHomeTabKey>(initialTab);
+  const [receiveSelectorOpen, setReceiveSelectorOpen] = useState(false);
   const [actionMenuOpen, setActionMenuOpen] = useState(false);
   const [selectedPendingTransfer, setSelectedPendingTransfer] = useState<RgbTransferItem>();
   const [handledTransferIds, setHandledTransferIds] = useState<Set<string>>(() => new Set());
@@ -66,7 +68,7 @@ export function RGBHomeTabs({ initialTab = 'assets', transfers, list }: RGBHomeT
                 preset="primary"
                 full
                 style={{ minHeight: 44, height: 44 }}
-                onClick={() => nav.navigate('RGBReceiveScreen', {})}
+                onClick={() => setReceiveSelectorOpen(true)}
                 data-testid="receive-rgb-button"
               />
               <div
@@ -159,6 +161,19 @@ export function RGBHomeTabs({ initialTab = 'assets', transfers, list }: RGBHomeT
           onClickExploreTx={
             selectedPendingTransfer.txid ? () => nav.navToExplorerTx(selectedPendingTransfer.txid || '') : undefined
           }
+        />
+      )}
+      {receiveSelectorOpen && (
+        <RgbReceiveSelectorModal
+          onClose={() => setReceiveSelectorOpen(false)}
+          onViewInvoices={() => {
+            setReceiveSelectorOpen(false);
+            nav.navigate('RGBInvoiceListScreen', {});
+          }}
+          onCreateInvoice={() => {
+            setReceiveSelectorOpen(false);
+            nav.navigate('RGBReceiveScreen', { initialStep: 'create_invoice' });
+          }}
         />
       )}
       {actionMenuOpen && (

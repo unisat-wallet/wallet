@@ -3142,6 +3142,10 @@
   "rgb_default_invoice_expiry": {
     "message": "Caducidad predeterminada de la factura"
   },
+  "rgb_invoice_expiry": { "message": "Caducidad de la factura" },
+  "invoice_options": { "message": "Opciones" },
+  "invoice_type": { "message": "Tipo de factura" },
+  "change": { "message": "Cambiar" },
   "rgb_invoice_expiry_description": {
     "message": "Establece la caducidad predeterminada para nuevas facturas"
   },

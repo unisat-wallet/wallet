@@ -16,6 +16,7 @@ import {
 import { getRgbAssetName } from '@/ui/components/RGBAssetIcon';
 import { BottomModal } from '@/ui/components/BottomModal';
 import { RunesTicker } from '@/ui/components/RunesTicker';
+import { TabBar } from '@/ui/components/TabBar';
 import { colors } from '@/ui/theme/colors';
 import { typography } from '@/ui/theme/typography';
 import { shortAddress } from '@/ui/utils';
@@ -26,8 +27,6 @@ import {
   getRgbTokenIconInfo,
   getRgbTokenPrecision,
   getRgbTokenTicker,
-  isCancelableRgbPendingInvoice,
-  isDeletableRgbWitnessInvoice,
   isRgbPendingInvoiceAwaitingAcceptance,
   isRgbPendingInvoiceAwaitingConfirmation,
   isRgbPendingInvoiceAwaitingSenderBroadcast,
@@ -106,30 +105,6 @@ const assetSelectorStyle = {
   cursor: 'pointer'
 };
 
-const pendingSummaryStyle = {
-  width: '100%',
-  minHeight: 48,
-  borderRadius: 10,
-  padding: '0 18px',
-  boxSizing: 'border-box' as const,
-  background: 'rgba(244,182,44,0.13)',
-  display: 'flex',
-  alignItems: 'center',
-  justifyContent: 'space-between',
-  cursor: 'pointer'
-};
-
-const pendingSummaryPlaceholderStyle = {
-  ...pendingSummaryStyle,
-  cursor: 'default'
-};
-
-const pendingSummarySkeletonStyle = {
-  height: 14,
-  borderRadius: 4,
-  background: 'rgba(255,255,255,0.08)'
-};
-
 const pendingInvoiceCardStyle = {
   minHeight: 64,
   padding: '0 12px 0 12px',
@@ -194,26 +169,14 @@ const invoiceTypeTagStyle = {
   flexShrink: 0
 };
 
-const confirmMaskStyle = {
-  position: 'fixed' as const,
-  inset: 0,
-  zIndex: 30,
-  background: 'rgba(0,0,0,0.72)',
-  display: 'flex',
-  alignItems: 'center',
-  justifyContent: 'center',
-  padding: '0 16px',
-  boxSizing: 'border-box' as const
-};
+const invoiceExpiryOptions = [
+  { seconds: 60 * 60, label: 'rgb_invoice_expiry_1h' },
+  { seconds: 24 * 60 * 60, label: 'rgb_invoice_expiry_24h' },
+  { seconds: 7 * 24 * 60 * 60, label: 'rgb_invoice_expiry_7d' },
+  { seconds: 0, label: 'rgb_invoice_expiry_never' }
+] as const;
 
-const confirmModalStyle = {
-  width: '100%',
-  borderRadius: 14,
-  padding: '28px 16px 24px',
-  background: '#171B21',
-  boxSizing: 'border-box' as const,
-  position: 'relative' as const
-};
+type InvoiceCreationStep = 'select_asset' | 'configure_invoice';
 
 export default function RGBReceiveScreen({
   initialStep = 'create_invoice'
@@ -222,7 +185,8 @@ export default function RGBReceiveScreen({
 }) {
   const { t, locale } = useI18n();
   const { requestWrite, writeLeaseModal } = useRgbWriteLeaseGuard();
-  const [releaseConfirmVisible, setReleaseConfirmVisible] = useState(false);
+  const [invoiceTypeSelectorOpen, setInvoiceTypeSelectorOpen] = useState(false);
+  const [creationStep, setCreationStep] = useState<InvoiceCreationStep>('select_asset');
   const {
     step,
     rgbItems,
@@ -233,15 +197,14 @@ export default function RGBReceiveScreen({
     assetTicker,
     assetPrecision,
     canSetFixedAmount,
-    assetSelectorOpen,
-    setAssetSelectorOpen,
     mode,
     setMode,
     recipientType,
     setRecipientType,
+    invoiceExpirySeconds,
+    setInvoiceExpirySeconds,
     amount,
     onAmountChange,
-    normalizedAmount,
     isFixedMode,
     isAmountValid,
     amountInvalidVisible,
@@ -253,11 +216,9 @@ export default function RGBReceiveScreen({
     selectedPendingInvoice,
     error,
     setError,
-    cancelLoading,
     pendingLoading,
     pendingInvoices,
     insufficientBtcForInvoice,
-    onOpenPendingInvoices,
     onClosePendingInvoices,
     onCopyPendingInvoice,
     onCreateInvoice,
@@ -265,9 +226,7 @@ export default function RGBReceiveScreen({
     signRgbUtxoParams,
     onSignRgbUtxoHandleConfirm,
     onSelectPendingInvoice,
-    onCancelPendingInvoice,
     onSelectAsset,
-    onBackToCreate,
     onCloseInvoice,
     onClickBack
   } = useRGBReceiveScreenLogic(initialStep);
@@ -298,8 +257,6 @@ export default function RGBReceiveScreen({
   };
 
   const renderLockedAssetHeader = () => {
-    if (!isAssetLocked) return null;
-
     return (
       <div
         style={{
@@ -314,103 +271,58 @@ export default function RGBReceiveScreen({
           {renderAssetIcon(selectedRgbItem, 28)}
           <Column gap="xs" style={{ minWidth: 0, flex: 1 }}>
             <RunesTicker tick={assetDisplayName} truncate preset="sm" />
-            <Text text={`(ticker: ${assetTicker})`} size="xs" color="textDim" ellipsis />
+            {assetId ? <Text text={shortAddress(assetId, 10)} size="xs" color="textDim" ellipsis /> : null}
           </Column>
         </Row>
       </div>
     );
   };
 
-  const renderAssetSelector = () => {
+  const renderAssetOptions = () => {
     return (
-      <Column gap="sm">
-        <div
-          style={{
-            ...assetSelectorStyle,
-            height: 'auto',
-            minHeight: 48,
-            padding: '10px 16px'
-          }}
-          onClick={() => setAssetSelectorOpen(true)}
-        >
-          <Row gap="md" itemsCenter style={{ flex: 1, minWidth: 0 }}>
-            {renderAssetIcon(selectedRgbItem, 28)}
-            <Column gap="xs" style={{ minWidth: 0, flex: 1 }}>
-              <Text text={assetDisplayName} color="white" size="sm" ellipsis />
-              {assetId ? (
-                <Text
-                  text={shortAddress(assetId, 10)}
-                  size="xs"
-                  ellipsis
-                  style={{ color: 'rgba(255, 255, 255, 0.45)' }}
-                />
-              ) : null}
-            </Column>
-          </Row>
-          <Icon icon="down" size={14} />
-        </div>
-      </Column>
-    );
-  };
-
-  const renderAssetSelectorSheet = () => {
-    if (!assetSelectorOpen) return null;
-
-    return (
-      <BottomModal onClose={() => setAssetSelectorOpen(false)}>
-        <Column justifyCenter itemsCenter>
-          <Row justifyBetween itemsCenter style={{ height: 20 }} fullX>
-            <Text text={t('select_asset')} textCenter size="md" />
-            <Row onClick={() => setAssetSelectorOpen(false)}>
-              <Icon icon="close" size={12} />
+      <Column gap="sm" fullX>
+        {(isAssetLocked ? [selectedRgbItem] : [ANY_RGB_ASSET, ...rgbItems]).map((item) => {
+          const itemAssetId = getRgbAssetId(item);
+          const isAnyRgbAsset = itemAssetId === ANY_RGB_ASSET_ID;
+          const displayName = isAnyRgbAsset ? t('any_rgb_asset') : getRgbAssetName(item) || getRgbTokenTicker(item);
+          const selected = itemAssetId === (assetId || ANY_RGB_ASSET_ID);
+          return (
+            <Row
+              key={itemAssetId || displayName}
+              itemsCenter
+              justifyBetween
+              gap="md"
+              style={{
+                minHeight: 56,
+                padding: '8px 12px',
+                borderRadius: 10,
+                border: selected ? `1px solid ${GOLD}` : '1px solid rgba(255,255,255,0.1)',
+                background: selected ? 'rgba(244,182,44,0.08)' : 'rgba(255,255,255,0.06)',
+                cursor: isAssetLocked ? 'default' : 'pointer'
+              }}
+              onClick={() => onSelectAsset(item)}>
+              <Row gap="md" itemsCenter style={{ flex: 1, minWidth: 0 }}>
+                {renderAssetIcon(item, 32)}
+                <Column gap="xs" style={{ minWidth: 0, flex: 1 }}>
+                  <RunesTicker tick={displayName} truncate preset="sm" />
+                  {!isAnyRgbAsset && itemAssetId ? (
+                    <Text
+                      text={shortAddress(itemAssetId, 10)}
+                      size="xs"
+                      ellipsis
+                      style={{ color: 'rgba(255, 255, 255, 0.45)' }}
+                    />
+                  ) : null}
+                </Column>
+              </Row>
+              {selected ? <Icon icon="checked" color="gold" size={20} /> : null}
             </Row>
-          </Row>
-
-          <Row fullX style={{ borderTopWidth: 1, borderColor: colors.border }} mt="md" />
-
-          <Column gap="md" mt="sm" mb="lg" fullX style={{ maxHeight: '50vh', overflowY: 'auto' }}>
-            {[ANY_RGB_ASSET, ...rgbItems].map((item) => {
-              const itemAssetId = getRgbAssetId(item);
-              const isAnyRgbAsset = itemAssetId === ANY_RGB_ASSET_ID;
-              const displayName = isAnyRgbAsset ? t('any_rgb_asset') : getRgbAssetName(item) || getRgbTokenTicker(item);
-              const selected = itemAssetId === (assetId || ANY_RGB_ASSET_ID);
-              return (
-                <Row
-                  key={itemAssetId || displayName}
-                  itemsCenter
-                  justifyBetween
-                  gap="md"
-                  style={{
-                    minHeight: 48,
-                    padding: '8px 12px',
-                    borderRadius: 10,
-                    background: selected ? 'rgba(244,182,44,0.12)' : 'transparent',
-                    cursor: 'pointer'
-                  }}
-                  onClick={() => onSelectAsset(item)}
-                >
-                  <Row gap="md" itemsCenter style={{ flex: 1, minWidth: 0 }}>
-                    {renderAssetIcon(item, 28)}
-                    <Column gap="xs" style={{ minWidth: 0, flex: 1 }}>
-                      <RunesTicker tick={displayName} truncate preset="sm" />
-                      {!isAnyRgbAsset && itemAssetId ? (
-                        <Text
-                          text={shortAddress(itemAssetId, 10)}
-                          size="xs"
-                          ellipsis
-                          style={{ color: 'rgba(255, 255, 255, 0.45)' }}
-                        />
-                      ) : null}
-                    </Column>
-                  </Row>
-                  {selected ? <Icon icon="checked" color="gold" size={20} /> : null}
-                </Row>
-              );
-            })}
-            {!rgbItems.length && rgbLoading ? <Text text={t('loading_assets')} color="white_muted" textCenter /> : null}
-          </Column>
-        </Column>
-      </BottomModal>
+          );
+        })}
+        {!rgbItems.length && rgbLoading && !isAssetLocked ? (
+          <Text text={t('loading_assets')} color="white_muted" textCenter />
+        ) : null}
+      </Column>
     );
   };
 
@@ -542,44 +454,6 @@ export default function RGBReceiveScreen({
     return renderAssetNameWithAmountTag(assetDisplayName, invoiceAmount, { centered: true });
   };
 
-  const renderPendingPlaceholder = () => {
-    return (
-      <div style={pendingSummaryPlaceholderStyle} aria-hidden>
-        <div style={{ ...pendingSummarySkeletonStyle, width: 140 }} />
-        <div style={{ ...pendingSummarySkeletonStyle, width: 72 }} />
-      </div>
-    );
-  };
-
-  const renderPendingSection = () => {
-    if (pendingLoading) {
-      return renderPendingPlaceholder();
-    }
-
-    if (pendingInvoices.length > 0) {
-      return renderPendingSummary();
-    }
-
-    return null;
-  };
-
-  const renderPendingSummary = () => {
-    return (
-      <div
-        style={pendingSummaryStyle}
-        onClick={() => {
-          onOpenPendingInvoices();
-        }}
-      >
-        <Row gap="sm" itemsCenter>
-          <Icon icon="invoice" color="white" size={22} />
-          <Text text={`${t('pending_invoices')} (${pendingInvoices.length})`} color="white" />
-        </Row>
-        <Icon icon="right" color="gold" size={14} />
-      </div>
-    );
-  };
-
   const renderPendingInvoiceListItem = (item: (typeof pendingInvoices)[number], index: number) => {
     const awaitingAcceptance = isRgbPendingInvoiceAwaitingAcceptance(item);
     const awaitingConfirmation = isRgbPendingInvoiceAwaitingConfirmation(item);
@@ -632,71 +506,66 @@ export default function RGBReceiveScreen({
     );
   };
 
-  const renderReleaseInvoiceConfirmModal = () => {
-    if (!releaseConfirmVisible) return null;
-    const isWitnessInvoice = isDeletableRgbWitnessInvoice(selectedPendingInvoice);
+  const renderCreationProgress = (activeKey: 'asset' | 'options' | 'complete') => (
+    <Row justifyCenter fullX>
+      <TabBar
+        preset="number-step"
+        progressEnabled
+        activeKey={activeKey}
+        numberStepList={[t('select_asset'), t('invoice_options'), t('completed')]}
+        items={[
+          { key: 'asset', label: '1' },
+          { key: 'options', label: '2' },
+          { key: 'complete', label: '3' }
+        ]}
+        onTabClick={() => undefined}
+      />
+    </Row>
+  );
+
+  const renderInvoiceTypeSelector = () => {
+    if (!invoiceTypeSelectorOpen) return null;
 
     return (
-      <div style={confirmMaskStyle}>
-        <Column gap="zero" style={confirmModalStyle}>
-          <Icon
-            icon="close"
-            color="white_muted2"
-            size={12}
-            onClick={cancelLoading ? undefined : () => setReleaseConfirmVisible(false)}
-            containerStyle={{ position: 'absolute', top: 30, right: 22, opacity: cancelLoading ? 0.45 : 1 }}
-          />
-          <Text
-            text={t(isWitnessInvoice ? 'delete_witness_invoice_confirm_title' : 'release_invoice_confirm_title')}
-            color="white"
-            size="md"
-            textCenter
-          />
-          <Text
-            text={t(
-              isWitnessInvoice ? 'delete_witness_invoice_confirm_description' : 'release_invoice_confirm_description'
-            )}
-            color="white_muted2"
-            size="sm"
-            wrap
-            style={{ marginTop: 16 }}
-          />
-          <Row gap="md" fullX style={{ marginTop: 24 }}>
-            <Button
-              text={
-                cancelLoading
-                  ? t(isWitnessInvoice ? 'deleting_invoice' : 'releasing_invoice')
-                  : t(isWitnessInvoice ? 'delete_invoice' : 'release_invoice')
-              }
-              preset={isWitnessInvoice ? 'danger' : 'default'}
-              disabled={cancelLoading}
-              onClick={() => {
-                void requestWrite(() => {
-                  void onCancelPendingInvoice().then((removed) => {
-                    if (removed) setReleaseConfirmVisible(false);
-                  });
-                });
-              }}
-              full
-              style={
-                isWitnessInvoice
-                  ? { height: 48 }
-                  : { height: 48, background: 'transparent', border: '1px solid rgba(255,255,255,0.42)' }
-              }
-              textStyle={isWitnessInvoice ? undefined : { color: colors.white, fontWeight: 'normal' }}
-            />
-            <Button
-              text={t('keep_invoice')}
-              preset="primary"
-              disabled={cancelLoading}
-              onClick={() => setReleaseConfirmVisible(false)}
-              full
-              style={{ height: 48 }}
-              textStyle={{ color: colors.black, fontWeight: 'normal' }}
-            />
+      <BottomModal onClose={() => setInvoiceTypeSelectorOpen(false)}>
+        <Column gap="md">
+          <Row justifyBetween itemsCenter style={{ height: 20 }} fullX>
+            <Text text={t('invoice_type')} size="md" />
+            <Row onClick={() => setInvoiceTypeSelectorOpen(false)}>
+              <Icon icon="close" size={12} />
+            </Row>
           </Row>
+          <Row fullX style={{ borderTopWidth: 1, borderColor: colors.border }} />
+          <Column gap="sm" fullX>
+            {(['blind', 'witness'] as const).map((type) => {
+              const selected = recipientType === type;
+              return (
+                <Row
+                  key={type}
+                  fullX
+                  itemsCenter
+                  justifyBetween
+                  onClick={() => {
+                    setRecipientType(type);
+                    setInvoiceTypeSelectorOpen(false);
+                  }}
+                  style={{
+                    minHeight: 56,
+                    padding: '0 16px',
+                    boxSizing: 'border-box',
+                    borderRadius: 10,
+                    border: selected ? `1px solid ${GOLD}` : '1px solid rgba(255,255,255,0.1)',
+                    background: selected ? 'rgba(244,182,44,0.08)' : 'rgba(255,255,255,0.06)',
+                    cursor: 'pointer'
+                  }}>
+                  <Text text={t(type === 'blind' ? 'rgb_invoice_blind' : 'rgb_invoice_witness')} size="sm" />
+                  {selected ? <Icon icon="checked" color="gold" size={20} /> : null}
+                </Row>
+              );
+            })}
+          </Column>
         </Column>
-      </div>
+      </BottomModal>
     );
   };
 
@@ -739,9 +608,10 @@ export default function RGBReceiveScreen({
   if (invoice) {
     return (
       <Layout>
-        <Header onBack={onBackToCreate} title={t('receive')} />
+        <Header onBack={onCloseInvoice} title={t('create_invoice')} />
         <Content>
           <Column gap="lg">
+            {renderCreationProgress('complete')}
             <ReceiveQRCodeCard
               title={renderInvoiceTitle()}
               description={t('use_this_invoice_to_receive', { ticker: assetDisplayName })}
@@ -767,74 +637,77 @@ export default function RGBReceiveScreen({
               accentColor={GOLD}
             />
 
-            <Row justifyBetween>
-              {isCancelableRgbPendingInvoice(selectedPendingInvoice) ||
-              isDeletableRgbWitnessInvoice(selectedPendingInvoice) ? (
-                <Button
-                  text={
-                    cancelLoading
-                      ? t(
-                          isDeletableRgbWitnessInvoice(selectedPendingInvoice)
-                            ? 'deleting_invoice'
-                            : 'releasing_invoice'
-                        )
-                      : t(isDeletableRgbWitnessInvoice(selectedPendingInvoice) ? 'delete_invoice' : 'release_invoice')
-                  }
-                  preset={isDeletableRgbWitnessInvoice(selectedPendingInvoice) ? 'danger' : 'default'}
-                  disabled={cancelLoading}
-                  onClick={() => setReleaseConfirmVisible(true)}
-                  full
-                  style={{ background: 'transparent', border: '1px solid rgba(244, 182, 44, 0.45)' }}
-                  textStyle={{ color: 'rgba(244, 182, 44, 0.85)', fontWeight: 'normal' }}
-                />
-              ) : null}
-
-              <Button
-                text={t('close')}
-                preset="default"
-                onClick={onCloseInvoice}
-                full
-                style={{ background: 'transparent' }}
-                textStyle={{ color: colors.white, fontWeight: 'normal' }}
-              />
-            </Row>
+            <Button
+              text={t('close')}
+              preset="default"
+              onClick={onCloseInvoice}
+              full
+              style={{ background: 'transparent' }}
+              textStyle={{ color: colors.white, fontWeight: 'normal' }}
+            />
 
             {error ? <Text text={error} size="xs" color="danger" wrap /> : null}
           </Column>
         </Content>
-        {renderReleaseInvoiceConfirmModal()}
         {writeLeaseModal}
+      </Layout>
+    );
+  }
+
+  if (creationStep === 'select_asset') {
+    return (
+      <Layout>
+        <Header onBack={onClickBack} title={t('create_invoice')} />
+        <Content>
+          <Column gap="lg">
+            {renderCreationProgress('asset')}
+            {renderAssetOptions()}
+          </Column>
+        </Content>
+        <Footer>
+          <Button text={t('next')} preset="primary" onClick={() => setCreationStep('configure_invoice')} />
+        </Footer>
       </Layout>
     );
   }
 
   return (
     <Layout>
-      <Header onBack={onClickBack} title={t('receive')} />
+      <Header onBack={() => setCreationStep('select_asset')} title={t('create_invoice')} />
       <Content>
         <Column gap="lg">
-          {renderPendingSection()}
+          {renderCreationProgress('options')}
 
-          <Row gap="sm">
-            <Button
-              text={t('rgb_invoice_blind')}
-              preset={recipientType === 'blind' ? 'primary' : 'default'}
-              onClick={() => setRecipientType('blind')}
-              style={{ flex: 1 }}
-            />
-            <Button
-              text={t('rgb_invoice_witness')}
-              preset={recipientType === 'witness' ? 'primary' : 'default'}
-              onClick={() => setRecipientType('witness')}
-              style={{ flex: 1 }}
-            />
+          {renderLockedAssetHeader()}
+
+          <Row
+            fullX
+            itemsCenter
+            justifyBetween
+            onClick={() => setInvoiceTypeSelectorOpen(true)}
+            style={{
+              minHeight: 56,
+              padding: '0 16px',
+              boxSizing: 'border-box',
+              borderRadius: 10,
+              background: 'rgba(255,255,255,0.06)',
+              border: '1px solid rgba(255,255,255,0.1)',
+              cursor: 'pointer'
+            }}>
+            <Column gap="xs">
+              <Text text={t('invoice_type')} size="xs" color="textDim" />
+              <Text
+                text={t(recipientType === 'blind' ? 'rgb_invoice_blind' : 'rgb_invoice_witness')}
+                size="sm"
+                color="white"
+              />
+            </Column>
+            <Text text={t('change')} size="sm" color="gold" />
           </Row>
 
           {recipientType === 'witness' ? (
             <Text text={t('rgb_witness_invoice_description')} size="xs" color="white_muted" wrap />
           ) : null}
-
-          {isAssetLocked ? renderLockedAssetHeader() : renderAssetSelector()}
 
           <Column gap="lg">
             {renderModeCard('any', t('any_amount'), t('accept_any_rgb_amount'))}
@@ -858,6 +731,21 @@ export default function RGBReceiveScreen({
                   </Row>
                 )
               : null}
+          </Column>
+
+          <Column gap="sm">
+            <Text text={t('rgb_invoice_expiry')} size="sm" color="white" />
+            <Row gap="sm" style={{ flexWrap: 'wrap' }}>
+              {invoiceExpiryOptions.map((option) => (
+                <Button
+                  key={option.seconds}
+                  text={t(option.label)}
+                  preset={invoiceExpirySeconds === option.seconds ? 'primary' : 'default'}
+                  onClick={() => setInvoiceExpirySeconds(option.seconds)}
+                  style={{ flex: '1 1 40%', minWidth: 0 }}
+                />
+              ))}
+            </Row>
           </Column>
 
           {recipientType === 'blind' && insufficientBtcForInvoice ? (
@@ -894,7 +782,7 @@ export default function RGBReceiveScreen({
           />
         </Column>
       </Footer>
-      {!isAssetLocked ? renderAssetSelectorSheet() : null}
+      {renderInvoiceTypeSelector()}
       {writeLeaseModal}
     </Layout>
   );

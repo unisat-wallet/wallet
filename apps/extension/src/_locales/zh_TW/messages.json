@@ -3211,6 +3211,10 @@
   "rgb_default_invoice_expiry": {
     "message": "預設 Invoice 有效期"
   },
+  "rgb_invoice_expiry": { "message": "Invoice 有效期" },
+  "invoice_options": { "message": "設定" },
+  "invoice_type": { "message": "Invoice 類型" },
+  "change": { "message": "更改" },
   "rgb_invoice_expiry_description": {
     "message": "設定新建 Invoice 的預設有效期"
   },
