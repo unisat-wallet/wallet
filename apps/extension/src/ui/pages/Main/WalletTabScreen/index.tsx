@@ -287,7 +287,7 @@ export default function WalletTabScreen({ screen = 'home' }: { screen?: 'home' |
           <Column mt="md" gap="lg2">
             <HomeTips />
             <BalanceCard />
-            <WalletActions chain={chain} rgbEnabled={isRgbActive} />
+            <WalletActions chain={chain} />
             <AnnouncementCard />
             <AddressHistorySection preview />
           </Column>

@@ -11,15 +11,12 @@ import {
   useNavigation,
   useResetFeeRateBar,
   useResetUiTxCreateScreen,
-  useRgbHomeDisplayMode,
-  useWallet,
   useWalletConfig
 } from '@unisat/wallet-state';
 import { ChainType } from '@unisat/wallet-types';
 
 interface WalletActionsProps {
   chain: TypeChain;
-  rgbEnabled?: boolean;
 }
 
 type WalletActionItem = {
@@ -61,15 +58,7 @@ const actionButtonTextStyle = {
   lineHeight: '14px'
 };
 
-function findUsdtToken(items: Array<{ assetId?: string; ticker?: string; name?: string; [key: string]: unknown }>) {
-  return items.find((item) => {
-    const ticker = (item.ticker || '').toUpperCase();
-    const name = (item.name || '').toUpperCase();
-    return ticker === 'USDT' || name === 'USDT';
-  });
-}
-
-export const WalletActions = ({ chain, rgbEnabled = false }: WalletActionsProps) => {
+export const WalletActions = ({ chain }: WalletActionsProps) => {
   const [showOverflowActions, setShowOverflowActions] = useState(false);
   const isFractal = chain.isFractal;
   const nav = useNavigation();
@@ -78,10 +67,8 @@ export const WalletActions = ({ chain, rgbEnabled = false }: WalletActionsProps)
   const chainType = useChainType();
   const [buyBtcModalVisible, setBuyBtcModalVisible] = useState(false);
   const walletConfig = useWalletConfig();
-  const wallet = useWallet();
   const { t } = useI18n();
   const accountCapabilities = useCurrentAccountCapabilities();
-  const { canSendRgbUsdtToken } = useRgbHomeDisplayMode();
 
   const handleUtxoClick = () => {
     nav.navToUtxoTools();
@@ -89,28 +76,6 @@ export const WalletActions = ({ chain, rgbEnabled = false }: WalletActionsProps)
 
   const onReceiveClick = () => {
     nav.navigate('ReceiveScreen');
-  };
-
-  const onRgbSendClick = async () => {
-    const fallbackToken = {
-      assetId: '',
-      ticker: 'USDT',
-      name: 'USDT',
-      spendable: '0',
-      balance: '0',
-      amount: '0'
-    };
-    let tokenBalance = fallbackToken;
-    try {
-      const { list } = await wallet.getRGBList('', 1, 20, { skipSync: true });
-      const usdtToken = findUsdtToken(list || []);
-      if (usdtToken) {
-        tokenBalance = usdtToken as typeof fallbackToken;
-      }
-    } catch {
-      // Keep the USDT fallback when the lightweight list fetch fails.
-    }
-    nav.navigate('SendRGBScreen', { assetId: tokenBalance.assetId || '', tokenBalance });
   };
 
   const onSendClick = () => {
@@ -145,19 +110,6 @@ export const WalletActions = ({ chain, rgbEnabled = false }: WalletActionsProps)
         dataTestId: 'send-button'
       }
     ];
-
-    if (rgbEnabled) {
-      if (canSendRgbUsdtToken) {
-        items.push({
-          key: 'send-usdt',
-          label: t('send_usdt'),
-          icon: 'usdt',
-          onClick: onRgbSendClick,
-          priority: 3,
-          dataTestId: 'send-usdt-button'
-        });
-      }
-    }
 
     items.push({
       key: 'history',
@@ -197,15 +149,12 @@ export const WalletActions = ({ chain, rgbEnabled = false }: WalletActionsProps)
   }, [
     accountCapabilities.canCreateSigningRequest,
     buyDisabled,
-    canSendRgbUsdtToken,
     handleUtxoClick,
     isFractal,
-    rgbEnabled,
     onHistoryClick,
     onReceiveClick,
     onSendClick,
     t,
-    wallet,
     walletConfig.disableUtxoTools
   ]);
 
@@ -226,7 +175,7 @@ export const WalletActions = ({ chain, rgbEnabled = false }: WalletActionsProps)
 
   useEffect(() => {
     setShowOverflowActions(false);
-  }, [chain.enum, overflowActions.length, rgbEnabled]);
+  }, [chain.enum, overflowActions.length]);
 
   const renderActionButton = (action: WalletActionItem, location: 'primary' | 'overflow') => {
     return (

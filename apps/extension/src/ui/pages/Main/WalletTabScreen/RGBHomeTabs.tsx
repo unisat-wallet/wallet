@@ -5,6 +5,7 @@ import { BottomModal } from '@/ui/components/BottomModal';
 import { Tabs } from '@/ui/components/Tabs';
 import {
   useI18n,
+  useCurrentAccountCapabilities,
   useNavigation,
   useRGBListLogic,
   useRGBTransfersLogic,
@@ -16,6 +17,7 @@ import { RGBTransferListItem } from '../../RGB/components/RGBTransferListItem';
 import { RGBList } from './RGBList';
 import { RGBTransfersList } from './RGBTransfersList';
 import { RgbReceiveSelectorModal } from './RgbReceiveSelectorModal';
+import { RgbSendAssetSelectorModal } from './RgbSendAssetSelectorModal';
 
 type RGBHomeTabKey = 'assets' | 'transfers';
 
@@ -28,8 +30,10 @@ type RGBHomeTabsProps = {
 export function RGBHomeTabs({ initialTab = 'assets', transfers, list }: RGBHomeTabsProps) {
   const { t } = useI18n();
   const nav = useNavigation();
+  const accountCapabilities = useCurrentAccountCapabilities();
   const [activeKey, setActiveKey] = useState<RGBHomeTabKey>(initialTab);
   const [receiveSelectorOpen, setReceiveSelectorOpen] = useState(false);
+  const [sendSelectorOpen, setSendSelectorOpen] = useState(false);
   const [actionMenuOpen, setActionMenuOpen] = useState(false);
   const [selectedPendingTransfer, setSelectedPendingTransfer] = useState<RgbTransferItem>();
   const [handledTransferIds, setHandledTransferIds] = useState<Set<string>>(() => new Set());
@@ -65,11 +69,22 @@ export function RGBHomeTabs({ initialTab = 'assets', transfers, list }: RGBHomeT
             <Row fullX itemsCenter gap="sm">
               <Button
                 text={t('receive_rgb')}
-                preset="primary"
+                preset="brc20-action"
+                icon="receive"
                 full
                 style={{ minHeight: 44, height: 44 }}
                 onClick={() => setReceiveSelectorOpen(true)}
                 data-testid="receive-rgb-button"
+              />
+              <Button
+                text={t('send')}
+                preset="brc20-action"
+                icon="send"
+                full
+                style={{ minHeight: 44, height: 44 }}
+                disabled={!accountCapabilities.canCreateSigningRequest}
+                onClick={() => setSendSelectorOpen(true)}
+                data-testid="send-rgb-button"
               />
               <div
                 role="button"
@@ -108,7 +123,7 @@ export function RGBHomeTabs({ initialTab = 'assets', transfers, list }: RGBHomeT
         children: <RGBTransfersList transfers={transfers} />
       }
     ],
-    [list, nav, t, transfers]
+    [accountCapabilities.canCreateSigningRequest, list, nav, t, transfers]
   );
 
   return (
@@ -173,6 +188,16 @@ export function RGBHomeTabs({ initialTab = 'assets', transfers, list }: RGBHomeT
           onCreateInvoice={() => {
             setReceiveSelectorOpen(false);
             nav.navigate('RGBReceiveScreen', { initialStep: 'create_invoice' });
+          }}
+        />
+      )}
+      {sendSelectorOpen && (
+        <RgbSendAssetSelectorModal
+          list={list}
+          onClose={() => setSendSelectorOpen(false)}
+          onSelect={(asset) => {
+            setSendSelectorOpen(false);
+            nav.navigate('SendRGBScreen', { assetId: asset.assetId, tokenBalance: asset });
           }}
         />
       )}
