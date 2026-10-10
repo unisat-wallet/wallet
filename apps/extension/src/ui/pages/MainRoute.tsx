@@ -61,6 +61,7 @@ import RGBIssueScreen from './RGB/RGBIssueScreen';
 import RGBReceiveScreen from './RGB/RGBReceiveScreen';
 import RGBSendCompleteScreen from './RGB/RGBSendCompleteScreen';
 import RGBTransferDetailScreen from './RGB/RGBTransferDetailScreen';
+import RGBTransfersScreen from './RGB/RGBTransfersScreen';
 import RGBTokenScreen from './RGB/RGBTokenScreen';
 import SendRGBScreen from './RGB/SendRGBScreen';
 import RunesTokenScreen from './Runes/RunesTokenScreen';
@@ -360,6 +361,10 @@ export const routes = {
     path: '/rgb/history',
     element: <RGBHistoryScreen />
   },
+  RGBTransfersScreen: {
+    path: '/rgb/transfers',
+    element: <RGBTransfersScreen />
+  },
 
   BabylonStakingScreen: {
     path: '/babylon/staking',
@@ -580,7 +585,7 @@ const Main = () => {
   }, [init]);
 
   useEffect(() => {
-    const refreshRgbRoutes = () => setRgbRecoveryGeneration(generation => generation + 1);
+    const refreshRgbRoutes = () => setRgbRecoveryGeneration((generation) => generation + 1);
     window.addEventListener('rgb-recovery-resolved', refreshRgbRoutes);
     return () => window.removeEventListener('rgb-recovery-resolved', refreshRgbRoutes);
   }, []);

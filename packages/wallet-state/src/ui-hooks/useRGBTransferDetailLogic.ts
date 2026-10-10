@@ -166,7 +166,7 @@ export function useRGBTransferDetailLogic() {
   }, [transfer])
 
   const onClickDone = () => {
-    nav.navigate('AssetsTabScreen', { rgbHomeTab: 'transfers' })
+    nav.navigate('RGBTransfersScreen')
   }
 
   const onClickExploreTx = () => {

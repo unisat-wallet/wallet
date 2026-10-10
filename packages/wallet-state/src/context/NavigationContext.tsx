@@ -26,19 +26,11 @@ export type RouteParamList = {
     fromColdWallet?: boolean
   }
 
-  MainScreen:
-    | {
-        rgbHomeTab?: 'assets' | 'transfers'
-      }
-    | undefined
+  MainScreen: undefined
 
   // tabs
   WalletTabScreen: undefined
-  AssetsTabScreen:
-    | {
-        rgbHomeTab?: 'assets' | 'transfers'
-      }
-    | undefined
+  AssetsTabScreen: undefined
   AppTabScreen: undefined
   TabMainScreen: undefined
   DiscoverTabScreen: undefined
@@ -198,6 +190,7 @@ export type RouteParamList = {
   // RGB
   RGBIssueScreen: undefined
   RGBHistoryScreen: undefined
+  RGBTransfersScreen: undefined
   RGBReceiveScreen: {
     assetId?: string
     tokenBalance?: RgbBalance

@@ -76,7 +76,6 @@ export default function WalletTabScreen({ screen = 'home' }: { screen?: 'home' |
   const [showVersionNotice, setShowVersionNotice] = useState<VersionDetail | null>(null);
 
   const nav = useNavigation();
-  const mainRouteState = nav.getRouteState<'AssetsTabScreen'>();
   const isUnlocked = useIsUnlocked();
 
   useEffect(() => {
@@ -173,7 +172,6 @@ export default function WalletTabScreen({ screen = 'home' }: { screen?: 'home' |
 
   const isRgbActive = supportedAssets.assets.rgb && rgbFeatureEnabled;
   const isRgbAssetTab = screen === 'assets' && assetTabKey === AssetTabKey.RGB;
-  const [rgbHomeTab, setRgbHomeTab] = useState<'assets' | 'transfers'>(mainRouteState?.rgbHomeTab || 'assets');
   const rgbList = useRGBListLogic({
     autoRefresh: true,
     enabled: isRgbActive && isRgbAssetTab,
@@ -228,12 +226,7 @@ export default function WalletTabScreen({ screen = 'home' }: { screen?: 'home' |
         key: AssetTabKey.RGB,
         label: t('rgb'),
         children: isRgbActive ? (
-          <RGBHomeTabs
-            key={`${chain.enum}:${currentAccount.key}`}
-            initialTab={rgbHomeTab}
-            transfers={rgbTransfers}
-            list={rgbList}
-          />
+          <RGBHomeTabs key={`${chain.enum}:${currentAccount.key}`} transfers={rgbTransfers} list={rgbList} />
         ) : (
           <Column itemsCenter gap="md">
             <Text text={t('rgb_assets')} color="white_muted" />
@@ -259,7 +252,7 @@ export default function WalletTabScreen({ screen = 'home' }: { screen?: 'home' |
       });
     }
     return items;
-  }, [supportedAssets.key, t, assetTabKey, isRgbActive, rgbHomeTab, rgbTransfers, rgbList, rgbRemoteRecoveryAvailable]);
+  }, [supportedAssets.key, t, assetTabKey, isRgbActive, rgbTransfers, rgbList, rgbRemoteRecoveryAvailable]);
 
   const finalAssetTabKey = useMemo(() => {
     if (!supportedAssets.tabKeys.includes(assetTabKey)) {
@@ -271,12 +264,6 @@ export default function WalletTabScreen({ screen = 'home' }: { screen?: 'home' |
   const [switchChainModalVisible, setSwitchChainModalVisible] = useState(false);
   const [moreSheetOpen, setMoreSheetOpen] = useState(false);
 
-  useEffect(() => {
-    if (mainRouteState?.rgbHomeTab) {
-      setRgbHomeTab(mainRouteState.rgbHomeTab);
-      dispatch(uiActions.updateAssetTabScreen({ assetTabKey: AssetTabKey.RGB }));
-    }
-  }, [mainRouteState?.rgbHomeTab, dispatch]);
   const [moreSheetSelection, setMoreSheetSelection] = useState<MoreAssetTabKey | undefined>(undefined);
 
   const mainContent = (
@@ -330,7 +317,8 @@ export default function WalletTabScreen({ screen = 'home' }: { screen?: 'home' |
             onClick={() => {
               navigate('SwitchKeyringScreen');
             }}
-            data-testid="wallet-management-entry">
+            data-testid="wallet-management-entry"
+          >
             <Text
               text={
                 currentKeyring.type === KeyringType.ColdWalletKeyring
@@ -371,10 +359,7 @@ export default function WalletTabScreen({ screen = 'home' }: { screen?: 'home' |
           />
         ) : null}
         {screen === 'home' && (
-          <RgbRecoveryConflictModal
-            key={`${chain.enum}:${currentAccount.address}`}
-            enabled={isRgbActive}
-          />
+          <RgbRecoveryConflictModal key={`${chain.enum}:${currentAccount.address}`} enabled={isRgbActive} />
         )}
         {screen === 'assets' && moreSheetOpen ? (
           <MoreActionSheet
