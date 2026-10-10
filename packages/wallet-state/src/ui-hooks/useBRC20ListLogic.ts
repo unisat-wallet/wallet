@@ -1,7 +1,9 @@
 import { TickPriceItem, TokenBalance } from '@unisat/wallet-shared'
 import { useEffect, useRef, useState } from 'react'
 import {
+  AssetTabKey,
   OrdinalsAssetTabKey,
+  useAssetTabKey,
   useChainType,
   useCurrentAccount,
   useNavigation,
@@ -55,7 +57,9 @@ export function useBRC20ListLogic() {
   })
 
   const tabKey = useOrdinalsAssetTabKey()
-  const isFocus = tabKey === OrdinalsAssetTabKey.BRC20
+  const assetTabKey = useAssetTabKey()
+  const isFocus = assetTabKey === AssetTabKey.BRC20 &&
+    (tabKey === OrdinalsAssetTabKey.BRC20 || tabKey === OrdinalsAssetTabKey.ALL)
   const lastRefreshTimeRef = useRef<number>(0)
   const walletTabFocusRefresh = useWallTabFocusRefresh()
   useEffect(() => {

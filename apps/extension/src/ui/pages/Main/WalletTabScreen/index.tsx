@@ -40,6 +40,7 @@ import { RGBTransferNotificationPanel } from '../../RGB/components/RGBTransferNo
 import { RgbFeatureActivationModal } from '../../RGB/components/RgbFeatureActivationModal';
 import { SwitchChainModal } from '../../Settings/SwitchChainModal';
 import { MoreActionSheet } from './MoreActionSheet';
+import { BRC20Tab } from './BRC20Tab';
 import { MoreTab } from './MoreTab';
 import { OrdinalsTab } from './OrdinalsTab';
 import { RGBHomeTabs } from './RGBHomeTabs';
@@ -203,6 +204,14 @@ export default function WalletTabScreen({ screen = 'home' }: { screen?: 'home' |
         key: AssetTabKey.ORDINALS,
         label: t('ordinals'),
         children: <OrdinalsTab />
+      });
+    }
+
+    if (supportedAssets.assets.brc20) {
+      items.push({
+        key: AssetTabKey.BRC20,
+        label: 'BRC20',
+        children: <BRC20Tab />
       });
     }
 

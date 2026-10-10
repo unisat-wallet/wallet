@@ -81,11 +81,11 @@ export function Tabs({ preset, items, defaultActiveKey, activeKey, onTabClick }:
             backgroundColor: '#070606',
             ...bleedStyle
           }}>
-          <Row style={{ padding: 0, height: 50, gap: spacing.medium, paddingLeft: spacing.medium, paddingRight: spacing.medium }}>
+          <Row style={{ padding: 0, height: 50, gap: spacing.medium, paddingLeft: spacing.medium, paddingRight: spacing.medium, overflowX: 'auto' }}>
             {items.map((item) => {
               const isActiveItem = item.key === activeTab;
               return (
-                <Row key={item.key} onClick={() => onTabClick(item.key)} data-testid={`tab-item-${item.key}`}>
+                <Row key={item.key} style={{ flexShrink: 0 }} onClick={() => onTabClick(item.key)} data-testid={`tab-item-${item.key}`}>
                   <Column gap="zero" justifyCenter itemsCenter>
                     {typeof item.label === 'string' ? (
                       <Text text={item.label} color={isActiveItem ? 'gold' : 'textDim'} size="md" />

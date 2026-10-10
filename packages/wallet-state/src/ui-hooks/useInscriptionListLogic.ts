@@ -2,11 +2,11 @@ import { Inscription } from '@unisat/wallet-shared'
 
 import { useEffect, useRef } from 'react'
 import {
-  OrdinalsAssetTabKey,
+  AssetTabKey,
+  useAssetTabKey,
   useChainType,
   useCurrentAccount,
   useNavigation,
-  useOrdinalsAssetTabKey,
   useWallet,
   useWallTabFocusRefresh,
 } from '..'
@@ -40,8 +40,8 @@ export function useInscriptionListLogic() {
     dependencies: [currentAccount.address, chainType],
   })
 
-  const tabKey = useOrdinalsAssetTabKey()
-  const isFocus = tabKey === OrdinalsAssetTabKey.ALL
+  const tabKey = useAssetTabKey()
+  const isFocus = tabKey === AssetTabKey.ORDINALS
   const lastRefreshTimeRef = useRef<number>(0)
   const walletTabFocusRefresh = useWallTabFocusRefresh()
   useEffect(() => {

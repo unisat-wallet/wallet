@@ -1,10 +1,11 @@
 import { colors } from '@/ui/theme/colors';
-import { TabOption, useHasNewBanner, useNavigation, useUnreadNotificationsCount } from '@unisat/wallet-state';
+import { TabOption, useHasNewBanner, useI18n, useNavigation, useUnreadNotificationsCount } from '@unisat/wallet-state';
 
 import { BaseView } from '../BaseView';
 import { Column } from '../Column';
 import { Grid } from '../Grid';
 import { Icon, IconTypes } from '../Icon';
+import { Text } from '../Text';
 import { UnreadDot } from '../UnreadDot';
 
 export function NavTabBar({ tab }: { tab: TabOption }) {
@@ -30,6 +31,7 @@ function TabButton({
   'data-testid'?: string;
 }) {
   const nav = useNavigation();
+  const { t } = useI18n();
   const hasNewBanner = useHasNewBanner();
   const unreadNotificationCount = useUnreadNotificationsCount();
 
@@ -37,7 +39,8 @@ function TabButton({
     <Column
       justifyCenter
       itemsCenter
-      onClick={(e) => {
+      style={{ gap: 4, minWidth: 0, cursor: 'pointer' }}
+      onClick={() => {
         if (tabName === 'home') {
           nav.navigate('MainScreen');
         } else if (tabName === 'assets') {
@@ -49,11 +52,12 @@ function TabButton({
         }
       }}
       data-testid={dataTestId}>
-      <Icon size={20} icon={icon} color={isActive ? 'white' : 'white_muted'} />
-      <BaseView style={{ position: 'relative' }}>
-        {tabName === 'discover' && hasNewBanner && <UnreadDot top={-28} right={-10} />}
-        {tabName === 'settings' && unreadNotificationCount > 0 && <UnreadDot top={-28} right={-10} />}
+      <BaseView style={{ position: 'relative', width: 20, height: 20 }}>
+        <Icon size={20} icon={icon} color={isActive ? 'white' : 'white_muted'} />
+        {tabName === 'discover' && hasNewBanner && <UnreadDot top={-3} right={-5} />}
+        {tabName === 'settings' && unreadNotificationCount > 0 && <UnreadDot top={-3} right={-5} />}
       </BaseView>
+      <Text text={t(tabName)} size="xs" color={isActive ? 'white' : 'white_muted'} textCenter max1Lines />
     </Column>
   );
 }

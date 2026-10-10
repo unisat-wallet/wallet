@@ -205,6 +205,7 @@ export function getSupportedAssets(
 
   const assets = {
     ordinals: false,
+    brc20: false,
     runes: false,
     alkanes: false,
     rgb: false,
@@ -215,6 +216,9 @@ export function getSupportedAssets(
 
   assets.ordinals = true
   assetTabKeys.push(AssetTabKey.ORDINALS)
+
+  assets.brc20 = true
+  assetTabKeys.push(AssetTabKey.BRC20)
 
   assets.runes = true
   assetTabKeys.push(AssetTabKey.RUNES)

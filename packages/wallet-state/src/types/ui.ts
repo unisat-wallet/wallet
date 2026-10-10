@@ -4,6 +4,7 @@ export enum AssetTabKey {
   RUNES = 2,
   MORE = 4,
   RGB = 5,
+  BRC20 = 6,
 }
 
 export enum WalletView {
