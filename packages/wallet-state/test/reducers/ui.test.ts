@@ -5,6 +5,12 @@ import ui, { initialState } from '../../src/reducers/ui'
 import { AssetTabKey, MoreAssetTabKey, WalletView } from '../../src/types/ui'
 
 describe('ui reducer', () => {
+  it('defaults to BRC20 and preserves a selected Ordinals tab on refresh', () => {
+    expect(ui(undefined, { type: '@@INIT' }).assetTabKey).toBe(AssetTabKey.BRC20)
+    const refreshed = ui({ ...initialState, assetTabKey: AssetTabKey.ORDINALS }, updateVersion())
+    expect(refreshed.assetTabKey).toBe(AssetTabKey.ORDINALS)
+  })
+
   it('migrates the legacy More > RGB selection back to Alkanes', () => {
     const state = ui(
       {

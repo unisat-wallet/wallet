@@ -62,7 +62,7 @@ export interface UIState {
 }
 
 export const initialState: UIState = {
-  assetTabKey: AssetTabKey.ORDINALS,
+  assetTabKey: AssetTabKey.BRC20,
   ordinalsAssetTabKey: OrdinalsAssetTabKey.ALL,
   alkanesAssetTabKey: AlkanesAssetTabKey.TOKEN,
   moreAssetTabKey: MoreAssetTabKey.ALKANES_TOKEN,
@@ -293,8 +293,8 @@ const slice: Slice<UIState> = createSlice({
   extraReducers: builder => {
     builder.addCase(updateVersion, state => {
       // todo
-      if (!state.assetTabKey) {
-        state.assetTabKey = AssetTabKey.ORDINALS
+      if (state.assetTabKey == null) {
+        state.assetTabKey = AssetTabKey.BRC20
       }
       if (!state.ordinalsAssetTabKey) {
         state.ordinalsAssetTabKey = OrdinalsAssetTabKey.ALL

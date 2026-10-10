@@ -198,19 +198,19 @@ export default function WalletTabScreen({ screen = 'home' }: { screen?: 'home' |
       label: string | JSX.Element;
       children: JSX.Element;
     }[] = [];
-    if (supportedAssets.assets.ordinals) {
-      items.push({
-        key: AssetTabKey.ORDINALS,
-        label: t('ordinals'),
-        children: <OrdinalsTab />
-      });
-    }
-
     if (supportedAssets.assets.brc20) {
       items.push({
         key: AssetTabKey.BRC20,
         label: 'BRC20',
         children: <BRC20Tab />
+      });
+    }
+
+    if (supportedAssets.assets.ordinals) {
+      items.push({
+        key: AssetTabKey.ORDINALS,
+        label: t('ordinals'),
+        children: <OrdinalsTab />
       });
     }
 
@@ -256,7 +256,7 @@ export default function WalletTabScreen({ screen = 'home' }: { screen?: 'home' |
 
   const finalAssetTabKey = useMemo(() => {
     if (!supportedAssets.tabKeys.includes(assetTabKey)) {
-      return AssetTabKey.ORDINALS;
+      return supportedAssets.assets.brc20 ? AssetTabKey.BRC20 : supportedAssets.tabKeys[0] ?? AssetTabKey.BRC20;
     }
     return assetTabKey;
   }, [assetTabKey, supportedAssets.key]);
