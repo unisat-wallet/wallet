@@ -44,6 +44,7 @@ import BabylonStakingScreen from './Babylon/BabylonStakingScreen';
 import BabylonTxConfirmScreen from './Babylon/BabylonTxConfirmScreen';
 import SendBabyScreen from './Babylon/SendBabyScreen';
 import AppTabScrren from './Main/AppTabScreen';
+import AssetsTabScreen from './Main/AssetsTabScreen';
 import BoostScreen from './Main/BoostScreen';
 import DiscoverTabScreen from './Main/DiscoverTabScreen';
 import SettingsTabScreen from './Main/SettingsTabScreen';
@@ -106,6 +107,10 @@ export const routes = {
   MainScreen: {
     path: '/main',
     element: <WalletTabScreen />
+  },
+  AssetsTabScreen: {
+    path: '/assets',
+    element: <AssetsTabScreen />
   },
   DiscoverTabScreen: {
     path: '/discover',

@@ -34,6 +34,11 @@ export type RouteParamList = {
 
   // tabs
   WalletTabScreen: undefined
+  AssetsTabScreen:
+    | {
+        rgbHomeTab?: 'assets' | 'transfers'
+      }
+    | undefined
   AppTabScreen: undefined
   TabMainScreen: undefined
   DiscoverTabScreen: undefined

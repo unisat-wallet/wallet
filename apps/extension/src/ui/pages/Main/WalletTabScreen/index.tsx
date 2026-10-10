@@ -9,7 +9,6 @@ import { NoticePopover } from '@/ui/components/NoticePopover';
 import { SwitchNetworkBar } from '@/ui/components/SwitchNetworkBar';
 import { Tabs } from '@/ui/components/Tabs';
 import { VersionNotice } from '@/ui/components/VersionNotice';
-import { spacingGap } from '@/ui/theme/spacing';
 import { getCurrentTab } from '@/ui/web/tabs';
 import { KeyringType } from '@unisat/keyring-service/types';
 import { VersionDetail } from '@unisat/wallet-shared';
@@ -53,7 +52,7 @@ import { WalletActions } from './components/WalletActions';
 
 const STORAGE_VERSION_KEY = 'version_detail';
 
-export default function WalletTabScreen() {
+export default function WalletTabScreen({ screen = 'home' }: { screen?: 'home' | 'assets' }) {
   const { t } = useI18n();
   const navigate = useNavigate();
 
@@ -75,7 +74,7 @@ export default function WalletTabScreen() {
   const [showVersionNotice, setShowVersionNotice] = useState<VersionDetail | null>(null);
 
   const nav = useNavigation();
-  const mainRouteState = nav.getRouteState<'MainScreen'>();
+  const mainRouteState = nav.getRouteState<'AssetsTabScreen'>();
   const isUnlocked = useIsUnlocked();
 
   useEffect(() => {
@@ -238,14 +237,13 @@ export default function WalletTabScreen() {
   }, [mainRouteState?.rgbHomeTab]);
   const [moreSheetSelection, setMoreSheetSelection] = useState<MoreAssetTabKey | undefined>(undefined);
 
-  const homeContent = (
+  const accountContent = (
     <>
       <AccountSelect />
 
-      <Column mt="md" gap="zero">
-        <Column gap="lg2">
+      {screen === 'home' ? (
+        <Column mt="md" gap="lg2">
           <HomeTips />
-
           <BalanceCardCarousel
             rgbList={rgbList}
             rgbFeatureEnabled={rgbFeatureEnabled}
@@ -253,11 +251,10 @@ export default function WalletTabScreen() {
             onRgbFeatureEnabled={onRgbFeatureEnabled}
           />
           <WalletActions chain={chain} walletView={isRgbView ? WalletView.RGB : WalletView.BITCOIN} />
-
           {!isRgbView ? <AnnouncementCard /> : null}
         </Column>
-
-        <Column style={{ marginTop: spacingGap.lg2 }}>
+      ) : (
+        <Column mt="md" gap="zero">
           {isRgbView ? (
             <RGBHomeTabs initialTab={rgbHomeTab} transfers={rgbTransfers} list={rgbList} />
           ) : (
@@ -280,7 +277,7 @@ export default function WalletTabScreen() {
             />
           )}
         </Column>
-      </Column>
+      )}
     </>
   );
 
@@ -321,7 +318,7 @@ export default function WalletTabScreen() {
       />
 
       <Content>
-        {homeContent}
+        {accountContent}
         {isRgbView ? (
           <RGBTransferNotificationPanel
             notification={rgbTransfers.notification}
@@ -338,11 +335,13 @@ export default function WalletTabScreen() {
             }}
           />
         ) : null}
-        <RgbRecoveryConflictModal
-          key={`${chain.enum}:${currentAccount.address}`}
-          enabled={isRgbView}
-        />
-        {!isRgbView && moreSheetOpen ? (
+        {screen === 'home' && (
+          <RgbRecoveryConflictModal
+            key={`${chain.enum}:${currentAccount.address}`}
+            enabled={isRgbView}
+          />
+        )}
+        {screen === 'assets' && !isRgbView && moreSheetOpen ? (
           <MoreActionSheet
             currentSelection={moreSheetSelection}
             onClose={() => setMoreSheetOpen(false)}
@@ -357,7 +356,7 @@ export default function WalletTabScreen() {
             }}
           />
         ) : null}
-        {showSafeNotice && (
+        {screen === 'home' && showSafeNotice && (
           <NoticePopover
             onClose={() => {
               wallet.setShowSafeNotice(false);
@@ -373,7 +372,7 @@ export default function WalletTabScreen() {
           />
         )}
 
-        {showVersionNotice && (
+        {screen === 'home' && showVersionNotice && (
           <VersionNotice
             notice={showVersionNotice}
             onClose={() => {
@@ -383,7 +382,7 @@ export default function WalletTabScreen() {
         )}
       </Content>
       <Footer px="zero" py="zero">
-        <NavTabBar tab="home" />
+        <NavTabBar tab={screen} />
       </Footer>
     </Layout>
   );

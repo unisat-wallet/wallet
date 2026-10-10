@@ -9,8 +9,9 @@ import { UnreadDot } from '../UnreadDot';
 
 export function NavTabBar({ tab }: { tab: TabOption }) {
   return (
-    <Grid columns={3} style={{ width: '100%', height: '67.5px', backgroundColor: colors.bg2 }}>
+    <Grid columns={4} style={{ width: '100%', height: '67.5px', backgroundColor: colors.bg2 }}>
       <TabButton tabName="home" icon="unisat" isActive={tab === 'home'} data-testid="tab-home" />
+      <TabButton tabName="assets" icon="assets" isActive={tab === 'assets'} data-testid="tab-assets" />
       <TabButton tabName="discover" icon="compass" isActive={tab === 'discover'} data-testid="tab-discover" />
       <TabButton tabName="settings" icon="settings" isActive={tab === 'settings'} data-testid="tab-settings" />
     </Grid>
@@ -39,6 +40,8 @@ function TabButton({
       onClick={(e) => {
         if (tabName === 'home') {
           nav.navigate('MainScreen');
+        } else if (tabName === 'assets') {
+          nav.navigate('AssetsTabScreen');
         } else if (tabName === 'discover') {
           nav.navigate('DiscoverTabScreen');
         } else if (tabName === 'settings') {

@@ -33,6 +33,18 @@ const confirmingReceive = {
 }
 
 describe('useRGBTransferDetailLogic', () => {
+  it('returns to the transfers list on the assets tab', async () => {
+    const { wrapper, navigation } = createHookTestHarness({
+      routeState: { transferId: 'recipient-id', initialTransfer: pendingReceive },
+    })
+    const { result } = renderHook(() => useRGBTransferDetailLogic(), { wrapper })
+
+    await waitFor(() => expect(result.current.transfer).toBeDefined())
+    act(() => result.current.onClickDone())
+
+    expect(navigation.navigate).toHaveBeenCalledWith('AssetsTabScreen', { rgbHomeTab: 'transfers' })
+  })
+
   it('accepts a pending receive using its recipient ID', async () => {
     const { wrapper, wallet } = createHookTestHarness({
       routeState: { transferId: 'recipient-id', initialTransfer: pendingReceive },
