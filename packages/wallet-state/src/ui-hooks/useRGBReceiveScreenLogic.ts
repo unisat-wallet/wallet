@@ -300,7 +300,7 @@ export function useRGBReceiveScreenLogic(
   const tools = useTools()
   const { t } = useI18n()
   const { feeRate } = useFeeRateBar()
-  const { items: rgbItems = [], loading: rgbLoading } = useRGBListLogic()
+  const { items: rgbItems = [], loading: rgbLoading } = useRGBListLogic({ focused: true })
   const rgbWallet = wallet as typeof wallet & RgbAllocationWallet & RgbReceiveWallet
   const routeState = nav.getRouteState<'RGBReceiveScreen'>() as RGBReceiveRouteState
   const routeAssetId = routeState?.assetId || ''

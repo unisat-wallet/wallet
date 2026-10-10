@@ -76,7 +76,7 @@ export default function RGBInvoiceDetailScreen() {
   const nav = useNavigation();
   const tools = useTools();
   const { t } = useI18n();
-  const { items: rgbItems = [] } = useRGBListLogic();
+  const { items: rgbItems = [] } = useRGBListLogic({ focused: true });
   const { requestWrite, writeLeaseModal } = useRgbWriteLeaseGuard();
   const { recipientId, invoice: routeInvoice, initialInvoice } = nav.getRouteState<'RGBInvoiceDetailScreen'>();
   const routePendingInvoice = initialInvoice as RgbPendingReceiveInvoice | undefined;

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 
-import { Card, Column, Content, Footer, Header, Icon, Layout, Row, Text } from '@/ui/components';
+import { Button, Card, Column, Content, Footer, Header, Icon, Layout, Row, Text } from '@/ui/components';
 import AccountSelect from '@/ui/components/AccountSelect';
 import { FeeRateIcon } from '@/ui/components/FeeRateIcon';
 import LoadingPage from '@/ui/components/LoadingPage';
@@ -16,7 +16,6 @@ import '@unisat/wallet-state';
 import {
   AssetTabKey,
   MoreAssetTabKey,
-  WalletView,
   uiActions,
   useAppDispatch,
   useAssetTabKey,
@@ -30,14 +29,15 @@ import {
   useRGBListLogic,
   useRGBTransfersLogic,
   useSupportedAssets,
+  useTools,
   useVersionInfo,
-  useWallet,
-  useWalletView
+  useWallet
 } from '@unisat/wallet-state';
 
 import { useNavigate } from '../../MainRoute';
 import { RgbRecoveryConflictModal } from '../../RGB/components/RgbRecoveryConflictModal';
 import { RGBTransferNotificationPanel } from '../../RGB/components/RGBTransferNotificationPanel';
+import { RgbFeatureActivationModal } from '../../RGB/components/RgbFeatureActivationModal';
 import { SwitchChainModal } from '../../Settings/SwitchChainModal';
 import { MoreActionSheet } from './MoreActionSheet';
 import { MoreTab } from './MoreTab';
@@ -46,7 +46,7 @@ import { RGBHomeTabs } from './RGBHomeTabs';
 import { RunesList } from './RunesList';
 import { SidePanelExpand } from './SidePanelExpand';
 import { AnnouncementCard } from './components/AnnouncementCard';
-import { BalanceCardCarousel } from './components/BalanceCardCarousel';
+import { BalanceCard } from './components/BalanceCard';
 import { HomeTips } from './components/HomeTips';
 import { WalletActions } from './components/WalletActions';
 
@@ -66,7 +66,7 @@ export default function WalletTabScreen({ screen = 'home' }: { screen?: 'home' |
   const dispatch = useAppDispatch();
   const assetTabKey = useAssetTabKey();
   const moreAssetTabKey = useMoreAssetTabKey();
-  const walletView = useWalletView();
+  const tools = useTools();
 
   const versionInfo = useVersionInfo();
 
@@ -133,20 +133,19 @@ export default function WalletTabScreen({ screen = 'home' }: { screen?: 'home' |
 
   const supportedAssets = useSupportedAssets();
   const [rgbFeatureEnabled, setRgbFeatureEnabled] = useState(false);
-  const [rgbFeatureReady, setRgbFeatureReady] = useState(false);
   const [rgbRemoteRecoveryAvailable, setRgbRemoteRecoveryAvailable] = useState(false);
+  const [rgbActivationOpen, setRgbActivationOpen] = useState(false);
+  const [rgbActivationLoading, setRgbActivationLoading] = useState(false);
 
   useEffect(() => {
     let active = true;
     if (!supportedAssets.assets.rgb) {
       setRgbFeatureEnabled(false);
       setRgbRemoteRecoveryAvailable(false);
-      setRgbFeatureReady(true);
       return () => {
         active = false;
       };
     }
-    setRgbFeatureReady(false);
     void wallet
       .getRgbFeatureStatus()
       .then((status) => {
@@ -159,31 +158,39 @@ export default function WalletTabScreen({ screen = 'home' }: { screen?: 'home' |
           setRgbFeatureEnabled(false);
           setRgbRemoteRecoveryAvailable(false);
         }
-      })
-      .finally(() => {
-        if (active) setRgbFeatureReady(true);
       });
     return () => {
       active = false;
     };
   }, [chain.enum, currentAccount?.key, currentKeyring?.key, supportedAssets.assets.rgb, wallet]);
 
-  useEffect(() => {
-    if (rgbFeatureReady && !rgbFeatureEnabled && walletView === WalletView.RGB) {
-      dispatch(uiActions.setWalletView(WalletView.BITCOIN));
-    }
-  }, [dispatch, rgbFeatureEnabled, rgbFeatureReady, walletView]);
-
   const onRgbFeatureEnabled = useCallback(() => {
     setRgbFeatureEnabled(true);
-    setRgbFeatureReady(true);
     setRgbRemoteRecoveryAvailable(false);
-    dispatch(uiActions.setWalletView(WalletView.RGB));
-  }, [dispatch]);
+  }, []);
 
-  const isRgbView = walletView === WalletView.RGB && supportedAssets.assets.rgb && rgbFeatureEnabled;
-  const rgbList = useRGBListLogic({ autoRefresh: true, enabled: isRgbView });
-  const rgbTransfers = useRGBTransfersLogic({ enabled: isRgbView });
+  const isRgbActive = supportedAssets.assets.rgb && rgbFeatureEnabled;
+  const isRgbAssetTab = screen === 'assets' && assetTabKey === AssetTabKey.RGB;
+  const [rgbHomeTab, setRgbHomeTab] = useState<'assets' | 'transfers'>(mainRouteState?.rgbHomeTab || 'assets');
+  const rgbList = useRGBListLogic({
+    autoRefresh: true,
+    enabled: isRgbActive && isRgbAssetTab,
+    focused: isRgbAssetTab
+  });
+  const rgbTransfers = useRGBTransfersLogic({ enabled: isRgbActive });
+
+  const onEnableRgb = useCallback(async () => {
+    setRgbActivationLoading(true);
+    try {
+      await wallet.enableRgbFeature();
+      setRgbActivationOpen(false);
+      onRgbFeatureEnabled();
+    } catch (error) {
+      tools.toastError(error instanceof Error ? error.message : String(error));
+    } finally {
+      setRgbActivationLoading(false);
+    }
+  }, [onRgbFeatureEnabled, tools, wallet]);
 
   const tabItems = useMemo(() => {
     const items: {
@@ -206,6 +213,24 @@ export default function WalletTabScreen({ screen = 'home' }: { screen?: 'home' |
         children: <RunesList />
       });
     }
+    if (supportedAssets.assets.rgb) {
+      items.push({
+        key: AssetTabKey.RGB,
+        label: t('rgb'),
+        children: isRgbActive ? (
+          <RGBHomeTabs initialTab={rgbHomeTab} transfers={rgbTransfers} list={rgbList} />
+        ) : (
+          <Column itemsCenter gap="md">
+            <Text text={t('rgb_assets')} color="white_muted" />
+            <Button
+              text={t(rgbRemoteRecoveryAvailable ? 'restore_rgb' : 'enable_rgb')}
+              preset="primary"
+              onClick={() => setRgbActivationOpen(true)}
+            />
+          </Column>
+        )
+      });
+    }
     if (supportedAssets.assets.alkanes) {
       items.push({
         key: AssetTabKey.MORE,
@@ -219,7 +244,7 @@ export default function WalletTabScreen({ screen = 'home' }: { screen?: 'home' |
       });
     }
     return items;
-  }, [supportedAssets.key, t, assetTabKey]);
+  }, [supportedAssets.key, t, assetTabKey, isRgbActive, rgbHomeTab, rgbTransfers, rgbList, rgbRemoteRecoveryAvailable]);
 
   const finalAssetTabKey = useMemo(() => {
     if (!supportedAssets.tabKeys.includes(assetTabKey)) {
@@ -230,52 +255,46 @@ export default function WalletTabScreen({ screen = 'home' }: { screen?: 'home' |
 
   const [switchChainModalVisible, setSwitchChainModalVisible] = useState(false);
   const [moreSheetOpen, setMoreSheetOpen] = useState(false);
-  const [rgbHomeTab, setRgbHomeTab] = useState<'assets' | 'transfers'>(mainRouteState?.rgbHomeTab || 'assets');
 
   useEffect(() => {
-    if (mainRouteState?.rgbHomeTab) setRgbHomeTab(mainRouteState.rgbHomeTab);
-  }, [mainRouteState?.rgbHomeTab]);
+    if (mainRouteState?.rgbHomeTab) {
+      setRgbHomeTab(mainRouteState.rgbHomeTab);
+      dispatch(uiActions.updateAssetTabScreen({ assetTabKey: AssetTabKey.RGB }));
+    }
+  }, [mainRouteState?.rgbHomeTab, dispatch]);
   const [moreSheetSelection, setMoreSheetSelection] = useState<MoreAssetTabKey | undefined>(undefined);
 
-  const accountContent = (
+  const mainContent = (
     <>
-      <AccountSelect />
-
       {screen === 'home' ? (
-        <Column mt="md" gap="lg2">
-          <HomeTips />
-          <BalanceCardCarousel
-            rgbList={rgbList}
-            rgbFeatureEnabled={rgbFeatureEnabled}
-            rgbRemoteRecoveryAvailable={rgbRemoteRecoveryAvailable}
-            onRgbFeatureEnabled={onRgbFeatureEnabled}
-          />
-          <WalletActions chain={chain} walletView={isRgbView ? WalletView.RGB : WalletView.BITCOIN} />
-          {!isRgbView ? <AnnouncementCard /> : null}
-        </Column>
+        <>
+          <AccountSelect />
+          <Column mt="md" gap="lg2">
+            <HomeTips />
+            <BalanceCard />
+            <WalletActions chain={chain} rgbEnabled={isRgbActive} />
+            <AnnouncementCard />
+          </Column>
+        </>
       ) : (
         <Column mt="md" gap="zero">
-          {isRgbView ? (
-            <RGBHomeTabs initialTab={rgbHomeTab} transfers={rgbTransfers} list={rgbList} />
-          ) : (
-            <Tabs
-              defaultActiveKey={finalAssetTabKey as unknown as string}
-              activeKey={finalAssetTabKey as unknown as string}
-              items={tabItems as unknown as any[]}
-              onTabClick={(key) => {
-                if ((key as unknown as AssetTabKey) === AssetTabKey.MORE) {
-                  if (assetTabKey === AssetTabKey.MORE) {
-                    setMoreSheetSelection(moreAssetTabKey);
-                  } else {
-                    setMoreSheetSelection(undefined);
-                  }
-                  setMoreSheetOpen(true);
-                  return;
+          <Tabs
+            defaultActiveKey={finalAssetTabKey as unknown as string}
+            activeKey={finalAssetTabKey as unknown as string}
+            items={tabItems as unknown as any[]}
+            onTabClick={(key) => {
+              if ((key as unknown as AssetTabKey) === AssetTabKey.MORE) {
+                if (assetTabKey === AssetTabKey.MORE) {
+                  setMoreSheetSelection(moreAssetTabKey);
+                } else {
+                  setMoreSheetSelection(undefined);
                 }
-                dispatch(uiActions.updateAssetTabScreen({ assetTabKey: key as unknown as AssetTabKey }));
-              }}
-            />
-          )}
+                setMoreSheetOpen(true);
+                return;
+              }
+              dispatch(uiActions.updateAssetTabScreen({ assetTabKey: key as unknown as AssetTabKey }));
+            }}
+          />
         </Column>
       )}
     </>
@@ -318,8 +337,8 @@ export default function WalletTabScreen({ screen = 'home' }: { screen?: 'home' |
       />
 
       <Content>
-        {accountContent}
-        {isRgbView ? (
+        {mainContent}
+        {isRgbActive ? (
           <RGBTransferNotificationPanel
             notification={rgbTransfers.notification}
             actionText={t('view_transfer')}
@@ -338,10 +357,10 @@ export default function WalletTabScreen({ screen = 'home' }: { screen?: 'home' |
         {screen === 'home' && (
           <RgbRecoveryConflictModal
             key={`${chain.enum}:${currentAccount.address}`}
-            enabled={isRgbView}
+            enabled={isRgbActive}
           />
         )}
-        {screen === 'assets' && !isRgbView && moreSheetOpen ? (
+        {screen === 'assets' && moreSheetOpen ? (
           <MoreActionSheet
             currentSelection={moreSheetSelection}
             onClose={() => setMoreSheetOpen(false)}
@@ -356,6 +375,14 @@ export default function WalletTabScreen({ screen = 'home' }: { screen?: 'home' |
             }}
           />
         ) : null}
+        {rgbActivationOpen && (
+          <RgbFeatureActivationModal
+            loading={rgbActivationLoading}
+            recoveryAvailable={rgbRemoteRecoveryAvailable}
+            onClose={() => setRgbActivationOpen(false)}
+            onEnable={() => void onEnableRgb()}
+          />
+        )}
         {screen === 'home' && showSafeNotice && (
           <NoticePopover
             onClose={() => {

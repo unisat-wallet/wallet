@@ -6,7 +6,7 @@ import { getSupportedAssets } from '../../src/hooks/ui'
 import { AssetTabKey } from '../../src/types/ui'
 
 describe('getSupportedAssets', () => {
-  it('enables the RGB view for an HD wallet on an RGB-enabled network regardless of address type', () => {
+  it('shows the RGB asset tab for an HD wallet on an RGB-enabled network regardless of address type', () => {
     const p2wpkh = getSupportedAssets(
       ChainType.BITCOIN_TESTNET4,
       'tb1qxy2kgdygjrsqtzq2n0yrf2493p83kkfjhx0wlh',
@@ -20,8 +20,8 @@ describe('getSupportedAssets', () => {
 
     expect(p2wpkh.assets.rgb).toBe(true)
     expect(p2tr.assets.rgb).toBe(true)
-    expect(p2wpkh.tabKeys).not.toContain(AssetTabKey.RGB)
-    expect(p2tr.tabKeys).not.toContain(AssetTabKey.RGB)
+    expect(p2wpkh.tabKeys).toContain(AssetTabKey.RGB)
+    expect(p2tr.tabKeys).toContain(AssetTabKey.RGB)
   })
 
   it.each([KeyringType.SimpleKeyring, KeyringType.KeystoneKeyring, KeyringType.ColdWalletKeyring])(

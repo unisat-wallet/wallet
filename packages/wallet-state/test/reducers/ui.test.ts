@@ -32,6 +32,18 @@ describe('ui reducer', () => {
     expect(state.walletView).toBe(WalletView.RGB)
   })
 
+  it('keeps the RGB asset tab selected on refresh', () => {
+    const state = ui(
+      {
+        ...initialState,
+        assetTabKey: AssetTabKey.RGB,
+      },
+      updateVersion()
+    )
+
+    expect(state.assetTabKey).toBe(AssetTabKey.RGB)
+  })
+
   it('migrates the legacy More > Alkanes collection selection', () => {
     const state = ui(
       {

@@ -16,14 +16,15 @@ import { uiEventBus } from '../utils/eventBus'
 export function useRGBListLogic({
   autoRefresh = false,
   enabled = true,
-}: { autoRefresh?: boolean; enabled?: boolean } = {}) {
+  focused,
+}: { autoRefresh?: boolean; enabled?: boolean; focused?: boolean } = {}) {
   const nav = useNavigation()
   const wallet = useWallet()
   const currentKeyring = useCurrentKeyring()
   const currentAccount = useCurrentAccount()
   const chainType = useChainType()
   const walletView = useWalletView()
-  const isFocus = walletView === WalletView.RGB
+  const isFocus = focused ?? walletView === WalletView.RGB
   const [fundingAddress, setFundingAddress] = useState('')
   const [fundingBalance, setFundingBalance] = useState(0)
 

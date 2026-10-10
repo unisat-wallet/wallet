@@ -309,9 +309,6 @@ const slice: Slice<UIState> = createSlice({
       if (state.assetTabKey === (4 as AssetTabKey)) {
         state.assetTabKey = AssetTabKey.MORE
       }
-      if (state.assetTabKey === AssetTabKey.RGB) {
-        state.assetTabKey = AssetTabKey.ORDINALS
-      }
       if (state.walletView !== WalletView.RGB && state.walletView !== WalletView.BITCOIN) {
         state.walletView = WalletView.BITCOIN
       }

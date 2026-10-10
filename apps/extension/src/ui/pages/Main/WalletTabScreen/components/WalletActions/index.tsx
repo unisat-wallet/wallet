@@ -14,14 +14,13 @@ import {
   useResetUiTxCreateScreen,
   useRgbHomeDisplayMode,
   useWallet,
-  useWalletConfig,
-  WalletView
+  useWalletConfig
 } from '@unisat/wallet-state';
 import { ChainType } from '@unisat/wallet-types';
 
 interface WalletActionsProps {
   chain: TypeChain;
-  walletView?: WalletView;
+  rgbEnabled?: boolean;
 }
 
 type WalletActionItem = {
@@ -71,7 +70,7 @@ function findUsdtToken(items: Array<{ assetId?: string; ticker?: string; name?: 
   });
 }
 
-export const WalletActions = ({ chain, walletView = WalletView.BITCOIN }: WalletActionsProps) => {
+export const WalletActions = ({ chain, rgbEnabled = false }: WalletActionsProps) => {
   const [showOverflowActions, setShowOverflowActions] = useState(false);
   const isFractal = chain.isFractal;
   const nav = useNavigation();
@@ -84,7 +83,6 @@ export const WalletActions = ({ chain, walletView = WalletView.BITCOIN }: Wallet
   const address = useCurrentAddress();
   const { t } = useI18n();
   const accountCapabilities = useCurrentAccountCapabilities();
-  const isRgbView = walletView === WalletView.RGB;
   const { canSendRgbUsdtToken } = useRgbHomeDisplayMode();
 
   const handleUtxoClick = () => {
@@ -92,52 +90,40 @@ export const WalletActions = ({ chain, walletView = WalletView.BITCOIN }: Wallet
   };
 
   const onReceiveClick = () => {
-    if (isRgbView) {
-      nav.navigate('RGBReceiveScreen', {});
-      return;
-    }
-
     nav.navigate('ReceiveScreen');
   };
 
-  const onSendClick = async () => {
-    if (isRgbView) {
-      const fallbackToken = {
-        assetId: '',
-        ticker: 'USDT',
-        name: 'USDT',
-        spendable: '0',
-        balance: '0',
-        amount: '0'
-      };
-      let tokenBalance = fallbackToken;
-      try {
-        const { list } = await wallet.getRGBList('', 1, 20, { skipSync: true });
-        const usdtToken = findUsdtToken(list || []);
-        if (usdtToken) {
-          tokenBalance = usdtToken as typeof fallbackToken;
-        }
-      } catch {
-        // Keep the USDT fallback when the lightweight list fetch fails.
-      }
-      nav.navigate('SendRGBScreen', {
-        assetId: tokenBalance.assetId || '',
-        tokenBalance
-      });
-      return;
-    }
+  const onRgbReceiveClick = () => nav.navigate('RGBReceiveScreen', {});
 
+  const onRgbSendClick = async () => {
+    const fallbackToken = {
+      assetId: '',
+      ticker: 'USDT',
+      name: 'USDT',
+      spendable: '0',
+      balance: '0',
+      amount: '0'
+    };
+    let tokenBalance = fallbackToken;
+    try {
+      const { list } = await wallet.getRGBList('', 1, 20, { skipSync: true });
+      const usdtToken = findUsdtToken(list || []);
+      if (usdtToken) {
+        tokenBalance = usdtToken as typeof fallbackToken;
+      }
+    } catch {
+      // Keep the USDT fallback when the lightweight list fetch fails.
+    }
+    nav.navigate('SendRGBScreen', { assetId: tokenBalance.assetId || '', tokenBalance });
+  };
+
+  const onSendClick = () => {
     resetUiTxCreateScreen();
     resetFeeRateBar();
     nav.navigate('TxCreateScreen');
   };
 
   const onHistoryClick = () => {
-    if (isRgbView) {
-      nav.navigate('RGBHistoryScreen');
-      return;
-    }
-
     nav.navToExplorerAddress(address);
   };
 
@@ -148,41 +134,6 @@ export const WalletActions = ({ chain, walletView = WalletView.BITCOIN }: Wallet
   const buyDisabled = chainType !== ChainType.BITCOIN_MAINNET && chainType !== ChainType.FRACTAL_BITCOIN_MAINNET;
 
   const actionItems = useMemo<WalletActionItem[]>(() => {
-    if (isRgbView) {
-      const items: WalletActionItem[] = [
-        {
-          key: 'receive-rgb',
-          label: t('receive'),
-          icon: 'rgb',
-          onClick: onReceiveClick,
-          priority: 1,
-          dataTestId: 'receive-rgb-button'
-        },
-        {
-          key: 'issue',
-          label: t('issue'),
-          icon: 'issue',
-          onClick: onIssueClick,
-          priority: 4,
-          overflowPreset: 'homeGold',
-          dataTestId: 'issue-button'
-        }
-      ];
-
-      if (canSendRgbUsdtToken) {
-        items.splice(1, 0, {
-          key: 'send-usdt',
-          label: t('send'),
-          icon: 'usdt',
-          onClick: onSendClick,
-          priority: 2,
-          dataTestId: 'send-usdt-button'
-        });
-      }
-
-      return items;
-    }
-
     const items: WalletActionItem[] = [
       {
         key: 'receive',
@@ -203,12 +154,51 @@ export const WalletActions = ({ chain, walletView = WalletView.BITCOIN }: Wallet
       }
     ];
 
+    if (rgbEnabled) {
+      items.push({
+        key: 'receive-rgb',
+        label: t('receive_rgb'),
+        icon: 'rgb',
+        onClick: onRgbReceiveClick,
+        priority: 3,
+        dataTestId: 'receive-rgb-button'
+      });
+      if (canSendRgbUsdtToken) {
+        items.push({
+          key: 'send-usdt',
+          label: t('send_usdt'),
+          icon: 'usdt',
+          onClick: onRgbSendClick,
+          priority: 4,
+          dataTestId: 'send-usdt-button'
+        });
+      }
+      items.push({
+        key: 'issue',
+        label: t('issue'),
+        icon: 'issue',
+        onClick: onIssueClick,
+        priority: 6,
+        overflowPreset: 'homeGold',
+        dataTestId: 'issue-button'
+      });
+      items.push({
+        key: 'rgb-history',
+        label: t('rgb_history'),
+        icon: 'history',
+        onClick: () => nav.navigate('RGBHistoryScreen'),
+        priority: 7,
+        overflowPreset: 'homeGold',
+        dataTestId: 'rgb-history-button'
+      });
+    }
+
     items.push({
       key: 'history',
       label: t('history'),
       icon: 'history',
       onClick: () => onHistoryClick(),
-      priority: 4,
+      priority: 5,
       overflowPreset: 'homeGold',
       dataTestId: 'history-button'
     });
@@ -219,7 +209,7 @@ export const WalletActions = ({ chain, walletView = WalletView.BITCOIN }: Wallet
       icon: isFractal ? 'fb' : 'bitcoin',
       onClick: () => setBuyBtcModalVisible(true),
       disabled: buyDisabled,
-      priority: 5,
+      priority: 8,
       overflowPreset: 'homeGold',
       dataTestId: 'buy-button'
     });
@@ -231,7 +221,7 @@ export const WalletActions = ({ chain, walletView = WalletView.BITCOIN }: Wallet
         icon: 'utxo',
         onClick: handleUtxoClick,
         disabled: !accountCapabilities.canCreateSigningRequest,
-        priority: 6,
+        priority: 9,
         overflowPreset: 'homeGold',
         dataTestId: 'utxo-button'
       });
@@ -244,7 +234,7 @@ export const WalletActions = ({ chain, walletView = WalletView.BITCOIN }: Wallet
     canSendRgbUsdtToken,
     handleUtxoClick,
     isFractal,
-    isRgbView,
+    rgbEnabled,
     onHistoryClick,
     onIssueClick,
     onReceiveClick,
@@ -271,7 +261,7 @@ export const WalletActions = ({ chain, walletView = WalletView.BITCOIN }: Wallet
 
   useEffect(() => {
     setShowOverflowActions(false);
-  }, [chain.enum, overflowActions.length, walletView]);
+  }, [chain.enum, overflowActions.length, rgbEnabled]);
 
   const renderActionButton = (action: WalletActionItem, location: 'primary' | 'overflow') => {
     return (
@@ -311,21 +301,18 @@ export const WalletActions = ({ chain, walletView = WalletView.BITCOIN }: Wallet
           )}
         </Row>
 
-        {showOverflowActions && overflowActions.length > 0 && (
-          <Row fullX style={actionRowStyle}>
-            {MAX_PRIMARY_ACTIONS - overflowActions.length > 0 && (
-              <Button preset="home" full style={{ ...actionButtonStyle, opacity: 0 }}></Button>
-            )}
-            {MAX_PRIMARY_ACTIONS - overflowActions.length > 1 && (
-              <Button preset="home" full style={{ ...actionButtonStyle, opacity: 0 }}></Button>
-            )}
-            {MAX_PRIMARY_ACTIONS - overflowActions.length > 2 && (
-              <Button preset="home" full style={{ ...actionButtonStyle, opacity: 0 }}></Button>
-            )}
-
-            {overflowActions.map((action) => renderActionButton(action, 'overflow'))}
-          </Row>
-        )}
+        {showOverflowActions &&
+          Array.from({ length: Math.ceil(overflowActions.length / MAX_PRIMARY_ACTIONS) }, (_, index) => {
+            const rowActions = overflowActions.slice(index * MAX_PRIMARY_ACTIONS, (index + 1) * MAX_PRIMARY_ACTIONS);
+            return (
+              <Row fullX style={actionRowStyle} key={index}>
+                {rowActions.map((action) => renderActionButton(action, 'overflow'))}
+                {Array.from({ length: MAX_PRIMARY_ACTIONS - rowActions.length }, (_, blankIndex) => (
+                  <div key={`blank-${blankIndex}`} style={{ flex: 1 }} />
+                ))}
+              </Row>
+            );
+          })}
       </Column>
 
       {buyBtcModalVisible && (

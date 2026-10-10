@@ -229,6 +229,7 @@ export function getSupportedAssets(
   if (isRgbNetwork && opts?.keyringType === KeyringType.HdKeyring) {
     assets.rgb = true
     assets.rgbCard = true
+    assetTabKeys.push(AssetTabKey.RGB)
   }
 
   if (chainType === ChainType.BITCOIN_MAINNET || chainType === ChainType.BITCOIN_SIGNET) {
