@@ -39,6 +39,7 @@ import { RgbRecoveryConflictModal } from '../../RGB/components/RgbRecoveryConfli
 import { RGBTransferNotificationPanel } from '../../RGB/components/RGBTransferNotificationPanel';
 import { RgbFeatureActivationModal } from '../../RGB/components/RgbFeatureActivationModal';
 import { SwitchChainModal } from '../../Settings/SwitchChainModal';
+import { AddressHistorySection } from '../../Wallet/HistoryScreen/AddressHistorySection';
 import { MoreActionSheet } from './MoreActionSheet';
 import { BRC20Tab } from './BRC20Tab';
 import { MoreTab } from './MoreTab';
@@ -283,6 +284,7 @@ export default function WalletTabScreen({ screen = 'home' }: { screen?: 'home' |
             <BalanceCard />
             <WalletActions chain={chain} rgbEnabled={isRgbActive} />
             <AnnouncementCard />
+            <AddressHistorySection preview />
           </Column>
         </>
       ) : (

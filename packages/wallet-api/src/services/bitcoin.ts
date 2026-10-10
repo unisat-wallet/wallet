@@ -3,6 +3,7 @@
  */
 
 import type { BaseHttpClient, HttpClient } from '../client/http-client'
+import type { AddressHistorySummaryPage } from '@unisat/wallet-shared'
 import type {
   AddressSummary,
   BitcoinBalance,
@@ -107,7 +108,7 @@ export class BitcoinService {
   /**
    * Get address recent history
    */
-  async getAddressRecentHistory(params: { address: string; start: number; limit: number }) {
+  async getAddressRecentHistory(params: { address: string; start: number; limit: number }): Promise<AddressHistorySummaryPage> {
     return this.httpClient.get('/v5/address/history', { query: params })
   }
 

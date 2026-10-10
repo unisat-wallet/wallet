@@ -7,7 +7,6 @@ import { TypeChain } from '@unisat/wallet-shared';
 import {
   useChainType,
   useCurrentAccountCapabilities,
-  useCurrentAddress,
   useI18n,
   useNavigation,
   useResetFeeRateBar,
@@ -80,7 +79,6 @@ export const WalletActions = ({ chain, rgbEnabled = false }: WalletActionsProps)
   const [buyBtcModalVisible, setBuyBtcModalVisible] = useState(false);
   const walletConfig = useWalletConfig();
   const wallet = useWallet();
-  const address = useCurrentAddress();
   const { t } = useI18n();
   const accountCapabilities = useCurrentAccountCapabilities();
   const { canSendRgbUsdtToken } = useRgbHomeDisplayMode();
@@ -124,7 +122,7 @@ export const WalletActions = ({ chain, rgbEnabled = false }: WalletActionsProps)
   };
 
   const onHistoryClick = () => {
-    nav.navToExplorerAddress(address);
+    nav.navigate('HistoryScreen');
   };
 
   const onIssueClick = () => {
