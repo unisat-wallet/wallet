@@ -1,0 +1,385 @@
+.historySection {
+  width: 100%;
+}
+
+.historyHeader {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 32px;
+}
+
+.filterContainer {
+  position: relative;
+  margin-left: auto;
+  z-index: 2;
+}
+
+.filterButton {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+}
+
+.filterMenu {
+  position: absolute;
+  top: 36px;
+  right: 0;
+  display: flex;
+  flex-direction: column;
+  min-width: 112px;
+  padding: 4px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  background: #20201f;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+}
+
+.filterOption,
+.filterActive {
+  padding: 8px 12px;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.8);
+  text-align: left;
+  cursor: pointer;
+}
+
+.filterActive {
+  color: #eac249;
+  background: rgba(234, 194, 73, 0.12);
+}
+
+.historyGroups,
+.historyGroup,
+.historyRows {
+  display: flex;
+  flex-direction: column;
+}
+
+.historyGroups {
+  gap: 24px;
+  width: 100%;
+}
+
+.historyGroup {
+  gap: 16px;
+}
+
+.historyRows {
+  gap: 16px;
+}
+
+.dateLabel {
+  color: rgba(255, 255, 255, 0.65);
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 20px;
+}
+
+.historyRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  width: 100%;
+  min-height: 58px;
+  padding: 0 0 16px;
+  border: 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  background: transparent;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.rowLeading {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  flex: 1;
+}
+
+.assetIconFrame {
+  width: 32px;
+  height: 32px;
+  flex: 0 0 32px;
+}
+
+.assetIcon {
+  position: absolute;
+  left: -1px;
+  top: -1px;
+  width: 34px;
+  height: 34px;
+  object-fit: contain;
+}
+
+.assetIconFrame {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.assetIconBase {
+  position: absolute;
+  left: -1px;
+  top: -1px;
+}
+
+.protocolIcon,
+.assetInitial {
+  position: relative;
+}
+
+.assetInitial {
+  color: rgba(255, 255, 255, 0.85);
+  font-size: 10px;
+  font-weight: 600;
+}
+
+.rowLabels,
+.rowAmounts {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.rowLabels {
+  gap: 2px;
+  flex: 1;
+}
+
+.rowTitle {
+  overflow: hidden;
+  color: rgba(255, 255, 255, 0.9);
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 20px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.rowSubtitle {
+  overflow: hidden;
+  color: rgba(255, 255, 255, 0.45);
+  font-size: 11px;
+  line-height: 16px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.rowAmounts {
+  align-items: flex-end;
+  max-width: 48%;
+  text-align: right;
+  flex: 0 1 48%;
+}
+
+.receivedAmount,
+.sentAmount,
+.moreCount {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.receivedAmount,
+.sentAmount {
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 20px;
+}
+
+.receivedAmount {
+  color: rgba(124, 219, 152, 0.85);
+}
+
+.sentAmount {
+  color: rgba(255, 255, 255, 0.85);
+}
+
+.moreCount {
+  color: rgba(255, 255, 255, 0.45);
+  font-size: 12px;
+  line-height: 20px;
+}
+
+.viewAllButton {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  align-self: center;
+  min-width: 130px;
+  height: 32px;
+  margin-top: 8px;
+  padding: 0 16px;
+  border: 0;
+  border-radius: 6px;
+  background: #20201f;
+  color: rgba(255, 255, 255, 0.85);
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.detailSheet {
+  width: 100%;
+  max-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.detailSheetBody {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 24px 16px 28px;
+  box-sizing: border-box;
+}
+
+.detailCoinHero,
+.detailInscriptionHero {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.detailCoinHero {
+  gap: 8px;
+  min-height: 32px;
+  color: rgba(255, 255, 255, 0.85);
+  font-family: Inter-Regular, sans-serif;
+  font-size: 18px;
+  font-weight: 500;
+  line-height: 25px;
+}
+
+.detailCoinIcon {
+  display: block;
+  width: 34px;
+  height: 34px;
+  object-fit: contain;
+}
+
+.detailOtherAssetIcon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.1);
+  color: #ebb94c;
+  font-size: 10px;
+}
+
+.detailInscriptionHero {
+  flex-direction: column;
+  gap: 12px;
+}
+
+.detailInscriptionPreview {
+  width: 100px;
+  min-height: 128px;
+  overflow: hidden;
+  border-radius: 12px;
+}
+
+.detailInscriptionFallback {
+  display: flex;
+  align-items: flex-end;
+  width: 100px;
+  height: 128px;
+  padding: 6px;
+  box-sizing: border-box;
+  background: rgba(255, 255, 255, 0.08);
+  color: #ebb94c;
+  font-size: 12px;
+}
+
+.detailInscriptionAmount {
+  color: rgba(124, 219, 152, 0.85);
+  font-family: Inter-Regular, sans-serif;
+  font-size: 18px;
+  font-weight: 500;
+  line-height: 32px;
+  text-align: center;
+}
+
+.detailSummary {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: 24px;
+}
+
+.detailSummaryRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-height: 32px;
+  font-size: 14px;
+  font-weight: 500;
+  font-family: Inter-Regular, sans-serif;
+}
+
+.detailSummaryLabel {
+  flex: 0 0 auto;
+  color: rgba(255, 255, 255, 0.45);
+}
+
+.detailSummaryValue {
+  min-width: 0;
+  color: rgba(255, 255, 255, 0.85);
+  text-align: right;
+}
+
+.detailConfirmed {
+  color: #7cdb98;
+}
+
+.detailPending,
+.detailUnit {
+  color: rgba(255, 255, 255, 0.45);
+}
+
+.detailAddress {
+  display: inline-flex;
+  max-width: 100%;
+  cursor: pointer;
+}
+
+.detailFooter {
+  flex: 0 0 auto;
+  padding: 16px 16px 30px;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.detailExplorerButton {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 48px;
+  border: 0;
+  border-radius: 8px;
+  background: linear-gradient(120deg, #ebb94c 0%, #e97e00 100%);
+  color: #000;
+  font-family: Inter-Regular, sans-serif;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+}

@@ -9,66 +9,91 @@ import type {
 } from '@unisat/wallet-shared';
 import { useCurrentAddress, useI18n, useNavigation, useWallet } from '@unisat/wallet-state';
 
+import { HistoryDetailSheet } from './HistoryDetailSheet';
+import styles from './history.module.less';
+import { getHistoryAssetChanges, getHistoryDate, type HistoryAssetChange } from './historyAssetView';
+
 const PREVIEW_LIMIT = 5;
 const PAGE_SIZE = 20;
 
-function HistoryRow({ item }: { item: AddressHistorySummaryItem }) {
-  const { t } = useI18n();
-  const nav = useNavigation();
-  const directionLabel = {
-    receive: t('receive'),
-    send: t('send'),
-    mixed: t('mixed'),
-    self: t('self_transfer')
-  }[item.direction];
-  const entries: { asset: AddressHistoryAssetItem; sign: string; color: 'green' | 'red' }[] = [
-    ...item.received.map((asset) => ({ asset, sign: '+', color: 'green' as const })),
-    ...item.sent.map((asset) => ({ asset, sign: item.direction === 'self' ? '' : '-', color: 'red' as const }))
-  ];
-  const remaining = Math.max(item.receivedCount + item.sentCount - Math.min(entries.length, 2), 0);
-  const date = item.timestamp > 0 ? new Date(item.timestamp * 1000).toLocaleString() : '';
+function HistoryAssetIcon({ asset }: { asset: AddressHistoryAssetItem }) {
+  if (asset.kind === 'coin') {
+    return (
+      <span className={styles.assetIconFrame} aria-hidden="true">
+        <img src="/images/history/bitcoin.png" alt="" className={styles.assetIcon} />
+      </span>
+    );
+  }
+
+  const protocolIcon =
+    asset.kind === 'inscription'
+      ? '/images/history/ordinals.svg'
+      : asset.kind === 'alkanes'
+      ? '/images/history/alkanes.svg'
+      : '';
 
   return (
-    <Row
-      clickable
-      itemsCenter
-      justifyBetween
-      gap="md"
-      onClick={() => nav.navToExplorerTx(item.txid)}
-      data-testid={`history-${item.txid}`}
-      style={{ padding: '12px 0', borderBottom: '1px solid rgba(255,255,255,0.1)', cursor: 'pointer' }}
-    >
-      <Row itemsCenter gap="sm" style={{ minWidth: 0, flex: 1 }}>
-        <Icon
-          icon={
-            item.direction === 'receive' ? 'history_receive' : item.direction === 'send' ? 'history_send' : 'history'
-          }
-          size={28}
-        />
-        <Column gap="zero" style={{ minWidth: 0 }}>
-          <Text text={directionLabel} size="sm" />
-          {date && <Text text={date} size="xxs" color="textDim" ellipsis />}
-          {item.status === 'pending' && <Text text={t('history_pending')} size="xxs" color="gold" />}
-        </Column>
-      </Row>
-      <Column gap="zero" style={{ alignItems: 'flex-end', minWidth: 0, maxWidth: '54%' }}>
-        {entries.slice(0, 2).map(({ asset, sign, color }, index) => (
-          <Text
-            key={`${asset.kind}:${asset.assetId || asset.symbol}:${index}`}
-            text={`${sign}${asset.amount} ${asset.displayName || asset.symbol || asset.kind}`}
-            size="xs"
-            color={sign ? color : 'white'}
-            ellipsis
-            style={{ maxWidth: '100%' }}
-          />
-        ))}
-        {remaining > 0 && <Text text={t('history_more_count', String(remaining))} size="xxs" color="textDim" />}
-        {entries.length === 0 && <Text text={item.txid.slice(0, 10)} size="xs" color="textDim" />}
-      </Column>
-    </Row>
+    <span className={styles.assetIconFrame} aria-hidden="true">
+      <img src="/images/history/asset-base.svg" alt="" className={styles.assetIconBase} />
+      {protocolIcon ? (
+        <img src={protocolIcon} alt="" className={styles.protocolIcon} />
+      ) : (
+        <span className={styles.assetInitial}>{(asset.symbol || asset.kind).slice(0, 2).toUpperCase()}</span>
+      )}
+    </span>
   );
 }
 
+function HistoryChange({ change }: { change: HistoryAssetChange }) {
+  const label = change.asset.displayName || change.asset.symbol || change.asset.kind;
+  const value = `${change.sign}${change.asset.amount} ${label}`;
+  return (
+    <span className={change.sign === '+' ? styles.receivedAmount : styles.sentAmount} title={value}>
+      {value}
+    </span>
+  );
+}
+
+function HistoryRow({ item, onClick }: { item: AddressHistorySummaryItem; onClick: () => void }) {
+  const { t } = useI18n();
+  const { changes, total } = getHistoryAssetChanges(item);
+  const primary = changes[0];
+  if (!primary) return null;
+  const directionLabel = item.direction === 'mixed' ? t('mixed') : primary.sign === '+' ? t('receive') : t('send');
+  const assetKind = primary.asset.kind;
+  const assetCategory =
+    assetKind === 'coin'
+      ? primary.asset.symbol
+      : assetKind === 'inscription'
+      ? t('ordinals')
+      : assetKind === 'runes' || assetKind === 'alkanes' || assetKind === 'brc20'
+      ? t(assetKind)
+      : assetKind.replaceAll('_', '-').toUpperCase();
+  const subtitle = item.status === 'pending' ? `${assetCategory} · ${t('history_pending')}` : assetCategory;
+
+  return (
+    <button type="button" className={styles.historyRow} onClick={onClick} data-testid={`history-${item.txid}`}>
+      <span className={styles.rowLeading}>
+        <HistoryAssetIcon asset={primary.asset} />
+        <span className={styles.rowLabels}>
+          <span className={styles.rowTitle}>{directionLabel}</span>
+          <span className={styles.rowSubtitle} title={item.txid}>
+            {subtitle}
+          </span>
+        </span>
+      </span>
+      <span className={styles.rowAmounts}>
+        <HistoryChange change={primary} />
+        {changes[1] && <HistoryChange change={changes[1]} />}
+        {total > 2 && <span className={styles.moreCount}>{t('history_more_count', String(total - 2))}</span>}
+      </span>
+    </button>
+  );
+}
+
+type HistoryFilter = 'all' | 'receive' | 'send';
+
+/** Displays address history as asset changes, with transaction details one tap away. */
 export function AddressHistorySection({ preview = false }: { preview?: boolean }) {
   const address = useCurrentAddress();
   const wallet = useWallet();
@@ -79,6 +104,9 @@ export function AddressHistorySection({ preview = false }: { preview?: boolean }
   const [history, setHistory] = useState<AddressHistorySummaryPage>({ start: 0, total: 0, detail: [] });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
+  const [filter, setFilter] = useState<HistoryFilter>('all');
+  const [filterOpen, setFilterOpen] = useState(false);
+  const [selectedItem, setSelectedItem] = useState<AddressHistorySummaryItem>();
 
   useEffect(() => setPage(1), [address]);
 
@@ -94,11 +122,7 @@ export function AddressHistorySection({ preview = false }: { preview?: boolean }
     setLoading(true);
     setError(false);
     wallet
-      .getAddressHistory({
-        address,
-        start: preview ? 0 : (page - 1) * PAGE_SIZE,
-        limit: preview ? PREVIEW_LIMIT : PAGE_SIZE
-      })
+      .getAddressHistory({ address, start: preview ? 0 : (page - 1) * PAGE_SIZE, limit: PAGE_SIZE })
       .then((result) => {
         if (active) setHistory(result);
       })
@@ -113,20 +137,54 @@ export function AddressHistorySection({ preview = false }: { preview?: boolean }
     };
   }, [address, wallet, page, preview, refreshKey]);
 
+  const visibleItems = history.detail
+    .filter((item) => getHistoryAssetChanges(item).total > 0)
+    .filter((item) => {
+      if (filter === 'all') return true;
+      return getHistoryAssetChanges(item).changes.some((change) => change.sign === (filter === 'receive' ? '+' : '-'));
+    })
+    .slice(0, preview ? PREVIEW_LIMIT : undefined);
+  const groupedItems = visibleItems.reduce<{ date: string; items: AddressHistorySummaryItem[] }[]>((groups, item) => {
+    const date = getHistoryDate(item.timestamp);
+    const lastGroup = groups[groups.length - 1];
+    if (lastGroup?.date === date) lastGroup.items.push(item);
+    else groups.push({ date, items: [item] });
+    return groups;
+  }, []);
+
   return (
-    <Column gap="sm" fullX>
-      {preview && (
-        <Row justifyBetween itemsCenter>
-          <Text text={t('history')} size="md" color="white" />
-          <Text
-            text={t('view_all')}
-            size="xs"
-            color="gold"
-            onClick={() => nav.navigate('HistoryScreen')}
-            style={{ cursor: 'pointer' }}
-          />
-        </Row>
-      )}
+    <Column gap="lg" fullX classname={styles.historySection}>
+      <div className={styles.historyHeader}>
+        {preview && <Text text={t('history')} size="md" color="white" />}
+        <div className={styles.filterContainer}>
+          <button
+            type="button"
+            className={styles.filterButton}
+            aria-label={t('filter')}
+            aria-expanded={filterOpen}
+            onClick={() => setFilterOpen((open) => !open)}
+          >
+            <img src="/images/history/filter.svg" alt="" />
+          </button>
+          {filterOpen && (
+            <div className={styles.filterMenu}>
+              {(['all', 'receive', 'send'] as const).map((key) => (
+                <button
+                  key={key}
+                  type="button"
+                  className={filter === key ? styles.filterActive : styles.filterOption}
+                  onClick={() => {
+                    setFilter(key);
+                    setFilterOpen(false);
+                  }}
+                >
+                  {t(key)}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
       {loading ? (
         <Text text={t('loading')} color="textDim" size="sm" />
       ) : error ? (
@@ -137,14 +195,30 @@ export function AddressHistorySection({ preview = false }: { preview?: boolean }
           onClick={() => setRefreshKey((key) => key + 1)}
           style={{ cursor: 'pointer' }}
         />
-      ) : history.detail.length === 0 ? (
-        <Text text={t('history_no_transactions')} color="textDim" size="sm" />
+      ) : visibleItems.length === 0 ? (
+        <Text
+          text={t(history.total > 0 ? 'history_no_asset_change' : 'history_no_transactions')}
+          color="textDim"
+          size="sm"
+        />
       ) : (
-        <Column gap="zero">
-          {history.detail.map((item) => (
-            <HistoryRow key={item.txid} item={item} />
+        <div className={styles.historyGroups}>
+          {groupedItems.map((group, index) => (
+            <section key={`${group.date}-${index}`} className={styles.historyGroup}>
+              {group.date && <div className={styles.dateLabel}>{group.date}</div>}
+              <div className={styles.historyRows}>
+                {group.items.map((item) => (
+                  <HistoryRow key={item.txid} item={item} onClick={() => setSelectedItem(item)} />
+                ))}
+              </div>
+            </section>
           ))}
-        </Column>
+        </div>
+      )}
+      {preview && history.total > 0 && (
+        <button type="button" className={styles.viewAllButton} onClick={() => nav.navigate('HistoryScreen')}>
+          {t('view_all')} <Icon icon="right" size={14} />
+        </button>
       )}
       {!preview && history.total > PAGE_SIZE && !loading && !error && (
         <Row justifyCenter mt="md">
@@ -155,6 +229,7 @@ export function AddressHistorySection({ preview = false }: { preview?: boolean }
           />
         </Row>
       )}
+      {selectedItem && <HistoryDetailSheet summary={selectedItem} onClose={() => setSelectedItem(undefined)} />}
     </Column>
   );
 }

@@ -912,7 +912,7 @@
     "message": "総取引数"
   },
   "history_more_count": {
-    "message": "+$1件"
+    "message": "ほか $1 件の資産"
   },
   "history_more_on_uniscan_count": {
     "message": "UniScanで+$1件"
@@ -923,6 +923,16 @@
   "history_pending": {
     "message": "保留中"
   },
+  "history_confirmed": {
+    "message": "確認済み"
+  },
+  "history_asset_changes": { "message": "資産の増減" },
+  "history_no_asset_change": { "message": "資産の増減なし" },
+  "history_onchain_details": { "message": "オンチェーン詳細" },
+  "history_carried_sats": { "message": "資産に付随する Sats" },
+  "history_change_output": { "message": "おつりの出力" },
+  "history_confirmations": { "message": "承認" },
+  "filter": { "message": "絞り込み" },
   "holders": {
     "message": "保有者"
   },

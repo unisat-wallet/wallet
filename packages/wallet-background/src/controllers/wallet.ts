@@ -1239,6 +1239,10 @@ export class WalletController extends BaseController {
     return data
   }
 
+  getAddressHistoryDetail = async (params: { address: string; txid: string }) => {
+    return walletApiService.bitcoin.getAddressHistoryDetail(params)
+  }
+
   getAddressInscriptions = async (address: string, cursor: number, size: number) => {
     const data = await walletApiService.inscriptions.getAddressInscriptions(address, cursor, size)
     return data

@@ -5,6 +5,7 @@ import { BabylonConfigV2 } from '@unisat/babylon-service/types'
 import {
   Account,
   AddressHistorySummaryPage,
+  AddressHistoryTxDetail,
   AddressAlkanesTokenSummary,
   AddressFlagType,
   AddressRunesTokenSummary,
@@ -127,6 +128,7 @@ export interface WalletController {
     start: number
     limit: number
   }) => Promise<AddressHistorySummaryPage>
+  getAddressHistoryDetail: (params: { address: string; txid: string }) => Promise<AddressHistoryTxDetail>
   getAddressCacheHistory: (address: string) => Promise<TxHistoryItem[]>
 
   getLocale(): Promise<string>

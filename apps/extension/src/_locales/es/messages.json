@@ -912,7 +912,7 @@
     "message": "Total de transacciones"
   },
   "history_more_count": {
-    "message": "+$1 más"
+    "message": "y $1 activos más"
   },
   "history_more_on_uniscan_count": {
     "message": "+$1 más en UniScan"
@@ -923,6 +923,16 @@
   "history_pending": {
     "message": "Pendiente"
   },
+  "history_confirmed": {
+    "message": "Confirmada"
+  },
+  "history_asset_changes": { "message": "Cambios de activos" },
+  "history_no_asset_change": { "message": "Sin cambios de activos" },
+  "history_onchain_details": { "message": "Detalles en cadena" },
+  "history_carried_sats": { "message": "Sats asociados a activos" },
+  "history_change_output": { "message": "Salida de cambio" },
+  "history_confirmations": { "message": "confirmaciones" },
+  "filter": { "message": "Filtrar" },
   "holders": {
     "message": "poseedores"
   },

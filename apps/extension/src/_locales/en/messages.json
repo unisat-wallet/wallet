@@ -918,7 +918,7 @@
     "message": "transactions"
   },
   "history_more_count": {
-    "message": "+$1 more"
+    "message": "and $1 more assets"
   },
   "history_more_on_uniscan_count": {
     "message": "+$1 more on UniScan"
@@ -929,6 +929,16 @@
   "history_pending": {
     "message": "Pending"
   },
+  "history_confirmed": {
+    "message": "Confirmed"
+  },
+  "history_asset_changes": { "message": "Asset changes" },
+  "history_no_asset_change": { "message": "No asset change" },
+  "history_onchain_details": { "message": "On-chain details" },
+  "history_carried_sats": { "message": "Sats carried with assets" },
+  "history_change_output": { "message": "Change output" },
+  "history_confirmations": { "message": "confirmations" },
+  "filter": { "message": "Filter" },
   "holders": {
     "message": "holders"
   },

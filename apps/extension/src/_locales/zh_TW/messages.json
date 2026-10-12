@@ -912,7 +912,7 @@
     "message": "總交易數量"
   },
   "history_more_count": {
-    "message": "+$1 更多"
+    "message": "還有 $1 項資產"
   },
   "history_more_on_uniscan_count": {
     "message": "UniScan 上 +$1 更多"
@@ -923,6 +923,16 @@
   "history_pending": {
     "message": "待處理"
   },
+  "history_confirmed": {
+    "message": "已確認"
+  },
+  "history_asset_changes": { "message": "資產變化" },
+  "history_no_asset_change": { "message": "沒有資產變化" },
+  "history_onchain_details": { "message": "鏈上詳情" },
+  "history_carried_sats": { "message": "資產攜帶的聰" },
+  "history_change_output": { "message": "找零輸出" },
+  "history_confirmations": { "message": "次確認" },
+  "filter": { "message": "篩選" },
   "holders": {
     "message": "持有者"
   },

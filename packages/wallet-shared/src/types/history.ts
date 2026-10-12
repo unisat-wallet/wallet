@@ -62,3 +62,47 @@ export interface AddressHistorySummaryPage {
   total: number
   detail: AddressHistorySummaryItem[]
 }
+
+export interface AddressHistoryTxInput {
+  index: number
+  prevTxid: string
+  prevVout: number
+  address: string
+  value: string
+  valueSatoshis: number
+  scriptType: string
+  scriptPk: string
+  isMine: boolean
+  assets: AddressHistoryAssetItem[]
+}
+
+export interface AddressHistoryTxOutput {
+  index: number
+  vout: number
+  address: string
+  value: string
+  valueSatoshis: number
+  scriptType: string
+  scriptPk: string
+  isMine: boolean
+  isSpent: boolean
+  assets: AddressHistoryAssetItem[]
+}
+
+export interface AddressHistoryTxDetail {
+  txid: string
+  timestamp: number
+  height: number
+  confirmations: number
+  status: 'pending' | 'confirmed'
+  blockhash: string
+  size: number
+  locktime: number
+  feeSatoshis: number
+  fee: string
+  totalInputValue: string
+  totalOutputValue: string
+  summary: AddressHistorySummaryItem
+  inputs: AddressHistoryTxInput[]
+  outputs: AddressHistoryTxOutput[]
+}

@@ -912,7 +912,7 @@
     "message": "Общее количество транзакций"
   },
   "history_more_count": {
-    "message": "+$1 ещё"
+    "message": "и ещё $1 активов"
   },
   "history_more_on_uniscan_count": {
     "message": "+$1 ещё на UniScan"
@@ -923,6 +923,16 @@
   "history_pending": {
     "message": "Ожидание"
   },
+  "history_confirmed": {
+    "message": "Подтверждено"
+  },
+  "history_asset_changes": { "message": "Изменения активов" },
+  "history_no_asset_change": { "message": "Нет изменений активов" },
+  "history_onchain_details": { "message": "Данные блокчейна" },
+  "history_carried_sats": { "message": "Сатоши с активами" },
+  "history_change_output": { "message": "Выход сдачи" },
+  "history_confirmations": { "message": "подтверждений" },
+  "filter": { "message": "Фильтр" },
   "holders": {
     "message": "держатели"
   },
