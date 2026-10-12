@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 
-import { Column, Icon, Row, Text } from '@/ui/components';
+import { Column, Row, Text } from '@/ui/components';
 import { Pagination } from '@/ui/components/Pagination';
 import type {
   AddressHistoryAssetItem,
@@ -215,9 +215,12 @@ export function AddressHistorySection({ preview = false }: { preview?: boolean }
           ))}
         </div>
       )}
-      {preview && history.total > 0 && (
-        <button type="button" className={styles.viewAllButton} onClick={() => nav.navigate('HistoryScreen')}>
-          {t('view_all')} <Icon icon="right" size={14} />
+      {preview && address && history.total > 0 && (
+        <button type="button" className={styles.viewAllButton} onClick={() => nav.navToExplorerAddress(address)}>
+          {t('view_on_uniscan')}
+          <span className={styles.viewAllArrow} aria-hidden="true">
+            <img src="/images/history/view-all-arrow.svg" alt="" />
+          </span>
         </button>
       )}
       {!preview && history.total > PAGE_SIZE && !loading && !error && (
