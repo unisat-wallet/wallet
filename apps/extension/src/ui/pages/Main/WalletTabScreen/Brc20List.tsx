@@ -10,6 +10,7 @@ export function BRC20List() {
     <InfiniteList
       data={items}
       total={total}
+      countUnit="asset"
       keyExtractor={(item) => item.ticker}
       renderItem={({ item }) => {
         return <BRC20BalanceCard tokenBalance={item} price={priceMap[item.ticker]} onClick={() => onClickItem(item)} />;

@@ -5,7 +5,6 @@ import { Tabs } from '@/ui/components/Tabs';
 import {
   OrdinalsAssetTabKey,
   uiActions,
-  useAddressSummary,
   useAppDispatch,
   useChain,
   useOrdinalsAssetTabKey
@@ -15,7 +14,6 @@ import { BRC20ProgList } from './BRC20ProgList';
 import { BRC20List } from './Brc20List';
 
 export function BRC20Tab() {
-  const addressSummary = useAddressSummary();
   const chain = useChain();
   const tabKey = useOrdinalsAssetTabKey();
   const dispatch = useAppDispatch();
@@ -30,7 +28,7 @@ export function BRC20Tab() {
     const items = [
       {
         key: OrdinalsAssetTabKey.BRC20,
-        label: `brc-20 (${addressSummary.brc20Count})`,
+        label: 'brc-20',
         children: <BRC20List />
       }
     ];
@@ -38,12 +36,12 @@ export function BRC20Tab() {
     if (chain.enableBrc20Prog) {
       items.push({
         key: OrdinalsAssetTabKey.BRC20_6BYTE,
-        label: `brc2.0 (${addressSummary.brc20Count6Byte || 0})`,
+        label: 'brc2.0',
         children: <BRC20ProgList />
       });
     }
     return items;
-  }, [addressSummary, chain.enableBrc20Prog]);
+  }, [chain.enableBrc20Prog]);
 
   const finalTabKey = tabKey === OrdinalsAssetTabKey.BRC20_6BYTE && chain.enableBrc20Prog
     ? OrdinalsAssetTabKey.BRC20_6BYTE

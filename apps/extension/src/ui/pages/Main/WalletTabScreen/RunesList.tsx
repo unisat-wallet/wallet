@@ -10,6 +10,7 @@ export function RunesList() {
     <InfiniteList
       data={items}
       total={total}
+      countUnit="asset"
       keyExtractor={(item) => item.runeid}
       renderItem={({ item, index }) => {
         return (

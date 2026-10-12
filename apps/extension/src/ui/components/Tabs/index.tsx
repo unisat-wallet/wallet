@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 
 import { colors } from '@/ui/theme/colors';
-import { spacing } from '@/ui/theme/spacing';
+import { spacing, spacingGap } from '@/ui/theme/spacing';
 
 import { Column } from '../Column';
 import { Row } from '../Row';
@@ -20,10 +20,11 @@ interface TabsProps {
   preset?: string;
   tabBar?: React.ReactNode;
   trailingAction?: React.ReactNode;
+  contentGap?: number;
   onTabClick: (key: string) => void;
 }
 
-export function Tabs({ preset, items, defaultActiveKey, activeKey, onTabClick, trailingAction }: TabsProps) {
+export function Tabs({ preset, items, defaultActiveKey, activeKey, onTabClick, trailingAction, contentGap }: TabsProps) {
   const [activeTab, setActiveTab] = useState(defaultActiveKey);
 
   const renderedTabs = useRef<Set<string>>(new Set([defaultActiveKey]));
@@ -123,12 +124,12 @@ export function Tabs({ preset, items, defaultActiveKey, activeKey, onTabClick, t
   }, [items, activeTab, onTabClick, preset, trailingAction]);
 
   return (
-    <Column gap="sm">
+    <Column gap="zero">
       {/* Tab Bar */}
       {tabBar}
 
       {/* Content */}
-      <Column mt="md">
+      <Column style={{ marginTop: contentGap ?? (spacingGap.sm + spacingGap.md) }}>
         {items.map((item) => {
           if (!renderedTabs.current.has(item.key)) return null;
 

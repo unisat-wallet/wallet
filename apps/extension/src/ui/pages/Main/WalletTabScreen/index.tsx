@@ -362,6 +362,7 @@ export default function WalletTabScreen({ screen = 'home' }: { screen?: 'home' |
               <div style={{ width: 58, height: 14, borderRadius: 4, backgroundColor: 'rgba(255,255,255,0.08)' }} />
             </Row>
           ) : <Tabs
+            contentGap={24}
             defaultActiveKey={finalAssetTabKey as unknown as string}
             activeKey={finalAssetTabKey as unknown as string}
             items={tabItems as unknown as any[]}

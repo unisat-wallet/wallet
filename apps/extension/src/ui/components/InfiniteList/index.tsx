@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 
-import { Column, Row } from '@/ui/components';
+import { Column, Row, Text } from '@/ui/components';
 import { AssetEmptyState } from '@/ui/components/Empty/AssetEmptyState';
 import { Empty } from '@/ui/components/Empty';
 import { Pagination } from '@/ui/components/Pagination';
@@ -26,6 +26,8 @@ interface InfiniteListProps<T> {
   emptyMarketplace?: boolean;
   /** Vertical gap between rows. Use 0 for bordered history-style lists. */
   rowGap?: number;
+  /** Show the total number of assets above the list. */
+  countUnit?: 'asset' | 'collection' | 'inscription';
 }
 
 export function InfiniteList<T>({
@@ -43,11 +45,17 @@ export function InfiniteList<T>({
   emptyText,
   emptyPreset = 'assets',
   emptyMarketplace = false,
-  rowGap = 8
+  rowGap = 8,
+  countUnit
 }: InfiniteListProps<T>) {
   const { t } = useI18n();
   const [pagination, setPagination] = useState({ currentPage: 1, pageSize: 20 });
   const containerRef = useRef<HTMLDivElement>(null);
+  const countLabel = countUnit === 'collection'
+    ? t(total === 1 ? 'collection' : 'collections')
+    : countUnit === 'inscription'
+      ? t(total === 1 ? 'inscription' : 'inscriptions')
+      : t(total === 1 ? 'asset' : 'assets');
 
   const pageData = useMemo(() => {
     const start = (pagination.currentPage - 1) * pagination.pageSize;
@@ -103,6 +111,15 @@ export function InfiniteList<T>({
         )}
 
         <div style={{ width: '100%' }}>
+          {countUnit && total > 0 && data.length > 0 && (
+            <Text
+              text={`${total} ${countLabel}`}
+              size="sm"
+              color="white_muted"
+              mb="sm"
+              style={{ textTransform: 'lowercase' }}
+            />
+          )}
           {gridRows.map((row, rowIndex) => (
             <div
               key={`row-${rowIndex}`}

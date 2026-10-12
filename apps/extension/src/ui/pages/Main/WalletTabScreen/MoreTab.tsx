@@ -9,9 +9,9 @@ export function MoreTab() {
   return (
     <Column gap="md">
       {tabKey === MoreAssetTabKey.ALKANES_COLLECTION ? (
-        <AlkanesCollectionList showHeader />
+        <AlkanesCollectionList />
       ) : (
-        <AlkanesList showHeader />
+        <AlkanesList />
       )}
     </Column>
   );

@@ -1,33 +1,29 @@
-import { Column, InfiniteList, Text } from '@/ui/components';
+import { InfiniteList } from '@/ui/components';
 import AlkanesBalanceCard from '@/ui/components/AlkanesBalanceCard';
 import { useAlkanesListLogic, useI18n } from '@unisat/wallet-state';
 
-export function AlkanesList({ showHeader = false }: { showHeader?: boolean }) {
+export function AlkanesList() {
   const { t } = useI18n();
   const { onRefresh, items, total, onLoadMore, onClickItem, loading, hasMore, priceMap } = useAlkanesListLogic();
 
   return (
-    <Column>
-      {showHeader ? (
-        <Text text={`${t('alkanes')} (${Math.max(total, 0)})`} size="sm" color="white_muted" mb="sm" />
-      ) : null}
-      <InfiniteList
-        data={items}
-        total={total}
-        keyExtractor={(item) => item.alkaneid}
-        renderItem={({ item }) => {
-          return (
-            <AlkanesBalanceCard tokenBalance={item} price={priceMap[item.alkaneid]} onClick={() => onClickItem(item)} />
-          );
-        }}
-        onLoadMore={onLoadMore}
-        onRefresh={onRefresh}
-        hasMore={hasMore}
-        loading={loading}
-        emptyText={t('assets_no_assets')}
-        emptyPreset="assets"
-        emptyMarketplace
-      />
-    </Column>
+    <InfiniteList
+      data={items}
+      total={total}
+      countUnit="asset"
+      keyExtractor={(item) => item.alkaneid}
+      renderItem={({ item }) => {
+        return (
+          <AlkanesBalanceCard tokenBalance={item} price={priceMap[item.alkaneid]} onClick={() => onClickItem(item)} />
+        );
+      }}
+      onLoadMore={onLoadMore}
+      onRefresh={onRefresh}
+      hasMore={hasMore}
+      loading={loading}
+      emptyText={t('assets_no_assets')}
+      emptyPreset="assets"
+      emptyMarketplace
+    />
   );
 }

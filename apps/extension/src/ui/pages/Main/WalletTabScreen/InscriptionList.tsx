@@ -11,6 +11,7 @@ export function InscriptionList() {
     <InfiniteList
       data={items}
       total={total}
+      countUnit="inscription"
       numColumns={device.cardColumnsInList}
       keyExtractor={(item) => item.inscriptionId}
       renderItem={({ item, index }) => {
