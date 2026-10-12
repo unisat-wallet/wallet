@@ -124,15 +124,17 @@ export function InfiniteList<T>({
         </div>
       </div>
 
-      <Row justifyCenter mt="lg">
-        <Pagination
-          pagination={pagination}
-          total={total}
-          onChange={(p) => {
-            setPagination(p);
-          }}
-        />
-      </Row>
+      {total > pagination.pageSize && (
+        <Row justifyCenter mt="lg">
+          <Pagination
+            pagination={pagination}
+            total={total}
+            onChange={(p) => {
+              setPagination(p);
+            }}
+          />
+        </Row>
+      )}
     </Column>
   );
 }
