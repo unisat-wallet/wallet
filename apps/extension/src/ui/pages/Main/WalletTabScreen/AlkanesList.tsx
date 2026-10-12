@@ -26,6 +26,7 @@ export function AlkanesList({ showHeader = false }: { showHeader?: boolean }) {
         loading={loading}
         emptyText={t('assets_no_assets')}
         emptyPreset="assets"
+        emptyMarketplace
       />
     </Column>
   );

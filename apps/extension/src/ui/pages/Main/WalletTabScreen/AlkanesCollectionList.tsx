@@ -32,6 +32,7 @@ export function AlkanesCollectionList({ showHeader = false }: { showHeader?: boo
         loading={loading}
         emptyText={t('assets_no_assets')}
         emptyPreset="assets"
+        emptyMarketplace
       />
     </Column>
   );

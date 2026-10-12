@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 
 import { Column, Row } from '@/ui/components';
+import { AssetEmptyState } from '@/ui/components/Empty/AssetEmptyState';
 import { Empty } from '@/ui/components/Empty';
 import { Pagination } from '@/ui/components/Pagination';
 import { LoadingOutlined } from '@ant-design/icons';
@@ -21,6 +22,8 @@ interface InfiniteListProps<T> {
   total: number;
   emptyText?: string;
   emptyPreset?: 'simple' | 'assets';
+  /** Show the Assets screen marketplace empty state. */
+  emptyMarketplace?: boolean;
   /** Vertical gap between rows. Use 0 for bordered history-style lists. */
   rowGap?: number;
 }
@@ -39,6 +42,7 @@ export function InfiniteList<T>({
   numColumns = 1,
   emptyText,
   emptyPreset = 'assets',
+  emptyMarketplace = false,
   rowGap = 8
 }: InfiniteListProps<T>) {
   const { t } = useI18n();
@@ -70,6 +74,7 @@ export function InfiniteList<T>({
   }, [pageData, numColumns]);
 
   if (!loading && data.length === 0) {
+    if (emptyMarketplace) return <AssetEmptyState />;
     const isAssetsEmpty = emptyPreset === 'assets';
     return (
       <Column itemsCenter justifyCenter={!isAssetsEmpty} style={isAssetsEmpty ? { paddingTop: 8 } : { minHeight: 150 }}>

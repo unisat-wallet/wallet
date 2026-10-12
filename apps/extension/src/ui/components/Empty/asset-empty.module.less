@@ -1,0 +1,68 @@
+.viewportCenter {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  width: 188px;
+  transform: translate(-50%, -50%);
+}
+
+.content,
+.message {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.content {
+  gap: 20px;
+}
+
+.message {
+  gap: 8px;
+  width: 164px;
+}
+
+.message > :last-child {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 24px;
+  font-family: Inter-Regular, sans-serif;
+  font-size: 14px;
+}
+
+.marketButton {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  width: 188px;
+  height: 40px;
+  padding: 6px 8px;
+  border: 0;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.1);
+  color: rgba(255, 255, 255, 0.85);
+  font-family: Inter-Regular, sans-serif;
+  font-size: 14px;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.arrow {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 7px;
+  height: 12px;
+  flex: 0 0 7px;
+}
+
+.arrow img {
+  display: block;
+  width: 12px;
+  height: 7.038px;
+  max-width: none;
+  transform: rotate(-90deg);
+}

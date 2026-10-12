@@ -32,6 +32,7 @@ export function RGBList({ list }: RGBListProps) {
         showLoading={showLoading && !hasLoaded}
         emptyText={t('assets_no_assets')}
         emptyPreset="assets"
+        emptyMarketplace
       />
     </Column>
   );

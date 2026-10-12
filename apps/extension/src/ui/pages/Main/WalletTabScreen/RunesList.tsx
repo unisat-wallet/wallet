@@ -26,7 +26,8 @@ export function RunesList() {
       hasMore={hasMore}
       loading={loading}
       emptyText={t('assets_no_assets')}
-      emptyPreset="assets"
+        emptyPreset="assets"
+        emptyMarketplace
     />
   );
 }
