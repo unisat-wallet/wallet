@@ -311,32 +311,42 @@ export default function WalletTabScreen({ screen = 'home' }: { screen?: 'home' |
       <Header
         type="home"
         LeftComponent={
-          <Card
-            preset="style2"
-            style={{ height: 28, padding: '0 8px' }}
-            onClick={() => {
-              navigate('SwitchKeyringScreen');
-            }}
-            data-testid="wallet-management-entry"
-          >
-            <Text
-              text={
-                currentKeyring.type === KeyringType.ColdWalletKeyring
-                  ? `❄️  ${currentKeyring.alianName}`
-                  : currentKeyring.alianName
-              }
-              size="xxs"
-              ellipsis
-              style={{ maxWidth: 100, lineHeight: '16px' }}
-            />
-          </Card>
+          screen === 'assets' ? (
+            <Row>
+              <Text preset="title-bold" text={t('assets')} />
+            </Row>
+          ) : (
+            <Card
+              preset="style2"
+              style={{ height: 28, padding: '0 8px' }}
+              onClick={() => {
+                navigate('SwitchKeyringScreen');
+              }}
+              data-testid="wallet-management-entry"
+            >
+              <Text
+                text={
+                  currentKeyring.type === KeyringType.ColdWalletKeyring
+                    ? `❄️  ${currentKeyring.alianName}`
+                    : currentKeyring.alianName
+                }
+                size="xxs"
+                ellipsis
+                style={{ maxWidth: 100, lineHeight: '16px' }}
+              />
+            </Card>
+          )
         }
         RightComponent={
-          <Row itemsCenter style={{ gap: 8 }}>
-            <FeeRateIcon />
+          screen === 'assets' ? (
             <SwitchNetworkBar />
-            <SidePanelExpand />
-          </Row>
+          ) : (
+            <Row itemsCenter style={{ gap: 8 }}>
+              <FeeRateIcon />
+              <SwitchNetworkBar />
+              <SidePanelExpand />
+            </Row>
+          )
         }
       />
 
