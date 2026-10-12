@@ -201,7 +201,7 @@ export default function WalletTabScreen({ screen = 'home' }: { screen?: 'home' |
     if (supportedAssets.assets.brc20) {
       items.push({
         key: AssetTabKey.BRC20,
-        label: 'BRC20',
+        label: t('brc20'),
         children: <BRC20Tab />
       });
     }
