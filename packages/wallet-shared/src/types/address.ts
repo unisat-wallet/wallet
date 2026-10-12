@@ -38,6 +38,22 @@ export interface AddressAssetSummary {
   alkanesCollectionCount: number
 }
 
+export type AddressAssetOverviewItem =
+  | {
+      kind: 'brc20' | 'rune' | 'alkanes'
+      tokenId: string
+      name: string
+      symbol: string
+      logo: string
+      divisibility: number
+      balance: string
+    }
+  | { kind: 'ord-collection'; collectionId: string; name: string; logo: string; count: number }
+  | { kind: 'alkanes-collection'; alkaneid: string; name: string; image: string; count: number }
+  | { kind: 'cat721-collection'; collectionId: string; name: string; count: number; contentType: string; previewLocalIds: number[] }
+  | { kind: 'domain'; category: string; count: number }
+  | { kind: 'inscription-summary'; total: number }
+
 export enum AddressFlagType {
   Is_Enable_Atomicals = 0b1, // deprecated
   CONFIRMED_UTXO_MODE = 0b10,

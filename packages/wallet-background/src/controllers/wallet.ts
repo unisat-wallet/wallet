@@ -3441,6 +3441,10 @@ export class WalletController extends BaseController {
     return walletApiService.bitcoin.getAddressAssetSummary(address)
   }
 
+  getAddressAssetOverview = async (address: string) => {
+    return walletApiService.bitcoin.getAddressAssetOverview(address)
+  }
+
   setPsbtSignNonSegwitEnable(psbt: bitcoin.Psbt, enabled: boolean) {
     // eslint-disable-next-line @typescript-eslint/ban-ts-comment
     //@ts-ignore

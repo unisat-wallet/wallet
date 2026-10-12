@@ -8,6 +8,7 @@ import {
   AddressHistoryTxDetail,
   AddressAlkanesTokenSummary,
   AddressAssetSummary,
+  AddressAssetOverviewItem,
   AddressFlagType,
   AddressRunesTokenSummary,
   AddressSummary,
@@ -432,6 +433,7 @@ export interface WalletController {
 
   getAddressSummary(address: string): Promise<AddressSummary>
   getAddressAssetSummary(address: string): Promise<AddressAssetSummary>
+  getAddressAssetOverview(address: string): Promise<{ list: AddressAssetOverviewItem[] }>
 
   getShowSafeNotice(): Promise<boolean>
   setShowSafeNotice(show: boolean): Promise<void>

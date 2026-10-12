@@ -1,0 +1,212 @@
+.section {
+  box-sizing: border-box;
+  width: calc(100% + 32px);
+  margin: 0 -16px;
+  padding: 11px 0 19px;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 32px;
+  padding: 0 16px;
+}
+
+.title {
+  color: #fff;
+  font-family: Inter-Regular, sans-serif;
+  font-size: 16px;
+  font-weight: 500;
+  line-height: 20px;
+}
+
+.viewAll {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 32px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: rgba(255, 255, 255, 0.65);
+  font-family: Inter-Regular, sans-serif;
+  font-size: 14px;
+  line-height: 16px;
+  cursor: pointer;
+}
+
+.viewAll img {
+  display: block;
+  width: 12px;
+  height: 6.7301px;
+  transform: rotate(-90deg);
+}
+
+.cardViewport {
+  position: relative;
+  margin-top: 8px;
+  overflow: hidden;
+}
+
+.cardViewport::before,
+.cardViewport::after {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  z-index: 1;
+  width: 24px;
+  content: '';
+  pointer-events: none;
+}
+
+.cardViewport::before {
+  left: 0;
+  background: linear-gradient(90deg, #070606, rgba(7, 6, 6, 0));
+}
+
+.cardViewport::after {
+  right: 0;
+  background: linear-gradient(270deg, #070606, rgba(7, 6, 6, 0));
+}
+
+.cardRow {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  padding: 0 16px;
+  scrollbar-width: none;
+}
+
+.cardRow::-webkit-scrollbar {
+  display: none;
+}
+
+.card {
+  display: flex;
+  flex: 0 0 121px;
+  align-items: center;
+  box-sizing: border-box;
+  width: 121px;
+  height: 60px;
+  gap: 8px;
+  padding: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 16px;
+  background: #1e1f24;
+  color: #fff;
+  text-align: left;
+  cursor: pointer;
+}
+
+.iconFrame {
+  position: relative;
+  display: block;
+  flex: 0 0 28px;
+  width: 28px;
+  height: 28px;
+}
+
+.iconImage,
+.domainBackground,
+.iconFallback {
+  display: block;
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+}
+
+.iconImage {
+  object-fit: cover;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  box-sizing: border-box;
+}
+
+.domainBackground {
+  border-radius: 50%;
+}
+
+.iconFallback {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #343742;
+  color: rgba(255, 255, 255, 0.9);
+  font-size: 11px;
+  font-weight: 500;
+}
+
+.domainLabel {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  color: rgba(255, 255, 255, 0.9);
+  font-size: 13px;
+}
+
+.ordinalsBadge {
+  position: absolute;
+  right: -5px;
+  bottom: -5px;
+  width: 17px;
+  height: 17px;
+}
+
+.cardText {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.cardName {
+  overflow: hidden;
+  color: #fff;
+  font-family: Inter-Regular, sans-serif;
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 20px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tokenAmount,
+.itemCount {
+  overflow: hidden;
+  font-size: 12px;
+  line-height: 16px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tokenAmount {
+  color: rgba(255, 255, 255, 0.9);
+  font-weight: 700;
+}
+
+.itemCount {
+  color: rgba(255, 255, 255, 0.6);
+}
+
+.emptyRow {
+  display: flex;
+  align-items: center;
+  height: 60px;
+  margin-top: 8px;
+  padding: 0 16px;
+  color: rgba(255, 255, 255, 0.5);
+  font-size: 12px;
+}
+
+.retry {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: #f4b62c;
+  cursor: pointer;
+}

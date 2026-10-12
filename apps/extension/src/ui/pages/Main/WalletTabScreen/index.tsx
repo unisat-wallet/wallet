@@ -49,6 +49,7 @@ import { RGBHomeTabs } from './RGBHomeTabs';
 import { RunesList } from './RunesList';
 import { SidePanelExpand } from './SidePanelExpand';
 import { AnnouncementCard } from './components/AnnouncementCard';
+import { AssetOverviewSection } from './components/AssetOverviewSection';
 import { BalanceCard } from './components/BalanceCard';
 import { HomeTips } from './components/HomeTips';
 import { WalletActions } from './components/WalletActions';
@@ -345,6 +346,7 @@ export default function WalletTabScreen({ screen = 'home' }: { screen?: 'home' |
             <BalanceCard />
             <WalletActions chain={chain} />
             <AnnouncementCard />
+            <AssetOverviewSection />
             <AddressHistorySection preview />
           </Column>
         </>
