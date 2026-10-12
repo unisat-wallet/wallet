@@ -225,7 +225,7 @@ export function getSupportedAssets(
 
   if (chainType === ChainType.BITCOIN_MAINNET || chainType === ChainType.BITCOIN_SIGNET) {
     assets.alkanes = true
-    assetTabKeys.push(AssetTabKey.MORE)
+    assetTabKeys.push(AssetTabKey.ALKANES)
   }
 
   const isRgbNetwork = Boolean(chain.rgbProxyEndpoints?.some(endpoint => endpoint.trim()))

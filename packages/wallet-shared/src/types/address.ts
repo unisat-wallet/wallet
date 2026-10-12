@@ -30,6 +30,14 @@ export interface AddressSummary {
   loading?: boolean
 }
 
+export interface AddressAssetSummary {
+  brc20Count: number
+  runesCount: number
+  alkanesCount: number
+  inscriptionCount: number
+  alkanesCollectionCount: number
+}
+
 export enum AddressFlagType {
   Is_Enable_Atomicals = 0b1, // deprecated
   CONFIRMED_UTXO_MODE = 0b10,

@@ -307,7 +307,7 @@ const slice: Slice<UIState> = createSlice({
         state.moreAssetTabKey = MoreAssetTabKey.ALKANES_TOKEN
       }
       if (state.assetTabKey === (4 as AssetTabKey)) {
-        state.assetTabKey = AssetTabKey.MORE
+        state.assetTabKey = AssetTabKey.ALKANES
       }
       if (state.walletView !== WalletView.RGB && state.walletView !== WalletView.BITCOIN) {
         state.walletView = WalletView.BITCOIN

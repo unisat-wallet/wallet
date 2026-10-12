@@ -19,10 +19,11 @@ interface TabsProps {
   items: TabItem[];
   preset?: string;
   tabBar?: React.ReactNode;
+  trailingAction?: React.ReactNode;
   onTabClick: (key: string) => void;
 }
 
-export function Tabs({ preset, items, defaultActiveKey, activeKey, onTabClick }: TabsProps) {
+export function Tabs({ preset, items, defaultActiveKey, activeKey, onTabClick, trailingAction }: TabsProps) {
   const [activeTab, setActiveTab] = useState(defaultActiveKey);
 
   const renderedTabs = useRef<Set<string>>(new Set([defaultActiveKey]));
@@ -81,29 +82,32 @@ export function Tabs({ preset, items, defaultActiveKey, activeKey, onTabClick }:
             backgroundColor: '#070606',
             ...bleedStyle
           }}>
-          <Row style={{ padding: 0, height: 50, gap: spacing.medium, paddingLeft: spacing.medium, paddingRight: spacing.medium, overflowX: 'auto' }}>
-            {items.map((item) => {
-              const isActiveItem = item.key === activeTab;
-              return (
-                <Row key={item.key} style={{ flexShrink: 0 }} onClick={() => onTabClick(item.key)} data-testid={`tab-item-${item.key}`}>
-                  <Column gap="zero" justifyCenter itemsCenter>
-                    {typeof item.label === 'string' ? (
-                      <Text text={item.label} color={isActiveItem ? 'gold' : 'textDim'} size="md" />
-                    ) : (
-                      item.label
-                    )}
-                    <Row
-                      style={{
-                        width: '100%',
-                        borderBottomWidth: 2,
-                        paddingBottom: 10,
-                        borderColor: isActiveItem ? colors.gold : colors.transparent
-                      }}
-                    />
-                  </Column>
-                </Row>
-              );
-            })}
+          <Row style={{ height: 50, gap: 0, alignItems: 'stretch' }}>
+            <Row style={{ flex: 1, minWidth: 0, gap: spacing.medium, paddingLeft: spacing.medium, paddingRight: trailingAction ? 0 : spacing.medium, overflowX: 'auto' }}>
+              {items.map((item) => {
+                const isActiveItem = item.key === activeTab;
+                return (
+                  <Row key={item.key} style={{ flexShrink: 0 }} onClick={() => onTabClick(item.key)} data-testid={`tab-item-${item.key}`}>
+                    <Column gap="zero" justifyCenter itemsCenter>
+                      {typeof item.label === 'string' ? (
+                        <Text text={item.label} color={isActiveItem ? 'gold' : 'textDim'} size="md" />
+                      ) : (
+                        item.label
+                      )}
+                      <Row
+                        style={{
+                          width: '100%',
+                          borderBottomWidth: 2,
+                          paddingBottom: 10,
+                          borderColor: isActiveItem ? colors.gold : colors.transparent
+                        }}
+                      />
+                    </Column>
+                  </Row>
+                );
+              })}
+            </Row>
+            {trailingAction ? <Row style={{ flexShrink: 0, alignItems: 'center', paddingLeft: 8, paddingRight: spacing.medium, backgroundColor: '#070606' }}>{trailingAction}</Row> : null}
           </Row>
           <div
             style={{
@@ -116,7 +120,7 @@ export function Tabs({ preset, items, defaultActiveKey, activeKey, onTabClick }:
         </Column>
       );
     }
-  }, [items, activeTab, onTabClick, preset]);
+  }, [items, activeTab, onTabClick, preset, trailingAction]);
 
   return (
     <Column gap="sm">

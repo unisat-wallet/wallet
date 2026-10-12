@@ -7,6 +7,7 @@ import {
   AddressHistorySummaryPage,
   AddressHistoryTxDetail,
   AddressAlkanesTokenSummary,
+  AddressAssetSummary,
   AddressFlagType,
   AddressRunesTokenSummary,
   AddressSummary,
@@ -430,6 +431,7 @@ export interface WalletController {
   formatOptionsToSignInputs(psbtHex: string, options?: SignPsbtOptions): Promise<ToSignInput[]>
 
   getAddressSummary(address: string): Promise<AddressSummary>
+  getAddressAssetSummary(address: string): Promise<AddressAssetSummary>
 
   getShowSafeNotice(): Promise<boolean>
   setShowSafeNotice(show: boolean): Promise<void>

@@ -21,7 +21,7 @@ describe('ui reducer', () => {
       updateVersion()
     )
 
-    expect(state.assetTabKey).toBe(AssetTabKey.MORE)
+    expect(state.assetTabKey).toBe(AssetTabKey.ALKANES)
     expect(state.moreAssetTabKey).toBe(MoreAssetTabKey.ALKANES_TOKEN)
     expect(state.walletView).toBe(WalletView.BITCOIN)
   })

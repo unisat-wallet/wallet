@@ -1,22 +1,23 @@
-import { useEffect, useState } from 'react';
-
 import { BottomSheetHeader, Icon, Inline, Stack, Text } from '@/ui/components';
 import { BottomModal } from '@/ui/components/BottomModal';
-import { MoreAssetTabKey, useI18n, useSupportedAssets } from '@unisat/wallet-state';
+import type { IconTypes } from '@/ui/components/Icon';
+import { AssetTabKey, MoreAssetTabKey, useI18n } from '@unisat/wallet-state';
+
+export interface MoreActionItem {
+  label: string;
+  icon: IconTypes;
+  assetTabKey: AssetTabKey;
+  moreAssetTabKey?: MoreAssetTabKey;
+}
 
 export function MoreActionSheet(props: {
-  currentSelection?: MoreAssetTabKey;
+  items: MoreActionItem[];
+  currentSelection?: { assetTabKey: AssetTabKey; moreAssetTabKey?: MoreAssetTabKey };
   onClose: () => void;
-  onSelect: (selection: MoreAssetTabKey) => void;
+  onSelect: (selection: MoreActionItem) => void;
 }) {
-  const { currentSelection, onClose, onSelect } = props;
+  const { items, currentSelection, onClose, onSelect } = props;
   const { t } = useI18n();
-  const supportedAssets = useSupportedAssets();
-  const [selected, setSelected] = useState<MoreAssetTabKey | undefined>(currentSelection);
-
-  useEffect(() => {
-    setSelected(currentSelection);
-  }, [currentSelection]);
 
   return (
     <BottomModal onClose={onClose} bodyStyle={{ padding: 0 }}>
@@ -31,28 +32,16 @@ export function MoreActionSheet(props: {
             gap: 12,
             boxSizing: 'border-box'
           }}>
-          {supportedAssets.assets.alkanes ? (
-            <>
-              <MoreActionRow
-                label={t('alkanes')}
-                icon="alkanes"
-                selected={selected === MoreAssetTabKey.ALKANES_TOKEN}
-                onClick={() => {
-                  setSelected(MoreAssetTabKey.ALKANES_TOKEN);
-                  onSelect(MoreAssetTabKey.ALKANES_TOKEN);
-                }}
-              />
-              <MoreActionRow
-                label={t('alkanes_collections')}
-                icon="alkanes"
-                selected={selected === MoreAssetTabKey.ALKANES_COLLECTION}
-                onClick={() => {
-                  setSelected(MoreAssetTabKey.ALKANES_COLLECTION);
-                  onSelect(MoreAssetTabKey.ALKANES_COLLECTION);
-                }}
-              />
-            </>
-          ) : null}
+          {items.map((item) => (
+            <MoreActionRow
+              key={`${item.assetTabKey}:${item.moreAssetTabKey || ''}`}
+              label={item.label}
+              icon={item.icon}
+              selected={currentSelection?.assetTabKey === item.assetTabKey &&
+                (item.assetTabKey !== AssetTabKey.ALKANES || currentSelection.moreAssetTabKey === item.moreAssetTabKey)}
+              onClick={() => onSelect(item)}
+            />
+          ))}
         </Stack>
       </Stack>
     </BottomModal>
@@ -62,13 +51,11 @@ export function MoreActionSheet(props: {
 function MoreActionRow({
   label,
   icon,
-  tag,
   onClick,
   selected
 }: {
   label: string;
-  icon: 'alkanes';
-  tag?: string;
+  icon: IconTypes;
   onClick: () => void;
   selected: boolean;
 }) {
@@ -90,16 +77,6 @@ function MoreActionRow({
       }}>
       <Icon icon={icon} size={18} />
       <Text text={label} style={{ fontSize: 14, color: 'rgba(255,255,255,0.78)', fontWeight: 400 }} />
-      {tag ? (
-        <Text
-          text={tag}
-          size="xs"
-          color="white_muted"
-          px="sm"
-          py="sm"
-          style={{ borderRadius: 4, backgroundColor: 'rgba(255,255,255,0.12)' }}
-        />
-      ) : null}
     </Inline>
   );
 }
