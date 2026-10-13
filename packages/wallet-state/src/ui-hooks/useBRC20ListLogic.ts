@@ -1,13 +1,11 @@
-import { TickPriceItem, TokenBalance } from '@unisat/wallet-shared'
+import { Brc20TickFilter, TickPriceItem, TokenBalance } from '@unisat/wallet-shared'
 import { useEffect, useRef, useState } from 'react'
 import {
   AssetTabKey,
-  OrdinalsAssetTabKey,
   useAssetTabKey,
   useChainType,
   useCurrentAccount,
   useNavigation,
-  useOrdinalsAssetTabKey,
   useWallTabFocusRefresh,
   useWallet,
 } from '..'
@@ -47,6 +45,7 @@ export function useBRC20ListLogic() {
         address: currentAccount.address,
         currentPage: page,
         pageSize,
+        tickFilter: Brc20TickFilter.TICK_BYTES_4_5_6,
       })
       if (list.length > 0) {
         wallet.getBrc20sPrice(list.map(item => item.ticker)).then(updatePrices)
@@ -56,10 +55,8 @@ export function useBRC20ListLogic() {
     dependencies: [currentAccount.address, chainType],
   })
 
-  const tabKey = useOrdinalsAssetTabKey()
   const assetTabKey = useAssetTabKey()
-  const isFocus = assetTabKey === AssetTabKey.BRC20 &&
-    (tabKey === OrdinalsAssetTabKey.BRC20 || tabKey === OrdinalsAssetTabKey.ALL)
+  const isFocus = assetTabKey === AssetTabKey.BRC20
   const lastRefreshTimeRef = useRef<number>(0)
   const walletTabFocusRefresh = useWallTabFocusRefresh()
   useEffect(() => {

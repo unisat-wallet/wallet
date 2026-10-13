@@ -89,6 +89,7 @@ import { baseUtils, bnUtils, paramsUtils } from '@unisat/base-utils'
 import {
   ADDRESS_TYPES,
   AddressFlagType,
+  Brc20TickFilter,
   BRAND_ALIAN_TYPE_TEXT,
   KEYRING_TYPES,
   NETWORK_TYPES,
@@ -3257,10 +3258,12 @@ export class WalletController extends BaseController {
     address,
     currentPage,
     pageSize,
+    tickFilter,
   }: {
     address: string
     currentPage: number
     pageSize: number
+    tickFilter?: Brc20TickFilter.TICK_BYTES_4_5_6
   }) => {
     const cursor = (currentPage - 1) * pageSize
     const size = pageSize
@@ -3269,6 +3272,7 @@ export class WalletController extends BaseController {
       address,
       cursor,
       size,
+      ...(tickFilter === undefined ? {} : { tickFilter }),
     })
 
     return {

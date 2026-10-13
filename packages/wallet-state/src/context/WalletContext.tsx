@@ -21,6 +21,7 @@ import {
   AppInfo,
   AppSummary,
   BRC20HistoryItem,
+  Brc20TickFilter,
   BabylonAddressSummary,
   BitcoinBalance,
   BitcoinBalanceV2,
@@ -369,10 +370,12 @@ export interface WalletController {
     address,
     currentPage,
     pageSize,
+    tickFilter,
   }: {
     address: string
     currentPage: number
     pageSize: number
+    tickFilter?: Brc20TickFilter.TICK_BYTES_4_5_6
   }): Promise<{ currentPage: number; pageSize: number; total: number; list: TokenBalance[] }>
 
   getBRC20ProgList({

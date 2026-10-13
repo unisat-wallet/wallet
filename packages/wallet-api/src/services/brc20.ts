@@ -3,6 +3,7 @@
  */
 
 import type { BaseHttpClient } from '../client/http-client'
+import { Brc20TickFilter } from '@unisat/wallet-shared'
 import type {
   AddressTokenSummary,
   BRC20HistoryItem,
@@ -37,13 +38,20 @@ export class BRC20Service {
     address,
     cursor,
     size,
+    tickFilter,
   }: {
     address: string
     cursor: number
     size: number
+    tickFilter?: Brc20TickFilter.TICK_BYTES_4_5_6
   }): Promise<{ list: TokenBalance[]; total: number }> {
     return this.httpClient.get('/v5/brc20/list', {
-      query: { address, cursor, size },
+      query: {
+        address,
+        cursor,
+        size,
+        ...(tickFilter === undefined ? {} : { tick_filter: tickFilter }),
+      },
     })
   }
 

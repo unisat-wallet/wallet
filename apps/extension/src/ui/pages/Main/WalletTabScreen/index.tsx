@@ -11,7 +11,7 @@ import { Tabs } from '@/ui/components/Tabs';
 import { VersionNotice } from '@/ui/components/VersionNotice';
 import { getCurrentTab } from '@/ui/web/tabs';
 import { KeyringType } from '@unisat/keyring-service/types';
-import { AddressAssetSummary, VersionDetail } from '@unisat/wallet-shared';
+import { AddressAssetSummary, Brc20TickFilter, VersionDetail } from '@unisat/wallet-shared';
 import '@unisat/wallet-state';
 import {
   AssetTabKey,
@@ -144,6 +144,7 @@ export default function WalletTabScreen({ screen = 'home' }: { screen?: 'home' |
   const [assetCounts, setAssetCounts] = useState<{
     key: string;
     summary: AddressAssetSummary;
+    brc20Count: number;
     rgbCount: number;
   } | null>(null);
   const [assetCountErrorKey, setAssetCountErrorKey] = useState<string | null>(null);
@@ -205,11 +206,24 @@ export default function WalletTabScreen({ screen = 'home' }: { screen?: 'home' |
         ? wallet.getRgbFeatureStatus().then((status) => status.enabled && status.supported
           ? wallet.getRGBList('', 1, 1, { skipSync: true }).then((result) => result.total)
           : 0)
-        : Promise.resolve(0)
+        : Promise.resolve(0),
+      supportedAssets.assets.brc20
+        ? wallet.getBRC20List({
+            address: currentAccount.address,
+            currentPage: 1,
+            pageSize: 1,
+            tickFilter: Brc20TickFilter.TICK_BYTES_4_5_6
+          }).then((result) => result.total).catch(() => null)
+        : Promise.resolve(null)
     ])
-      .then(([summary, rgbCount]) => {
+      .then(([summary, rgbCount, brc20Count]) => {
         if (active) {
-          setAssetCounts({ key: assetContextKey, summary, rgbCount });
+          setAssetCounts({
+            key: assetContextKey,
+            summary,
+            brc20Count: Math.max(summary.brc20Count, brc20Count ?? 0),
+            rgbCount
+          });
           setAssetCountErrorKey(null);
         }
       })
@@ -218,7 +232,7 @@ export default function WalletTabScreen({ screen = 'home' }: { screen?: 'home' |
         if (active) setAssetCountErrorKey(assetContextKey);
       });
     return () => { active = false; };
-  }, [screen, assetContextKey, walletTabFocusRefresh, isRgbActive, supportedAssets.assets.rgb, wallet]);
+  }, [screen, assetContextKey, walletTabFocusRefresh, isRgbActive, supportedAssets.assets.rgb, supportedAssets.assets.brc20, wallet]);
 
   const effectiveAssetTabKey = assetTabKey === AssetTabKey.MORE ? AssetTabKey.ALKANES : assetTabKey;
   const isRgbAssetTab = screen === 'assets' && effectiveAssetTabKey === AssetTabKey.RGB;
@@ -284,12 +298,12 @@ export default function WalletTabScreen({ screen = 'home' }: { screen?: 'home' |
   const counts = assetCounts?.key === assetContextKey ? assetCounts : null;
   const assetTabsLoading = !counts && assetCountErrorKey !== assetContextKey;
   const hasAnyAsset = counts ? (
-    counts.summary.brc20Count + counts.summary.inscriptionCount + counts.summary.runesCount +
+    counts.brc20Count + counts.summary.inscriptionCount + counts.summary.runesCount +
     counts.summary.alkanesCount + counts.summary.alkanesCollectionCount + counts.rgbCount > 0
   ) : false;
   const showAllBaseTabs = (!counts && !assetTabsLoading) || Boolean(counts && !hasAnyAsset);
   const tabCounts = [
-    { key: AssetTabKey.BRC20, supported: supportedAssets.assets.brc20, count: counts?.summary.brc20Count ?? 0 },
+    { key: AssetTabKey.BRC20, supported: supportedAssets.assets.brc20, count: counts?.brc20Count ?? 0 },
     { key: AssetTabKey.ORDINALS, supported: supportedAssets.assets.ordinals, count: counts?.summary.inscriptionCount ?? 0 },
     { key: AssetTabKey.RUNES, supported: supportedAssets.assets.runes, count: counts?.summary.runesCount ?? 0 },
     { key: AssetTabKey.RGB, supported: supportedAssets.assets.rgb, count: counts?.rgbCount ?? 0 },
