@@ -341,13 +341,14 @@ export class RgbTransferQuery {
       ...visibleLocalReceiveHistory,
       ...remoteItems,
     ].sort((left, right) => right.timestamp - left.timestamp)
+    // Local records appear on page one, but every page must report the same total.
     const localOnlyTransferKeys = new Set(
       [
-        ...visibleLocalSends,
-        ...visibleLocalIssues,
-        ...visibleLocalHistory.filter(send => send.status !== 'broadcasted'),
-        ...visibleLocalReceives,
-        ...visibleLocalReceiveHistory,
+        ...localSends,
+        ...localIssues,
+        ...localSendHistory.filter(send => send.status !== 'broadcasted'),
+        ...localReceives,
+        ...localReceiveHistory,
       ]
         .map(item => ('transferId' in item ? item.transferId : undefined) ?? item.txid ?? item.id)
         .filter(Boolean)
@@ -356,7 +357,12 @@ export class RgbTransferQuery {
     return {
       currentPage,
       pageSize,
-      total: Math.max(activity.total + localOnlyTransferKeys.size, list.length),
+      // When the first remote page contains every remote record, `list` is the
+      // complete deduplicated history. Adding local records to the remote total
+      // would count transfers present in both sources twice.
+      total: currentPage === 1 && activity.list.length >= activity.total
+        ? list.length
+        : Math.max(activity.total + localOnlyTransferKeys.size, list.length),
       list,
     }
   }

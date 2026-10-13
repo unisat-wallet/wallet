@@ -26,6 +26,8 @@ interface InfiniteListProps<T> {
   emptyMarketplace?: boolean;
   /** Vertical gap between rows. Use 0 for bordered history-style lists. */
   rowGap?: number;
+  /** Number of items shown per UI page; independent of the fetch batch size. */
+  pageSize?: number;
   /** Show the total number of assets above the list. */
   countUnit?: 'asset' | 'collection' | 'inscription';
 }
@@ -46,10 +48,11 @@ export function InfiniteList<T>({
   emptyPreset = 'assets',
   emptyMarketplace = false,
   rowGap = 8,
+  pageSize = 20,
   countUnit
 }: InfiniteListProps<T>) {
   const { t } = useI18n();
-  const [pagination, setPagination] = useState({ currentPage: 1, pageSize: 20 });
+  const [pagination, setPagination] = useState({ currentPage: 1, pageSize });
   const containerRef = useRef<HTMLDivElement>(null);
   const countLabel = countUnit === 'collection'
     ? t(total === 1 ? 'collection' : 'collections')
@@ -72,6 +75,12 @@ export function InfiniteList<T>({
   useEffect(() => {
     setPagination({ currentPage: 1, pageSize: pagination.pageSize });
   }, [total]);
+
+  useEffect(() => {
+    setPagination((current) =>
+      current.pageSize === pageSize ? current : { currentPage: 1, pageSize }
+    );
+  }, [pageSize]);
 
   const gridRows = useMemo(() => {
     const rows: T[][] = [];

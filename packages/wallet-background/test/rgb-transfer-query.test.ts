@@ -4,6 +4,94 @@ import { toRgbDisplayAmount } from '@unisat/wallet-shared'
 import { RgbTransferQuery } from '../src/rgb/RgbTransferQuery'
 
 describe('RgbTransferQuery', () => {
+  it('does not create a second page when local history overlaps all remote activity', async () => {
+    const localHistory = Array.from({ length: 18 }, (_, index) => ({
+      transferId: `receive-${index}`,
+      assetId: 'rgb:asset',
+      amount: '1',
+      txid: String(index).padStart(64, '0'),
+      createdAt: index,
+      status: 'settled',
+    }))
+    const service = {
+      getPendingTransfers: vi.fn().mockReturnValue([]),
+      getPendingSendHistory: vi.fn().mockReturnValue([]),
+      getIssueHistory: vi.fn().mockReturnValue([]),
+      getPendingReceiveHistory: vi.fn().mockReturnValue(localHistory),
+      getPendingReceives: vi.fn().mockReturnValue([]),
+    }
+    const context = {
+      service,
+      wallet: { walletId: 'wallet', fundingAddress: 'funding', network: 'mainnet' },
+    }
+    const remoteHistory = localHistory.slice(0, 13).map((item, index) => ({
+      id: `remote-${index}`,
+      assetId: item.assetId,
+      type: 'receive',
+      amount: item.amount,
+      txid: item.txid,
+      timestamp: item.createdAt,
+      status: 'settled',
+    }))
+    const query = new RgbTransferQuery({
+      getContext: vi.fn().mockResolvedValue(context),
+      syncReceiveHistory: vi.fn(),
+      syncPendingTransfers: vi.fn(),
+      syncReceivedAllocations: vi.fn().mockResolvedValue(context),
+      getRemoteActivity: vi.fn().mockResolvedValue({ total: 13, list: remoteHistory }),
+      warn: vi.fn(),
+    })
+
+    const firstPage = await query.getTransfers(1, 20, { skipSync: true })
+
+    expect(firstPage.list).toHaveLength(18)
+    expect(firstPage.total).toBe(18)
+  })
+
+  it('keeps the total stable across pages when a local transfer appears only on page one', async () => {
+    const service = {
+      getPendingTransfers: vi.fn().mockReturnValue([{
+        id: 'local-send',
+        request: { assetId: 'rgb:asset', amount: '1', precision: 0 },
+        createdAt: 1,
+      }]),
+      getPendingSendHistory: vi.fn().mockReturnValue([]),
+      getIssueHistory: vi.fn().mockReturnValue([]),
+      getPendingReceiveHistory: vi.fn().mockReturnValue([]),
+      getPendingReceives: vi.fn().mockReturnValue([]),
+    }
+    const context = {
+      service,
+      wallet: { walletId: 'wallet', fundingAddress: 'funding', network: 'mainnet' },
+    }
+    const remoteItems = Array.from({ length: 21 }, (_, index) => ({
+      id: `remote-${index}`,
+      type: 'receive',
+      amount: '1',
+      timestamp: index,
+      status: 'settled',
+    }))
+    const query = new RgbTransferQuery({
+      getContext: vi.fn().mockResolvedValue(context),
+      syncReceiveHistory: vi.fn(),
+      syncPendingTransfers: vi.fn(),
+      syncReceivedAllocations: vi.fn().mockResolvedValue(context),
+      getRemoteActivity: vi.fn().mockImplementation((_address, page, pageSize) =>
+        Promise.resolve({ total: remoteItems.length, list: remoteItems.slice((page - 1) * pageSize, page * pageSize) })
+      ),
+      warn: vi.fn(),
+    })
+
+    const firstPage = await query.getTransfers(1, 20, { skipSync: true })
+    const secondPage = await query.getTransfers(2, 20, { skipSync: true })
+
+    expect(firstPage.total).toBe(22)
+    expect(secondPage.total).toBe(firstPage.total)
+    expect(firstPage.list).toHaveLength(21)
+    expect(secondPage.list).toHaveLength(1)
+    expect(secondPage.list[0]?.id).toBe('remote-20')
+  })
+
   it('keeps the sender precision for a witness invoice with any asset and amount', async () => {
     const service = {
       getPendingTransfers: vi.fn().mockReturnValue([{

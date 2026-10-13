@@ -10,6 +10,8 @@ type RGBTransfersListProps = {
   transfers: ReturnType<typeof useRGBTransfersLogic>;
 };
 
+const RGB_TRANSFERS_PAGE_SIZE = 10;
+
 function getTransferId(transfer: RgbTransferItem) {
   return transfer.transferId || transfer.id;
 }
@@ -37,6 +39,7 @@ export function RGBTransfersList({ transfers }: RGBTransfersListProps) {
         emptyText={t('empty')}
         emptyPreset="assets"
         rowGap={0}
+        pageSize={RGB_TRANSFERS_PAGE_SIZE}
         renderItem={({ item }) => {
           const displayItem: RgbTransferItem =
             acceptedTransferIds.has(getTransferId(item)) &&
@@ -47,7 +50,7 @@ export function RGBTransfersList({ transfers }: RGBTransfersListProps) {
           const itemIndex = items.indexOf(item);
           const date = getRgbTransferDateKey(item.timestamp);
           const previousDate = itemIndex > 0 ? getRgbTransferDateKey(items[itemIndex - 1]?.timestamp) : '';
-          const showDate = Boolean(date && date !== previousDate);
+          const showDate = Boolean(date && (itemIndex % RGB_TRANSFERS_PAGE_SIZE === 0 || date !== previousDate));
           return (
             <RGBTransferListItem
               item={displayItem}
