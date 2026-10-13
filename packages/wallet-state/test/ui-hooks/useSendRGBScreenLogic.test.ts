@@ -171,6 +171,50 @@ describe('useSendRGBScreenLogic', () => {
     )
   })
 
+  it.each([
+    ['blind, any asset', '~', 'bc:utxob:test'],
+    ['blind, fixed asset', 'test-asset', 'bc:utxob:test'],
+    ['witness, any asset', '~', 'bc:txout:test'],
+    ['witness, fixed asset', 'test-asset', 'bc:txout:test'],
+  ])('uses 18-digit asset precision for %s any-amount invoices', async (_case, invoiceAsset, recipientId) => {
+    const assetId = 'rgb:test-asset'
+    const invoice = `rgb:${invoiceAsset}/~/~/${recipientId}?endpoints=rpc://proxy`
+    const { wrapper, wallet } = createHookTestHarness({
+      routeState: {
+        assetId,
+        tokenBalance: {
+          assetId,
+          ticker: 'RGB',
+          precision: 18,
+          spendable: '1000000000000000000',
+        },
+      },
+    })
+    wallet.createRgbSendBegin = vi.fn().mockResolvedValue({ toSignData: {} })
+    const { result, unmount } = renderHook(() => useSendRGBScreenLogic(), { wrapper })
+
+    act(() => {
+      result.current.onInvoiceChange(invoice)
+      result.current.onAmountChange('0.123456789012345678')
+    })
+
+    expect(result.current.assetPrecision).toBe(18)
+    expect(result.current.requiresAmount).toBe(true)
+    expect(result.current.isAmountValid).toBe(true)
+    expect(result.current.disabled).toBe(false)
+
+    await act(async () => {
+      await result.current.onClickNext()
+    })
+    expect(wallet.createRgbSendBegin).toHaveBeenCalledWith(
+      expect.objectContaining({ amount: '123456789012345678', precision: 18 })
+    )
+
+    act(() => result.current.onAmountChange('0.1234567890123456789'))
+    expect(result.current.isAmountValid).toBe(false)
+    unmount()
+  })
+
   it('reports an amount that exceeds the RGB token precision', async () => {
     const assetId = 'rgb:test-asset'
     const invoice = 'rgb:test-asset/~/~/bc:utxob:test?endpoints=rpc://proxy'

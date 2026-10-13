@@ -103,15 +103,16 @@ const fieldHeaderStyle: CSSProperties = {
   alignItems: 'center'
 };
 
-function isValidAmountInput(value: string, options: { disableDecimal?: boolean; runesDecimal?: number }) {
+function isValidAmountInput(value: string, options: { disableDecimal?: boolean; decimalPlaces?: number; runesDecimal?: number }) {
   if (value === '') return true;
 
   if (options.disableDecimal) {
     return /^[1-9]\d*$/.test(value);
   }
 
-  if (options.runesDecimal !== undefined) {
-    const regex = new RegExp(`^(0(\\.\\d{0,${options.runesDecimal}})?|[1-9]\\d*\\.?\\d{0,${options.runesDecimal}})$`);
+  const decimalPlaces = options.decimalPlaces ?? options.runesDecimal;
+  if (decimalPlaces !== undefined) {
+    const regex = new RegExp(`^(0(\\.\\d{0,${decimalPlaces}})?|[1-9]\\d*\\.?\\d{0,${decimalPlaces}})$`);
     return regex.test(value);
   }
 
@@ -161,6 +162,7 @@ export type TransferAmountCardProps = {
   availableAmount: string;
   unit: string;
   amountMuted?: boolean;
+  decimalPlaces?: number;
   runesDecimal?: number;
   disableDecimal?: boolean;
   inputTestId?: string;
@@ -248,6 +250,7 @@ export function TransferAmountCard({
   availableAmount,
   unit,
   amountMuted = false,
+  decimalPlaces,
   runesDecimal,
   disableDecimal,
   inputTestId,
@@ -275,12 +278,12 @@ export function TransferAmountCard({
             onChange={(e) => {
               if (readOnly) return;
               const value = normalizeAmountValue(e.target.value);
-              if (isValidAmountInput(value, { disableDecimal, runesDecimal })) {
+              if (isValidAmountInput(value, { disableDecimal, decimalPlaces, runesDecimal })) {
                 onAmountChange(value);
               }
             }}
             placeholder={placeholder}
-            inputMode={runesDecimal !== undefined && runesDecimal > 0 ? 'decimal' : 'numeric'}
+            inputMode={(decimalPlaces ?? runesDecimal ?? 0) > 0 ? 'decimal' : 'numeric'}
             readOnly={readOnly}
             style={{ ...inputStyle, flex: 1, color: inputColor }}
             data-testid={inputTestId}

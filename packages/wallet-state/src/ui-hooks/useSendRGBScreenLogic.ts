@@ -555,6 +555,7 @@ export function useSendRGBScreenLogic() {
     tokenBalance,
     ticker,
     name,
+    assetPrecision,
     spendable,
     iconInfo,
     invoice,

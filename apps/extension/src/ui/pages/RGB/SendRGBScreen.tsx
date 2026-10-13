@@ -57,6 +57,7 @@ export default function SendRGBScreen() {
     t,
     ticker,
     name,
+    assetPrecision,
     spendable,
     iconInfo,
     invoice,
@@ -168,6 +169,7 @@ export default function SendRGBScreen() {
                 availableAmount={showLongNumber(spendable)}
                 unit={ticker}
                 amountMuted={amountMuted}
+                decimalPlaces={assetPrecision}
                 inputTestId="send-rgb-amount-input"
               />
               {amountInvalidVisible ? <Text text={amountValidationMessage} size="xs" color="danger" /> : null}
