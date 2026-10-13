@@ -81,18 +81,20 @@ function getTransferIcon(type: RgbTransferItem['type']): IconTypes {
 export function RGBTransferListItem({
   item,
   assetLabel,
+  showAssetLabel,
   showDate,
   showDirectionIcon,
   onClick
 }: {
   item: RgbTransferItem;
   assetLabel?: string;
+  showAssetLabel?: boolean;
   showDate?: boolean;
   showDirectionIcon?: boolean;
   onClick?: () => void;
 }) {
   const { t } = useI18n();
-  const resolvedAssetLabel = assetLabel || item.ticker || item.name || 'RGB';
+  const resolvedAssetLabel = assetLabel || item.ticker || item.name || item.assetId?.slice(0, 8) || 'RGB';
   const status = item.status.toLowerCase();
   const pending = isPending(item.status);
   const showStatus = item.type !== 'issue' && (pending || ['canceled', 'cancelled', 'rejected'].includes(status));
@@ -153,7 +155,21 @@ export function RGBTransferListItem({
                 </Row>
               ) : null}
             </Row>
-            {transferTime ? <Text text={transferTime} preset="sub" /> : null}
+            {showAssetLabel ? (
+              <Row itemsCenter gap="xs" style={{ minWidth: 0, overflow: 'hidden' }}>
+                <Text
+                  text={resolvedAssetLabel}
+                  size="sm"
+                  ellipsis
+                  style={{ minWidth: 0, color: 'rgba(255,255,255,0.75)' }}
+                />
+                {transferTime ? (
+                  <Text text={`· ${transferTime}`} preset="sub" style={{ flexShrink: 0 }} />
+                ) : null}
+              </Row>
+            ) : transferTime ? (
+              <Text text={transferTime} preset="sub" />
+            ) : null}
           </Column>
         </Row>
         {!isCanceledReceive ? (

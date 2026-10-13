@@ -50,7 +50,6 @@ export function RGBTokenHistory(props: {
   activityHasMore?: boolean;
   onLoadMoreActivity?: () => void;
   onRefreshActivity?: () => void;
-  showAssetTicker?: boolean;
   showDirectionIcon?: boolean;
 }) {
   const { t } = useI18n();
@@ -66,7 +65,6 @@ export function RGBTokenHistory(props: {
     activityHasMore = false,
     onLoadMoreActivity,
     onRefreshActivity,
-    showAssetTicker = false,
     showDirectionIcon = false
   } = props;
   const tokenName = displayName || ticker;
@@ -106,13 +104,10 @@ export function RGBTokenHistory(props: {
                 ? getRgbTransferDateKey(getActivityTimestamp(sortedActivityItems[itemIndex - 1]))
                 : '';
             const transfer = toTransferItem(item, ticker, tokenName, precision);
-            const assetLabel = showAssetTicker
-              ? item.ticker || item.name || item.assetId?.slice(0, 8) || ticker
-              : ticker;
             return (
               <RGBTransferListItem
                 item={transfer}
-                assetLabel={assetLabel}
+                assetLabel={ticker}
                 showDate={Boolean(date && date !== previousDate)}
                 showDirectionIcon={showDirectionIcon}
                 onClick={() => setSelectedTransfer(transfer)}

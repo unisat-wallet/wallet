@@ -51,6 +51,7 @@ export function RGBTransfersList({ transfers }: RGBTransfersListProps) {
           return (
             <RGBTransferListItem
               item={displayItem}
+              showAssetLabel
               showDate={showDate}
               onClick={() => setSelectedTransfer(displayItem)}
             />

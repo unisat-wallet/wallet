@@ -189,7 +189,6 @@ export type RouteParamList = {
 
   // RGB
   RGBIssueScreen: undefined
-  RGBHistoryScreen: undefined
   RGBTransfersScreen: undefined
   RGBReceiveScreen: {
     assetId?: string
