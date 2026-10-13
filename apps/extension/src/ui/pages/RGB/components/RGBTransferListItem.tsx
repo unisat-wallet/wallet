@@ -95,11 +95,14 @@ export function RGBTransferListItem({
 }) {
   const { t } = useI18n();
   const resolvedAssetLabel = assetLabel || item.ticker || item.name || item.assetId?.slice(0, 8) || 'RGB';
+  const assetSymbol = item.ticker?.trim() || resolvedAssetLabel;
+  const assetName = item.name?.trim() || '';
   const status = item.status.toLowerCase();
   const pending = isPending(item.status);
   const showStatus = item.type !== 'issue' && (pending || ['canceled', 'cancelled', 'rejected'].includes(status));
   const isReceive = item.type === 'receive';
   const isCanceledReceive = isReceive && ['canceled', 'cancelled'].includes(status);
+  const secondaryAssetLabel = assetName || (isCanceledReceive ? assetSymbol : '');
   const amountColor = isReceive ? 'rgba(124, 219, 152, 0.85)' : 'rgba(255, 255, 255, 0.85)';
   const sign = item.type === 'issue' ? '' : isReceive ? '+' : '-';
   const transferTime = formatTransferTime(item.timestamp);
@@ -155,16 +158,18 @@ export function RGBTransferListItem({
                 </Row>
               ) : null}
             </Row>
-            {showAssetLabel ? (
+            {showAssetLabel && (secondaryAssetLabel || transferTime) ? (
               <Row itemsCenter gap="xs" style={{ minWidth: 0, overflow: 'hidden' }}>
-                <Text
-                  text={resolvedAssetLabel}
-                  size="sm"
-                  ellipsis
-                  style={{ minWidth: 0, color: 'rgba(255,255,255,0.75)' }}
-                />
+                {secondaryAssetLabel ? (
+                  <Text
+                    text={secondaryAssetLabel}
+                    size="sm"
+                    ellipsis
+                    style={{ minWidth: 0, color: 'rgba(255,255,255,0.75)' }}
+                  />
+                ) : null}
                 {transferTime ? (
-                  <Text text={`· ${transferTime}`} preset="sub" style={{ flexShrink: 0 }} />
+                  <Text text={secondaryAssetLabel ? `· ${transferTime}` : transferTime} preset="sub" style={{ flexShrink: 0 }} />
                 ) : null}
               </Row>
             ) : transferTime ? (
@@ -173,8 +178,23 @@ export function RGBTransferListItem({
           </Column>
         </Row>
         {!isCanceledReceive ? (
-          <Row itemsCenter style={{ flexShrink: 0, marginLeft: 12 }}>
-            <HistoryAmount amount={signedDisplayAmount} color={amountColor} />
+          <Row itemsCenter gap="xs" style={{ flexShrink: 0, maxWidth: showAssetLabel ? '58%' : undefined, marginLeft: 12 }}>
+            {showAssetLabel ? (
+              <div title={signedDisplayAmount} style={{ minWidth: 0, flexShrink: 1, overflow: 'hidden' }}>
+                <HistoryAmount amount={signedDisplayAmount} color={amountColor} />
+              </div>
+            ) : (
+              <HistoryAmount amount={signedDisplayAmount} color={amountColor} />
+            )}
+            {showAssetLabel ? (
+              <Text
+                text={assetSymbol}
+                size="sm"
+                ellipsis
+                disableTranslate
+                style={{ flexShrink: 0, maxWidth: 64, color: amountColor }}
+              />
+            ) : null}
           </Row>
         ) : null}
       </Row>
