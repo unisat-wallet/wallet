@@ -491,7 +491,7 @@ export class RgbService {
     }
   }
 
-  /** Advance sender ACK/broadcast state without fetching the full UTXO snapshot. */
+  /** Observe sender ACKs and already-broadcast transfers without fetching the full UTXO snapshot. */
   async syncPendingTransfers() {
     if (this.syncInFlight) {
       await this.syncInFlight
@@ -2296,7 +2296,11 @@ export class RgbService {
       delete delivery.requiresCounterpartySignature
       delete delivery.makerSignedPsbt
       await this.persist({ waitForRecovery: true })
-      return this.advancePendingDelivery(transferId, pending, !options.externalBroadcast)
+      return this.advancePendingDelivery(
+        transferId,
+        pending,
+        options.externalBroadcast ? 'external' : 'broadcast'
+      )
     })
   }
 
@@ -2327,6 +2331,21 @@ export class RgbService {
       await this.persistWithRecoveryRollback(rollback)
     }
     return this.advancePendingDelivery(transferId, pending)
+  }
+
+  /** Broadcast a receiver-accepted wallet send only after the sender requests it. */
+  async broadcastPendingSend(transferId: string) {
+    return this.runPendingTransferOperation(transferId, async () => {
+      const pending = this.requireState().pending[transferId]
+      if (
+        !pending?.delivery?.acknowledgedAt ||
+        pending.delivery.externalBroadcast ||
+        pending.delivery.requiresCounterpartySignature
+      ) {
+        throw new RgbServiceError('RGB transfer is not ready for sender broadcast')
+      }
+      return this.advancePendingDelivery(transferId, pending, 'broadcast')
+    })
   }
 
   async abortSend(transferId: string) {
@@ -2559,7 +2578,7 @@ export class RgbService {
   private async advancePendingDelivery(
     transferId: string,
     pending: RgbPendingTransfer,
-    allowWalletBroadcast = true
+    mode: 'manual' | 'broadcast' | 'external' = 'manual'
   ) {
     const state = this.requireState()
     const delivery = pending.delivery
@@ -2628,16 +2647,20 @@ export class RgbService {
     if (acknowledgements.some(acknowledged => acknowledged === undefined)) {
       throw new RgbTransferAwaitingAckError(transferId)
     }
-    delivery.acknowledgedAt ||= this.now()
-    delete delivery.broadcastError
-    await this.persist({ waitForRecovery: true })
+    if (!delivery.acknowledgedAt) {
+      delivery.acknowledgedAt = this.now()
+      await this.persist({ waitForRecovery: true })
+    }
 
-    if (!allowWalletBroadcast) {
+    if (mode === 'manual') return delivery.completed
+
+    if (mode === 'external') {
       delivery.externalBroadcast = true
       await this.persist({ waitForRecovery: true })
       return delivery.completed
     }
 
+    delete delivery.broadcastError
     let broadcastTxid: string
     try {
       broadcastTxid = await this.dependencies.broadcaster.broadcast(delivery.completed.rawTx)

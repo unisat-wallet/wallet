@@ -37,6 +37,7 @@ import {
 
 import { useNavigate } from '../../MainRoute';
 import { RgbRecoveryConflictModal } from '../../RGB/components/RgbRecoveryConflictModal';
+import { RGBTransferDetailSheet } from '../../RGB/RGBTransferDetailSheet';
 import { RGBTransferNotificationPanel } from '../../RGB/components/RGBTransferNotificationPanel';
 import { RgbFeatureActivationModal } from '../../RGB/components/RgbFeatureActivationModal';
 import { SwitchChainModal } from '../../Settings/SwitchChainModal';
@@ -225,6 +226,19 @@ export default function WalletTabScreen({ screen = 'home' }: { screen?: 'home' |
     focused: isRgbAssetTab
   });
   const rgbTransfers = useRGBTransfersLogic({ enabled: isRgbActive });
+  const [dismissedBroadcastIds, setDismissedBroadcastIds] = useState<Set<string>>(() => new Set());
+  const readyBroadcast = rgbTransfers.items.find(
+    (item) =>
+      item.type === 'send' &&
+      item.status === 'ready_to_broadcast' &&
+      !dismissedBroadcastIds.has(item.transferId || item.id)
+  );
+  const dismissBroadcast = () => {
+    if (!readyBroadcast) return;
+    setDismissedBroadcastIds((current) =>
+      new Set(current).add(readyBroadcast.transferId || readyBroadcast.id)
+    );
+  };
 
   const onEnableRgb = useCallback(async () => {
     setRgbActivationLoading(true);
@@ -475,6 +489,15 @@ export default function WalletTabScreen({ screen = 'home' }: { screen?: 'home' |
                 initialTransfer: notification.transfer
               });
             }}
+          />
+        ) : null}
+        {isRgbActive && readyBroadcast ? (
+          <RGBTransferDetailSheet
+            key={readyBroadcast.transferId || readyBroadcast.id}
+            transfer={readyBroadcast}
+            transferId={readyBroadcast.transferId || readyBroadcast.id}
+            onClose={dismissBroadcast}
+            onCanceled={() => void rgbTransfers.onRefresh({ showLoading: false })}
           />
         ) : null}
         {screen === 'home' && (

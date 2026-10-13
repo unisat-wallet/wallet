@@ -2,6 +2,12 @@
   "Broadcast": {
     "message": "Broadcast"
   },
+  "rgb_status_ready_to_broadcast": {
+    "message": "Ready to broadcast"
+  },
+  "rgb_transfer_ready_to_broadcast_description": {
+    "message": "The receiver accepted. Review this transfer and tap Broadcast to submit the transaction."
+  },
   "about_3_minutes": {
     "message": "(about 3 minutes)"
   },

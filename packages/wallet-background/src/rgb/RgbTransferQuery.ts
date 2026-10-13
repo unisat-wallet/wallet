@@ -106,13 +106,15 @@ export class RgbTransferQuery {
       timestamp: transfer.createdAt,
       status: transfer.delivery?.broadcastError
         ? 'broadcast_failed'
-        : transfer.delivery?.acknowledgedAt
+        : transfer.delivery?.externalBroadcast
           ? 'broadcasting'
-          : transfer.delivery
-            ? 'waiting_ack'
-            : transfer.broadcast
-              ? 'broadcasted'
-              : 'signed',
+          : transfer.delivery?.acknowledgedAt
+            ? 'ready_to_broadcast'
+            : transfer.delivery
+              ? 'waiting_ack'
+              : transfer.broadcast
+                ? 'broadcasted'
+                : 'signed',
       local: true,
     }))
     const localSendHistory = (service.getPendingSendHistory?.() || []).map(send => ({

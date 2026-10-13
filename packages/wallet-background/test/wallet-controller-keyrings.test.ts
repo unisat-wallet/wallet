@@ -1242,6 +1242,30 @@ describe('RGB wallet references', () => {
     })
   })
 
+  it('returns a sender action when the recipient already accepted during signing', async () => {
+    const wallet = new WalletController()
+    const service = {
+      getPendingTransfers: vi.fn(() => [{
+        id: 'accepted-rgb-transfer',
+        delivery: { acknowledgedAt: 1, completed: { txid: 'bb'.repeat(32) } },
+      }]),
+      completeSend: vi.fn().mockResolvedValue({ txid: 'bb'.repeat(32) }),
+    }
+    vi.spyOn(wallet as any, 'getLocalRgbService').mockResolvedValue({
+      service,
+      wallet: { fundingAddress: 'bc1p-rgb-funding' },
+    })
+    vi.spyOn(wallet as any, 'ensureRgbWriteLease').mockResolvedValue(undefined)
+
+    const signedPsbt = new bitcoin.Psbt().toBase64()
+    await expect(wallet.createRgbSendEnd({ signedPsbt, transferId: 'accepted-rgb-transfer' }))
+      .resolves.toEqual({
+        transferId: 'accepted-rgb-transfer',
+        txid: 'bb'.repeat(32),
+        status: 'ready_to_broadcast',
+      })
+  })
+
   it('formats atomic RGB amounts for the signing action', async () => {
     const wallet = new WalletController()
     const service = {
@@ -1343,12 +1367,12 @@ describe('RGB wallet references', () => {
     const pending = [
       {
         id: 'pending-rgb-transfer',
-        delivery: { broadcastError: 'broadcast unavailable' },
+        delivery: { acknowledgedAt: 1, broadcastError: 'broadcast unavailable' },
       },
     ]
     const service = {
       getPendingTransfers: vi.fn(() => pending),
-      sync: vi.fn(async () => {
+      broadcastPendingSend: vi.fn(async () => {
         pending.splice(0)
       }),
     }
@@ -1366,7 +1390,7 @@ describe('RGB wallet references', () => {
       expect.anything(),
       { forceRenew: true }
     )
-    expect(service.sync).toHaveBeenCalledTimes(1)
+    expect(service.broadcastPendingSend).toHaveBeenCalledWith('pending-rgb-transfer')
   })
 
   it('does not process pending RGB receives when another device owns the writer lease', async () => {

@@ -2,6 +2,12 @@
   "Broadcast": {
     "message": "ブロードキャスト"
   },
+  "rgb_status_ready_to_broadcast": {
+    "message": "ブロードキャスト待ち"
+  },
+  "rgb_transfer_ready_to_broadcast_description": {
+    "message": "受信者が承認しました。内容を確認してから「ブロードキャスト」を押してください。"
+  },
   "about_3_minutes": {
     "message": "(約3分)"
   },

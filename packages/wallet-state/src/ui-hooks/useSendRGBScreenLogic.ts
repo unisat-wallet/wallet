@@ -480,6 +480,8 @@ export function useSendRGBScreenLogic() {
           status:
             endResult?.status === 'waiting_ack'
               ? 'waiting_ack'
+              : endResult?.status === 'ready_to_broadcast'
+                ? 'ready_to_broadcast'
               : endResult?.status === 'broadcast_failed'
                 ? 'broadcast_failed'
                 : endResult?.status === 'rejected'

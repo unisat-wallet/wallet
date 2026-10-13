@@ -2,6 +2,12 @@
   "Broadcast": {
     "message": "Difundir"
   },
+  "rgb_status_ready_to_broadcast": {
+    "message": "Listo para transmitir"
+  },
+  "rgb_transfer_ready_to_broadcast_description": {
+    "message": "El destinatario aceptó. Revisa la transferencia y pulsa Transmitir para enviar la transacción."
+  },
   "about_3_minutes": {
     "message": "(unos 3 minutos)"
   },

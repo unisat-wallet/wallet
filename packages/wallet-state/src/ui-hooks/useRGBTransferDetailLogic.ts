@@ -135,6 +135,8 @@ export function useRGBTransferDetailLogic() {
     String(transfer?.status || '').toLowerCase() === 'pending_accept'
   const canRetryBroadcast =
     transfer?.type === 'send' && String(transfer?.status || '').toLowerCase() === 'broadcast_failed'
+  const canBroadcast =
+    transfer?.type === 'send' && String(transfer?.status || '').toLowerCase() === 'ready_to_broadcast'
 
   useEffect(() => {
     const status = transfer?.status?.toLowerCase()
@@ -298,6 +300,7 @@ export function useRGBTransferDetailLogic() {
     canCancelSend,
     canAcceptReceive,
     canRetryBroadcast,
+    canBroadcast,
     notification,
     dismissNotification: () => setNotification(undefined),
     t,

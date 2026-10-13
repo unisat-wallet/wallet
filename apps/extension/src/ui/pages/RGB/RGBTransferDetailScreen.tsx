@@ -1,4 +1,7 @@
+import { useState } from 'react';
+
 import { Button, Card, Column, Content, CopyableAddress, Footer, Header, Icon, Layout, Row, Text } from '@/ui/components';
+import { BottomModal } from '@/ui/components/BottomModal';
 import { TxResultStatusMark } from '@/ui/components/TxResultStatusMark';
 import { colors } from '@/ui/theme/colors';
 import { spacing } from '@/ui/theme/spacing';
@@ -18,6 +21,8 @@ function getStatusLabel(status: string, t: (key: string) => string, type?: RgbTr
       return t('rgb_status_signed');
     case 'waiting_ack':
       return t('rgb_status_waiting_ack');
+    case 'ready_to_broadcast':
+      return t('rgb_status_ready_to_broadcast');
     case 'broadcasting':
       return t('rgb_status_broadcasting');
     case 'broadcasted':
@@ -49,6 +54,7 @@ function getStatusLabel(status: string, t: (key: string) => string, type?: RgbTr
 
 function getDescription(transfer: RgbTransferItem | undefined, t: (key: string) => string) {
   if (transfer?.status === 'waiting_ack') return t('rgb_transfer_waiting_ack_description');
+  if (transfer?.status === 'ready_to_broadcast') return t('rgb_transfer_ready_to_broadcast_description');
   if (transfer?.status === 'broadcasting') return t('rgb_transfer_broadcasting_description');
   if (transfer?.status === 'broadcasted') return t('rgb_transfer_broadcasted_description');
   if (transfer?.status === 'broadcast_failed') return t('rgb_transfer_broadcast_failed_description');
@@ -74,6 +80,7 @@ function isFailedStatus(status: string) {
 
 export default function RGBTransferDetailScreen() {
   const chain = useChain();
+  const [dismissedBroadcastId, setDismissedBroadcastId] = useState<string>();
   const {
     transfer,
     transferId,
@@ -82,6 +89,7 @@ export default function RGBTransferDetailScreen() {
     broadcastRetryLoading,
     canAcceptReceive,
     canRetryBroadcast,
+    canBroadcast,
     notification,
     dismissNotification,
     onClickDone,
@@ -100,7 +108,7 @@ export default function RGBTransferDetailScreen() {
   const statusLabel = getStatusLabel(status, t, transfer?.type);
   const canExplore =
     !!transfer?.txid &&
-    !['waiting_ack', 'broadcasting', 'broadcast_failed', 'pending_accept', 'rejected'].includes(status);
+    !['waiting_ack', 'ready_to_broadcast', 'broadcasting', 'broadcast_failed', 'pending_accept', 'rejected'].includes(status);
   const assetId = transfer?.assetId?.trim();
 
   const isConfirmed = isConfirmedStatus(status);
@@ -204,10 +212,10 @@ export default function RGBTransferDetailScreen() {
               onClick={() => void onAcceptReceive()}
             />
           </Row>
-        ) : canRetryBroadcast ? (
+        ) : canBroadcast || canRetryBroadcast ? (
           <Button
             full
-            text={t('rgb_retry_broadcast')}
+            text={t(canBroadcast ? 'Broadcast' : 'rgb_retry_broadcast')}
             disabled={broadcastRetryLoading}
             onClick={() => void onRetryBroadcast()}
           />
@@ -221,6 +229,20 @@ export default function RGBTransferDetailScreen() {
         onAction={dismissNotification}
         onClose={dismissNotification}
       />
+      {canBroadcast && dismissedBroadcastId !== transferId ? (
+        <BottomModal onClose={() => setDismissedBroadcastId(transferId)}>
+          <Column fullX gap="lg">
+            <Text preset="title" text={t('rgb_status_ready_to_broadcast')} />
+            <Text text={t('rgb_transfer_ready_to_broadcast_description')} color="textDim" />
+            <Button
+              full
+              text={t('Broadcast')}
+              disabled={broadcastRetryLoading}
+              onClick={() => void onRetryBroadcast()}
+            />
+          </Column>
+        </BottomModal>
+      ) : null}
     </Layout>
   );
 }

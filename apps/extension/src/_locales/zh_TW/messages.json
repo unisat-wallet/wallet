@@ -2,6 +2,12 @@
   "Broadcast": {
     "message": "廣播交易"
   },
+  "rgb_status_ready_to_broadcast": {
+    "message": "待廣播"
+  },
+  "rgb_transfer_ready_to_broadcast_description": {
+    "message": "接收方已接受。請確認此轉帳，點擊「廣播交易」後才會提交交易。"
+  },
   "about_3_minutes": {
     "message": "(約 3 分鐘)"
   },

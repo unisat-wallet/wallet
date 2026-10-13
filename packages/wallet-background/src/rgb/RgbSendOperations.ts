@@ -110,7 +110,14 @@ export class RgbSendOperations {
     }
     this.dependencies.setActiveTransferId(wallet.fundingAddress, transferId)
     try {
-      return await service.completeSend(transferId, psbtFromString(params.signedPsbt).toBase64())
+      const completed = await service.completeSend(
+        transferId,
+        psbtFromString(params.signedPsbt).toBase64()
+      )
+      const latest = service.getPendingTransfers().find(item => item.id === transferId)
+      return latest?.delivery?.acknowledgedAt
+        ? { transferId, txid: completed.txid, status: 'ready_to_broadcast' as const }
+        : completed
     } catch (error) {
       const transfer = service.getPendingTransfers().find(item => item.id === transferId)
       if (error instanceof RgbTransferAwaitingAckError) {
@@ -179,11 +186,12 @@ export class RgbSendOperations {
     // the same authoritative lease check as signed completion.
     await this.dependencies.ensureWriteLease?.({ service, wallet }, { forceRenew: true })
     const transfer = service.getPendingTransfers().find(item => item.id === transferId)
-    if (!transfer?.delivery?.broadcastError) {
+    if (!transfer?.delivery?.acknowledgedAt || transfer.delivery.externalBroadcast) {
       return { broadcast: false, status: 'not_retryable' as const }
     }
     try {
-      await service.sync()
+      await this.dependencies.assertContext?.({ service, wallet })
+      await service.broadcastPendingSend(transferId)
     } catch (error) {
       if (error instanceof RgbTransferCanceledError) {
         return { broadcast: false, status: 'canceled' as const, error: error.message }
@@ -211,9 +219,9 @@ export class RgbSendOperations {
         error: latest.delivery.broadcastError,
       }
     }
-    if (latest?.delivery) return { broadcast: false, status: 'waiting_ack' as const }
-    // A successful sync may compact the locally persisted pending transfer
-    // immediately after broadcast. It is confirming, not a user cancellation.
+    if (latest?.delivery) return { broadcast: false, status: 'ready_to_broadcast' as const }
+    // Broadcast synchronization may compact the local pending transfer
+    // immediately. It is confirming, not a user cancellation.
     return { broadcast: true, status: 'confirming' as const }
   }
 

@@ -2,6 +2,12 @@
   "Broadcast": {
     "message": "Транслировать"
   },
+  "rgb_status_ready_to_broadcast": {
+    "message": "Готово к трансляции"
+  },
+  "rgb_transfer_ready_to_broadcast_description": {
+    "message": "Получатель подтвердил перевод. Проверьте его и нажмите «Транслировать», чтобы отправить транзакцию."
+  },
   "about_3_minutes": {
     "message": "(около 3 минут)"
   },

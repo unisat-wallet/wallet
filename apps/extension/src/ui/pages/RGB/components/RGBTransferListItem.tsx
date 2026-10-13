@@ -37,6 +37,8 @@ function getStatusLabel(status: string, t: (key: string) => string, type: RgbTra
       return t('rgb_status_signed');
     case 'waiting_ack':
       return t('rgb_status_waiting_ack');
+    case 'ready_to_broadcast':
+      return t('rgb_status_ready_to_broadcast');
     case 'broadcasting':
       return t('rgb_status_broadcasting');
     case 'broadcasted':

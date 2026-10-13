@@ -25,6 +25,8 @@ function getStatusLabel(status: string, t: (key: string) => string, type?: RgbTr
       return t('rgb_status_signed');
     case 'waiting_ack':
       return t('rgb_status_waiting_ack');
+    case 'ready_to_broadcast':
+      return t('rgb_status_ready_to_broadcast');
     case 'broadcasting':
       return t('rgb_status_broadcasting');
     case 'broadcasted':
@@ -62,6 +64,7 @@ function getTransferTitle(type: RgbTransferItem['type'] | undefined, t: (key: st
 
 function getDescription(transfer: RgbTransferItem | undefined, t: (key: string) => string) {
   if (transfer?.status === 'waiting_ack') return t('rgb_transfer_waiting_ack_description');
+  if (transfer?.status === 'ready_to_broadcast') return t('rgb_transfer_ready_to_broadcast_description');
   if (transfer?.status === 'broadcasting') return t('rgb_transfer_broadcasting_description');
   if (transfer?.status === 'broadcasted') return t('rgb_transfer_broadcasted_description');
   if (transfer?.status === 'broadcast_failed') return t('rgb_transfer_broadcast_failed_description');
@@ -221,7 +224,7 @@ export function RGBTransferDetailSheet({
   const description = getDescription(transfer, t);
   const canExplore =
     !!transfer?.txid &&
-    !['waiting_ack', 'broadcasting', 'broadcast_failed', 'pending_accept', 'rejected'].includes(status) &&
+    !['waiting_ack', 'ready_to_broadcast', 'broadcasting', 'broadcast_failed', 'pending_accept', 'rejected'].includes(status) &&
     !!onClickExploreTx;
   const canCancelSend =
     transfer?.type === 'send' && ['signed', 'waiting_ack'].includes(String(transfer?.status || '').toLowerCase());
@@ -231,6 +234,8 @@ export function RGBTransferDetailSheet({
     String(transfer?.status || '').toLowerCase() === 'pending_accept';
   const canRetryBroadcast =
     transfer?.type === 'send' && String(transfer?.status || '').toLowerCase() === 'broadcast_failed';
+  const canBroadcast =
+    transfer?.type === 'send' && String(transfer?.status || '').toLowerCase() === 'ready_to_broadcast';
   const assetId = transfer?.assetId?.trim();
   const isIssue = transfer?.type === 'issue';
   const recordId = isIssue ? transfer?.txid : transfer?.transferId || transferId || '';
@@ -542,9 +547,9 @@ export function RGBTransferDetailSheet({
                   textStyle={{ color: colors.black, fontWeight: 'normal' }}
                 />
               </Row>
-            ) : canRetryBroadcast ? (
+            ) : canBroadcast || canRetryBroadcast ? (
               <Button
-                text={t('rgb_retry_broadcast')}
+                text={t(canBroadcast ? 'Broadcast' : 'rgb_retry_broadcast')}
                 preset="primary"
                 disabled={broadcastRetryLoading}
                 onClick={() => void requestWrite(() => void onRetryBroadcast())}

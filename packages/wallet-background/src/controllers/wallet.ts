@@ -4976,7 +4976,7 @@ export class WalletController extends BaseController {
             : pending.delivery?.broadcastError
               ? 'broadcast_failed'
               : pending.delivery?.acknowledgedAt
-                ? 'broadcasting'
+                ? 'ready_to_broadcast'
                 : pending.delivery
                   ? 'waiting_ack'
                   : pending.broadcast

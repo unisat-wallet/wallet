@@ -20,6 +20,9 @@ export function RGBTransfersList({ transfers }: RGBTransfersListProps) {
   const { items, total, loading, hasMore, onRefresh, onLoadMore } = transfers;
   const [selectedTransfer, setSelectedTransfer] = useState<RgbTransferItem | undefined>();
   const [acceptedTransferIds, setAcceptedTransferIds] = useState<Set<string>>(() => new Set());
+  const latestSelectedTransfer = selectedTransfer
+    ? items.find((item) => getTransferId(item) === getTransferId(selectedTransfer)) || selectedTransfer
+    : undefined;
 
   return (
     <>
@@ -55,20 +58,20 @@ export function RGBTransfersList({ transfers }: RGBTransfersListProps) {
         }}
       />
 
-      {selectedTransfer ? (
+      {latestSelectedTransfer ? (
         <RGBTransferDetailSheet
-          transfer={selectedTransfer}
-          transferId={selectedTransfer.transferId || selectedTransfer.id}
+          transfer={latestSelectedTransfer}
+          transferId={latestSelectedTransfer.transferId || latestSelectedTransfer.id}
           onClose={() => setSelectedTransfer(undefined)}
           onAccepted={() => {
-            const transferId = getTransferId(selectedTransfer);
+            const transferId = getTransferId(latestSelectedTransfer);
             setAcceptedTransferIds((current) => new Set(current).add(transferId));
           }}
           onCanceled={() => void transfers.onRefresh({ showLoading: false })}
           onClickExploreTx={
-            selectedTransfer.txid
+            latestSelectedTransfer.txid
               ? () => {
-                  if (selectedTransfer.txid) nav.navToExplorerTx(selectedTransfer.txid);
+                  if (latestSelectedTransfer.txid) nav.navToExplorerTx(latestSelectedTransfer.txid);
                 }
               : undefined
           }

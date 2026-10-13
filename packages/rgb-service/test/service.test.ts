@@ -1483,7 +1483,7 @@ describe('RgbService', () => {
       expect.objectContaining({
         pendingReceives: [expect.objectContaining({ assetId: 'rgb:asset' })],
       }),
-      { reason: 'state_change' }
+      { reason: 'state_change', kind: 'normal' }
     )
     const checkpointState = vi
       .mocked(dependencies.onStatePersisted)
@@ -1564,7 +1564,7 @@ describe('RgbService', () => {
       expect.objectContaining({
         pendingReceives: [expect.objectContaining({ claimedAt: expect.any(Number) })],
       }),
-      { reason: 'state_change' }
+      { reason: 'state_change', kind: 'normal' }
     )
     expect(service.getPendingReceives()).toHaveLength(1)
   })
@@ -1803,6 +1803,7 @@ describe('RgbService', () => {
 
     expect(reopened.getPendingTransfers()).toEqual([expect.objectContaining({ id: 'transfer-1' })])
     await reopened.completeSend('transfer-1', 'signed-psbt')
+    await reopened.broadcastPendingSend('transfer-1')
     expect(dependencies.broadcaster.broadcast).toHaveBeenCalled()
   })
 
@@ -1959,7 +1960,7 @@ describe('RgbService', () => {
     expect(dependencies.encoder.prepareTransfer).toHaveBeenCalledTimes(2)
   })
 
-  it('publishes and receives acknowledgement before broadcasting the completed transfer', async () => {
+  it('waits for the sender to broadcast after recipient acknowledgement', async () => {
     const dependencies = createDependencies()
     const service = new RgbService(dependencies)
     await service.open(wallet)
@@ -1974,7 +1975,7 @@ describe('RgbService', () => {
     const completed = await service.completeSend('transfer-1', 'signed-psbt')
 
     expect(dependencies.transport.publishConsignment).toHaveBeenCalledWith({
-      recipientId: 'recipient',
+      recipientId: blindRecipient,
       payload: 'consignment',
       assetId: 'rgb:asset',
       opIds: ['d'.repeat(64)],
@@ -1982,6 +1983,10 @@ describe('RgbService', () => {
       txid: 'c'.repeat(64),
       endpoints: [proxyEndpoint],
     })
+    expect(dependencies.broadcaster.broadcast).not.toHaveBeenCalled()
+    await service.sync()
+    expect(dependencies.broadcaster.broadcast).not.toHaveBeenCalled()
+    await service.broadcastPendingSend('transfer-1')
     expect(dependencies.broadcaster.broadcast).toHaveBeenCalledWith(completed.rawTx)
     expect(
       vi.mocked(dependencies.transport.publishConsignment).mock.invocationCallOrder[0]
@@ -2765,7 +2770,8 @@ describe('RgbService', () => {
       feeRate: 2,
     })
 
-    const completing = service.completeSend('transfer-1', 'signed-psbt')
+    await service.completeSend('transfer-1', 'signed-psbt')
+    const completing = service.broadcastPendingSend('transfer-1')
     await broadcastStarted
 
     const aborting = service.abortSend('transfer-1')
@@ -2819,7 +2825,7 @@ describe('RgbService', () => {
 
     await completing
     await expect(aborting).resolves.toEqual({ aborted: false })
-    expect(dependencies.broadcaster.broadcast).toHaveBeenCalledTimes(1)
+    expect(dependencies.broadcaster.broadcast).not.toHaveBeenCalled()
   })
 
   it('discards a rejected receive invoice because its proxy recipient ID is single-use', async () => {
@@ -2935,10 +2941,16 @@ describe('RgbService', () => {
     expect(service.getPendingTransfers()).toEqual([
       expect.objectContaining({ id: 'transfer-1', delivery: expect.any(Object) }),
     ])
+    await expect(service.broadcastPendingSend('transfer-1')).rejects.toThrow(
+      'not ready for sender broadcast'
+    )
 
     vi.mocked(dependencies.transport.getAcknowledgement!).mockResolvedValueOnce(true)
     await service.sync()
 
+    expect(service.getPendingTransfers()[0]?.delivery?.acknowledgedAt).toEqual(expect.any(Number))
+    expect(dependencies.broadcaster.broadcast).not.toHaveBeenCalled()
+    await service.broadcastPendingSend('transfer-1')
     expect(dependencies.broadcaster.broadcast).toHaveBeenCalledTimes(1)
     expect(service.getPendingTransfers()).toEqual([])
   })
@@ -3027,7 +3039,8 @@ describe('RgbService', () => {
       feeRate: 2,
     })
 
-    await expect(service.completeSend('transfer-1', 'signed-psbt')).rejects.toThrow(
+    await service.completeSend('transfer-1', 'signed-psbt')
+    await expect(service.broadcastPendingSend('transfer-1')).rejects.toThrow(
       'broadcast unavailable'
     )
     expect(service.getPendingTransfers()).toEqual([
@@ -3050,7 +3063,8 @@ describe('RgbService', () => {
     ])
 
     await reopened.sync()
-
+    expect(dependencies.broadcaster.broadcast).toHaveBeenCalledTimes(1)
+    await reopened.broadcastPendingSend('transfer-1')
     expect(dependencies.broadcaster.broadcast).toHaveBeenCalledTimes(2)
     expect(reopened.getPendingTransfers()).toEqual([])
   })
@@ -3071,12 +3085,13 @@ describe('RgbService', () => {
       feeRate: 2,
     })
 
-    await expect(service.completeSend('transfer-1', 'signed-psbt')).rejects.toMatchObject({
+    await service.completeSend('transfer-1', 'signed-psbt')
+    await expect(service.broadcastPendingSend('transfer-1')).rejects.toMatchObject({
       name: 'RgbTransferCanceledError',
     })
     expect(service.getPendingTransfers()).toEqual([])
     expect(dependencies.transport.acknowledgeConsignment).toHaveBeenCalledWith(
-      expect.objectContaining({ recipientId: 'recipient', acknowledged: false })
+      expect.objectContaining({ recipientId: blindRecipient, acknowledged: false })
     )
     expect(service.getPendingSendHistory()).toEqual([
       expect.objectContaining({ transferId: 'transfer-1', status: 'canceled' }),
@@ -3103,7 +3118,8 @@ describe('RgbService', () => {
       feeRate: 2,
     })
 
-    await expect(service.completeSend('transfer-1', 'signed-psbt')).resolves.toMatchObject({
+    await service.completeSend('transfer-1', 'signed-psbt')
+    await expect(service.broadcastPendingSend('transfer-1')).resolves.toMatchObject({
       txid: 'c'.repeat(64),
     })
     expect(dependencies.stateSource.getTransactionStatus).toHaveBeenCalledWith(
@@ -3136,12 +3152,13 @@ describe('RgbService', () => {
       feeRate: 2,
     })
 
-    await expect(service.completeSend('transfer-1', 'signed-psbt')).rejects.toMatchObject({
+    await service.completeSend('transfer-1', 'signed-psbt')
+    await expect(service.broadcastPendingSend('transfer-1')).rejects.toMatchObject({
       name: 'RgbTransferCanceledError',
     })
     expect(service.getPendingTransfers()).toEqual([])
     expect(dependencies.transport.acknowledgeConsignment).toHaveBeenCalledWith(
-      expect.objectContaining({ recipientId: 'recipient', acknowledged: false })
+      expect.objectContaining({ recipientId: blindRecipient, acknowledged: false })
     )
   })
 
@@ -3165,7 +3182,8 @@ describe('RgbService', () => {
       feeRate: 2,
     })
 
-    await expect(service.completeSend('transfer-1', 'signed-psbt')).rejects.toThrow(
+    await service.completeSend('transfer-1', 'signed-psbt')
+    await expect(service.broadcastPendingSend('transfer-1')).rejects.toThrow(
       'was canceled because its inputs were spent'
     )
 
@@ -3178,7 +3196,7 @@ describe('RgbService', () => {
       expect.objectContaining({ transferId: 'transfer-1', status: 'canceled' }),
     ])
     expect(dependencies.transport.acknowledgeConsignment).toHaveBeenCalledWith({
-      recipientId: 'recipient',
+      recipientId: blindRecipient,
       endpoints: [proxyEndpoint],
       acknowledged: false,
     })
@@ -3256,7 +3274,8 @@ describe('RgbService', () => {
       feeRate: 2,
     })
 
-    await expect(service.completeSend('transfer-1', 'signed-psbt')).rejects.toThrow(
+    await service.completeSend('transfer-1', 'signed-psbt')
+    await expect(service.broadcastPendingSend('transfer-1')).rejects.toThrow(
       'indexer unavailable'
     )
     expect(service.getPendingTransfers()).toEqual([
@@ -3318,6 +3337,7 @@ describe('RgbService', () => {
       feeRate: 2,
     })
     await service.completeSend('transfer-1', 'signed-psbt')
+    await service.broadcastPendingSend('transfer-1')
 
     expect(service.getSnapshot().utxos.map(utxo => utxo.outpoint)).toEqual([
       { txid: 'a'.repeat(64), vout: 0 },
@@ -3397,6 +3417,7 @@ describe('RgbService', () => {
     expect(dependencies.onStatePersisted).not.toHaveBeenCalled()
 
     await service.completeSend('transfer-1', 'signed-psbt')
+    await service.broadcastPendingSend('transfer-1')
 
     // Signed state, recipient ACK, and successful Bitcoin broadcast are the
     // only non-replayable milestones. Publishing and history bookkeeping are
