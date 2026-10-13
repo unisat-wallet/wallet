@@ -8,6 +8,9 @@
   "rgb_transfer_ready_to_broadcast_description": {
     "message": "El destinatario aceptó. Revisa la transferencia y pulsa Transmitir para enviar la transacción."
   },
+  "rgb_more_transfers_to_broadcast": {
+    "message": "Otras transferencias listas para transmitir"
+  },
   "about_3_minutes": {
     "message": "(unos 3 minutos)"
   },

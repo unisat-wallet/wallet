@@ -105,6 +105,7 @@ export class RgbTransferQuery {
       precision: transfer.request.precision,
       txid: transfer.delivery?.completed.txid ?? transfer.broadcast?.completed.txid,
       timestamp: transfer.createdAt,
+      acknowledgedAt: transfer.delivery?.acknowledgedAt,
       status: transfer.delivery?.broadcastError
         ? 'broadcast_failed'
         : transfer.delivery?.externalBroadcast

@@ -103,6 +103,8 @@ export interface RgbTransferItem {
   amount?: string
   txid?: string
   timestamp: number
+  /** Time the receiver accepted this send, used to order pending broadcasts. */
+  acknowledgedAt?: number
   status: RgbTransferStatus
   local?: boolean
 }

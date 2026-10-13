@@ -88,4 +88,43 @@ describe('RgbTransferQuery', () => {
       ])
     )
   })
+
+  it('includes the receiver acceptance time for each pending send', async () => {
+    const service = {
+      getPendingTransfers: vi.fn().mockReturnValue(
+        ['first', 'second'].map((id, index) => ({
+          id,
+          request: { assetId: `rgb:${id}`, amount: '1', precision: 0 },
+          createdAt: index + 1,
+          delivery: {
+            acknowledgedAt: index === 0 ? 40 : 30,
+            completed: { txid: String(index + 1).repeat(64) },
+          },
+        }))
+      ),
+      getPendingSendHistory: vi.fn().mockReturnValue([]),
+      getIssueHistory: vi.fn().mockReturnValue([]),
+      getPendingReceiveHistory: vi.fn().mockReturnValue([]),
+      getPendingReceives: vi.fn().mockReturnValue([]),
+    }
+    const context = {
+      service,
+      wallet: { walletId: 'wallet', fundingAddress: 'funding', network: 'mainnet' },
+    }
+    const query = new RgbTransferQuery({
+      getContext: vi.fn().mockResolvedValue(context),
+      syncReceiveHistory: vi.fn(),
+      syncPendingTransfers: vi.fn(),
+      syncReceivedAllocations: vi.fn().mockResolvedValue(context),
+      getRemoteActivity: vi.fn().mockResolvedValue({ total: 0, list: [] }),
+      warn: vi.fn(),
+    })
+
+    const result = await query.getTransfers(1, 20, { skipSync: true })
+
+    expect(result.list).toEqual(expect.arrayContaining([
+      expect.objectContaining({ transferId: 'first', acknowledgedAt: 40 }),
+      expect.objectContaining({ transferId: 'second', acknowledgedAt: 30 }),
+    ]))
+  })
 })

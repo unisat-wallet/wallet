@@ -8,6 +8,9 @@
   "rgb_transfer_ready_to_broadcast_description": {
     "message": "Получатель подтвердил перевод. Проверьте его и нажмите «Транслировать», чтобы отправить транзакцию."
   },
+  "rgb_more_transfers_to_broadcast": {
+    "message": "Другие переводы, готовые к трансляции"
+  },
   "about_3_minutes": {
     "message": "(около 3 минут)"
   },

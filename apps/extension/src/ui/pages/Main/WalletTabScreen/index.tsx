@@ -16,6 +16,8 @@ import '@unisat/wallet-state';
 import {
   AssetTabKey,
   MoreAssetTabKey,
+  getReadyRgbBroadcasts,
+  selectReadyRgbBroadcastId,
   uiActions,
   useAppDispatch,
   useAssetTabKey,
@@ -226,18 +228,44 @@ export default function WalletTabScreen({ screen = 'home' }: { screen?: 'home' |
     focused: isRgbAssetTab
   });
   const rgbTransfers = useRGBTransfersLogic({ enabled: isRgbActive });
-  const [dismissedBroadcastIds, setDismissedBroadcastIds] = useState<Set<string>>(() => new Set());
-  const readyBroadcast = rgbTransfers.items.find(
-    (item) =>
-      item.type === 'send' &&
-      item.status === 'ready_to_broadcast' &&
-      !dismissedBroadcastIds.has(item.transferId || item.id)
-  );
+  const [broadcastQueue, setBroadcastQueue] = useState<{
+    contextKey: string;
+    activeId?: string;
+    dismissedIdsByContext: Map<string, Set<string>>;
+  }>(() => ({ contextKey: rgbContextKey, dismissedIdsByContext: new Map() }));
+  const dismissedBroadcastIds = broadcastQueue.contextKey === rgbContextKey
+    ? broadcastQueue.dismissedIdsByContext.get(rgbContextKey) ?? new Set<string>()
+    : new Set<string>();
+  const readyBroadcasts = getReadyRgbBroadcasts(rgbTransfers.items, dismissedBroadcastIds);
+  const readyBroadcast = broadcastQueue.contextKey === rgbContextKey
+    ? readyBroadcasts.find((item) => (item.transferId || item.id) === broadcastQueue.activeId)
+    : undefined;
+
+  useEffect(() => {
+    setBroadcastQueue((current) => {
+      if (current.contextKey !== rgbContextKey) {
+        return { ...current, contextKey: rgbContextKey, activeId: undefined };
+      }
+      const available = rgbTransfers.isCurrentAccountLoaded
+        ? getReadyRgbBroadcasts(rgbTransfers.items, current.dismissedIdsByContext.get(rgbContextKey) ?? new Set())
+        : [];
+      const activeId = selectReadyRgbBroadcastId(available, current.activeId);
+      return current.activeId === activeId ? current : { ...current, activeId };
+    });
+  }, [rgbContextKey, rgbTransfers.items, rgbTransfers.isCurrentAccountLoaded, broadcastQueue.activeId, broadcastQueue.dismissedIdsByContext]);
+
   const dismissBroadcast = () => {
     if (!readyBroadcast) return;
-    setDismissedBroadcastIds((current) =>
-      new Set(current).add(readyBroadcast.transferId || readyBroadcast.id)
-    );
+    const transferId = readyBroadcast.transferId || readyBroadcast.id;
+    setBroadcastQueue((current) => {
+      if (current.contextKey !== rgbContextKey) return current;
+      const dismissedIdsByContext = new Map(current.dismissedIdsByContext);
+      dismissedIdsByContext.set(
+        rgbContextKey,
+        new Set(dismissedIdsByContext.get(rgbContextKey)).add(transferId)
+      );
+      return { ...current, activeId: undefined, dismissedIdsByContext };
+    });
   };
 
   const onEnableRgb = useCallback(async () => {
@@ -496,6 +524,7 @@ export default function WalletTabScreen({ screen = 'home' }: { screen?: 'home' |
             key={readyBroadcast.transferId || readyBroadcast.id}
             transfer={readyBroadcast}
             transferId={readyBroadcast.transferId || readyBroadcast.id}
+            remainingBroadcastCount={readyBroadcasts.length - 1}
             onClose={dismissBroadcast}
             onCanceled={() => void rgbTransfers.onRefresh({ showLoading: false })}
           />

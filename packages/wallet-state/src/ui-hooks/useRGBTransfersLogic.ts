@@ -33,7 +33,8 @@ export function useRGBTransfersLogic({ enabled = true }: { enabled?: boolean } =
   const currentKeyring = useCurrentKeyring()
   const currentAccount = useCurrentAccount()
   const chainType = useChainType()
-  const cacheKey = `${chainType}:${currentAccount?.key || ''}:${enabled ? '1' : '0'}`
+  const cacheKey = `${chainType}:${currentKeyring?.key || ''}:${currentAccount?.key || ''}:${enabled ? '1' : '0'}`
+  const [loadedCacheKey, setLoadedCacheKey] = useState('')
   const skipSyncRef = useRef(true)
   const requestFullSyncRef = useRef(false)
 
@@ -56,6 +57,7 @@ export function useRGBTransfersLogic({ enabled = true }: { enabled?: boolean } =
           }
         })
       )
+      if (page === 1) setLoadedCacheKey(cacheKey)
       return {
         ...result,
         list: result.list.map(item => {
@@ -72,7 +74,7 @@ export function useRGBTransfersLogic({ enabled = true }: { enabled?: boolean } =
         }),
       }
     },
-    [enabled, wallet]
+    [cacheKey, enabled, wallet]
   )
   const {
     data: items,
@@ -150,6 +152,7 @@ export function useRGBTransfersLogic({ enabled = true }: { enabled?: boolean } =
 
   return {
     items: visibleItems,
+    isCurrentAccountLoaded: loadedCacheKey === cacheKey,
     total: visibleTotal,
     loading,
     hasMore,

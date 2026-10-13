@@ -8,6 +8,9 @@
   "rgb_transfer_ready_to_broadcast_description": {
     "message": "受信者が承認しました。内容を確認してから「ブロードキャスト」を押してください。"
   },
+  "rgb_more_transfers_to_broadcast": {
+    "message": "他のブロードキャスト待ちの転送"
+  },
   "about_3_minutes": {
     "message": "(約3分)"
   },

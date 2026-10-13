@@ -186,6 +186,7 @@ export type RGBTransferDetailSheetProps = {
   onClickExploreTx?: () => void;
   onCanceled?: () => void;
   onAccepted?: () => void;
+  remainingBroadcastCount?: number;
 };
 
 export function RGBTransferDetailSheet({
@@ -195,7 +196,8 @@ export function RGBTransferDetailSheet({
   onClose,
   onClickExploreTx,
   onCanceled,
-  onAccepted
+  onAccepted,
+  remainingBroadcastCount = 0
 }: RGBTransferDetailSheetProps) {
   const { t } = useI18n();
   const chain = useChain();
@@ -457,6 +459,14 @@ export function RGBTransferDetailSheet({
             </Row>
 
             {description ? <Text text={description} color="textDim" textCenter size="xs" /> : null}
+            {canBroadcast && remainingBroadcastCount > 0 ? (
+              <Text
+                text={`${t('rgb_more_transfers_to_broadcast')}: ${remainingBroadcastCount}`}
+                color="gold"
+                textCenter
+                size="xs"
+              />
+            ) : null}
 
             <Column fullX style={{ gap: 12 }}>
               <DetailRow label={t('date')} value={formatDate(transfer?.timestamp || 0)} />

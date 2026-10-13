@@ -8,6 +8,9 @@
   "rgb_transfer_ready_to_broadcast_description": {
     "message": "Le destinataire a accepté. Vérifiez le transfert, puis appuyez sur Diffuser pour envoyer la transaction."
   },
+  "rgb_more_transfers_to_broadcast": {
+    "message": "Autres transferts prêts à diffuser"
+  },
   "about_3_minutes": {
     "message": "(environ 3 minutes)"
   },
