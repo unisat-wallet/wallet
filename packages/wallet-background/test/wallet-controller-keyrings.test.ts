@@ -1268,6 +1268,7 @@ describe('RGB wallet references', () => {
 
   it('formats atomic RGB amounts for the signing action', async () => {
     const wallet = new WalletController()
+    vi.spyOn(wallet as any, 'assertActiveRgbWallet').mockResolvedValue(undefined)
     const service = {
       sync: vi.fn(),
       prepareSend: vi.fn().mockResolvedValue({
@@ -1297,6 +1298,10 @@ describe('RGB wallet references', () => {
       1,
       { service, wallet: localWallet },
       { forceRenew: true }
+    )
+    expect(service.prepareSend).toHaveBeenCalledWith(
+      expect.objectContaining({ precision: 8, amount: '8888888888' }),
+      expect.anything()
     )
 
     expect(getRgbToSignData).toHaveBeenCalledWith(

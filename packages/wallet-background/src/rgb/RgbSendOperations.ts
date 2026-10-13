@@ -66,6 +66,7 @@ export class RgbSendOperations {
         assetId: params.assetId,
         invoice: params.invoice,
         feeRate,
+        ...(params.precision === undefined ? {} : { precision: params.precision }),
         ...(params.amount === undefined ? {} : { amount: String(params.amount) }),
         ...(params.donation === undefined ? {} : { donation: params.donation }),
         ...(params.minConfirmations === undefined

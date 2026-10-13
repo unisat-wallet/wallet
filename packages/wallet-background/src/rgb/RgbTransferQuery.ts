@@ -102,6 +102,7 @@ export class RgbTransferQuery {
       assetId: transfer.request.assetId,
       type: 'send' as const,
       amount: transfer.request.amount,
+      precision: transfer.request.precision,
       txid: transfer.delivery?.completed.txid ?? transfer.broadcast?.completed.txid,
       timestamp: transfer.createdAt,
       status: transfer.delivery?.broadcastError
@@ -123,6 +124,7 @@ export class RgbTransferQuery {
       assetId: send.assetId,
       type: 'send' as const,
       amount: send.amount,
+      precision: send.precision,
       txid: send.txid,
       timestamp: send.createdAt,
       status: send.status,

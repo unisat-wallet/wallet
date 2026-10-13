@@ -1968,6 +1968,7 @@ describe('RgbService', () => {
     await service.prepareSend({
       assetId: 'rgb:asset',
       amount: '60',
+      precision: 7,
       invoice: rgbInvoice(),
       feeRate: 2,
     })
@@ -2002,6 +2003,7 @@ describe('RgbService', () => {
       expect.objectContaining({
         transferId: 'transfer-1',
         txid: completed.txid,
+        precision: 7,
         status: 'broadcasted',
       }),
     ])

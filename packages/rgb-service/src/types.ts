@@ -86,6 +86,8 @@ export interface RgbTransferRequest {
   assetId: string
   /** Optional only when the RGB invoice fixes the transfer amount. */
   amount?: string
+  /** Display precision of the selected asset, retained for local transfer activity. */
+  precision?: number
   invoice: string
   feeRate: number
   donation?: boolean
@@ -291,6 +293,7 @@ export interface RgbPendingSendHistory {
   transferId: string
   assetId: string
   amount: string
+  precision?: number
   txid?: string
   invoice?: string
   /** Funding allocations removed locally when this broadcast was accepted. */
