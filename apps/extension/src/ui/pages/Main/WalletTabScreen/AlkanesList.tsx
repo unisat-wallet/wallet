@@ -24,6 +24,7 @@ export function AlkanesList() {
       emptyText={t('assets_no_assets')}
       emptyPreset="assets"
       emptyMarketplace
+      emptyMarketplacePath="/alkanes/market"
     />
   );
 }

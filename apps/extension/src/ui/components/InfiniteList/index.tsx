@@ -24,6 +24,7 @@ interface InfiniteListProps<T> {
   emptyPreset?: 'simple' | 'assets';
   /** Show the Assets screen marketplace empty state. */
   emptyMarketplace?: boolean;
+  emptyMarketplacePath?: string;
   /** Vertical gap between rows. Use 0 for bordered history-style lists. */
   rowGap?: number;
   /** Number of items shown per UI page; independent of the fetch batch size. */
@@ -47,6 +48,7 @@ export function InfiniteList<T>({
   emptyText,
   emptyPreset = 'assets',
   emptyMarketplace = false,
+  emptyMarketplacePath,
   rowGap = 8,
   pageSize = 20,
   countUnit
@@ -91,7 +93,7 @@ export function InfiniteList<T>({
   }, [pageData, numColumns]);
 
   if (!loading && data.length === 0) {
-    if (emptyMarketplace) return <AssetEmptyState />;
+    if (emptyMarketplace) return <AssetEmptyState marketplacePath={emptyMarketplacePath} />;
     const isAssetsEmpty = emptyPreset === 'assets';
     return (
       <Column itemsCenter justifyCenter={!isAssetsEmpty} style={isAssetsEmpty ? { paddingTop: 8 } : { minHeight: 150 }}>

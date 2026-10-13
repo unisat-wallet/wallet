@@ -29,6 +29,7 @@ export function RunesList() {
       emptyText={t('assets_no_assets')}
         emptyPreset="assets"
         emptyMarketplace
+      emptyMarketplacePath="/runes/market"
     />
   );
 }

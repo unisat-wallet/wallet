@@ -22,6 +22,7 @@ export function BRC20List() {
       emptyText={t('assets_no_assets')}
         emptyPreset="assets"
         emptyMarketplace
+      emptyMarketplacePath="/market/brc20"
     />
   );
 }

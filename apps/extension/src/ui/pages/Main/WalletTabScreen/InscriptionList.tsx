@@ -32,6 +32,7 @@ export function InscriptionList() {
       emptyText={t('assets_no_assets')}
         emptyPreset="assets"
         emptyMarketplace
+      emptyMarketplacePath="/market/collection"
     />
   );
 }

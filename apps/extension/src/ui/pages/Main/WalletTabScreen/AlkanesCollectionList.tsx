@@ -24,7 +24,6 @@ export function AlkanesCollectionList() {
       loading={loading}
       emptyText={t('assets_no_assets')}
       emptyPreset="assets"
-      emptyMarketplace
     />
   );
 }
