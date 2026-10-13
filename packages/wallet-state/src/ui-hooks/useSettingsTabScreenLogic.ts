@@ -33,30 +33,30 @@ export function useSettingsTabScreenLogic() {
   const versionInfo = useVersionInfo()
   const hasUpdate = versionInfo.hasUpdate
   const { t } = useI18n()
-  const [rgbFeatureEnabled, setRgbFeatureEnabled] = useState(false)
+  const rgbContextKey = `${chain.enum}:${currentKeyring.key}:${currentAccount.key}`
+  const [rgbFeatureStatus, setRgbFeatureStatus] = useState({ contextKey: '', enabled: false })
 
   useEffect(() => {
     let active = true
     const rgbSupported = Boolean(chain.rgbProxyEndpoints?.some(endpoint => endpoint.trim()))
     if (!rgbSupported || currentKeyring.type !== KeyringType.HdKeyring) {
-      setRgbFeatureEnabled(false)
+      setRgbFeatureStatus({ contextKey: rgbContextKey, enabled: false })
       return () => {
         active = false
       }
     }
-    setRgbFeatureEnabled(false)
     void wallet
       .getRgbFeatureStatus()
       .then(status => {
-        if (active) setRgbFeatureEnabled(status.enabled && status.supported)
+        if (active) setRgbFeatureStatus({ contextKey: rgbContextKey, enabled: status.enabled && status.supported })
       })
       .catch(() => {
-        if (active) setRgbFeatureEnabled(false)
+        if (active) setRgbFeatureStatus({ contextKey: rgbContextKey, enabled: false })
       })
     return () => {
       active = false
     }
-  }, [chain.enum, chain.rgbProxyEndpoints, currentAccount.key, currentKeyring.key, currentKeyring.type, wallet])
+  }, [rgbContextKey, chain.rgbProxyEndpoints, currentKeyring.type, wallet])
 
   const { isExtensionInExpandView } = useDevice()
 
@@ -149,7 +149,8 @@ export function useSettingsTabScreenLogic() {
 
   const settings_rgbSettings: SettingsItemType | null = useMemo(() => {
     const rgbEnabled = Boolean(chain.rgbProxyEndpoints?.some(endpoint => endpoint.trim()))
-    if (!rgbEnabled || !rgbFeatureEnabled || currentKeyring.type !== KeyringType.HdKeyring) return null
+    if (!rgbEnabled || rgbFeatureStatus.contextKey !== rgbContextKey || !rgbFeatureStatus.enabled ||
+        currentKeyring.type !== KeyringType.HdKeyring) return null
     return {
       key: 'settings_rgbSettings',
       label: t('rgb_settings'),
@@ -161,7 +162,7 @@ export function useSettingsTabScreenLogic() {
         nav.navigate('RgbSettingsScreen')
       },
     }
-  }, [chain.rgbProxyEndpoints, currentKeyring.type, nav, rgbFeatureEnabled, t])
+  }, [chain.rgbProxyEndpoints, currentKeyring.type, nav, rgbFeatureStatus, rgbContextKey, t])
 
   const settings_feedback = useMemo(() => {
     return {

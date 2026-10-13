@@ -312,6 +312,7 @@ describe('RGB fee-pool inspection', () => {
 
 describe('RGB wallet references', () => {
   let previousMainnetRgbProxyEndpoints: string[] | undefined
+  const rgbConsent = { enabled: true, agreementVersion: 'rgb-terms-v1', acceptedAt: 1 }
 
   // These tests cover RGB wallet behavior independently from the production
   // feature flag. Production mainnet remains disabled and is covered above.
@@ -320,7 +321,7 @@ describe('RGB wallet references', () => {
     previousMainnetRgbProxyEndpoints = chain.rgbProxyEndpoints
     chain.rgbProxyEndpoints = ['rpcs://rgb-mainnet.example/json-rpc']
     ;(keyringService as any).getEncryptedStorageItem = vi.fn(
-      (_namespace: string, key: string) => Promise.resolve(key.startsWith('rgb-feature-enabled:') ? true : undefined)
+      (_namespace: string, key: string) => Promise.resolve(key.startsWith('rgb-feature-enabled:') ? rgbConsent : undefined)
     )
     ;(keyringService as any).setEncryptedStorageItem = vi.fn().mockResolvedValue(undefined)
     ;(keyringService as any).removeEncryptedStorageItem = vi.fn().mockResolvedValue(undefined)
@@ -356,7 +357,7 @@ describe('RGB wallet references', () => {
     const storageStarted = new Promise<void>(resolve => (signalStorageStarted = resolve))
     const getEncryptedStorageItem = vi.fn(
       (_namespace: string, key: string) => {
-        if (key.startsWith('rgb-feature-enabled:')) return Promise.resolve(true)
+        if (key.startsWith('rgb-feature-enabled:')) return Promise.resolve(rgbConsent)
         signalStorageStarted!()
         return new Promise<undefined>(resolve => (resolveStorage = resolve))
       }
@@ -389,7 +390,7 @@ describe('RGB wallet references', () => {
     vi.spyOn(wallet as any, 'restoreRgbRecoveryIfNeeded').mockReturnValue(recovery)
 
     ;(keyringService as any).getEncryptedStorageItem = vi.fn(
-      (_namespace: string, key: string) => Promise.resolve(key.startsWith('rgb-feature-enabled:') ? true : undefined)
+      (_namespace: string, key: string) => Promise.resolve(key.startsWith('rgb-feature-enabled:') ? rgbConsent : undefined)
     )
     ;(keyringService as any).setEncryptedStorageItem = vi.fn().mockResolvedValue(undefined)
     ;(keyringService as any).removeEncryptedStorageItem = vi.fn().mockResolvedValue(undefined)
@@ -433,7 +434,7 @@ describe('RGB wallet references', () => {
     await expect(wallet.enableRgbFeature()).resolves.toEqual({ enabled: true })
     expect(setEncryptedStorageItem).toHaveBeenCalledWith(
       'rgb-service-v1',
-      'rgb-feature-enabled:v1:rgb-wallet',
+      'rgb-feature-enabled:v1:rgb-wallet:mainnet',
       expect.objectContaining({
         enabled: true,
         agreementVersion: 'rgb-terms-v1',
@@ -446,7 +447,7 @@ describe('RGB wallet references', () => {
   it('shares RGB consent across accounts derived from the same wallet', async () => {
     const wallet = new WalletController()
     const storage = new Map<string, unknown>([
-      ['rgb-feature-enabled:v1:unisat-deadbeef', { enabled: true, agreementVersion: 'rgb-terms-v1', acceptedAt: 1 }],
+      ['rgb-feature-enabled:v1:unisat-deadbeef:mainnet', rgbConsent],
     ])
     ;(keyringService as any).getEncryptedStorageItem = vi.fn(
       (_namespace: string, key: string) => Promise.resolve(storage.get(key))
@@ -462,6 +463,61 @@ describe('RGB wallet references', () => {
       supported: true,
       remoteRecoveryAvailable: false,
     })
+  })
+
+  it('requires separate RGB activation on testnet4 and mainnet', async () => {
+    const wallet = new WalletController()
+    const storage = new Map<string, unknown>()
+    ;(keyringService as any).getEncryptedStorageItem = vi.fn(
+      (_namespace: string, key: string) => Promise.resolve(storage.get(key))
+    )
+    ;(keyringService as any).setEncryptedStorageItem = vi.fn(
+      (_namespace: string, key: string, value: unknown) => {
+        storage.set(key, value)
+        return Promise.resolve()
+      }
+    )
+    const walletRef = { walletId: 'unisat-deadbeef-0', network: 'testnet4', fundingAddress: 'tb1p-rgb-funding' }
+    vi.spyOn(wallet, 'getCurrentRgbWalletRef').mockImplementation(async () => walletRef)
+    vi.spyOn(wallet as any, 'getLocalRgbService').mockResolvedValue(undefined)
+
+    await wallet.enableRgbFeature()
+    expect(storage.has('rgb-feature-enabled:v1:unisat-deadbeef:testnet4')).toBe(true)
+
+    walletRef.network = 'mainnet'
+    walletRef.fundingAddress = 'bc1p-rgb-funding'
+    await expect(wallet.getRgbFeatureStatus()).resolves.toMatchObject({ enabled: false, supported: true })
+    await expect((wallet as any).assertRgbFeatureEnabled()).rejects.toThrow('RGB is not enabled')
+
+    await wallet.enableRgbFeature()
+    expect(storage.has('rgb-feature-enabled:v1:unisat-deadbeef:mainnet')).toBe(true)
+    walletRef.network = 'testnet4'
+    await expect(wallet.getRgbFeatureStatus()).resolves.toMatchObject({ enabled: true, supported: true })
+  })
+
+  it('ignores unscoped consent but keeps network consent valid across terms versions', async () => {
+    const wallet = new WalletController()
+    const storage = new Map<string, unknown>([
+      ['rgb-feature-enabled:v1:unisat-deadbeef', true],
+    ])
+    ;(keyringService as any).getEncryptedStorageItem = vi.fn(
+      (_namespace: string, key: string) => Promise.resolve(storage.get(key))
+    )
+    vi.spyOn(wallet, 'getCurrentRgbWalletRef').mockResolvedValue({
+      walletId: 'unisat-deadbeef-0',
+      network: 'mainnet',
+      fundingAddress: 'bc1p-rgb-funding',
+    })
+
+    await expect(wallet.getRgbFeatureStatus()).resolves.toMatchObject({ enabled: false, supported: true })
+    await expect((wallet as any).assertRgbFeatureEnabled()).rejects.toThrow('RGB is not enabled')
+
+    storage.set('rgb-feature-enabled:v1:unisat-deadbeef:mainnet', {
+      enabled: true,
+      agreementVersion: 'rgb-terms-v0',
+      acceptedAt: 1,
+    })
+    await expect(wallet.getRgbFeatureStatus()).resolves.toMatchObject({ enabled: true, supported: true })
   })
 
   it('detects an existing encrypted RGB recovery checkpoint without opening RGB state', async () => {

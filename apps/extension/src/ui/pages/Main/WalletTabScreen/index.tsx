@@ -137,6 +137,7 @@ export default function WalletTabScreen({ screen = 'home' }: { screen?: 'home' |
   const supportedAssets = useSupportedAssets();
   const walletTabFocusRefresh = useWallTabFocusRefresh();
   const assetContextKey = `${chain.enum}:${currentAccount.key}:${currentAccount.address}`;
+  const rgbContextKey = `${assetContextKey}:${currentKeyring?.key ?? ''}`;
   const [assetCounts, setAssetCounts] = useState<{
     key: string;
     summary: AddressAssetSummary;
@@ -146,6 +147,7 @@ export default function WalletTabScreen({ screen = 'home' }: { screen?: 'home' |
   const [pinnedSelection, setPinnedSelection] = useState<{ contextKey: string; tabKey: AssetTabKey } | null>(null);
   const [rgbFeatureEnabled, setRgbFeatureEnabled] = useState(false);
   const [rgbRemoteRecoveryAvailable, setRgbRemoteRecoveryAvailable] = useState(false);
+  const [rgbStatusContextKey, setRgbStatusContextKey] = useState('');
   const [rgbActivationOpen, setRgbActivationOpen] = useState(false);
   const [rgbActivationLoading, setRgbActivationLoading] = useState(false);
 
@@ -154,6 +156,7 @@ export default function WalletTabScreen({ screen = 'home' }: { screen?: 'home' |
     if (!supportedAssets.assets.rgb) {
       setRgbFeatureEnabled(false);
       setRgbRemoteRecoveryAvailable(false);
+      setRgbStatusContextKey(rgbContextKey);
       return () => {
         active = false;
       };
@@ -164,24 +167,32 @@ export default function WalletTabScreen({ screen = 'home' }: { screen?: 'home' |
         if (!active) return;
         setRgbFeatureEnabled(status.enabled && status.supported);
         setRgbRemoteRecoveryAvailable(!status.enabled && status.supported && status.remoteRecoveryAvailable);
+        setRgbStatusContextKey(rgbContextKey);
       })
       .catch(() => {
         if (active) {
           setRgbFeatureEnabled(false);
           setRgbRemoteRecoveryAvailable(false);
+          setRgbStatusContextKey(rgbContextKey);
         }
       });
     return () => {
       active = false;
     };
-  }, [chain.enum, currentAccount?.key, currentKeyring?.key, supportedAssets.assets.rgb, wallet]);
+  }, [rgbContextKey, supportedAssets.assets.rgb, wallet]);
+
+  useEffect(() => {
+    setRgbActivationOpen(false);
+  }, [rgbContextKey]);
 
   const onRgbFeatureEnabled = useCallback(() => {
     setRgbFeatureEnabled(true);
     setRgbRemoteRecoveryAvailable(false);
-  }, []);
+    setRgbStatusContextKey(rgbContextKey);
+  }, [rgbContextKey]);
 
-  const isRgbActive = supportedAssets.assets.rgb && rgbFeatureEnabled;
+  const isRgbActive = supportedAssets.assets.rgb && rgbStatusContextKey === rgbContextKey && rgbFeatureEnabled;
+  const rgbRecoveryAvailable = rgbStatusContextKey === rgbContextKey && rgbRemoteRecoveryAvailable;
   useEffect(() => {
     if (screen !== 'assets' || !currentAccount.address) return;
     let active = true;
@@ -317,7 +328,7 @@ export default function WalletTabScreen({ screen = 'home' }: { screen?: 'home' |
           <Column itemsCenter gap="md">
             <Text text={t('rgb_assets')} color="white_muted" />
             <Button
-              text={t(rgbRemoteRecoveryAvailable ? 'restore_rgb' : 'enable_rgb')}
+              text={t(rgbRecoveryAvailable ? 'restore_rgb' : 'enable_rgb')}
               preset="primary"
               onClick={() => setRgbActivationOpen(true)}
             />
@@ -327,7 +338,7 @@ export default function WalletTabScreen({ screen = 'home' }: { screen?: 'home' |
       if (key === AssetTabKey.ALKANES) items.push({ key, label: t('alkanes'), children: <MoreTab /> });
     }
     return items;
-  }, [visibleTabKeys.join(','), t, isRgbActive, rgbTransfers, rgbList, rgbRemoteRecoveryAvailable, chain.enum, currentAccount.key]);
+  }, [visibleTabKeys.join(','), t, isRgbActive, rgbTransfers, rgbList, rgbRecoveryAvailable, chain.enum, currentAccount.key]);
 
   const finalAssetTabKey = visibleTabKeys.includes(effectiveAssetTabKey)
     ? effectiveAssetTabKey
@@ -489,7 +500,7 @@ export default function WalletTabScreen({ screen = 'home' }: { screen?: 'home' |
         {rgbActivationOpen && (
           <RgbFeatureActivationModal
             loading={rgbActivationLoading}
-            recoveryAvailable={rgbRemoteRecoveryAvailable}
+            recoveryAvailable={rgbRecoveryAvailable}
             onClose={() => setRgbActivationOpen(false)}
             onEnable={() => void onEnableRgb()}
           />

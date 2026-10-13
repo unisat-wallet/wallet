@@ -486,7 +486,8 @@ type RgbWalletRef = {
 
 type RgbFeatureConsent = {
   enabled: true
-  agreementVersion: string
+  /** Recorded for reference; changing terms does not disable an enabled network. */
+  agreementVersion?: string
   acceptedAt: number
 }
 
@@ -3835,7 +3836,7 @@ export class WalletController extends BaseController {
     return this.rgbTransferQuery.getTransfers(currentPage, pageSize, options)
   }
 
-  /** RGB activation is local to this installation and applies to the whole HD wallet. */
+  /** RGB activation is local to this installation and scoped to the HD wallet and network. */
   getRgbFeatureStatus = async (): Promise<{
     enabled: boolean
     supported: boolean
@@ -3896,23 +3897,26 @@ export class WalletController extends BaseController {
     wallet: Pick<RgbWalletRef, 'walletId' | 'network' | 'fundingAddress'>
   ) {
     // walletId is `unisat-<master fingerprint>-<account index>`. Consent is
-    // deliberately shared by all accounts derived from the same HD wallet.
+    // shared by accounts from the same HD wallet, but never across networks.
     const walletScope = wallet.walletId?.replace(/-\d+$/, '')
     if (!walletScope) throw new Error('RGB wallet identity is unavailable')
-    return `${RGB_FEATURE_STORAGE_KEY_PREFIX}:${walletScope}`
+    if (!wallet.network) throw new Error('RGB network identity is unavailable')
+    return `${RGB_FEATURE_STORAGE_KEY_PREFIX}:${walletScope}:${wallet.network}`
   }
 
-  private isRgbFeatureConsent(value: unknown): value is true | RgbFeatureConsent {
+  private isRgbFeatureConsent(value: unknown): value is RgbFeatureConsent {
     return (
-      value === true ||
-      (typeof value === 'object' && value !== null && (value as RgbFeatureConsent).enabled === true)
+      typeof value === 'object' &&
+      value !== null &&
+      (value as RgbFeatureConsent).enabled === true &&
+      typeof (value as RgbFeatureConsent).acceptedAt === 'number'
     )
   }
 
   private async isRgbFeatureEnabled(
     wallet: Pick<RgbWalletRef, 'walletId' | 'network' | 'fundingAddress'>
   ) {
-    const consent = await keyringService.getEncryptedStorageItem<boolean | RgbFeatureConsent>(
+    const consent = await keyringService.getEncryptedStorageItem<RgbFeatureConsent>(
       RGB_ENCRYPTED_STORAGE_NAMESPACE,
       this.rgbFeatureStorageKey(wallet)
     )
