@@ -46,6 +46,12 @@ export function RGBHomeTabs({ transfers, list }: RGBHomeTabsProps) {
       item.status.toLowerCase() === 'pending_accept' &&
       !handledTransferIds.has(item.transferId || item.id)
   );
+  const pendingBroadcasts = transfers.items.filter(
+    (item) =>
+      item.type === 'send' &&
+      ['ready_to_broadcast', 'broadcast_failed'].includes(item.status.toLowerCase()) &&
+      !handledTransferIds.has(item.transferId || item.id)
+  );
 
   const markPendingHandled = () => {
     if (!selectedPendingTransfer) return;
@@ -56,6 +62,34 @@ export function RGBHomeTabs({ transfers, list }: RGBHomeTabsProps) {
 
   return (
     <Column gap="md">
+      {pendingBroadcasts.length > 0 && (
+        <Column
+          fullX
+          gap="zero"
+          data-testid="rgb-pending-broadcasts"
+          style={{
+            padding: '12px 16px',
+            border: '1px solid rgba(244,182,44,0.35)',
+            borderRadius: 12,
+            backgroundColor: 'rgba(244,182,44,0.08)',
+            boxSizing: 'border-box'
+          }}
+        >
+          <Text text={`${t('Broadcast')} (${pendingBroadcasts.length})`} color="gold" size="sm" />
+          {pendingBroadcasts.map((item) => (
+            <Column key={item.transferId || item.id} gap="zero">
+              <RGBTransferListItem item={item} onClick={() => setSelectedPendingTransfer(item)} />
+              <Text
+                text={t('view_transfer')}
+                color="gold"
+                size="xs"
+                onClick={() => setSelectedPendingTransfer(item)}
+                style={{ alignSelf: 'flex-end', paddingTop: 6, paddingBottom: 8, cursor: 'pointer' }}
+              />
+            </Column>
+          ))}
+        </Column>
+      )}
       {pendingReceives.length > 0 && (
         <Column
           fullX
