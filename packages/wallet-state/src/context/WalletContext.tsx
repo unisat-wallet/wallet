@@ -690,6 +690,19 @@ export interface WalletController {
   /** Creates a seed-bound, encrypted offline RGB recovery package. */
   exportRgbBackup(): Promise<string>
 
+  /** Exports every created RGB account in the selected HD keyring. */
+  getRgbHdBackupPlan(): Promise<{
+    network: string
+    walletScope: string
+    accountIndexes: number[]
+  }>
+
+  exportRgbHdBackup(expected?: {
+    network: string
+    walletScope: string
+    accountIndexes: number[]
+  }): Promise<string>
+
   /** Authenticates a package and confirms it belongs to the current RGB wallet. */
   inspectRgbBackup(
     payload: string
@@ -699,6 +712,19 @@ export interface WalletController {
   restoreRgbBackup(params: { payload: string; replaceRemote: boolean }): Promise<{
     restored: true
     createdAt: number
+  }>
+
+  inspectRgbBackupFile(payload: string): Promise<{
+    kind: 'hd' | 'account'
+    createdAt: number
+    network: string
+    accountIndexes: number[]
+  }>
+
+  restoreRgbBackupFile(params: { payload: string; replaceRemote: boolean }): Promise<{
+    restored: true
+    createdAt: number
+    accountIndexes: number[]
   }>
 
   getRgbWriteLeaseStatus(): Promise<{

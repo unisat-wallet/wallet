@@ -93,7 +93,8 @@ export type RouteParamList = {
   AddressTypeScreen: undefined
   AdvancedScreen: undefined
   RgbSettingsScreen: undefined
-  RgbBackupScreen: undefined
+  RgbBackupExportScreen: undefined
+  RgbBackupRestoreScreen: undefined
   RgbUtxoInspectionScreen: undefined
   RgbFeePoolInspectionScreen: undefined
   ContactsScreen: {

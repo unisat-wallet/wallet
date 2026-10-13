@@ -116,6 +116,11 @@ import {
   encryptRgbRecoveryCheckpoint,
 } from '../rgb/RgbRecoveryCheckpoint'
 import { createRgbBackupPackage, readRgbBackupPackage } from '../rgb/RgbBackupPackage'
+import {
+  createRgbHdBackupPackage,
+  isRgbHdBackupPackage,
+  readRgbHdBackupPackage,
+} from '../rgb/RgbHdBackupPackage'
 import { RgbReceiveOperations } from '../rgb/RgbReceiveOperations'
 import { RgbSendOperations } from '../rgb/RgbSendOperations'
 import { RgbTransferQuery, type RgbRemoteActivity } from '../rgb/RgbTransferQuery'
@@ -1005,6 +1010,7 @@ export class WalletController extends BaseController {
   })
   private readonly rgbRecoveryRestores = new Map<string, Promise<void>>()
   private readonly rgbRecoveryBackups = new Map<string, Promise<unknown>>()
+  private readonly rgbHdBackupWallets = new Map<string, number>()
   private readonly rgbRecoveryVersions = new Map<
     string,
     { updatedAt?: number; revision?: string; generation?: number; kind?: 'normal' | 'replacement' }
@@ -1096,6 +1102,7 @@ export class WalletController extends BaseController {
       this.rgbPendingBitcoinOperations.clear()
       this.rgbRecoveryRestores.clear()
       this.rgbRecoveryBackups.clear()
+      this.rgbHdBackupWallets.clear()
       this.clearRgbRecoveryCaches()
       this.rgbWriteLeases.clear()
     })
@@ -3941,6 +3948,10 @@ export class WalletController extends BaseController {
   getCurrentRgbWalletRef = async (): Promise<RgbWalletRef> => {
     const account = preferenceService.getCurrentAccount()
     if (!account) throw new Error('no current account')
+    return this.getRgbWalletRefForAccount(account)
+  }
+
+  private getRgbWalletRefForAccount = async (account: Account): Promise<LocalRgbWallet> => {
     assertCanCreateSigningRequest(account)
 
     const keyring = await keyringService.getKeyringForAccount(account.pubkey, account.type)
@@ -3961,6 +3972,51 @@ export class WalletController extends BaseController {
     }
   }
 
+  private getRgbAccountForWallet = async (wallet: LocalRgbWallet): Promise<Account> => {
+    const matches = (candidate: LocalRgbWallet) =>
+      candidate.fundingAddress === wallet.fundingAddress &&
+      candidate.network === wallet.network &&
+      (!wallet.walletId || candidate.walletId === wallet.walletId)
+    const current = preferenceService.getCurrentAccount()
+    if (current) {
+      try {
+        const currentWallet = await this.getRgbWalletRefForAccount(current)
+        if (matches(currentWallet)) return current
+      } catch {
+        // The selected account may be a non-RGB wallet while a backup runs.
+      }
+    }
+    for (const keyring of await this.getKeyrings()) {
+      if (!this.isUsableKeyring(keyring) || keyring.type !== KeyringType.HdKeyring) continue
+      for (const account of keyring.accounts) {
+        if (matches(await this.getRgbWalletRefForAccount(account))) return account
+      }
+    }
+    throw new Error('RGB backup account has not been created in this HD wallet')
+  }
+
+  private withRgbHdBackupWallet = async <T>(wallet: LocalRgbWallet, operation: () => Promise<T>): Promise<T> => {
+    const key = `${wallet.network}:${wallet.fundingAddress}`
+    this.rgbHdBackupWallets.set(key, (this.rgbHdBackupWallets.get(key) ?? 0) + 1)
+    try {
+      return await operation()
+    } finally {
+      const remaining = (this.rgbHdBackupWallets.get(key) ?? 0) - 1
+      if (remaining > 0) this.rgbHdBackupWallets.set(key, remaining)
+      else this.rgbHdBackupWallets.delete(key)
+    }
+  }
+
+  private assertRgbRecoveryWallet = async (wallet: LocalRgbWallet) => {
+    if (!this.rgbHdBackupWallets.has(`${wallet.network}:${wallet.fundingAddress}`)) {
+      return this.assertActiveRgbWallet(wallet)
+    }
+    if (!isWalletUnlocked() || wallet.network !== chainTypeToRgbNetwork(this.getChainType())) {
+      throw new RgbWalletContextChangedError()
+    }
+    await this.getRgbAccountForWallet(wallet)
+  }
+
   /**
    * Signs every private RGB API call with the dedicated funding key. The
    * server binds this exact message to method, route and body hash, so an
@@ -3972,17 +4028,53 @@ export class WalletController extends BaseController {
     body: unknown
   }) => {
     await this.assertRgbEnabled()
+    const requestedWallet = (request.body as { wallet?: Partial<LocalRgbWallet> } | null)?.wallet
+    const bodyWallet =
+      requestedWallet &&
+      typeof requestedWallet.walletId === 'string' &&
+      typeof requestedWallet.fundingAddress === 'string' &&
+      typeof requestedWallet.network === 'string'
+        ? (requestedWallet as LocalRgbWallet)
+        : undefined
+    if (bodyWallet) {
+      const current = preferenceService.getCurrentAccount()
+      let isCurrent = false
+      if (current) {
+        try {
+          isCurrent = isSameRgbWallet(await this.getRgbWalletRefForAccount(current), bodyWallet)
+        } catch {
+          // A backup may continue after the user selects a non-RGB account.
+        }
+      }
+      if (
+        !isCurrent &&
+        (!this.rgbHdBackupWallets.has(`${bodyWallet.network}:${bodyWallet.fundingAddress}`) ||
+          !(
+            request.path.startsWith('/v5/rgb/recovery/checkpoint') ||
+            request.path.startsWith('/v5/rgb/lease/')
+          ))
+      ) {
+        throw new RgbWalletContextChangedError()
+      }
+    }
+    const account = bodyWallet
+      ? await this.getRgbAccountForWallet(bodyWallet)
+      : preferenceService.getCurrentAccount()
+    if (!account) throw new Error('no current account')
+    const wallet = await this.getRgbWalletRefForAccount(account)
     // This endpoint deliberately exposes only whether an encrypted checkpoint
     // exists. It must be signed by the funding key, but is allowed before
     // local RGB consent so a restored wallet is not presented as first-time
     // activation. All payload/state endpoints remain consent-gated.
     if (request.path !== '/v5/rgb/recovery/checkpoint/metadata') {
-      await this.assertRgbFeatureEnabled()
+      if (!(await this.isRgbFeatureEnabled(wallet))) {
+        throw new Error('RGB is not enabled for this wallet. Enable RGB before continuing.')
+      }
     }
-    const account = preferenceService.getCurrentAccount()
-    if (!account) throw new Error('no current account')
     assertCanCreateSigningRequest(account)
-    const funding = await this.getCurrentRgbFundingAccount()
+    const keyring = await keyringService.getKeyringForAccount(account.pubkey, account.type)
+    if (!keyring?.getRgbFundingAccount) throw new Error('RGB funding account is unavailable')
+    const funding = keyring.getRgbFundingAccount(this.getNetworkType(), account.index)
     const bodyHash = bitcoin.crypto.sha256(Buffer.from(stableRgbJson(request.body))).toString('hex')
     const nonceBytes = new Uint8Array(16)
     globalThis.crypto.getRandomValues(nonceBytes)
@@ -4002,10 +4094,9 @@ export class WalletController extends BaseController {
       address: funding.address,
       networkType: this.getNetworkType(),
     })
-    await this.attachRgbPsbtDerivations(psbt)
-    const toSignInputs = await this.getRgbToSignInputs(psbt)
+    await this.attachRgbPsbtDerivations(psbt, undefined, account)
+    const toSignInputs = await this.getRgbToSignInputs(psbt, account)
     if (toSignInputs.length !== 1) throw new Error('Unable to prepare RGB authorization signature')
-    const keyring = await keyringService.getKeyringForAccount(account.pubkey, account.type)
     await keyringService.signTransaction(keyring, psbt, toSignInputs)
     psbt.finalizeAllInputs()
     return {
@@ -4226,6 +4317,10 @@ export class WalletController extends BaseController {
   /** Export an offline, encrypted RGB recovery package for the current wallet. */
   exportRgbBackup = async () => {
     const context = await this.getLocalRgbService()
+    return this.exportRgbBackupForContext(context)
+  }
+
+  private exportRgbBackupForContext = async (context: LocalRgbServiceContext) => {
     await this.ensureRgbWriteLease(context, { forceRenew: true })
     if (!(await context.service.retryRecoveryCheckpoint())) {
       throw new Error(
@@ -4248,6 +4343,10 @@ export class WalletController extends BaseController {
   inspectRgbBackup = async (payload: string) => {
     if (typeof payload !== 'string' || !payload) throw new Error('RGB backup package is required')
     const context = await this.getLocalRgbService()
+    return this.inspectRgbBackupForContext(payload, context)
+  }
+
+  private inspectRgbBackupForContext = async (payload: string, context: LocalRgbServiceContext) => {
     const backup = await readRgbBackupPackage(payload, await this.rgbBackupKey(context.wallet))
     if (!context.service.canRestoreRecoveryState(backup.state)) {
       throw new Error('RGB backup package does not belong to this wallet')
@@ -4265,8 +4364,12 @@ export class WalletController extends BaseController {
     if (typeof params.payload !== 'string' || !params.payload)
       throw new Error('RGB backup package is required')
     const context = await this.getLocalRgbService()
+    return this.restoreRgbBackupForContext(params.payload, context)
+  }
+
+  private restoreRgbBackupForContext = async (payload: string, context: LocalRgbServiceContext) => {
     const backup = await readRgbBackupPackage(
-      params.payload,
+      payload,
       await this.rgbBackupKey(context.wallet)
     )
     if (!context.service.canRestoreRecoveryState(backup.state)) {
@@ -4285,6 +4388,184 @@ export class WalletController extends BaseController {
       throw new Error('RGB backup checkpoint publication failed')
     }
     return { restored: true, createdAt: backup.createdAt }
+  }
+
+  /** Only the accounts already created in the selected HD keyring are included. */
+  private getRgbHdBackupAccounts = async () => {
+    const keyring = await this.getCurrentKeyring()
+    const current = preferenceService.getCurrentAccount()
+    if (!keyring || keyring.type !== KeyringType.HdKeyring || !current) {
+      throw new Error('RGB HD backup requires an HD wallet')
+    }
+    if (!keyring.accounts.some(account => account.key === current.key)) {
+      throw new Error('Current account does not belong to this HD wallet')
+    }
+    return keyring.accounts
+  }
+
+  /** Stable across all accounts in one HD keyring, separate from account backup keys. */
+  private rgbHdBackupKey = async () => {
+    const accounts = await this.getRgbHdBackupAccounts()
+    const account = accounts[0]!
+    const keyring = await keyringService.getKeyringForAccount(account.pubkey, account.type)
+    if (!keyring?.getRgbFundingAccount || !keyring.deriveRgbRecoveryKey) {
+      throw new Error('Current wallet does not support RGB HD backup encryption')
+    }
+    const funding = keyring.getRgbFundingAccount(this.getNetworkType(), 0)
+    const network = chainTypeToCanonicalNetwork(this.getChainType())
+    const context = bitcoin.crypto
+      .sha256(Buffer.from(`unisat-rgb-hd-export-v1:${network}:${funding.masterFingerprint}`))
+      .toString('hex')
+    return keyring.deriveRgbRecoveryKey(
+      '0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798',
+      network,
+      context
+    )
+  }
+
+  getRgbHdBackupPlan = async () => {
+    const accounts = await this.getRgbHdBackupAccounts()
+    const wallet = await this.getCurrentLocalRgbWallet()
+    return {
+      network: wallet.network,
+      walletScope: wallet.walletId.replace(/-\d+$/, ''),
+      accountIndexes: accounts.map(account => account.index!),
+    }
+  }
+
+  /** Export every created RGB account in the selected HD keyring for this network. */
+  exportRgbHdBackup = async (expected?: {
+    network: string
+    walletScope: string
+    accountIndexes: number[]
+  }) => {
+    const accounts = await this.getRgbHdBackupAccounts()
+    const selectedWallet = await this.getCurrentLocalRgbWallet()
+    const network = selectedWallet.network
+    const walletScope = selectedWallet.walletId.replace(/-\d+$/, '')
+    const accountIndexes = accounts.map(account => account.index!)
+    if (
+      expected &&
+      (expected.network !== network ||
+        expected.walletScope !== walletScope ||
+        expected.accountIndexes.length !== accountIndexes.length ||
+        expected.accountIndexes.some((index, position) => index !== accountIndexes[position]))
+    ) {
+      throw new Error('RGB backup scope changed. Review the accounts and try again.')
+    }
+    const key = await this.rgbHdBackupKey()
+    const entries: Array<{ index: number; payload: string }> = []
+    for (const account of accounts) {
+      const wallet = await this.getRgbWalletRefForAccount(account)
+      if (wallet.network !== network || !wallet.walletId.startsWith(`${walletScope}-`)) {
+        throw new Error('RGB backup scope changed. Review the accounts and try again.')
+      }
+      const payload = await this.withRgbHdBackupWallet(wallet, async () => {
+        const context = await this.getLocalRgbServiceForWallet(wallet)
+        return this.exportRgbBackupForContext(context)
+      })
+      entries.push({ index: account.index!, payload })
+    }
+    return createRgbHdBackupPackage(network, entries, key)
+  }
+
+  /** Authenticate every entry before offering a destructive restore. */
+  inspectRgbHdBackup = async (payload: string) => {
+    const backup = await readRgbHdBackupPackage(payload, await this.rgbHdBackupKey())
+    const accounts = await this.getRgbHdBackupAccounts()
+    const network = (await this.getCurrentLocalRgbWallet()).network
+    if (backup.network !== network) throw new Error('RGB backup network does not match')
+    for (const entry of backup.accounts) {
+      const account = accounts.find(item => item.index === entry.index)
+      if (!account) throw new Error(`RGB account ${entry.index + 1} has not been created`)
+      const wallet = await this.getRgbWalletRefForAccount(account)
+      await this.withRgbHdBackupWallet(wallet, async () => {
+        const context = await this.getLocalRgbServiceForWallet(wallet)
+        await this.inspectRgbBackupForContext(entry.payload, context)
+      })
+    }
+    return { createdAt: backup.createdAt, network, accountIndexes: backup.accounts.map(item => item.index) }
+  }
+
+  /** Restore each account through the existing fenced replacement path. */
+  restoreRgbHdBackup = async (params: { payload: string; replaceRemote: boolean }) => {
+    if (!params?.replaceRemote) {
+      throw new Error('Restoring an RGB backup requires explicit replacement confirmation')
+    }
+    await this.inspectRgbHdBackup(params.payload)
+    const backup = await readRgbHdBackupPackage(params.payload, await this.rgbHdBackupKey())
+    const accounts = await this.getRgbHdBackupAccounts()
+    const restoredIndexes: number[] = []
+    for (const entry of backup.accounts) {
+      const account = accounts.find(item => item.index === entry.index)
+      if (!account) throw new Error(`RGB account ${entry.index + 1} has not been created`)
+      try {
+        const wallet = await this.getRgbWalletRefForAccount(account)
+        await this.withRgbHdBackupWallet(wallet, async () => {
+          const context = await this.getLocalRgbServiceForWallet(wallet)
+          await this.restoreRgbBackupForContext(entry.payload, context)
+        })
+        restoredIndexes.push(entry.index)
+      } catch (error) {
+        throw new Error(
+          `RGB account ${entry.index + 1} failed to restore; completed accounts: ${restoredIndexes.map(index => index + 1).join(', ') || 'none'}. ${String(error)}`
+        )
+      }
+    }
+    return { restored: true, createdAt: backup.createdAt, accountIndexes: restoredIndexes }
+  }
+
+  private findLegacyRgbBackupAccount = async (payload: string) => {
+    for (const account of await this.getRgbHdBackupAccounts()) {
+      const wallet = await this.getRgbWalletRefForAccount(account)
+      const key = await this.rgbBackupKey(wallet)
+      try {
+        await readRgbBackupPackage(payload, key)
+        return { account, wallet }
+      } catch (error) {
+        if (
+          !(error instanceof Error) ||
+          error.message !== 'RGB backup package cannot be decrypted by this wallet'
+        ) {
+          throw error
+        }
+      }
+    }
+    throw new Error('RGB backup does not belong to a created account in this HD wallet')
+  }
+
+  inspectRgbBackupFile = async (payload: string) => {
+    if (isRgbHdBackupPackage(payload)) {
+      const backup = await this.inspectRgbHdBackup(payload)
+      return { kind: 'hd' as const, ...backup }
+    }
+    const { account, wallet } = await this.findLegacyRgbBackupAccount(payload)
+    const backup = await this.withRgbHdBackupWallet(wallet, async () => {
+      const context = await this.getLocalRgbServiceForWallet(wallet)
+      return this.inspectRgbBackupForContext(payload, context)
+    })
+    return {
+      kind: 'account' as const,
+      createdAt: backup.createdAt,
+      network: backup.wallet.network,
+      accountIndexes: [account.index!],
+    }
+  }
+
+  restoreRgbBackupFile = async (params: { payload: string; replaceRemote: boolean }) => {
+    if (isRgbHdBackupPackage(params.payload)) return this.restoreRgbHdBackup(params)
+    if (!params.replaceRemote) {
+      throw new Error('Restoring an RGB backup requires explicit replacement confirmation')
+    }
+    const { account, wallet } = await this.findLegacyRgbBackupAccount(params.payload)
+    const result = await this.withRgbHdBackupWallet(wallet, async () => {
+      const context = await this.getLocalRgbServiceForWallet(wallet)
+      return this.restoreRgbBackupForContext(params.payload, context)
+    })
+    return {
+      ...result,
+      accountIndexes: [account.index!],
+    }
   }
 
   /** Indicates whether this device may mutate RGB state; no other-device identity is exposed. */
@@ -5166,8 +5447,7 @@ export class WalletController extends BaseController {
     const context = bitcoin.crypto
       .sha256(Buffer.from(`unisat-rgb-recovery-v2:${wallet.network}:${wallet.fundingAddress}`))
       .toString('hex')
-    const account = preferenceService.getCurrentAccount()
-    if (!account) throw new Error('no current account')
+    const account = await this.getRgbAccountForWallet(wallet)
     const keyring = await keyringService.getKeyringForAccount(account.pubkey, account.type)
     if (!keyring?.getRgbFundingAccount || !keyring.deriveRgbRecoveryKey) {
       throw new Error('Current wallet does not support RGB recovery encryption')
@@ -5185,8 +5465,7 @@ export class WalletController extends BaseController {
     const context = bitcoin.crypto
       .sha256(Buffer.from(`unisat-rgb-export-v1:${wallet.network}:${wallet.fundingAddress}`))
       .toString('hex')
-    const account = preferenceService.getCurrentAccount()
-    if (!account) throw new Error('no current account')
+    const account = await this.getRgbAccountForWallet(wallet)
     const keyring = await keyringService.getKeyringForAccount(account.pubkey, account.type)
     if (!keyring?.getRgbFundingAccount || !keyring.deriveRgbRecoveryKey) {
       throw new Error('Current wallet does not support RGB backup encryption')
@@ -5414,7 +5693,7 @@ export class WalletController extends BaseController {
     const backup = previous
       .catch(() => undefined)
       .then(async () => {
-        await this.assertActiveRgbWallet(wallet)
+        await this.assertRgbRecoveryWallet(wallet)
         const verifiedFingerprint = this.rgbRecoveryVerifiedFingerprints.get(key)
         if (verifiedFingerprint === diagnosticFingerprint) {
           const version = this.rgbRecoveryVersions.get(key)
@@ -5429,7 +5708,7 @@ export class WalletController extends BaseController {
         }
         const payload = await encryptRgbRecoveryCheckpoint(state, await this.rgbRecoveryKey(wallet))
         const checksum = await rgbRecoveryPayloadChecksum(payload)
-        await this.assertActiveRgbWallet(wallet)
+        await this.assertRgbRecoveryWallet(wallet)
         let expected = this.rgbRecoveryVersions.get(key)
         // The backend deliberately rejects a replacement without a CAS
         // baseline. The cached version may have been cleared by a background
@@ -5441,7 +5720,7 @@ export class WalletController extends BaseController {
           expected?.updatedAt === undefined
         ) {
           const checkpoint = await getRgbApiService().getRgbRecoveryCheckpoint({ wallet })
-          await this.assertActiveRgbWallet(wallet)
+          await this.assertRgbRecoveryWallet(wallet)
           if (checkpoint.revision === undefined && checkpoint.updatedAt === undefined) {
             throw new Error('RGB recovery replacement requires an existing cloud checkpoint')
           }
@@ -5619,6 +5898,20 @@ export class WalletController extends BaseController {
     const context = await this.rgbServiceRegistry.get()
     // Unlike UI reads, mutations must wait until recovery has established the
     // checkpoint revision used for safe writes.
+    await this.restoreRgbRecoveryIfNeeded(context)
+    if (!context.service.isRecoveryBackupEnabled()) {
+      throw new Error('RGB recovery service is unavailable; retry when the backend is reachable')
+    }
+    return context
+  }
+
+  private getLocalRgbServiceForWallet = async (
+    wallet: LocalRgbWallet
+  ): Promise<LocalRgbServiceContext> => {
+    if (!(await this.isRgbFeatureEnabled(wallet))) {
+      throw new Error('RGB is not enabled for this wallet. Enable RGB before continuing.')
+    }
+    const context = await this.rgbServiceRegistry.get(wallet)
     await this.restoreRgbRecoveryIfNeeded(context)
     if (!context.service.isRecoveryBackupEnabled()) {
       throw new Error('RGB recovery service is unavailable; retry when the backend is reachable')
@@ -5948,13 +6241,22 @@ export class WalletController extends BaseController {
   /** Add only the current account's local RGB derivation to wallet-built PSBTs. */
   private attachRgbPsbtDerivations = async (
     psbt: bitcoin.Psbt,
-    expectedWallet?: LocalRgbWallet
+    expectedWallet?: LocalRgbWallet,
+    signingAccount?: Account
   ) => {
     if (expectedWallet) await this.assertActiveRgbWallet(expectedWallet)
-    const accounts = await Promise.all([
-      this.getCurrentRgbFundingAccount(),
-      this.getCurrentRgbFeeAccount(),
-    ])
+    const accounts = signingAccount
+      ? await (async () => {
+          const keyring = await keyringService.getKeyringForAccount(signingAccount.pubkey, signingAccount.type)
+          if (!keyring?.getRgbFundingAccount || !keyring.getRgbFeeAccount) {
+            throw new Error('RGB signing account is unavailable')
+          }
+          return [
+            keyring.getRgbFundingAccount(this.getNetworkType(), signingAccount.index),
+            keyring.getRgbFeeAccount(this.getNetworkType(), signingAccount.index),
+          ]
+        })()
+      : await Promise.all([this.getCurrentRgbFundingAccount(), this.getCurrentRgbFeeAccount()])
     if (expectedWallet) await this.assertActiveRgbWallet(expectedWallet)
     const networkType = this.getNetworkType()
     for (const account of accounts) {
@@ -5986,8 +6288,8 @@ export class WalletController extends BaseController {
     return psbt
   }
 
-  private getRgbToSignInputs = async (psbt: bitcoin.Psbt): Promise<ToSignInput[]> => {
-    const account = preferenceService.getCurrentAccount()
+  private getRgbToSignInputs = async (psbt: bitcoin.Psbt, signingAccount?: Account): Promise<ToSignInput[]> => {
+    const account = signingAccount ?? preferenceService.getCurrentAccount()
     if (!account) throw new Error('no current account')
     assertCanCreateSigningRequest(account)
 

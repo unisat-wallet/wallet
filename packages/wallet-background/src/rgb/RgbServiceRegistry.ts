@@ -22,8 +22,8 @@ export class RgbServiceRegistry {
     this.initializations.clear()
   }
 
-  async get(): Promise<LocalRgbServiceContext> {
-    const wallet = await this.dependencies.getWallet()
+  async get(explicitWallet?: LocalRgbWallet): Promise<LocalRgbServiceContext> {
+    const wallet = explicitWallet ?? (await this.dependencies.getWallet())
     const key = walletKey(wallet)
     const service = this.services.get(key)
     if (service) return { service, wallet }

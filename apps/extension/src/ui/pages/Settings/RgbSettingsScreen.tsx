@@ -1,11 +1,12 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 
-import { Column, Content, Header, Icon, Layout, Row, Text } from '@/ui/components';
+import { Button, Column, Content, Header, Icon, Layout, Row, Text } from '@/ui/components';
 import type { IconTypes } from '@/ui/components/Icon';
+import { Popover } from '@/ui/components/Popover';
 import type { ColorTypes } from '@/ui/theme/colors';
 import { fontSizes } from '@/ui/theme/font';
-import { useI18n, useWallet } from '@unisat/wallet-state';
+import { useI18n, useTools, useWallet } from '@unisat/wallet-state';
 
 const actionStyle = {
   width: '100%',
@@ -39,7 +40,7 @@ function SettingsAction({
         <Icon icon={icon} color={iconColor} size={20} />
         <Column gap="xs" style={{ minWidth: 0 }}>
           <Text text={title} color="white" size="sm" />
-          <Text text={description} color="textDim" size="xs" />
+          <Text text={description} color="textDim" size="xs" wrap />
         </Column>
       </Row>
       <Row itemsCenter gap="xs" style={{ flexShrink: 0 }}>
@@ -54,7 +55,28 @@ export default function RgbSettingsScreen() {
   const navigate = useNavigate();
   const { t } = useI18n();
   const wallet = useWallet();
+  const tools = useTools();
   const [invoiceExpiry, setInvoiceExpiry] = useState(24 * 60 * 60);
+  const [confirmCloudRestore, setConfirmCloudRestore] = useState(false);
+  const [restoring, setRestoring] = useState(false);
+
+  const restoreCloudCheckpoint = async () => {
+    setRestoring(true);
+    try {
+      await wallet.restoreLatestRgbRecoveryCheckpoint();
+      setConfirmCloudRestore(false);
+      tools.toastSuccess(t('rgb_cloud_state_restored'));
+    } catch (error) {
+      const message = error && typeof error === 'object' && 'message' in error ? error.message : error;
+      tools.toastError(
+        typeof message === 'string' && message && message !== 'Object' && message !== '[object Object]'
+          ? message
+          : t('unknown_error')
+      );
+    } finally {
+      setRestoring(false);
+    }
+  };
 
   useEffect(() => {
     wallet.getRgbInvoiceExpirySeconds().then(setInvoiceExpiry).catch(() => undefined);
@@ -79,9 +101,23 @@ export default function RgbSettingsScreen() {
             <SettingsAction
               icon="wallet-info"
               iconColor="ticker_color2"
-              title={t('rgb_backup')}
-              description={t('rgb_backup_description')}
-              onClick={() => navigate('/settings/rgb-backup')}
+              title={t('rgb_export_backup_entry')}
+              description={t('rgb_export_backup_settings_description')}
+              onClick={() => navigate('/settings/rgb/backup/export')}
+            />
+            <SettingsAction
+              icon="wallet-info"
+              iconColor="ticker_color2"
+              title={t('rgb_import_backup_entry')}
+              description={t('rgb_import_backup_settings_description')}
+              onClick={() => navigate('/settings/rgb/backup/restore')}
+            />
+            <SettingsAction
+              icon="rgb"
+              iconColor="ticker_color2"
+              title={t('rgb_recover_latest_cloud_state')}
+              description={t('rgb_cloud_current_account_description')}
+              onClick={() => !restoring && setConfirmCloudRestore(true)}
             />
           </Column>
 
@@ -116,6 +152,19 @@ export default function RgbSettingsScreen() {
           </Column>
         </Column>
       </Content>
+      {confirmCloudRestore ? (
+        <Popover onClose={() => !restoring && setConfirmCloudRestore(false)}>
+          <Column gap="md">
+            <Text text={t('rgb_recover_cloud_title')} preset="title-bold" />
+            <Text text={t('rgb_cloud_current_account_description')} color="white" size="sm" wrap />
+            <Text text={t('rgb_recover_cloud_description')} color="textDim" size="sm" wrap />
+            <Row fullX>
+              <Button text={t('cancel')} preset="defaultV2" full disabled={restoring} onClick={() => setConfirmCloudRestore(false)} />
+              <Button text={t(restoring ? 'rgb_recovering' : 'rgb_recover_from_cloud')} preset="primaryV2" full disabled={restoring} onClick={() => void restoreCloudCheckpoint()} />
+            </Row>
+          </Column>
+        </Popover>
+      ) : null}
     </Layout>
   );
 }

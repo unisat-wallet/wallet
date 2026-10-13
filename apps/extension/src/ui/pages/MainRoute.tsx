@@ -81,7 +81,8 @@ import NetworkTypeScreen from './Settings/NetworkTypeScreen';
 import NotificationListScreen from './Settings/NotificationListScreen';
 import RgbUtxoInspectionScreen from './Settings/RgbUtxoInspectionScreen';
 import RgbFeePoolInspectionScreen from './Settings/RgbFeePoolInspectionScreen';
-import RgbBackupScreen from './Settings/RgbBackupScreen';
+import RgbBackupExportScreen from './Settings/RgbBackupExportScreen';
+import RgbBackupRestoreScreen from './Settings/RgbBackupRestoreScreen';
 import RgbInvoiceExpiryScreen from './Settings/RgbInvoiceExpiryScreen';
 import RgbSettingsScreen from './Settings/RgbSettingsScreen';
 import UpgradeNoticeScreen from './Settings/UpgradeNoticeScreen';
@@ -208,9 +209,13 @@ export const routes = {
     path: '/settings/rgb',
     element: <RgbSettingsScreen />
   },
-  RgbBackupScreen: {
-    path: '/settings/rgb-backup',
-    element: <RgbBackupScreen />
+  RgbBackupExportScreen: {
+    path: '/settings/rgb/backup/export',
+    element: <RgbBackupExportScreen />
+  },
+  RgbBackupRestoreScreen: {
+    path: '/settings/rgb/backup/restore',
+    element: <RgbBackupRestoreScreen />
   },
   RgbUtxoInspectionScreen: {
     path: '/settings/rgb-utxos',

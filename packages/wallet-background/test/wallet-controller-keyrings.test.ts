@@ -17,6 +17,8 @@ import {
 import { keyringService, preferenceService, walletApiService } from '../src/services'
 import { bgEventBus } from '../src/utils/eventBus'
 import { encryptRgbRecoveryCheckpoint } from '../src/rgb/RgbRecoveryCheckpoint'
+import { createRgbBackupPackage } from '../src/rgb/RgbBackupPackage'
+import { createRgbHdBackupPackage, readRgbHdBackupPackage } from '../src/rgb/RgbHdBackupPackage'
 
 vi.mock('@unisat/babylon-service', () => ({
   COSMOS_CHAINS_MAP: {},
@@ -166,6 +168,164 @@ describe('WalletController keyring recovery', () => {
 
     expect(preferenceService.setCurrentKeyringIndex).not.toHaveBeenCalled()
     expect(preferenceService.setCurrentAccount).not.toHaveBeenCalled()
+  })
+})
+
+describe('RGB HD backup orchestration', () => {
+  const accounts = [
+    { index: 0, key: 'keyring_0#0' },
+    { index: 2, key: 'keyring_0#2' },
+  ]
+
+  beforeEach(() => vi.clearAllMocks())
+
+  it('exports both created accounts without switching the selected account', async () => {
+    const controller = new WalletController()
+    vi.spyOn(controller as any, 'rgbHdBackupKey').mockResolvedValue('11'.repeat(32))
+    vi.spyOn(controller as any, 'getRgbHdBackupAccounts').mockResolvedValue(accounts)
+    vi.spyOn(controller as any, 'getCurrentLocalRgbWallet').mockResolvedValue({
+      walletId: 'wallet-0',
+      network: 'mainnet',
+    })
+    vi.spyOn(controller as any, 'getRgbWalletRefForAccount').mockImplementation(async (account: any) => ({
+      walletId: `wallet-${account.index}`,
+      network: 'mainnet',
+      fundingAddress: `funding-${account.index}`,
+    }))
+    vi.spyOn(controller as any, 'getLocalRgbServiceForWallet').mockImplementation(async (wallet: any) => ({
+      service: { walletId: wallet.walletId },
+      wallet,
+    }))
+    vi.spyOn(controller as any, 'exportRgbBackupForContext').mockImplementation(async (context: any) =>
+      `encrypted-${context.wallet.walletId}`
+    )
+
+    const plan = await controller.getRgbHdBackupPlan()
+    expect(plan).toEqual({ network: 'mainnet', walletScope: 'wallet', accountIndexes: [0, 2] })
+    const backup = await readRgbHdBackupPackage(await controller.exportRgbHdBackup(plan), '11'.repeat(32))
+    expect(backup?.accounts).toEqual([
+      { index: 0, payload: 'encrypted-wallet-0' },
+      { index: 2, payload: 'encrypted-wallet-2' },
+    ])
+    expect(preferenceService.setCurrentAccount).not.toHaveBeenCalled()
+  })
+
+  it('requires another review if the HD wallet backup scope changes', async () => {
+    const controller = new WalletController()
+    vi.spyOn(controller as any, 'getRgbHdBackupAccounts').mockResolvedValue(accounts)
+    vi.spyOn(controller as any, 'getCurrentLocalRgbWallet').mockResolvedValue({
+      walletId: 'wallet-0',
+      network: 'mainnet',
+    })
+    const exportAccount = vi.spyOn(controller as any, 'exportRgbBackupForContext')
+    await expect(
+      controller.exportRgbHdBackup({
+        network: 'mainnet',
+        walletScope: 'wallet',
+        accountIndexes: [0],
+      })
+    ).rejects.toThrow('scope changed')
+    expect(exportAccount).not.toHaveBeenCalled()
+  })
+
+  it('validates every account before replacing any account', async () => {
+    const controller = new WalletController()
+    vi.spyOn(controller as any, 'rgbHdBackupKey').mockResolvedValue('11'.repeat(32))
+    const payload = await createRgbHdBackupPackage(
+      'mainnet',
+      [
+        { index: 0, payload: 'encrypted-0' },
+        { index: 2, payload: 'encrypted-2' },
+      ],
+      '11'.repeat(32)
+    )
+    vi.spyOn(controller as any, 'getRgbHdBackupAccounts').mockResolvedValue(accounts)
+    vi.spyOn(controller as any, 'getCurrentLocalRgbWallet').mockResolvedValue({ network: 'mainnet' })
+    vi.spyOn(controller as any, 'getRgbWalletRefForAccount').mockImplementation(async (account: any) => ({
+      walletId: `wallet-${account.index}`,
+      network: 'mainnet',
+      fundingAddress: `funding-${account.index}`,
+    }))
+    vi.spyOn(controller as any, 'getLocalRgbServiceForWallet').mockImplementation(async (wallet: any) => ({
+      service: {},
+      wallet,
+    }))
+    const inspect = vi.spyOn(controller as any, 'inspectRgbBackupForContext').mockImplementation(
+      async (entry: string) => {
+        if (entry === 'encrypted-2') throw new Error('invalid account backup')
+      }
+    )
+    const restore = vi.spyOn(controller as any, 'restoreRgbBackupForContext').mockResolvedValue({ restored: true })
+
+    await expect(controller.restoreRgbHdBackup({ payload, replaceRemote: true })).rejects.toThrow(
+      'invalid account backup'
+    )
+    expect(inspect).toHaveBeenCalledTimes(2)
+    expect(restore).not.toHaveBeenCalled()
+  })
+
+  it('routes old single-account files to their matching account', async () => {
+    const controller = new WalletController()
+    const legacyPayload = JSON.stringify({ magic: 'unisat-rgb-backup' })
+    const target = {
+      account: { index: 2 },
+      wallet: { network: 'mainnet', fundingAddress: 'funding-2', walletId: 'wallet-2' },
+    }
+    vi.spyOn(controller as any, 'findLegacyRgbBackupAccount').mockResolvedValue(target)
+    vi.spyOn(controller as any, 'getLocalRgbServiceForWallet').mockResolvedValue({ service: {}, wallet: target.wallet })
+    const inspect = vi.spyOn(controller as any, 'inspectRgbBackupForContext').mockResolvedValue({
+      createdAt: 123,
+      wallet: target.wallet,
+    })
+    const restore = vi.spyOn(controller as any, 'restoreRgbBackupForContext').mockResolvedValue({ restored: true, createdAt: 123 })
+
+    await expect(controller.inspectRgbBackupFile(legacyPayload)).resolves.toMatchObject({
+      kind: 'account',
+      accountIndexes: [2],
+    })
+    await expect(
+      controller.restoreRgbBackupFile({ payload: legacyPayload, replaceRemote: true })
+    ).resolves.toMatchObject({ accountIndexes: [2] })
+    expect(inspect).toHaveBeenCalledWith(legacyPayload, { service: {}, wallet: target.wallet })
+    expect(restore).toHaveBeenCalledWith(legacyPayload, { service: {}, wallet: target.wallet })
+  })
+
+  it('finds a legacy backup even when another account is selected', async () => {
+    const controller = new WalletController()
+    vi.spyOn(controller as any, 'getRgbHdBackupAccounts').mockResolvedValue(accounts)
+    vi.spyOn(controller as any, 'getRgbWalletRefForAccount').mockImplementation(async (account: any) => ({
+      walletId: `wallet-${account.index}`,
+      network: 'mainnet',
+      fundingAddress: `funding-${account.index}`,
+    }))
+    vi.spyOn(controller as any, 'rgbBackupKey').mockImplementation(async (wallet: any) =>
+      wallet.walletId === 'wallet-2' ? '22'.repeat(32) : '11'.repeat(32)
+    )
+    const payload = await createRgbBackupPackage({ walletId: 'wallet-2' }, '22'.repeat(32), 123)
+
+    await expect((controller as any).findLegacyRgbBackupAccount(payload)).resolves.toMatchObject({
+      account: { index: 2 },
+      wallet: { walletId: 'wallet-2' },
+    })
+  })
+
+  it('does not sign another account without an active HD backup operation', async () => {
+    const controller = new WalletController()
+    vi.mocked(preferenceService.getCurrentAccount).mockReturnValue({ index: 0 } as any)
+    vi.spyOn(controller as any, 'getRgbWalletRefForAccount').mockResolvedValue({
+      walletId: 'wallet-0',
+      network: 'mainnet',
+      fundingAddress: 'funding-0',
+    })
+    await expect(
+      (controller as any).createRgbRequestAuthorization({
+        method: 'POST',
+        path: '/v5/rgb/recovery/checkpoint/read',
+        body: {
+          wallet: { walletId: 'wallet-2', network: 'mainnet', fundingAddress: 'funding-2' },
+        },
+      })
+    ).rejects.toThrow('RGB operation canceled')
   })
 })
 
