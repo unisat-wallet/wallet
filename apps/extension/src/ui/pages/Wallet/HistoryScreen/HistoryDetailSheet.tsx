@@ -10,6 +10,7 @@ import { useChain, useCurrentAddress, useI18n, useNavigation, useWallet } from '
 
 import styles from './history.module.less';
 import { getHistoryAssetChanges } from './historyAssetView';
+import { HistoryTokenIcon } from './HistoryTokenIcon';
 
 function formatHistoryDateTime(timestamp: number) {
   if (!timestamp) return '—';
@@ -124,9 +125,9 @@ export function HistoryDetailSheet({ summary, onClose }: { summary: AddressHisto
               {isCoin ? (
                 <img src={IMAGE_SOURCE_MAP[chain.icon]} alt="" className={styles.detailCoinIcon} />
               ) : (
-                <span className={styles.detailOtherAssetIcon} aria-hidden="true">
+                primary ? <HistoryTokenIcon asset={primary.asset} className={styles.detailCoinIcon} fallback={<span className={styles.detailOtherAssetIcon} aria-hidden="true">
                   {(primary?.asset.symbol || primary?.asset.kind || '?').slice(0, 2).toUpperCase()}
-                </span>
+                </span>} /> : null
               )}
               <span>
                 {primary?.sign || ''}{primary?.asset.amount || '0'} {assetLabel}

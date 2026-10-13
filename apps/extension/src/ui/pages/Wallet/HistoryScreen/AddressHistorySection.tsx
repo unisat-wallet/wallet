@@ -11,6 +11,7 @@ import type {
 import { useChain, useCurrentAddress, useI18n, useNavigation, useWallet } from '@unisat/wallet-state';
 
 import { HistoryDetailSheet } from './HistoryDetailSheet';
+import { HistoryTokenIcon } from './HistoryTokenIcon';
 import styles from './history.module.less';
 import { getHistoryAssetChanges, getHistoryDate, type HistoryAssetChange } from './historyAssetView';
 
@@ -37,11 +38,11 @@ function HistoryAssetIcon({ asset }: { asset: AddressHistoryAssetItem }) {
   return (
     <span className={styles.assetIconFrame} aria-hidden="true">
       <img src="/images/history/asset-base.svg" alt="" className={styles.assetIconBase} />
-      {protocolIcon ? (
+      <HistoryTokenIcon asset={asset} className={styles.assetIcon} fallback={protocolIcon ? (
         <img src={protocolIcon} alt="" className={styles.protocolIcon} />
       ) : (
         <span className={styles.assetInitial}>{(asset.symbol || asset.kind).slice(0, 2).toUpperCase()}</span>
-      )}
+      )} />
     </span>
   );
 }
