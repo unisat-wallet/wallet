@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 
+import { IMAGE_SOURCE_MAP } from '@/shared/constant';
 import { Column, Row, Text } from '@/ui/components';
 import { Pagination } from '@/ui/components/Pagination';
 import type {
@@ -7,7 +8,7 @@ import type {
   AddressHistorySummaryItem,
   AddressHistorySummaryPage
 } from '@unisat/wallet-shared';
-import { useCurrentAddress, useI18n, useNavigation, useWallet } from '@unisat/wallet-state';
+import { useChain, useCurrentAddress, useI18n, useNavigation, useWallet } from '@unisat/wallet-state';
 
 import { HistoryDetailSheet } from './HistoryDetailSheet';
 import styles from './history.module.less';
@@ -17,10 +18,11 @@ const PREVIEW_LIMIT = 5;
 const PAGE_SIZE = 20;
 
 function HistoryAssetIcon({ asset }: { asset: AddressHistoryAssetItem }) {
+  const chain = useChain();
   if (asset.kind === 'coin') {
     return (
       <span className={styles.assetIconFrame} aria-hidden="true">
-        <img src="/images/history/bitcoin.png" alt="" className={styles.assetIcon} />
+        <img src={IMAGE_SOURCE_MAP[chain.icon]} alt="" className={styles.assetIcon} />
       </span>
     );
   }
@@ -45,7 +47,8 @@ function HistoryAssetIcon({ asset }: { asset: AddressHistoryAssetItem }) {
 }
 
 function HistoryChange({ change }: { change: HistoryAssetChange }) {
-  const label = change.asset.displayName || change.asset.symbol || change.asset.kind;
+  const chain = useChain();
+  const label = change.asset.kind === 'coin' ? chain.unit : change.asset.displayName || change.asset.symbol || change.asset.kind;
   const value = `${change.sign}${change.asset.amount} ${label}`;
   return (
     <span className={change.sign === '+' ? styles.receivedAmount : styles.sentAmount} title={value}>
@@ -56,6 +59,7 @@ function HistoryChange({ change }: { change: HistoryAssetChange }) {
 
 function HistoryRow({ item, onClick }: { item: AddressHistorySummaryItem; onClick: () => void }) {
   const { t } = useI18n();
+  const chain = useChain();
   const { changes, total } = getHistoryAssetChanges(item);
   const primary = changes[0];
   if (!primary) return null;
@@ -63,7 +67,7 @@ function HistoryRow({ item, onClick }: { item: AddressHistorySummaryItem; onClic
   const assetKind = primary.asset.kind;
   const assetCategory =
     assetKind === 'coin'
-      ? primary.asset.symbol
+      ? chain.unit
       : assetKind === 'inscription'
       ? t('ordinals')
       : assetKind === 'runes' || assetKind === 'alkanes' || assetKind === 'brc20'

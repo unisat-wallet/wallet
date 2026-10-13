@@ -1,5 +1,6 @@
 import { useEffect, useState, type ReactNode } from 'react';
 
+import { IMAGE_SOURCE_MAP } from '@/shared/constant';
 import InscriptionPreview from '@/ui/components/InscriptionPreview';
 import { BottomModal } from '@/ui/components/BottomModal';
 import { BottomSheetHeader } from '@/ui/components/BottomSheetHeader';
@@ -84,7 +85,10 @@ export function HistoryDetailSheet({ summary, onClose }: { summary: AddressHisto
     ? detail?.inputs.find((input) => !input.isMine)?.address || detail?.inputs[0]?.address
     : detail?.outputs.find((output) => !output.isMine)?.address || detail?.outputs[0]?.address;
   const fee = detail?.fee ?? (resolvedSummary.feeSatoshis / 100_000_000).toFixed(8);
-  const coinUnit = primary?.asset.symbol || chain.unit;
+  const coinUnit = chain.unit;
+  const assetLabel = isCoin
+    ? coinUnit
+    : primary?.asset.displayName || primary?.asset.symbol || primary?.asset.kind || '';
   const inscriptionNumber = inscription?.inscriptionNumber || primary?.asset.displayName?.match(/#?\d+/)?.[0];
 
   return (
@@ -118,14 +122,14 @@ export function HistoryDetailSheet({ summary, onClose }: { summary: AddressHisto
           ) : (
             <div className={styles.detailCoinHero}>
               {isCoin ? (
-                <img src="/images/history/bitcoin.png" alt="" className={styles.detailCoinIcon} />
+                <img src={IMAGE_SOURCE_MAP[chain.icon]} alt="" className={styles.detailCoinIcon} />
               ) : (
                 <span className={styles.detailOtherAssetIcon} aria-hidden="true">
                   {(primary?.asset.symbol || primary?.asset.kind || '?').slice(0, 2).toUpperCase()}
                 </span>
               )}
               <span>
-                {primary?.sign || ''}{primary?.asset.amount || '0'} {isCoin ? coinUnit : primary?.asset.displayName || coinUnit}
+                {primary?.sign || ''}{primary?.asset.amount || '0'} {assetLabel}
               </span>
             </div>
           )}
