@@ -204,6 +204,8 @@ export interface RgbPendingTransfer {
     externalBroadcast?: boolean
     /** The last Bitcoin broadcast failure; retrying reuses the signed transaction. */
     broadcastError?: string
+    /** Last successful report to the wallet backend. */
+    failureReportedAt?: number
   }
   /** Broadcast has succeeded; only delivery/index synchronization remains. */
   broadcast?: {
@@ -448,6 +450,14 @@ export interface RgbStateSource {
     status: 'mempool' | 'confirmed' | 'pending_spend' | 'spent' | 'replaced' | 'unknown'
     confirmations: number
   }>
+  reportBroadcastFailure?(wallet: RgbWalletRef, report: {
+    transferId: string
+    recipientId: string
+    txid: string
+    rawTx: string
+    error: string
+  }): Promise<void>
+  getBroadcastCancellation?(wallet: RgbWalletRef, recipientId: string, txid: string): Promise<boolean>
   /** Verify locally selected Bitcoin outpoints before an RGB transfer is encoded. */
   verifyUtxos?(
     wallet: RgbWalletRef,

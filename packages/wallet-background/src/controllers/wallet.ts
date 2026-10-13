@@ -460,7 +460,7 @@ type RgbControllerApiService = {
     txid: string
     createdAt: number
   }) => Promise<void>
-}
+} & Pick<RgbBackendApi, 'reportRgbBroadcastFailure' | 'getRgbBroadcastFailureStatus'>
 
 const getRgbApiService = () => (walletApiService as unknown as { rgb: RgbControllerApiService }).rgb
 

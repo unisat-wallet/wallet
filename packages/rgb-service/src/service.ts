@@ -1071,10 +1071,9 @@ export class RgbService {
           }
         }
 
-        // Sender cancellation only applies before acceptance. Once the user
-        // ACKs, the sender may have broadcast already, so the local receipt
-        // must be retained until chain settlement even if the proxy later
-        // reports ack=false.
+        // Before acceptance, an explicit proxy rejection can release the
+        // invoice. An accepted receipt waits for chain settlement or a
+        // reviewed backend cancellation.
         if (
           !receive.receivedConsignment?.accepted &&
           !receive.receivedConsignment?.acknowledgementPending &&
@@ -1088,7 +1087,7 @@ export class RgbService {
 
         // Already accepted by the user: advance chain confirmation / settlement.
         if (receive.receivedConsignment?.accepted) {
-          if (await this.isAcceptedReceiveTerminallyCanceled(receive, item.endpoint)) {
+          if (await this.isAcceptedReceiveTerminallyCanceled(receive)) {
             this.recordReceiveOutcome(receive, 'canceled', match.txid)
             pending.splice(receiveIndex, 1)
             changed = true
@@ -1601,16 +1600,21 @@ export class RgbService {
     }
   }
 
-  /**
-   * A sender cannot normally cancel after receiving ACK=true. We post ACK=false
-   * at that point only after a terminal input-spent failure, so it is a durable
-   * cancellation signal for the accepted invoice as well.
-   */
+  /** An accepted invoice is canceled only by a reviewed backend decision. */
   private async isAcceptedReceiveTerminallyCanceled(
-    receive: import('./types').RgbPendingReceive,
-    endpoint?: string
+    receive: import('./types').RgbPendingReceive
   ) {
-    return this.isProxyAckRejected(receive, endpoint)
+    const txid = receive.receivedConsignment?.txid || receive.pendingAccept?.txid
+    if (!txid || !this.dependencies.stateSource.getBroadcastCancellation) return false
+    try {
+      return await this.dependencies.stateSource.getBroadcastCancellation(
+        this.requireState().wallet,
+        receive.proxyRecipientId || receive.recipientId,
+        txid
+      )
+    } catch {
+      return false
+    }
   }
 
   private async isProxyAckRejected(
@@ -2344,8 +2348,65 @@ export class RgbService {
       ) {
         throw new RgbServiceError('RGB transfer is not ready for sender broadcast')
       }
+      let canceled = false
+      try {
+        canceled = (await this.dependencies.stateSource.getBroadcastCancellation?.(
+          this.requireState().wallet,
+          decodeRgbInvoice(pending.request.invoice).proxyRecipientId,
+          pending.delivery.completed.txid
+        )) === true
+      } catch { /* A backend outage must not disable sender retry. */ }
+      if (canceled) {
+        const txid = pending.delivery.completed.txid
+        await this.cancelTerminalBroadcastFailure(transferId, pending)
+        throw new RgbTransferCanceledError(transferId, txid)
+      }
       return this.advancePendingDelivery(transferId, pending, 'broadcast')
     })
+  }
+
+  /** Apply only a backend decision backed by a confirmed conflicting spend. */
+  async processBroadcastCancellations() {
+    const getCancellation = this.dependencies.stateSource.getBroadcastCancellation
+    const state = this.requireState()
+    let canceled = 0
+    for (const [transferId, pending] of Object.entries(state.pending)) {
+      if (!pending.delivery?.broadcastError || pending.broadcast) continue
+      if (!pending.delivery.failureReportedAt) {
+        try { await this.reportPendingBroadcastFailure(transferId, pending) } catch { /* Retry on next poll. */ }
+      }
+      if (!getCancellation) continue
+      try {
+        if (!await getCancellation(
+          state.wallet,
+          decodeRgbInvoice(pending.request.invoice).proxyRecipientId,
+          pending.delivery.completed.txid
+        )) continue
+        await this.cancelTerminalBroadcastFailure(transferId, pending)
+        canceled++
+      } catch { /* Preserve the local lock while the backend is unavailable. */ }
+    }
+    return canceled
+  }
+
+  private async reportPendingBroadcastFailure(transferId: string, pending: RgbPendingTransfer) {
+    const delivery = pending.delivery
+    const report = this.dependencies.stateSource.reportBroadcastFailure
+    if (!delivery?.broadcastError || !report) return
+    await report(this.requireState().wallet, {
+      transferId,
+      recipientId: decodeRgbInvoice(pending.request.invoice).proxyRecipientId,
+      txid: delivery.completed.txid,
+      rawTx: delivery.completed.rawTx,
+      error: delivery.broadcastError,
+    })
+    delivery.failureReportedAt = this.now()
+    try {
+      await this.persist({ skipRecovery: true })
+    } catch (error) {
+      delete delivery.failureReportedAt
+      throw error
+    }
   }
 
   async abortSend(transferId: string) {
@@ -2669,13 +2730,14 @@ export class RgbService {
       broadcastTxid = await this.dependencies.broadcaster.broadcast(delivery.completed.rawTx)
     } catch (error) {
       delivery.broadcastError = error instanceof Error ? error.message : String(error)
+      delete delivery.failureReportedAt
       await this.persist({ waitForRecovery: true })
-      const recovery = await this.reconcileFailedBroadcast(transferId, pending, error)
+      const recovery = await this.reconcileFailedBroadcast(transferId, pending)
       if (recovery === 'broadcasted') return this.syncBroadcastedTransfer(transferId, pending)
-      if (recovery === 'canceled') {
-        await this.cancelTerminalBroadcastFailure(transferId, pending)
-        throw new RgbTransferCanceledError(transferId, delivery.completed.txid)
-      }
+      // ACK=true cannot be changed to ACK=false by the proxy. Keep the signed
+      // transfer retryable until a reviewed cancellation is published.
+      try { await this.reportPendingBroadcastFailure(transferId, pending) }
+      catch { /* Reporting is best effort; background polling retries it. */ }
       throw error
     }
     if (broadcastTxid !== delivery.completed.txid) {
@@ -2695,9 +2757,8 @@ export class RgbService {
    */
   private async reconcileFailedBroadcast(
     transferId: string,
-    pending: RgbPendingTransfer,
-    error: unknown
-  ): Promise<'broadcasted' | 'canceled' | 'unknown'> {
+    pending: RgbPendingTransfer
+  ): Promise<'broadcasted' | 'unknown'> {
     const state = this.requireState()
     const delivery = pending.delivery
     if (!delivery) return 'unknown'
@@ -2713,50 +2774,22 @@ export class RgbService {
           await this.persist({ waitForRecovery: true })
           return 'broadcasted'
         }
-        // The status endpoint explicitly looked up this txid. Any non-chain
-        // state means this exact signed transaction was not accepted and can
-        // never be made valid by retrying the same bytes.
-        if (
-          chain.status === 'unknown' ||
-          chain.status === 'pending_spend' ||
-          isTerminallyReplacedTransaction(chain.status)
-        ) {
-          return 'canceled'
-        }
+        // A missing txid or a policy rejection is not proof that these signed
+        // bytes can never be mined. Admin review handles terminal conflicts.
       } catch {
         // Preserve the lock only when status itself is unavailable. The
         // previous broadcast outcome is then genuinely ambiguous.
         return 'unknown'
       }
     }
-    // Fallback for deployments that do not expose transaction status yet.
-    // These errors are deterministic local-node rejections.
-    return isSpentInputBroadcastError(error) || isBelowRelayFeeBroadcastError(error)
-      ? 'canceled'
-      : 'unknown'
+    return 'unknown'
   }
 
   private async cancelTerminalBroadcastFailure(transferId: string, pending: RgbPendingTransfer) {
     const state = this.requireState()
     const delivery = pending.delivery
     if (!delivery) return
-    // A terminal chain result makes it safe to supersede the earlier ACK and
-    // lets the receiver release its accepted, but now impossible, invoice.
-    if (this.dependencies.transport.acknowledgeConsignment) {
-      const proxyRecipientId = decodeRgbInvoice(pending.request.invoice).proxyRecipientId
-      for (const consignment of delivery.completed.consignments) {
-        try {
-          await this.dependencies.transport.acknowledgeConsignment({
-            recipientId: proxyRecipientId,
-            endpoints: delivery.endpoints,
-            acknowledged: false,
-          })
-        } catch {
-          // The local lock must still be released; the proxy state will be
-          // retried by the receiver only once its chain status is terminal.
-        }
-      }
-    }
+    // The proxy ACK is immutable. Both wallets consume the backend decision.
     const history = state.pendingSendHistory || (state.pendingSendHistory = [])
     if (!history.some(item => item.transferId === transferId)) {
       history.push({
@@ -3364,32 +3397,6 @@ function sameBlindSeal(
   right: import('./protocol/receive').RgbBlindSeal
 ) {
   return left.txid === right.txid && left.vout === right.vout && left.blinding === right.blinding
-}
-
-function isTerminallyReplacedTransaction(
-  status: 'mempool' | 'confirmed' | 'pending_spend' | 'spent' | 'replaced' | 'unknown'
-) {
-  return status === 'spent' || status === 'replaced'
-}
-
-/** Bitcoin Core rejects this only when at least one transaction input is no longer spendable. */
-function isSpentInputBroadcastError(error: unknown) {
-  const message = (error instanceof Error ? error.message : String(error)).toLowerCase()
-  return (
-    message.includes('bad-txns-inputs-missingorspent') ||
-    message.includes('bad-txns-inputs-spent') ||
-    message.includes('inputs-missingorspent')
-  )
-}
-
-/** Bitcoin Core policy rejection for a transaction whose signed fee is below the relay floor. */
-function isBelowRelayFeeBroadcastError(error: unknown) {
-  const message = (error instanceof Error ? error.message : String(error)).toLowerCase()
-  return (
-    message.includes('min relay fee not met') ||
-    message.includes('min relay feerate not met') ||
-    message.includes('mempool min fee not met')
-  )
 }
 
 function randomU64() {

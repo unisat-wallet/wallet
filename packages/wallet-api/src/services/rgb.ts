@@ -285,6 +285,25 @@ export class RgbService {
     return this.privatePost(`/v5/rgb/chain/transactions/${encodeURIComponent(txid)}`, params)
   }
 
+  async reportRgbBroadcastFailure(params: {
+    wallet: RgbTransactionStatusRequest['wallet']
+    transferId: string
+    recipientId: string
+    txid: string
+    rawTx: string
+    error: string
+  }): Promise<void> {
+    await this.privatePost('/v5/rgb/broadcast-failures/report', params)
+  }
+
+  async getRgbBroadcastFailureStatus(params: {
+    wallet: RgbTransactionStatusRequest['wallet']
+    recipientId: string
+    txid: string
+  }): Promise<{ canceled: boolean; conflictingTxid?: string }> {
+    return this.privatePost('/v5/rgb/broadcast-failures/status', params)
+  }
+
   /**
    * Fetch opaque history required for local consignment construction. This is
    * a transport read: no wallet key material or transaction parameters leave

@@ -187,6 +187,7 @@ export class RgbWalletCoordinator {
     // Claims are durable recipient-to-address bindings. Retrying them here
     // covers invoices created while the recovery endpoint was unavailable.
     await service.claimPendingReceives?.()
+    await service.processBroadcastCancellations?.()
     await this.dependencies.assertContext?.(context)
     await this.dependencies.syncIndexerOutbox(service, wallet)
     await this.dependencies.assertContext?.(context)

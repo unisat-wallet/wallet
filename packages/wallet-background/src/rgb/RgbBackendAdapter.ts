@@ -85,6 +85,19 @@ export type RgbBackendApi = {
     status: 'mempool' | 'confirmed' | 'pending_spend' | 'spent' | 'replaced' | 'unknown'
     confirmations: number
   }>
+  reportRgbBroadcastFailure: (params: {
+    wallet: RgbWalletRef
+    transferId: string
+    recipientId: string
+    txid: string
+    rawTx: string
+    error: string
+  }) => Promise<void>
+  getRgbBroadcastFailureStatus: (params: {
+    wallet: RgbWalletRef
+    recipientId: string
+    txid: string
+  }) => Promise<{ canceled: boolean }>
   verifyRgbUtxos: (params: {
     wallet: RgbWalletRef & { network: string }
     deviceId: string
@@ -170,6 +183,11 @@ export function createRgbBackendAdapter(
       return result.consignments
     },
     getTransactionStatus: (wallet, txid) => api.getRgbTransactionStatus(txid, { wallet }),
+    reportBroadcastFailure: (wallet, report) => api.reportRgbBroadcastFailure({ wallet, ...report }),
+    getBroadcastCancellation: async (wallet, recipientId, txid) => {
+      const result = await api.getRgbBroadcastFailureStatus({ wallet, recipientId, txid })
+      return result.canceled
+    },
     verifyUtxos: async (wallet, outpoints) => {
       const lease = dependencies.getActiveWriteLease(wallet)
       if (!lease) throw new Error('RGB write lease is unavailable')
