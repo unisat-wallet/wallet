@@ -12,7 +12,7 @@ export function useRGBSendCompleteScreenLogic() {
   }
 
   const onClickDone = () => {
-    nav.navigate('MainScreen')
+    nav.navigate('AssetsTabScreen')
   }
 
   return {

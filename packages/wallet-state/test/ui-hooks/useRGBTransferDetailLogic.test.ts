@@ -33,7 +33,7 @@ const confirmingReceive = {
 }
 
 describe('useRGBTransferDetailLogic', () => {
-  it('opens the RGB transfers list', async () => {
+  it('returns to Assets from the transfer detail screen', async () => {
     const { wrapper, navigation } = createHookTestHarness({
       routeState: { transferId: 'recipient-id', initialTransfer: pendingReceive },
     })
@@ -42,7 +42,7 @@ describe('useRGBTransferDetailLogic', () => {
     await waitFor(() => expect(result.current.transfer).toBeDefined())
     act(() => result.current.onClickDone())
 
-    expect(navigation.navigate).toHaveBeenCalledWith('RGBTransfersScreen')
+    expect(navigation.navigate).toHaveBeenCalledWith('AssetsTabScreen')
   })
 
   it('accepts a pending receive using its recipient ID', async () => {

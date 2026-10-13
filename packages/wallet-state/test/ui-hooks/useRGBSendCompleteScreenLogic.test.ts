@@ -5,7 +5,7 @@ import { useRGBSendCompleteScreenLogic } from '../../src/ui-hooks/useRGBSendComp
 import { createHookTestHarness } from './testHelpers'
 
 describe('useRGBSendCompleteScreenLogic', () => {
-  it('returns to the main screen when done is clicked', () => {
+  it('returns to Assets when done is clicked', () => {
     const { wrapper, navigation } = createHookTestHarness({
       routeState: {
         assetId: 'rgb:test-asset',
@@ -20,7 +20,7 @@ describe('useRGBSendCompleteScreenLogic', () => {
       result.current.onClickDone()
     })
 
-    expect(navigation.navigate).toHaveBeenCalledWith('MainScreen')
+    expect(navigation.navigate).toHaveBeenCalledWith('AssetsTabScreen')
     expect(navigation.navToTab).not.toHaveBeenCalled()
   })
 })
