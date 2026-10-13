@@ -69,6 +69,9 @@ export interface RgbAssetDetail {
 
 export interface RgbActivityItem {
   id: string
+  /** Present when this activity comes from a local transfer. */
+  transferId?: string
+  local?: boolean
   assetId: string
   ticker?: string
   name?: string

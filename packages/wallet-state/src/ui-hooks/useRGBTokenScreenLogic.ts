@@ -124,6 +124,8 @@ export function useRGBTokenScreenLogic() {
         )
         .map(transfer => ({
           id: transfer.id,
+          transferId: transfer.transferId,
+          local: transfer.local,
           assetId: transfer.assetId ?? assetId,
           ticker: transfer.ticker,
           name: transfer.name,

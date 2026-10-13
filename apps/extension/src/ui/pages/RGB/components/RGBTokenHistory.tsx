@@ -28,6 +28,8 @@ function toTransferItem(
   const type = item.type === 'send' || item.type === 'receive' ? item.type : 'issue';
   return {
     id: item.id || item.txid,
+    transferId: item.transferId,
+    local: item.local,
     assetId: item.assetId,
     ticker: item.ticker || fallbackTicker,
     name: item.name || fallbackName,
@@ -125,7 +127,7 @@ export function RGBTokenHistory(props: {
       {selectedTransfer ? (
         <RGBTransferDetailSheet
           transfer={selectedTransfer}
-          transferId={selectedTransfer.id}
+          transferId={selectedTransfer.transferId || selectedTransfer.id}
           onClose={() => setSelectedTransfer(undefined)}
           onCanceled={() => onRefreshActivity?.()}
           onClickExploreTx={

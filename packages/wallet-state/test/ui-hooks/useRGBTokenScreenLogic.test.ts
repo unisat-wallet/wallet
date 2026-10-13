@@ -185,4 +185,35 @@ describe('useRGBTokenScreenLogic', () => {
     expect(result.current.activityTotal).toBe(2)
     expect(wallet.getRgbTransfers).toHaveBeenCalledWith(1, 50, { skipSync: true })
   })
+
+  it('preserves the local receive identity needed to accept it from token history', async () => {
+    const { wrapper, wallet } = createHookTestHarness({ routeState: { assetId } })
+    wallet.getRGBAssetDetail.mockResolvedValue(detail)
+    wallet.getRGBAssetBalance.mockResolvedValue(fetchedBalance)
+    wallet.getRGBAssetActivity.mockResolvedValue({ list: [], total: 0 })
+    wallet.getRgbTransfers.mockResolvedValue({
+      total: 1,
+      list: [{
+        id: 'local-receive:recipient-1',
+        transferId: 'recipient-1',
+        assetId,
+        type: 'receive',
+        status: 'pending_accept',
+        amount: '7',
+        timestamp: 2,
+        local: true,
+      }],
+    })
+
+    const { result } = renderHook(() => useRGBTokenScreenLogic(), { wrapper })
+
+    await waitFor(() => {
+      expect(result.current.activityItems).toContainEqual(expect.objectContaining({
+        id: 'local-receive:recipient-1',
+        transferId: 'recipient-1',
+        local: true,
+        status: 'pending_accept',
+      }))
+    })
+  })
 })
