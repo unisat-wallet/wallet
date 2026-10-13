@@ -5,7 +5,7 @@ import { RGBTransfersList } from '../Main/WalletTabScreen/RGBTransfersList';
 
 export default function RGBTransfersScreen() {
   const { t } = useI18n();
-  const transfers = useRGBTransfersLogic();
+  const transfers = useRGBTransfersLogic({ initialFullSync: true, pollingEnabled: false });
 
   return (
     <Layout>

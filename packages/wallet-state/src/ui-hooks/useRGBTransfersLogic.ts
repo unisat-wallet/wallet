@@ -28,14 +28,18 @@ function isInProgress(item: RgbTransferItem) {
   )
 }
 
-export function useRGBTransfersLogic({ enabled = true }: { enabled?: boolean } = {}) {
+export function useRGBTransfersLogic({
+  enabled = true,
+  initialFullSync = false,
+  pollingEnabled = true,
+}: { enabled?: boolean; initialFullSync?: boolean; pollingEnabled?: boolean } = {}) {
   const wallet = useWallet()
   const currentKeyring = useCurrentKeyring()
   const currentAccount = useCurrentAccount()
   const chainType = useChainType()
   const cacheKey = `${chainType}:${currentKeyring?.key || ''}:${currentAccount?.key || ''}:${enabled ? '1' : '0'}`
   const [loadedCacheKey, setLoadedCacheKey] = useState('')
-  const skipSyncRef = useRef(true)
+  const skipSyncRef = useRef(!initialFullSync)
   const requestFullSyncRef = useRef(false)
 
   const fetchTransfers = useCallback(
@@ -96,9 +100,9 @@ export function useRGBTransfersLogic({ enabled = true }: { enabled?: boolean } =
   const [notifications, setNotifications] = useState<RgbTransferNotification[]>([])
 
   useEffect(() => {
-    skipSyncRef.current = true
+    skipSyncRef.current = !initialFullSync
     requestFullSyncRef.current = false
-  }, [cacheKey])
+  }, [cacheKey, initialFullSync])
 
   useEffect(() => {
     if (loading) return
@@ -142,13 +146,13 @@ export function useRGBTransfersLogic({ enabled = true }: { enabled?: boolean } =
   }, [items])
 
   useEffect(() => {
-    if (!hasInProgressTransfer) return undefined
+    if (!pollingEnabled || !hasInProgressTransfer) return undefined
     const intervalId = setInterval(() => {
       skipSyncRef.current = false
       onRefresh()
     }, 10_000)
     return () => clearInterval(intervalId)
-  }, [hasInProgressTransfer, onRefresh])
+  }, [hasInProgressTransfer, onRefresh, pollingEnabled])
 
   return {
     items: visibleItems,

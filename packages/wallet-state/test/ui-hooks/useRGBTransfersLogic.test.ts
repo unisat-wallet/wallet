@@ -1,5 +1,5 @@
 import { act, renderHook, waitFor } from '@testing-library/react'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 
 import { useRGBTransfersLogic } from '../../src/ui-hooks/useRGBTransfersLogic'
 import { createHookTestHarness } from './testHelpers'
@@ -17,6 +17,30 @@ const confirmingReceive = {
 }
 
 describe('useRGBTransfersLogic', () => {
+  it('loads the full activity once when the history screen requests an initial sync', async () => {
+    const { wrapper, wallet } = createHookTestHarness()
+    wallet.getRgbTransfers.mockResolvedValue({
+      list: [{ ...confirmingReceive, assetId: 'rgb:history-no-poll' }],
+      total: 1,
+    })
+    const intervalSpy = vi.spyOn(globalThis, 'setInterval')
+
+    try {
+      const { result } = renderHook(
+        () => useRGBTransfersLogic({ initialFullSync: true, pollingEnabled: false }),
+        { wrapper }
+      )
+
+      await waitFor(() => expect(result.current.isCurrentAccountLoaded).toBe(true))
+      await waitFor(() => expect(result.current.loading).toBe(false))
+      expect(wallet.getRgbTransfers).toHaveBeenCalledTimes(1)
+      expect(wallet.getRgbTransfers).toHaveBeenCalledWith(1, 20, { skipSync: false })
+      expect(intervalSpy).not.toHaveBeenCalledWith(expect.any(Function), 10_000)
+    } finally {
+      intervalSpy.mockRestore()
+    }
+  })
+
   it('attaches the asset precision needed to display atomic transfer amounts', async () => {
     const { wrapper, wallet } = createHookTestHarness()
     wallet.getRgbTransfers.mockResolvedValue({ list: [confirmingReceive], total: 1 })
