@@ -7,6 +7,7 @@ import { TickUsdWithoutPrice, TokenType } from '@/ui/components/TickUsd';
 import { TokenScreenIcon } from '@/ui/components/TokenScreenIcon';
 import { colors } from '@/ui/theme/colors';
 import { fontSizes } from '@/ui/theme/font';
+import { bnUtils } from '@unisat/base-utils';
 import {
   BRC20TokenScreenTabKey,
   useBRC20TokenScreenLogic,
@@ -22,7 +23,7 @@ import { BRC20TokenHistory } from './components/BRC20TokenHistory';
 export default function BRC20TokenScreen() {
   const nav = useNavigation();
   const [isInSwapMoreOpen, setIsInSwapMoreOpen] = useState(false);
-  const [isProgMoreOpen, setIsProgMoreOpen] = useState(false);
+  const [isOutWalletActionsExpanded, setIsOutWalletActionsExpanded] = useState(false);
   const screenLogic = useBRC20TokenScreenLogic() as ReturnType<typeof useBRC20TokenScreenLogic> & {
     outWalletBalanceItems: BRC20OutWalletBalanceItem[];
     onClickAddLiquidityInSwap: () => void;
@@ -68,7 +69,6 @@ export default function BRC20TokenScreen() {
     isBrc20Prog,
     onClickWrapBrc20Prog,
     onClickUnwrapBrc20Prog,
-    onClickSendBrc20Prog,
 
     onClickSwapInSwap,
     onClickAddLiquidityInSwap,
@@ -81,6 +81,10 @@ export default function BRC20TokenScreen() {
     onClickTrade,
     onClickSingleStepSend
   } = screenLogic;
+  const walletBalance = outWalletBalanceItems.find((item) => item.key === 'wallet')?.amount || '0';
+  const wrappedBalance = outWalletBalanceItems.find((item) => item.key === (showSwapBalance ? 'swap' : 'prog'))?.amount || '0';
+  const canWrap = bnUtils.toBigNumber(walletBalance).gt(0);
+  const canUnwrap = bnUtils.toBigNumber(wrappedBalance).gt(0);
 
   const renderTabChildren = useMemo(() => {
     if (activeTab === BRC20TokenScreenTabKey.HISTORY && enableHistory) {
@@ -100,21 +104,8 @@ export default function BRC20TokenScreen() {
     setIsInSwapMoreOpen(false);
   };
 
-  const handleOpenProgMore = () => {
-    setIsProgMoreOpen(true);
-  };
-
-  const handleCloseProgMore = () => {
-    setIsProgMoreOpen(false);
-  };
-
   const runInSwapMoreAction = (action: () => void) => {
     setIsInSwapMoreOpen(false);
-    action();
-  };
-
-  const runProgMoreAction = (action: () => void) => {
-    setIsProgMoreOpen(false);
     action();
   };
 
@@ -166,19 +157,25 @@ export default function BRC20TokenScreen() {
 
           {showSwapBalance || showProgBalance ? (
             <Column mb="xl" style={outWalletCardStyle}>
-              <BRC20OutWalletBalance items={outWalletBalanceItems} />
-              {showSwapBalance ? (
+              <BRC20OutWalletBalance
+                items={outWalletBalanceItems}
+                expandAction={{
+                  itemKey: showSwapBalance ? 'swap' : 'prog',
+                  label: t('more'),
+                  expanded: isOutWalletActionsExpanded,
+                  onClick: () => setIsOutWalletActionsExpanded((expanded) => !expanded)
+                }}
+              />
+              {isOutWalletActionsExpanded && showSwapBalance ? (
                 <Row gap="sm">
                   <Button
                     text={t('swap_wrap')}
                     preset="swap"
                     icon="swap_wrap"
                     onClick={onClickWrapInSwap}
+                    disabled={!canWrap}
                     style={outWalletActionButtonStyle}
-                    iconSize={{
-                      width: 12,
-                      height: 12
-                    }}
+                    iconSize={{ width: 12, height: 12 }}
                     full
                   />
                   <Button
@@ -186,11 +183,9 @@ export default function BRC20TokenScreen() {
                     preset="swap"
                     icon="swap_unwrap"
                     onClick={onClickUnwrapInSwap}
+                    disabled={!canUnwrap}
                     style={outWalletActionButtonStyle}
-                    iconSize={{
-                      width: 12,
-                      height: 12
-                    }}
+                    iconSize={{ width: 12, height: 12 }}
                     full
                   />
                   <Button
@@ -199,27 +194,21 @@ export default function BRC20TokenScreen() {
                     icon="more_grey"
                     onClick={handleOpenInSwapMore}
                     style={outWalletActionButtonStyle}
-                    iconSize={{
-                      width: 12,
-                      height: 12
-                    }}
+                    iconSize={{ width: 12, height: 12 }}
                     full
                   />
                 </Row>
               ) : null}
-
-              {showProgBalance ? (
+              {isOutWalletActionsExpanded && showProgBalance ? (
                 <Row gap="sm">
                   <Button
                     text={t('swap_wrap')}
                     preset="swap"
                     icon="swap_wrap"
                     onClick={onClickWrapBrc20Prog}
+                    disabled={!canWrap}
                     style={outWalletActionButtonStyle}
-                    iconSize={{
-                      width: 12,
-                      height: 12
-                    }}
+                    iconSize={{ width: 12, height: 12 }}
                     full
                   />
                   <Button
@@ -227,23 +216,9 @@ export default function BRC20TokenScreen() {
                     preset="swap"
                     icon="swap_unwrap"
                     onClick={onClickUnwrapBrc20Prog}
+                    disabled={!canUnwrap}
                     style={outWalletActionButtonStyle}
-                    iconSize={{
-                      width: 12,
-                      height: 12
-                    }}
-                    full
-                  />
-                  <Button
-                    text={t('more')}
-                    preset="swap"
-                    icon="more_grey"
-                    onClick={handleOpenProgMore}
-                    style={outWalletActionButtonStyle}
-                    iconSize={{
-                      width: 12,
-                      height: 12
-                    }}
+                    iconSize={{ width: 12, height: 12 }}
                     full
                   />
                 </Row>
@@ -349,21 +324,8 @@ export default function BRC20TokenScreen() {
               key: 'send',
               label: t('send'),
               icon: 'send_grey',
+              disabled: !canUnwrap,
               onClick: () => runInSwapMoreAction(onClickSendInSwap)
-            }
-          ]}
-          t={t}
-        />
-      ) : null}
-      {isProgMoreOpen ? (
-        <BRC20InSwapMoreSheet
-          onClose={handleCloseProgMore}
-          actions={[
-            {
-              key: 'send',
-              label: t('send'),
-              icon: 'send_grey',
-              onClick: () => runProgMoreAction(onClickSendBrc20Prog)
             }
           ]}
           t={t}

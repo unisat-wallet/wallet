@@ -1,4 +1,4 @@
-import { BottomSheetHeader, Icon, Inline, Stack, Text } from '@/ui/components';
+import { BottomSheetHeader, Icon, Stack, Text } from '@/ui/components';
 import { BottomModal } from '@/ui/components/BottomModal';
 
 export interface BRC20MoreActionItem {
@@ -6,6 +6,7 @@ export interface BRC20MoreActionItem {
   label: string;
   symbol?: string;
   icon?: 'send_grey' | 'swap_send' | 'swap_more' | 'add_liquidity';
+  disabled?: boolean;
   onClick: () => void;
 }
 
@@ -50,6 +51,7 @@ export function BRC20InSwapMoreSheet(props: BRC20InSwapMoreSheetProps) {
                 label={action.label}
                 symbol={action.symbol}
                 icon={action.icon}
+                disabled={action.disabled}
                 onClick={action.onClick}
               />
             ))}
@@ -64,26 +66,34 @@ function ActionRow({
   label,
   symbol,
   icon,
+  disabled,
   onClick
 }: {
   key?: string;
   label: string;
   symbol?: string;
   icon?: 'send_grey' | 'swap_send' | 'swap_more' | 'add_liquidity';
+  disabled?: boolean;
   onClick: () => void;
 }) {
   return (
-    <Inline
-      align="center"
+    <button
+      type="button"
+      disabled={disabled}
       onClick={onClick}
       style={{
+        display: 'flex',
+        alignItems: 'center',
         width: '100%',
         height: layout.actionHeight,
         borderRadius: layout.actionBorderRadius,
+        border: 0,
         backgroundColor: 'rgba(255,255,255,0.06)',
         paddingLeft: layout.actionInsetX,
         paddingRight: layout.actionInsetX,
-        cursor: 'pointer',
+        cursor: disabled ? 'not-allowed' : 'pointer',
+        opacity: disabled ? 0.45 : 1,
+        textAlign: 'left',
         gap: layout.actionIconGap,
         boxSizing: 'border-box'
       }}>
@@ -110,6 +120,6 @@ function ActionRow({
           fontWeight: 400
         }}
       />
-    </Inline>
+    </button>
   );
 }
