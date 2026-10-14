@@ -93,6 +93,8 @@ const getFormErrors = (ticker: string, name: string, amount: string, precision: 
   const parsedPrecision = Number(precision);
   if (!amount) {
     errors.amount = 'required';
+  } else if (errors.precision) {
+    // Supply validation requires a valid precision.
   } else if (
     !isValidRgbDecimalAmount(amount, parsedPrecision) ||
     !/[1-9]/.test(toRgbAtomicAmount(amount, parsedPrecision))
@@ -513,20 +515,6 @@ export default function RGBIssueScreen() {
               />
             </FormField>
 
-            <FormField label={t('total_supply')} error={amountError}>
-              <div className={`rgb-issue-input-shell ${amountError ? 'rgb-issue-input-error' : ''}`}>
-                <input
-                  className="rgb-issue-input rgb-issue-supply-input"
-                  value={amount}
-                  onChange={(e) => setAmount(normalizeRgbAmountInput(e.target.value, assetPrecision))}
-                  inputMode="decimal"
-                  placeholder={t('enter_total_supply')}
-                  disabled={isFormLocked}
-                />
-                <span>{assetTicker}</span>
-              </div>
-            </FormField>
-
             <FormField
               label={t('precision_rgb')}
               labelExtra={
@@ -559,6 +547,20 @@ export default function RGBIssueScreen() {
                 placeholder="0"
                 disabled={isFormLocked}
               />
+            </FormField>
+
+            <FormField label={t('total_supply')} error={amountError}>
+              <div className={`rgb-issue-input-shell ${amountError ? 'rgb-issue-input-error' : ''}`}>
+                <input
+                  className="rgb-issue-input rgb-issue-supply-input"
+                  value={amount}
+                  onChange={(e) => setAmount(normalizeRgbAmountInput(e.target.value, assetPrecision))}
+                  inputMode="decimal"
+                  placeholder={t('enter_total_supply')}
+                  disabled={isFormLocked}
+                />
+                <span>{assetTicker}</span>
+              </div>
             </FormField>
 
             {availableIssueUtxoCount === 0 ? (
