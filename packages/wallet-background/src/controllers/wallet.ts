@@ -6565,11 +6565,22 @@ export class WalletController extends BaseController {
     return preferenceService.getRgbInvoiceExpirySeconds()
   }
 
+  getRgbInvoiceRecipientType = async () => {
+    return preferenceService.getRgbInvoiceRecipientType()
+  }
+
   setRgbInvoiceExpirySeconds = async (seconds: number) => {
     if (![0, 60 * 60, 24 * 60 * 60, 7 * 24 * 60 * 60].includes(seconds)) {
       throw new Error('Invalid RGB invoice expiry')
     }
     preferenceService.setRgbInvoiceExpirySeconds(seconds)
+  }
+
+  setRgbInvoiceRecipientType = async (type: 'blind' | 'witness') => {
+    if (type !== 'blind' && type !== 'witness') {
+      throw new Error('Invalid RGB invoice recipient type')
+    }
+    preferenceService.setRgbInvoiceRecipientType(type)
   }
 
   setAutoLockTimeId = async (timeId: number) => {

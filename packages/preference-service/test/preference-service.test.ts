@@ -59,6 +59,10 @@ describe('PreferenceService', () => {
     expect(service.getExternalLinkAck()).toBe(false)
     expect(service.getShowSafeNotice()).toBe(true)
     expect(service.getCurrentAccount()).toBeNull()
+    expect(service.getRgbInvoiceRecipientType()).toBe('blind')
+    service.setRgbInvoiceRecipientType('witness')
+    expect(service.getRgbInvoiceRecipientType()).toBe('witness')
+    expect(rawStore.rgbInvoiceRecipientType).toBe('witness')
 
     expect(service.getWalletSavedList()).toEqual([])
     expect(service.getAddressBalance('bc1qnone')).toBeNull()

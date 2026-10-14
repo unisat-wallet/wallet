@@ -48,6 +48,7 @@ const defaultTemplate: BasePreferenceStore = {
   addressFlags: {},
   autoLockTimeId: DEFAULT_LOCKTIME_ID,
   rgbInvoiceExpirySeconds: 24 * 60 * 60,
+  rgbInvoiceRecipientType: 'blind',
   openInSidePanel: false,
   developerMode: false,
   rateUsStatus: {
@@ -557,6 +558,14 @@ export class PreferenceService extends EventEmitter<PreferenceServiceEvents> {
 
   setRgbInvoiceExpirySeconds(seconds: number): void {
     this.store.rgbInvoiceExpirySeconds = seconds
+  }
+
+  getRgbInvoiceRecipientType(): 'blind' | 'witness' {
+    return this.store.rgbInvoiceRecipientType === 'witness' ? 'witness' : 'blind'
+  }
+
+  setRgbInvoiceRecipientType(type: 'blind' | 'witness'): void {
+    this.store.rgbInvoiceRecipientType = type
   }
 
   /**

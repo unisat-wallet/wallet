@@ -503,6 +503,8 @@ export interface WalletController {
   getAutoLockTimeId(): Promise<number>
   setRgbInvoiceExpirySeconds(seconds: number): Promise<void>
   getRgbInvoiceExpirySeconds(): Promise<number>
+  setRgbInvoiceRecipientType(type: 'blind' | 'witness'): Promise<void>
+  getRgbInvoiceRecipientType(): Promise<'blind' | 'witness'>
 
   getDeveloperMode(): Promise<boolean>
   setDeveloperMode(developerMode: boolean): Promise<void>

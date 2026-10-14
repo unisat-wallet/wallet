@@ -2,6 +2,7 @@ import { ReactNode, useState } from 'react';
 
 import {
   Button,
+  Checkbox,
   Column,
   Content,
   Footer,
@@ -188,6 +189,7 @@ export default function RGBReceiveScreen({
   const tools = useTools();
   const { requestWrite, writeLeaseModal } = useRgbWriteLeaseGuard();
   const [invoiceTypeSelectorOpen, setInvoiceTypeSelectorOpen] = useState(false);
+  const [invoiceExpirySelectorOpen, setInvoiceExpirySelectorOpen] = useState(false);
   const [creationStep, setCreationStep] = useState<InvoiceCreationStep>('select_asset');
   const {
     step,
@@ -205,6 +207,10 @@ export default function RGBReceiveScreen({
     setRecipientType,
     invoiceExpirySeconds,
     setInvoiceExpirySeconds,
+    rememberRecipientType,
+    setRememberRecipientType,
+    rememberInvoiceExpiry,
+    setRememberInvoiceExpiry,
     amount,
     onAmountChange,
     isFixedMode,
@@ -234,6 +240,8 @@ export default function RGBReceiveScreen({
   } = useRGBReceiveScreenLogic(initialStep);
   const assetDisplayTicker = assetId ? assetTicker : t('any_rgb_asset');
   const assetDisplayName = assetId ? getRgbAssetName(selectedRgbItem) || assetTicker : t('any_rgb_asset');
+  const selectedExpiryLabel =
+    invoiceExpiryOptions.find((option) => option.seconds === invoiceExpirySeconds)?.label ?? 'rgb_invoice_expiry_24h';
 
   const copyInvoice = async () => {
     if (!invoice) return;
@@ -548,6 +556,11 @@ export default function RGBReceiveScreen({
             </Row>
           </Row>
           <Row fullX style={{ borderTopWidth: 1, borderColor: colors.border }} />
+          <Checkbox
+            checked={rememberRecipientType}
+            onChange={(event) => setRememberRecipientType(event.target.checked)}>
+            <Text text={t('remember_my_choice')} size="sm" color="white_muted" />
+          </Checkbox>
           <Column gap="sm" fullX>
             {(['blind', 'witness'] as const).map((type) => {
               const selected = recipientType === type;
@@ -571,6 +584,57 @@ export default function RGBReceiveScreen({
                     cursor: 'pointer'
                   }}>
                   <Text text={t(type === 'blind' ? 'rgb_invoice_blind' : 'rgb_invoice_witness')} size="sm" />
+                  {selected ? <Icon icon="checked" color="gold" size={20} /> : null}
+                </Row>
+              );
+            })}
+          </Column>
+        </Column>
+      </BottomModal>
+    );
+  };
+
+  const renderInvoiceExpirySelector = () => {
+    if (!invoiceExpirySelectorOpen) return null;
+
+    return (
+      <BottomModal onClose={() => setInvoiceExpirySelectorOpen(false)}>
+        <Column gap="md">
+          <Row justifyBetween itemsCenter style={{ height: 20 }} fullX>
+            <Text text={t('rgb_invoice_expiry')} size="md" />
+            <Row onClick={() => setInvoiceExpirySelectorOpen(false)}>
+              <Icon icon="close" size={12} />
+            </Row>
+          </Row>
+          <Row fullX style={{ borderTopWidth: 1, borderColor: colors.border }} />
+          <Checkbox
+            checked={rememberInvoiceExpiry}
+            onChange={(event) => setRememberInvoiceExpiry(event.target.checked)}>
+            <Text text={t('remember_my_choice')} size="sm" color="white_muted" />
+          </Checkbox>
+          <Column gap="sm" fullX>
+            {invoiceExpiryOptions.map((option) => {
+              const selected = invoiceExpirySeconds === option.seconds;
+              return (
+                <Row
+                  key={option.seconds}
+                  fullX
+                  itemsCenter
+                  justifyBetween
+                  onClick={() => {
+                    setInvoiceExpirySeconds(option.seconds);
+                    setInvoiceExpirySelectorOpen(false);
+                  }}
+                  style={{
+                    minHeight: 56,
+                    padding: '0 16px',
+                    boxSizing: 'border-box',
+                    borderRadius: 10,
+                    border: selected ? `1px solid ${GOLD}` : '1px solid rgba(255,255,255,0.1)',
+                    background: selected ? 'rgba(244,182,44,0.08)' : 'rgba(255,255,255,0.06)',
+                    cursor: 'pointer'
+                  }}>
+                  <Text text={t(option.label)} size="sm" />
                   {selected ? <Icon icon="checked" color="gold" size={20} /> : null}
                 </Row>
               );
@@ -711,6 +775,31 @@ export default function RGBReceiveScreen({
             <Text text={t('change')} size="sm" color="gold" />
           </Row>
 
+          <Row
+            fullX
+            itemsCenter
+            justifyBetween
+            onClick={() => setInvoiceExpirySelectorOpen(true)}
+            style={{
+              minHeight: 56,
+              padding: '0 16px',
+              boxSizing: 'border-box',
+              borderRadius: 10,
+              background: 'rgba(255,255,255,0.06)',
+              border: '1px solid rgba(255,255,255,0.1)',
+              cursor: 'pointer'
+            }}>
+            <Column gap="xs">
+              <Text text={t('rgb_invoice_expiry')} size="xs" color="textDim" />
+              <Text
+                text={t(selectedExpiryLabel)}
+                size="sm"
+                color="white"
+              />
+            </Column>
+            <Text text={t('change')} size="sm" color="gold" />
+          </Row>
+
           {recipientType === 'witness' ? (
             <Text text={t('rgb_witness_invoice_description')} size="xs" color="white_muted" wrap />
           ) : null}
@@ -737,21 +826,6 @@ export default function RGBReceiveScreen({
                   </Row>
                 )
               : null}
-          </Column>
-
-          <Column gap="sm">
-            <Text text={t('rgb_invoice_expiry')} size="sm" color="white" />
-            <Row gap="sm" style={{ flexWrap: 'wrap' }}>
-              {invoiceExpiryOptions.map((option) => (
-                <Button
-                  key={option.seconds}
-                  text={t(option.label)}
-                  preset={invoiceExpirySeconds === option.seconds ? 'primary' : 'default'}
-                  onClick={() => setInvoiceExpirySeconds(option.seconds)}
-                  style={{ flex: '1 1 40%', minWidth: 0 }}
-                />
-              ))}
-            </Row>
           </Column>
 
           {recipientType === 'blind' && insufficientBtcForInvoice ? (
@@ -789,6 +863,7 @@ export default function RGBReceiveScreen({
         </Column>
       </Footer>
       {renderInvoiceTypeSelector()}
+      {renderInvoiceExpirySelector()}
       {writeLeaseModal}
     </Layout>
   );

@@ -97,6 +97,7 @@ export interface BasePreferenceStore {
   // Extension-specific fields (optional)
   autoLockTimeId?: number
   rgbInvoiceExpirySeconds?: number
+  rgbInvoiceRecipientType?: 'blind' | 'witness'
   openInSidePanel?: boolean
   developerMode?: boolean
 
@@ -123,6 +124,7 @@ export interface RateUsStatus {
 export interface ExtensionPreferenceStore extends BasePreferenceStore {
   autoLockTimeId: number
   rgbInvoiceExpirySeconds: number
+  rgbInvoiceRecipientType: 'blind' | 'witness'
   openInSidePanel: boolean
   developerMode: boolean
 }

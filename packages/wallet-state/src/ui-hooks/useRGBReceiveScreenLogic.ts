@@ -1,5 +1,5 @@
 import type { SignPsbtParams, SignedData, ToSignData } from '@unisat/wallet-shared'
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { useI18n, useNavigation, useTools, useWallet } from 'src/context'
 import { useFeeRateBar } from 'src/hooks'
 import {
@@ -76,6 +76,9 @@ type RgbReceiveWallet = {
     skipSync?: boolean
   }): Promise<RgbCancelReceiveInvoiceResult>
   getRgbInvoiceExpirySeconds(): Promise<number>
+  setRgbInvoiceExpirySeconds(seconds: number): Promise<void>
+  getRgbInvoiceRecipientType(): Promise<RGBInvoiceRecipientType>
+  setRgbInvoiceRecipientType(type: RGBInvoiceRecipientType): Promise<void>
 }
 
 type RGBReceiveRouteState = {
@@ -314,8 +317,20 @@ export function useRGBReceiveScreenLogic(
     routeState?.tokenBalance as RgbAssetItem | undefined
   )
   const [mode, setModeState] = useState<RGBReceiveMode>('any')
-  const [recipientType, setRecipientType] = useState<RGBInvoiceRecipientType>('blind')
-  const [invoiceExpirySeconds, setInvoiceExpirySeconds] = useState(24 * 60 * 60)
+  const [recipientType, setRecipientTypeState] = useState<RGBInvoiceRecipientType>('blind')
+  const [invoiceExpirySeconds, setInvoiceExpirySecondsState] = useState(24 * 60 * 60)
+  const recipientTypeChanged = useRef(false)
+  const invoiceExpiryChanged = useRef(false)
+  const setRecipientType = (value: RGBInvoiceRecipientType) => {
+    recipientTypeChanged.current = true
+    setRecipientTypeState(value)
+  }
+  const setInvoiceExpirySeconds = (value: number) => {
+    invoiceExpiryChanged.current = true
+    setInvoiceExpirySecondsState(value)
+  }
+  const [rememberRecipientType, setRememberRecipientType] = useState(false)
+  const [rememberInvoiceExpiry, setRememberInvoiceExpiry] = useState(false)
   const [amount, setAmount] = useState('')
   const [loading, setLoading] = useState(false)
   const [loadingText, setLoadingText] = useState('')
@@ -333,10 +348,24 @@ export function useRGBReceiveScreenLogic(
   const [insufficientBtcForInvoice, setInsufficientBtcForInvoice] = useState(false)
 
   useEffect(() => {
+    let active = true
     rgbWallet
       .getRgbInvoiceExpirySeconds()
-      .then(setInvoiceExpirySeconds)
+      .then(value => {
+        if (active && !invoiceExpiryChanged.current) setInvoiceExpirySecondsState(value)
+      })
       .catch(() => undefined)
+    rgbWallet
+      .getRgbInvoiceRecipientType()
+      .then(value => {
+        if (active && !recipientTypeChanged.current && (value === 'blind' || value === 'witness')) {
+          setRecipientTypeState(value)
+        }
+      })
+      .catch(() => undefined)
+    return () => {
+      active = false
+    }
   }, [rgbWallet])
 
   const selectedRgbItem =
@@ -475,6 +504,20 @@ export function useRGBReceiveScreenLogic(
       setSelectedPendingInvoice(pendingInvoice as RgbPendingReceiveInvoice)
     }
     setStep('create_invoice')
+    if (rememberRecipientType) {
+      try {
+        await rgbWallet.setRgbInvoiceRecipientType(recipientType)
+      } catch (error) {
+        tools.toastError(getErrorMessage(error))
+      }
+    }
+    if (rememberInvoiceExpiry) {
+      try {
+        await rgbWallet.setRgbInvoiceExpirySeconds(invoiceExpirySeconds)
+      } catch (error) {
+        tools.toastError(getErrorMessage(error))
+      }
+    }
   }
 
   const getRgbUtxoBeginTxid = (value: unknown) => {
@@ -775,6 +818,10 @@ export function useRGBReceiveScreenLogic(
     setRecipientType,
     invoiceExpirySeconds,
     setInvoiceExpirySeconds,
+    rememberRecipientType,
+    setRememberRecipientType,
+    rememberInvoiceExpiry,
+    setRememberInvoiceExpiry,
     amount,
     onAmountChange,
     normalizedAmount,
