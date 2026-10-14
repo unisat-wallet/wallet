@@ -573,6 +573,7 @@ type RgbPendingVanillaTxsResult = {
 type RgbAbortVanillaTxRequest = {
   wallet: RgbWalletRef
   txid: string
+  discardUnsigned?: boolean
 }
 
 type RgbAbortVanillaTxResult = {
@@ -5122,7 +5123,9 @@ export class WalletController extends BaseController {
   abortRgbVanillaTx = async (params: Omit<RgbAbortVanillaTxRequest, 'wallet'>) => {
     const context = await this.getLocalRgbService()
     await this.ensureRgbWriteLease(context, { forceRenew: true })
-    return this.rgbSendOperations.abortVanillaTx(params.txid, context)
+    return this.rgbSendOperations.abortVanillaTx(params.txid, context, {
+      discardUnsigned: params.discardUnsigned === true,
+    })
   }
 
   abortRgbAcknowledgedSwap = async (params: Omit<RgbAbortVanillaTxRequest, 'wallet'>) => {

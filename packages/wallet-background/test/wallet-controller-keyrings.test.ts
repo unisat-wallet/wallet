@@ -1484,15 +1484,16 @@ describe('RGB wallet references', () => {
     const ensureLease = vi.spyOn(wallet as any, 'ensureRgbWriteLease').mockResolvedValue(undefined)
     vi.spyOn((wallet as any).rgbReceiveOperations, 'createBlindReceive').mockResolvedValue({})
     vi.spyOn((wallet as any).rgbReceiveOperations, 'cancelReceiveInvoice').mockResolvedValue({ changed: false })
-    vi.spyOn((wallet as any).rgbSendOperations, 'abortVanillaTx').mockResolvedValue({ aborted: false })
+    const abortVanillaTx = vi.spyOn((wallet as any).rgbSendOperations, 'abortVanillaTx').mockResolvedValue({ aborted: false })
 
     await wallet.createRgbBlindReceive({})
     await wallet.cancelRgbReceiveInvoice({ batchTransferIdx: 0 })
-    await wallet.abortRgbVanillaTx({ txid: 'pending-transfer' })
+    await wallet.abortRgbVanillaTx({ txid: 'pending-transfer', discardUnsigned: true })
 
     expect(ensureLease).toHaveBeenNthCalledWith(1, context, { forceRenew: true })
     expect(ensureLease).toHaveBeenNthCalledWith(2, context, { forceRenew: true })
     expect(ensureLease).toHaveBeenNthCalledWith(3, context, { forceRenew: true })
+    expect(abortVanillaTx).toHaveBeenCalledWith('pending-transfer', context, { discardUnsigned: true })
   })
 
   it('returns a rejected transfer result without retaining a pending send', async () => {

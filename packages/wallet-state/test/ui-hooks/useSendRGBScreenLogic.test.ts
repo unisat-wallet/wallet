@@ -9,6 +9,35 @@ import {
 import { createHookTestHarness } from './testHelpers'
 
 describe('useSendRGBScreenLogic', () => {
+  it('discards the unsigned RGB send when signing is rejected', async () => {
+    const assetId = 'rgb:test-asset'
+    const invoice = 'rgb:test-asset/~/~/bc:utxob:test?amount=1&endpoints=rpc://proxy'
+    const { wrapper, wallet } = createHookTestHarness({
+      routeState: {
+        assetId,
+        tokenBalance: { assetId, ticker: 'RGB', precision: 8, spendable: '150000000' },
+      },
+    })
+    wallet.createRgbSendBegin = vi.fn().mockResolvedValue({
+      txid: 'prepared-transfer',
+      toSignData: { psbtHex: 'unsigned-psbt' },
+    })
+    wallet.abortRgbVanillaTx = vi.fn().mockResolvedValue({ aborted: true, status: 'discarded' })
+    const { result } = renderHook(() => useSendRGBScreenLogic(), { wrapper })
+
+    act(() => result.current.onInvoiceChange(invoice))
+    await act(async () => result.current.onClickNext())
+    expect(result.current.step).toBe(SendRGBScreenStep.SIGN_TX)
+
+    await act(async () => result.current.onSignPsbtHandleCancel())
+
+    expect(wallet.abortRgbVanillaTx).toHaveBeenCalledWith({
+      txid: 'prepared-transfer',
+      discardUnsigned: true,
+    })
+    expect(result.current.step).toBe(SendRGBScreenStep.CREATE_TX)
+  })
+
   it('checks a pasted RGB invoice silently while keeping Next disabled', async () => {
     vi.useFakeTimers()
     const assetId = 'rgb:test-asset'

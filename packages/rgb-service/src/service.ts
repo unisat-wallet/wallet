@@ -2409,8 +2409,10 @@ export class RgbService {
     }
   }
 
-  async abortSend(transferId: string) {
-    return this.runPendingTransferOperation(transferId, () => this.abortSendOnce(transferId))
+  async abortSend(transferId: string, options: { discardUnsigned?: boolean } = {}) {
+    return this.runPendingTransferOperation(transferId, () =>
+      this.abortSendOnce(transferId, false, options)
+    )
   }
 
   /**
@@ -2423,7 +2425,11 @@ export class RgbService {
     return this.runPendingTransferOperation(transferId, () => this.abortSendOnce(transferId, true))
   }
 
-  private async abortSendOnce(transferId: string, allowAcknowledged = false) {
+  private async abortSendOnce(
+    transferId: string,
+    allowAcknowledged = false,
+    options: { discardUnsigned?: boolean } = {}
+  ) {
     const state = this.requireState()
     const pending = state.pending[transferId]
     if (!pending) return { aborted: false }
@@ -2457,27 +2463,37 @@ export class RgbService {
       }
     }
 
-    const sendHistory = state.pendingSendHistory || (state.pendingSendHistory = [])
-    if (!sendHistory.some(item => item.transferId === transferId)) {
-      sendHistory.push({
-        transferId,
-        assetId: pending.request.assetId,
-        amount: pending.request.amount,
-        ...(pending.request.precision === undefined ? {} : { precision: pending.request.precision }),
-        txid: pending.delivery?.completed.txid,
-        invoice: pending.request.invoice,
-        createdAt: pending.createdAt,
-        status: 'canceled',
-        ...(pending.providerOrigin ? { providerOrigin: pending.providerOrigin } : {}),
-        ...(pending.providerOrigin
-          ? { providerOriginExpiresAt: this.now() + PROVIDER_ORIGIN_HISTORY_TTL_MS }
-          : {}),
-      })
+    // Rejecting an unsigned wallet PSBT only releases a local reservation.
+    // Once delivery exists, retain the cancellation record even if a caller
+    // mistakenly requests an unsigned discard.
+    const discardUnsigned =
+      options.discardUnsigned === true &&
+      !pending.delivery &&
+      !pending.broadcast &&
+      !pending.providerOrigin
+    if (!discardUnsigned) {
+      const sendHistory = state.pendingSendHistory || (state.pendingSendHistory = [])
+      if (!sendHistory.some(item => item.transferId === transferId)) {
+        sendHistory.push({
+          transferId,
+          assetId: pending.request.assetId,
+          amount: pending.request.amount,
+          ...(pending.request.precision === undefined ? {} : { precision: pending.request.precision }),
+          txid: pending.delivery?.completed.txid,
+          invoice: pending.request.invoice,
+          createdAt: pending.createdAt,
+          status: 'canceled',
+          ...(pending.providerOrigin ? { providerOrigin: pending.providerOrigin } : {}),
+          ...(pending.providerOrigin
+            ? { providerOriginExpiresAt: this.now() + PROVIDER_ORIGIN_HISTORY_TTL_MS }
+            : {}),
+        })
+      }
     }
 
     delete state.pending[transferId]
-    await this.persist()
-    return { aborted: true, status: 'canceled' as const }
+    await this.persist({ skipRecovery: discardUnsigned })
+    return { aborted: true, status: discardUnsigned ? ('discarded' as const) : ('canceled' as const) }
   }
 
   private applyFundingUpdate(completed: RgbCompletedTransfer) {

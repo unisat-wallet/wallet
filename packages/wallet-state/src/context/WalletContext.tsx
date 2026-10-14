@@ -804,7 +804,7 @@ export interface WalletController {
     [key: string]: any
   }>
 
-  abortRgbVanillaTx(params: { txid: string }): Promise<{
+  abortRgbVanillaTx(params: { txid: string; discardUnsigned?: boolean }): Promise<{
     aborted: boolean
     [key: string]: any
   }>

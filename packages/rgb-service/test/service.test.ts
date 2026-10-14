@@ -225,7 +225,7 @@ describe('RgbService', () => {
     }
     expect(recovery.pending[prepared.id]?.providerOrigin).toBeUndefined()
 
-    await restarted.abortSend(prepared.id)
+    await restarted.abortSend(prepared.id, { discardUnsigned: true })
     await expect(restarted.getTransferProviderOrigin(prepared.id)).resolves.toBe(
       'https://dapp.example'
     )
@@ -3225,6 +3225,31 @@ describe('RgbService', () => {
     ).resolves.toBe(true)
   })
 
+  it('discards an unsigned send without adding a canceled transfer to history', async () => {
+    const dependencies = createDependencies()
+    const service = new RgbService(dependencies)
+    await service.open(wallet)
+    await service.sync()
+    const prepared = await service.prepareSend({
+      assetId: 'rgb:asset',
+      amount: '60',
+      invoice: rgbInvoice(),
+      feeRate: 2,
+    })
+
+    await expect(service.abortSend(prepared.id, { discardUnsigned: true })).resolves.toEqual({
+      aborted: true,
+      status: 'discarded',
+    })
+    expect(service.getPendingTransfers()).toEqual([])
+    expect(service.getPendingSendHistory()).toEqual([])
+
+    const reopened = new RgbService(dependencies)
+    await reopened.open(wallet)
+    expect(reopened.getPendingTransfers()).toEqual([])
+    expect(reopened.getPendingSendHistory()).toEqual([])
+  })
+
   it('allows the sender to abort a delivered transfer before it is broadcast', async () => {
     const dependencies = createDependencies()
     vi.mocked(dependencies.transport.getAcknowledgement!).mockResolvedValueOnce(undefined)
@@ -3245,7 +3270,7 @@ describe('RgbService', () => {
       expect.objectContaining({ id: 'transfer-1', delivery: expect.any(Object) }),
     ])
 
-    await expect(service.abortSend('transfer-1')).resolves.toEqual({
+    await expect(service.abortSend('transfer-1', { discardUnsigned: true })).resolves.toEqual({
       aborted: true,
       status: 'canceled',
     })

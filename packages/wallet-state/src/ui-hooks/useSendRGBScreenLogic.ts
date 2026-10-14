@@ -513,7 +513,7 @@ export function useSendRGBScreenLogic() {
     if (!txid) return
 
     try {
-      await wallet.abortRgbVanillaTx({ txid })
+      await wallet.abortRgbVanillaTx({ txid, discardUnsigned: true })
     } catch (e) {
       console.warn('Failed to abort RGB send tx', e)
     }

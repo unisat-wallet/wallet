@@ -226,7 +226,11 @@ export class RgbSendOperations {
     return { broadcast: true, status: 'confirming' as const }
   }
 
-  async abortVanillaTx(txid: string, boundContext?: LocalRgbServiceContext) {
+  async abortVanillaTx(
+    txid: string,
+    boundContext?: LocalRgbServiceContext,
+    options: { discardUnsigned?: boolean } = {}
+  ) {
     const { service, wallet } = boundContext ?? (await this.dependencies.getContext())
     await this.dependencies.ensureWriteLease?.({ service, wallet })
     await this.dependencies.assertContext?.({ service, wallet })
@@ -241,7 +245,7 @@ export class RgbSendOperations {
       )
     if (!match) return { aborted: false, local: true }
 
-    const result = await service.abortSend(match.id)
+    const result = await service.abortSend(match.id, options)
     if (
       result.aborted &&
       this.dependencies.getActiveTransferId(wallet.fundingAddress) === match.id
