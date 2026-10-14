@@ -2848,7 +2848,7 @@
     "message": "找不到 RGB UTXO"
   },
   "rgb_utxo_empty_description": {
-    "message": "建立 發票 時會自動建立 RGB UTXO。"
+    "message": "建立發票時會自動建立 RGB UTXO。"
   },
   "rgb_asset": {
     "message": "RGB 資產"
@@ -3146,7 +3146,7 @@
   "rgb_creating_invoice": { "message": "正在建立發票…" },
   "rgb_preparing_utxo": { "message": "正在準備 RGB UTXO…" },
   "rgb_preparing_transfer": { "message": "正在準備 RGB 轉帳…" },
-  "rgb_approval_create_invoice_title": { "message": "建立 RGB 收款 發票" },
+  "rgb_approval_create_invoice_title": { "message": "建立 RGB 收款發票" },
   "rgb_approval_create_invoice_description": { "message": "繼續前請確認收款請求。" },
   "rgb_approval_prepare_payment_title": { "message": "準備 RGB 付款" },
   "rgb_approval_prepare_payment_description": { "message": "繼續前請確認付款詳情。" },
@@ -3246,7 +3246,7 @@
     "message": "RGB 資產地址"
   },
   "rgb_asset_address_description": {
-    "message": "查看 RGB 資產 UTXO 與 發票 保留項目"
+    "message": "查看 RGB 資產 UTXO 與發票保留項目"
   },
   "rgb_invoice_expires": {
     "message": "將於 $time 到期"
@@ -3258,14 +3258,14 @@
     "message": "永不過期"
   },
   "rgb_default_invoice_expiry": {
-    "message": "預設 發票 有效期"
+    "message": "預設發票有效期"
   },
-  "rgb_invoice_expiry": { "message": "發票 有效期" },
+  "rgb_invoice_expiry": { "message": "發票有效期" },
   "invoice_options": { "message": "設定" },
-  "invoice_type": { "message": "發票 類型" },
+  "invoice_type": { "message": "發票類型" },
   "change": { "message": "更改" },
   "rgb_invoice_expiry_description": {
-    "message": "設定新建 發票 的預設有效期"
+    "message": "設定新建發票的預設有效期"
   },
   "rgb_invoice_expiry_1h": { "message": "1 小時" },
   "rgb_invoice_expiry_24h": { "message": "24 小時" },
@@ -3377,7 +3377,7 @@
     "message": "釋放此發票？"
   },
   "remove_invoice_confirm_description": {
-    "message": "釋放或刪除此 發票 前，請確認它未被使用。若有人已使用它傳送資產，操作可能導致資產遺失。"
+    "message": "釋放或刪除此發票前，請確認它未被使用。若有人已使用它傳送資產，操作可能導致資產遺失。"
   },
   "keep_invoice": {
     "message": "保留發票"
@@ -3533,10 +3533,10 @@
   "rgb_approval_blind": { "message": "Blind" },
   "rgb_approval_how_it_works": { "message": "運作方式" },
   "rgb_approval_create_how_it_works_description": { "message": "簡要說明接下來的流程。" },
-  "rgb_approval_create_step_invoice": { "message": "錢包會為此網站建立 發票。" },
+  "rgb_approval_create_step_invoice": { "message": "錢包會為此網站建立發票。" },
   "rgb_approval_create_step_setup": { "message": "如果錢包設定需要 Bitcoin 交易，下一個畫面會在簽名前顯示收款方與網路費用。" },
-  "rgb_approval_create_step_no_assets_leave": { "message": "建立此 發票 時不會轉出任何 RGB 資產。" },
-  "rgb_approval_invoice_details": { "message": "發票 詳情" },
+  "rgb_approval_create_step_no_assets_leave": { "message": "建立此發票時不會轉出任何 RGB 資產。" },
+  "rgb_approval_invoice_details": { "message": "發票詳情" },
   "rgb_approval_invoice_details_description": { "message": "資產 ID、接收方式與到期資訊。" },
   "rgb_approval_expiry": { "message": "到期時間" },
   "rgb_approval_witness_seal": { "message": "Witness seal" },
@@ -3548,28 +3548,28 @@
   "rgb_approval_pending_acceptance": { "message": "等待接受" },
   "rgb_approval_accept_rgb": { "message": "接受 RGB" },
   "rgb_approval_reject_receive_title": { "message": "拒絕 RGB 收款" },
-  "rgb_approval_reject_receive_description": { "message": "拒絕將使此一次性 發票 失效，傳送方不得廣播這筆 RGB 轉帳。" },
+  "rgb_approval_reject_receive_description": { "message": "拒絕將使此一次性發票失效，傳送方不得廣播這筆 RGB 轉帳。" },
   "rgb_approval_reject_receive": { "message": "拒絕收款" },
-  "rgb_approval_use_invoice_amount": { "message": "使用 發票 金額" },
-  "rgb_approval_asset_from_invoice": { "message": "發票 中的 RGB 資產" },
+  "rgb_approval_use_invoice_amount": { "message": "使用發票金額" },
+  "rgb_approval_asset_from_invoice": { "message": "發票中的 RGB 資產" },
   "rgb_approval_fund_fee_pool_failed": { "message": "無法為 RGB Fee Pool 補充資金" },
   "rgb_approval_fee_pool_no_signing_data": { "message": "RGB Fee Pool 補充資金時未回傳簽名資料" },
   "rgb_approval_fee_pool_no_signed_psbt": { "message": "RGB Fee Pool 簽名未回傳已簽名的 PSBT" },
   "rgb_approval_pay": { "message": "支付" },
-  "rgb_approval_from_invoice": { "message": "來自 發票" },
+  "rgb_approval_from_invoice": { "message": "來自發票" },
   "rgb_approval_payment_how_it_works_description": { "message": "準備此付款所需的後續步驟。" },
   "rgb_approval_payment_step_check_fee_pool": { "message": "錢包會在準備付款前檢查 RGB Fee Pool。" },
   "rgb_approval_payment_step_funding": { "message": "如果需要 Bitcoin 入金交易，下一個畫面會在簽名前顯示收款方與網路費用。" },
   "rgb_approval_payment_step_review": { "message": "簽名前你將確認最終的 RGB 付款交易。" },
   "rgb_approval_payment_details": { "message": "付款詳情" },
-  "rgb_approval_payment_details_description": { "message": "資產、金額與收款 發票 資訊。" },
-  "rgb_approval_recipient_invoice": { "message": "收款 發票" },
+  "rgb_approval_payment_details_description": { "message": "資產、金額與收款發票資訊。" },
+  "rgb_approval_recipient_invoice": { "message": "收款發票" },
   "rgb_approval_not_provided": { "message": "未提供" },
   "rgb_approval_cancel_payment_title": { "message": "取消 RGB 付款" },
   "rgb_approval_cancel_payment_description": { "message": "僅在收款方尚未確認 consignment 且交易尚未廣播時取消。" },
   "rgb_approval_cancel_payment": { "message": "取消付款" },
-  "delete_invoice": { "message": "刪除 發票" },
-  "deleting_invoice": { "message": "正在刪除 發票…" },
+  "delete_invoice": { "message": "刪除發票" },
+  "deleting_invoice": { "message": "正在刪除發票…" },
   "delete_witness_invoice_confirm_title": { "message": "刪除 Witness 發票？" },
-  "use_this_invoice_to_receive_any_rgb_asset": { "message": "使用此 發票 接收任意 RGB 資產。" }
+  "use_this_invoice_to_receive_any_rgb_asset": { "message": "使用此發票接收任意 RGB 資產。" }
 }
