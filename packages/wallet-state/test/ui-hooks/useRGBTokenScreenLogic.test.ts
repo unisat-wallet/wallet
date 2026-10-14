@@ -186,6 +186,41 @@ describe('useRGBTokenScreenLogic', () => {
     expect(wallet.getRgbTransfers).toHaveBeenCalledWith(1, 50, { skipSync: true })
   })
 
+  it('includes a ready-to-broadcast transfer from the full RGB history', async () => {
+    const { wrapper, wallet } = createHookTestHarness({ routeState: { assetId } })
+    wallet.getRGBAssetDetail.mockResolvedValue(detail)
+    wallet.getRGBAssetBalance.mockResolvedValue(fetchedBalance)
+    wallet.getRGBAssetActivity.mockResolvedValue({ list: [], total: 0 })
+    wallet.getRgbTransfers.mockResolvedValue({
+      total: 1,
+      list: [{
+        id: 'local-send:ready-transfer',
+        transferId: 'ready-transfer',
+        assetId: 'test-asset',
+        type: 'send',
+        status: 'ready_to_broadcast',
+        amount: '7',
+        txid: 'ready-txid',
+        timestamp: 2,
+        local: true,
+      }],
+    })
+
+    const { result } = renderHook(() => useRGBTokenScreenLogic(), { wrapper })
+
+    await waitFor(() => {
+      expect(result.current.activityItems).toEqual([
+        expect.objectContaining({
+          id: 'local-send:ready-transfer',
+          transferId: 'ready-transfer',
+          status: 'ready_to_broadcast',
+          local: true,
+        }),
+      ])
+    })
+    expect(result.current.activityTotal).toBe(1)
+  })
+
   it('preserves the local receive identity needed to accept it from token history', async () => {
     const { wrapper, wallet } = createHookTestHarness({ routeState: { assetId } })
     wallet.getRGBAssetDetail.mockResolvedValue(detail)

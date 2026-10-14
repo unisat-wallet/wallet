@@ -10,22 +10,6 @@ export enum RGBTokenScreenTabKey {
   HISTORY = 'history',
 }
 
-const LOCAL_ACTIVITY_STATUSES = new Set([
-  'signed',
-  'waiting_ack',
-  'broadcasting',
-  'broadcasted',
-  'broadcast_failed',
-  'pending_accept',
-  'confirming',
-  'waiting_receive',
-  'pending',
-  'unconfirmed',
-  'canceled',
-  'cancelled',
-  'rejected',
-])
-
 function isSameRgbAssetId(left?: string, right?: string) {
   const normalize = (value?: string) => value?.replace(/^rgb:/, '')
   return !!left && !!right && normalize(left) === normalize(right)
@@ -114,16 +98,15 @@ export function useRGBTokenScreenLogic() {
       const activity = await wallet.getRGBAssetActivity('', assetId, page, pageSize, activityType)
       if (page !== 1) return activity
 
-      // Keep local transfers visible while the indexer catches up, including
-      // canceled or rejected records that may never appear in indexed activity.
+      // Use the same local transfer rows as the full RGB history. Some states
+      // (including ready_to_broadcast and canceled) never reach the indexer.
       const transfers = await wallet.getRgbTransfers(1, 50, { skipSync: true })
       const localItems: RgbActivityItem[] = transfers.list
         .filter(
           transfer =>
             transfer.local &&
             isSameRgbAssetId(transfer.assetId, assetId) &&
-            (!activityType || transfer.type === activityType) &&
-            LOCAL_ACTIVITY_STATUSES.has(String(transfer.status).toLowerCase())
+            (!activityType || transfer.type === activityType)
         )
         .map(transfer => ({
           id: transfer.id,
