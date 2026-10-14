@@ -25,6 +25,7 @@ export function RGBTokenDetail(props: {
   };
   const settled = formatNumber(tokenBalance?.settled);
   const pending = formatNumber(tokenBalance?.pending);
+  const incomingPending = formatNumber(tokenBalance?.incomingPending);
 
   return (
     <Column
@@ -58,6 +59,12 @@ export function RGBTokenDetail(props: {
       <Section title={t('settled')} value={settled} maxLength={Number.POSITIVE_INFINITY} wrapValue />
       <Line />
       <Section title={t('pending')} value={pending} maxLength={Number.POSITIVE_INFINITY} wrapValue />
+      {Number(tokenBalance?.incomingPending || 0) > 0 ? (
+        <>
+          <Line />
+          <Section title={t('rgb_incoming_pending')} value={incomingPending} maxLength={Number.POSITIVE_INFINITY} wrapValue />
+        </>
+      ) : null}
     </Column>
   );
 }

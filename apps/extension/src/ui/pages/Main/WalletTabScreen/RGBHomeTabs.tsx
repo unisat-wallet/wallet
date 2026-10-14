@@ -173,7 +173,10 @@ export function RGBHomeTabs({ transfers, list }: RGBHomeTabsProps) {
           transfer={selectedPendingTransfer}
           transferId={selectedPendingTransfer.transferId || selectedPendingTransfer.id}
           onClose={() => setSelectedPendingTransfer(undefined)}
-          onAccepted={markPendingHandled}
+          onAccepted={() => {
+            markPendingHandled();
+            list.onRefresh();
+          }}
           onCanceled={() => {
             markPendingHandled();
             void transfers.onRefresh({ showLoading: false });

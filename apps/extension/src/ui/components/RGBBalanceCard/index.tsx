@@ -24,6 +24,10 @@ export default function RGBBalanceCard(props: RGBBalanceCardProps) {
   } = useRGBBalanceCardLogic(props);
   const { t } = useI18n();
   const hasPendingBalance = pendingBalance.gt(0);
+  const hasIncomingPending = Number(props.tokenBalance?.incomingPending || 0) > 0;
+  const pendingLabel = hasIncomingPending && props.tokenBalance?.incomingPending === props.tokenBalance?.pending
+    ? t('rgb_incoming_pending')
+    : t('pending');
   const hasLockedBalance = lockedBalance.gt(0);
   const displayedBalance = balance.isZero() && hasLockedBalance ? lockedBalanceStr : balanceStr;
   const pendingOnly = balance.isZero() && hasPendingBalance && !hasLockedBalance;
@@ -38,13 +42,13 @@ export default function RGBBalanceCard(props: RGBBalanceCardProps) {
           pendingOnly ? (
             <Row itemsCenter gap="sm">
               <Text text={pendingBalanceStr} size="xs" digital />
-              <Text text={`(${t('pending')})`} size="xxs" color="gold" />
+              <Text text={`(${pendingLabel})`} size="xxs" color="gold" />
             </Row>
           ) : (
             <Row itemsCenter gap="sm">
               <Text text={displayedBalance} size="xs" digital />
               {hasPendingBalance ? (
-                <Text text={`(${t('pending')})`} size="xxs" color="gold" />
+                <Text text={`(${pendingLabel})`} size="xxs" color="gold" />
               ) : null}
               {hasLockedBalance ? (
                 <Text

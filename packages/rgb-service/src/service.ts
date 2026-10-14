@@ -1834,7 +1834,7 @@ export class RgbService {
     }
   }
 
-  /** Return a local balance for an asset currently represented in the snapshot. */
+  /** Return a local balance for an asset represented by allocations or accepted receives. */
   getLocalAssetBalance(assetId: string): RgbLocalAssetBalance | undefined {
     const normalized = normalizeAssetId(assetId)
     return this.getLocalAssetBalances().find(asset => asset.assetId === normalized)
@@ -1856,7 +1856,7 @@ export class RgbService {
         pending.prepared.lockedOutpoints.map(outpoint => `${outpoint.txid}:${outpoint.vout}`)
       )
     )
-    const amounts = new Map<string, { settled: bigint; spendable: bigint; pending: bigint }>()
+    const amounts = new Map<string, { settled: bigint; spendable: bigint; pending: bigint; incomingPending: bigint }>()
     for (const utxo of state.snapshot.utxos) {
       if (
         utxo.chainStatus === 'spent' ||
@@ -1870,6 +1870,7 @@ export class RgbService {
           settled: 0n,
           spendable: 0n,
           pending: 0n,
+          incomingPending: 0n,
         }
         const amount = BigInt(allocation.amount)
         if (allocation.settled) current.settled += amount
@@ -1880,6 +1881,35 @@ export class RgbService {
         amounts.set(allocation.assetId, current)
       }
     }
+    for (const receive of state.pendingReceives || []) {
+      const receipt = receive.receivedConsignment
+      if (!receipt?.accepted || !receipt.assetId || !receipt.amount || !/^\d+$/.test(receipt.amount)) {
+        continue
+      }
+      const assetId = normalizeAssetId(receipt.assetId)
+      const amount = BigInt(receipt.amount)
+      const current = amounts.get(assetId) || {
+        settled: 0n,
+        spendable: 0n,
+        pending: 0n,
+        incomingPending: 0n,
+      }
+      // A remote snapshot can report the same allocation before the local
+      // receive finishes. Count it once, and never present a settled output as
+      // still incoming while the receive record is being finalized.
+      const allocation = state.snapshot.utxos
+        .filter(utxo =>
+          receive.seal
+            ? outpointKey(utxo) === `${receive.seal.txid}:${receive.seal.vout}`
+            : utxo.outpoint.txid === receipt.txid
+        )
+        .flatMap(utxo => utxo.allocations)
+        .find(item => normalizeAssetId(item.assetId) === assetId && item.amount === receipt.amount)
+      if (allocation?.settled) continue
+      if (!allocation) current.pending += amount
+      current.incomingPending += amount
+      amounts.set(assetId, current)
+    }
     return [...amounts.entries()]
       .map(([assetId, amount]) => this.getEmptyLocalAssetBalance(assetId, amount))
       .sort((left, right) => left.assetId.localeCompare(right.assetId))
@@ -1887,19 +1917,23 @@ export class RgbService {
 
   private getEmptyLocalAssetBalance(
     assetId: string,
-    amount: { settled: bigint; spendable: bigint; pending: bigint } = {
+    amount: { settled: bigint; spendable: bigint; pending: bigint; incomingPending: bigint } = {
       settled: 0n,
       spendable: 0n,
       pending: 0n,
+      incomingPending: 0n,
     }
   ): RgbLocalAssetDetail {
-    const metadata = this.requireState().contracts?.[assetId]?.metadata
+    const state = this.requireState()
+    const metadata = state.contracts?.[assetId]?.metadata ||
+      state.pendingAssetMetadata?.find(item => item.assetId === assetId)?.metadata
     return {
       assetId,
       balance: amount.settled.toString(),
       settled: amount.settled.toString(),
       spendable: amount.spendable.toString(),
       pending: amount.pending.toString(),
+      incomingPending: amount.incomingPending.toString(),
       ...(metadata
         ? {
             ticker: metadata.ticker,

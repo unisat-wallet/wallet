@@ -48,6 +48,7 @@ export interface RgbBalance {
   settled?: string
   spendable?: string
   pending?: string
+  incomingPending?: string
   lockedAmount?: string
   [key: string]: any
 }

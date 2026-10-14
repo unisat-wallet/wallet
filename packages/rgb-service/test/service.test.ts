@@ -2095,6 +2095,9 @@ describe('RgbService', () => {
       amount: '60',
       precision: 2,
     })
+    expect(service.getLocalAssetBalance('rgb:asset')).toMatchObject({
+      settled: '0', spendable: '0', pending: '60', incomingPending: '60',
+    })
 
     expect(dependencies.transport.getAcknowledgement).toHaveBeenCalledTimes(1)
     expect(dependencies.transport.acknowledgeConsignment).toHaveBeenCalledTimes(1)
@@ -2103,6 +2106,70 @@ describe('RgbService', () => {
       accepted: true,
       payload: 'consignment',
       endpoint: proxyEndpoint,
+    })
+  })
+
+  it('shows an accepted receive as incoming pending without making it spendable or counting it twice', async () => {
+    const service = new RgbService(createDependencies())
+    await service.open(wallet)
+    const state = (service as any).state
+    state.snapshot.utxos = [{
+      outpoint: { txid: 'a'.repeat(64), vout: 0 },
+      satoshis: 1000,
+      scriptPubKey: '5120' + '00'.repeat(32),
+      publicKey: '02' + '11'.repeat(32),
+      chainStatus: 'confirmed',
+      allocations: [],
+    }]
+    state.pendingAssetMetadata = [{
+      assetId: 'rgb:new-asset',
+      metadata: {
+        ticker: 'NEW', name: 'New Asset', precision: 2,
+        schema: 'NIA', issuedSupply: '100',
+      },
+    }]
+    state.pendingReceives = [{
+      recipientId: 'recipient',
+      createdAt: 1,
+      seal: { txid: 'a'.repeat(64), vout: 0, blinding: 1n },
+      receivedConsignment: {
+        accepted: false,
+        txid: 'c'.repeat(64),
+        assetId: 'rgb:new-asset',
+        amount: '2',
+        precision: 0,
+        receivedAt: 1,
+      },
+    }]
+    expect(service.getLocalAssetBalance('rgb:new-asset')).toBeUndefined()
+
+    state.pendingReceives[0].receivedConsignment.accepted = true
+    expect(service.getLocalAssetBalance('rgb:new-asset')).toMatchObject({
+      settled: '0',
+      spendable: '0',
+      pending: '2',
+      incomingPending: '2',
+      ticker: 'NEW',
+      precision: 2,
+    })
+    expect(service.getLocalAssetList().list.some(item => item.assetId === 'rgb:new-asset')).toBe(true)
+
+    state.pendingReceives[0].receivedConsignment.broadcastDetectedAt = 2
+    expect(service.getLocalAssetBalance('rgb:new-asset')).toMatchObject({
+      spendable: '0', pending: '2', incomingPending: '2',
+    })
+
+    state.snapshot.utxos[0].allocations.push({
+      assetId: 'rgb:new-asset', amount: '2', settled: false, spendable: false,
+    })
+    expect(service.getLocalAssetBalance('rgb:new-asset')).toMatchObject({
+      settled: '0', pending: '2', incomingPending: '2',
+    })
+
+    state.snapshot.utxos[0].allocations.at(-1).settled = true
+    state.snapshot.utxos[0].allocations.at(-1).spendable = true
+    expect(service.getLocalAssetBalance('rgb:new-asset')).toMatchObject({
+      settled: '2', spendable: '2', pending: '0', incomingPending: '0',
     })
   })
 

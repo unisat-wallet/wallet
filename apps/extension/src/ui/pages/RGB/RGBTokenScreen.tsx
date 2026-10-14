@@ -59,6 +59,13 @@ export default function RGBTokenScreen() {
     tokenBalance?.spendable === undefined ? '--' : toRgbDisplayAmount(tokenBalance.spendable, precision);
   const lockedAmount = toRgbDisplayAmount(tokenBalance?.lockedAmount, precision);
   const pendingAmount = toRgbDisplayAmount(tokenBalance?.pending, precision);
+  const incomingPendingAmount = toRgbDisplayAmount(tokenBalance?.incomingPending, precision);
+  const hasIncomingPending = Number(tokenBalance?.incomingPending || 0) > 0;
+  const pendingStatusText = hasIncomingPending && tokenBalance?.incomingPending === tokenBalance?.pending
+    ? `${pendingAmount} (${t('rgb_incoming_pending')})`
+    : hasIncomingPending
+      ? `${pendingAmount} (${t('pending')}) · ${incomingPendingAmount} (${t('rgb_incoming_pending')})`
+      : `${pendingAmount} (${t('pending')})`;
   const autoRefreshing =
     Number(tokenBalance?.pending || 0) > 0 ||
     activityItems.some(item =>
@@ -178,7 +185,7 @@ export default function RGBTokenScreen() {
                 <Text
                   text={
                     Number(tokenBalance?.pending || 0) > 0
-                      ? `${pendingAmount} (${t('pending')}) · ${t('rgb_updates_automatically')}`
+                      ? `${pendingStatusText} · ${t('rgb_updates_automatically')}`
                       : t('rgb_updates_automatically')
                   }
                   size="xs"

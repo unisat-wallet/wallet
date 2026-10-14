@@ -71,6 +71,8 @@ export interface RgbLocalAssetBalance {
   spendable: string
   /** Allocations that are known locally but are not settled/spendable yet. */
   pending: string
+  /** Accepted incoming consignments awaiting settlement, included in pending. */
+  incomingPending: string
   ticker?: string
   name?: string
   precision?: number

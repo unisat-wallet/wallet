@@ -3572,5 +3572,6 @@
   "deleting_invoice": { "message": "正在刪除發票…" },
   "delete_witness_invoice_confirm_title": { "message": "刪除 Witness 發票？" },
   "use_this_invoice_to_receive_any_rgb_asset": { "message": "使用此發票接收任意 RGB 資產。" },
-  "rgb_updates_automatically": { "message": "將自動更新" }
+  "rgb_updates_automatically": { "message": "將自動更新" },
+  "rgb_incoming_pending": { "message": "待到帳" }
 }
