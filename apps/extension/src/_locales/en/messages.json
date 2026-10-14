@@ -3579,7 +3579,7 @@
   "rgb_approval_cancel_payment_title": { "message": "Cancel RGB payment" },
   "rgb_approval_cancel_payment_description": { "message": "Cancel only if the recipient has not acknowledged the consignment and the transaction has not been broadcast." },
   "rgb_approval_cancel_payment": { "message": "Cancel payment" },
-  "delete_invoice": { "message": "Delete invoice" },
+  "delete_invoice": { "message": "Delete Invoice" },
   "deleting_invoice": { "message": "Deleting invoice…" },
   "delete_witness_invoice_confirm_title": { "message": "Delete witness invoice?" },
   "use_this_invoice_to_receive_any_rgb_asset": { "message": "Use this invoice to receive any RGB asset." }
