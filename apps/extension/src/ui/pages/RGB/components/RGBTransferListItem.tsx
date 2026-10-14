@@ -139,21 +139,25 @@ export function RGBTransferListItem({
             />
           )}
           <Column gap="xs" style={{ minWidth: 0, overflow: 'hidden' }}>
-            <Row itemsCenter style={{ minWidth: 0, overflow: 'hidden' }}>
-              <Text text={getTransferTitle(item.type, t)} style={{ flexShrink: 0 }} />
+            <Row style={{ minWidth: 0, flexDirection: 'column', alignItems: 'flex-start', gap: 4 }}>
+              <Text text={getTransferTitle(item.type, t)} style={{ flexShrink: 0, lineHeight: '20px' }} />
               {showStatus ? (
                 <Row
                   style={{
                     backgroundColor: pending ? 'rgba(244, 182, 44, 0.15)' : 'rgba(238, 52, 76, 0.15)',
-                    borderRadius: 4
+                    borderRadius: 4,
+                    minWidth: 0,
+                    maxWidth: '100%',
+                    boxSizing: 'border-box',
+                    minHeight: 24
                   }}
                   px="sm"
                   py="xs">
                   <Text
                     text={getStatusLabel(item.status, t, item.type)}
                     size="xs"
-                    ellipsis
-                    style={{ color: pending ? 'rgba(244, 182, 44, 0.85)' : '#EE344C' }}
+                    wrap
+                    style={{ color: pending ? 'rgba(244, 182, 44, 0.85)' : '#EE344C', lineHeight: '16px' }}
                   />
                 </Row>
               ) : null}
@@ -178,13 +182,13 @@ export function RGBTransferListItem({
           </Column>
         </Row>
         {!isCanceledReceive ? (
-          <Row itemsCenter gap="xs" style={{ flexShrink: 0, maxWidth: showAssetLabel ? '58%' : undefined, marginLeft: 12 }}>
+          <Row gap="xs" style={{ alignItems: 'center', flexShrink: 0, maxWidth: showAssetLabel ? '58%' : undefined, marginLeft: 12, ...(showStatus ? { alignSelf: 'flex-start', marginTop: 24, minHeight: 24 } : {}) }}>
             {showAssetLabel ? (
-              <div title={signedDisplayAmount} style={{ minWidth: 0, flexShrink: 1, overflow: 'hidden' }}>
-                <HistoryAmount amount={signedDisplayAmount} color={amountColor} />
+              <div title={signedDisplayAmount} style={{ display: 'flex', alignItems: 'center', height: 20, minWidth: 0, flexShrink: 1, overflow: 'hidden' }}>
+                <HistoryAmount amount={signedDisplayAmount} color={amountColor} textStyle={{ fontSize: 14, lineHeight: '20px' }} />
               </div>
             ) : (
-              <HistoryAmount amount={signedDisplayAmount} color={amountColor} />
+              <HistoryAmount amount={signedDisplayAmount} color={amountColor} textStyle={{ fontSize: 14, lineHeight: '20px' }} />
             )}
             {showAssetLabel ? (
               <Text
@@ -192,7 +196,7 @@ export function RGBTransferListItem({
                 size="sm"
                 ellipsis
                 disableTranslate
-                style={{ flexShrink: 0, maxWidth: 64, color: amountColor }}
+                style={{ display: 'flex', alignItems: 'center', height: 20, flexShrink: 0, maxWidth: 64, color: amountColor, fontSize: 14, lineHeight: '20px' }}
               />
             ) : null}
           </Row>

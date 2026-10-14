@@ -37,17 +37,20 @@ function getHistoryAmountDisplay(amount: string) {
   };
 }
 
-export function HistoryAmount({ amount, color }: { amount: string; color?: string }) {
+export function HistoryAmount({ amount, color, textStyle }: { amount: string; color?: string; textStyle?: CSSProperties }) {
   const { display, fullText, isTruncated } = getHistoryAmountDisplay(amount);
   const amountText = (
-    <Text text={display} ellipsis disableTranslate style={{ maxWidth: 140, textAlign: 'right', color }} />
+    <Text text={display} ellipsis disableTranslate style={{ maxWidth: 140, textAlign: 'right', color, ...textStyle }} />
   );
 
   if (!isTruncated) return amountText;
 
-  return (
+  const tooltip = (
     <Tooltip title={fullText} overlayStyle={{ fontSize: fontSizes.xs }}>
       {amountText}
     </Tooltip>
   );
+  // A flex wrapper avoids the inline-block tooltip's extra baseline space.
+  return textStyle ? <div style={{ display: 'flex', alignItems: 'center' }}>{tooltip}</div> : tooltip;
 }
+import type { CSSProperties } from 'react';
