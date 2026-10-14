@@ -321,8 +321,8 @@ export function useRGBReceiveScreenLogic(
   const setInvoiceExpirySeconds = (value: number) => {
     invoiceExpiryChanged.current = true
     setInvoiceExpirySecondsState(value)
+    void rgbWallet.setRgbInvoiceExpirySeconds(value).catch((error) => tools.toastError(getErrorMessage(error)))
   }
-  const [rememberInvoiceExpiry, setRememberInvoiceExpiry] = useState(false)
   const [amount, setAmount] = useState('')
   const [loading, setLoading] = useState(false)
   const [loadingText, setLoadingText] = useState('')
@@ -488,13 +488,6 @@ export function useRGBReceiveScreenLogic(
       setSelectedPendingInvoice(pendingInvoice as RgbPendingReceiveInvoice)
     }
     setStep('create_invoice')
-    if (rememberInvoiceExpiry) {
-      try {
-        await rgbWallet.setRgbInvoiceExpirySeconds(invoiceExpirySeconds)
-      } catch (error) {
-        tools.toastError(getErrorMessage(error))
-      }
-    }
   }
 
   const getRgbUtxoBeginTxid = (value: unknown) => {
@@ -795,8 +788,6 @@ export function useRGBReceiveScreenLogic(
     setRecipientType,
     invoiceExpirySeconds,
     setInvoiceExpirySeconds,
-    rememberInvoiceExpiry,
-    setRememberInvoiceExpiry,
     amount,
     onAmountChange,
     normalizedAmount,

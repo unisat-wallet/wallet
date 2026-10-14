@@ -2,7 +2,6 @@ import { useState } from 'react';
 
 import {
   Button,
-  Checkbox,
   Column,
   Content,
   Footer,
@@ -194,8 +193,6 @@ export default function RGBReceiveScreen({ initialStep = 'create_invoice' }: { i
     setRecipientType,
     invoiceExpirySeconds,
     setInvoiceExpirySeconds,
-    rememberInvoiceExpiry,
-    setRememberInvoiceExpiry,
     amount,
     onAmountChange,
     isFixedMode,
@@ -523,9 +520,6 @@ export default function RGBReceiveScreen({ initialStep = 'create_invoice' }: { i
             </Row>
           </Row>
           <Row fullX style={{ borderTopWidth: 1, borderColor: colors.border }} />
-          <Checkbox checked={rememberInvoiceExpiry} onChange={(event) => setRememberInvoiceExpiry(event.target.checked)}>
-            <Text text={t('remember_my_choice')} size="sm" color="white_muted" />
-          </Checkbox>
           <Column gap="sm" fullX>
             {invoiceExpiryOptions.map((option) => (
               <div key={option.seconds}>
@@ -655,13 +649,8 @@ export default function RGBReceiveScreen({ initialStep = 'create_invoice' }: { i
               style={selectorRowStyle}
             >
               <Column gap="xs">
-                <Text text={t('invoice_type')} size="xs" color="textDim" />
                 <Row itemsCenter gap="xs">
-                  <Text
-                    text={t(recipientType === 'blind' ? 'rgb_invoice_blind' : 'rgb_invoice_witness')}
-                    size="sm"
-                    color="white"
-                  />
+                  <Text text={t('invoice_type')} size="xs" color="textDim" />
                   <Tooltip
                     placement="bottom"
                     overlayInnerStyle={{ maxWidth: 280, fontSize: 12, lineHeight: '16px' }}
@@ -682,6 +671,13 @@ export default function RGBReceiveScreen({ initialStep = 'create_invoice' }: { i
                     </div>
                   </Tooltip>
                 </Row>
+                <Row itemsCenter gap="xs">
+                  <Text
+                    text={t(recipientType === 'blind' ? 'rgb_invoice_blind' : 'rgb_invoice_witness')}
+                    size="sm"
+                    color="white"
+                  />
+                </Row>
               </Column>
               <Icon icon="invoice-switch" size={18} />
             </Row>
@@ -700,9 +696,8 @@ export default function RGBReceiveScreen({ initialStep = 'create_invoice' }: { i
               style={{ ...selectorRowStyle, cursor: canSetFixedAmount ? 'pointer' : 'default' }}
             >
               <Column gap="xs">
-                <Text text={t('amount')} size="xs" color="textDim" />
                 <Row itemsCenter gap="xs">
-                  <Text text={t(isFixedMode ? 'fixed_amount' : 'any_amount')} size="sm" color="white" />
+                  <Text text={t('amount')} size="xs" color="textDim" />
                   <Tooltip
                     title={t(isFixedMode ? 'set_exact_rgb_amount' : 'accept_any_rgb_amount')}
                     placement="bottom"
@@ -711,6 +706,9 @@ export default function RGBReceiveScreen({ initialStep = 'create_invoice' }: { i
                       <Icon icon="circle-question" color="white_muted" size={14} />
                     </div>
                   </Tooltip>
+                </Row>
+                <Row itemsCenter gap="xs">
+                  <Text text={t(isFixedMode ? 'fixed_amount' : 'any_amount')} size="sm" color="white" />
                 </Row>
               </Column>
               {canSetFixedAmount ? <Icon icon="invoice-switch" size={18} /> : null}

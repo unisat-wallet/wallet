@@ -103,7 +103,7 @@ describe('useRGBReceiveScreenLogic', () => {
     })
   })
 
-  it('uses the selected invoice type and only remembers expiry when requested', async () => {
+  it('uses the selected invoice type and remembers the selected expiry', async () => {
     const { wrapper, wallet } = createHookTestHarness()
     const { result } = renderHook(() => useRGBReceiveScreenLogic(), { wrapper })
 
@@ -120,13 +120,10 @@ describe('useRGBReceiveScreenLogic', () => {
     await act(async () => {
       result.current.setInvoiceExpirySeconds(7 * 24 * 60 * 60)
     })
-    await act(async () => {
-      result.current.setRememberInvoiceExpiry(true)
-    })
+    expect(wallet.setRgbInvoiceExpirySeconds).toHaveBeenCalledWith(7 * 24 * 60 * 60)
     await act(async () => {
       await result.current.onCreateInvoice()
     })
-    expect(wallet.setRgbInvoiceExpirySeconds).toHaveBeenCalledWith(7 * 24 * 60 * 60)
   })
 
   it('clears a fixed amount when switching back to Any Asset', async () => {
