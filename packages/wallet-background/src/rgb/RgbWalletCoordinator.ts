@@ -104,7 +104,10 @@ export class RgbWalletCoordinator {
     const { service, wallet } = context
     if (!service.isRecoveryBackupEnabled()) return
     const snapshot = service.getSnapshot()
-    if (!snapshot.utxos.some(utxo => utxo.allocations.length > 0)) return
+    if (
+      !snapshot.utxos.some(utxo => utxo.allocations.length > 0) &&
+      !service.hasKnownAssetHistory()
+    ) return
     const key = walletKey(wallet)
     // Avoid a lease round-trip when this is only a render-triggered call that
     // is already covered by an in-flight or recently completed list refresh.

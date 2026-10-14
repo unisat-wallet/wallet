@@ -1807,6 +1807,17 @@ export class RgbService {
     return this.requireState().snapshot
   }
 
+  /** Keep polling a previously used wallet after a temporary empty snapshot. */
+  hasKnownAssetHistory() {
+    const state = this.requireState()
+    return Boolean(
+      Object.keys(state.contracts || {}).length ||
+      state.issueHistory?.length ||
+      state.pendingSendHistory?.length ||
+      state.pendingReceiveHistory?.length
+    )
+  }
+
   /**
    * Derive the asset list solely from durable wallet state. This deliberately
    * avoids the indexer asset/list endpoints: local allocations and locally

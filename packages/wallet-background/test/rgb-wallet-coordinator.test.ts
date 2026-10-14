@@ -7,6 +7,35 @@ import {
 } from '../src/rgb/RgbWalletCoordinator'
 
 describe('RgbWalletCoordinator', () => {
+  it('refreshes an empty RGB snapshot when the wallet has asset history', async () => {
+    const service = {
+      isRecoveryBackupEnabled: vi.fn().mockReturnValue(true),
+      getSnapshot: vi.fn().mockReturnValue({ syncedAt: 1, utxos: [] }),
+      hasKnownAssetHistory: vi.fn().mockReturnValue(true),
+      sync: vi.fn().mockResolvedValue({ syncedAt: 2, utxos: [] }),
+    }
+    const context = {
+      service,
+      wallet: {
+        walletId: 'wallet-1',
+        fundingAddress: 'bc1p-funding',
+        network: 'mainnet' as const,
+      },
+    }
+    const tryEnsureWriteLease = vi.fn().mockResolvedValue(true)
+    const coordinator = new RgbWalletCoordinator({
+      getContext: vi.fn().mockResolvedValue(context as any),
+      syncIndexerOutbox: vi.fn(),
+      syncReceiveHistory: vi.fn(),
+      tryEnsureWriteLease,
+    })
+
+    await coordinator.syncListState()
+
+    expect(tryEnsureWriteLease).toHaveBeenCalledOnce()
+    expect(service.sync).toHaveBeenCalledOnce()
+  })
+
   it('treats the network and wallet id as part of RGB wallet identity', () => {
     const wallet = {
       walletId: 'wallet-1',
