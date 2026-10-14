@@ -161,34 +161,36 @@ export function AddressHistorySection({ preview = false }: { preview?: boolean }
     <Column gap="lg" fullX classname={styles.historySection}>
       <div className={styles.historyHeader}>
         {preview && <Text text={t('history')} size="md" color="white" />}
-        <div className={styles.filterContainer}>
-          <button
-            type="button"
-            className={styles.filterButton}
-            aria-label={t('filter')}
-            aria-expanded={filterOpen}
-            onClick={() => setFilterOpen((open) => !open)}
-          >
-            <img src="/images/history/filter.svg" alt="" />
-          </button>
-          {filterOpen && (
-            <div className={styles.filterMenu}>
-              {(['all', 'receive', 'send'] as const).map((key) => (
-                <button
-                  key={key}
-                  type="button"
-                  className={filter === key ? styles.filterActive : styles.filterOption}
-                  onClick={() => {
-                    setFilter(key);
-                    setFilterOpen(false);
-                  }}
-                >
-                  {t(key)}
-                </button>
-              ))}
-            </div>
-          )}
-        </div>
+        {!preview && (
+          <div className={styles.filterContainer}>
+            <button
+              type="button"
+              className={styles.filterButton}
+              aria-label={t('filter')}
+              aria-expanded={filterOpen}
+              onClick={() => setFilterOpen((open) => !open)}
+            >
+              <img src="/images/history/filter.svg" alt="" />
+            </button>
+            {filterOpen && (
+              <div className={styles.filterMenu}>
+                {(['all', 'receive', 'send'] as const).map((key) => (
+                  <button
+                    key={key}
+                    type="button"
+                    className={filter === key ? styles.filterActive : styles.filterOption}
+                    onClick={() => {
+                      setFilter(key);
+                      setFilterOpen(false);
+                    }}
+                  >
+                    {t(key)}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
       </div>
       {loading ? (
         <Text text={t('loading')} color="textDim" size="sm" />
