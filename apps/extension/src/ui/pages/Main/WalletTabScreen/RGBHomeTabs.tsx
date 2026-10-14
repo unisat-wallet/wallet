@@ -121,7 +121,7 @@ export function RGBHomeTabs({ transfers, list }: RGBHomeTabsProps) {
       <Column gap="md">
         <Row fullX itemsCenter gap="sm">
           <Button
-            text={t('receive_rgb')}
+            text={t('receive')}
             preset="brc20-action"
             icon="receive"
             full

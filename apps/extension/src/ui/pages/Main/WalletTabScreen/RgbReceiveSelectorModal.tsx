@@ -1,6 +1,8 @@
+import { useEffect, useState } from 'react';
+
 import { BottomSheetHeader, Card, Column, Icon, Row, Text } from '@/ui/components';
 import { BottomModal } from '@/ui/components/BottomModal';
-import { useI18n } from '@unisat/wallet-state';
+import { useChainType, useCurrentAccount, useCurrentKeyring, useI18n, useWallet } from '@unisat/wallet-state';
 
 export function RgbReceiveSelectorModal({
   onClose,
@@ -12,6 +14,29 @@ export function RgbReceiveSelectorModal({
   onCreateInvoice: () => void;
 }) {
   const { t } = useI18n();
+  const wallet = useWallet();
+  const account = useCurrentAccount();
+  const keyring = useCurrentKeyring();
+  const chainType = useChainType();
+  const [invoiceCount, setInvoiceCount] = useState<number | null>();
+  const invoicesDisabled = invoiceCount === undefined || invoiceCount === 0;
+
+  useEffect(() => {
+    let active = true;
+    setInvoiceCount(undefined);
+    void wallet
+      .getRgbPendingReceiveInvoices({ skipSync: true })
+      .then(({ list }) => {
+        if (active) setInvoiceCount(list.filter((invoice) => Boolean(invoice.invoice)).length);
+      })
+      .catch(() => {
+        // Keep the list reachable when the count could not be loaded.
+        if (active) setInvoiceCount(null);
+      });
+    return () => {
+      active = false;
+    };
+  }, [wallet, account.key, keyring?.key, chainType]);
 
   return (
     <BottomModal onClose={onClose} bodyStyle={{ padding: 0 }}>
@@ -21,13 +46,22 @@ export function RgbReceiveSelectorModal({
           <Card
             fullX
             itemsCenter
-            onClick={onViewInvoices}
+            onClick={invoicesDisabled ? undefined : onViewInvoices}
             data-testid="view-rgb-invoices-option"
-            style={{ minHeight: 56, padding: '10px 12px', borderRadius: 10, cursor: 'pointer' }}
+            style={{
+              minHeight: 56,
+              padding: '10px 12px',
+              borderRadius: 10,
+              cursor: invoicesDisabled ? 'default' : 'pointer',
+              opacity: invoicesDisabled ? 0.45 : 1
+            }}
           >
             <Row itemsCenter gap="md" style={{ flex: 1 }}>
               <Icon icon="invoice" color="ticker_color2" size={20} />
-              <Text text={t('pending_invoices')} size="sm" />
+              <Text
+                text={typeof invoiceCount === 'number' ? `${t('pending_invoices')}(${invoiceCount})` : t('pending_invoices')}
+                size="sm"
+              />
             </Row>
             <Icon icon="right" color="textDim" size={14} />
           </Card>
