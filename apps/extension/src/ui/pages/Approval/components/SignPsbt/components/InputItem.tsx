@@ -42,14 +42,12 @@ export function InputItem(props: {
   const alkanes = itemInfo.alkanes || [];
   const isMyAddress = itemInfo.address === currentAddress;
   const isRgbAddress = Boolean(rgbFundingAddress && itemInfo.address === rgbFundingAddress);
-  const actionAddressDetail = outputInfo
-    ? toSignData?.action?.details?.find(
-        (detail) =>
-          detail.labelKey === 'my_rgb_fee_address' &&
-          detail.type === PsbtActionDetailType.ADDRESS &&
-          detail.value === itemInfo.address
-      )
-    : undefined;
+  const actionAddressDetail = toSignData?.action?.details?.find(
+    (detail) =>
+      detail.labelKey === 'my_rgb_fee_address' &&
+      detail.type === PsbtActionDetailType.ADDRESS &&
+      detail.value === itemInfo.address
+  );
   const actionAddressLabel = actionAddressDetail
     ? actionAddressDetail.labelKey
       ? t(actionAddressDetail.labelKey)

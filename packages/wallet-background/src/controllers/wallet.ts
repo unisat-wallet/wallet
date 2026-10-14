@@ -1065,8 +1065,9 @@ export class WalletController extends BaseController {
     getContext: () => this.getLocalRgbService(),
     ensureWriteLease: (context, options) => this.ensureRgbWriteLease(context, options),
     getFeeRate: async () => (await this.getFeeSummary()).list[1]?.feeRate,
-    getToSignData: ({ wallet, psbt, toSignInputs, amountDisplay, actionName }) =>
-      this.getRgbToSignData({
+    getToSignData: async ({ wallet, psbt, toSignInputs, amountDisplay, actionName }) => {
+      const feeAccount = await this.getCurrentRgbFeeAccount()
+      return this.getRgbToSignData({
         expectedWallet: wallet,
         psbt,
         toSignInputs,
@@ -1080,10 +1081,17 @@ export class WalletController extends BaseController {
               value: amountDisplay,
               highlight: true,
             },
+            {
+              label: 'My RGB Fee Address',
+              labelKey: 'my_rgb_fee_address',
+              type: PsbtActionDetailType.ADDRESS,
+              value: feeAccount.address,
+            },
           ],
           type: PsbtActionType.CUSTOM,
         },
-      }),
+      })
+    },
     getActiveTransferId: address => this.rgbCoordinator.getActiveTransferId(address),
     setActiveTransferId: (address, transferId) =>
       this.rgbCoordinator.setActiveTransferId(address, transferId),
@@ -4857,6 +4865,12 @@ export class WalletController extends BaseController {
         name: 'Withdraw RGB Fee Pool',
         description: '',
         details: [
+          {
+            label: 'My RGB Fee Address',
+            labelKey: 'my_rgb_fee_address',
+            type: PsbtActionDetailType.ADDRESS,
+            value: feeAccount.address,
+          },
           { label: 'To', type: PsbtActionDetailType.ADDRESS, value: account.address },
           { label: 'Amount', type: PsbtActionDetailType.TEXT, value: `${amount || 0} sats` },
         ],
