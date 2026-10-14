@@ -19,7 +19,7 @@ import { RunesTicker } from '@/ui/components/RunesTicker';
 import { TabBar } from '@/ui/components/TabBar';
 import { colors } from '@/ui/theme/colors';
 import { typography } from '@/ui/theme/typography';
-import { shortAddress } from '@/ui/utils';
+import { copyToClipboard, shortAddress } from '@/ui/utils';
 import {
   ANY_RGB_ASSET,
   ANY_RGB_ASSET_ID,
@@ -34,6 +34,7 @@ import {
   toRgbDisplayAmount,
   useI18n,
   useRGBReceiveScreenLogic,
+  useTools,
   type RGBReceiveMode,
   type RGBReceiveScreenStep
 } from '@unisat/wallet-state';
@@ -184,6 +185,7 @@ export default function RGBReceiveScreen({
   initialStep?: RGBReceiveScreenStep;
 }) {
   const { t, locale } = useI18n();
+  const tools = useTools();
   const { requestWrite, writeLeaseModal } = useRgbWriteLeaseGuard();
   const [invoiceTypeSelectorOpen, setInvoiceTypeSelectorOpen] = useState(false);
   const [creationStep, setCreationStep] = useState<InvoiceCreationStep>('select_asset');
@@ -232,6 +234,16 @@ export default function RGBReceiveScreen({
   } = useRGBReceiveScreenLogic(initialStep);
   const assetDisplayTicker = assetId ? assetTicker : t('any_rgb_asset');
   const assetDisplayName = assetId ? getRgbAssetName(selectedRgbItem) || assetTicker : t('any_rgb_asset');
+
+  const copyInvoice = async () => {
+    if (!invoice) return;
+    try {
+      await copyToClipboard(invoice);
+      tools.toastSuccess(t('copied'));
+    } catch (error) {
+      tools.toastError(error instanceof Error ? error.message : String(error));
+    }
+  };
 
   const getRgbPendingAmountTagText = (amount?: number | string, precision = 0) => {
     if (amount === undefined || amount === null || amount === '' || String(amount) === '0') {
@@ -609,7 +621,7 @@ export default function RGBReceiveScreen({
     return (
       <Layout>
         <Header onBack={onCloseInvoice} title={t('create_invoice')} />
-        <Content>
+        <Content style={{ minHeight: 0 }}>
           <Column gap="lg">
             {renderCreationProgress('complete')}
             <ReceiveQRCodeCard
@@ -635,20 +647,14 @@ export default function RGBReceiveScreen({
                 </div>
               }
               accentColor={GOLD}
+              showCopyButton={false}
             />
-
-            <Button
-              text={t('close')}
-              preset="default"
-              onClick={onCloseInvoice}
-              full
-              style={{ background: 'transparent' }}
-              textStyle={{ color: colors.white, fontWeight: 'normal' }}
-            />
-
             {error ? <Text text={error} size="xs" color="danger" wrap /> : null}
           </Column>
         </Content>
+        <Footer style={{ flexShrink: 0 }}>
+          <Button text={t('copy_to_clipboard')} preset="primary" onClick={() => void copyInvoice()} full />
+        </Footer>
         {writeLeaseModal}
       </Layout>
     );

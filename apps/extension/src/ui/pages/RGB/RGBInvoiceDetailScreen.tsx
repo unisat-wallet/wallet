@@ -17,6 +17,7 @@ import {
 import { BottomModal } from '@/ui/components/BottomModal';
 import { getRgbAssetName } from '@/ui/components/RGBAssetIcon';
 import { colors } from '@/ui/theme/colors';
+import { copyToClipboard } from '@/ui/utils';
 import {
   ANY_RGB_ASSET,
   ANY_RGB_ASSET_ID,
@@ -178,6 +179,15 @@ export default function RGBInvoiceDetailScreen() {
   const invoiceDescription = isAnyRgbAsset
     ? t('use_this_invoice_to_receive_any_rgb_asset')
     : t('use_this_invoice_to_receive', { ticker: invoiceName });
+  const copyInvoice = async () => {
+    if (!invoiceText || invoiceInUse) return;
+    try {
+      await copyToClipboard(invoiceText);
+      tools.toastSuccess(t('copied'));
+    } catch (error) {
+      tools.toastError(error instanceof Error ? error.message : String(error));
+    }
+  };
 
   return (
     <Layout>
@@ -190,7 +200,7 @@ export default function RGBInvoiceDetailScreen() {
           ) : null
         }
       />
-      <Content>
+      <Content style={{ minHeight: 0 }}>
         {invoiceText && !invoiceInUse ? (
           <ReceiveQRCodeCard
             value={invoiceText}
@@ -230,6 +240,7 @@ export default function RGBInvoiceDetailScreen() {
               ) : undefined
             }
             accentColor="#F4B62C"
+            showCopyButton={false}
           />
         ) : null}
         {invoiceInUse ? (
@@ -247,15 +258,15 @@ export default function RGBInvoiceDetailScreen() {
         ) : null}
         {loading && !invoiceText ? <Text text={t('loading')} color="textDim" textCenter size="sm" /> : null}
       </Content>
-      <Footer>
+      <Footer style={{ flexShrink: 0 }}>
         <Row fullX gap="md">
           <Button
-            text={t('close')}
-            preset="default"
-            onClick={closeInvoice}
+            text={invoiceText && !invoiceInUse ? t('copy_to_clipboard') : t('close')}
+            preset={invoiceText && !invoiceInUse ? 'primary' : 'default'}
+            onClick={invoiceText && !invoiceInUse ? () => void copyInvoice() : closeInvoice}
             full
-            style={{ background: 'transparent' }}
-            textStyle={{ color: colors.white, fontWeight: 'normal' }}
+            style={invoiceText && !invoiceInUse ? undefined : { background: 'transparent' }}
+            textStyle={invoiceText && !invoiceInUse ? undefined : { color: colors.white, fontWeight: 'normal' }}
           />
         </Row>
       </Footer>

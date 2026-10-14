@@ -751,7 +751,7 @@ export function useRGBReceiveScreenLogic(
   }
 
   const onCloseInvoice = () => {
-    nav.navToTab()
+    nav.navigate('AssetsTabScreen')
   }
 
   const onClickBack = () => {

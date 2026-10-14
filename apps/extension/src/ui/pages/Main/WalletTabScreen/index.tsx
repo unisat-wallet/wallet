@@ -296,7 +296,8 @@ export default function WalletTabScreen({ screen = 'home' }: { screen?: 'home' |
   }, [onRgbFeatureEnabled, tools, wallet]);
 
   const counts = assetCounts?.key === assetContextKey ? assetCounts : null;
-  const assetTabsLoading = !counts && assetCountErrorKey !== assetContextKey;
+  const assetTabsLoading = (!counts && assetCountErrorKey !== assetContextKey) ||
+    (supportedAssets.assets.rgb && rgbStatusContextKey !== rgbContextKey);
   const hasAnyAsset = counts ? (
     counts.brc20Count + counts.summary.inscriptionCount + counts.summary.runesCount +
     counts.summary.alkanesCount + counts.summary.alkanesCollectionCount + counts.rgbCount > 0
@@ -314,7 +315,7 @@ export default function WalletTabScreen({ screen = 'home' }: { screen?: 'home' |
     }
   ];
   useEffect(() => {
-    if (!counts || !hasAnyAsset ||
+    if (assetTabsLoading || !counts || !hasAnyAsset ||
         (pinnedSelection?.contextKey === assetContextKey && pinnedSelection.tabKey === effectiveAssetTabKey)) return;
     const selected = tabCounts.find(({ key }) => key === effectiveAssetTabKey);
     if (effectiveAssetTabKey === AssetTabKey.ALKANES && counts.summary.alkanesCount === 0 &&
@@ -327,7 +328,7 @@ export default function WalletTabScreen({ screen = 'home' }: { screen?: 'home' |
       dispatch(uiActions.updateAssetTabScreen({ moreAssetTabKey: MoreAssetTabKey.ALKANES_TOKEN }));
       return;
     }
-    if (selected?.supported && selected.count > 0) return;
+    if (selected?.supported && (selected.count > 0 || (selected.key === AssetTabKey.RGB && isRgbActive))) return;
     const firstPopulated = tabCounts.find(({ supported, count }) => supported && count > 0);
     if (firstPopulated) {
       dispatch(uiActions.updateAssetTabScreen({
@@ -337,11 +338,12 @@ export default function WalletTabScreen({ screen = 'home' }: { screen?: 'home' |
             ? MoreAssetTabKey.ALKANES_TOKEN : MoreAssetTabKey.ALKANES_COLLECTION } : {})
       }));
     }
-  }, [assetContextKey, assetCounts, effectiveAssetTabKey, hasAnyAsset, pinnedSelection, supportedAssets.key, moreAssetTabKey, dispatch]);
+  }, [assetContextKey, assetCounts, assetTabsLoading, effectiveAssetTabKey, hasAnyAsset, pinnedSelection, supportedAssets.key, moreAssetTabKey, isRgbActive, dispatch]);
   const visibleAssetTabs = [
     ...tabCounts
   ].filter(({ key, supported, count }) => supported && (
-    count > 0 || (key === effectiveAssetTabKey && !assetTabsLoading && (!counts || !hasAnyAsset ||
+    count > 0 || (key === AssetTabKey.RGB && isRgbActive) ||
+    (key === effectiveAssetTabKey && !assetTabsLoading && (!counts || !hasAnyAsset ||
       (pinnedSelection?.contextKey === assetContextKey && pinnedSelection.tabKey === key))) ||
     (showAllBaseTabs && key !== AssetTabKey.ALKANES)
   ));

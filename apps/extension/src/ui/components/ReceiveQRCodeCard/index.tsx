@@ -21,6 +21,7 @@ type ReceiveQRCodeCardProps = {
   qrCenter?: ReactNode;
   accentColor?: string;
   copyDisabled?: boolean;
+  showCopyButton?: boolean;
   qrTopSpacing?: number;
 };
 
@@ -38,6 +39,7 @@ export function ReceiveQRCodeCard(props: ReceiveQRCodeCardProps) {
     qrCenter,
     accentColor = GOLD,
     copyDisabled = false,
+    showCopyButton = true,
     qrTopSpacing = 12
   } = props;
   const [copied, setCopied] = useState(false);
@@ -142,25 +144,29 @@ export function ReceiveQRCodeCard(props: ReceiveQRCodeCardProps) {
           {valuePrefix}
           <Text text={value} size="sm" color="white" textCenter wrap selectText />
         </Column>
-        <div style={{ width: '100%', height: 1, background: 'rgba(255,255,255,0.12)' }} />
-        <Row
-          justifyCenter
-          itemsCenter
-          gap="sm"
-          style={{
-            width: '100%',
-            padding: '12px 0',
-            color: copyDisabled ? 'rgba(255,255,255,0.35)' : accentColor,
-            cursor: copyDisabled ? 'default' : 'pointer'
-          }}
-          onClick={onCopy}>
-          <Icon icon="copy" size={14} color={copyDisabled ? 'white_muted' : 'gold'} />
-          <Text
-            text={copyDisabled ? t('unavailable') : copied ? resolvedCopiedText : resolvedCopyText}
-            size="sm"
-            style={{ color: copyDisabled ? 'rgba(255,255,255,0.35)' : accentColor }}
-          />
-        </Row>
+        {showCopyButton ? (
+          <>
+            <div style={{ width: '100%', height: 1, background: 'rgba(255,255,255,0.12)' }} />
+            <Row
+              justifyCenter
+              itemsCenter
+              gap="sm"
+              style={{
+                width: '100%',
+                padding: '12px 0',
+                color: copyDisabled ? 'rgba(255,255,255,0.35)' : accentColor,
+                cursor: copyDisabled ? 'default' : 'pointer'
+              }}
+              onClick={onCopy}>
+              <Icon icon="copy" size={14} color={copyDisabled ? 'white_muted' : 'gold'} />
+              <Text
+                text={copyDisabled ? t('unavailable') : copied ? resolvedCopiedText : resolvedCopyText}
+                size="sm"
+                style={{ color: copyDisabled ? 'rgba(255,255,255,0.35)' : accentColor }}
+              />
+            </Row>
+          </>
+        ) : null}
       </Column>
     </Column>
   );
