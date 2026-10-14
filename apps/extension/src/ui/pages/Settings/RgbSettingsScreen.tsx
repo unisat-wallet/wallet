@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 
 import { Button, Column, Content, Header, Icon, Layout, Row, Text } from '@/ui/components';
@@ -24,14 +24,12 @@ function SettingsAction({
   iconColor,
   title,
   description,
-  value,
   onClick
 }: {
   icon: IconTypes;
   iconColor: ColorTypes;
   title: string;
   description: string;
-  value?: string;
   onClick: () => void;
 }) {
   return (
@@ -44,7 +42,6 @@ function SettingsAction({
         </Column>
       </Row>
       <Row itemsCenter gap="xs" style={{ flexShrink: 0 }}>
-        {value ? <Text text={value} color="textDim" size="xs" /> : null}
         <Icon icon="right" size={fontSizes.lg} color="textDim" />
       </Row>
     </Row>
@@ -56,7 +53,6 @@ export default function RgbSettingsScreen() {
   const { t } = useI18n();
   const wallet = useWallet();
   const tools = useTools();
-  const [invoiceExpiry, setInvoiceExpiry] = useState(24 * 60 * 60);
   const [confirmCloudRestore, setConfirmCloudRestore] = useState(false);
   const [restoring, setRestoring] = useState(false);
 
@@ -77,19 +73,6 @@ export default function RgbSettingsScreen() {
       setRestoring(false);
     }
   };
-
-  useEffect(() => {
-    wallet.getRgbInvoiceExpirySeconds().then(setInvoiceExpiry).catch(() => undefined);
-  }, [wallet]);
-
-  const invoiceExpiryLabel =
-    invoiceExpiry === 0
-      ? t('rgb_invoice_expiry_never')
-      : invoiceExpiry === 60 * 60
-        ? t('rgb_invoice_expiry_1h')
-        : invoiceExpiry === 7 * 24 * 60 * 60
-          ? t('rgb_invoice_expiry_7d')
-          : t('rgb_invoice_expiry_24h');
 
   return (
     <Layout>
@@ -118,18 +101,6 @@ export default function RgbSettingsScreen() {
               title={t('rgb_recover_latest_cloud_state')}
               description={t('rgb_cloud_current_account_description')}
               onClick={() => !restoring && setConfirmCloudRestore(true)}
-            />
-          </Column>
-
-          <Column fullX gap="md">
-            <Text text={t('preferences')} color="textDim" size="xs" />
-            <SettingsAction
-              icon="invoice"
-              iconColor="gold"
-              title={t('rgb_default_invoice_expiry')}
-              description={t('rgb_invoice_expiry_description')}
-              value={invoiceExpiryLabel}
-              onClick={() => navigate('/settings/rgb-invoice-expiry')}
             />
           </Column>
 
