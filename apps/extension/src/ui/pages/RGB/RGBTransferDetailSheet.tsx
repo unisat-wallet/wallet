@@ -226,7 +226,7 @@ export function RGBTransferDetailSheet({
   const description = getDescription(transfer, t);
   const canExplore =
     !!transfer?.txid &&
-    !['waiting_ack', 'ready_to_broadcast', 'broadcasting', 'broadcast_failed', 'pending_accept', 'rejected'].includes(status) &&
+    !['waiting_ack', 'ready_to_broadcast', 'broadcasting', 'broadcast_failed', 'pending_accept', 'rejected', 'canceled', 'cancelled'].includes(status.toLowerCase()) &&
     !!onClickExploreTx;
   const canCancelSend =
     transfer?.type === 'send' && ['signed', 'waiting_ack'].includes(String(transfer?.status || '').toLowerCase());

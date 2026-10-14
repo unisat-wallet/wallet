@@ -216,4 +216,46 @@ describe('useRGBTokenScreenLogic', () => {
       }))
     })
   })
+
+  it('keeps a canceled send in token history after refreshing', async () => {
+    const { wrapper, wallet } = createHookTestHarness({ routeState: { assetId } })
+    wallet.getRGBAssetDetail.mockResolvedValue(detail)
+    wallet.getRGBAssetBalance.mockResolvedValue(fetchedBalance)
+    wallet.getRGBAssetActivity
+      .mockResolvedValueOnce({ list: [], total: 0 })
+      .mockResolvedValue({
+        list: [{ id: 'indexed-transfer-1', assetId, type: 'send', status: 'pending', amount: '7', txid: 'txid-1', timestamp: 1 }],
+        total: 1,
+      })
+    const transfer = {
+      id: 'local-send:transfer-1',
+      transferId: 'transfer-1',
+      assetId,
+      type: 'send',
+      amount: '7',
+      txid: 'txid-1',
+      timestamp: 2,
+      local: true,
+    }
+    wallet.getRgbTransfers
+      .mockResolvedValueOnce({ list: [{ ...transfer, status: 'waiting_ack' }], total: 1 })
+      .mockResolvedValue({ list: [{ ...transfer, status: 'canceled' }], total: 1 })
+
+    const { result } = renderHook(() => useRGBTokenScreenLogic(), { wrapper })
+
+    await waitFor(() => {
+      expect(result.current.activityItems).toContainEqual(
+        expect.objectContaining({ id: transfer.id, status: 'waiting_ack' })
+      )
+    })
+
+    act(() => result.current.onRefreshActivity())
+
+    await waitFor(() => {
+      expect(result.current.activityItems).toEqual([
+        expect.objectContaining({ id: transfer.id, status: 'canceled', transferId: 'transfer-1' }),
+      ])
+    })
+    expect(result.current.activityTotal).toBe(1)
+  })
 })

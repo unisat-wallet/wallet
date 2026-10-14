@@ -21,6 +21,9 @@ const LOCAL_ACTIVITY_STATUSES = new Set([
   'waiting_receive',
   'pending',
   'unconfirmed',
+  'canceled',
+  'cancelled',
+  'rejected',
 ])
 
 function isSameRgbAssetId(left?: string, right?: string) {
@@ -111,8 +114,8 @@ export function useRGBTokenScreenLogic() {
       const activity = await wallet.getRGBAssetActivity('', assetId, page, pageSize, activityType)
       if (page !== 1) return activity
 
-      // The indexer does not expose a newly prepared transfer yet. Reuse the
-      // transfer-list projection of local state until the indexed row appears.
+      // Keep local transfers visible while the indexer catches up, including
+      // canceled or rejected records that may never appear in indexed activity.
       const transfers = await wallet.getRgbTransfers(1, 50, { skipSync: true })
       const localItems: RgbActivityItem[] = transfers.list
         .filter(
@@ -146,7 +149,10 @@ export function useRGBTokenScreenLogic() {
       )
       return {
         list,
-        total: Math.max(activity.total + localItems.length, list.length),
+        total:
+          activity.list.length >= activity.total
+            ? list.length
+            : Math.max(activity.total + localItems.length, list.length),
       }
     },
     dependencies: [assetId, activityType],

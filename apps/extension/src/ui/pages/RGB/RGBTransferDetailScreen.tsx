@@ -108,7 +108,7 @@ export default function RGBTransferDetailScreen() {
   const statusLabel = getStatusLabel(status, t, transfer?.type);
   const canExplore =
     !!transfer?.txid &&
-    !['waiting_ack', 'ready_to_broadcast', 'broadcasting', 'broadcast_failed', 'pending_accept', 'rejected'].includes(status);
+    !['waiting_ack', 'ready_to_broadcast', 'broadcasting', 'broadcast_failed', 'pending_accept', 'rejected', 'canceled', 'cancelled'].includes(status.toLowerCase());
   const assetId = transfer?.assetId?.trim();
 
   const isConfirmed = isConfirmedStatus(status);
