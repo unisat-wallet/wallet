@@ -77,8 +77,6 @@ type RgbReceiveWallet = {
   }): Promise<RgbCancelReceiveInvoiceResult>
   getRgbInvoiceExpirySeconds(): Promise<number>
   setRgbInvoiceExpirySeconds(seconds: number): Promise<void>
-  getRgbInvoiceRecipientType(): Promise<RGBInvoiceRecipientType>
-  setRgbInvoiceRecipientType(type: RGBInvoiceRecipientType): Promise<void>
 }
 
 type RGBReceiveRouteState = {
@@ -317,19 +315,13 @@ export function useRGBReceiveScreenLogic(
     routeState?.tokenBalance as RgbAssetItem | undefined
   )
   const [mode, setModeState] = useState<RGBReceiveMode>('any')
-  const [recipientType, setRecipientTypeState] = useState<RGBInvoiceRecipientType>('blind')
+  const [recipientType, setRecipientType] = useState<RGBInvoiceRecipientType>('blind')
   const [invoiceExpirySeconds, setInvoiceExpirySecondsState] = useState(24 * 60 * 60)
-  const recipientTypeChanged = useRef(false)
   const invoiceExpiryChanged = useRef(false)
-  const setRecipientType = (value: RGBInvoiceRecipientType) => {
-    recipientTypeChanged.current = true
-    setRecipientTypeState(value)
-  }
   const setInvoiceExpirySeconds = (value: number) => {
     invoiceExpiryChanged.current = true
     setInvoiceExpirySecondsState(value)
   }
-  const [rememberRecipientType, setRememberRecipientType] = useState(false)
   const [rememberInvoiceExpiry, setRememberInvoiceExpiry] = useState(false)
   const [amount, setAmount] = useState('')
   const [loading, setLoading] = useState(false)
@@ -353,14 +345,6 @@ export function useRGBReceiveScreenLogic(
       .getRgbInvoiceExpirySeconds()
       .then(value => {
         if (active && !invoiceExpiryChanged.current) setInvoiceExpirySecondsState(value)
-      })
-      .catch(() => undefined)
-    rgbWallet
-      .getRgbInvoiceRecipientType()
-      .then(value => {
-        if (active && !recipientTypeChanged.current && (value === 'blind' || value === 'witness')) {
-          setRecipientTypeState(value)
-        }
       })
       .catch(() => undefined)
     return () => {
@@ -504,13 +488,6 @@ export function useRGBReceiveScreenLogic(
       setSelectedPendingInvoice(pendingInvoice as RgbPendingReceiveInvoice)
     }
     setStep('create_invoice')
-    if (rememberRecipientType) {
-      try {
-        await rgbWallet.setRgbInvoiceRecipientType(recipientType)
-      } catch (error) {
-        tools.toastError(getErrorMessage(error))
-      }
-    }
     if (rememberInvoiceExpiry) {
       try {
         await rgbWallet.setRgbInvoiceExpirySeconds(invoiceExpirySeconds)
@@ -818,8 +795,6 @@ export function useRGBReceiveScreenLogic(
     setRecipientType,
     invoiceExpirySeconds,
     setInvoiceExpirySeconds,
-    rememberRecipientType,
-    setRememberRecipientType,
     rememberInvoiceExpiry,
     setRememberInvoiceExpiry,
     amount,

@@ -8,6 +8,7 @@ export const svgRegistry = {
   history: '/images/icons/tx/clock-solid.svg',
   right: '/images/icons/nav/right.svg',
   left: '/images/icons/nav/arrow-left.svg',
+  'arrow-left-right': '/images/icons/nav/arrow-left-right.svg',
   down: '/images/icons/nav/down.svg',
   up: '/images/icons/nav/up.svg',
   link: '/images/icons/nav/arrow-up-right.svg',

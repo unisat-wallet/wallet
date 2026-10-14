@@ -103,30 +103,23 @@ describe('useRGBReceiveScreenLogic', () => {
     })
   })
 
-  it('uses the saved invoice type and only updates defaults when asked to remember the choice', async () => {
+  it('uses the selected invoice type and only remembers expiry when requested', async () => {
     const { wrapper, wallet } = createHookTestHarness()
-    wallet.getRgbInvoiceRecipientType.mockResolvedValue('witness')
     const { result } = renderHook(() => useRGBReceiveScreenLogic(), { wrapper })
 
-    await waitFor(() => expect(result.current.recipientType).toBe('witness'))
+    expect(result.current.recipientType).toBe('blind')
+    await act(async () => {
+      result.current.setRecipientType('witness')
+    })
     await act(async () => {
       await result.current.onCreateInvoice()
     })
     expect(wallet.createRgbWitnessReceive).toHaveBeenCalledWith({ durationSeconds: 86_400, skipSync: true })
-    expect(wallet.setRgbInvoiceRecipientType).not.toHaveBeenCalled()
     expect(wallet.setRgbInvoiceExpirySeconds).not.toHaveBeenCalled()
 
     await act(async () => {
-      result.current.setRecipientType('blind')
       result.current.setInvoiceExpirySeconds(7 * 24 * 60 * 60)
-      result.current.setRememberRecipientType(true)
     })
-    await act(async () => {
-      await result.current.onCreateInvoice()
-    })
-    expect(wallet.setRgbInvoiceRecipientType).toHaveBeenCalledWith('blind')
-    expect(wallet.setRgbInvoiceExpirySeconds).not.toHaveBeenCalled()
-
     await act(async () => {
       result.current.setRememberInvoiceExpiry(true)
     })
@@ -134,18 +127,6 @@ describe('useRGBReceiveScreenLogic', () => {
       await result.current.onCreateInvoice()
     })
     expect(wallet.setRgbInvoiceExpirySeconds).toHaveBeenCalledWith(7 * 24 * 60 * 60)
-  })
-
-  it('keeps Blind selected when a saved invoice type is unavailable', async () => {
-    const { wrapper, wallet } = createHookTestHarness()
-    wallet.getRgbInvoiceRecipientType.mockResolvedValue(undefined as never)
-    const { result } = renderHook(() => useRGBReceiveScreenLogic(), { wrapper })
-
-    await act(async () => {
-      await wallet.getRgbInvoiceRecipientType.mock.results[0].value
-    })
-
-    expect(result.current.recipientType).toBe('blind')
   })
 
   it('clears a fixed amount when switching back to Any Asset', async () => {
