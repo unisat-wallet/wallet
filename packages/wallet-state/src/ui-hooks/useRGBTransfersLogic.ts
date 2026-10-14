@@ -9,7 +9,7 @@ import { useInfiniteList } from './useInfiniteList'
 import { getRgbTokenPrecision } from '../utils/rgb-amount-utils'
 import { mergeRgbTransferAssetMetadata } from '../utils/rgb-transfer-metadata'
 
-const rgbAssetDetailCache = new Map<string, RgbAssetDetail | undefined>()
+const rgbAssetDetailCache = new Map<string, RgbAssetDetail>()
 const rgbTransferListCache = new Map<string, { list: RgbTransferItem[]; total: number }>()
 
 function isInProgress(item: RgbTransferItem) {
@@ -50,14 +50,23 @@ export function useRGBTransfersLogic({
       const result = await wallet.getRgbTransfers(page, pageSize, { skipSync })
       if (skipSync && page === 1) requestFullSyncRef.current = true
       const assetIds = [...new Set(result.list.map(item => item.assetId).filter(Boolean))] as string[]
-      const missingAssetIds = assetIds.filter(assetId => !rgbAssetDetailCache.has(assetId))
+      const details = new Map<string, RgbAssetDetail>()
       await Promise.all(
-        missingAssetIds.map(async assetId => {
+        assetIds.map(async assetId => {
+          const detailKey = `${cacheKey}:${assetId}`
+          const cachedDetail = rgbAssetDetailCache.get(detailKey)
+          if (cachedDetail) {
+            details.set(assetId, cachedDetail)
+            return
+          }
           try {
             const detail = await wallet.getRGBAssetDetail('', assetId)
-            rgbAssetDetailCache.set(assetId, detail)
+            if (detail) {
+              details.set(assetId, detail)
+              if (detail.name || detail.ticker) rgbAssetDetailCache.set(detailKey, detail)
+            }
           } catch {
-            rgbAssetDetailCache.set(assetId, undefined)
+            // Retry on the next refresh when local asset metadata becomes available.
           }
         })
       )
@@ -65,7 +74,7 @@ export function useRGBTransfersLogic({
       return {
         ...result,
         list: result.list.map(item => {
-          const detail = rgbAssetDetailCache.get(item.assetId || '')
+          const detail = details.get(item.assetId || '')
           const enriched = mergeRgbTransferAssetMetadata(item, detail)
           const detailPrecision = detail ? getRgbTokenPrecision(detail) : undefined
           return {

@@ -81,6 +81,32 @@ describe('useRGBTransfersLogic', () => {
     })
   })
 
+  it('retries asset metadata after a temporary detail lookup failure', async () => {
+    const assetId = 'rgb:detail-retry-after-failure'
+    const { wrapper, wallet } = createHookTestHarness()
+    wallet.getRgbTransfers.mockResolvedValue({
+      list: [{ ...confirmingReceive, assetId, type: 'send', status: 'broadcasted' }],
+      total: 1,
+    })
+    wallet.getRGBAssetDetail
+      .mockRejectedValueOnce(new Error('temporarily unavailable'))
+      .mockResolvedValue({ assetId, name: 'Example Token', ticker: 'EXM', precision: 2 })
+
+    const { result } = renderHook(
+      () => useRGBTransfersLogic({ initialFullSync: true, pollingEnabled: false }),
+      { wrapper }
+    )
+
+    await waitFor(() => expect(result.current.isCurrentAccountLoaded).toBe(true))
+    await waitFor(() => expect(result.current.loading).toBe(false))
+    expect(result.current.items[0]?.name).toBeUndefined()
+    await act(async () => {
+      await result.current.onRefresh()
+    })
+    await waitFor(() => expect(result.current.items[0]?.ticker).toBe('EXM'))
+    expect(wallet.getRGBAssetDetail).toHaveBeenCalledTimes(2)
+  })
+
   it('does not notify for a broadcast that completed before the list was opened', async () => {
     const { wrapper, wallet } = createHookTestHarness()
     wallet.getRgbTransfers.mockResolvedValue({

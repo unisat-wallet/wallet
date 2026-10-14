@@ -96,10 +96,19 @@ export class RgbTransferQuery {
       activityPromise,
       Promise.resolve(service.getPendingTransfers()),
     ])
+    const localAssetMetadata = (assetId: string) => {
+      try {
+        const { name, ticker } = service.getLocalAssetDetail(assetId)
+        return { name, ticker }
+      } catch {
+        return { name: undefined, ticker: undefined }
+      }
+    }
     const localSends = pendingTransfers.map(transfer => ({
       id: `local-send:${transfer.id}`,
       transferId: transfer.id,
       assetId: transfer.request.assetId,
+      ...localAssetMetadata(transfer.request.assetId),
       type: 'send' as const,
       amount: transfer.request.amount,
       precision: transfer.request.precision,
@@ -123,6 +132,7 @@ export class RgbTransferQuery {
       id: `local-send:${send.transferId}`,
       transferId: send.transferId,
       assetId: send.assetId,
+      ...localAssetMetadata(send.assetId),
       type: 'send' as const,
       amount: send.amount,
       precision: send.precision,

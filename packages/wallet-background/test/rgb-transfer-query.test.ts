@@ -4,6 +4,45 @@ import { toRgbDisplayAmount } from '@unisat/wallet-shared'
 import { RgbTransferQuery } from '../src/rgb/RgbTransferQuery'
 
 describe('RgbTransferQuery', () => {
+  it('includes local asset metadata on a broadcasted send', async () => {
+    const service = {
+      getPendingTransfers: vi.fn().mockReturnValue([]),
+      getPendingSendHistory: vi.fn().mockReturnValue([{
+        transferId: 'send-1',
+        assetId: 'rgb:asset',
+        amount: '10',
+        createdAt: 1,
+        status: 'broadcasted',
+      }]),
+      getIssueHistory: vi.fn().mockReturnValue([]),
+      getPendingReceiveHistory: vi.fn().mockReturnValue([]),
+      getPendingReceives: vi.fn().mockReturnValue([]),
+      getLocalAssetDetail: vi.fn().mockReturnValue({ name: 'Example Token', ticker: 'EXM' }),
+    }
+    const context = {
+      service,
+      wallet: { walletId: 'wallet', fundingAddress: 'funding', network: 'mainnet' },
+    }
+    const query = new RgbTransferQuery({
+      getContext: vi.fn().mockResolvedValue(context),
+      syncReceiveHistory: vi.fn(),
+      syncPendingTransfers: vi.fn(),
+      syncReceivedAllocations: vi.fn().mockResolvedValue(context),
+      getRemoteActivity: vi.fn().mockResolvedValue({ total: 0, list: [] }),
+      warn: vi.fn(),
+    })
+
+    const result = await query.getTransfers(1, 20, { skipSync: true })
+
+    expect(result.list[0]).toMatchObject({
+      id: 'local-send:send-1',
+      status: 'broadcasted',
+      name: 'Example Token',
+      ticker: 'EXM',
+    })
+    expect(service.getLocalAssetDetail).toHaveBeenCalledWith('rgb:asset')
+  })
+
   it('does not create a second page when local history overlaps all remote activity', async () => {
     const localHistory = Array.from({ length: 18 }, (_, index) => ({
       transferId: `receive-${index}`,
