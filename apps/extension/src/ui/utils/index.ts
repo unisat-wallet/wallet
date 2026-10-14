@@ -191,7 +191,7 @@ export function numberWithCommas(value: string, maxFixed: number, isFixed = fals
 
 export function showLongNumber(num: string | number | undefined, maxFixed = 8, isFixed = false) {
   if (!num || new BigNumber(num).isZero()) return '0';
-  if (Math.abs(num as number) < 0.000001 && maxFixed <= 6) {
+  if (Math.abs(num as number) < 0.000001 && maxFixed >= 0 && maxFixed <= 6) {
     let temp = '0.';
     for (let i = 0; i < maxFixed; i += 1) {
       temp += '0';

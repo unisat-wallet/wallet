@@ -217,9 +217,9 @@ export function RGBTransferDetailSheet({
   const amountPrefix = isCanceledReceive
     ? ''
     : transfer?.type === 'receive'
-      ? '+ '
+      ? '+'
       : transfer?.type === 'send'
-        ? '- '
+        ? '-'
         : '';
   const displayAmount = transfer?.amount ? toRgbDisplayAmount(transfer.amount, getRgbTokenPrecision(transfer)) : '--';
   const amountText = amountPrefix + displayAmount;
@@ -407,55 +407,41 @@ export function RGBTransferDetailSheet({
           />
 
           <Column fullX itemsCenter style={{ paddingLeft: 16, paddingRight: 16, gap: 24 }}>
-            <Row itemsCenter justifyCenter style={{ gap: 8 }}>
+            <Row itemsCenter fullX style={{ gap: 8, minWidth: 0 }}>
               <RGBAssetIcon
                 iconInfo={getRgbTokenIconInfo(transfer, ticker)}
                 ticker={ticker}
                 name={getRgbAssetName(transfer) || assetName}
                 size={32}
               />
-              {!isCanceledReceive ? (
-                <>
+              <Column gap="xs" style={{ minWidth: 0, maxWidth: 'calc(100% - 40px)' }}>
+                {!isCanceledReceive ? (
                   <Text
                     text={amountText}
                     style={{
-                      fontSize: 18,
+                      fontSize: amountText.length > 22 ? 16 : 18,
                       fontWeight: 500,
                       color: 'rgba(255,255,255,0.85)',
-                      lineHeight: '1.4'
+                      lineHeight: '1.4',
+                      maxWidth: '100%',
+                      whiteSpace: 'nowrap',
+                      overflowX: 'auto'
                     }}
                   />
-                  <Text
-                    text={assetName}
-                    style={{
-                      fontSize: 18,
-                      fontWeight: 500,
-                      color: 'rgba(255,255,255,0.85)',
-                      lineHeight: '1.4'
-                    }}
-                  />
-                </>
-              ) : null}
-              <Row
-                itemsCenter
-                justifyCenter
-                style={{
-                  height: 20,
-                  paddingLeft: 6,
-                  paddingRight: 6,
-                  borderRadius: 4,
-                  backgroundColor: 'rgba(244,182,44,0.1)'
-                }}
-              >
-                <Text
-                  text="RGB"
-                  style={{
-                    fontSize: 12,
-                    fontWeight: 600,
-                    color: 'rgba(244,182,44,0.85)'
-                  }}
-                />
-              </Row>
+                ) : null}
+                <Row itemsCenter style={{ gap: 8, minWidth: 0 }}>
+                  {!isCanceledReceive ? (
+                    <Text
+                      text={assetName}
+                      ellipsis
+                      style={{ minWidth: 0, fontSize: 16, fontWeight: 500, color: 'rgba(255,255,255,0.85)', lineHeight: '1.4' }}
+                    />
+                  ) : null}
+                  <Row itemsCenter justifyCenter style={{ height: 20, flexShrink: 0, paddingLeft: 6, paddingRight: 6, borderRadius: 4, backgroundColor: 'rgba(244,182,44,0.1)' }}>
+                    <Text text="RGB" style={{ fontSize: 12, fontWeight: 600, color: 'rgba(244,182,44,0.85)' }} />
+                  </Row>
+                </Row>
+              </Column>
             </Row>
 
             {description ? <Text text={description} color="textDim" textCenter size="xs" /> : null}
