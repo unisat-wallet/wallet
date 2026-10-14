@@ -2851,7 +2851,7 @@
     "message": "No RGB UTXOs found"
   },
   "rgb_utxo_empty_description": {
-    "message": "RGB UTXOs are created automatically when you create an invoice."
+    "message": "RGB UTXOs are created automatically when you create a blind invoice."
   },
   "rgb_asset": {
     "message": "RGB Asset"

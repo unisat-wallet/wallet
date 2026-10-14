@@ -3296,7 +3296,7 @@
     "message": "UTXO RGB не найдены"
   },
   "rgb_utxo_empty_description": {
-    "message": "RGB UTXO создаются автоматически при создании инвойса."
+    "message": "RGB UTXO создаются автоматически при создании blind инвойса."
   },
   "rgb_asset": {
     "message": "RGB-актив"

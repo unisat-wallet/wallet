@@ -3296,7 +3296,7 @@
     "message": "Aucun UTXO RGB trouvé"
   },
   "rgb_utxo_empty_description": {
-    "message": "Les UTXO RGB sont créés automatiquement lorsque vous créez une facture."
+    "message": "Les UTXO RGB sont créés automatiquement lorsque vous créez une facture blind."
   },
   "rgb_asset": {
     "message": "Actif RGB"

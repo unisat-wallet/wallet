@@ -3296,7 +3296,7 @@
     "message": "RGB UTXO が見つかりません"
   },
   "rgb_utxo_empty_description": {
-    "message": "RGB UTXO は、インボイスを作成すると自動的に作成されます。"
+    "message": "RGB UTXO は、blind インボイスを作成すると自動的に作成されます。"
   },
   "rgb_asset": {
     "message": "RGB 資産"

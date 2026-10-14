@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 
-import { Button, Card, Column, Content, CopyableAddress, Header, Icon, Layout, Row, Text } from '@/ui/components';
+import { Button, Card, Column, Content, CopyableAddress, Header, Icon, Layout, Row, Text, Tooltip } from '@/ui/components';
 import { Tabs } from '@/ui/components/Tabs';
 import { SignedData, ToSignData } from '@unisat/wallet-shared';
 import { useI18n, useNavigation, useTools, useWallet } from '@unisat/wallet-state';
@@ -149,7 +149,9 @@ export default function RgbFeePoolInspectionScreen() {
             <Row fullX itemsCenter justifyBetween gap="md" style={accountInfoRowStyle}>
               <Text text={t('address')} color="textDim" size="sm" style={{ flexShrink: 0 }} />
               {inspection ? (
-                <CopyableAddress address={inspection.address} copyPosition="after" color="ticker_color2" />
+                <Tooltip title={inspection.address} overlayStyle={{ maxWidth: 'calc(100vw - 32px)', overflowWrap: 'anywhere', boxSizing: 'border-box' }}>
+                  <CopyableAddress address={inspection.address} copyPosition="after" color="ticker_color2" />
+                </Tooltip>
               ) : (
                 <Text text="—" color="white" size="xs" />
               )}
