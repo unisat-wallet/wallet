@@ -56,6 +56,7 @@ export function RGBTransfersList({ transfers }: RGBTransfersListProps) {
               item={displayItem}
               showAssetLabel
               showDate={showDate}
+              showDirectionIcon
               onClick={() => setSelectedTransfer(displayItem)}
             />
           );
