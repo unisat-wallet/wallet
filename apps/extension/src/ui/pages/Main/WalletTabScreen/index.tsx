@@ -59,6 +59,27 @@ import { WalletActions } from './components/WalletActions';
 
 const STORAGE_VERSION_KEY = 'version_detail';
 
+function getPendingRgbAcceptances(items: ReturnType<typeof useRGBTransfersLogic>['items'], dismissedIds: Set<string>) {
+  return items
+    .filter(
+      (item) =>
+        item.type === 'receive' &&
+        item.local === true &&
+        item.status.toLowerCase() === 'pending_accept' &&
+        !dismissedIds.has(item.transferId || item.id)
+    )
+    .sort((left, right) => right.timestamp - left.timestamp);
+}
+
+function selectPendingRgbAcceptanceId(
+  pendingAcceptances: ReturnType<typeof getPendingRgbAcceptances>,
+  activeId?: string
+) {
+  if (activeId && pendingAcceptances.some((item) => (item.transferId || item.id) === activeId)) return activeId;
+  const first = pendingAcceptances[0];
+  return first?.transferId || first?.id;
+}
+
 export default function WalletTabScreen({ screen = 'home' }: { screen?: 'home' | 'assets' }) {
   const { t } = useI18n();
   const navigate = useNavigate();
@@ -247,12 +268,24 @@ export default function WalletTabScreen({ screen = 'home' }: { screen?: 'home' |
     activeId?: string;
     dismissedIdsByContext: Map<string, Set<string>>;
   }>(() => ({ contextKey: rgbContextKey, dismissedIdsByContext: new Map() }));
+  const [acceptanceQueue, setAcceptanceQueue] = useState<{
+    contextKey: string;
+    activeId?: string;
+    dismissedIdsByContext: Map<string, Set<string>>;
+  }>(() => ({ contextKey: rgbContextKey, dismissedIdsByContext: new Map() }));
   const dismissedBroadcastIds = broadcastQueue.contextKey === rgbContextKey
     ? broadcastQueue.dismissedIdsByContext.get(rgbContextKey) ?? new Set<string>()
     : new Set<string>();
   const readyBroadcasts = getReadyRgbBroadcasts(rgbTransfers.items, dismissedBroadcastIds);
   const readyBroadcast = broadcastQueue.contextKey === rgbContextKey
     ? readyBroadcasts.find((item) => (item.transferId || item.id) === broadcastQueue.activeId)
+    : undefined;
+  const dismissedAcceptanceIds = acceptanceQueue.contextKey === rgbContextKey
+    ? acceptanceQueue.dismissedIdsByContext.get(rgbContextKey) ?? new Set<string>()
+    : new Set<string>();
+  const pendingAcceptances = getPendingRgbAcceptances(rgbTransfers.items, dismissedAcceptanceIds);
+  const pendingAcceptance = screen === 'home' && acceptanceQueue.contextKey === rgbContextKey
+    ? pendingAcceptances.find((item) => (item.transferId || item.id) === acceptanceQueue.activeId)
     : undefined;
 
   useEffect(() => {
@@ -268,10 +301,37 @@ export default function WalletTabScreen({ screen = 'home' }: { screen?: 'home' |
     });
   }, [rgbContextKey, rgbTransfers.items, rgbTransfers.isCurrentAccountLoaded, broadcastQueue.activeId, broadcastQueue.dismissedIdsByContext]);
 
+  useEffect(() => {
+    setAcceptanceQueue((current) => {
+      if (current.contextKey !== rgbContextKey) {
+        return { ...current, contextKey: rgbContextKey, activeId: undefined };
+      }
+      const available = screen === 'home' && isRgbActive && rgbTransfers.isCurrentAccountLoaded
+        ? getPendingRgbAcceptances(rgbTransfers.items, current.dismissedIdsByContext.get(rgbContextKey) ?? new Set())
+        : [];
+      const activeId = selectPendingRgbAcceptanceId(available, current.activeId);
+      return current.activeId === activeId ? current : { ...current, activeId };
+    });
+  }, [screen, isRgbActive, rgbContextKey, rgbTransfers.items, rgbTransfers.isCurrentAccountLoaded, acceptanceQueue.activeId, acceptanceQueue.dismissedIdsByContext]);
+
   const dismissBroadcast = () => {
     if (!readyBroadcast) return;
     const transferId = readyBroadcast.transferId || readyBroadcast.id;
     setBroadcastQueue((current) => {
+      if (current.contextKey !== rgbContextKey) return current;
+      const dismissedIdsByContext = new Map(current.dismissedIdsByContext);
+      dismissedIdsByContext.set(
+        rgbContextKey,
+        new Set(dismissedIdsByContext.get(rgbContextKey)).add(transferId)
+      );
+      return { ...current, activeId: undefined, dismissedIdsByContext };
+    });
+  };
+
+  const dismissPendingAcceptance = () => {
+    if (!pendingAcceptance) return;
+    const transferId = pendingAcceptance.transferId || pendingAcceptance.id;
+    setAcceptanceQueue((current) => {
       if (current.contextKey !== rgbContextKey) return current;
       const dismissedIdsByContext = new Map(current.dismissedIdsByContext);
       dismissedIdsByContext.set(
@@ -542,6 +602,15 @@ export default function WalletTabScreen({ screen = 'home' }: { screen?: 'home' |
             transferId={readyBroadcast.transferId || readyBroadcast.id}
             remainingBroadcastCount={readyBroadcasts.length - 1}
             onClose={dismissBroadcast}
+            onCanceled={() => void rgbTransfers.onRefresh({ showLoading: false })}
+          />
+        ) : null}
+        {isRgbActive && !readyBroadcast && pendingAcceptance ? (
+          <RGBTransferDetailSheet
+            key={pendingAcceptance.transferId || pendingAcceptance.id}
+            transfer={pendingAcceptance}
+            transferId={pendingAcceptance.transferId || pendingAcceptance.id}
+            onClose={dismissPendingAcceptance}
             onCanceled={() => void rgbTransfers.onRefresh({ showLoading: false })}
           />
         ) : null}
