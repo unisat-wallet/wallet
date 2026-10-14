@@ -37,7 +37,7 @@ export default function RGBBalanceCard(props: RGBBalanceCardProps) {
         quantity={
           pendingOnly ? (
             <Row itemsCenter gap="sm">
-              <Text text={pendingBalanceStr} size="xs" color="gold" digital />
+              <Text text={pendingBalanceStr} size="xs" digital />
               <Text text={`(${t('pending')})`} size="xxs" color="gold" />
             </Row>
           ) : (
