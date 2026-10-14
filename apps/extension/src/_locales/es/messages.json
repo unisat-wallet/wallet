@@ -2935,7 +2935,7 @@
     "message": "Mantén al menos 3000 sats disponibles para crear 5 UTXO RGB. Puede requerirse más si las comisiones de red son altas."
   },
   "not_enough_btc_for_rgb_utxo": {
-    "message": "El BTC disponible es inferior al importe estimado necesario para esta transacción."
+    "message": "El saldo de BTC es insuficiente."
   },
   "create_invoice": {
     "message": "Crear factura"

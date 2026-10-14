@@ -53,7 +53,7 @@ function FeeRateValue({ feeRate }: { feeRate: number }) {
   );
 }
 
-export function FeeRateBar({ readonly }: { readonly?: boolean }) {
+export function FeeRateBar({ readonly, autoFocus = true }: { readonly?: boolean; autoFocus?: boolean }) {
   const {
     feeOptions,
     feeOptionIndex,
@@ -199,7 +199,7 @@ export function FeeRateBar({ readonly }: { readonly?: boolean }) {
           onAmountInputChange={(amount) => {
             adjustFeeRateInput(amount);
           }}
-          autoFocus={true}
+          autoFocus={autoFocus}
           enableStepper={true}
           step={0.01}
           min={supportLowFeeMode ? 0.1 : 1}

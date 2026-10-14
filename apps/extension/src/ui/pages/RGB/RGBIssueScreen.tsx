@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { Column, Content, Header, Icon, Layout, Text, Tooltip } from '@/ui/components';
 import { FeeRateBar } from '@/ui/components/FeeRateBar';
@@ -6,7 +6,7 @@ import LoadingPage from '@/ui/components/LoadingPage';
 import type { SignedData, SignPsbtParams, ToSignData } from '@unisat/wallet-shared';
 import {
   useCurrentAccount,
-  useAccountBalance,
+  useChain,
   useFeeRateBar,
   useI18n,
   useNavigation,
@@ -212,7 +212,9 @@ export default function RGBIssueScreen() {
   const tools = useTools();
   const { t } = useI18n();
   const currentAccount = useCurrentAccount();
-  const accountBalance = useAccountBalance();
+  const chain = useChain();
+  const fundingRequestRef = useRef(0);
+  const [availableFundingSats, setAvailableFundingSats] = useState<number>();
   const { requestWrite, writeLeaseModal } = useRgbWriteLeaseGuard();
   const { feeRate } = useFeeRateBar();
   const [ticker, setTicker] = useState('');
@@ -249,7 +251,7 @@ export default function RGBIssueScreen() {
   const isFeeRateValid = Number.isFinite(feeRate) && feeRate > 0;
   const estimatedFundingSats = estimateRgbUtxoCreateMinSats(feeRate);
   const insufficientBtcForFunding =
-    availableIssueUtxoCount === 0 && accountBalance.availableBalance < estimatedFundingSats;
+    !fundingLoading && availableIssueUtxoCount === 0 && availableFundingSats !== undefined && availableFundingSats < estimatedFundingSats;
   const canIssue =
     !isFormLocked &&
     !fundingLoading &&
@@ -261,29 +263,36 @@ export default function RGBIssueScreen() {
   const displaySupply = formatSupply(amount.trim() || '0', assetTicker);
 
   const refreshFundingState = useCallback(async () => {
+    const request = ++fundingRequestRef.current;
     setFundingLoading(true);
+    setAvailableFundingSats(undefined);
     setAvailableIssueUtxoCount(undefined);
     try {
-      const [funding, summary] = await Promise.all([
+      const [funding, summary, balance] = await Promise.all([
         wallet.getRgbFundingAddress(),
-        wallet.getRgbAllocationSummary({ skipSync: false })
+        wallet.getRgbAllocationSummary({ skipSync: false }),
+        wallet.getAddressBalanceV2(currentAccount.address)
       ]);
+      if (request !== fundingRequestRef.current) return;
+      setAvailableFundingSats(balance.availableBalance);
       setFundingAddress(funding.address);
       setAvailableIssueUtxoCount(getAvailableAllocationCount(summary as RgbAllocationSummary));
     } catch (e: unknown) {
+      if (request !== fundingRequestRef.current) return;
       setFundingAddress('');
       setAvailableIssueUtxoCount(undefined);
       setOperationError(getErrorMessage(e, t('unknown_error')));
     } finally {
-      setFundingLoading(false);
+      if (request === fundingRequestRef.current) setFundingLoading(false);
     }
-  }, [t, wallet]);
+  }, [t, wallet, currentAccount.address, chain.enum]);
 
   useEffect(() => {
     setIssueResult(undefined);
     setFundingTxid('');
     setOperationError('');
     void refreshFundingState();
+    return () => { fundingRequestRef.current += 1; };
   }, [currentAccount?.key, refreshFundingState]);
 
   const issueAsset = useCallback(async () => {
@@ -465,6 +474,15 @@ export default function RGBIssueScreen() {
       <Header onBack={() => nav.goBack()} title={t('issue_rgb_asset')} />
       <Content style={{ backgroundColor: '#070706', padding: '12px 16px 112px' }}>
         <main className="rgb-issue-page">
+          {insufficientBtcForFunding ? (
+            <Text
+              text={`${t('not_enough_btc_for_rgb_utxo')} ${t('rgb_utxo_recommended_balance')}`}
+              wrap
+              size="xs"
+              color="danger"
+              style={{ marginBottom: 16 }}
+            />
+          ) : null}
           <Text
             text={t('issue_rgb_asset_desc')}
             size="sm"
@@ -546,16 +564,9 @@ export default function RGBIssueScreen() {
             {availableIssueUtxoCount === 0 ? (
               <>
                 <div className="rgb-issue-fee-section">
-                  <FeeRateBar />
+                  <FeeRateBar autoFocus={false} />
                 </div>
-                {insufficientBtcForFunding ? (
-                  <Text
-                    text={`${t('not_enough_btc_for_rgb_utxo')} ${t('rgb_utxo_recommended_balance')}`}
-                    wrap
-                    size="xs"
-                    color="danger"
-                  />
-                ) : null}
+
               </>
             ) : null}
           </Column>

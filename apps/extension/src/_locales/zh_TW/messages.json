@@ -3004,7 +3004,7 @@
     "message": "建立 5 個 RGB UTXO 建議至少準備 3,000 sats；網路費較高時可能需要更多。"
   },
   "not_enough_btc_for_rgb_utxo": {
-    "message": "目前可用 BTC 低於此交易的預估所需金額。"
+    "message": "BTC 餘額不足。"
   },
   "create_invoice": {
     "message": "建立發票"
