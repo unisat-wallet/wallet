@@ -72,6 +72,21 @@ const recipientTypeTagStyle = {
   boxSizing: 'border-box' as const
 };
 
+function getInvoiceErrorMessage(error: unknown, fallback: string): string {
+  const seen = new Set<unknown>();
+  const read = (value: unknown): string | undefined => {
+    if (typeof value === 'string') {
+      const message = value.trim();
+      return message && message !== 'Object' && message !== '[object Object]' ? message : undefined;
+    }
+    if (!value || typeof value !== 'object' || seen.has(value)) return undefined;
+    seen.add(value);
+    const detail = value as Record<string, unknown>;
+    return read(detail.message) || read(detail.msg) || read(detail.error) || read(detail.cause);
+  };
+  return read(error) || fallback;
+}
+
 export default function RGBInvoiceDetailScreen() {
   const wallet = useWallet();
   const nav = useNavigation();
@@ -101,11 +116,11 @@ export default function RGBInvoiceDetailScreen() {
       );
       setInvoice(item as RgbPendingReceiveInvoice | undefined);
     } catch (error) {
-      tools.toastError(error instanceof Error ? error.message : String(error));
+      tools.toastError(getInvoiceErrorMessage(error, t('unknown_error')));
     } finally {
       setLoading(false);
     }
-  }, [recipientId, routeInvoice, tools, wallet]);
+  }, [recipientId, routeInvoice, t, tools, wallet]);
 
   useEffect(() => {
     // The create-invoice response is already a complete public invoice view.
@@ -152,7 +167,7 @@ export default function RGBInvoiceDetailScreen() {
         ) as RgbPendingReceiveInvoice | undefined
       );
     } catch (error) {
-      tools.toastError(error instanceof Error ? error.message : String(error));
+      tools.toastError(getInvoiceErrorMessage(error, t('unknown_error')));
     } finally {
       setReleasing(false);
     }
@@ -185,7 +200,7 @@ export default function RGBInvoiceDetailScreen() {
       await copyToClipboard(invoiceText);
       tools.toastSuccess(t('copied'));
     } catch (error) {
-      tools.toastError(error instanceof Error ? error.message : String(error));
+      tools.toastError(getInvoiceErrorMessage(error, t('unknown_error')));
     }
   };
 
