@@ -3386,8 +3386,8 @@
   "release_invoice_confirm_title": {
     "message": "Release this invoice?"
   },
-  "release_invoice_confirm_description": {
-    "message": "This will free the reserved UTXO. The invoice will no longer be available."
+  "remove_invoice_confirm_description": {
+    "message": "Before releasing or deleting this invoice, make sure it is not in use. If someone has already used it to send assets, you may lose those assets."
   },
   "keep_invoice": {
     "message": "Keep Invoice"
@@ -3581,6 +3581,5 @@
   "delete_invoice": { "message": "Delete invoice" },
   "deleting_invoice": { "message": "Deleting invoice…" },
   "delete_witness_invoice_confirm_title": { "message": "Delete witness invoice?" },
-  "delete_witness_invoice_confirm_description": { "message": "After deletion, your wallet will stop monitoring this invoice. If someone sends assets using it, you may not be able to receive them." },
   "use_this_invoice_to_receive_any_rgb_asset": { "message": "Use this invoice to receive any RGB asset." }
 }

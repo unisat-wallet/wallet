@@ -306,9 +306,7 @@ export default function RGBInvoiceDetailScreen() {
               textCenter
             />
             <Text
-              text={t(
-                isWitnessInvoice ? 'delete_witness_invoice_confirm_description' : 'release_invoice_confirm_description'
-              )}
+              text={t('remove_invoice_confirm_description')}
               color="white_muted2"
               size="sm"
               wrap
@@ -321,18 +319,14 @@ export default function RGBInvoiceDetailScreen() {
                     ? t(isWitnessInvoice ? 'deleting_invoice' : 'releasing_invoice')
                     : t(isWitnessInvoice ? 'delete_invoice' : 'release_invoice')
                 }
-                preset={isWitnessInvoice ? 'danger' : 'default'}
+                preset="default"
                 disabled={releasing}
                 onClick={() => {
                   void requestWrite(() => void removeInvoice());
                 }}
                 full
-                style={
-                  isWitnessInvoice
-                    ? { height: 48 }
-                    : { height: 48, background: 'transparent', border: '1px solid rgba(255,255,255,0.42)' }
-                }
-                textStyle={isWitnessInvoice ? undefined : { color: colors.white, fontWeight: 'normal' }}
+                style={{ height: 48, background: 'transparent', border: '1px solid rgba(255,255,255,0.42)' }}
+                textStyle={{ color: colors.white, fontWeight: 'normal' }}
               />
               <Button
                 text={t('keep_invoice')}

@@ -3363,8 +3363,8 @@
   "release_invoice_confirm_title": {
     "message": "¿Liberar esta factura?"
   },
-  "release_invoice_confirm_description": {
-    "message": "Esto liberará el UTXO reservado. La factura ya no estará disponible."
+  "remove_invoice_confirm_description": {
+    "message": "Antes de liberar o eliminar esta factura, asegúrate de que no esté en uso. Si alguien ya la usó para enviar activos, podrías perderlos."
   },
   "keep_invoice": {
     "message": "Conservar factura"
@@ -3493,6 +3493,5 @@
   "delete_invoice": { "message": "Eliminar factura" },
   "deleting_invoice": { "message": "Eliminando factura…" },
   "delete_witness_invoice_confirm_title": { "message": "¿Eliminar la factura witness?" },
-  "delete_witness_invoice_confirm_description": { "message": "Después de eliminarla, tu cartera dejará de supervisar esta factura. Si alguien envía activos mediante ella, es posible que no puedas recibirlos." },
   "use_this_invoice_to_receive_any_rgb_asset": { "message": "Usa esta factura para recibir cualquier activo RGB." }
 }
