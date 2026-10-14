@@ -3505,7 +3505,5 @@
   "delete_invoice": { "message": "Supprimer la facture" },
   "deleting_invoice": { "message": "Suppression de la facture…" },
   "delete_witness_invoice_confirm_title": { "message": "Supprimer la facture witness ?" },
-  "use_this_invoice_to_receive_any_rgb_asset": { "message": "Utilisez cette facture pour recevoir n’importe quel actif RGB." },
-  "rgb_updates_automatically": { "message": "Mise à jour automatique" },
-  "rgb_incoming_pending": { "message": "Réception en attente" }
+  "use_this_invoice_to_receive_any_rgb_asset": { "message": "Utilisez cette facture pour recevoir n’importe quel actif RGB." }
 }

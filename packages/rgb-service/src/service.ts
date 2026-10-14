@@ -763,14 +763,14 @@ export class RgbService {
   }
 
   getPendingAssetMetadata() {
-    return this.requireState().pendingAssetMetadata || []
+    return (this.requireState().pendingAssetMetadata || []).filter(item => !item.synced)
   }
 
   async markAssetMetadataSynced(assetId: string) {
     const state = this.requireState()
     const normalized = normalizeAssetId(assetId)
     const pending = state.pendingAssetMetadata || []
-    const next = pending.filter(item => item.assetId !== normalized)
+    const item = pending.find(candidate => candidate.assetId === normalized)
     let markedReceive = false
     for (const receive of state.pendingReceives || []) {
       const receivedAssetId = receive.receivedConsignment?.assetId
@@ -783,8 +783,14 @@ export class RgbService {
         markedReceive = true
       }
     }
-    if (next.length === pending.length && !markedReceive) return
-    state.pendingAssetMetadata = next
+    if (!item && !markedReceive) return
+    if (item) {
+      if (state.contracts?.[normalized]?.metadata) {
+        state.pendingAssetMetadata = pending.filter(candidate => candidate !== item)
+      } else {
+        item.synced = true
+      }
+    }
     await this.persist()
   }
 
@@ -1796,6 +1802,9 @@ export class RgbService {
         updatedAt: this.now(),
       },
     }
+    state.pendingAssetMetadata = state.pendingAssetMetadata?.filter(
+      item => item.assetId !== input.assetId || !item.synced
+    )
   }
 
   getContractGenesis(assetId: string) {
@@ -1925,8 +1934,27 @@ export class RgbService {
     }
   ): RgbLocalAssetDetail {
     const state = this.requireState()
-    const metadata = state.contracts?.[assetId]?.metadata ||
+    const knownMetadata = state.contracts?.[assetId]?.metadata ||
       state.pendingAssetMetadata?.find(item => item.assetId === assetId)?.metadata
+    // Older installations removed indexed metadata before the Bitcoin
+    // transaction confirmed. The accepted receipt still has the validated
+    // consignment, so recover its display metadata locally.
+    const receipt = knownMetadata ? undefined : state.pendingReceives?.find(receive =>
+      receive.receivedConsignment?.assetId === assetId &&
+      receive.receivedConsignment?.accepted &&
+      receive.receivedConsignment.payload
+    )?.receivedConsignment
+    let receiptMetadata: RgbPendingAssetMetadata['metadata'] | undefined
+    if (receipt?.payload) {
+      try {
+        receiptMetadata = decodeNiaConsignment(
+          Uint8Array.from(Buffer.from(receipt.payload, 'base64'))
+        ).metadata
+      } catch {
+        // Older incomplete receipts still render the pending amount.
+      }
+    }
+    const metadata = knownMetadata || receiptMetadata
     return {
       assetId,
       balance: amount.settled.toString(),
@@ -3205,7 +3233,10 @@ export class RgbService {
         key =>
           existing.metadata[key as keyof typeof metadata] !== metadata[key as keyof typeof metadata]
       )
-      if (changed) existing.metadata = metadata
+      if (changed) {
+        existing.metadata = metadata
+        existing.synced = false
+      }
       return changed
     }
     pending.push({ assetId: normalized, metadata })

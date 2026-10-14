@@ -348,6 +348,8 @@ export interface RgbContractMetadata {
 export interface RgbPendingAssetMetadata {
   assetId: string
   metadata: RgbContractMetadata
+  /** Indexed metadata stays available locally until the receive is settled. */
+  synced?: boolean
 }
 
 export interface RgbServiceState {
@@ -392,7 +394,7 @@ export interface RgbServiceState {
   pendingUtxoSync?: RgbPendingUtxoSync
   pendingIssues?: RgbPendingIssue[]
   issueHistory?: RgbIssueHistoryItem[]
-  /** Asset metadata learned from received consignments and waiting for indexing. */
+  /** Asset metadata learned from received consignments, retained until settlement. */
   pendingAssetMetadata?: RgbPendingAssetMetadata[]
   /** Unconfirmed fee-pool outputs retained until the address indexer exposes them. */
   pendingFeePoolUtxos?: RgbFeePoolUtxo[]

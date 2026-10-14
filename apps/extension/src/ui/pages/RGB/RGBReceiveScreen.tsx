@@ -465,9 +465,6 @@ export default function RGBReceiveScreen({ initialStep = 'create_invoice' }: { i
             {awaitingSenderBroadcast ? <Text text={t('rgb_status_waiting_receive')} color="gold" size="xs" /> : null}
             {awaitingSenderConfirmation ? <Text text={t('rgb_status_confirming')} color="gold" size="xs" /> : null}
             {awaitingConfirmation ? <Text text={t('transaction_unconfirmed')} color="gold" size="xs" /> : null}
-            {(awaitingAcceptance || awaitingSenderBroadcast || awaitingSenderConfirmation || awaitingConfirmation) ? (
-              <Text text={t('rgb_updates_automatically')} color="textDim" size="xs" />
-            ) : null}
           </Column>
         </Row>
         <div

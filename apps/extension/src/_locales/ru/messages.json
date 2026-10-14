@@ -3501,7 +3501,5 @@
   "delete_invoice": { "message": "Удалить инвойс" },
   "deleting_invoice": { "message": "Удаление инвойса…" },
   "delete_witness_invoice_confirm_title": { "message": "Удалить witness-инвойс?" },
-  "use_this_invoice_to_receive_any_rgb_asset": { "message": "Используйте этот инвойс для получения любого RGB-актива." },
-  "rgb_updates_automatically": { "message": "Обновляется автоматически" },
-  "rgb_incoming_pending": { "message": "Ожидается поступление" }
+  "use_this_invoice_to_receive_any_rgb_asset": { "message": "Используйте этот инвойс для получения любого RGB-актива." }
 }

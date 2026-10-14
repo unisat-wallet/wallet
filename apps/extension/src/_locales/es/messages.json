@@ -3494,7 +3494,5 @@
   "delete_invoice": { "message": "Eliminar factura" },
   "deleting_invoice": { "message": "Eliminando factura…" },
   "delete_witness_invoice_confirm_title": { "message": "¿Eliminar la factura witness?" },
-  "use_this_invoice_to_receive_any_rgb_asset": { "message": "Usa esta factura para recibir cualquier activo RGB." },
-  "rgb_updates_automatically": { "message": "Se actualiza automáticamente" },
-  "rgb_incoming_pending": { "message": "Recepción pendiente" }
+  "use_this_invoice_to_receive_any_rgb_asset": { "message": "Usa esta factura para recibir cualquier activo RGB." }
 }

@@ -7,7 +7,14 @@ import type {
   RgbWalletRef,
   RgbWalletSnapshot,
 } from '../src'
-import { RgbInsufficientBalanceError, RgbService, RgbServiceError } from '../src'
+import {
+  encodeNiaContract,
+  encodeNiaGenesis,
+  encodeRgbContractId,
+  RgbInsufficientBalanceError,
+  RgbService,
+  RgbServiceError,
+} from '../src'
 
 const wallet: RgbWalletRef = {
   walletId: 'rgb-wallet-1',
@@ -725,6 +732,15 @@ describe('RgbService', () => {
 
     expect((service as any).state.pendingReceives[0]).toMatchObject({ assetMetadataIndexed: true })
     expect(service.getPendingAssetMetadata()).toEqual([])
+    expect(service.getLocalAssetDetail('rgb:asset')).toMatchObject({
+      ticker: 'TOK', name: 'Token', precision: 0,
+    })
+    const reopened = new RgbService(dependencies)
+    await reopened.open(wallet)
+    expect(reopened.getPendingAssetMetadata()).toEqual([])
+    expect(reopened.getLocalAssetDetail('rgb:asset')).toMatchObject({
+      ticker: 'TOK', name: 'Token', precision: 0,
+    })
     dependencies.transport.getConsignment = vi.fn().mockResolvedValue({
       recipientId: 'recipient',
       payload: 'consignment',
@@ -743,6 +759,37 @@ describe('RgbService', () => {
     await service.processClaimedReceives({ includeClaimed: false })
 
     expect(service.getPendingAssetMetadata()).toEqual([])
+  })
+
+  it('recovers the name from an accepted receipt when an older wallet already removed indexed metadata', async () => {
+    const genesis = encodeNiaGenesis({
+      ticker: 'ARRIVE',
+      name: 'Arriving Asset',
+      precision: 2,
+      timestamp: 1_713_261_744,
+      network: 'mainnet',
+      allocations: [{ txid: 'a'.repeat(64), vout: 0, blinding: 1n, amount: 100n }],
+    })
+    const assetId = encodeRgbContractId(genesis.assetId)
+    const service = new RgbService(createDependencies())
+    await service.open(wallet)
+    ;(service as any).state.pendingReceives = [{
+      recipientId: 'recipient',
+      createdAt: 1,
+      receivedConsignment: {
+        accepted: true,
+        assetId,
+        amount: '2',
+        txid: 'b'.repeat(64),
+        receivedAt: 1,
+        payload: Buffer.from(encodeNiaContract(genesis).strict).toString('base64'),
+      },
+    }]
+
+    expect(service.getLocalAssetBalance(assetId)).toMatchObject({
+      ticker: 'ARRIVE', name: 'Arriving Asset', precision: 2,
+      pending: '2', incomingPending: '2', spendable: '0',
+    })
   })
 
   it('archives an invalid receive when the proxy ACK is already immutable', async () => {
