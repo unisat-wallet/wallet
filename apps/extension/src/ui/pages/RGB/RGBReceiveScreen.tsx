@@ -683,7 +683,7 @@ export default function RGBReceiveScreen({ initialStep = 'create_invoice' }: { i
                   </Tooltip>
                 </Row>
               </Column>
-              <Icon icon="arrow-left-right" color="gold" size={18} />
+              <Icon icon="invoice-switch" size={18} />
             </Row>
           </Column>
 
@@ -713,7 +713,7 @@ export default function RGBReceiveScreen({ initialStep = 'create_invoice' }: { i
                   </Tooltip>
                 </Row>
               </Column>
-              {canSetFixedAmount ? <Icon icon="arrow-left-right" color="gold" size={18} /> : null}
+              {canSetFixedAmount ? <Icon icon="invoice-switch" size={18} /> : null}
             </Row>
             {isFixedMode ? (
               <Row itemsCenter gap="lg" style={amountInputContainerStyle}>
@@ -744,7 +744,7 @@ export default function RGBReceiveScreen({ initialStep = 'create_invoice' }: { i
                 <Text text={t('rgb_invoice_expiry')} size="xs" color="textDim" />
                 <Text text={t(selectedExpiryLabel)} size="sm" color="white" />
               </Column>
-              <Icon icon="pencil" color="gold" size={16} />
+              <Icon icon="invoice-edit" size={18} />
             </Row>
           </Column>
 
