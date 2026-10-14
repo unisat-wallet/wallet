@@ -2830,7 +2830,7 @@
     "message": "UTXO 摘要"
   },
   "rgb_utxo_summary_counts": {
-    "message": "{utxos} 個 UTXO · {assets} 個含資產 · {發票} 個已保留給發票"
+    "message": "{utxos} 個 UTXO · {assets} 個含資產 · {invoices} 個已保留給發票"
   },
   "rgb_utxo_invoice_reserved": {
     "message": "已保留給發票"
