@@ -58,6 +58,14 @@ export default function RGBTokenScreen() {
   const spendable =
     tokenBalance?.spendable === undefined ? '--' : toRgbDisplayAmount(tokenBalance.spendable, precision);
   const lockedAmount = toRgbDisplayAmount(tokenBalance?.lockedAmount, precision);
+  const pendingAmount = toRgbDisplayAmount(tokenBalance?.pending, precision);
+  const autoRefreshing =
+    Number(tokenBalance?.pending || 0) > 0 ||
+    activityItems.some(item =>
+      !['settled', 'confirmed', 'failed', 'rejected', 'canceled', 'cancelled'].includes(
+        String(item.status || '').toLowerCase()
+      )
+    );
   const displayBalance =
     lockedAmount
       ? spendable === '0'
@@ -166,6 +174,19 @@ export default function RGBTokenScreen() {
                 color="white"
                 style={{ width: '100%', overflowWrap: 'anywhere' }}
               />
+              {autoRefreshing ? (
+                <Text
+                  text={
+                    Number(tokenBalance?.pending || 0) > 0
+                      ? `${pendingAmount} (${t('pending')}) · ${t('rgb_updates_automatically')}`
+                      : t('rgb_updates_automatically')
+                  }
+                  size="xs"
+                  color="gold"
+                  textCenter
+                  wrap
+                />
+              ) : null}
             </Column>
           </Column>
 

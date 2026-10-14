@@ -36,6 +36,52 @@ describe('RgbWalletCoordinator', () => {
     expect(service.sync).toHaveBeenCalledOnce()
   })
 
+  it('checks pending RGB allocations sooner than settled balances', async () => {
+    const snapshot = {
+      syncedAt: 1,
+      utxos: [{
+        chainStatus: 'mempool',
+        allocations: [{ assetId: 'rgb-asset', amount: '998', settled: false }],
+      }],
+    }
+    const service = {
+      isRecoveryBackupEnabled: vi.fn().mockReturnValue(true),
+      getSnapshot: vi.fn().mockReturnValue(snapshot),
+      hasKnownAssetHistory: vi.fn().mockReturnValue(true),
+      sync: vi.fn().mockResolvedValue(snapshot),
+    }
+    const context = {
+      service,
+      wallet: { walletId: 'wallet-1', fundingAddress: 'bc1p-funding', network: 'mainnet' },
+    }
+    const coordinator = new RgbWalletCoordinator({
+      getContext: vi.fn().mockResolvedValue(context as any),
+      syncIndexerOutbox: vi.fn(),
+      syncReceiveHistory: vi.fn(),
+      tryEnsureWriteLease: vi.fn().mockResolvedValue(true),
+    })
+    const now = Date.now()
+    vi.spyOn(Date, 'now').mockReturnValue(now)
+    try {
+      await coordinator.syncListState()
+      vi.spyOn(Date, 'now').mockReturnValue(now + 9_000)
+      await coordinator.syncListState()
+      expect(service.sync).toHaveBeenCalledTimes(1)
+
+      vi.spyOn(Date, 'now').mockReturnValue(now + 10_000)
+      await coordinator.syncListState()
+      expect(service.sync).toHaveBeenCalledTimes(2)
+
+      snapshot.utxos[0]!.allocations[0]!.settled = true
+      snapshot.utxos[0]!.chainStatus = 'confirmed'
+      vi.spyOn(Date, 'now').mockReturnValue(now + 20_000)
+      await coordinator.syncListState()
+      expect(service.sync).toHaveBeenCalledTimes(2)
+    } finally {
+      vi.restoreAllMocks()
+    }
+  })
+
   it('treats the network and wallet id as part of RGB wallet identity', () => {
     const wallet = {
       walletId: 'wallet-1',

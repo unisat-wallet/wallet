@@ -3365,7 +3365,11 @@ describe('RgbService', () => {
       { txid: 'a'.repeat(64), vout: 0 },
       { txid: 'e'.repeat(64), vout: 1 },
     ])
-    expect(service.getLocalAssetBalance('rgb:asset')).toMatchObject({ balance: '80' })
+    expect(service.getLocalAssetBalance('rgb:asset')).toMatchObject({
+      settled: '40',
+      spendable: '40',
+      pending: '40',
+    })
 
     // The indexer has not yet observed the funding transaction and still
     // reports the spent 60-unit allocation. Do not regress the local balance.

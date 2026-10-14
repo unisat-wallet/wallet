@@ -56,7 +56,7 @@ export function useRGBTokenScreenLogic() {
     loadDetail()
   }, [loadDetail])
 
-  const loadBalance = useCallback(async () => {
+  const loadBalance = useCallback(async (showLoading = true) => {
     if (assetId === '') {
       setFetchedTokenBalance(undefined)
       setBalanceLoading(false)
@@ -64,14 +64,16 @@ export function useRGBTokenScreenLogic() {
       return
     }
 
-    setFetchedTokenBalance(undefined)
-    setBalanceLoading(true)
-    setBalanceChecked(false)
+    if (showLoading) {
+      setFetchedTokenBalance(undefined)
+      setBalanceLoading(true)
+      setBalanceChecked(false)
+    }
     try {
       const data = await wallet.getRGBAssetBalance('', assetId)
       setFetchedTokenBalance(data)
     } catch (e) {
-      setFetchedTokenBalance(undefined)
+      if (showLoading) setFetchedTokenBalance(undefined)
     } finally {
       setBalanceLoading(false)
       setBalanceChecked(true)
@@ -95,12 +97,18 @@ export function useRGBTokenScreenLogic() {
         return { list: [], total: 0 }
       }
 
-      const activity = await wallet.getRGBAssetActivity('', assetId, page, pageSize, activityType)
-      if (page !== 1) return activity
+      if (page !== 1) {
+        return wallet.getRGBAssetActivity('', assetId, page, pageSize, activityType)
+      }
 
       // Use the same local transfer rows as the full RGB history. Some states
       // (including ready_to_broadcast and canceled) never reach the indexer.
-      const transfers = await wallet.getRgbTransfers(1, 50, { skipSync: true })
+      // This also advances pending receive consignments while the token page
+      // is open; the full RGB history page need not be mounted for progress.
+      const [activity, transfers] = await Promise.all([
+        wallet.getRGBAssetActivity('', assetId, page, pageSize, activityType),
+        wallet.getRgbTransfers(1, 50, { skipSync: false }),
+      ])
       const localItems: RgbActivityItem[] = transfers.list
         .filter(
           transfer =>
@@ -146,6 +154,24 @@ export function useRGBTokenScreenLogic() {
     loadBalance()
     onRefreshActivity()
   }, [loadDetail, loadBalance, onRefreshActivity])
+
+  const hasActiveActivity = activity.some(item =>
+    !['settled', 'confirmed', 'failed', 'rejected', 'canceled', 'cancelled'].includes(
+      String(item.status || '').toLowerCase()
+    )
+  )
+  const hasPendingBalance = hasPositiveAmount(
+    fetchedTokenBalance?.pending ?? tokenBalance?.pending
+  )
+
+  useEffect(() => {
+    if (!hasActiveActivity && !hasPendingBalance) return undefined
+    const intervalId = setInterval(() => {
+      void loadBalance(false)
+      onRefreshActivity()
+    }, 10_000)
+    return () => clearInterval(intervalId)
+  }, [hasActiveActivity, hasPendingBalance, loadBalance, onRefreshActivity])
 
   const latestTokenBalance = fetchedTokenBalance || tokenBalance || detail?.balance
   const resolvedPrecision =
@@ -218,7 +244,7 @@ export function useRGBTokenScreenLogic() {
     detail,
     activity,
     total,
-    loading: detailLoading || balanceLoading || activityLoading,
+    loading: detailLoading || balanceLoading,
     detailLoading,
     balanceLoading,
     activityLoading,

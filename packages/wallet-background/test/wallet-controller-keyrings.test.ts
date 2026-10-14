@@ -2439,6 +2439,24 @@ describe('RGB wallet references', () => {
     })
   })
 
+  it('refreshes the RGB snapshot while a token detail balance is pending', async () => {
+    const wallet = new WalletController()
+    vi.spyOn(wallet, 'getRgbFundingAddress').mockResolvedValue({ address: 'bc1p-rgb-funding' })
+    vi.spyOn(wallet, 'getRgbAssetBalance').mockResolvedValue({
+      assetId: 'rgb:asset',
+      settled: '0',
+      spendable: '0',
+      pending: '998',
+    })
+    vi.spyOn(wallet as any, 'getRgbPendingLockedAmounts').mockResolvedValue(new Map())
+    const syncListState = vi.spyOn(wallet as any, 'syncRgbListState').mockResolvedValue(undefined)
+
+    await expect(wallet.getRGBAssetBalance('', 'rgb:asset')).resolves.toMatchObject({
+      pending: '998',
+    })
+    expect(syncListState).toHaveBeenCalledOnce()
+  })
+
   it('keeps a broadcast RGB history entry locked after it is compacted from pending transfers', async () => {
     const wallet = new WalletController()
     const service = {

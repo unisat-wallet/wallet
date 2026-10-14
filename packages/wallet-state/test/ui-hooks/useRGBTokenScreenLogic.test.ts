@@ -37,6 +37,37 @@ describe('useRGBTokenScreenLogic', () => {
     expect(result.current.enableTransfer).toBe(true)
   })
 
+  it('refreshes a pending token balance automatically while its detail page is open', async () => {
+    vi.useFakeTimers()
+    const { wrapper, wallet } = createHookTestHarness({ routeState: { assetId } })
+    wallet.getRGBAssetDetail.mockResolvedValue(detail)
+    wallet.getRGBAssetBalance
+      .mockResolvedValueOnce({ ...fetchedBalance, spendable: '0', pending: '998' })
+      .mockResolvedValue({ ...fetchedBalance, spendable: '998', pending: '0' })
+    wallet.getRGBAssetActivity.mockResolvedValue({ list: [], total: 0 })
+
+    try {
+      const { result } = renderHook(() => useRGBTokenScreenLogic(), { wrapper })
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(0)
+      })
+      expect(result.current.tokenBalance?.pending).toBe('998')
+
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(10_000)
+      })
+      expect(result.current.tokenBalance).toMatchObject({ spendable: '998', pending: '0' })
+      expect(wallet.getRGBAssetBalance).toHaveBeenCalledTimes(2)
+      expect(wallet.getRGBAssetActivity).toHaveBeenCalledTimes(2)
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(10_000)
+      })
+      expect(wallet.getRGBAssetBalance).toHaveBeenCalledTimes(2)
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
   it('refreshes a route tokenBalance and prefers the latest value', async () => {
     const routeBalance = {
       assetId,
@@ -183,7 +214,7 @@ describe('useRGBTokenScreenLogic', () => {
       ])
     })
     expect(result.current.activityTotal).toBe(2)
-    expect(wallet.getRgbTransfers).toHaveBeenCalledWith(1, 50, { skipSync: true })
+    expect(wallet.getRgbTransfers).toHaveBeenCalledWith(1, 50, { skipSync: false })
   })
 
   it('includes a ready-to-broadcast transfer from the full RGB history', async () => {

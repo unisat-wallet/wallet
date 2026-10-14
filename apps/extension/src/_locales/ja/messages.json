@@ -3507,5 +3507,6 @@
   "delete_invoice": { "message": "Invoiceを削除" },
   "deleting_invoice": { "message": "Invoiceを削除中…" },
   "delete_witness_invoice_confirm_title": { "message": "Witness Invoiceを削除しますか？" },
-  "use_this_invoice_to_receive_any_rgb_asset": { "message": "このInvoiceを使用して任意のRGB資産を受け取ります。" }
+  "use_this_invoice_to_receive_any_rgb_asset": { "message": "このInvoiceを使用して任意のRGB資産を受け取ります。" },
+  "rgb_updates_automatically": { "message": "自動的に更新されます" }
 }

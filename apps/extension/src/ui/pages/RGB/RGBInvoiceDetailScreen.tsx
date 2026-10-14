@@ -266,6 +266,7 @@ export default function RGBInvoiceDetailScreen() {
               color="white"
               size="sm"
             />
+            <Text text={t('rgb_updates_automatically')} color="textDim" size="xs" textCenter />
           </Column>
         ) : null}
         {!loading && !invoiceText ? (

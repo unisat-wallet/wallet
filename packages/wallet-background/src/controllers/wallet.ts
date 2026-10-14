@@ -3650,6 +3650,14 @@ export class WalletController extends BaseController {
   getRGBAssetBalance = async (_address: string, assetId: string) => {
     const { address } = await this.getRgbFundingAddress()
     const balance = await this.getRgbAssetBalance(address, assetId)
+    // A token detail screen may be open without the RGB asset list. Keep its
+    // pending allocation moving while a receive or change output confirms.
+    if (Number(balance?.pending || 0) > 0) {
+      void this.syncRgbListState().catch(error => {
+        if (isRgbWalletLockCancellation(error)) return
+        log.warn('Failed to refresh RGB indexer snapshot while loading asset balance', error)
+      })
+    }
     return balance
       ? this.applyRgbPendingLock(balance, await this.getRgbPendingLockedAmounts())
       : undefined

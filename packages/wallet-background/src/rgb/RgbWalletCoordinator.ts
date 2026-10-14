@@ -40,6 +40,7 @@ type RgbWalletCoordinatorDependencies = {
 }
 
 const LIST_SNAPSHOT_SYNC_INTERVAL = 60_000
+const ACTIVE_SNAPSHOT_SYNC_INTERVAL = 10_000
 const RECEIVE_POLL_INTERVAL = 10_000
 
 /** Owns per-funding-wallet RGB polling, snapshot synchronization, and local locks. */
@@ -109,11 +110,17 @@ export class RgbWalletCoordinator {
       !service.hasKnownAssetHistory()
     ) return
     const key = walletKey(wallet)
+    const hasPendingAllocations = snapshot.utxos.some(utxo =>
+      utxo.allocations.some(allocation => !allocation.settled || utxo.chainStatus === 'mempool')
+    )
+    const minInterval = hasPendingAllocations
+      ? ACTIVE_SNAPSHOT_SYNC_INTERVAL
+      : LIST_SNAPSHOT_SYNC_INTERVAL
     // Avoid a lease round-trip when this is only a render-triggered call that
     // is already covered by an in-flight or recently completed list refresh.
     if (
       this.snapshotSyncing.has(key) ||
-      (this.snapshotSyncAt.get(key) ?? 0) + LIST_SNAPSHOT_SYNC_INTERVAL > Date.now()
+      (this.snapshotSyncAt.get(key) ?? 0) + minInterval > Date.now()
     ) {
       return
     }
@@ -125,7 +132,7 @@ export class RgbWalletCoordinator {
     if (!canWrite) return
 
     try {
-      await this.syncSnapshot(service, wallet, LIST_SNAPSHOT_SYNC_INTERVAL)
+      await this.syncSnapshot(service, wallet, minInterval)
     } catch (error) {
       if (error instanceof RgbTransferAwaitingAckError) return
       throw error

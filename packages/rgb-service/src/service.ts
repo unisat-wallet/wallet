@@ -2519,7 +2519,19 @@ export class RgbService {
       update.createdUtxo &&
       !state.snapshot.utxos.some(utxo => outpointKey(utxo) === outpointKey(update.createdUtxo!))
     ) {
-      state.snapshot.utxos.push(update.createdUtxo)
+      // The change output is known locally after broadcast, but Bitcoin has
+      // not confirmed it yet. Keep it visible as pending until the backend
+      // snapshot verifies the output on-chain.
+      state.snapshot.utxos.push({
+        ...update.createdUtxo,
+        chainStatus: 'mempool',
+        confirmations: 0,
+        allocations: update.createdUtxo.allocations.map(allocation => ({
+          ...allocation,
+          settled: false,
+          spendable: false,
+        })),
+      })
     }
     state.snapshot.syncedAt = this.now()
     const pending = Object.values(state.pending).find(
