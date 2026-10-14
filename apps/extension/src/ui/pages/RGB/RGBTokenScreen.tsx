@@ -162,7 +162,7 @@ export default function RGBTokenScreen() {
                 textCenter
                 size={balanceSize}
                 max2Lines
-                digital
+                disableTranslate
                 color="white"
                 style={{ width: '100%', overflowWrap: 'anywhere' }}
               />

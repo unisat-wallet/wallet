@@ -95,7 +95,7 @@ export function RGBTransferListItem({
 }) {
   const { t } = useI18n();
   const resolvedAssetLabel = assetLabel || item.ticker || item.name || item.assetId?.slice(0, 8) || 'RGB';
-  const assetSymbol = item.ticker?.trim() || resolvedAssetLabel;
+  const assetSymbol = item.ticker?.trim() || item.name?.trim() || '';
   const assetName = item.name?.trim() || '';
   const status = item.status.toLowerCase();
   const pending = isPending(item.status);
@@ -190,7 +190,7 @@ export function RGBTransferListItem({
             ) : (
               <HistoryAmount amount={signedDisplayAmount} color={amountColor} textStyle={{ fontSize: 14, lineHeight: '20px' }} />
             )}
-            {showAssetLabel ? (
+            {showAssetLabel && assetSymbol ? (
               <Text
                 text={assetSymbol}
                 size="sm"
