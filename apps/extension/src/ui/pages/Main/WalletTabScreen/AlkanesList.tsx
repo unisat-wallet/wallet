@@ -10,7 +10,6 @@ export function AlkanesList() {
     <InfiniteList
       data={items}
       total={total}
-      countUnit="asset"
       keyExtractor={(item) => item.alkaneid}
       renderItem={({ item }) => {
         return (

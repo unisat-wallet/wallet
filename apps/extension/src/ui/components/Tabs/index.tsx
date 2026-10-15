@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 
 import { colors } from '@/ui/theme/colors';
 import { spacing, spacingGap } from '@/ui/theme/spacing';
@@ -22,12 +22,15 @@ interface TabsProps {
   tabBar?: React.ReactNode;
   trailingAction?: React.ReactNode;
   hideScrollbar?: boolean;
+  scrollActiveIntoView?: boolean;
   contentGap?: number;
   onTabClick: (key: string) => void;
 }
 
-export function Tabs({ preset, items, defaultActiveKey, activeKey, onTabClick, trailingAction, hideScrollbar, contentGap }: TabsProps) {
+export function Tabs({ preset, items, defaultActiveKey, activeKey, onTabClick, trailingAction, hideScrollbar, scrollActiveIntoView, contentGap }: TabsProps) {
   const [activeTab, setActiveTab] = useState(defaultActiveKey);
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const tabOrder = items.map((item) => item.key).join('|');
 
   const renderedTabs = useRef<Set<string>>(new Set([defaultActiveKey]));
 
@@ -35,6 +38,19 @@ export function Tabs({ preset, items, defaultActiveKey, activeKey, onTabClick, t
     setActiveTab(activeKey);
     renderedTabs.current.add(activeKey);
   }, [activeKey]);
+
+  useLayoutEffect(() => {
+    if (!scrollActiveIntoView || preset === 'style2') return;
+    const container = scrollContainerRef.current;
+    const selected = Array.from(container?.children || []).find(
+      (item) => item.getAttribute('data-testid') === `tab-item-${activeTab}`
+    );
+    if (!container || !selected) return;
+    const viewport = container.getBoundingClientRect();
+    const tab = selected.getBoundingClientRect();
+    if (tab.left < viewport.left) container.scrollLeft -= viewport.left - tab.left;
+    if (tab.right > viewport.right) container.scrollLeft += tab.right - viewport.right;
+  }, [activeTab, tabOrder, preset, scrollActiveIntoView]);
 
   const tabBar = useMemo(() => {
     if (preset == 'style2') {
@@ -86,9 +102,10 @@ export function Tabs({ preset, items, defaultActiveKey, activeKey, onTabClick, t
             ...bleedStyle
           }}>
           <Row style={{ height: 50, gap: 0, alignItems: 'stretch' }}>
-            <Row
-              classname={hideScrollbar ? 'tabs-hidden-scrollbar' : undefined}
-              style={{ flex: 1, minWidth: 0, gap: spacing.medium, paddingLeft: spacing.medium, paddingRight: trailingAction ? 0 : spacing.medium, overflowX: 'auto', scrollbarWidth: hideScrollbar ? 'none' : undefined }}>
+            <div
+              ref={scrollContainerRef}
+              className={hideScrollbar ? 'tabs-hidden-scrollbar' : undefined}
+              style={{ display: 'flex', flex: 1, minWidth: 0, gap: spacing.medium, paddingLeft: spacing.medium, paddingRight: trailingAction ? 0 : spacing.medium, overflowX: 'auto', scrollbarWidth: hideScrollbar ? 'none' : undefined }}>
               {items.map((item) => {
                 const isActiveItem = item.key === activeTab;
                 return (
@@ -111,7 +128,7 @@ export function Tabs({ preset, items, defaultActiveKey, activeKey, onTabClick, t
                   </Row>
                 );
               })}
-            </Row>
+            </div>
             {trailingAction ? <Row style={{ flexShrink: 0, alignItems: 'center', paddingLeft: 8, paddingRight: spacing.medium, backgroundColor: '#070606' }}>{trailingAction}</Row> : null}
           </Row>
           <div

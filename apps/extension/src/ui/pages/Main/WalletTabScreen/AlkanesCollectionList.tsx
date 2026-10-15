@@ -12,7 +12,6 @@ export function AlkanesCollectionList() {
     <InfiniteList
       data={items}
       total={total}
-      countUnit="collection"
       numColumns={device.cardColumnsInList}
       keyExtractor={(item) => item.alkaneid}
       renderItem={({ item }) => {

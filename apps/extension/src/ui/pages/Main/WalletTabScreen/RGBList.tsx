@@ -19,7 +19,6 @@ export function RGBList({ list }: RGBListProps) {
       <InfiniteList
         data={items}
         total={total}
-        countUnit="asset"
         keyExtractor={getAssetId}
         renderItem={({ item, index }) => {
           return (
