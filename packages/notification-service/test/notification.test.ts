@@ -123,13 +123,29 @@ describe('NotificationService', () => {
       expect(results[0].id).toBe('n24')
     })
 
+    it('removes notifications withdrawn from the server', async () => {
+      const stored = {
+        withdrawn: makeItem({ id: 'withdrawn' }),
+        active: makeItem({ id: 'active', readAt: Date.now() }),
+      }
+      const { storage } = await initService(service, {
+        stored,
+        list: [makeItem({ id: 'active' })],
+      })
+
+      const results = await service.getNotifications()
+      expect(results.map(item => item.id)).toEqual(['active'])
+      expect(results[0].readAt).toBe(stored.active.readAt)
+      expect(storage._db['notifications']['withdrawn']).toBeUndefined()
+    })
+
     it('purges read entries older than 7 days', async () => {
       const sevenDaysAgo = Date.now() - 8 * 24 * 60 * 60 * 1000
       const stored = {
         old: makeItem({ id: 'old', readAt: sevenDaysAgo }),
         fresh: makeItem({ id: 'fresh' }),
       }
-      await initService(service, { stored, list: [] })
+      await initService(service, { stored, list: [makeItem({ id: 'old' }), makeItem({ id: 'fresh' })] })
       const results = await service.getNotifications()
       expect(results.find(r => r.id === 'old')).toBeUndefined()
       expect(results.find(r => r.id === 'fresh')).toBeDefined()

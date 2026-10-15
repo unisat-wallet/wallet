@@ -58,11 +58,20 @@ export class NotificationService {
     this.store = {}
   }
 
-  // Fetch from server, merge into local store.
+  // Fetch the published list from the server and keep local read state.
   // Prune read+expired entries, then cap total at MAX_NOTIFICATIONS (keep highest priority / newest).
   getNotifications = async (): Promise<StoredNotification[]> => {
     try {
       const res = await this.api.notification.getList()
+
+      // A successful response is authoritative: deleted or archived notifications
+      // must disappear from the local store too.
+      const publishedIds = new Set(res.list.map(item => item.id))
+      for (const id of Object.keys(this.store)) {
+        if (!publishedIds.has(id)) {
+          delete this.store[id]
+        }
+      }
 
       // Merge server items into local store (server is source of truth for content)
       for (const item of res.list) {
