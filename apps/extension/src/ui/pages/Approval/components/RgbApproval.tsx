@@ -32,6 +32,10 @@ interface Props {
       amount?: string;
       durationSeconds?: number;
       recipientType?: 'blind' | 'witness';
+      ticker?: string;
+      name?: string;
+      precision?: number;
+      orderId?: string;
       invoice?: string;
       receive?: Receive;
     };
@@ -675,6 +679,25 @@ export function RgbPaymentCancel({ params: { session } }: Props) {
       rows={[]}
       confirmText={t('rgb_approval_cancel_payment')}
       confirmPreset="danger"
+    />
+  );
+}
+
+export function RgbIssue({ params: { data, session } }: Props) {
+  const { t } = useI18n();
+  return (
+    <RgbApprovalLayout
+      session={session}
+      title={t('issue_rgb_asset')}
+      description={t('issue_rgb_asset_desc')}
+      rows={[
+        [t('name_label'), data.name || ''],
+        [t('ticker_label'), data.ticker || ''],
+        [t('total_supply'), data.amount || ''],
+        [t('precision_rgb'), String(data.precision ?? 0)],
+        ['Order ID', data.orderId || '']
+      ]}
+      confirmText={t('issue_asset')}
     />
   );
 }

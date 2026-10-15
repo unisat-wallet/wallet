@@ -10,6 +10,7 @@ export { default as SwitchNetwork } from './SwitchNetwork';
 export {
   RgbPayment,
   RgbPaymentCancel,
+  RgbIssue,
   RgbReceive,
   RgbReceiveAccept,
   RgbReceiveReject,

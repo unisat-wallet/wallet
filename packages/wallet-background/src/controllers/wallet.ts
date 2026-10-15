@@ -534,6 +534,7 @@ type RgbCancelReceiveInvoiceResult = {
 
 type RgbIssueNiaRequest = {
   wallet: RgbWalletRef
+  orderId?: string
   ticker: string
   name: string
   precision: number

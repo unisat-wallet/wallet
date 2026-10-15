@@ -651,6 +651,69 @@ class ProviderController extends BaseController {
   @Reflect.metadata('SAFE', true)
   getRgbFeeUtxos = async () => wallet.getRgbFeeUtxos()
 
+  @Reflect.metadata('SAFE', true)
+  getRgbIssueAvailability = async () => wallet.getRgbAllocationSummary({ skipSync: false })
+
+  @Reflect.metadata('APPROVAL', [
+    'SignPsbt',
+    async req => {
+      const params = req.data.params as { feeRate?: number; toSignDatas?: ToSignData[] }
+      const prepared = await wallet.createRgbUtxosBegin({
+        num: 1,
+        ...(params.feeRate === undefined ? {} : { feeRate: params.feeRate }),
+      })
+      params.toSignDatas = [prepared.toSignData]
+    },
+  ])
+  prepareRgbIssueUtxo = async ({ data: { params }, approvalRes }: {
+    data: { params: { toSignDatas?: ToSignData[] } }
+    approvalRes: SignPsbtResult
+  }) => {
+    const signedPsbt = approvalRes[0]?.psbtHex
+    if (!signedPsbt) throw new Error('RGB UTXO signing did not return a PSBT')
+    assertReadonlySignedPsbt(await wallet.getCurrentAccount(), getToSignDatas(params.toSignDatas)[0]!, signedPsbt)
+    return wallet.createRgbUtxosEnd({ signedPsbt })
+  }
+
+  @Reflect.metadata('APPROVAL', ['RgbIssue'])
+  issueRgbNia = async ({ data: { params } }: {
+    data: { params: { orderId: string; ticker: string; name: string; precision: number; amount: string } }
+  }) => {
+    if (!/^[0-9a-f-]{36}$/i.test(params.orderId)) throw new Error('invalid RGB issue order ID')
+    if (!/^[1-9][0-9]*$/.test(params.amount)) throw new Error('invalid RGB issue amount')
+    const chain = CHAINS_MAP[wallet.getChainType()]
+    const walletApiUrl = chain?.endpoints[0]
+    if (!walletApiUrl) throw new Error('RGB issuance orders are unavailable on this network')
+    const currentAccount = await wallet.getCurrentAccount()
+    if (!currentAccount) throw new Error('no current account')
+    const response = await fetch(`${walletApiUrl}/v5/rgb/issue/order/${params.orderId}`)
+    if (!response.ok) throw new Error('unable to verify RGB issuance order')
+    const payload = await response.json() as { code: number; data?: {
+      status: string; network: string; address: string; ticker: string; name: string;
+      precision: number; amount: string; feeSats: number; paymentTxid?: string
+    } }
+    const order = payload.data
+    if (payload.code !== 0 || !order || order.status !== 'paid' ||
+        order.network !== wallet.getChainType() || order.address !== currentAccount.address ||
+        order.ticker !== params.ticker || order.name !== params.name ||
+        order.precision !== params.precision || order.amount !== params.amount ||
+        !Number.isSafeInteger(order.feeSats) || order.feeSats < 546 || !order.paymentTxid) {
+      throw new Error('RGB issuance order does not match a paid wallet order')
+    }
+    const issued = await wallet.createRgbIssueNia({
+      orderId: params.orderId,
+      ticker: params.ticker,
+      name: params.name,
+      precision: params.precision,
+      amounts: [params.amount],
+    })
+    return {
+      assetId: issued.assetId,
+      pendingConfirmation: issued.pendingConfirmation,
+      syncPending: issued.syncPending,
+    }
+  }
+
   @Reflect.metadata('APPROVAL', ['RgbReceive'])
   createRgbReceiveInvoice = async ({
     data: { params },

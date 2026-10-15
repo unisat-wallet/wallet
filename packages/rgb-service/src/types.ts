@@ -328,6 +328,8 @@ export interface RgbPendingIssue {
 /** Durable local record of a self-issued asset, retained after indexing completes. */
 export interface RgbIssueHistoryItem {
   assetId: string
+  /** Paid web issuance order used to make retries idempotent. */
+  orderId?: string
   amount: string
   txid: string
   createdAt: number

@@ -31,10 +31,6 @@ export function RGBHomeTabs({ transfers, list }: RGBHomeTabsProps) {
   const [actionMenuOpen, setActionMenuOpen] = useState(false);
   const [selectedPendingTransfer, setSelectedPendingTransfer] = useState<RgbTransferItem>();
   const [handledTransferIds, setHandledTransferIds] = useState<Set<string>>(() => new Set());
-  const openIssueScreen = () => {
-    setActionMenuOpen(false);
-    nav.navigate('RGBIssueScreen');
-  };
   const openHistoryScreen = () => {
     setActionMenuOpen(false);
     nav.navigate('RGBTransfersScreen');
@@ -213,30 +209,6 @@ export function RGBHomeTabs({ transfers, list }: RGBHomeTabsProps) {
         <BottomModal onClose={() => setActionMenuOpen(false)} bodyStyle={{ padding: 0 }}>
           <Column fullX gap="zero">
             <BottomSheetHeader title={t('more')} onClose={() => setActionMenuOpen(false)} />
-            <div
-              role="button"
-              tabIndex={0}
-              onClick={openIssueScreen}
-              onKeyDown={(event) => {
-                if (event.key === 'Enter' || event.key === ' ') {
-                  event.preventDefault();
-                  openIssueScreen();
-                }
-              }}
-              data-testid="issue-button"
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: 12,
-                width: '100%',
-                padding: '0 20px 24px',
-                boxSizing: 'border-box',
-                cursor: 'pointer'
-              }}
-            >
-              <Icon icon="issue" size={20} />
-              <Text text={t('issue')} size="sm" />
-            </div>
             <div
               role="button"
               tabIndex={0}

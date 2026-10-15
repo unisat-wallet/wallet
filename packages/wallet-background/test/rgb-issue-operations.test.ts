@@ -20,6 +20,33 @@ function fundingUtxo(txid: string, vout: number) {
 }
 
 describe('RgbIssueOperations', () => {
+  it('returns the existing asset when a paid web order is retried', async () => {
+    const service = {
+      sync: vi.fn(),
+      getSnapshot: vi.fn().mockReturnValue({ syncedAt: 1, utxos: [] }),
+      getIssueHistory: vi.fn().mockReturnValue([{
+        orderId: 'f7f0e1f0-0000-4000-8000-000000000001',
+        assetId: 'rgb:existing',
+        chainStatus: 'confirmed',
+      }]),
+      getPendingIssues: vi.fn().mockReturnValue([]),
+      getAvailableIssueUtxos: vi.fn(),
+      queueIssue: vi.fn(),
+    }
+    const operation = new RgbIssueOperations({
+      getContext: vi.fn().mockResolvedValue({ service, wallet }),
+      syncIndexerOutbox: vi.fn(),
+      now: () => 1_700_000_000_000,
+    })
+    const result = await operation.issueNia({
+      orderId: 'f7f0e1f0-0000-4000-8000-000000000001',
+      ticker: 'TOK', name: 'Token', precision: 0, amounts: ['1'],
+    })
+    expect(result.assetId).toBe('rgb:existing')
+    expect(service.getAvailableIssueUtxos).not.toHaveBeenCalled()
+    expect(service.queueIssue).not.toHaveBeenCalled()
+  })
+
   it('rejects an issuance whose combined supply exceeds u64 before queuing it', async () => {
     const service = {
       sync: vi.fn(),

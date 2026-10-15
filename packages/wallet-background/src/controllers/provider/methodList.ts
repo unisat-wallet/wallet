@@ -56,6 +56,15 @@ export type ProviderMethodList = {
     assetId: string
   }
   getRgbFeeUtxos: undefined
+  getRgbIssueAvailability: undefined
+  prepareRgbIssueUtxo: { feeRate?: number }
+  issueRgbNia: {
+    orderId: string
+    ticker: string
+    name: string
+    precision: number
+    amount: string
+  }
   createRgbReceiveInvoice: {
     assetId?: string
     amount?: string

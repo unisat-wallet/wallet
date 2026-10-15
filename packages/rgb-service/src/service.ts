@@ -822,6 +822,7 @@ export class RgbService {
   /** Persist a local issue and its allocation before contacting the indexer. */
   async queueIssue(input: {
     assetId: string
+    orderId?: string
     contract: Uint8Array
     genesis: Uint8Array
     asset: RgbPendingIssue['asset']
@@ -856,6 +857,7 @@ export class RgbService {
     const history = state.issueHistory || (state.issueHistory = [])
     const historyItem: RgbIssueHistoryItem = {
       assetId,
+      ...(input.orderId ? { orderId: input.orderId } : {}),
       amount: input.asset.issuedSupply,
       txid: input.utxoSync.txid,
       createdAt: this.now(),
@@ -3466,6 +3468,7 @@ function validateRecoveredState(state: RgbServiceState, currentWallet: RgbWallet
     }
     if (
       !/^(0|[1-9][0-9]*)$/.test(issue.amount) ||
+      (issue.orderId !== undefined && !/^[0-9a-f-]{36}$/i.test(issue.orderId)) ||
       !/^[0-9a-f]{64}$/i.test(issue.txid) ||
       !Number.isSafeInteger(issue.createdAt) ||
       issue.createdAt < 0 ||

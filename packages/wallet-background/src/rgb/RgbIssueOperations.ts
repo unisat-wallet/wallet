@@ -20,6 +20,7 @@ type RgbIssueOperationsDependencies = {
 }
 
 export type RgbIssueNiaParams = {
+  orderId?: string
   ticker: string
   name: string
   precision: number
@@ -45,6 +46,18 @@ export class RgbIssueOperations {
     await service.sync()
     await this.dependencies.assertContext?.(context)
     const snapshot = service.getSnapshot()
+    if (params.orderId) {
+      const previous = service.getIssueHistory().find(issue => issue.orderId === params.orderId)
+      if (previous) {
+        return {
+          assetId: previous.assetId,
+          genesis: '',
+          contract: '',
+          pendingConfirmation: previous.chainStatus !== 'confirmed',
+          syncPending: service.getPendingIssues().some(issue => issue.assetId === previous.assetId),
+        }
+      }
+    }
     const amounts = params.amounts.map(value => toPositiveAtomicAmount(value))
     if (!amounts.length) throw new Error('RGB issuance requires at least one allocation')
     if (amounts.reduce((total, amount) => total + amount, 0n) > MAX_RGB_ISSUED_SUPPLY) {
@@ -107,6 +120,7 @@ export class RgbIssueOperations {
     })
     await service.queueIssue({
       assetId,
+      ...(params.orderId ? { orderId: params.orderId } : {}),
       contract: contract.strict,
       genesis: genesis.strict,
       asset: {
