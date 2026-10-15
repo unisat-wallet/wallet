@@ -2139,6 +2139,15 @@
   "sighash_none_risk_title": {
     "message": "偵測到SIGHASH_NONE"
   },
+  "sighash_single_warning_title": {
+    "message": "使用 SIGHASH_SINGLE 簽署的輸入"
+  },
+  "sighash_single_warning_description": {
+    "message": "每個簽名僅承諾與該輸入相同序號的輸出。其他輸出可能在簽名後變更。請確認交易來源與簽名範圍。"
+  },
+  "sighash_single_anyonecanpay_description": {
+    "message": "ANYONECANPAY 也允許其他輸入在簽名後變更。"
+  },
   "sign": {
     "message": "簽署"
   },

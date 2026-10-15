@@ -16,4 +16,4 @@ export * from './transaction'
 export * from './types'
 
 // PSBT utilities
-export { PsbtDecoder, type FeeRateThresholds } from './decode-psbt'
+export { PsbtDecoder, getSighashSingleInputIndexes, type FeeRateThresholds } from './decode-psbt'

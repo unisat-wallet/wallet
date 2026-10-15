@@ -3169,6 +3169,7 @@ export class WalletController extends BaseController {
     let totalInput = 0
     let completedCount = 0
     let hasSighashNone = false
+    let hasSighashSingle = false
     let parseErrorCount = 0
     const items: LocalPsbtSummary['items'] = []
 
@@ -3203,6 +3204,9 @@ export class WalletController extends BaseController {
 
         const itemHasSighashNone = result.risks.some(r => r.type === RiskType.SIGHASH_NONE)
         if (itemHasSighashNone) hasSighashNone = true
+        const itemHasSighashSingle =
+          txHelpers.getSighashSingleInputIndexes(toSignData, result.inputInfos).length > 0
+        if (itemHasSighashSingle) hasSighashSingle = true
 
         const itemTotalInput = result.inputInfos.reduce((sum, v) => sum + v.value, 0)
         if (result.isCompleted) {
@@ -3222,6 +3226,7 @@ export class WalletController extends BaseController {
           totalInput: itemTotalInput,
           isCompleted: result.isCompleted,
           hasSighashNone: itemHasSighashNone,
+          hasSighashSingle: itemHasSighashSingle,
           parseError: false,
         })
       } catch (e) {
@@ -3235,6 +3240,7 @@ export class WalletController extends BaseController {
           totalInput: 0,
           isCompleted: false,
           hasSighashNone: false,
+          hasSighashSingle: false,
           parseError: true,
         })
       }
@@ -3260,6 +3266,7 @@ export class WalletController extends BaseController {
       totalInput,
       completedCount,
       hasSighashNone,
+      hasSighashSingle,
       parseErrorCount,
       hasAssets,
       items,

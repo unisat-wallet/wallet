@@ -2136,6 +2136,15 @@
   "sighash_none_risk_title": {
     "message": "SIGHASH_NONE detectado"
   },
+  "sighash_single_warning_title": {
+    "message": "Entradas firmadas con SIGHASH_SINGLE"
+  },
+  "sighash_single_warning_description": {
+    "message": "Cada firma solo vincula la salida con el mismo índice que su entrada. Las demás salidas pueden cambiar después de firmar. Compruebe el origen de la transacción y el alcance de la firma."
+  },
+  "sighash_single_anyonecanpay_description": {
+    "message": "ANYONECANPAY también permite cambiar otras entradas después de firmar."
+  },
   "sign": {
     "message": "Firmar"
   },

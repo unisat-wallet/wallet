@@ -2136,6 +2136,15 @@
   "sighash_none_risk_title": {
     "message": "Обнаружен SIGHASH_NONE"
   },
+  "sighash_single_warning_title": {
+    "message": "Входы с подписью SIGHASH_SINGLE"
+  },
+  "sighash_single_warning_description": {
+    "message": "Каждая подпись закрепляет только выход с тем же индексом, что и вход. Остальные выходы могут измениться после подписания. Проверьте источник транзакции и область действия подписи."
+  },
+  "sighash_single_anyonecanpay_description": {
+    "message": "ANYONECANPAY также позволяет изменять другие входы после подписания."
+  },
   "sign": {
     "message": "Подписать"
   },

@@ -7,12 +7,14 @@ import { useIncrementalList } from './useIncrementalList';
 
 export function InputsList({
   toSignData,
+  sighashSingleInputIndexes,
   decodedPsbt,
   runesPriceMap,
   resetKey,
   setContractPopoverData
 }: {
   toSignData: ToSignData;
+  sighashSingleInputIndexes: number[];
   decodedPsbt: DecodedPsbt;
   runesPriceMap: { [key: string]: TickPriceItem } | undefined;
   resetKey: string;
@@ -42,6 +44,7 @@ export function InputsList({
                 decodedPsbt={decodedPsbt}
                 setContractPopoverData={setContractPopoverData}
                 toSignData={toSignData}
+                isSighashSingle={sighashSingleInputIndexes.includes(index)}
                 runesPriceMap={runesPriceMap}
               />
             );

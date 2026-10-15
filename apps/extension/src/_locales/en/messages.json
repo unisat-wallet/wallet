@@ -2142,6 +2142,15 @@
   "sighash_none_risk_title": {
     "message": "SIGHASH_NONE detected"
   },
+  "sighash_single_warning_title": {
+    "message": "Inputs using SIGHASH_SINGLE"
+  },
+  "sighash_single_warning_description": {
+    "message": "Among transaction outputs, each signature commits only to the output with the same index as its input. Other outputs may change after signing. Check the transaction source and signing scope."
+  },
+  "sighash_single_anyonecanpay_description": {
+    "message": "ANYONECANPAY also allows other inputs to change after signing."
+  },
   "sign": {
     "message": "Sign"
   },

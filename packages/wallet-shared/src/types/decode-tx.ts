@@ -90,6 +90,7 @@ export interface PsbtLocalInfo {
   totalInput: number
   isCompleted: boolean
   hasSighashNone: boolean
+  hasSighashSingle: boolean
   parseError: boolean
 }
 
@@ -100,6 +101,7 @@ export interface LocalPsbtSummary {
   totalInput: number
   completedCount: number
   hasSighashNone: boolean
+  hasSighashSingle: boolean
   parseErrorCount: number
   /** True if any input UTXO carries inscriptions, runes, or alkanes */
   hasAssets: boolean

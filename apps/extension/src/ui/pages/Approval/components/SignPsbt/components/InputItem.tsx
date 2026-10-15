@@ -24,6 +24,7 @@ export function InputItem(props: {
   outputInfo?: DecodedPsbtOutput;
   decodedPsbt: DecodedPsbt;
   toSignData?: ToSignData;
+  isSighashSingle?: boolean;
   brc20PriceMap?: Record<string, TickPriceItem>;
   runesPriceMap?: Record<string, TickPriceItem>;
   setContractPopoverData: (data: any) => void;
@@ -130,6 +131,16 @@ export function InputItem(props: {
                   <Row style={{ borderWidth: 1, borderColor: 'gold', borderRadius: 5, padding: 2 }}>
                     <Text text={t('to_sign')} color="gold" size="xxs" />
                   </Row>
+                </Row>
+              )}
+              {inputInfo && props.isSighashSingle && (
+                <Row style={{ padding: '2px 4px', backgroundColor: 'rgba(244, 182, 44, 0.15)', borderRadius: 4 }}>
+                  <Text text="SIGHASH_SINGLE" color="warning" size="xxs" />
+                </Row>
+              )}
+              {inputInfo && props.isSighashSingle && (inputInfo.sighashType & 0x80) !== 0 && (
+                <Row style={{ padding: '2px 4px', backgroundColor: 'rgba(244, 182, 44, 0.15)', borderRadius: 4 }}>
+                  <Text text="ANYONECANPAY" color="warning" size="xxs" />
                 </Row>
               )}
             </Row>

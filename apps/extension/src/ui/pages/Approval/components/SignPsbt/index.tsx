@@ -13,6 +13,7 @@ import KeystoneSignScreen from '@/ui/pages/Wallet/KeystoneSignScreen';
 import { fontSizes } from '@/ui/theme/font';
 import { numUtils } from '@unisat/base-utils';
 import { KeystoneSignEnum } from '@unisat/keyring-service/types';
+import { getSighashSingleInputIndexes } from '@unisat/tx-helpers';
 import { AccountSignMethod } from '@unisat/wallet-shared';
 import {
   PsbtLocalInfo,
@@ -70,6 +71,7 @@ function TransactionItem(
                 <BtcUsd sats={psbtInfo.fee} size="xs" />
               </Row>
               {psbtInfo.hasSighashNone && <Text text="SIGHASH_NONE" size="xs" color="red" />}
+              {psbtInfo.hasSighashSingle && <Text text="SIGHASH_SINGLE" size="xs" color="warning" />}
             </Row>
           ) : psbtInfo?.parseError ? (
             <Text text={t('parse_error')} size="xs" color="red" />
@@ -150,6 +152,13 @@ export default function SignPsbt(props: SignPsbtProps) {
   let header = props.header;
 
   const isValidData = isValid && currentDecodedPsbt;
+  const sighashSingleInputIndexes =
+    currentDecodedPsbt && currentToSignData
+      ? getSighashSingleInputIndexes(currentToSignData, currentDecodedPsbt.inputInfos)
+      : [];
+  const hasSighashSingleAnyoneCanPay = sighashSingleInputIndexes.some(
+    (index) => ((currentDecodedPsbt?.inputInfos[index]?.sighashType || 0) & 0x80) !== 0
+  );
   const listResetKey = getIncrementalListResetKey(currentToSignData?.psbtHex || '');
 
   const ForwardTransactionItem = forwardRef(TransactionItem);
@@ -210,6 +219,7 @@ export default function SignPsbt(props: SignPsbtProps) {
     const layoutHeight = Math.ceil((window.innerHeight - 64 - SUMMARY_HEIGHT) / ITEM_HEIGHT) * ITEM_HEIGHT;
 
     const hasSighashNoneRisk = localPsbtSummary?.hasSighashNone;
+    const hasSighashSingle = localPsbtSummary?.hasSighashSingle;
     const hasParseError = localPsbtSummary && localPsbtSummary.parseErrorCount > 0;
 
     return (
@@ -223,7 +233,7 @@ export default function SignPsbt(props: SignPsbtProps) {
               style={{
                 marginTop: 8,
                 padding: '8px 12px',
-                borderColor: hasSighashNoneRisk || hasParseError ? '#ff4d4f' : '#2C2C2C',
+                borderColor: hasSighashNoneRisk || hasParseError ? '#ff4d4f' : hasSighashSingle ? '#F4B62C' : '#2C2C2C',
                 borderWidth: 1,
                 background: '#1A1A1A'
               }}
@@ -232,13 +242,11 @@ export default function SignPsbt(props: SignPsbtProps) {
                 <Column>
                   <Text text={`${t('transaction_count')}: ${toSignDatas.length}`} size="xs" color="textDim" />
                 </Column>
-                {(hasSighashNoneRisk || hasParseError) && (
-                  <Text
-                    text={hasSighashNoneRisk ? `🚫 SIGHASH_NONE` : `🚫 ${t('parse_error')}`}
-                    size="xs"
-                    color="red"
-                  />
-                )}
+                <Row gap="sm" itemsCenter style={{ flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+                  {hasSighashNoneRisk && <Text text="🚫 SIGHASH_NONE" size="xs" color="red" />}
+                  {hasSighashSingle && <Text text="SIGHASH_SINGLE" size="xs" color="warning" />}
+                  {hasParseError && <Text text={`🚫 ${t('parse_error')}`} size="xs" color="red" />}
+                </Row>
               </Row>
             </Card>
           )}
@@ -300,6 +308,22 @@ export default function SignPsbt(props: SignPsbtProps) {
         <Column gap="xl">
           <ActionOverviewSection decodedPsbt={currentDecodedPsbt} action={currentToSignData.action!} />
 
+          {sighashSingleInputIndexes.length > 0 && (
+            <Card style={{ backgroundColor: 'rgba(244, 182, 44, 0.1)', border: '1px solid #F4B62C' }}>
+              <Column gap="sm" fullX>
+                <Text
+                  text={`${t('sighash_single_warning_title')} (${sighashSingleInputIndexes.length})`}
+                  color="warning"
+                  preset="bold"
+                />
+                <Text text={t('sighash_single_warning_description')} size="xs" color="textDim" />
+                {hasSighashSingleAnyoneCanPay && (
+                  <Text text={t('sighash_single_anyonecanpay_description')} size="xs" color="textDim" />
+                )}
+              </Column>
+            </Card>
+          )}
+
           <AssetOverviewSection
             decodedPsbt={currentDecodedPsbt}
             runesPriceMap={runesPriceMap}
@@ -312,6 +336,7 @@ export default function SignPsbt(props: SignPsbtProps) {
                 <InputsList
                   decodedPsbt={currentDecodedPsbt}
                   toSignData={currentToSignData}
+                  sighashSingleInputIndexes={sighashSingleInputIndexes}
                   runesPriceMap={runesPriceMap}
                   resetKey={listResetKey}
                   setContractPopoverData={setContractPopoverData}

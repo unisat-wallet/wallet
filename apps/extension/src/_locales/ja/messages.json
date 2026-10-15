@@ -2136,6 +2136,15 @@
   "sighash_none_risk_title": {
     "message": "SIGHASH_NONEが検出されました"
   },
+  "sighash_single_warning_title": {
+    "message": "SIGHASH_SINGLE で署名する入力"
+  },
+  "sighash_single_warning_description": {
+    "message": "各署名が確定するのは、その入力と同じ番号の出力だけです。他の出力は署名後に変更される可能性があります。取引の送信元と署名範囲を確認してください。"
+  },
+  "sighash_single_anyonecanpay_description": {
+    "message": "ANYONECANPAY では、署名後に他の入力も変更できます。"
+  },
   "sign": {
     "message": "署名"
   },

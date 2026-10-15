@@ -1,11 +1,33 @@
 import { bitcoin, toPsbtNetwork } from '@unisat/wallet-bitcoin'
-import { AlkanesBalance, Risk, RiskType, RuneBalance, ToSignData } from '@unisat/wallet-shared'
+import {
+  AlkanesBalance,
+  DecodedPsbtInput,
+  Risk,
+  RiskType,
+  RuneBalance,
+  ToSignData,
+} from '@unisat/wallet-shared'
 import { NetworkType } from '@unisat/wallet-types'
 
 function isDangerousSighashType(sighashType?: number): boolean {
   if (typeof sighashType !== 'number') return false
   const outputType = sighashType & bitcoin.Transaction.SIGHASH_OUTPUT_MASK
   return outputType === bitcoin.Transaction.SIGHASH_NONE
+}
+
+export function getSighashSingleInputIndexes(
+  toSignData: ToSignData,
+  inputInfos: Pick<DecodedPsbtInput, 'sighashType'>[]
+): number[] {
+  const indexesToSign = new Set(toSignData.toSignInputs.map(input => input.index))
+  return inputInfos.flatMap((input, index) => {
+    // sighashTypes on ToSignInput is an allowlist; the PSBT input selects the actual type.
+    if (!indexesToSign.has(index) || typeof input.sighashType !== 'number') return []
+    return (input.sighashType & bitcoin.Transaction.SIGHASH_OUTPUT_MASK) ===
+      bitcoin.Transaction.SIGHASH_SINGLE
+      ? [index]
+      : []
+  })
 }
 
 interface InputInfo {
@@ -338,5 +360,4 @@ export class PsbtDecoder {
       }
     }
   }
-
 }
