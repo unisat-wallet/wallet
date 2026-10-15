@@ -29,6 +29,8 @@ interface InfiniteListProps<T> {
   rowGap?: number;
   /** Number of items shown per UI page; independent of the fetch batch size. */
   pageSize?: number;
+  /** Keep the current page when the total changes while more data is loaded. */
+  preservePageOnTotalChange?: boolean;
   /** Show the total number of assets above the list. */
   countUnit?: 'asset' | 'collection' | 'inscription';
 }
@@ -51,6 +53,7 @@ export function InfiniteList<T>({
   emptyMarketplacePath,
   rowGap = 8,
   pageSize = 20,
+  preservePageOnTotalChange = false,
   countUnit
 }: InfiniteListProps<T>) {
   const { t } = useI18n();
@@ -75,8 +78,15 @@ export function InfiniteList<T>({
   }, [pagination, data.length]);
 
   useEffect(() => {
-    setPagination({ currentPage: 1, pageSize: pagination.pageSize });
-  }, [total]);
+    if (!preservePageOnTotalChange) {
+      setPagination((current) => ({ currentPage: 1, pageSize: current.pageSize }));
+      return;
+    }
+    setPagination((current) => {
+      const lastPage = Math.max(1, Math.ceil(total / current.pageSize));
+      return current.currentPage > lastPage ? { ...current, currentPage: lastPage } : current;
+    });
+  }, [total, preservePageOnTotalChange]);
 
   useEffect(() => {
     setPagination((current) =>

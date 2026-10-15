@@ -40,6 +40,7 @@ export function RGBTransfersList({ transfers }: RGBTransfersListProps) {
         emptyPreset="assets"
         rowGap={0}
         pageSize={RGB_TRANSFERS_PAGE_SIZE}
+        preservePageOnTotalChange
         renderItem={({ item }) => {
           const displayItem: RgbTransferItem =
             acceptedTransferIds.has(getTransferId(item)) &&

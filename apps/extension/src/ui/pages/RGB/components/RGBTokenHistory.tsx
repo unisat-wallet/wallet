@@ -122,6 +122,7 @@ export function RGBTokenHistory(props: {
           loading={activityLoading}
           rowGap={0}
           pageSize={10}
+          preservePageOnTotalChange
         />
       </Column>
 
