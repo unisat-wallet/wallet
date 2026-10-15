@@ -3018,6 +3018,9 @@
   "not_enough_btc_for_rgb_utxo": {
     "message": "BTC balance is insufficient."
   },
+  "invoice_created": {
+    "message": "Invoice Created"
+  },
   "create_invoice": {
     "message": "Create Invoice"
   },

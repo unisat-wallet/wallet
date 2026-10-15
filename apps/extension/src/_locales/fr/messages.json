@@ -2955,6 +2955,9 @@
   "not_enough_btc_for_rgb_utxo": {
     "message": "Le solde BTC est insuffisant."
   },
+  "invoice_created": {
+    "message": "Facture créée"
+  },
   "create_invoice": {
     "message": "Créer une facture"
   },

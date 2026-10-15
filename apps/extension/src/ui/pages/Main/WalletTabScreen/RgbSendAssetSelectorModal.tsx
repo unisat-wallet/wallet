@@ -16,6 +16,10 @@ function canSendAsset(asset: RgbBalance) {
   return !!asset.assetId && Number(asset.spendable || 0) > 0;
 }
 
+function SelectorChevron() {
+  return <Icon icon="right" size={20} style={{ backgroundColor: 'rgba(255, 255, 255, 0.65)' }} />;
+}
+
 export function RgbSendAssetSelectorModal({
   list,
   onClose,
@@ -31,7 +35,14 @@ export function RgbSendAssetSelectorModal({
     <BottomModal onClose={onClose} bodyStyle={{ padding: 0 }}>
       <Column fullX gap="zero">
         <BottomSheetHeader title={t('select_asset')} onClose={onClose} />
-        <Column fullX style={{ padding: '0 20px 20px', boxSizing: 'border-box' }}>
+        <Column
+          fullX
+          style={{
+            padding: '0 20px 20px',
+            boxSizing: 'border-box',
+            minHeight: 200
+          }}
+        >
           <InfiniteList
             data={list.items}
             total={list.total}
@@ -40,7 +51,6 @@ export function RgbSendAssetSelectorModal({
             showLoading={list.showLoading && !list.hasLoaded}
             onLoadMore={list.onLoadMore}
             onRefresh={list.onRefresh}
-            height="48vh"
             emptyText={t('assets_no_assets')}
             keyExtractor={(asset) => asset.assetId}
             renderItem={({ item: asset, index }) => {
@@ -74,7 +84,7 @@ export function RgbSendAssetSelectorModal({
                       />
                     </Column>
                   </Row>
-                  {sendable && <Icon icon="right" size={14} color="textDim" />}
+                  {sendable ? <SelectorChevron /> : null}
                 </Card>
               );
             }}

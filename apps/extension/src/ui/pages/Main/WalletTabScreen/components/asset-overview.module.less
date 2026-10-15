@@ -1,10 +1,28 @@
 .section {
+  position: relative;
   box-sizing: border-box;
   width: calc(100% + 32px);
   margin: 0 -16px;
-  padding: 11px 0 19px;
-  border-top: 1px solid rgba(255, 255, 255, 0.08);
-  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  padding: 12px 0 20px;
+  border-top: 1px solid rgba(255, 255, 255, 0.05);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.02);
+  background: linear-gradient(180deg, rgba(244, 182, 44, 0.15) 0%, rgba(244, 182, 44, 0) 45%);
+}
+
+.section::before {
+  position: absolute;
+  top: 0;
+  left: 50%;
+  width: 76%;
+  height: 1px;
+  content: '';
+  transform: translateX(-50%);
+  background: linear-gradient(
+    90deg,
+    rgba(244, 182, 44, 0) 0%,
+    rgba(244, 182, 44, 0.7) 55%,
+    rgba(244, 182, 44, 0) 100%
+  );
 }
 
 .header {
@@ -31,17 +49,19 @@
   padding: 0;
   border: 0;
   background: none;
-  color: rgba(255, 255, 255, 0.65);
+  color: #f4b62c;
   font-family: Inter-Regular, sans-serif;
   font-size: 14px;
+  font-weight: 500;
   line-height: 16px;
   cursor: pointer;
 }
 
-.viewAll img {
+.viewAllArrow {
   display: block;
   width: 12px;
   height: 6.7301px;
+  flex-shrink: 0;
   transform: rotate(-90deg);
 }
 
@@ -147,14 +167,6 @@
   overflow: hidden;
   color: rgba(255, 255, 255, 0.9);
   font-size: 13px;
-}
-
-.ordinalsBadge {
-  position: absolute;
-  right: -5px;
-  bottom: -5px;
-  width: 17px;
-  height: 17px;
 }
 
 .cardText {

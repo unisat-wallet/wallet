@@ -142,7 +142,13 @@ export function ReceiveQRCodeCard(props: ReceiveQRCodeCardProps) {
         <Column itemsCenter gap="sm" style={{ width: '100%', padding: '14px 12px' }}>
           {valueLabel ? <Text text={valueLabel} size="xs" color="white_muted" textCenter /> : null}
           {valuePrefix}
-          <Text text={value} size="sm" color="white" textCenter wrap selectText />
+          <Text
+            text={value}
+            textCenter
+            wrap
+            selectText
+            style={{ fontSize: 12, color: 'rgba(255, 255, 255, 0.65)', lineHeight: '16px' }}
+          />
         </Column>
         {showCopyButton ? (
           <>

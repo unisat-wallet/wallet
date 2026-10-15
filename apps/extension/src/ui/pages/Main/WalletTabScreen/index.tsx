@@ -601,7 +601,7 @@ export default function WalletTabScreen({ screen = 'home' }: { screen?: 'home' |
       {screen === 'home' ? (
         <>
           <AccountSelect />
-          <Column mt="md" gap="lg2">
+          <Column mt="md" gap="xl">
             <HomeTips />
             <BalanceCard />
             <WalletActions chain={chain} />
@@ -613,16 +613,16 @@ export default function WalletTabScreen({ screen = 'home' }: { screen?: 'home' |
       ) : (
         <Column mt="md" gap="zero">
           {assetTabsLoading ? (
-            <Row itemsCenter aria-label={t('loading')} style={{ height: 50, gap: 16 }}>
-              <div style={{ width: 68, height: 14, borderRadius: 4, backgroundColor: 'rgba(255,255,255,0.08)' }} />
-              <div style={{ width: 86, height: 14, borderRadius: 4, backgroundColor: 'rgba(255,255,255,0.08)' }} />
-              <div style={{ width: 58, height: 14, borderRadius: 4, backgroundColor: 'rgba(255,255,255,0.08)' }} />
+            <Row itemsCenter aria-label={t('loading')} style={{ flexWrap: 'wrap', gap: 8, rowGap: 8 }}>
+              <div style={{ width: 72, height: 32, borderRadius: 16, backgroundColor: 'rgba(255,255,255,0.08)' }} />
+              <div style={{ width: 88, height: 32, borderRadius: 16, backgroundColor: 'rgba(255,255,255,0.08)' }} />
+              <div style={{ width: 76, height: 32, borderRadius: 16, backgroundColor: 'rgba(255,255,255,0.08)' }} />
+              <div style={{ width: 64, height: 32, borderRadius: 16, backgroundColor: 'rgba(255,255,255,0.08)' }} />
             </Row>
           ) : (
             <Tabs
-              contentGap={24}
-              hideScrollbar
-              scrollActiveIntoView
+              preset="style2"
+              contentGap={16}
               defaultActiveKey={finalAssetTabKey}
               activeKey={finalAssetTabKey}
               items={tabItems}

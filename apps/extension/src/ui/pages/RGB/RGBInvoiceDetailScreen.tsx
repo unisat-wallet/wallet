@@ -5,7 +5,6 @@ import {
   Button,
   Column,
   Content,
-  Footer,
   Header,
   Icon,
   Layout,
@@ -17,7 +16,7 @@ import {
 import { BottomModal } from '@/ui/components/BottomModal';
 import { getRgbAssetName } from '@/ui/components/RGBAssetIcon';
 import { colors } from '@/ui/theme/colors';
-import { copyToClipboard } from '@/ui/utils';
+import { EllipsisOutlined } from '@ant-design/icons';
 import {
   ANY_RGB_ASSET,
   ANY_RGB_ASSET_ID,
@@ -39,6 +38,7 @@ import {
 } from '@unisat/wallet-state';
 
 import { useRgbWriteLeaseGuard } from './components/useRgbWriteLeaseGuard';
+import { formatRgbInvoiceExpiryTime } from './rgbInvoicePresentation';
 
 const confirmMaskStyle = {
   position: 'fixed' as const,
@@ -91,7 +91,7 @@ export default function RGBInvoiceDetailScreen() {
   const wallet = useWallet();
   const nav = useNavigation();
   const tools = useTools();
-  const { t } = useI18n();
+  const { t, locale } = useI18n();
   const { items: rgbItems = [] } = useRGBListLogic({ focused: true });
   const { requestWrite, writeLeaseModal } = useRgbWriteLeaseGuard();
   const { recipientId, invoice: routeInvoice, initialInvoice } = nav.getRouteState<'RGBInvoiceDetailScreen'>();
@@ -194,15 +194,9 @@ export default function RGBInvoiceDetailScreen() {
   const invoiceDescription = isAnyRgbAsset
     ? t('use_this_invoice_to_receive_any_rgb_asset')
     : t('use_this_invoice_to_receive', { ticker: invoiceName });
-  const copyInvoice = async () => {
-    if (!invoiceText || invoiceInUse) return;
-    try {
-      await copyToClipboard(invoiceText);
-      tools.toastSuccess(t('copied'));
-    } catch (error) {
-      tools.toastError(getInvoiceErrorMessage(error, t('unknown_error')));
-    }
-  };
+  const expirationMatch = invoiceText.match(/[?&]expirationTimestamp=(-?\d+)/);
+  const invoiceExpirationTimestamp =
+    invoice?.expirationTimestamp ?? (expirationMatch ? Number(expirationMatch[1]) : undefined);
 
   return (
     <Layout>
@@ -211,7 +205,12 @@ export default function RGBInvoiceDetailScreen() {
         title={t('receiving_invoice')}
         RightComponent={
           canRemoveInvoice ? (
-            <Icon icon="more" color="textDim" size={20} onClick={() => setActionMenuVisible(true)} />
+            <Icon
+              style={{ fontSize: 24, color: 'rgba(255, 255, 255, 0.65)' }}
+              onClick={() => setActionMenuVisible(true)}
+            >
+              <EllipsisOutlined />
+            </Icon>
           ) : null
         }
       />
@@ -239,6 +238,12 @@ export default function RGBInvoiceDetailScreen() {
                     </div>
                   </Row>
                   <Text text={invoiceDescription} color="white_muted2" size="xs" textCenter />
+                  <Text
+                    text={formatRgbInvoiceExpiryTime(invoiceExpirationTimestamp, locale, t)}
+                    color="white_muted"
+                    size="xs"
+                    textCenter
+                  />
                 </Column>
               ) : undefined
             }
@@ -255,7 +260,7 @@ export default function RGBInvoiceDetailScreen() {
               ) : undefined
             }
             accentColor="#F4B62C"
-            showCopyButton={false}
+            copyDisabled={invoiceInUse}
           />
         ) : null}
         {invoiceInUse ? (
@@ -273,18 +278,6 @@ export default function RGBInvoiceDetailScreen() {
         ) : null}
         {loading && !invoiceText ? <Text text={t('loading')} color="textDim" textCenter size="sm" /> : null}
       </Content>
-      <Footer style={{ flexShrink: 0 }}>
-        <Row fullX gap="md">
-          <Button
-            text={invoiceText && !invoiceInUse ? t('copy_to_clipboard') : t('close')}
-            preset={invoiceText && !invoiceInUse ? 'primary' : 'default'}
-            onClick={invoiceText && !invoiceInUse ? () => void copyInvoice() : closeInvoice}
-            full
-            style={invoiceText && !invoiceInUse ? undefined : { background: 'transparent' }}
-            textStyle={invoiceText && !invoiceInUse ? undefined : { color: colors.white, fontWeight: 'normal' }}
-          />
-        </Row>
-      </Footer>
       {actionMenuVisible ? (
         <BottomModal onClose={() => setActionMenuVisible(false)} bodyStyle={{ padding: 0 }}>
           <Column fullX gap="zero">

@@ -101,7 +101,12 @@ export function TabBar(props: TabBarProps) {
                   data-testid={`number-step-${v.key}`}
                 >
                   {isCompleted ? (
-                    <Icon icon="check" size={16} color="white" />
+                    <Icon
+                      icon="check"
+                      size={14}
+                      color="white"
+                      style={{ maskSize: 'contain', WebkitMaskSize: 'contain' }}
+                    />
                   ) : (
                     <Text text={v.label} color={isCurrent ? 'white' : 'textDim'} />
                   )}
@@ -109,10 +114,18 @@ export function TabBar(props: TabBarProps) {
                 {stepLabel && (
                   <Text
                     text={stepLabel}
-                    size="xxs"
                     textCenter
                     color={isCurrent ? 'white' : 'textDim'}
-                    style={{ position: 'absolute', width: 64, top: 45, left: 0 }}
+                    style={{
+                      position: 'absolute',
+                      width: 90,
+                      top: 45,
+                      left: '50%',
+                      transform: 'translateX(-50%)',
+                      fontSize: 11,
+                      whiteSpace: 'nowrap',
+                      lineHeight: '14px'
+                    }}
                   />
                 )}
               </Column>

@@ -1,6 +1,6 @@
 import { useState } from 'react';
 
-import { BottomSheetHeader, Button, Column, Icon, Row, Text } from '@/ui/components';
+import { BottomSheetHeader, Button, Card, Column, Icon, Row, Text } from '@/ui/components';
 import { BottomModal } from '@/ui/components/BottomModal';
 import {
   useI18n,
@@ -31,6 +31,10 @@ export function RGBHomeTabs({ transfers, list }: RGBHomeTabsProps) {
   const [actionMenuOpen, setActionMenuOpen] = useState(false);
   const [selectedPendingTransfer, setSelectedPendingTransfer] = useState<RgbTransferItem>();
   const [handledTransferIds, setHandledTransferIds] = useState<Set<string>>(() => new Set());
+  const openIssueScreen = () => {
+    setActionMenuOpen(false);
+    nav.navigate('RGBIssueScreen');
+  };
   const openHistoryScreen = () => {
     setActionMenuOpen(false);
     nav.navigate('RGBTransfersScreen');
@@ -114,14 +118,15 @@ export function RGBHomeTabs({ transfers, list }: RGBHomeTabsProps) {
           ))}
         </Column>
       )}
-      <Column gap="md">
-        <Row fullX itemsCenter gap="sm">
+      <Column style={{ gap: 13 }}>
+        <Row fullX itemsCenter style={{ gap: 8 }}>
           <Button
             text={t('receive')}
             preset="brc20-action"
             icon="receive"
             full
-            style={{ minHeight: 44, height: 44 }}
+            style={{ minHeight: 44, height: 44, marginLeft: 0, marginRight: 0 }}
+            textStyle={{ fontSize: 13 }}
             onClick={() => setReceiveSelectorOpen(true)}
             data-testid="receive-rgb-button"
           />
@@ -130,7 +135,8 @@ export function RGBHomeTabs({ transfers, list }: RGBHomeTabsProps) {
             preset="brc20-action"
             icon="send"
             full
-            style={{ minHeight: 44, height: 44 }}
+            style={{ minHeight: 44, height: 44, marginLeft: 0, marginRight: 0 }}
+            textStyle={{ fontSize: 13 }}
             disabled={!accountCapabilities.canCreateSigningRequest}
             onClick={() => setSendSelectorOpen(true)}
             data-testid="send-rgb-button"
@@ -159,7 +165,7 @@ export function RGBHomeTabs({ transfers, list }: RGBHomeTabsProps) {
               cursor: 'pointer'
             }}
           >
-            <Icon icon="more" size={20} />
+            <Icon icon="more" size={16} />
           </div>
         </Row>
         <RGBList list={list} />
@@ -209,30 +215,34 @@ export function RGBHomeTabs({ transfers, list }: RGBHomeTabsProps) {
         <BottomModal onClose={() => setActionMenuOpen(false)} bodyStyle={{ padding: 0 }}>
           <Column fullX gap="zero">
             <BottomSheetHeader title={t('more')} onClose={() => setActionMenuOpen(false)} />
-            <div
-              role="button"
-              tabIndex={0}
-              onClick={openHistoryScreen}
-              onKeyDown={(event) => {
-                if (event.key === 'Enter' || event.key === ' ') {
-                  event.preventDefault();
-                  openHistoryScreen();
-                }
-              }}
-              data-testid="rgb-history-button"
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: 12,
-                width: '100%',
-                padding: '0 20px 24px',
-                boxSizing: 'border-box',
-                cursor: 'pointer'
-              }}
-            >
-              <Icon icon="history" size={20} />
-              <Text text={t('rgb_history')} size="sm" />
-            </div>
+            <Column fullX gap="lg" style={{ padding: '0 20px 24px', boxSizing: 'border-box' }}>
+              <Card
+                fullX
+                itemsCenter
+                onClick={openIssueScreen}
+                data-testid="issue-button"
+                style={{ minHeight: 56, padding: '10px 12px', borderRadius: 10, cursor: 'pointer' }}
+              >
+                <Row itemsCenter gap="md" style={{ flex: 1 }}>
+                  <Icon icon="issue" color="ticker_color2" size={20} />
+                  <Text text={t('issue')} size="sm" />
+                </Row>
+                <Icon icon="right" size={20} style={{ backgroundColor: 'rgba(255, 255, 255, 0.65)' }} />
+              </Card>
+              <Card
+                fullX
+                itemsCenter
+                onClick={openHistoryScreen}
+                data-testid="rgb-history-button"
+                style={{ minHeight: 56, padding: '10px 12px', borderRadius: 10, cursor: 'pointer' }}
+              >
+                <Row itemsCenter gap="md" style={{ flex: 1 }}>
+                  <Icon icon="history" color="ticker_color2" size={20} />
+                  <Text text={t('rgb_history')} size="sm" />
+                </Row>
+                <Icon icon="right" size={20} style={{ backgroundColor: 'rgba(255, 255, 255, 0.65)' }} />
+              </Card>
+            </Column>
           </Column>
         </BottomModal>
       )}

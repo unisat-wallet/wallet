@@ -3,8 +3,8 @@ import { useI18n, useRGBBalanceCardLogic, type RGBBalanceCardProps } from '@unis
 import { Card } from '../Card';
 import { RGBAssetIcon } from '../RGBAssetIcon';
 import { Row } from '../Row';
-import { RunesTicker } from '../RunesTicker';
 import { Text } from '../Text';
+import { TruncatedAssetName } from '../TruncatedAssetName';
 import { getTokenBalanceCardStyle, TokenBalanceCardLayout } from '../TokenBalanceCardLayout';
 
 export default function RGBBalanceCard(props: RGBBalanceCardProps) {
@@ -33,7 +33,7 @@ export default function RGBBalanceCard(props: RGBBalanceCardProps) {
       <TokenBalanceCardLayout
         icon={<RGBAssetIcon iconInfo={iconInfo} ticker={ticker} name={name} size={32} />}
         onIconClick={onClick}
-        title={<RunesTicker tick={name} truncate />}
+        title={<TruncatedAssetName text={name || ticker || ''} size="sm" color="white" />}
         quantity={
           pendingOnly ? (
             <Row itemsCenter gap="sm">

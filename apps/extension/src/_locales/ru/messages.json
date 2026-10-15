@@ -2955,6 +2955,9 @@
   "not_enough_btc_for_rgb_utxo": {
     "message": "Недостаточно средств в BTC."
   },
+  "invoice_created": {
+    "message": "Инвойс создан"
+  },
   "create_invoice": {
     "message": "Создать инвойс"
   },

@@ -210,6 +210,7 @@ export default function RGBTokenScreen() {
               icon="receive"
               onClick={() => void requestWrite(onClickReceive)}
               full
+              textStyle={{ fontSize: 14 }}
               data-testid="rgb-receive-button"
             />
 
@@ -220,6 +221,7 @@ export default function RGBTokenScreen() {
               onClick={() => void requestWrite(onClickSend)}
               disabled={!enableTransfer}
               full
+              textStyle={{ fontSize: 14 }}
               data-testid="rgb-send-button"
             />
           </Row>

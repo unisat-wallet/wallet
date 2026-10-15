@@ -55,8 +55,15 @@ export function Tabs({ preset, items, defaultActiveKey, activeKey, onTabClick, t
   const tabBar = useMemo(() => {
     if (preset == 'style2') {
       return (
-        <Row>
-          {items.map((item, index) => {
+        <Row
+          style={{
+            flexWrap: 'wrap',
+            gap: 8,
+            rowGap: 8,
+            alignItems: 'flex-start'
+          }}
+        >
+          {items.map((item) => {
             const isActiveItem = item.key === activeTab;
 
             return (
@@ -64,17 +71,26 @@ export function Tabs({ preset, items, defaultActiveKey, activeKey, onTabClick, t
                 key={item.key}
                 itemsCenter
                 justifyCenter
-                px="lg"
                 style={{
                   height: 32,
+                  padding: '0 12px',
                   borderRadius: 16,
-                  borderWidth: 0,
-                  backgroundColor: isActiveItem ? '#322D1F' : 'rgba(255, 255, 255, 0.08)'
+                  boxSizing: 'border-box',
+                  flexShrink: 0,
+                  backgroundColor: isActiveItem ? '#322D1F' : 'rgba(255, 255, 255, 0.08)',
+                  border: isActiveItem ? `1px solid ${colors.gold}` : '1px solid transparent',
+                  cursor: 'pointer'
                 }}
                 onClick={() => onTabClick(item.key)}
                 data-testid={`tab-item-${item.key}`}>
                 {typeof item.label === 'string' ? (
-                  <Text text={item.label} size="xs" color={isActiveItem ? 'gold' : 'white_muted'} />
+                  <Text
+                    text={item.label}
+                    style={{
+                      fontSize: 13,
+                      color: isActiveItem ? colors.gold : 'rgba(255, 255, 255, 0.65)'
+                    }}
+                  />
                 ) : (
                   item.label
                 )}

@@ -4,6 +4,10 @@ import { BottomSheetHeader, Card, Column, Icon, Row, Text } from '@/ui/component
 import { BottomModal } from '@/ui/components/BottomModal';
 import { useChainType, useCurrentAccount, useCurrentKeyring, useI18n, useWallet } from '@unisat/wallet-state';
 
+function SelectorChevron() {
+  return <Icon icon="right" size={20} style={{ backgroundColor: 'rgba(255, 255, 255, 0.65)' }} />;
+}
+
 export function RgbReceiveSelectorModal({
   onClose,
   onViewInvoices,
@@ -42,7 +46,7 @@ export function RgbReceiveSelectorModal({
     <BottomModal onClose={onClose} bodyStyle={{ padding: 0 }}>
       <Column fullX gap="zero">
         <BottomSheetHeader title={t('receive_rgb')} onClose={onClose} />
-        <Column fullX gap="sm" style={{ padding: '0 20px 24px', boxSizing: 'border-box' }}>
+        <Column fullX gap="lg" style={{ padding: '0 20px 24px', boxSizing: 'border-box' }}>
           <Card
             fullX
             itemsCenter
@@ -63,7 +67,7 @@ export function RgbReceiveSelectorModal({
                 size="sm"
               />
             </Row>
-            <Icon icon="right" color="textDim" size={14} />
+            <SelectorChevron />
           </Card>
           <Card
             fullX
@@ -76,7 +80,7 @@ export function RgbReceiveSelectorModal({
               <Icon icon="rgb" color="ticker_color2" size={20} />
               <Text text={t('create_invoice')} size="sm" />
             </Row>
-            <Icon icon="right" color="textDim" size={14} />
+            <SelectorChevron />
           </Card>
         </Column>
       </Column>

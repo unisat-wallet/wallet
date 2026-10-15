@@ -3015,6 +3015,9 @@
   "not_enough_btc_for_rgb_utxo": {
     "message": "BTC 餘額不足。"
   },
+  "invoice_created": {
+    "message": "發票已建立"
+  },
   "create_invoice": {
     "message": "建立發票"
   },

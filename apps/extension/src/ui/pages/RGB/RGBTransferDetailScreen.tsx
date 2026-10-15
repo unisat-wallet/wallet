@@ -122,7 +122,7 @@ export default function RGBTransferDetailScreen() {
       <Content style={{ gap: spacing.large, paddingLeft: 10, paddingRight: 10 }}>
         <Column mt="lg" itemsCenter gap="sm">
           {isFailed ? (
-            <Icon icon={transfer?.type === 'receive' ? 'history_receive' : 'history_send'} size={48} />
+            <Icon icon={transfer?.type === 'receive' ? 'history_receive' : 'history_send'} size={72} />
           ) : (
             <TxResultStatusMark pending={!isConfirmed} />
           )}

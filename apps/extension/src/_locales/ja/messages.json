@@ -2955,6 +2955,9 @@
   "not_enough_btc_for_rgb_utxo": {
     "message": "BTC 残高が不足しています。"
   },
+  "invoice_created": {
+    "message": "インボイスを作成しました"
+  },
   "create_invoice": {
     "message": "インボイスを作成"
   },

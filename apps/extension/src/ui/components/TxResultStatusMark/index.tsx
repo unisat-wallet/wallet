@@ -1,4 +1,4 @@
-export function TxResultStatusMark({ pending, size = 100 }: { pending: boolean; size?: number }) {
+export function TxResultStatusMark({ pending, size = 72 }: { pending: boolean; size?: number }) {
   if (pending) {
     return (
       <svg width={size} height={size} viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
