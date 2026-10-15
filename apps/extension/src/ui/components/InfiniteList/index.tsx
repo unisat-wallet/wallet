@@ -72,7 +72,7 @@ export function InfiniteList<T>({
   }, [data, pagination]);
 
   useEffect(() => {
-    if (pageData.length < pagination.pageSize && hasMore && !loading) {
+    if (data.length > 0 && pageData.length < pagination.pageSize && hasMore && !loading) {
       onLoadMore();
     }
   }, [pagination, data.length]);

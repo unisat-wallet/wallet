@@ -184,8 +184,8 @@ export default function WalletTabScreen({ screen = 'home' }: { screen?: 'home' |
     key: string;
     summary: AddressAssetSummary;
     brc20Count: number;
-    rgbCount: number;
   } | null>(null);
+  const [rgbAssetCount, setRgbAssetCount] = useState<{ key: string; count: number } | null>(null);
   const [assetCountErrorKey, setAssetCountErrorKey] = useState<string | null>(null);
   const [pinnedSelection, setPinnedSelection] = useState<{ contextKey: string; tabKey: string } | null>(null);
   const [restoredTabContextKey, setRestoredTabContextKey] = useState('');
@@ -242,15 +242,6 @@ export default function WalletTabScreen({ screen = 'home' }: { screen?: 'home' |
     let active = true;
     Promise.all([
       wallet.getAddressAssetSummary(currentAccount.address),
-      supportedAssets.assets.rgb
-        ? wallet
-            .getRgbFeatureStatus()
-            .then((status) =>
-              status.enabled && status.supported
-                ? wallet.getRGBList('', 1, 1, { skipSync: true }).then((result) => result.total)
-                : 0
-            )
-        : Promise.resolve(0),
       supportedAssets.assets.brc20
         ? wallet
             .getBRC20List({
@@ -263,13 +254,12 @@ export default function WalletTabScreen({ screen = 'home' }: { screen?: 'home' |
             .catch(() => null)
         : Promise.resolve(null)
     ])
-      .then(([summary, rgbCount, brc20Count]) => {
+      .then(([summary, brc20Count]) => {
         if (active) {
           setAssetCounts({
             key: assetContextKey,
             summary,
-            brc20Count: Math.max(summary.brc20Count, brc20Count ?? 0),
-            rgbCount
+            brc20Count: Math.max(summary.brc20Count, brc20Count ?? 0)
           });
           setAssetCountErrorKey(null);
         }
@@ -285,11 +275,24 @@ export default function WalletTabScreen({ screen = 'home' }: { screen?: 'home' |
     screen,
     assetContextKey,
     walletTabFocusRefresh,
-    isRgbActive,
-    supportedAssets.assets.rgb,
     supportedAssets.assets.brc20,
     wallet
   ]);
+
+  useEffect(() => {
+    if (screen !== 'assets' || !currentAccount.address || !isRgbActive) return;
+    let active = true;
+    void wallet.getRGBList('', 1, 1, { skipSync: true })
+      .then((result) => {
+        if (active) setRgbAssetCount({ key: rgbContextKey, count: result.total });
+      })
+      .catch((error) => {
+        console.error('Failed to load RGB asset tab count', error);
+      });
+    return () => {
+      active = false;
+    };
+  }, [screen, rgbContextKey, walletTabFocusRefresh, isRgbActive, wallet]);
 
   const effectiveAssetTabKey = assetTabKey === AssetTabKey.MORE ? AssetTabKey.ALKANES : assetTabKey;
   const isRgbAssetTab = screen === 'assets' && restoredTabContextKey === assetContextKey && effectiveAssetTabKey === AssetTabKey.RGB;
@@ -426,15 +429,15 @@ export default function WalletTabScreen({ screen = 'home' }: { screen?: 'home' |
   const counts = assetCounts?.key === assetContextKey ? assetCounts : null;
   const assetTabsLoading =
     (!counts && assetCountErrorKey !== assetContextKey) ||
-    (screen === 'assets' && restoredTabContextKey !== assetContextKey) ||
-    (supportedAssets.assets.rgb && rgbStatusContextKey !== rgbContextKey);
+    (screen === 'assets' && restoredTabContextKey !== assetContextKey);
+  const rgbCount = isRgbActive && rgbAssetCount?.key === rgbContextKey ? rgbAssetCount.count : 0;
   const hasAnyAsset = counts
     ? counts.brc20Count +
         counts.summary.inscriptionCount +
         counts.summary.runesCount +
         counts.summary.alkanesCount +
         counts.summary.alkanesCollectionCount +
-        counts.rgbCount >
+        rgbCount >
       0
     : false;
   const tabCounts = [
@@ -460,7 +463,7 @@ export default function WalletTabScreen({ screen = 'home' }: { screen?: 'home' |
       key: String(AssetTabKey.RGB),
       assetTabKey: AssetTabKey.RGB,
       supported: supportedAssets.assets.rgb,
-      count: counts?.rgbCount ?? 0
+      count: rgbCount
     },
     {
       key: String(AssetTabKey.ALKANES),
@@ -552,7 +555,9 @@ export default function WalletTabScreen({ screen = 'home' }: { screen?: 'home' |
         items.push({
           key,
           label: label(t('rgb')),
-          children: isRgbActive ? (
+          children: rgbStatusContextKey !== rgbContextKey ? (
+            <Text text={t('loading')} color="white_muted" />
+          ) : isRgbActive ? (
             <RGBHomeTabs key={`${chain.enum}:${currentAccount.key}`} transfers={rgbTransfers} list={rgbList} />
           ) : (
             <Column itemsCenter gap="md">
@@ -576,6 +581,8 @@ export default function WalletTabScreen({ screen = 'home' }: { screen?: 'home' |
     !!counts,
     t,
     isRgbActive,
+    rgbStatusContextKey,
+    rgbContextKey,
     rgbTransfers,
     rgbList,
     rgbRecoveryAvailable,
