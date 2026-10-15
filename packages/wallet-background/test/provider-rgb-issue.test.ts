@@ -26,27 +26,28 @@ import wallet from '../src/controllers/wallet'
 
 const orderId = 'f7f0e1f0-0000-4000-8000-000000000001'
 const params = { orderId, ticker: 'TOK', name: 'Token', precision: 0, amount: '100' }
+const chainType = ChainType.BITCOIN_MAINNET
 const paidOrder = {
   code: 0,
   data: {
-    status: 'paid', network: ChainType.BITCOIN_TESTNET4, address: 'tb1qowner',
+    status: 'paid', network: chainType, address: 'bc1qowner',
     ticker: 'TOK', name: 'Token', precision: 0, amount: '100', feeSats: 1500,
     paymentTxid: 'a'.repeat(64),
   },
 }
-const originalEndpoints = CHAINS_MAP[ChainType.BITCOIN_TESTNET4]!.endpoints
+const originalEndpoints = CHAINS_MAP[chainType]!.endpoints
 
 describe('provider RGB issue payment gate', () => {
   beforeEach(() => {
     vi.clearAllMocks()
-    CHAINS_MAP[ChainType.BITCOIN_TESTNET4]!.endpoints = ['https://wallet.example']
-    vi.mocked(wallet.getChainType).mockReturnValue(ChainType.BITCOIN_TESTNET4)
-    vi.mocked(wallet.getCurrentAccount).mockResolvedValue({ address: 'tb1qowner' } as any)
+    CHAINS_MAP[chainType]!.endpoints = ['https://wallet.example']
+    vi.mocked(wallet.getChainType).mockReturnValue(chainType)
+    vi.mocked(wallet.getCurrentAccount).mockResolvedValue({ address: 'bc1qowner' } as any)
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, json: async () => paidOrder }))
   })
 
   afterEach(() => {
-    CHAINS_MAP[ChainType.BITCOIN_TESTNET4]!.endpoints = originalEndpoints
+    CHAINS_MAP[chainType]!.endpoints = originalEndpoints
     vi.unstubAllGlobals()
   })
 
@@ -55,6 +56,13 @@ describe('provider RGB issue payment gate', () => {
       ok: true, json: async () => ({ ...paidOrder, data: { ...paidOrder.data, status: 'pending' } }),
     }))
     await expect(providerController.issueRgbNia({ data: { params } })).rejects.toThrow('does not match')
+    expect(wallet.createRgbIssueNia).not.toHaveBeenCalled()
+  })
+
+  it('reports when wallet API has no issuance verification route', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: false, status: 404 }))
+    await expect(providerController.issueRgbNia({ data: { params } }))
+      .rejects.toThrow('wallet API (HTTP 404)')
     expect(wallet.createRgbIssueNia).not.toHaveBeenCalled()
   })
 

@@ -687,7 +687,11 @@ class ProviderController extends BaseController {
     const currentAccount = await wallet.getCurrentAccount()
     if (!currentAccount) throw new Error('no current account')
     const response = await fetch(`${walletApiUrl}/v5/rgb/issue/order/${params.orderId}`)
-    if (!response.ok) throw new Error('unable to verify RGB issuance order')
+    if (!response.ok) {
+      throw new Error(response.status === 404
+        ? 'RGB issuance order verification is unavailable in wallet API (HTTP 404)'
+        : `unable to verify RGB issuance order (wallet API HTTP ${response.status})`)
+    }
     const payload = await response.json() as { code: number; data?: {
       status: string; network: string; address: string; ticker: string; name: string;
       precision: number; amount: string; feeSats: number; paymentTxid?: string
