@@ -133,6 +133,52 @@ function assertReadonlySignedPsbt(
   }
 }
 
+type RgbIssueWalletOrder = {
+  status: string; network: string; address: string; ticker: string; name: string;
+  precision: number; amount: string; feeSats: number; feeAddress: string; paymentTxid?: string
+}
+
+async function getRgbIssueWalletOrder(orderId: string): Promise<RgbIssueWalletOrder> {
+  if (!/^[0-9a-f-]{36}$/i.test(orderId)) throw new Error('invalid RGB issue order ID')
+  const walletApiUrl = CHAINS_MAP[wallet.getChainType()]?.endpoints[0]
+  if (!walletApiUrl) throw new Error('RGB issuance orders are unavailable on this network')
+  const response = await fetch(`${walletApiUrl}/v5/rgb/issue/order/${orderId}`)
+  if (!response.ok) {
+    throw new Error(response.status === 404
+      ? 'RGB issuance order verification is unavailable in wallet API (HTTP 404)'
+      : `unable to verify RGB issuance order (wallet API HTTP ${response.status})`)
+  }
+  const payload = await response.json() as { code: number; data?: RgbIssueWalletOrder }
+  if (payload.code !== 0 || !payload.data) throw new Error('unable to verify RGB issuance order')
+  return payload.data
+}
+
+async function claimRgbIssueWalletPayment(orderId: string, txid: string): Promise<RgbIssueWalletOrder> {
+  const walletApiUrl = CHAINS_MAP[wallet.getChainType()]?.endpoints[0]
+  if (!walletApiUrl) throw new Error('RGB issuance orders are unavailable on this network')
+  let lastError: Error | undefined
+  for (let attempt = 0; attempt < 10; attempt++) {
+    try {
+      const response = await fetch(`${walletApiUrl}/v5/rgb/issue/order/${orderId}/claim-payment`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ txid }),
+      })
+      if (!response.ok) throw new Error(`wallet API payment verification failed (HTTP ${response.status})`)
+      const payload = await response.json() as { code: number; msg?: string; data?: RgbIssueWalletOrder }
+      if (payload.code === 0 && payload.data?.status === 'paid' && payload.data.paymentTxid === txid) {
+        return payload.data
+      }
+      throw new Error(payload.msg || 'RGB issue payment is not visible yet')
+    } catch (error) {
+      lastError = error instanceof Error ? error : new Error(String(error))
+      if (/invalid|insufficient|predates|order wallet|network mismatch/i.test(lastError.message)) break
+      if (attempt < 9) await new Promise(resolve => setTimeout(resolve, 1500))
+    }
+  }
+  throw lastError || new Error('RGB issue payment is not visible yet')
+}
+
 function restoreCounterpartyFinalizedInputs(
   signedPsbt: bitcoin.Psbt,
   sourcePsbt: bitcoin.Psbt,
@@ -654,67 +700,99 @@ class ProviderController extends BaseController {
   @Reflect.metadata('SAFE', true)
   getRgbIssueAvailability = async () => wallet.getRgbAllocationSummary({ skipSync: false })
 
-  @Reflect.metadata('APPROVAL', [
-    'SignPsbt',
-    async req => {
-      const params = req.data.params as { feeRate?: number; toSignDatas?: ToSignData[] }
-      const prepared = await wallet.createRgbUtxosBegin({
-        num: 1,
-        ...(params.feeRate === undefined ? {} : { feeRate: params.feeRate }),
-      })
-      params.toSignDatas = [prepared.toSignData]
-    },
-  ])
-  prepareRgbIssueUtxo = async ({ data: { params }, approvalRes }: {
-    data: { params: { toSignDatas?: ToSignData[] } }
-    approvalRes: SignPsbtResult
-  }) => {
-    const signedPsbt = approvalRes[0]?.psbtHex
-    if (!signedPsbt) throw new Error('RGB UTXO signing did not return a PSBT')
-    assertReadonlySignedPsbt(await wallet.getCurrentAccount(), getToSignDatas(params.toSignDatas)[0]!, signedPsbt)
-    return wallet.createRgbUtxosEnd({ signedPsbt })
-  }
-
-  @Reflect.metadata('APPROVAL', ['RgbIssue'])
-  issueRgbNia = async ({ data: { params } }: {
-    data: { params: { orderId: string; ticker: string; name: string; precision: number; amount: string } }
-  }) => {
-    if (!/^[0-9a-f-]{36}$/i.test(params.orderId)) throw new Error('invalid RGB issue order ID')
-    if (!/^[1-9][0-9]*$/.test(params.amount)) throw new Error('invalid RGB issue amount')
-    const chain = CHAINS_MAP[wallet.getChainType()]
-    const walletApiUrl = chain?.endpoints[0]
-    if (!walletApiUrl) throw new Error('RGB issuance orders are unavailable on this network')
-    const currentAccount = await wallet.getCurrentAccount()
-    if (!currentAccount) throw new Error('no current account')
-    const response = await fetch(`${walletApiUrl}/v5/rgb/issue/order/${params.orderId}`)
-    if (!response.ok) {
-      throw new Error(response.status === 404
-        ? 'RGB issuance order verification is unavailable in wallet API (HTTP 404)'
-        : `unable to verify RGB issuance order (wallet API HTTP ${response.status})`)
+  @Reflect.metadata('APPROVAL', ['RgbIssue', async req => {
+    const params = req.data.params as {
+      orderId: string; ticker: string; name: string; precision: number; amount: string;
+      paymentTxid?: string; toSignData?: ToSignData
     }
-    const payload = await response.json() as { code: number; data?: {
-      status: string; network: string; address: string; ticker: string; name: string;
-      precision: number; amount: string; feeSats: number; paymentTxid?: string
-    } }
-    const order = payload.data
-    if (payload.code !== 0 || !order || order.status !== 'paid' ||
-        order.network !== wallet.getChainType() || order.address !== currentAccount.address ||
+    if (!/^[1-9][0-9]*$/.test(params.amount)) throw new Error('invalid RGB issue amount')
+    const order = await getRgbIssueWalletOrder(params.orderId)
+    const account = await wallet.getCurrentAccount()
+    if (!account || order.network !== wallet.getChainType() || order.address !== account.address ||
         order.ticker !== params.ticker || order.name !== params.name ||
         order.precision !== params.precision || order.amount !== params.amount ||
-        !Number.isSafeInteger(order.feeSats) || order.feeSats < 546 || !order.paymentTxid) {
-      throw new Error('RGB issuance order does not match a paid wallet order')
+        !Number.isSafeInteger(order.feeSats) || order.feeSats < 546 || !order.feeAddress ||
+        !['pending', 'paid'].includes(order.status)) {
+      throw new Error('RGB issuance order does not match this wallet')
     }
-    const issued = await wallet.createRgbIssueNia({
-      orderId: params.orderId,
-      ticker: params.ticker,
-      name: params.name,
-      precision: params.precision,
-      amounts: [params.amount],
-    })
-    return {
-      assetId: issued.assetId,
-      pendingConfirmation: issued.pendingConfirmation,
-      syncPending: issued.syncPending,
+    delete params.toSignData
+    if (params.paymentTxid && !/^[0-9a-f]{64}$/i.test(params.paymentTxid)) {
+      throw new Error('invalid RGB issue payment transaction ID')
+    }
+    if (order.status === 'pending' && !params.paymentTxid) {
+      const prepared = await wallet.createRgbUtxosBegin({
+        num: 1,
+        payment: { address: order.feeAddress, satoshis: order.feeSats },
+        issue: { ticker: order.ticker, name: order.name, amount: order.amount, precision: order.precision },
+      })
+      params.toSignData = prepared.toSignData
+    }
+  }])
+  issueRgbNia = async ({ data: { params }, approvalRes }: {
+    data: { params: {
+      orderId: string; ticker: string; name: string; precision: number; amount: string;
+      paymentTxid?: string; toSignData?: ToSignData
+    } }
+    approvalRes?: { signedPsbt?: string }
+  }) => {
+    if (!/^[1-9][0-9]*$/.test(params.amount)) throw new Error('invalid RGB issue amount')
+    const currentAccount = await wallet.getCurrentAccount()
+    if (!currentAccount) throw new Error('no current account')
+    let order = await getRgbIssueWalletOrder(params.orderId)
+    if (!['pending', 'paid'].includes(order.status) || order.network !== wallet.getChainType() ||
+        order.address !== currentAccount.address ||
+        order.ticker !== params.ticker || order.name !== params.name ||
+        order.precision !== params.precision || order.amount !== params.amount ||
+        !Number.isSafeInteger(order.feeSats) || order.feeSats < 546) {
+      throw new Error('RGB issuance order does not match this wallet')
+    }
+    let paymentTxid = order.paymentTxid || params.paymentTxid
+    if (params.toSignData) {
+      const signedPsbt = approvalRes?.signedPsbt
+      if (!signedPsbt) throw new Error('RGB funding transaction was not signed')
+      assertReadonlySignedPsbt(currentAccount, params.toSignData, signedPsbt)
+      if (order.status !== 'pending') throw new Error('RGB issuance order changed during signing')
+      const transaction = bitcoin.Psbt.fromHex(signedPsbt).extractTransaction(true)
+      const paid = transaction.outs
+        .filter(output => scriptPkToAddress(output.script, wallet.getNetworkType()) === order.feeAddress)
+        .reduce((sum, output) => sum + Number(output.value), 0)
+      if (paid < order.feeSats) throw new Error('RGB issuance transaction is missing the service fee')
+      const funded = await wallet.createRgbUtxosEnd({ signedPsbt })
+      paymentTxid = funded.txid
+    }
+    if (!paymentTxid || !/^[0-9a-f]{64}$/i.test(paymentTxid)) {
+      throw new Error('RGB issuance payment transaction ID is missing')
+    }
+    if (order.status === 'pending') {
+      try {
+        order = await claimRgbIssueWalletPayment(params.orderId, paymentTxid)
+      } catch (error) {
+        return { status: 'payment_pending', paymentTxid, error: error instanceof Error ? error.message : String(error) }
+      }
+    }
+    if (order.status !== 'paid' || order.paymentTxid !== paymentTxid ||
+        order.network !== wallet.getChainType() || order.address !== currentAccount.address ||
+        order.ticker !== params.ticker || order.name !== params.name ||
+        order.precision !== params.precision || order.amount !== params.amount) {
+      throw new Error('RGB issuance order does not match the paid transaction')
+    }
+    try {
+      const issued = await wallet.createRgbIssueNia({
+        orderId: params.orderId,
+        ticker: params.ticker,
+        name: params.name,
+        precision: params.precision,
+        amounts: [params.amount],
+      })
+      return {
+        status: 'issued',
+        paymentTxid,
+        assetId: issued.assetId,
+        pendingConfirmation: issued.pendingConfirmation,
+        syncPending: issued.syncPending,
+      }
+    } catch (error) {
+      return { status: 'issuance_pending', paymentTxid, error: error instanceof Error ? error.message : String(error) }
     }
   }
 

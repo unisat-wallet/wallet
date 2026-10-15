@@ -1,7 +1,8 @@
 import 'reflect-metadata'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { CHAINS_MAP } from '@unisat/wallet-shared'
-import { ChainType } from '@unisat/wallet-types'
+import { bitcoin } from '@unisat/wallet-bitcoin'
+import { ChainType, NetworkType } from '@unisat/wallet-types'
 
 vi.mock('@unisat/babylon-service', () => ({
   arbitrarySignDocToBytesHex: vi.fn(),
@@ -16,7 +17,10 @@ vi.mock('../src/services', () => ({
 vi.mock('../src/controllers/wallet', () => ({
   default: {
     getChainType: vi.fn(),
+    getNetworkType: vi.fn(),
     getCurrentAccount: vi.fn(),
+    createRgbUtxosBegin: vi.fn(),
+    createRgbUtxosEnd: vi.fn(),
     createRgbIssueNia: vi.fn(),
   },
 }))
@@ -27,11 +31,13 @@ import wallet from '../src/controllers/wallet'
 const orderId = 'f7f0e1f0-0000-4000-8000-000000000001'
 const params = { orderId, ticker: 'TOK', name: 'Token', precision: 0, amount: '100' }
 const chainType = ChainType.BITCOIN_MAINNET
+const feeAddress = bitcoin.payments.p2wpkh({ hash: Buffer.alloc(20, 2), network: bitcoin.networks.bitcoin }).address!
 const paidOrder = {
   code: 0,
   data: {
     status: 'paid', network: chainType, address: 'bc1qowner',
     ticker: 'TOK', name: 'Token', precision: 0, amount: '100', feeSats: 1500,
+    feeAddress,
     paymentTxid: 'a'.repeat(64),
   },
 }
@@ -42,6 +48,7 @@ describe('provider RGB issue payment gate', () => {
     vi.clearAllMocks()
     CHAINS_MAP[chainType]!.endpoints = ['https://wallet.example']
     vi.mocked(wallet.getChainType).mockReturnValue(chainType)
+    vi.mocked(wallet.getNetworkType).mockReturnValue(NetworkType.MAINNET)
     vi.mocked(wallet.getCurrentAccount).mockResolvedValue({ address: 'bc1qowner' } as any)
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, json: async () => paidOrder }))
   })
@@ -51,12 +58,72 @@ describe('provider RGB issue payment gate', () => {
     vi.unstubAllGlobals()
   })
 
-  it('rejects an unpaid or mismatched order before local issuance', async () => {
+  it('rejects a mismatched order before asking for a signature', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
+      ok: true, json: async () => ({ ...paidOrder, data: { ...paidOrder.data, ticker: 'OTHER' } }),
+    }))
+    const approval = Reflect.getMetadata('APPROVAL', providerController, 'issueRgbNia')
+    await expect(approval[1]({ data: { params: { ...params } } })).rejects.toThrow('does not match')
+    expect(wallet.createRgbIssueNia).not.toHaveBeenCalled()
+  })
+
+  it('adds the verified order fee to the RGB funding transaction', async () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
       ok: true, json: async () => ({ ...paidOrder, data: { ...paidOrder.data, status: 'pending' } }),
     }))
-    await expect(providerController.issueRgbNia({ data: { params } })).rejects.toThrow('does not match')
-    expect(wallet.createRgbIssueNia).not.toHaveBeenCalled()
+    vi.mocked(wallet.createRgbUtxosBegin).mockResolvedValue({ toSignData: { psbtHex: 'psbt' } } as any)
+    const approval = Reflect.getMetadata('APPROVAL', providerController, 'issueRgbNia')
+    const request = { data: { params: { ...params, toSignData: { psbtHex: 'untrusted' } } } }
+    await approval[1](request)
+    expect(wallet.createRgbUtxosBegin).toHaveBeenCalledWith({
+      num: 1,
+      payment: { address: feeAddress, satoshis: 1500 },
+      issue: { ticker: 'TOK', name: 'Token', amount: '100', precision: 0 },
+    })
+    expect(request.data.params.toSignData).toEqual({ psbtHex: 'psbt' })
+  })
+
+  it('does not prepare or trust a site-supplied PSBT when retrying a broadcast payment', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
+      ok: true, json: async () => ({ ...paidOrder, data: { ...paidOrder.data, status: 'pending' } }),
+    }))
+    const approval = Reflect.getMetadata('APPROVAL', providerController, 'issueRgbNia')
+    const request = {
+      data: { params: { ...params, paymentTxid: 'b'.repeat(64), toSignData: { psbtHex: 'untrusted' } } },
+    }
+    await approval[1](request)
+    expect(wallet.createRgbUtxosBegin).not.toHaveBeenCalled()
+    expect(request.data.params).not.toHaveProperty('toSignData')
+  })
+
+  it('signs, broadcasts, claims, and issues through one wallet request', async () => {
+    const txid = 'c'.repeat(64)
+    const signedPsbt = new bitcoin.Psbt({ network: bitcoin.networks.bitcoin })
+      .addInput({
+        hash: 'd'.repeat(64), index: 0,
+        witnessUtxo: { script: bitcoin.address.toOutputScript(feeAddress), value: 10_000 },
+      })
+      .addOutput({ address: feeAddress, value: 1500 })
+    signedPsbt.updateInput(0, { finalScriptWitness: Buffer.from([1, 0]) })
+    const pending = { ...paidOrder.data, status: 'pending', paymentTxid: undefined }
+    vi.stubGlobal('fetch', vi.fn().mockImplementation(async (_url: string, options?: { method?: string }) => ({
+      ok: true,
+      json: async () => options?.method === 'POST'
+        ? { code: 0, data: { ...paidOrder.data, paymentTxid: txid } }
+        : { code: 0, data: pending },
+    })))
+    vi.mocked(wallet.createRgbUtxosBegin).mockResolvedValue({ toSignData: { psbtHex: signedPsbt.toHex() } } as any)
+    vi.mocked(wallet.createRgbUtxosEnd).mockResolvedValue({ txid } as any)
+    vi.mocked(wallet.createRgbIssueNia).mockResolvedValue({ assetId: 'rgb:issued' } as any)
+    const approval = Reflect.getMetadata('APPROVAL', providerController, 'issueRgbNia')
+    const request = { data: { params: { ...params } } }
+    await approval[1](request)
+    const result = await providerController.issueRgbNia({
+      data: request.data,
+      approvalRes: { signedPsbt: signedPsbt.toHex() },
+    })
+    expect(wallet.createRgbUtxosEnd).toHaveBeenCalledWith({ signedPsbt: signedPsbt.toHex() })
+    expect(result).toMatchObject({ status: 'issued', paymentTxid: txid, assetId: 'rgb:issued' })
   })
 
   it('reports when wallet API has no issuance verification route', async () => {
@@ -66,6 +133,30 @@ describe('provider RGB issue payment gate', () => {
     expect(wallet.createRgbIssueNia).not.toHaveBeenCalled()
   })
 
+  it('claims an existing funding transaction and issues without another payment', async () => {
+    const txid = 'b'.repeat(64)
+    const pending = { ...paidOrder.data, status: 'pending', paymentTxid: undefined }
+    const fetchMock = vi.fn().mockImplementation(async (_url: string, options?: { method?: string }) => ({
+      ok: true,
+      json: async () => options?.method === 'POST'
+        ? { code: 0, data: { ...paidOrder.data, paymentTxid: txid } }
+        : { code: 0, data: pending },
+    }))
+    vi.stubGlobal('fetch', fetchMock)
+    vi.mocked(wallet.createRgbIssueNia).mockResolvedValue({
+      assetId: 'rgb:issued', pendingConfirmation: true, syncPending: false,
+    } as any)
+    const result = await providerController.issueRgbNia({
+      data: { params: { ...params, paymentTxid: txid } },
+    })
+    expect(fetchMock).toHaveBeenCalledWith(
+      `https://wallet.example/v5/rgb/issue/order/${orderId}/claim-payment`,
+      expect.objectContaining({ method: 'POST', body: JSON.stringify({ txid }) }),
+    )
+    expect(wallet.createRgbUtxosBegin).not.toHaveBeenCalled()
+    expect(result).toMatchObject({ status: 'issued', paymentTxid: txid, assetId: 'rgb:issued' })
+  })
+
   it('returns only the asset ID and status after verified local issuance', async () => {
     vi.mocked(wallet.createRgbIssueNia).mockResolvedValue({
       assetId: 'rgb:issued', genesis: 'secret-genesis', contract: 'secret-contract',
@@ -73,7 +164,10 @@ describe('provider RGB issue payment gate', () => {
     })
     const result = await providerController.issueRgbNia({ data: { params } })
     expect(fetch).toHaveBeenCalledWith(`https://wallet.example/v5/rgb/issue/order/${orderId}`)
-    expect(result).toEqual({ assetId: 'rgb:issued', pendingConfirmation: false, syncPending: false })
+    expect(result).toEqual({
+      status: 'issued', paymentTxid: 'a'.repeat(64), assetId: 'rgb:issued',
+      pendingConfirmation: false, syncPending: false,
+    })
     expect(wallet.createRgbIssueNia).toHaveBeenCalledWith({
       orderId, ticker: 'TOK', name: 'Token', precision: 0, amounts: ['100'],
     })

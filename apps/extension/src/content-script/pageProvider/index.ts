@@ -20,8 +20,7 @@ export class UnisatProvider extends EventEmitter {
     getFundingUtxos: (assetId: string) => Promise<any>;
     getFeeUtxos: () => Promise<any>;
     getIssueAvailability: () => Promise<any>;
-    prepareIssueUtxo: (feeRate?: number) => Promise<any>;
-    issueNia: (params: { orderId: string; ticker: string; name: string; precision: number; amount: string }) => Promise<any>;
+    issueNia: (params: { orderId: string; ticker: string; name: string; precision: number; amount: string; paymentTxid?: string }) => Promise<any>;
     createReceiveInvoice: (params: { assetId?: string; amount?: string; durationSeconds?: number; recipientType?: 'blind' | 'witness' }) => Promise<any>;
     getPendingReceives: () => Promise<any>;
     acceptReceive: (recipientId: string) => Promise<any>;
@@ -53,7 +52,6 @@ export class UnisatProvider extends EventEmitter {
       getFundingUtxos: assetId => this.bitcoinAPI.getRgbFundingUtxos(assetId),
       getFeeUtxos: () => this.bitcoinAPI.getRgbFeeUtxos(),
       getIssueAvailability: () => this.bitcoinAPI.getRgbIssueAvailability(),
-      prepareIssueUtxo: feeRate => this.bitcoinAPI.prepareRgbIssueUtxo(feeRate),
       issueNia: params => this.bitcoinAPI.issueRgbNia(params),
       createReceiveInvoice: params => this.bitcoinAPI.createRgbReceiveInvoice(params),
       getPendingReceives: () => this.bitcoinAPI.getRgbPendingReceives(),

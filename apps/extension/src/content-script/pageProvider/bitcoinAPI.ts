@@ -281,11 +281,7 @@ export class BitcoinAPIMethods {
     return this.provider[requestMethodKey]({ method: 'getRgbIssueAvailability' });
   };
 
-  prepareRgbIssueUtxo = async (feeRate?: number) => {
-    return this.provider[requestMethodKey]({ method: 'prepareRgbIssueUtxo', params: { feeRate } });
-  };
-
-  issueRgbNia = async (params: { orderId: string; ticker: string; name: string; precision: number; amount: string }) => {
+  issueRgbNia = async (params: { orderId: string; ticker: string; name: string; precision: number; amount: string; paymentTxid?: string }) => {
     return this.provider[requestMethodKey]({ method: 'issueRgbNia', params });
   };
 

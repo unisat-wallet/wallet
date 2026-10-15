@@ -1147,6 +1147,28 @@ describe('RGB wallet references', () => {
       })
     )
     expect(result).toMatchObject({ local: true, psbtHex: '70736274ff' })
+
+    await wallet.createRgbUtxosBegin({
+      num: 1,
+      feeRate: 3,
+      payment: { address: 'bc1qservice', satoshis: 1500 },
+      issue: { name: 'Token', ticker: 'TOK', amount: '100', precision: 0 },
+    })
+    expect(sendSpy).toHaveBeenLastCalledWith(expect.objectContaining({
+      tos: [
+        { address: 'bc1p0rgbfundingaddress', satoshis: 330 },
+        { address: 'bc1qservice', satoshis: 1500 },
+      ],
+    }))
+    expect(wallet.getToSignData).toHaveBeenLastCalledWith(expect.objectContaining({
+      action: expect.objectContaining({
+        name: 'Issue RGB asset',
+        details: expect.arrayContaining([
+          expect.objectContaining({ label: 'Asset', value: 'Token (TOK)' }),
+          expect.objectContaining({ label: 'Service Fee', value: '1500 sats' }),
+        ]),
+      }),
+    }))
   })
 
   it('builds a withdrawal that spends only unlocked RGB Fee Pool UTXOs', async () => {
@@ -1317,6 +1339,12 @@ describe('RGB wallet references', () => {
     expect(service.queueUtxoSync.mock.invocationCallOrder[0]).toBeLessThan(
       syncOutbox.mock.invocationCallOrder[0]
     )
+
+    service.queueUtxoSync.mockRejectedValueOnce(new Error('temporary sync failure'))
+    await expect(wallet.createRgbUtxosEnd({ signedPsbt: signedPsbt.toBase64() })).resolves.toMatchObject({
+      txid: 'e'.repeat(64),
+      syncPending: true,
+    })
   })
 
   it('does not broadcast RGB funding UTXOs after the writer lease is fenced', async () => {

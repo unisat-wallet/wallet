@@ -36,6 +36,7 @@ interface Props {
       name?: string;
       precision?: number;
       orderId?: string;
+      toSignData?: ToSignData;
       invoice?: string;
       receive?: Receive;
     };
@@ -685,6 +686,20 @@ export function RgbPaymentCancel({ params: { session } }: Props) {
 
 export function RgbIssue({ params: { data, session } }: Props) {
   const { t } = useI18n();
+  const { resolveApproval, rejectApproval } = useApproval();
+  const { requestWrite, writeLeaseModal } = useRgbWriteLeaseGuard();
+  if (data.toSignData) {
+    return (
+      <>
+        <SignPsbt
+          params={{ data: { toSignDatas: [data.toSignData] }, session }}
+          handleCancel={() => void rejectApproval()}
+          handleConfirm={(signedDatas) => void requestWrite(() => void resolveApproval({ signedPsbt: signedDatas[0]?.psbtHex }))}
+        />
+        {writeLeaseModal}
+      </>
+    );
+  }
   return (
     <RgbApprovalLayout
       session={session}

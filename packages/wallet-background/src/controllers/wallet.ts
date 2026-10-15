@@ -543,6 +543,8 @@ type RgbIssueNiaRequest = {
 
 type RgbCreateUtxosBeginRequest = {
   wallet: RgbWalletRef
+  payment?: { address: string; satoshis: number }
+  issue?: { ticker: string; name: string; amount: string; precision: number }
   upTo?: boolean
   num?: number
   size?: number
@@ -5057,6 +5059,8 @@ export class WalletController extends BaseController {
       throw new Error(`RGB UTXO size must be at least ${RGB_FUNDING_UTXO_DUST} sats`)
     }
     if (!feeRate || feeRate <= 0) throw new Error('Invalid RGB UTXO fee rate')
+    if (params.payment && (!params.payment.address || !Number.isSafeInteger(params.payment.satoshis) ||
+        params.payment.satoshis < 546)) throw new Error('Invalid RGB issue service fee')
 
     const [btcUtxos, funding] = await Promise.all([
       this.getBTCUtxos(),
@@ -5068,7 +5072,10 @@ export class WalletController extends BaseController {
     // UTXOs only after the indexer observes the confirmed transaction.
     const { psbt, toSignInputs } = await txHelpers.sendBTC({
       btcUtxos,
-      tos: Array.from({ length: num }, () => ({ address: funding.address, satoshis: size })),
+      tos: [
+        ...Array.from({ length: num }, () => ({ address: funding.address, satoshis: size })),
+        ...(params.payment ? [params.payment] : []),
+      ],
       networkType: this.getNetworkType(),
       changeAddress: account.address,
       feeRate,
@@ -5082,11 +5089,20 @@ export class WalletController extends BaseController {
         autoFinalized: true,
       },
       action: {
-        name: 'Create RGB UTXO',
+        name: params.issue ? 'Issue RGB asset' : 'Create RGB UTXO',
         description: '',
         details: [
           { label: 'UTXO Count', type: PsbtActionDetailType.TEXT, value: String(num) },
           { label: 'RGB Address', type: PsbtActionDetailType.ADDRESS, value: funding.address },
+          ...(params.payment ? [
+            { label: 'Service Fee', type: PsbtActionDetailType.TEXT, value: `${params.payment.satoshis} sats` },
+            { label: 'Service Fee Address', type: PsbtActionDetailType.ADDRESS, value: params.payment.address },
+          ] : []),
+          ...(params.issue ? [
+            { label: 'Asset', type: PsbtActionDetailType.TEXT, value: `${params.issue.name} (${params.issue.ticker})` },
+            { label: 'Supply', type: PsbtActionDetailType.TEXT, value: `${params.issue.amount} atomic units` },
+            { label: 'Decimals', type: PsbtActionDetailType.TEXT, value: String(params.issue.precision) },
+          ] : []),
         ],
         type: PsbtActionType.CUSTOM,
       },
@@ -5132,20 +5148,26 @@ export class WalletController extends BaseController {
         allocations: [],
       }))
 
-    await service.queueUtxoSync({
-      txid,
-      outpoints: outpoints.map(outpoint => ({
-        outpoint: { txid: outpoint.txid, vout: outpoint.vout },
-        satoshis: outpoint.satoshis,
-        scriptPubKey: outpoint.scriptPk,
-        publicKey: outpoint.publicKey,
-        chainStatus: 'mempool',
-        allocations: outpoint.allocations,
-      })),
-    })
-    await this.syncRgbIndexerOutbox(service, wallet)
+    let syncPending = false
+    try {
+      await service.queueUtxoSync({
+        txid,
+        outpoints: outpoints.map(outpoint => ({
+          outpoint: { txid: outpoint.txid, vout: outpoint.vout },
+          satoshis: outpoint.satoshis,
+          scriptPubKey: outpoint.scriptPk,
+          publicKey: outpoint.publicKey,
+          chainStatus: 'mempool',
+          allocations: outpoint.allocations,
+        })),
+      })
+      await this.syncRgbIndexerOutbox(service, wallet)
+    } catch (error) {
+      syncPending = true
+      log.warn('RGB funding transaction was broadcast, but UTXO sync is pending', error)
+    }
 
-    return { txid, outpoints }
+    return { txid, outpoints, syncPending }
   }
 
   getRgbPendingVanillaTxs = () => this.rgbSendOperations.getPendingVanillaTxs()
