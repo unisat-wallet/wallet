@@ -60,6 +60,7 @@ export {
   getRgbTokenTicker,
   isCancelableRgbPendingInvoice,
   isDeletableRgbWitnessInvoice,
+  isInvoiceForAsset,
   useRGBReceiveScreenLogic,
   type RgbPendingReceiveInvoice,
   type RGBReceiveMode,

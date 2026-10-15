@@ -5,12 +5,21 @@ import {
   ANY_RGB_ASSET,
   isCancelableRgbPendingInvoice,
   isDeletableRgbWitnessInvoice,
+  isInvoiceForAsset,
   isRgbPendingInvoiceAwaitingAcceptance,
   useRGBReceiveScreenLogic,
 } from '../../src/ui-hooks/useRGBReceiveScreenLogic'
 import { createHookTestHarness } from './testHelpers'
 
 describe('useRGBReceiveScreenLogic', () => {
+  it('includes only the selected token and Any RGB Asset invoices for a token', () => {
+    const assetId = 'rgb:test-asset'
+    expect(isInvoiceForAsset({ invoice: 'specific', assetId }, assetId)).toBe(true)
+    expect(isInvoiceForAsset({ invoice: 'any' }, assetId)).toBe(true)
+    expect(isInvoiceForAsset({ invoice: 'other', assetId: 'rgb:other-asset' }, assetId)).toBe(false)
+    expect(isInvoiceForAsset({ invoice: 'other', assetId: 'rgb:other-asset' })).toBe(true)
+  })
+
   it('does not offer release for an accepted receipt awaiting settlement', () => {
     expect(
       isCancelableRgbPendingInvoice({

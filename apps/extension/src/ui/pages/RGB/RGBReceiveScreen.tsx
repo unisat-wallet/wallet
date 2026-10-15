@@ -671,7 +671,10 @@ export default function RGBReceiveScreen({ initialStep = 'create_invoice' }: { i
           title={t('pending_invoices')}
           RightComponent={
             <Icon
-              onClick={() => nav.navigate('RGBReceiveScreen', { initialStep: 'create_invoice' })}
+              onClick={() => nav.navigate('RGBReceiveScreen', {
+                initialStep: 'create_invoice',
+                ...(assetId ? { assetId } : {})
+              })}
               data-testid="rgb-invoice-list-create-button"
             >
               <PlusCircleOutlined />

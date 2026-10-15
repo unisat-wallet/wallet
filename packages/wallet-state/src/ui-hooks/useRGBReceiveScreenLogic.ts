@@ -211,7 +211,7 @@ const getPendingInvoiceList = (value: unknown): RgbPendingReceiveInvoice[] => {
   return []
 }
 
-const isInvoiceForAsset = (item: RgbPendingReceiveInvoice, assetId?: string) => {
+export const isInvoiceForAsset = (item: RgbPendingReceiveInvoice, assetId?: string) => {
   if (!assetId) return true
   return !item.assetId || item.assetId === assetId
 }

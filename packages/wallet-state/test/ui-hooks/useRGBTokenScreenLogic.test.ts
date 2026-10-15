@@ -18,6 +18,23 @@ describe('useRGBTokenScreenLogic', () => {
     balance: '12',
   }
 
+  it('opens the token invoice list with the selected asset and balance', async () => {
+    const { wrapper, wallet, navigation } = createHookTestHarness({ routeState: { assetId } })
+    wallet.getRGBAssetDetail.mockResolvedValue(detail)
+    wallet.getRGBAssetBalance.mockResolvedValue(fetchedBalance)
+    wallet.getRGBAssetActivity.mockResolvedValue({ list: [], total: 0 })
+
+    const { result } = renderHook(() => useRGBTokenScreenLogic(), { wrapper })
+    await waitFor(() => expect(result.current.tokenBalance).toEqual(fetchedBalance))
+
+    act(() => result.current.onClickViewInvoices())
+
+    expect(navigation.navigate).toHaveBeenCalledWith('RGBInvoiceListScreen', {
+      assetId,
+      tokenBalance: fetchedBalance,
+    })
+  })
+
   it('fetches token balance when route tokenBalance is missing', async () => {
     const { wrapper, wallet } = createHookTestHarness({
       routeState: { assetId },

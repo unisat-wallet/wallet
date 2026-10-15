@@ -231,6 +231,12 @@ export function useRGBTokenScreenLogic() {
       tokenBalance: resolvedTokenBalance,
     })
   }
+  const onClickViewInvoices = () => {
+    nav.navigate('RGBInvoiceListScreen', {
+      assetId,
+      tokenBalance: resolvedTokenBalance,
+    })
+  }
   const onClickSend = () => {
     nav.navigate('SendRGBScreen', {
       assetId,
@@ -268,5 +274,6 @@ export function useRGBTokenScreenLogic() {
     enableTransfer,
     onClickSend,
     onClickReceive,
+    onClickViewInvoices,
   }
 }

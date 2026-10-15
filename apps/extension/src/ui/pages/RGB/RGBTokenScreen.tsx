@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 
 import {
   Button,
@@ -16,6 +16,7 @@ import {
 import { TabBar } from '@/ui/components/TabBar';
 import { colors } from '@/ui/theme/colors';
 import { fontSizes } from '@/ui/theme/font';
+import { RgbReceiveSelectorModal } from '../Main/WalletTabScreen/RgbReceiveSelectorModal';
 import {
   getRgbTokenPrecision,
   RGBTokenScreenTabKey,
@@ -29,7 +30,9 @@ import { useRgbWriteLeaseGuard } from './components/useRgbWriteLeaseGuard';
 
 export default function RGBTokenScreen() {
   const { requestWrite, writeLeaseModal } = useRgbWriteLeaseGuard();
+  const [receiveSelectorOpen, setReceiveSelectorOpen] = useState(false);
   const {
+    assetId: routeAssetId,
     tokenSummary,
     loading,
     iconInfo,
@@ -41,6 +44,7 @@ export default function RGBTokenScreen() {
     onLoadMoreActivity,
     onRefreshActivity,
     onClickReceive,
+    onClickViewInvoices,
     onClickSend,
     enableTransfer,
     activeTab,
@@ -53,7 +57,7 @@ export default function RGBTokenScreen() {
   const tokenBalance = (tokenSummaryAny?.tokenBalance || tokenInfo) as Record<string, any> | undefined;
   const ticker = tokenInfo?.ticker || 'RGB';
   const name = tokenInfo?.name || ticker;
-  const assetId = tokenInfo?.assetId || '';
+  const assetId = routeAssetId || tokenInfo?.assetId || '';
   const precision = getRgbTokenPrecision(tokenBalance) || getRgbTokenPrecision(tokenInfo);
   const spendable =
     tokenBalance?.spendable === undefined ? '--' : toRgbDisplayAmount(tokenBalance.spendable, precision);
@@ -208,7 +212,7 @@ export default function RGBTokenScreen() {
               text={t('receive')}
               preset="brc20-action"
               icon="receive"
-              onClick={() => void requestWrite(onClickReceive)}
+              onClick={() => setReceiveSelectorOpen(true)}
               full
               textStyle={{ fontSize: 14 }}
               data-testid="rgb-receive-button"
@@ -227,6 +231,20 @@ export default function RGBTokenScreen() {
           </Row>
         </Column>
       </Footer>
+      {receiveSelectorOpen && (
+        <RgbReceiveSelectorModal
+          assetId={assetId}
+          onClose={() => setReceiveSelectorOpen(false)}
+          onViewInvoices={() => {
+            setReceiveSelectorOpen(false);
+            onClickViewInvoices();
+          }}
+          onCreateInvoice={() => {
+            setReceiveSelectorOpen(false);
+            void requestWrite(onClickReceive);
+          }}
+        />
+      )}
       {writeLeaseModal}
     </Layout>
   );

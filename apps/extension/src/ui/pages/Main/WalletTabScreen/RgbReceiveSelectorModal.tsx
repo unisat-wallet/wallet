@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 
 import { BottomSheetHeader, Card, Column, Icon, Row, Text } from '@/ui/components';
 import { BottomModal } from '@/ui/components/BottomModal';
-import { useChainType, useCurrentAccount, useCurrentKeyring, useI18n, useWallet } from '@unisat/wallet-state';
+import { isInvoiceForAsset, useChainType, useCurrentAccount, useCurrentKeyring, useI18n, useWallet } from '@unisat/wallet-state';
 
 function SelectorChevron() {
   return <Icon icon="right" size={20} style={{ backgroundColor: 'rgba(255, 255, 255, 0.65)' }} />;
@@ -11,11 +11,13 @@ function SelectorChevron() {
 export function RgbReceiveSelectorModal({
   onClose,
   onViewInvoices,
-  onCreateInvoice
+  onCreateInvoice,
+  assetId
 }: {
   onClose: () => void;
   onViewInvoices: () => void;
   onCreateInvoice: () => void;
+  assetId?: string;
 }) {
   const { t } = useI18n();
   const wallet = useWallet();
@@ -31,7 +33,7 @@ export function RgbReceiveSelectorModal({
     void wallet
       .getRgbPendingReceiveInvoices({ skipSync: true })
       .then(({ list }) => {
-        if (active) setInvoiceCount(list.filter((invoice) => Boolean(invoice.invoice)).length);
+        if (active) setInvoiceCount(list.filter((invoice) => Boolean(invoice.invoice) && isInvoiceForAsset(invoice, assetId)).length);
       })
       .catch(() => {
         // Keep the list reachable when the count could not be loaded.
@@ -40,7 +42,7 @@ export function RgbReceiveSelectorModal({
     return () => {
       active = false;
     };
-  }, [wallet, account.key, keyring?.key, chainType]);
+  }, [wallet, account.key, keyring?.key, chainType, assetId]);
 
   return (
     <BottomModal onClose={onClose} bodyStyle={{ padding: 0 }}>
