@@ -44,9 +44,9 @@ import { RGBTransferNotificationPanel } from '../../RGB/components/RGBTransferNo
 import { RgbFeatureActivationModal } from '../../RGB/components/RgbFeatureActivationModal';
 import { SwitchChainModal } from '../../Settings/SwitchChainModal';
 import { AddressHistorySection } from '../../Wallet/HistoryScreen/AddressHistorySection';
-import { MoreActionItem, MoreActionSheet } from './MoreActionSheet';
+import { AlkanesCollectionList } from './AlkanesCollectionList';
+import { AlkanesList } from './AlkanesList';
 import { BRC20Tab } from './BRC20Tab';
-import { MoreTab } from './MoreTab';
 import { OrdinalsTab } from './OrdinalsTab';
 import { RGBHomeTabs } from './RGBHomeTabs';
 import { RunesList } from './RunesList';
@@ -58,6 +58,7 @@ import { HomeTips } from './components/HomeTips';
 import { WalletActions } from './components/WalletActions';
 
 const STORAGE_VERSION_KEY = 'version_detail';
+const ALKANES_COLLECTION_TAB_KEY = 'alkanes_collection';
 const dismissedRgbBroadcastIdsByContext = new Map<string, Set<string>>();
 const dismissedRgbAcceptanceIdsByContext = new Map<string, Set<string>>();
 
@@ -186,7 +187,7 @@ export default function WalletTabScreen({ screen = 'home' }: { screen?: 'home' |
     rgbCount: number;
   } | null>(null);
   const [assetCountErrorKey, setAssetCountErrorKey] = useState<string | null>(null);
-  const [pinnedSelection, setPinnedSelection] = useState<{ contextKey: string; tabKey: AssetTabKey } | null>(null);
+  const [pinnedSelection, setPinnedSelection] = useState<{ contextKey: string; tabKey: string } | null>(null);
   const [rgbFeatureEnabled, setRgbFeatureEnabled] = useState(false);
   const [rgbRemoteRecoveryAvailable, setRgbRemoteRecoveryAvailable] = useState(false);
   const [rgbStatusContextKey, setRgbStatusContextKey] = useState('');
@@ -381,82 +382,59 @@ export default function WalletTabScreen({ screen = 'home' }: { screen?: 'home' |
     counts.brc20Count + counts.summary.inscriptionCount + counts.summary.runesCount +
     counts.summary.alkanesCount + counts.summary.alkanesCollectionCount + counts.rgbCount > 0
   ) : false;
-  const showAllBaseTabs = (!counts && !assetTabsLoading) || Boolean(counts && !hasAnyAsset);
   const tabCounts = [
-    { key: AssetTabKey.BRC20, supported: supportedAssets.assets.brc20, count: counts?.brc20Count ?? 0 },
-    { key: AssetTabKey.ORDINALS, supported: supportedAssets.assets.ordinals, count: counts?.summary.inscriptionCount ?? 0 },
-    { key: AssetTabKey.RUNES, supported: supportedAssets.assets.runes, count: counts?.summary.runesCount ?? 0 },
-    { key: AssetTabKey.RGB, supported: supportedAssets.assets.rgb, count: counts?.rgbCount ?? 0 },
+    { key: String(AssetTabKey.BRC20), assetTabKey: AssetTabKey.BRC20, supported: supportedAssets.assets.brc20, count: counts?.brc20Count ?? 0 },
+    { key: String(AssetTabKey.ORDINALS), assetTabKey: AssetTabKey.ORDINALS, supported: supportedAssets.assets.ordinals, count: counts?.summary.inscriptionCount ?? 0 },
+    { key: String(AssetTabKey.RUNES), assetTabKey: AssetTabKey.RUNES, supported: supportedAssets.assets.runes, count: counts?.summary.runesCount ?? 0 },
+    { key: String(AssetTabKey.RGB), assetTabKey: AssetTabKey.RGB, supported: supportedAssets.assets.rgb, count: counts?.rgbCount ?? 0 },
     {
-      key: AssetTabKey.ALKANES,
+      key: String(AssetTabKey.ALKANES),
+      assetTabKey: AssetTabKey.ALKANES,
+      moreAssetTabKey: MoreAssetTabKey.ALKANES_TOKEN,
       supported: supportedAssets.assets.alkanes,
-      count: (counts?.summary.alkanesCount ?? 0) + (counts?.summary.alkanesCollectionCount ?? 0)
+      count: counts?.summary.alkanesCount ?? 0
+    },
+    {
+      key: ALKANES_COLLECTION_TAB_KEY,
+      assetTabKey: AssetTabKey.ALKANES,
+      moreAssetTabKey: MoreAssetTabKey.ALKANES_COLLECTION,
+      supported: supportedAssets.assets.alkanes,
+      count: counts?.summary.alkanesCollectionCount ?? 0
     }
   ];
+  const selectedTabKey = effectiveAssetTabKey === AssetTabKey.ALKANES &&
+    moreAssetTabKey === MoreAssetTabKey.ALKANES_COLLECTION
+    ? ALKANES_COLLECTION_TAB_KEY
+    : String(effectiveAssetTabKey);
   useEffect(() => {
     if (assetTabsLoading || !counts || !hasAnyAsset ||
-        (pinnedSelection?.contextKey === assetContextKey && pinnedSelection.tabKey === effectiveAssetTabKey)) return;
-    const selected = tabCounts.find(({ key }) => key === effectiveAssetTabKey);
-    if (effectiveAssetTabKey === AssetTabKey.ALKANES && counts.summary.alkanesCount === 0 &&
-        counts.summary.alkanesCollectionCount > 0 && moreAssetTabKey !== MoreAssetTabKey.ALKANES_COLLECTION) {
-      dispatch(uiActions.updateAssetTabScreen({ moreAssetTabKey: MoreAssetTabKey.ALKANES_COLLECTION }));
-      return;
-    }
-    if (effectiveAssetTabKey === AssetTabKey.ALKANES && counts.summary.alkanesCount > 0 &&
-        counts.summary.alkanesCollectionCount === 0 && moreAssetTabKey !== MoreAssetTabKey.ALKANES_TOKEN) {
-      dispatch(uiActions.updateAssetTabScreen({ moreAssetTabKey: MoreAssetTabKey.ALKANES_TOKEN }));
-      return;
-    }
-    if (selected?.supported && (selected.count > 0 || (selected.key === AssetTabKey.RGB && isRgbActive))) return;
+        (pinnedSelection?.contextKey === assetContextKey && pinnedSelection.tabKey === selectedTabKey)) return;
+    const selected = tabCounts.find(({ key }) => key === selectedTabKey);
+    if (selected?.supported && selected.count > 0) return;
     const firstPopulated = tabCounts.find(({ supported, count }) => supported && count > 0);
     if (firstPopulated) {
       dispatch(uiActions.updateAssetTabScreen({
-        assetTabKey: firstPopulated.key,
-        ...(firstPopulated.key === AssetTabKey.ALKANES
-          ? { moreAssetTabKey: counts.summary.alkanesCount > 0
-            ? MoreAssetTabKey.ALKANES_TOKEN : MoreAssetTabKey.ALKANES_COLLECTION } : {})
+        assetTabKey: firstPopulated.assetTabKey,
+        ...(firstPopulated.moreAssetTabKey ? { moreAssetTabKey: firstPopulated.moreAssetTabKey } : {})
       }));
     }
-  }, [assetContextKey, assetCounts, assetTabsLoading, effectiveAssetTabKey, hasAnyAsset, pinnedSelection, supportedAssets.key, moreAssetTabKey, isRgbActive, dispatch]);
-  const visibleAssetTabs = [
-    ...tabCounts
-  ].filter(({ key, supported, count }) => supported && (
-    count > 0 || (key === AssetTabKey.RGB && isRgbActive) ||
-    (key === effectiveAssetTabKey && !assetTabsLoading && (!counts || !hasAnyAsset ||
-      (pinnedSelection?.contextKey === assetContextKey && pinnedSelection.tabKey === key))) ||
-    (showAllBaseTabs && key !== AssetTabKey.ALKANES)
-  ));
+  }, [assetContextKey, assetCounts, assetTabsLoading, selectedTabKey, hasAnyAsset, pinnedSelection, supportedAssets.key, dispatch]);
+  const visibleAssetTabs = tabCounts
+    .filter(({ supported }) => supported)
+    .sort((left, right) => Number(right.count > 0) - Number(left.count > 0));
   const visibleTabKeys = visibleAssetTabs.map(({ key }) => key);
-
-  const moreActionItems: MoreActionItem[] = [
-    ...(!visibleTabKeys.includes(AssetTabKey.BRC20) && supportedAssets.assets.brc20
-      ? [{ assetTabKey: AssetTabKey.BRC20, label: t('brc20'), icon: 'assets' as const }] : []),
-    ...(!visibleTabKeys.includes(AssetTabKey.ORDINALS) && supportedAssets.assets.ordinals
-      ? [{ assetTabKey: AssetTabKey.ORDINALS, label: t('ordinals'), icon: 'ordinals' as const }] : []),
-    ...(!visibleTabKeys.includes(AssetTabKey.RUNES) && supportedAssets.assets.runes
-      ? [{ assetTabKey: AssetTabKey.RUNES, label: t('runes'), icon: 'assets' as const }] : []),
-    ...(!visibleTabKeys.includes(AssetTabKey.RGB) && supportedAssets.assets.rgb
-      ? [{ assetTabKey: AssetTabKey.RGB, label: t('rgb'), icon: 'rgb' as const }] : []),
-    ...(supportedAssets.assets.alkanes ? [
-      ...(!visibleTabKeys.includes(AssetTabKey.ALKANES) || moreAssetTabKey === MoreAssetTabKey.ALKANES_COLLECTION
-        ? [{ assetTabKey: AssetTabKey.ALKANES, moreAssetTabKey: MoreAssetTabKey.ALKANES_TOKEN, label: t('alkanes'), icon: 'alkanes' as const }]
-        : []),
-      { assetTabKey: AssetTabKey.ALKANES, moreAssetTabKey: MoreAssetTabKey.ALKANES_COLLECTION,
-        label: t('alkanes_collections'), icon: 'alkanes' as const }
-    ] : [])
-  ];
 
   const tabItems = useMemo(() => {
     const items: {
-      key: AssetTabKey;
+      key: string;
       label: string | JSX.Element;
       children: JSX.Element;
     }[] = [];
     for (const key of visibleTabKeys) {
-      if (key === AssetTabKey.BRC20) items.push({ key, label: t('brc20'), children: <BRC20Tab /> });
-      if (key === AssetTabKey.ORDINALS) items.push({ key, label: t('ordinals'), children: <OrdinalsTab /> });
-      if (key === AssetTabKey.RUNES) items.push({ key, label: t('runes'), children: <RunesList /> });
-      if (key === AssetTabKey.RGB) items.push({
+      if (key === String(AssetTabKey.BRC20)) items.push({ key, label: t('brc20'), children: <BRC20Tab /> });
+      if (key === String(AssetTabKey.ORDINALS)) items.push({ key, label: t('ordinals'), children: <OrdinalsTab /> });
+      if (key === String(AssetTabKey.RUNES)) items.push({ key, label: t('runes'), children: <RunesList /> });
+      if (key === String(AssetTabKey.RGB)) items.push({
         key,
         label: t('rgb'),
         children: isRgbActive ? (
@@ -472,17 +450,17 @@ export default function WalletTabScreen({ screen = 'home' }: { screen?: 'home' |
           </Column>
         )
       });
-      if (key === AssetTabKey.ALKANES) items.push({ key, label: t('alkanes'), children: <MoreTab /> });
+      if (key === String(AssetTabKey.ALKANES)) items.push({ key, label: t('alkanes'), children: <AlkanesList /> });
+      if (key === ALKANES_COLLECTION_TAB_KEY) items.push({ key, label: t('alkanes_collections'), children: <AlkanesCollectionList /> });
     }
     return items;
   }, [visibleTabKeys.join(','), t, isRgbActive, rgbTransfers, rgbList, rgbRecoveryAvailable, chain.enum, currentAccount.key]);
 
-  const finalAssetTabKey = visibleTabKeys.includes(effectiveAssetTabKey)
-    ? effectiveAssetTabKey
-    : (visibleTabKeys[0] ?? AssetTabKey.BRC20);
+  const finalAssetTabKey = visibleTabKeys.includes(selectedTabKey)
+    ? selectedTabKey
+    : (visibleTabKeys[0] ?? String(AssetTabKey.BRC20));
 
   const [switchChainModalVisible, setSwitchChainModalVisible] = useState(false);
-  const [moreSheetOpen, setMoreSheetOpen] = useState(false);
 
   const mainContent = (
     <>
@@ -511,37 +489,18 @@ export default function WalletTabScreen({ screen = 'home' }: { screen?: 'home' |
             </Row>
           ) : <Tabs
             contentGap={24}
-            defaultActiveKey={finalAssetTabKey as unknown as string}
-            activeKey={finalAssetTabKey as unknown as string}
-            items={tabItems as unknown as any[]}
-            trailingAction={moreActionItems.length ? (
-              <button
-                type="button"
-                aria-label={t('more')}
-                title={t('more')}
-                data-testid="asset-tabs-more"
-                onClick={() => setMoreSheetOpen(true)}
-                style={{
-                  width: 36,
-                  height: 40,
-                  border: 0,
-                  borderRadius: 8,
-                  background: 'transparent',
-                  color: 'rgba(255,255,255,0.65)',
-                  fontSize: 25,
-                  lineHeight: 1,
-                  cursor: 'pointer'
-                }}>
-                ⋯
-              </button>
-            ) : undefined}
+            hideScrollbar
+            defaultActiveKey={finalAssetTabKey}
+            activeKey={finalAssetTabKey}
+            items={tabItems}
             onTabClick={(key) => {
-              if ((key as unknown as AssetTabKey) === AssetTabKey.ALKANES &&
-                  counts && counts.summary.alkanesCount === 0 && counts.summary.alkanesCollectionCount > 0) {
-                dispatch(uiActions.updateAssetTabScreen({ moreAssetTabKey: MoreAssetTabKey.ALKANES_COLLECTION }));
-              }
-              setPinnedSelection(null);
-              dispatch(uiActions.updateAssetTabScreen({ assetTabKey: key as unknown as AssetTabKey }));
+              const selected = visibleAssetTabs.find((item) => item.key === key);
+              if (!selected) return;
+              setPinnedSelection({ contextKey: assetContextKey, tabKey: key });
+              dispatch(uiActions.updateAssetTabScreen({
+                assetTabKey: selected.assetTabKey,
+                ...(selected.moreAssetTabKey ? { moreAssetTabKey: selected.moreAssetTabKey } : {})
+              }));
             }}
           />}
         </Column>
@@ -636,23 +595,6 @@ export default function WalletTabScreen({ screen = 'home' }: { screen?: 'home' |
         {screen === 'home' && (
           <RgbRecoveryConflictModal key={`${chain.enum}:${currentAccount.address}`} enabled={isRgbActive} />
         )}
-        {screen === 'assets' && !assetTabsLoading && moreSheetOpen ? (
-          <MoreActionSheet
-            items={moreActionItems}
-            currentSelection={{ assetTabKey: effectiveAssetTabKey, moreAssetTabKey }}
-            onClose={() => setMoreSheetOpen(false)}
-            onSelect={(selection) => {
-              setMoreSheetOpen(false);
-              setPinnedSelection({ contextKey: assetContextKey, tabKey: selection.assetTabKey });
-              dispatch(
-                uiActions.updateAssetTabScreen({
-                  assetTabKey: selection.assetTabKey,
-                  moreAssetTabKey: selection.moreAssetTabKey
-                })
-              );
-            }}
-          />
-        ) : null}
         {rgbActivationOpen && (
           <RgbFeatureActivationModal
             loading={rgbActivationLoading}

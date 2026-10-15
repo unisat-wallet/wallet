@@ -6,6 +6,7 @@ import { spacing, spacingGap } from '@/ui/theme/spacing';
 import { Column } from '../Column';
 import { Row } from '../Row';
 import { Text } from '../Text';
+import './index.less';
 
 interface TabItem {
   key: string;
@@ -20,11 +21,12 @@ interface TabsProps {
   preset?: string;
   tabBar?: React.ReactNode;
   trailingAction?: React.ReactNode;
+  hideScrollbar?: boolean;
   contentGap?: number;
   onTabClick: (key: string) => void;
 }
 
-export function Tabs({ preset, items, defaultActiveKey, activeKey, onTabClick, trailingAction, contentGap }: TabsProps) {
+export function Tabs({ preset, items, defaultActiveKey, activeKey, onTabClick, trailingAction, hideScrollbar, contentGap }: TabsProps) {
   const [activeTab, setActiveTab] = useState(defaultActiveKey);
 
   const renderedTabs = useRef<Set<string>>(new Set([defaultActiveKey]));
@@ -84,7 +86,9 @@ export function Tabs({ preset, items, defaultActiveKey, activeKey, onTabClick, t
             ...bleedStyle
           }}>
           <Row style={{ height: 50, gap: 0, alignItems: 'stretch' }}>
-            <Row style={{ flex: 1, minWidth: 0, gap: spacing.medium, paddingLeft: spacing.medium, paddingRight: trailingAction ? 0 : spacing.medium, overflowX: 'auto' }}>
+            <Row
+              classname={hideScrollbar ? 'tabs-hidden-scrollbar' : undefined}
+              style={{ flex: 1, minWidth: 0, gap: spacing.medium, paddingLeft: spacing.medium, paddingRight: trailingAction ? 0 : spacing.medium, overflowX: 'auto', scrollbarWidth: hideScrollbar ? 'none' : undefined }}>
               {items.map((item) => {
                 const isActiveItem = item.key === activeTab;
                 return (
@@ -121,7 +125,7 @@ export function Tabs({ preset, items, defaultActiveKey, activeKey, onTabClick, t
         </Column>
       );
     }
-  }, [items, activeTab, onTabClick, preset, trailingAction]);
+  }, [items, activeTab, onTabClick, preset, trailingAction, hideScrollbar]);
 
   return (
     <Column gap="zero">
