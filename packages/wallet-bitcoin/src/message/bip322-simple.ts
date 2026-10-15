@@ -177,7 +177,17 @@ function verifySignatureOfBIP322Simple_P2PWPKH(
   const data = Buffer.from(sign, 'base64')
   const _res = bitcoin.script.decompile(data.slice(1))
 
-  if (!_res) return false
+  if (!_res || _res.length !== 2 || !Buffer.isBuffer(_res[0]) || !Buffer.isBuffer(_res[1])) {
+    return false
+  }
+
+  const pubkey = _res[1]
+  try {
+    const pubkeyOutputScript = bitcoin.payments.p2wpkh({ pubkey, network }).output
+    if (!pubkeyOutputScript?.equals(outputScript)) return false
+  } catch {
+    return false
+  }
 
   const psbtToSign = new bitcoin.Psbt()
   psbtToSign.setVersion(0)
@@ -195,8 +205,8 @@ function verifySignatureOfBIP322Simple_P2PWPKH(
   psbtToSign.updateInput(0, {
     partialSig: [
       {
-        pubkey: _res[1] as any,
-        signature: _res[0] as any,
+        pubkey,
+        signature: _res[0],
       },
     ],
   })
