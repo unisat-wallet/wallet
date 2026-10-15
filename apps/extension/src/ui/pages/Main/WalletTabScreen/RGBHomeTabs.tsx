@@ -6,6 +6,7 @@ import {
   useI18n,
   useCurrentAccountCapabilities,
   useNavigation,
+  useUnisatWebsite,
   useRGBListLogic,
   useRGBTransfersLogic,
   type RgbTransferItem
@@ -25,15 +26,16 @@ type RGBHomeTabsProps = {
 export function RGBHomeTabs({ transfers, list }: RGBHomeTabsProps) {
   const { t } = useI18n();
   const nav = useNavigation();
+  const unisatWebsite = useUnisatWebsite();
   const accountCapabilities = useCurrentAccountCapabilities();
   const [receiveSelectorOpen, setReceiveSelectorOpen] = useState(false);
   const [sendSelectorOpen, setSendSelectorOpen] = useState(false);
   const [actionMenuOpen, setActionMenuOpen] = useState(false);
   const [selectedPendingTransfer, setSelectedPendingTransfer] = useState<RgbTransferItem>();
   const [handledTransferIds, setHandledTransferIds] = useState<Set<string>>(() => new Set());
-  const openIssueScreen = () => {
+  const openIssueWebsite = () => {
     setActionMenuOpen(false);
-    nav.navigate('RGBIssueScreen');
+    nav.navToUrl(`${unisatWebsite.replace(/\/$/, '')}/inscribe/rgb`);
   };
   const openHistoryScreen = () => {
     setActionMenuOpen(false);
@@ -219,7 +221,7 @@ export function RGBHomeTabs({ transfers, list }: RGBHomeTabsProps) {
               <Card
                 fullX
                 itemsCenter
-                onClick={openIssueScreen}
+                onClick={openIssueWebsite}
                 data-testid="issue-button"
                 style={{ minHeight: 56, padding: '10px 12px', borderRadius: 10, cursor: 'pointer' }}
               >

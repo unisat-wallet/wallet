@@ -139,7 +139,7 @@ type RgbIssueWalletOrder = {
 }
 
 async function getRgbIssueWalletOrder(orderId: string): Promise<RgbIssueWalletOrder> {
-  if (!/^[0-9a-f-]{36}$/i.test(orderId)) throw new Error('invalid RGB issue order ID')
+  if (!/^\d{6}-RGB20-[A-Z0-9]{8}$/.test(orderId)) throw new Error('invalid RGB issue order ID')
   const walletApiUrl = CHAINS_MAP[wallet.getChainType()]?.endpoints[0]
   if (!walletApiUrl) throw new Error('RGB issuance orders are unavailable on this network')
   const response = await fetch(`${walletApiUrl}/v5/rgb/issue/order/${orderId}`)

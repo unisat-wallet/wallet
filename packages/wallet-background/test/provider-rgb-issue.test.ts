@@ -28,7 +28,7 @@ vi.mock('../src/controllers/wallet', () => ({
 import providerController from '../src/controllers/provider/controller'
 import wallet from '../src/controllers/wallet'
 
-const orderId = 'f7f0e1f0-0000-4000-8000-000000000001'
+const orderId = '202610-RGB20-ABC12345'
 const params = { orderId, ticker: 'TOK', name: 'Token', precision: 0, amount: '100' }
 const chainType = ChainType.BITCOIN_MAINNET
 const feeAddress = bitcoin.payments.p2wpkh({ hash: Buffer.alloc(20, 2), network: bitcoin.networks.bitcoin }).address!

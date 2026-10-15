@@ -1,5 +1,5 @@
 import React from 'react'
-import { act, cleanup, fireEvent, render, waitFor } from '@testing-library/react'
+import { act, cleanup, fireEvent, render } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 const mocks = vi.hoisted(() => ({
@@ -53,17 +53,6 @@ vi.mock('@/ui/components/LoadingPage', () => ({ default: () => null }))
 vi.mock('../../../../apps/extension/src/ui/pages/Approval/components', () => ({
   SignPsbt: () => null,
 }))
-vi.mock('../../../../apps/extension/src/ui/pages/RGB/RGBIssueScreen.less', () => ({}))
-vi.mock('../../../../apps/extension/src/ui/pages/RGB/components/useRgbWriteLeaseGuard', () => ({
-  useRgbWriteLeaseGuard: () => ({
-    requestWrite: (action: () => void) => action(),
-    writeLeaseModal: null,
-  }),
-}))
-vi.mock('../../../../apps/extension/src/ui/pages/RGB/components/IssueReviewModal', () => ({
-  IssueReviewModal: ({ onConfirm }: any) =>
-    React.createElement('button', { onClick: onConfirm }, 'review confirm'),
-}))
 vi.mock('../../../../apps/extension/src/ui/components/Button', () => ({
   Button: ({ text, disabled, onClick }: any) =>
     React.createElement('button', { disabled, onClick }, text),
@@ -84,7 +73,6 @@ vi.mock('../../../../apps/extension/src/ui/components/FeeRateBar', () => ({
 vi.mock('../../../../apps/extension/src/ui/components/RBFBar', () => ({ RBFBar: () => null }))
 
 import { MergeBTCPopover } from '../../../../apps/extension/src/ui/components/MergeBTCPopover'
-import RGBIssueScreen from '../../../../apps/extension/src/ui/pages/RGB/RGBIssueScreen'
 
 afterEach(cleanup)
 beforeEach(() => {
@@ -108,37 +96,5 @@ describe('extension fee submission controls', () => {
       fireEvent.click(view.getByText('confirm'))
     })
     expect(mocks.prepare).toHaveBeenCalledWith(expect.objectContaining({ feeRate: 2.5 }))
-  })
-
-  it('blocks RGB issuance for an empty fee instead of using the backend default', async () => {
-    const view = render(React.createElement(RGBIssueScreen))
-    await waitFor(() => expect(mocks.wallet.getRgbFundingAddress).toHaveBeenCalled())
-    fireEvent.change(view.getByPlaceholderText('asset_display_name'), {
-      target: { value: 'Test Asset' },
-    })
-    fireEvent.change(view.getByPlaceholderText('ticker_placeholder'), { target: { value: 'TEST' } })
-    fireEvent.change(view.getByPlaceholderText('enter_total_supply'), { target: { value: '10' } })
-    await waitFor(() =>
-      expect((view.getByText('issue_asset') as HTMLButtonElement).disabled).toBe(false)
-    )
-    mocks.feeRate = 0
-    view.rerender(React.createElement(RGBIssueScreen))
-    expect((view.getByText('issue_asset') as HTMLButtonElement).disabled).toBe(true)
-    fireEvent.click(view.getByText('issue_asset'))
-    expect(view.queryByText('review confirm')).toBeNull()
-    expect(mocks.wallet.createRgbUtxosBegin).not.toHaveBeenCalled()
-    expect(mocks.wallet.createRgbIssueNia).not.toHaveBeenCalled()
-    mocks.feeRate = 2.5
-    view.rerender(React.createElement(RGBIssueScreen))
-    await waitFor(() =>
-      expect((view.getByText('issue_asset') as HTMLButtonElement).disabled).toBe(false)
-    )
-    fireEvent.click(view.getByText('issue_asset'))
-    await act(async () => {
-      fireEvent.click(view.getByText('review confirm'))
-    })
-    await waitFor(() =>
-      expect(mocks.wallet.createRgbUtxosBegin).toHaveBeenCalledWith({ num: 5, feeRate: 2.5 })
-    )
   })
 })
