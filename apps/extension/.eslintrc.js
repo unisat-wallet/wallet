@@ -76,6 +76,26 @@ module.exports = {
   },
   overrides: [
     {
+      files: ['src/ui/**/*.{ts,tsx}'],
+      rules: {
+        'no-restricted-imports': [
+          'error',
+          {
+            patterns: [
+              '@unisat/tx-helpers',
+              '@unisat/tx-helpers/*',
+              '@unisat/wallet-bitcoin',
+              '@unisat/wallet-bitcoin/*',
+              'bitcoinjs-lib',
+              'bitcoinjs-lib/*',
+              'tiny-secp256k1',
+              'bip174'
+            ]
+          }
+        ]
+      }
+    },
+    {
       files: ['**/*.tsx'],
       rules: {
         'react/prop-types': 'off'

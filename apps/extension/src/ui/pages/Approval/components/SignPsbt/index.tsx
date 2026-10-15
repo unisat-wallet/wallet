@@ -13,8 +13,7 @@ import KeystoneSignScreen from '@/ui/pages/Wallet/KeystoneSignScreen';
 import { fontSizes } from '@/ui/theme/font';
 import { numUtils } from '@unisat/base-utils';
 import { KeystoneSignEnum } from '@unisat/keyring-service/types';
-import { getSighashSingleInputIndexes } from '@unisat/tx-helpers';
-import { AccountSignMethod } from '@unisat/wallet-shared';
+import { AccountSignMethod, getSighashSingleInputIndexes } from '@unisat/wallet-shared';
 import {
   PsbtLocalInfo,
   SignPsbtProps,
