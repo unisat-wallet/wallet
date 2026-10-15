@@ -12,7 +12,7 @@ import {
   toRgbAtomicAmount,
   toRgbDisplayAmount,
 } from 'src/utils/rgb-amount-utils'
-import { useRGBListLogic } from './useRGBListLogic'
+import { UNCONFIGURED_RGB_USDT_ASSET_ID, useRGBListLogic } from './useRGBListLogic'
 
 export type RGBReceiveMode = 'any' | 'fixed'
 export type RGBInvoiceRecipientType = 'blind' | 'witness'
@@ -191,7 +191,7 @@ export const getRgbTokenIconInfo = (value: unknown, ticker: string) => {
   const name = readStringPath(tokenInfo, ['name']) || readStringPath(record, ['name'])
   const iconUrl = readStringPath(iconInfo, ['iconUrl']) || readStringPath(record, ['iconUrl']) || ''
   const iconShortName = getRgbIconShortName(name, ticker)
-  return { iconUrl, iconShortName }
+  return { iconUrl, iconShortName, isConfiguredUsdt: record?.['configuredUsdt'] === true }
 }
 
 const getPendingInvoiceList = (value: unknown): RgbPendingReceiveInvoice[] => {
@@ -301,7 +301,8 @@ export function useRGBReceiveScreenLogic(
   const tools = useTools()
   const { t } = useI18n()
   const { feeRate } = useFeeRateBar()
-  const { items: rgbItems = [], loading: rgbLoading } = useRGBListLogic({ focused: true })
+  const { items: allRgbItems = [], loading: rgbLoading } = useRGBListLogic({ focused: true })
+  const rgbItems = allRgbItems.filter(item => getRgbAssetId(item) !== UNCONFIGURED_RGB_USDT_ASSET_ID)
   const rgbWallet = wallet as typeof wallet & RgbAllocationWallet & RgbReceiveWallet
   const routeState = nav.getRouteState<'RGBReceiveScreen'>() as RGBReceiveRouteState
   const routeAssetId = routeState?.assetId || ''
@@ -363,9 +364,9 @@ export function useRGBReceiveScreenLogic(
   const assetId = selectedSpecificAssetId === ANY_RGB_ASSET_ID ? '' : selectedSpecificAssetId
   // An Any Asset invoice intentionally has no contract metadata. In
   // particular, it cannot state a human-readable amount because the asset
-  // precision is unknown. Fixed invoice amounts are therefore available only
-  // after selecting a concrete asset.
-  const canSetFixedAmount = Boolean(assetId)
+  // precision is unknown. A configured token without local contract metadata
+  // also cannot encode a fixed display amount safely.
+  const canSetFixedAmount = Boolean(assetId && !selectedRgbItem['configuredPlaceholder'])
   const assetTicker = getRgbTokenTicker(selectedRgbItem)
   // Balance list responses can omit metadata; retain the route token's
   // precision so fixed invoice amounts are still encoded in atomic units.
@@ -549,6 +550,7 @@ export function useRGBReceiveScreenLogic(
   }
 
   const onCreateInvoice = async () => {
+    if (routeAssetId === UNCONFIGURED_RGB_USDT_ASSET_ID) return
     if (!isAmountValid) return
     setLoading(true)
     setLoadingText(t('rgb_checking_utxo'))

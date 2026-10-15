@@ -42,7 +42,7 @@ export { useCreateWalletLogicImportWordsStep } from './useCreateWalletLogicImpor
 export { useOrdinalsInscriptionScreenLogic } from './useOrdinalsInscriptionScreenLogic'
 
 export { useRunesTokenScreenLogic } from './useRunesTokenScreenLogic'
-export { useRGBListLogic } from './useRGBListLogic'
+export { UNCONFIGURED_RGB_USDT_ASSET_ID, useRGBListLogic } from './useRGBListLogic'
 export { useRGBTransfersLogic } from './useRGBTransfersLogic'
 export { useRGBTransferDetailLogic } from './useRGBTransferDetailLogic'
 export {

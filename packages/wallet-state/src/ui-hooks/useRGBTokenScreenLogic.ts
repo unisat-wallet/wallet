@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 
 import type { RgbActivityItem, RgbActivityType, RgbAssetDetail, RgbBalance } from '..'
-import { useI18n, useNavigation, useWallet } from '..'
+import { useI18n, useNavigation, useWallet, useWalletConfig } from '..'
 import { getRgbIconShortName } from '../utils/rgb-amount-utils'
 import { useInfiniteList } from './useInfiniteList'
+import { UNCONFIGURED_RGB_USDT_ASSET_ID } from './useRGBListLogic'
 
 export enum RGBTokenScreenTabKey {
   DETAILS = 'details',
@@ -25,6 +26,9 @@ function hasPositiveAmount(value?: string | number | null) {
 export function useRGBTokenScreenLogic() {
   const nav = useNavigation()
   const { assetId, tokenBalance } = nav.getRouteState<'RGBTokenScreen'>()
+  const configuredUsdtAssetId = useWalletConfig().rgbUsdtAssetId?.trim()
+  const isConfiguredUsdt = !!configuredUsdtAssetId && isSameRgbAssetId(assetId, configuredUsdtAssetId)
+  const isUnconfiguredUsdt = assetId === UNCONFIGURED_RGB_USDT_ASSET_ID
   const wallet = useWallet()
   const { t } = useI18n()
 
@@ -37,8 +41,8 @@ export function useRGBTokenScreenLogic() {
   const [activeTab, setActiveTab] = useState<RGBTokenScreenTabKey>(RGBTokenScreenTabKey.HISTORY)
 
   const loadDetail = useCallback(async () => {
-    if (assetId === '') {
-      setDetail(undefined)
+    if (assetId === '' || isUnconfiguredUsdt) {
+      setDetail(isUnconfiguredUsdt ? { assetId, ticker: 'USDT', name: 'USDT' } : undefined)
       setDetailLoading(false)
       return
     }
@@ -50,14 +54,14 @@ export function useRGBTokenScreenLogic() {
     } finally {
       setDetailLoading(false)
     }
-  }, [assetId, wallet])
+  }, [assetId, isUnconfiguredUsdt, wallet])
 
   useEffect(() => {
     loadDetail()
   }, [loadDetail])
 
   const loadBalance = useCallback(async (showLoading = true) => {
-    if (assetId === '') {
+    if (assetId === '' || isUnconfiguredUsdt) {
       setFetchedTokenBalance(undefined)
       setBalanceLoading(false)
       setBalanceChecked(true)
@@ -78,7 +82,7 @@ export function useRGBTokenScreenLogic() {
       setBalanceLoading(false)
       setBalanceChecked(true)
     }
-  }, [assetId, wallet])
+  }, [assetId, isUnconfiguredUsdt, wallet])
 
   useEffect(() => {
     loadBalance()
@@ -93,7 +97,7 @@ export function useRGBTokenScreenLogic() {
     onLoadMore,
   } = useInfiniteList<RgbActivityItem>({
     fetcher: async (page, pageSize) => {
-      if (assetId === '') {
+      if (assetId === '' || isUnconfiguredUsdt) {
         return { list: [], total: 0 }
       }
 
@@ -146,7 +150,7 @@ export function useRGBTokenScreenLogic() {
             : Math.max(activity.total + localItems.length, list.length),
       }
     },
-    dependencies: [assetId, activityType],
+    dependencies: [assetId, activityType, isUnconfiguredUsdt],
   })
 
   const onRefresh = useCallback(() => {
@@ -200,6 +204,7 @@ export function useRGBTokenScreenLogic() {
     'RGB'
   const name = detail?.name || resolvedTokenBalance?.name || ticker
   const iconInfo = {
+    isConfiguredUsdt,
     iconUrl: detail?.['iconUrl'] || resolvedTokenBalance?.['iconUrl'] || '',
     iconShortName: getRgbIconShortName(name, ticker),
   }
@@ -209,7 +214,8 @@ export function useRGBTokenScreenLogic() {
   // authorize another send; otherwise the same allocation could appear
   // spendable for a brief period before it becomes pending.
   const enableTransfer =
-    !!assetId && balanceChecked && hasPositiveAmount(fetchedTokenBalance?.spendable)
+    !!assetId && !isUnconfiguredUsdt && balanceChecked && hasPositiveAmount(fetchedTokenBalance?.spendable)
+  const enableReceive = !!assetId && !isUnconfiguredUsdt
 
   const tabItems = useMemo(
     () => [
@@ -226,18 +232,21 @@ export function useRGBTokenScreenLogic() {
   )
 
   const onClickReceive = () => {
+    if (isUnconfiguredUsdt) return
     nav.navigate('RGBReceiveScreen', {
       assetId,
       tokenBalance: resolvedTokenBalance,
     })
   }
   const onClickViewInvoices = () => {
+    if (isUnconfiguredUsdt) return
     nav.navigate('RGBInvoiceListScreen', {
       assetId,
       tokenBalance: resolvedTokenBalance,
     })
   }
   const onClickSend = () => {
+    if (isUnconfiguredUsdt) return
     nav.navigate('SendRGBScreen', {
       assetId,
       tokenBalance: resolvedTokenBalance,
@@ -272,6 +281,7 @@ export function useRGBTokenScreenLogic() {
     onLoadMoreActivity: onLoadMore,
     onRefreshActivity: onRefresh,
     enableTransfer,
+    enableReceive,
     onClickSend,
     onClickReceive,
     onClickViewInvoices,

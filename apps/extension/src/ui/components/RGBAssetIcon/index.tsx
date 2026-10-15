@@ -6,6 +6,7 @@ import { Image } from '../Image';
 export type RGBAssetIconInfo = {
   iconShortName?: string;
   iconUrl?: string;
+  isConfiguredUsdt?: boolean;
 };
 
 type RGBAssetIconProps = {
@@ -51,6 +52,7 @@ export function getRgbPlaceholderLetters(name?: string, ticker?: string) {
 }
 
 function resolveRgbAssetIconUrl(iconInfo?: RGBAssetIconInfo, ticker?: string) {
+  if (iconInfo?.isConfiguredUsdt) return USDT_LOGO;
   if (iconInfo?.iconUrl) return iconInfo.iconUrl;
   if ((ticker || '').toUpperCase() === 'USDT') return USDT_LOGO;
   return '';

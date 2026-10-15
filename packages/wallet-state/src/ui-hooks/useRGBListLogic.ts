@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
 import { BUS_METHODS } from '@unisat/wallet-shared'
 import { useNavigation } from '../context/NavigationContext'
@@ -6,12 +6,39 @@ import { useWallet } from '../context/WalletContext'
 import { useWallTabFocusRefresh } from '../hooks/global'
 import { useCurrentKeyring } from '../hooks/keyrings'
 import { useCurrentAccount } from '../hooks/accounts'
-import { useChainType } from '../hooks/settings'
+import { useChainType, useWalletConfig } from '../hooks/settings'
 import { getSupportedAssets, useWalletView } from '../hooks/ui'
 import type { RgbBalance } from '../types'
 import { WalletView } from '../types/ui'
 import { useInfiniteList } from './useInfiniteList'
 import { uiEventBus } from '../utils/eventBus'
+
+export const UNCONFIGURED_RGB_USDT_ASSET_ID = '-'
+
+export function isSameRgbAssetId(left: string, right: string) {
+  return left.replace(/^rgb:/i, '') === right.replace(/^rgb:/i, '')
+}
+
+export function includeConfiguredRgbUsdt(items: RgbBalance[], assetId: string, balance?: RgbBalance) {
+  if (!assetId) return items
+  if (assetId === UNCONFIGURED_RGB_USDT_ASSET_ID) {
+    return [{
+      assetId,
+      name: 'USDT',
+      ticker: 'USDT',
+      balance: '0',
+      spendable: '0',
+      configuredUsdt: true,
+      configuredPlaceholder: true,
+      configurationUnavailable: true,
+    }, ...items]
+  }
+  const existing = items.find(item => isSameRgbAssetId(item.assetId, assetId)) || balance
+  const usdt: RgbBalance = existing
+    ? { ...existing, name: existing.name || 'USDT', ticker: existing.ticker || 'USDT', configuredUsdt: true }
+    : { assetId, name: 'USDT', ticker: 'USDT', balance: '0', spendable: '0', configuredUsdt: true, configuredPlaceholder: true }
+  return [usdt, ...items.filter(item => !isSameRgbAssetId(item.assetId, assetId))]
+}
 
 export function useRGBListLogic({
   autoRefresh = false,
@@ -23,15 +50,32 @@ export function useRGBListLogic({
   const currentKeyring = useCurrentKeyring()
   const currentAccount = useCurrentAccount()
   const chainType = useChainType()
+  const configuredUsdtAssetId = useWalletConfig().rgbUsdtAssetId?.trim() || ''
   const walletView = useWalletView()
   const isFocus = focused ?? walletView === WalletView.RGB
   const [fundingAddress, setFundingAddress] = useState('')
   const [fundingBalance, setFundingBalance] = useState(0)
+  const [configuredUsdtBalance, setConfiguredUsdtBalance] = useState<RgbBalance>()
 
   const supportedAssets = getSupportedAssets(chainType, '', {
     keyringType: currentKeyring?.type,
   })
   const isRgbSupported = supportedAssets.assets.rgb
+
+  useEffect(() => {
+    let active = true
+    setConfiguredUsdtBalance(undefined)
+    if (enabled && isRgbSupported && configuredUsdtAssetId && configuredUsdtAssetId !== UNCONFIGURED_RGB_USDT_ASSET_ID) {
+      void wallet.getRGBAssetBalance('', configuredUsdtAssetId)
+        .then(balance => {
+          if (active) setConfiguredUsdtBalance(balance)
+        })
+        .catch(() => undefined)
+    }
+    return () => {
+      active = false
+    }
+  }, [enabled, isRgbSupported, configuredUsdtAssetId, chainType, currentKeyring?.key, currentAccount?.key, wallet])
 
   const refreshFundingAddress = useCallback(async () => {
     if (!enabled || !isRgbSupported) {
@@ -88,6 +132,21 @@ export function useRGBListLogic({
     ],
   })
   const lastRefreshTimeRef = useRef<number>(0)
+  const visibleItems = useMemo(
+    () => includeConfiguredRgbUsdt(
+      items,
+      enabled && isRgbSupported ? configuredUsdtAssetId : '',
+      configuredUsdtBalance && isSameRgbAssetId(configuredUsdtBalance.assetId, configuredUsdtAssetId)
+        ? configuredUsdtBalance
+        : undefined
+    ),
+    [items, enabled, isRgbSupported, configuredUsdtAssetId, configuredUsdtBalance]
+  )
+  const usdtAlreadyCounted = configuredUsdtAssetId !== UNCONFIGURED_RGB_USDT_ASSET_ID && (
+    items.some(item => configuredUsdtAssetId && isSameRgbAssetId(item.assetId, configuredUsdtAssetId)) ||
+    !!(configuredUsdtBalance && isSameRgbAssetId(configuredUsdtBalance.assetId, configuredUsdtAssetId))
+  )
+  const visibleTotal = total + (enabled && isRgbSupported && configuredUsdtAssetId && !usdtAlreadyCounted ? 1 : 0)
   const walletTabFocusRefresh = useWallTabFocusRefresh()
 
   useEffect(() => {
@@ -140,8 +199,8 @@ export function useRGBListLogic({
   }, [enabled, isFocus, refreshList, refreshFundingAddress])
 
   return {
-    items,
-    total,
+    items: visibleItems,
+    total: visibleTotal,
     loading,
     showLoading,
     hasLoaded,

@@ -15,6 +15,7 @@ import { AddressAssetSummary, Brc20TickFilter, VersionDetail } from '@unisat/wal
 import '@unisat/wallet-state';
 import {
   AssetTabKey,
+  UNCONFIGURED_RGB_USDT_ASSET_ID,
   MoreAssetTabKey,
   getReadyRgbBroadcasts,
   selectReadyRgbBroadcastId,
@@ -34,7 +35,8 @@ import {
   useTools,
   useVersionInfo,
   useWallTabFocusRefresh,
-  useWallet
+  useWallet,
+  useWalletConfig
 } from '@unisat/wallet-state';
 
 import { useNavigate } from '../../MainRoute';
@@ -108,6 +110,7 @@ export default function WalletTabScreen({ screen = 'home' }: { screen?: 'home' |
   const currentAccount = useCurrentAccount();
 
   const wallet = useWallet();
+  const rgbUsdtAssetId = useWalletConfig().rgbUsdtAssetId?.trim() || '';
   const [connected, setConnected] = useState(false);
   const dispatch = useAppDispatch();
   const assetTabKey = useAssetTabKey();
@@ -282,17 +285,28 @@ export default function WalletTabScreen({ screen = 'home' }: { screen?: 'home' |
   useEffect(() => {
     if (screen !== 'assets' || !currentAccount.address || !isRgbActive) return;
     let active = true;
-    void wallet.getRGBList('', 1, 1, { skipSync: true })
-      .then((result) => {
-        if (active) setRgbAssetCount({ key: rgbContextKey, count: result.total });
+    void Promise.all([
+      wallet.getRGBList('', 1, 1, { skipSync: true }),
+      rgbUsdtAssetId && rgbUsdtAssetId !== UNCONFIGURED_RGB_USDT_ASSET_ID
+        ? wallet.getRGBAssetBalance('', rgbUsdtAssetId).catch(() => undefined)
+        : Promise.resolve(undefined)
+    ])
+      .then(([result, usdtBalance]) => {
+        if (active) {
+          setRgbAssetCount({
+            key: rgbContextKey,
+            count: result.total + (rgbUsdtAssetId && !usdtBalance ? 1 : 0)
+          });
+        }
       })
       .catch((error) => {
         console.error('Failed to load RGB asset tab count', error);
+        if (active && rgbUsdtAssetId) setRgbAssetCount({ key: rgbContextKey, count: 1 });
       });
     return () => {
       active = false;
     };
-  }, [screen, rgbContextKey, walletTabFocusRefresh, isRgbActive, wallet]);
+  }, [screen, rgbContextKey, walletTabFocusRefresh, isRgbActive, rgbUsdtAssetId, wallet]);
 
   const effectiveAssetTabKey = assetTabKey === AssetTabKey.MORE ? AssetTabKey.ALKANES : assetTabKey;
   const isRgbAssetTab = screen === 'assets' && restoredTabContextKey === assetContextKey && effectiveAssetTabKey === AssetTabKey.RGB;

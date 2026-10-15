@@ -112,6 +112,29 @@ describe('useRGBReceiveScreenLogic', () => {
     })
   })
 
+  it('keeps fixed amounts unavailable for a configured token without precision metadata', () => {
+    const assetId = 'rgb:usdt-asset'
+    const { wrapper } = createHookTestHarness({
+      routeState: { assetId, tokenBalance: { assetId, ticker: 'USDT', configuredPlaceholder: true } },
+    })
+    const { result } = renderHook(() => useRGBReceiveScreenLogic(), { wrapper })
+
+    expect(result.current.assetId).toBe(assetId)
+    expect(result.current.canSetFixedAmount).toBe(false)
+  })
+
+  it('never creates an invoice for an unconfigured USDT asset ID', async () => {
+    const { wrapper, wallet } = createHookTestHarness({ routeState: { assetId: '-' } })
+    const { result } = renderHook(() => useRGBReceiveScreenLogic(), { wrapper })
+
+    await act(async () => {
+      await result.current.onCreateInvoice()
+    })
+
+    expect(wallet.createRgbBlindReceive).not.toHaveBeenCalled()
+    expect(wallet.createRgbWitnessReceive).not.toHaveBeenCalled()
+  })
+
   it('uses the selected invoice type and remembers the selected expiry', async () => {
     const { wrapper, wallet } = createHookTestHarness()
     const { result } = renderHook(() => useRGBReceiveScreenLogic(), { wrapper })

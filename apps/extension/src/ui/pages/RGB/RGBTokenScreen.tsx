@@ -46,6 +46,7 @@ export default function RGBTokenScreen() {
     onClickReceive,
     onClickViewInvoices,
     onClickSend,
+    enableReceive,
     enableTransfer,
     activeTab,
     setActiveTab,
@@ -55,8 +56,8 @@ export default function RGBTokenScreen() {
   const tokenSummaryAny = tokenSummary as Record<string, unknown> | undefined;
   const tokenInfo = (tokenSummaryAny?.tokenInfo || tokenSummaryAny) as Record<string, any> | undefined;
   const tokenBalance = (tokenSummaryAny?.tokenBalance || tokenInfo) as Record<string, any> | undefined;
-  const ticker = tokenInfo?.ticker || 'RGB';
-  const name = tokenInfo?.name || ticker;
+  const ticker = tokenInfo?.ticker || tokenBalance?.ticker || 'RGB';
+  const name = tokenInfo?.name || tokenBalance?.name || ticker;
   const assetId = routeAssetId || tokenInfo?.assetId || '';
   const precision = getRgbTokenPrecision(tokenBalance) || getRgbTokenPrecision(tokenInfo);
   const spendable =
@@ -213,6 +214,7 @@ export default function RGBTokenScreen() {
               preset="brc20-action"
               icon="receive"
               onClick={() => setReceiveSelectorOpen(true)}
+              disabled={!enableReceive}
               full
               textStyle={{ fontSize: 14 }}
               data-testid="rgb-receive-button"

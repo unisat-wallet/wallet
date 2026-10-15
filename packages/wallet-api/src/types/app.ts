@@ -54,6 +54,8 @@ export interface WalletConfig {
   endpoints: string[]
   chainType: NetworkType
   enabledFeatures: string[]
+  /** '-' displays USDT without enabling receive or send. */
+  rgbUsdtAssetId?: string
   feeRates: {
     slow: number
     standard: number

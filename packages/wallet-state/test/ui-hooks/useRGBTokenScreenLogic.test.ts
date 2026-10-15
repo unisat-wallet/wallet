@@ -2,6 +2,7 @@ import { act, renderHook, waitFor } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
 
 import { useRGBTokenScreenLogic } from '../../src/ui-hooks/useRGBTokenScreenLogic'
+import { settingsActions } from '../../src/reducers/settings'
 import { createHookTestHarness } from './testHelpers'
 
 describe('useRGBTokenScreenLogic', () => {
@@ -17,6 +18,40 @@ describe('useRGBTokenScreenLogic', () => {
     spendable: '12',
     balance: '12',
   }
+
+  it('marks the configured token for the USDT icon even when its metadata uses another ticker', async () => {
+    const { store, wrapper, wallet } = createHookTestHarness({ routeState: { assetId } })
+    store.dispatch(settingsActions.updateSettings({
+      walletConfig: { ...store.getState().settings.walletConfig, rgbUsdtAssetId: assetId },
+    }))
+    wallet.getRGBAssetDetail.mockResolvedValue({ ...detail, ticker: 'OTHER', iconUrl: 'https://example.com/other.png' })
+    wallet.getRGBAssetBalance.mockResolvedValue(fetchedBalance)
+    wallet.getRGBAssetActivity.mockResolvedValue({ list: [], total: 0 })
+
+    const { result } = renderHook(() => useRGBTokenScreenLogic(), { wrapper })
+    await waitFor(() => expect(result.current.iconInfo.isConfiguredUsdt).toBe(true))
+  })
+
+  it('shows the unconfigured USDT item without loading an invalid asset or allowing transfers', async () => {
+    const { wrapper, wallet, navigation } = createHookTestHarness({
+      routeState: { assetId: '-', tokenBalance: { assetId: '-', ticker: 'USDT', spendable: '0' } },
+    })
+
+    const { result } = renderHook(() => useRGBTokenScreenLogic(), { wrapper })
+    await waitFor(() => expect(result.current.loading).toBe(false))
+
+    expect(result.current.tokenSummary?.tokenInfo).toMatchObject({ assetId: '-', ticker: 'USDT' })
+    expect(result.current.enableReceive).toBe(false)
+    expect(result.current.enableTransfer).toBe(false)
+    expect(wallet.getRGBAssetDetail).not.toHaveBeenCalled()
+    expect(wallet.getRGBAssetBalance).not.toHaveBeenCalled()
+    expect(wallet.getRGBAssetActivity).not.toHaveBeenCalled()
+    act(() => {
+      result.current.onClickReceive()
+      result.current.onClickSend()
+    })
+    expect(navigation.navigate).not.toHaveBeenCalled()
+  })
 
   it('opens the token invoice list with the selected asset and balance', async () => {
     const { wrapper, wallet, navigation } = createHookTestHarness({ routeState: { assetId } })

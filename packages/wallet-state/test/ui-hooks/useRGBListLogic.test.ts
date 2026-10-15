@@ -5,13 +5,65 @@ import { describe, expect, it, vi } from 'vitest'
 
 import { useRGBListLogic } from '../../src/ui-hooks/useRGBListLogic'
 import { uiActions } from '../../src/reducers/ui'
+import { settingsActions } from '../../src/reducers/settings'
 import { WalletView } from '../../src/types/ui'
 import { uiEventBus } from '../../src/utils/eventBus'
 import { createHookTestHarness } from './testHelpers'
 
 describe('useRGBListLogic', () => {
   const createRgbHookTestHarness = () =>
-    createHookTestHarness({ chainType: ChainType.BITCOIN_TESTNET4 })
+    createHookTestHarness({ chainType: ChainType.BITCOIN_MAINNET })
+
+  it('shows the configured USDT asset even before the wallet holds it', async () => {
+    const { store, wrapper, wallet } = createRgbHookTestHarness()
+    wallet.getRGBAssetBalance.mockResolvedValue(undefined)
+    store.dispatch(settingsActions.updateSettings({
+      walletConfig: { ...store.getState().settings.walletConfig, rgbUsdtAssetId: 'rgb:usdt-asset' },
+    }))
+
+    const { result } = renderHook(() => useRGBListLogic(), { wrapper })
+
+    await waitFor(() => expect(result.current.items).toEqual([
+      expect.objectContaining({ assetId: 'rgb:usdt-asset', ticker: 'USDT', configuredUsdt: true, configuredPlaceholder: true }),
+    ]))
+    expect(result.current.total).toBe(1)
+    expect(wallet.getRGBAssetBalance).toHaveBeenCalledWith('', 'rgb:usdt-asset')
+  })
+
+  it('shows an inert zero-balance USDT item when the configured asset ID is a dash', async () => {
+    const { store, wrapper, wallet } = createRgbHookTestHarness()
+    store.dispatch(settingsActions.updateSettings({
+      walletConfig: { ...store.getState().settings.walletConfig, rgbUsdtAssetId: '-' },
+    }))
+
+    const { result } = renderHook(() => useRGBListLogic(), { wrapper })
+
+    await waitFor(() => expect(result.current.hasLoaded).toBe(true))
+    expect(result.current.items).toEqual([
+      expect.objectContaining({ assetId: '-', ticker: 'USDT', spendable: '0', configuredUsdt: true, configurationUnavailable: true }),
+    ])
+    expect(result.current.total).toBe(1)
+    expect(wallet.getRGBAssetBalance).not.toHaveBeenCalled()
+  })
+
+  it('does not duplicate configured USDT when it is already in the RGB asset list', async () => {
+    const { store, wrapper, wallet } = createRgbHookTestHarness()
+    store.dispatch(settingsActions.updateSettings({
+      walletConfig: { ...store.getState().settings.walletConfig, rgbUsdtAssetId: 'rgb:usdt-asset' },
+    }))
+    wallet.getRGBList.mockResolvedValue({
+      list: [{ assetId: 'rgb:usdt-asset', ticker: 'USDT', name: 'Tether', spendable: '42' }],
+      total: 1,
+    })
+    wallet.getRGBAssetBalance.mockResolvedValue({ assetId: 'rgb:usdt-asset', spendable: '42' })
+
+    const { result } = renderHook(() => useRGBListLogic(), { wrapper })
+
+    await waitFor(() => expect(result.current.items).toEqual([
+      expect.objectContaining({ assetId: 'rgb:usdt-asset', spendable: '42', configuredUsdt: true }),
+    ]))
+    expect(result.current.total).toBe(1)
+  })
 
   it('does not load the RGB asset list when disabled', async () => {
     const { wrapper, wallet } = createRgbHookTestHarness()

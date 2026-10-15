@@ -82,6 +82,8 @@ export interface WalletConfig {
   endpoint: string
   chainTip: string
   disableUtxoTools: boolean
+  /** RGB USDT asset shown before it has a balance; '-' displays an inactive zero-balance item. */
+  rgbUsdtAssetId?: string
 }
 
 export enum WebsiteState {
