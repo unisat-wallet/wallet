@@ -4,11 +4,13 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 const mocks = vi.hoisted(() => ({
   feeRate: 3,
+  t: (key: string) => key,
   prepare: vi.fn(),
   wallet: {
     getEnableRBF: vi.fn().mockResolvedValue(true),
     getRgbFundingAddress: vi.fn().mockResolvedValue({ address: 'bc1funding' }),
     getRgbAllocationSummary: vi.fn().mockResolvedValue({ availableAllocationCount: 0 }),
+    getAddressBalanceV2: vi.fn().mockResolvedValue({ availableBalance: 100000 }),
     createRgbUtxosBegin: vi.fn().mockResolvedValue({ toSignData: { psbtHex: 'test' } }),
     createRgbIssueNia: vi.fn(),
   },
@@ -19,12 +21,13 @@ const mocks = vi.hoisted(() => ({
 }))
 vi.mock('@unisat/wallet-state', async () => ({
   ...(await import('../../src/utils/rgb-amount-utils')),
+  ...(await import('../../src/utils/rgb-utxo-utils')),
   useFeeRateBar: () => ({ feeRate: mocks.feeRate }),
   useCurrentAccount: () => mocks.account,
   useWallet: () => mocks.wallet,
   useTools: () => mocks.tools,
   useNavigation: () => mocks.nav,
-  useI18n: () => ({ t: (key: string) => key }),
+  useI18n: () => ({ t: mocks.t }),
   useChain: () => ({ unit: 'BTC' }),
   useFetchUtxosCallback: () => mocks.fetchUtxos,
   useSafeBalance: () => '0.001',
@@ -127,6 +130,9 @@ describe('extension fee submission controls', () => {
     expect(mocks.wallet.createRgbIssueNia).not.toHaveBeenCalled()
     mocks.feeRate = 2.5
     view.rerender(React.createElement(RGBIssueScreen))
+    await waitFor(() =>
+      expect((view.getByText('issue_asset') as HTMLButtonElement).disabled).toBe(false)
+    )
     fireEvent.click(view.getByText('issue_asset'))
     await act(async () => {
       fireEvent.click(view.getByText('review confirm'))

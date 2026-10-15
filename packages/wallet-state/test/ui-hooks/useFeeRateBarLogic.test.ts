@@ -1,11 +1,14 @@
 import { act, renderHook, waitFor } from '@testing-library/react'
-import { describe, expect, it } from 'vitest'
+import { CHAINS_MAP } from '@unisat/wallet-shared'
+import { ChainType } from '@unisat/wallet-types'
+import { afterEach, describe, expect, it } from 'vitest'
 
 import { uiActions } from '../../src/reducers/ui'
 import { useFeeRateBarLogic } from '../../src/ui-hooks/useFeeRateBarLogic'
 import { createHookTestHarness } from './testHelpers'
 
 async function setup(disableLowFeeMode: boolean) {
+  CHAINS_MAP[ChainType.BITCOIN_MAINNET].enableLowFeeMode = !disableLowFeeMode
   const harness = createHookTestHarness()
   harness.store.dispatch(
     uiActions.updateFeeRateBar({
@@ -14,7 +17,7 @@ async function setup(disableLowFeeMode: boolean) {
       feeRate: 2,
     })
   )
-  const hook = renderHook(() => useFeeRateBarLogic({ disableLowFeeMode }), {
+  const hook = renderHook(() => useFeeRateBarLogic({}), {
     wrapper: harness.wrapper,
   })
   await waitFor(() => expect(hook.result.current.feeOptionsLoading).toBe(false))
@@ -22,6 +25,10 @@ async function setup(disableLowFeeMode: boolean) {
   const feeRate = () => harness.store.getState().ui.feeRateBar.feeRate
   return { ...hook, ...harness, input, feeRate }
 }
+
+afterEach(() => {
+  CHAINS_MAP[ChainType.BITCOIN_MAINNET].enableLowFeeMode = true
+})
 
 describe('useFeeRateBarLogic editing', () => {
   it.each([false, true])(
