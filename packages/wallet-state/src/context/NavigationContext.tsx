@@ -13,7 +13,7 @@ import {
 } from '@unisat/wallet-shared'
 import { ChainType } from '@unisat/wallet-types'
 import React, { useContext } from 'react'
-import type { RgbBalance, RgbTransferItem } from '../types'
+import type { AssetTabKey, MoreAssetTabKey, RgbBalance, RgbTransferItem } from '../types'
 
 export type RouteParamList = {
   WelcomeScreen: undefined
@@ -30,7 +30,7 @@ export type RouteParamList = {
 
   // tabs
   WalletTabScreen: undefined
-  AssetsTabScreen: undefined
+  AssetsTabScreen: { assetTabKey: AssetTabKey; moreAssetTabKey?: MoreAssetTabKey } | undefined
   AppTabScreen: undefined
   TabMainScreen: undefined
   DiscoverTabScreen: undefined

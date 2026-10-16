@@ -100,7 +100,13 @@ function selectPendingRgbAcceptanceId(
   return first?.transferId || first?.id;
 }
 
-export default function WalletTabScreen({ screen = 'home' }: { screen?: 'home' | 'assets' }) {
+export default function WalletTabScreen({
+  screen = 'home',
+  preferredAssetTab
+}: {
+  screen?: 'home' | 'assets';
+  preferredAssetTab?: { assetTabKey: AssetTabKey; moreAssetTabKey?: MoreAssetTabKey };
+}) {
   const { t } = useI18n();
   const navigate = useNavigate();
 
@@ -503,9 +509,14 @@ export default function WalletTabScreen({ screen = 'home' }: { screen?: 'home' |
     } catch {
       // Asset tabs still work when browser storage is unavailable.
     }
+    const requestedTab = preferredAssetTab && tabCounts.find(({ assetTabKey, moreAssetTabKey, supported }) =>
+      supported && assetTabKey === preferredAssetTab.assetTabKey &&
+      (preferredAssetTab.moreAssetTabKey === undefined || moreAssetTabKey === preferredAssetTab.moreAssetTabKey)
+    );
     const savedTab = tabCounts.find(({ key, supported }) => supported && key === savedTabKey);
-    const initialTab = savedTab || tabCounts.find(({ supported }) => supported);
-    setPinnedSelection(savedTab ? { contextKey: assetContextKey, tabKey: savedTab.key } : null);
+    const initialTab = requestedTab || savedTab || tabCounts.find(({ supported }) => supported);
+    const pinnedTab = requestedTab || savedTab;
+    setPinnedSelection(pinnedTab ? { contextKey: assetContextKey, tabKey: pinnedTab.key } : null);
     if (initialTab) {
       dispatch(uiActions.updateAssetTabScreen({
         assetTabKey: initialTab.assetTabKey,
@@ -513,7 +524,7 @@ export default function WalletTabScreen({ screen = 'home' }: { screen?: 'home' |
       }));
     }
     setRestoredTabContextKey(assetContextKey);
-  }, [screen, assetContextKey, supportedAssets.key, dispatch]);
+  }, [screen, assetContextKey, supportedAssets.key, preferredAssetTab?.assetTabKey, preferredAssetTab?.moreAssetTabKey, dispatch]);
   const selectedTabKey =
     effectiveAssetTabKey === AssetTabKey.ALKANES && moreAssetTabKey === MoreAssetTabKey.ALKANES_COLLECTION
       ? ALKANES_COLLECTION_TAB_KEY

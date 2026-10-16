@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 
 import type { AddressAssetOverviewItem } from '@unisat/wallet-shared';
-import { useChainType, useCurrentAddress, useI18n, useNavigation, useWallTabFocusRefresh, useWallet } from '@unisat/wallet-state';
+import { AssetTabKey, MoreAssetTabKey, useChainType, useCurrentAddress, useI18n, useNavigation, useWallTabFocusRefresh, useWallet } from '@unisat/wallet-state';
 
 import styles from './asset-overview.module.less';
 
@@ -115,6 +115,16 @@ function AssetOverviewContent({ address, isRgbActive, rgbUsdtAssetId }: { addres
         break;
       case 'rgb':
         nav.navigate('RGBTokenScreen', { assetId: item.tokenId });
+        break;
+      case 'inscription-summary':
+      case 'domain':
+        nav.navigate('AssetsTabScreen', { assetTabKey: AssetTabKey.ORDINALS });
+        break;
+      case 'alkanes-collection':
+        nav.navigate('AssetsTabScreen', {
+          assetTabKey: AssetTabKey.ALKANES,
+          moreAssetTabKey: MoreAssetTabKey.ALKANES_COLLECTION
+        });
         break;
       default:
         openAssets();
