@@ -105,6 +105,8 @@ export type RgbRequestAuthenticator = (request: {
   method: 'POST'
   path: string
   body: unknown
+  /** Server epoch seconds supplied after an authenticated request detects clock skew. */
+  serverTime?: number
 }) => Promise<RgbRequestAuthorization>
 
 export interface RgbUtxoSyncRequest {

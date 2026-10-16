@@ -220,7 +220,7 @@ export class HttpClient implements BaseHttpClient {
     if (this.isApiResponse(data)) {
       if (data.code !== 0) {
         // Assuming 0 is success
-        throw new ApiClientError(data.msg || 'API error', data.code)
+        throw new ApiClientError(data.msg || 'API error', data.code, data.data)
       }
       return data.data
     }

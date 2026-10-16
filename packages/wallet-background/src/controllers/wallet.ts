@@ -999,6 +999,19 @@ function isRgbWalletContextCancellation(error: unknown) {
 
 export class WalletController extends BaseController {
   timer: any = null
+  /** Server-calibrated clock used by RGB protocol timestamps and lease expiry checks. */
+  private rgbClock: { serverTimeMs: number; monotonicMs: number } | undefined
+  private getRgbMonotonicNow = () => globalThis.performance?.now?.() ?? Date.now()
+
+  private getRgbNow = () =>
+    this.rgbClock
+      ? this.rgbClock.serverTimeMs + (this.getRgbMonotonicNow() - this.rgbClock.monotonicMs)
+      : Date.now()
+
+  private calibrateRgbClock(serverTime: number) {
+    if (!Number.isSafeInteger(serverTime) || serverTime <= 0) return
+    this.rgbClock = { serverTimeMs: serverTime * 1000, monotonicMs: this.getRgbMonotonicNow() }
+  }
 
   // Pending transfer locks are intentionally in-memory. After a background
   // restart the user must explicitly reprepare; no prior transfer is broadcast.
@@ -1062,7 +1075,7 @@ export class WalletController extends BaseController {
     refreshRecovery: context => this.refreshRgbRecoveryForWrite(context),
     ensureWriteLease: context => this.ensureRgbWriteLease(context),
     syncIndexerOutbox: context => this.syncRgbIndexerOutbox(context.service, context.wallet),
-    now: () => Date.now(),
+    now: () => this.getRgbNow(),
     assertContext: context => this.assertActiveRgbWallet(context.wallet),
   })
   private readonly rgbSendOperations = new RgbSendOperations({
@@ -4075,7 +4088,9 @@ export class WalletController extends BaseController {
     method: 'POST'
     path: string
     body: unknown
+    serverTime?: number
   }) => {
+    if (request.serverTime !== undefined) this.calibrateRgbClock(request.serverTime)
     await this.assertRgbEnabled()
     const requestedWallet = (request.body as { wallet?: Partial<LocalRgbWallet> } | null)?.wallet
     const bodyWallet =
@@ -4128,7 +4143,7 @@ export class WalletController extends BaseController {
     const nonceBytes = new Uint8Array(16)
     globalThis.crypto.getRandomValues(nonceBytes)
     const nonce = Buffer.from(nonceBytes).toString('hex')
-    const expiresAt = Math.floor(Date.now() / 1000) + 60
+    const expiresAt = Math.floor(this.getRgbNow() / 1000) + 60
     const message = [
       'RGB Authorization v1',
       request.method,
@@ -4957,7 +4972,7 @@ export class WalletController extends BaseController {
           txid,
           amount,
           destination: account.address,
-          createdAt: Date.now(),
+          createdAt: this.getRgbNow(),
         })
       } catch (error) {
         console.warn('Failed to save local RGB fee-pool withdrawal history', error)
@@ -5057,7 +5072,7 @@ export class WalletController extends BaseController {
         satoshis: Number(output.value),
         scriptPubKey: output.script.toString('hex'),
         publicKey: feeAccount.publicKey,
-        createdAt: Date.now(),
+        createdAt: this.getRgbNow(),
       }))
     if (!utxos.length) throw new Error('RGB fee-pool top-up has no fee outputs')
     await service.queueFeePoolUtxos(utxos)
@@ -5809,7 +5824,7 @@ export class WalletController extends BaseController {
           }
           this.rgbRecoveryVersions.set(key, expected)
         }
-        const updatedAt = Math.max(Date.now(), (expected?.updatedAt ?? -1) + 1)
+        const updatedAt = Math.max(this.getRgbNow(), (expected?.updatedAt ?? -1) + 1)
         const api = getRgbApiService()
         const activeLease = this.getRgbActiveWriteLease(wallet)
         const lease = activeLease
@@ -6003,7 +6018,7 @@ export class WalletController extends BaseController {
   private getRgbActiveWriteLease(wallet: RgbWalletRef): RgbControllerWriteLease | undefined {
     if (!wallet.network) return undefined
     const lease = this.rgbWriteLeases.get(`${wallet.network}:${wallet.fundingAddress}`)
-    return lease && lease.expiresAt > Date.now() ? lease : undefined
+    return lease && lease.expiresAt > this.getRgbNow() ? lease : undefined
   }
 
   private getRgbWriteLeaseCredential(
@@ -6043,7 +6058,7 @@ export class WalletController extends BaseController {
     const existing = this.rgbWriteLeases.get(key)
     // Reserve enough time for the preflight and local encoder; a later phase
     // renews this lease while a hardware signer is awaiting user confirmation.
-    if (!options.forceRenew && existing && existing.expiresAt > Date.now() + 30_000) return
+    if (!options.forceRenew && existing && existing.expiresAt > this.getRgbNow() + 30_000) return
     // A user-requested takeover must retain its own server request and never
     // be silently folded into an ordinary background refresh.
     if (options.takeover) return this.ensureRgbWriteLeaseOnce(context, options)
@@ -6067,7 +6082,7 @@ export class WalletController extends BaseController {
     const existing = this.rgbWriteLeases.get(key)
     const deviceId = await this.getRgbDeviceId()
     let ignoreCheckpointRevision = options.ignoreCheckpointRevision === true
-    if (existing && existing.expiresAt > Date.now()) {
+    if (existing && existing.expiresAt > this.getRgbNow()) {
       try {
         const renewed = await getRgbApiService().renewRgbWriteLease({
           wallet: context.wallet,
@@ -6278,6 +6293,7 @@ export class WalletController extends BaseController {
           return txid
         },
       },
+      now: () => this.getRgbNow(),
       onStatePersisted: (state, context) =>
         this.queueRgbRecoveryCheckpoint(localWallet, state, context),
     })

@@ -42,7 +42,7 @@ describe('HttpClient', () => {
   it('throws ApiClientError when api code is non-zero', async () => {
     const fetchMock = vi.mocked(globalThis.fetch as any)
     fetchMock.mockResolvedValueOnce(
-      jsonResponse({ code: 1001, msg: 'bad request', data: null })
+      jsonResponse({ code: 1001, msg: 'bad request', data: { serverTime: 1_000 } })
     )
 
     const client = new HttpClient({ endpoint: 'https://api.example.com' })
@@ -51,6 +51,7 @@ describe('HttpClient', () => {
       name: 'ApiClientError',
       code: 1001,
       message: 'bad request',
+      details: { serverTime: 1_000 },
     })
   })
 

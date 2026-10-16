@@ -3,6 +3,7 @@
  */
 
 import type { BaseHttpClient } from '../client/http-client'
+import { ApiClientError } from '../utils/errors'
 import { normalizeRgbAssetId, normalizeRgbAssetRecord } from './rgb-contract-id'
 import type {
   RgbActivityItem,
@@ -47,6 +48,8 @@ import type {
   RgbWriteLeaseStatus,
   RgbWriteLeaseStatusRequest,
 } from '../types'
+
+export const RGB_CLOCK_SKEW_ERROR_CODE = -605
 
 export class RgbService {
   private authenticator: RgbRequestAuthenticator | undefined
@@ -356,8 +359,18 @@ export class RgbService {
     if (!this.authenticator) {
       throw new Error('RGB request authentication is not configured')
     }
-    const auth = await this.authenticator({ method: 'POST', path, body })
-    return this.httpClient.post<T>(path, { ...(body as Record<string, unknown>), auth })
+    const request = { method: 'POST' as const, path, body }
+    const auth = await this.authenticator(request)
+    try {
+      return await this.httpClient.post<T>(path, { ...(body as Record<string, unknown>), auth })
+    } catch (error) {
+      const serverTime = error instanceof ApiClientError && error.code === RGB_CLOCK_SKEW_ERROR_CODE
+        ? Number(error.details?.serverTime)
+        : NaN
+      if (!Number.isSafeInteger(serverTime) || serverTime <= 0) throw error
+      const retryAuth = await this.authenticator({ ...request, serverTime })
+      return this.httpClient.post<T>(path, { ...(body as Record<string, unknown>), auth: retryAuth })
+    }
   }
 
   private normalizeListResponse<T>(response: any): RgbPageResponse<T> {

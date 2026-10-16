@@ -1,8 +1,32 @@
 import { describe, expect, it, vi } from 'vitest'
 
-import { RgbService } from '../src/services/rgb'
+import { RGB_CLOCK_SKEW_ERROR_CODE, RgbService } from '../src/services/rgb'
+import { ApiClientError } from '../src/utils/errors'
 
 describe('RgbService', () => {
+  it('re-signs once with server time when RGB authorization detects clock skew', async () => {
+    const httpClient = {
+      post: vi.fn()
+        .mockRejectedValueOnce(new ApiClientError('Computer time differs from server time', RGB_CLOCK_SKEW_ERROR_CODE, { serverTime: 1_000 }))
+        .mockResolvedValueOnce({ ok: true }),
+      get: vi.fn(),
+    }
+    const authenticator = vi.fn()
+      .mockResolvedValueOnce({ fundingAddress: 'bc1p-funding', nonce: 'a'.repeat(32), expiresAt: 9_999, signature: 'old' })
+      .mockResolvedValueOnce({ fundingAddress: 'bc1p-funding', nonce: 'b'.repeat(32), expiresAt: 1_060, signature: 'new' })
+    const service = new RgbService(httpClient as any)
+    service.setRequestAuthenticator(authenticator)
+
+    await expect(service.getRgbWriteLeaseStatus({
+      wallet: { fundingAddress: 'bc1p-funding', network: 'mainnet' },
+    })).resolves.toEqual({ ok: true })
+
+    expect(authenticator).toHaveBeenNthCalledWith(2, expect.objectContaining({ serverTime: 1_000 }))
+    expect(httpClient.post).toHaveBeenNthCalledWith(2, '/v5/rgb/lease/status', expect.objectContaining({
+      auth: expect.objectContaining({ nonce: 'b'.repeat(32) }),
+    }))
+  })
+
   it('sends consumed funding outpoints in the authenticated broadcast sync', async () => {
     const httpClient = {
       post: vi.fn().mockResolvedValue(undefined),

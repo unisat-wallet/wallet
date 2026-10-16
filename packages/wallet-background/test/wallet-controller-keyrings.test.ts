@@ -73,6 +73,20 @@ vi.mock('../src/services/approval', () => ({
 const validCompressedPubkey = '0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798'
 const invalidPubkey = 'aa'.repeat(32)
 
+describe('RGB server clock', () => {
+  it('keeps protocol time moving from the calibrated server time', () => {
+    const now = vi.spyOn(performance, 'now')
+      .mockReturnValueOnce(500)
+      .mockReturnValueOnce(1_750)
+    const wallet = new WalletController()
+
+    ;(wallet as any).calibrateRgbClock(1_000)
+
+    expect((wallet as any).getRgbNow()).toBe(1_001_250)
+    now.mockRestore()
+  })
+})
+
 describe('address asset overview', () => {
   beforeEach(() => vi.clearAllMocks())
 
