@@ -4750,7 +4750,7 @@ export class WalletController extends BaseController {
         .flatMap(transfer => transfer.prepared.feeOutpoints || [])
         .map(outpoint => `${outpoint.txid}:${outpoint.vout}`)
     )
-    const remoteUtxos = await walletApiService.bitcoin.getBTCUtxos(feeAccount.address)
+    const remoteUtxos = await walletApiService.bitcoin.getAllBTCUtxos(feeAccount.address)
     const scriptPubKey = bitcoin.address
       .toOutputScript(feeAccount.address, toPsbtNetwork(this.getNetworkType()))
       .toString('hex')
@@ -4817,7 +4817,7 @@ export class WalletController extends BaseController {
   getRgbFeePoolInspection = async (params: { feeRate?: number } = {}) => {
     const { service, wallet } = await this.getLocalRgbService()
     const feeAccount = await this.getCurrentRgbFeeAccount()
-    const remoteUtxos = await walletApiService.bitcoin.getBTCUtxos(feeAccount.address)
+    const remoteUtxos = await walletApiService.bitcoin.getAllBTCUtxos(feeAccount.address)
     const locked = new Set(
       service
         .getPendingTransfers()
@@ -4891,7 +4891,7 @@ export class WalletController extends BaseController {
         .flatMap(transfer => transfer.prepared.feeOutpoints || [])
         .map(outpoint => `${outpoint.txid}:${outpoint.vout}`)
     )
-    const remoteUtxos = await walletApiService.bitcoin.getBTCUtxos(feeAccount.address)
+    const remoteUtxos = await walletApiService.bitcoin.getAllBTCUtxos(feeAccount.address)
     const feeUtxos = remoteUtxos
       .filter(utxo => !locked.has(`${utxo.txid}:${utxo.vout}`))
       .filter(isSafeRgbFeePoolFundingUtxo)
@@ -6254,7 +6254,7 @@ export class WalletController extends BaseController {
           await this.assertActiveRgbWallet(localWallet)
           const feeAccount = await this.getCurrentRgbFeeAccount()
           await this.assertActiveRgbWallet(localWallet)
-          const remoteUtxos = await walletApiService.bitcoin.getBTCUtxos(feeAccount.address)
+          const remoteUtxos = await walletApiService.bitcoin.getAllBTCUtxos(feeAccount.address)
           await this.assertActiveRgbWallet(localWallet)
           const pendingUtxos = service?.getPendingFeePoolUtxos() || []
           const feeUtxosByOutpoint = new Map(

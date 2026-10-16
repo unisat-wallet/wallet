@@ -91,6 +91,10 @@ export class BitcoinService {
     return this.httpClient.get('/v5/address/btc-utxo', { query: { address } })
   }
 
+  async getAllBTCUtxos(address: string): Promise<UTXO[]> {
+    return this.httpClient.get('/v5/address/all-btc-utxo', { query: { address } })
+  }
+
   // ========================================
   // Transaction related
   // ========================================

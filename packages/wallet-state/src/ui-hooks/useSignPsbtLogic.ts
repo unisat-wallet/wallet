@@ -357,6 +357,9 @@ export function useSignPsbtLogic(props: SignPsbtProps) {
 
   const localSign = async () => {
     try {
+      setIsPsbtSigning(true)
+      // Let React paint the loading page before wallet signing starts.
+      await new Promise<void>(resolve => setTimeout(resolve, 50))
       const toSignData = toSignDatas[signingTxIndex]
       const signedData = await wallet.signPsbtV2(toSignData)
       onSignedData(signedData, signingTxIndex)
@@ -369,6 +372,8 @@ export function useSignPsbtLogic(props: SignPsbtProps) {
       }
       signedStates[signingTxIndex] = SignState.FAILED
       setSignedStates([...signedStates])
+    } finally {
+      setIsPsbtSigning(false)
     }
   }
 
@@ -469,7 +474,7 @@ export function useSignPsbtLogic(props: SignPsbtProps) {
 
   const isWaitingData = showMultiSignView == false && (!currentDecodedPsbt || !currentToSignData)
 
-  const showLoading = isWaitingData || loading
+  const showLoading = isWaitingData || loading || isPsbtSigning
 
   const backButtonText = isMultipleViewMode ? t('back') : t('reject')
 

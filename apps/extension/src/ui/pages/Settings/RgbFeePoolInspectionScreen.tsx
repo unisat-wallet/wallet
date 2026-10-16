@@ -2,6 +2,8 @@ import { useCallback, useEffect, useState } from 'react';
 
 import { Button, Card, Column, Content, CopyableAddress, Header, Icon, Layout, Row, Text, Tooltip } from '@/ui/components';
 import { Tabs } from '@/ui/components/Tabs';
+import LoadingPage from '@/ui/components/LoadingPage';
+import { LoadingOutlined } from '@ant-design/icons';
 import { SignedData, ToSignData } from '@unisat/wallet-shared';
 import { useI18n, useNavigation, useTools, useWallet } from '@unisat/wallet-state';
 
@@ -74,6 +76,8 @@ export default function RgbFeePoolInspectionScreen() {
   const { requestWrite, writeLeaseModal } = useRgbWriteLeaseGuard();
   const [inspection, setInspection] = useState<FeePoolInspection>();
   const [refreshing, setRefreshing] = useState(false);
+  const [withdrawPreparing, setWithdrawPreparing] = useState(false);
+  const [withdrawSubmitting, setWithdrawSubmitting] = useState(false);
   const [withdrawToSignData, setWithdrawToSignData] = useState<ToSignData>();
   const [activeTab, setActiveTab] = useState<FeePoolTabKey>('utxos');
 
@@ -100,11 +104,15 @@ export default function RgbFeePoolInspectionScreen() {
   }, [refresh]);
 
   const beginWithdraw = async () => {
+    if (withdrawPreparing) return;
+    setWithdrawPreparing(true);
     try {
       const result = await wallet.createRgbFeePoolWithdrawBegin();
       setWithdrawToSignData(result.toSignData);
     } catch (error) {
       tools.toastError(error instanceof Error ? error.message : String(error));
+    } finally {
+      setWithdrawPreparing(false);
     }
   };
 
@@ -114,6 +122,7 @@ export default function RgbFeePoolInspectionScreen() {
       tools.toastError(t('rgb_psbt_signing_missing_result'));
       return;
     }
+    setWithdrawSubmitting(true);
     try {
       const result = await wallet.createRgbFeePoolWithdrawEnd({ signedPsbt });
       setWithdrawToSignData(undefined);
@@ -121,8 +130,14 @@ export default function RgbFeePoolInspectionScreen() {
     } catch (error) {
       tools.toastError(error instanceof Error ? error.message : String(error));
       setWithdrawToSignData(undefined);
+    } finally {
+      setWithdrawSubmitting(false);
     }
   };
+
+  if (withdrawSubmitting) {
+    return <LoadingPage />;
+  }
 
   if (withdrawToSignData) {
     return (
@@ -279,10 +294,11 @@ export default function RgbFeePoolInspectionScreen() {
       {activeTab === 'utxos' ? (
         <Row style={{ padding: '0 16px 16px' }}>
           <Button
-            text={t('rgb_fee_pool_transfer_to_wallet')}
+            text={withdrawPreparing ? t('loading') : t('rgb_fee_pool_transfer_to_wallet')}
             preset="default"
-            disabled={!canWithdraw}
+            disabled={!canWithdraw || withdrawPreparing}
             onClick={() => void requestWrite(() => void beginWithdraw())}
+            LeftAccessory={withdrawPreparing ? <LoadingOutlined /> : undefined}
             style={{ flex: 1 }}
           />
           <Button

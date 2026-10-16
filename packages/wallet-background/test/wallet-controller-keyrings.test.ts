@@ -55,6 +55,7 @@ vi.mock('../src/services', () => ({
     setClientAddress: vi.fn(),
     bitcoin: {
       getBTCUtxos: vi.fn().mockResolvedValue([]),
+      getAllBTCUtxos: vi.fn().mockResolvedValue([]),
       getAddressAssetOverview: vi.fn(),
     },
   },
@@ -512,7 +513,7 @@ describe('RGB fee-pool inspection', () => {
       address: 'bc1p-rgb-fee',
       derivationPath: "m/86'/0'/0'/1/0",
     })
-    vi.mocked(walletApiService.bitcoin.getBTCUtxos).mockResolvedValue([
+    vi.mocked(walletApiService.bitcoin.getAllBTCUtxos).mockResolvedValue([
       { txid: 'a'.repeat(64), vout: 0, satoshis: 1_000 },
       { txid: 'b'.repeat(64), vout: 1, satoshis: 5_000 },
     ] as any)
@@ -1261,7 +1262,7 @@ describe('RGB wallet references', () => {
       address: 'bc1pfeepool',
       publicKey: validCompressedPubkey,
     })
-    vi.mocked(walletApiService.bitcoin.getBTCUtxos).mockResolvedValue([
+    vi.mocked(walletApiService.bitcoin.getAllBTCUtxos).mockResolvedValue([
       {
         txid: 'a'.repeat(64),
         vout: 0,
