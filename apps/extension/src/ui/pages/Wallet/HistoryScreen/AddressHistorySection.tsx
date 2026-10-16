@@ -15,7 +15,7 @@ import { HistoryTokenIcon } from './HistoryTokenIcon';
 import styles from './history.module.less';
 import { getHistoryAssetChanges, getHistoryDate, type HistoryAssetChange } from './historyAssetView';
 
-const PREVIEW_LIMIT = 5;
+const PREVIEW_LIMIT = 10;
 const PAGE_SIZE = 20;
 
 function HistoryAssetIcon({ asset }: { asset: AddressHistoryAssetItem }) {
@@ -82,7 +82,7 @@ function HistoryRow({ item, onClick }: { item: AddressHistorySummaryItem; onClic
         <HistoryAssetIcon asset={primary.asset} />
         <span className={styles.rowLabels}>
           <span className={styles.rowTitle}>{directionLabel}</span>
-          <span className={styles.rowSubtitle} title={item.txid}>
+          <span className={styles.rowSubtitle}>
             {subtitle}
           </span>
         </span>
