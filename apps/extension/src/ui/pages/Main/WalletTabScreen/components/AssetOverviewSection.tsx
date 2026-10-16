@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 
 import type { AddressAssetOverviewItem } from '@unisat/wallet-shared';
-import { useCurrentAddress, useI18n, useNavigation, useWallTabFocusRefresh, useWallet } from '@unisat/wallet-state';
+import { useChainType, useCurrentAddress, useI18n, useNavigation, useWallTabFocusRefresh, useWallet } from '@unisat/wallet-state';
 
 import styles from './asset-overview.module.less';
 
@@ -62,6 +62,11 @@ function AssetOverviewCard({ item, onClick, isUsdt }: { item: AddressAssetOvervi
 /** Small homepage preview of the address's assets. */
 export function AssetOverviewSection({ isRgbActive, rgbUsdtAssetId }: { isRgbActive: boolean; rgbUsdtAssetId: string }) {
   const address = useCurrentAddress();
+  const chainType = useChainType();
+  return <AssetOverviewContent key={`${chainType}:${address}`} address={address} isRgbActive={isRgbActive} rgbUsdtAssetId={rgbUsdtAssetId} />;
+}
+
+function AssetOverviewContent({ address, isRgbActive, rgbUsdtAssetId }: { address: string; isRgbActive: boolean; rgbUsdtAssetId: string }) {
   const wallet = useWallet();
   const nav = useNavigation();
   const { t } = useI18n();

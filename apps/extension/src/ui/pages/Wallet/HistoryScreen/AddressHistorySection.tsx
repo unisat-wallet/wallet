@@ -8,7 +8,7 @@ import type {
   AddressHistorySummaryItem,
   AddressHistorySummaryPage
 } from '@unisat/wallet-shared';
-import { useChain, useCurrentAddress, useI18n, useNavigation, useWallet } from '@unisat/wallet-state';
+import { useChain, useChainType, useCurrentAddress, useI18n, useNavigation, useWallet } from '@unisat/wallet-state';
 
 import { HistoryDetailSheet } from './HistoryDetailSheet';
 import { HistoryTokenIcon } from './HistoryTokenIcon';
@@ -101,6 +101,11 @@ type HistoryFilter = 'all' | 'receive' | 'send';
 /** Displays address history as asset changes, with transaction details one tap away. */
 export function AddressHistorySection({ preview = false }: { preview?: boolean }) {
   const address = useCurrentAddress();
+  const chainType = useChainType();
+  return <AddressHistoryContent key={`${chainType}:${address}`} address={address} preview={preview} />;
+}
+
+function AddressHistoryContent({ address, preview }: { address: string; preview: boolean }) {
   const wallet = useWallet();
   const nav = useNavigation();
   const { t } = useI18n();
