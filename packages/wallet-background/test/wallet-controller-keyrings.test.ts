@@ -55,6 +55,7 @@ vi.mock('../src/services', () => ({
     setClientAddress: vi.fn(),
     bitcoin: {
       getBTCUtxos: vi.fn().mockResolvedValue([]),
+      getAddressAssetOverview: vi.fn(),
     },
   },
   sessionService: {
@@ -71,6 +72,53 @@ vi.mock('../src/services/approval', () => ({
 
 const validCompressedPubkey = '0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798'
 const invalidPubkey = 'aa'.repeat(32)
+
+describe('address asset overview', () => {
+  beforeEach(() => vi.clearAllMocks())
+
+  it('includes the current wallet RGB balance in display units without duplicating remote assets', async () => {
+    const wallet = new WalletController()
+    vi.mocked(preferenceService.getCurrentAccount).mockReturnValue({ address: 'current' } as any)
+    vi.mocked(walletApiService.bitcoin.getAddressAssetOverview).mockResolvedValue({
+      list: [{ kind: 'rgb', tokenId: 'existing', name: 'Existing', symbol: 'EX', logo: '', divisibility: 0, balance: '1' }],
+    })
+    vi.spyOn(wallet, 'getRGBList').mockResolvedValue({
+      currentPage: 1,
+      pageSize: Number.MAX_SAFE_INTEGER,
+      total: 2,
+      list: [
+        { assetId: 'existing', name: 'Existing', ticker: 'EX', precision: 0, balance: '1', spendable: '1' },
+        { assetId: 'new', name: 'New', ticker: 'NEW', precision: 2, balance: '1234', spendable: '950' },
+      ],
+    } as any)
+
+    const result = await wallet.getAddressAssetOverview('current')
+
+    expect(result.list).toHaveLength(2)
+    expect(result.list[1]).toMatchObject({ kind: 'rgb', tokenId: 'new', balance: '9.5', divisibility: 2 })
+  })
+
+  it('does not expose local RGB assets for another address', async () => {
+    const wallet = new WalletController()
+    vi.mocked(preferenceService.getCurrentAccount).mockReturnValue({ address: 'current' } as any)
+    vi.mocked(walletApiService.bitcoin.getAddressAssetOverview).mockResolvedValue({ list: [] })
+    const getRgbList = vi.spyOn(wallet, 'getRGBList')
+
+    expect(await wallet.getAddressAssetOverview('other')).toEqual({ list: [] })
+    expect(getRgbList).not.toHaveBeenCalled()
+  })
+
+  it('keeps the remote overview when local RGB assets are unavailable', async () => {
+    const wallet = new WalletController()
+    vi.mocked(preferenceService.getCurrentAccount).mockReturnValue({ address: 'current' } as any)
+    const remote = { list: [{ kind: 'domain' as const, category: '.btc', count: 1 }] }
+    vi.mocked(walletApiService.bitcoin.getAddressAssetOverview).mockResolvedValue(remote)
+    vi.spyOn(wallet, 'getRGBList').mockRejectedValue(new Error('RGB inactive'))
+    vi.spyOn(log, 'debug').mockImplementation(() => {})
+
+    expect(await wallet.getAddressAssetOverview('current')).toEqual(remote)
+  })
+})
 
 function createDisplayedKeyring({
   index,

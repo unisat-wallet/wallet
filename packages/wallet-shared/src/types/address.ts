@@ -40,7 +40,7 @@ export interface AddressAssetSummary {
 
 export type AddressAssetOverviewItem =
   | {
-      kind: 'brc20' | 'rune' | 'alkanes'
+      kind: 'brc20' | 'rune' | 'alkanes' | 'rgb'
       tokenId: string
       name: string
       symbol: string

@@ -23,13 +23,13 @@ function formatBalance(value: string) {
   return fraction ? `${grouped}.${fraction}` : grouped;
 }
 
-function AssetOverviewCard({ item, onClick }: { item: AddressAssetOverviewItem; onClick: () => void }) {
+function AssetOverviewCard({ item, onClick, isUsdt }: { item: AddressAssetOverviewItem; onClick: () => void; isUsdt: boolean }) {
   const { t } = useI18n();
   const [imageError, setImageError] = useState(false);
   const name = isToken(item) ? item.name || item.symbol :
     item.kind === 'domain' ? item.category :
     item.kind === 'inscription-summary' ? t('ordinals') : item.name;
-  const imageUrl = isToken(item) ? item.logo :
+  const imageUrl = isUsdt ? './images/icons/protocol/usdt-logo.svg' : isToken(item) ? item.logo :
     item.kind === 'ord-collection' ? item.logo :
     item.kind === 'alkanes-collection' ? item.image : '';
   const amount = isToken(item) ? formatBalance(item.balance) :
@@ -60,7 +60,7 @@ function AssetOverviewCard({ item, onClick }: { item: AddressAssetOverviewItem; 
 }
 
 /** Small homepage preview of the address's assets. */
-export function AssetOverviewSection() {
+export function AssetOverviewSection({ isRgbActive, rgbUsdtAssetId }: { isRgbActive: boolean; rgbUsdtAssetId: string }) {
   const address = useCurrentAddress();
   const wallet = useWallet();
   const nav = useNavigation();
@@ -85,10 +85,36 @@ export function AssetOverviewSection() {
         if (active) setErrorAddress(address);
       });
     return () => { active = false; };
-  }, [address, wallet, focusRefresh, refreshKey]);
+  }, [address, wallet, focusRefresh, refreshKey, isRgbActive]);
 
-  const items = result?.address === address ? result.items : null;
+  const overviewItems = result?.address === address ? result.items : null;
+  const configuredUsdtId = isRgbActive ? rgbUsdtAssetId : '';
+  const isRgbUsdt = (item: AddressAssetOverviewItem) => item.kind === 'rgb' && (
+    item.symbol.toUpperCase() === 'USDT' ||
+    (!!configuredUsdtId && item.tokenId.replace(/^rgb:/i, '') === configuredUsdtId.replace(/^rgb:/i, ''))
+  );
+  const items = overviewItems?.filter(item => !(
+    isRgbUsdt(item) && isToken(item) && /^0+(?:\.0+)?$/.test(item.balance.trim())
+  )) ?? null;
   const openAssets = () => nav.navigate('AssetsTabScreen');
+  const openItem = (item: AddressAssetOverviewItem) => {
+    switch (item.kind) {
+      case 'brc20':
+        nav.navigate('BRC20TokenScreen', { ticker: item.tokenId });
+        break;
+      case 'rune':
+        nav.navigate('RunesTokenScreen', { runeid: item.tokenId });
+        break;
+      case 'alkanes':
+        nav.navigate('AlkanesTokenScreen', { alkaneid: item.tokenId });
+        break;
+      case 'rgb':
+        nav.navigate('RGBTokenScreen', { assetId: item.tokenId });
+        break;
+      default:
+        openAssets();
+    }
+  };
 
   return (
     <section className={styles.section} aria-label={t('assets')}>
@@ -107,7 +133,7 @@ export function AssetOverviewSection() {
       {items?.length ? (
         <div className={styles.cardViewport}>
           <div className={styles.cardRow}>
-            {items.map((item) => <AssetOverviewCard key={getItemKey(item)} item={item} onClick={openAssets} />)}
+            {items.map((item) => <AssetOverviewCard key={getItemKey(item)} item={item} isUsdt={isRgbUsdt(item)} onClick={() => openItem(item)} />)}
           </div>
         </div>
       ) : (

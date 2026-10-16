@@ -620,7 +620,7 @@ export default function WalletTabScreen({ screen = 'home' }: { screen?: 'home' |
             <BalanceCard />
             <WalletActions chain={chain} />
             <AnnouncementCard />
-            <AssetOverviewSection />
+            <AssetOverviewSection isRgbActive={isRgbActive} rgbUsdtAssetId={rgbUsdtAssetId} />
             <AddressHistorySection preview />
           </Column>
         </>

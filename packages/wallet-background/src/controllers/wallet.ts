@@ -69,6 +69,7 @@ import {
   isChangeAddressHdPath,
   isKeystoneAccountHdPath,
   t,
+  toRgbDisplayAmount,
 } from '@unisat/wallet-shared'
 import { AddressType, ChainType, NetworkType } from '@unisat/wallet-types'
 import {
@@ -3473,7 +3474,28 @@ export class WalletController extends BaseController {
   }
 
   getAddressAssetOverview = async (address: string) => {
-    return walletApiService.bitcoin.getAddressAssetOverview(address)
+    const overview = await walletApiService.bitcoin.getAddressAssetOverview(address)
+    if (address !== preferenceService.getCurrentAccount()?.address) return overview
+
+    try {
+      // RGB balances belong to the local wallet, not the address indexer.
+      const { list } = await this.getRGBList('', 1, Number.MAX_SAFE_INTEGER, { skipSync: true })
+      const rgbItems = list.map(asset => ({
+        kind: 'rgb' as const,
+        tokenId: asset.assetId,
+        name: asset.name || asset.ticker || 'RGB',
+        symbol: asset.ticker || asset.name || 'RGB',
+        logo: '',
+        divisibility: asset.precision || 0,
+        balance: toRgbDisplayAmount(asset.spendable || '0', asset.precision || 0),
+      }))
+      const knownIds = new Set(overview.list.flatMap(item => item.kind === 'rgb' ? [item.tokenId.replace(/^rgb:/i, '')] : []))
+      return { ...overview, list: [...overview.list, ...rgbItems.filter(item => !knownIds.has(item.tokenId.replace(/^rgb:/i, '')))] }
+    } catch (error) {
+      // An unavailable or inactive RGB wallet must not hide the other assets.
+      log.debug('RGB assets unavailable for address overview', error)
+      return overview
+    }
   }
 
   setPsbtSignNonSegwitEnable(psbt: bitcoin.Psbt, enabled: boolean) {
