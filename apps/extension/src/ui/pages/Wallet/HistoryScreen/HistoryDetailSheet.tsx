@@ -149,11 +149,6 @@ export function HistoryDetailSheet({ summary, onClose }: { summary: AddressHisto
                 </span>
               ) : '—'}
             </SummaryRow>
-            {!isReceive && !isInscription && detail && (
-              <SummaryRow label={t('outputs')}>
-                {detail.totalOutputValue} <span className={styles.detailUnit}>{chain.unit}</span>
-              </SummaryRow>
-            )}
             <SummaryRow label={t('network_fee')}>
               {fee} <span className={styles.detailUnit}>{chain.unit}</span>
             </SummaryRow>
