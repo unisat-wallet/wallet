@@ -98,6 +98,17 @@
   overflow-x: auto;
   padding: 0 16px;
   scrollbar-width: none;
+  cursor: grab;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.cardRow img {
+  -webkit-user-drag: none;
+}
+
+.cardRow:active .card {
+  cursor: grabbing;
 }
 
 .cardRow::-webkit-scrollbar {

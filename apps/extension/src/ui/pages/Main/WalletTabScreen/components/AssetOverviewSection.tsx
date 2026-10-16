@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 import type { AddressAssetOverviewItem } from '@unisat/wallet-shared';
 import { AssetTabKey, MoreAssetTabKey, useChainType, useCurrentAddress, useI18n, useNavigation, useWallTabFocusRefresh, useWallet } from '@unisat/wallet-state';
@@ -38,13 +38,30 @@ function AssetOverviewCard({ item, onClick, isUsdt }: { item: AddressAssetOvervi
   useEffect(() => setImageError(false), [imageUrl]);
 
   return (
-    <button type="button" className={styles.card} onClick={onClick} title={name}>
+    <button
+      type="button"
+      className={styles.card}
+      onClick={onClick}
+      onDragStart={(event) => event.preventDefault()}
+      title={name}
+    >
       <span className={styles.iconFrame} aria-hidden="true">
         {imageUrl && !imageError ? (
-          <img className={styles.iconImage} src={imageUrl} alt="" onError={() => setImageError(true)} />
+          <img
+            className={styles.iconImage}
+            src={imageUrl}
+            alt=""
+            draggable={false}
+            onError={() => setImageError(true)}
+          />
         ) : item.kind === 'domain' ? (
           <>
-            <img className={styles.domainBackground} src="/images/asset-overview/domain-bg.svg" alt="" />
+            <img
+              className={styles.domainBackground}
+              src="/images/asset-overview/domain-bg.svg"
+              alt=""
+              draggable={false}
+            />
             <span className={styles.domainLabel}>{item.category.replace(/^\./, '').slice(0, 3)}</span>
           </>
         ) : (
@@ -74,6 +91,39 @@ function AssetOverviewContent({ address, isRgbActive, rgbUsdtAssetId }: { addres
   const [result, setResult] = useState<{ address: string; items: AddressAssetOverviewItem[] } | null>(null);
   const [errorAddress, setErrorAddress] = useState<string | null>(null);
   const [refreshKey, setRefreshKey] = useState(0);
+  const cardRowRef = useRef<HTMLDivElement>(null);
+  const mouseDragRef = useRef<{ startX: number; startScrollLeft: number; moved: boolean } | null>(null);
+  const suppressClickRef = useRef(false);
+
+  useEffect(() => {
+    const onMouseMove = (event: MouseEvent) => {
+      const drag = mouseDragRef.current;
+      const element = cardRowRef.current;
+      if (!drag || !element) return;
+
+      const deltaX = event.clientX - drag.startX;
+      if (Math.abs(deltaX) > 4) drag.moved = true;
+      if (drag.moved) {
+        element.scrollLeft = drag.startScrollLeft - deltaX;
+        event.preventDefault();
+      }
+    };
+
+    const onMouseUp = (event: MouseEvent) => {
+      const drag = mouseDragRef.current;
+      if (drag?.moved && cardRowRef.current?.contains(event.target as Node)) {
+        suppressClickRef.current = true;
+      }
+      mouseDragRef.current = null;
+    };
+
+    window.addEventListener('mousemove', onMouseMove);
+    window.addEventListener('mouseup', onMouseUp);
+    return () => {
+      window.removeEventListener('mousemove', onMouseMove);
+      window.removeEventListener('mouseup', onMouseUp);
+    };
+  }, []);
 
   useEffect(() => {
     if (!address) return;
@@ -147,7 +197,37 @@ function AssetOverviewContent({ address, isRgbActive, rgbUsdtAssetId }: { addres
       </div>
       {items?.length ? (
         <div className={styles.cardViewport}>
-          <div className={styles.cardRow}>
+          <div
+            ref={cardRowRef}
+            className={styles.cardRow}
+            onMouseDown={(event) => {
+              if (event.button !== 0) return;
+              mouseDragRef.current = {
+                startX: event.clientX,
+                startScrollLeft: event.currentTarget.scrollLeft,
+                moved: false
+              };
+            }}
+            onClickCapture={(event) => {
+              if (!suppressClickRef.current) return;
+              suppressClickRef.current = false;
+              event.preventDefault();
+              event.stopPropagation();
+            }}
+            onWheel={(event) => {
+              // Let browsers handle trackpad's native horizontal gesture for smooth scrolling.
+              if (event.deltaX !== 0 || event.deltaY === 0) return;
+              const element = event.currentTarget;
+              const nextScrollLeft = Math.max(
+                0,
+                Math.min(element.scrollWidth - element.clientWidth, element.scrollLeft + event.deltaY)
+              );
+              if (nextScrollLeft !== element.scrollLeft) {
+                element.scrollLeft = nextScrollLeft;
+                event.preventDefault();
+              }
+            }}
+          >
             {items.map((item) => <AssetOverviewCard key={getItemKey(item)} item={item} isUsdt={isRgbUsdt(item)} onClick={() => openItem(item)} />)}
           </div>
         </div>
