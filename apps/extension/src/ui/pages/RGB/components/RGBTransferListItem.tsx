@@ -103,7 +103,9 @@ export function RGBTransferListItem({
   const isReceive = item.type === 'receive';
   const isCanceledReceive = isReceive && ['canceled', 'cancelled'].includes(status);
   const secondaryAssetLabel = assetName || (isCanceledReceive ? assetSymbol : '');
-  const amountColor = isReceive ? 'rgba(124, 219, 152, 0.85)' : 'rgba(255, 255, 255, 0.85)';
+  const amountColor = isReceive || item.type === 'issue'
+    ? 'rgba(124, 219, 152, 0.85)'
+    : 'rgba(255, 255, 255, 0.85)';
   const sign = item.type === 'issue' ? '' : isReceive ? '+' : '-';
   const transferTime = formatTransferTime(item.timestamp);
   const date = getRgbTransferDateKey(item.timestamp);
