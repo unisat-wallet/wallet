@@ -34,6 +34,8 @@ import {
   ToSignData,
   ToSignMessage,
   getAccountCapabilities,
+  hasOwn,
+  isSupportedChainType,
 } from '@unisat/wallet-shared'
 import { NetworkType } from '@unisat/wallet-types'
 import { formatPsbtHex } from '../../utils/psbt-utils'
@@ -327,7 +329,7 @@ class ProviderController extends BaseController {
     'SwitchChain',
     async req => {
       const chainType = req.data.params.chain
-      if (!CHAINS_MAP[chainType]) {
+      if (!isSupportedChainType(chainType)) {
         throw new Error(
           `the chain is invalid, supported chains: ${CHAINS.map(v => v.enum).join(',')}`
         )
@@ -346,7 +348,12 @@ class ProviderController extends BaseController {
         params: { chain },
       },
     } = req
-    wallet.setChainType(chain)
+    if (!isSupportedChainType(chain)) {
+      throw new Error(
+        `the chain is invalid, supported chains: ${CHAINS.map(v => v.enum).join(',')}`
+      )
+    }
+    await wallet.setChainType(chain)
     return getChainInfo(chain)
   }
 
@@ -1238,7 +1245,7 @@ class ProviderController extends BaseController {
       params: { chainId },
     },
   }) => {
-    if (!wallet.cosmosChainInfoMap[chainId]) {
+    if (!hasOwn(wallet.cosmosChainInfoMap, chainId)) {
       throw new Error('Not supported chainId')
     }
   }

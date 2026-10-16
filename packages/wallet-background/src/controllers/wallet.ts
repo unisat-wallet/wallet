@@ -66,7 +66,9 @@ import {
   bgI18n,
   getAccountCapabilities,
   getLockTimeInfo,
+  hasOwn,
   isChangeAddressHdPath,
+  isSupportedChainType,
   isKeystoneAccountHdPath,
   t,
   toRgbDisplayAmount,
@@ -1149,7 +1151,10 @@ export class WalletController extends BaseController {
     this._cacheCosmosKeyringKey = null
   }
 
-  cosmosChainInfoMap: Record<string, CosmosChainInfo> = Object.assign({}, COSMOS_CHAINS_MAP)
+  cosmosChainInfoMap: Record<string, CosmosChainInfo> = Object.assign(
+    Object.create(null),
+    COSMOS_CHAINS_MAP
+  )
 
   private backgroundInited = false
 
@@ -2251,7 +2256,7 @@ export class WalletController extends BaseController {
 
   getNetworkType = () => {
     const chainType = this.getChainType()
-    if (!CHAINS_MAP[chainType]) {
+    if (!isSupportedChainType(chainType)) {
       preferenceService.setChainType(ChainType.BITCOIN_MAINNET)
       return CHAINS_MAP[ChainType.BITCOIN_MAINNET]!.networkType
     }
@@ -2285,6 +2290,9 @@ export class WalletController extends BaseController {
   }
 
   setChainType = async (chainType: ChainType) => {
+    if (!isSupportedChainType(chainType)) {
+      throw new Error(`Unsupported chain type: ${String(chainType)}`)
+    }
     const currentChainType = preferenceService.getChainType()
     if (currentChainType === chainType) {
       return
@@ -6742,7 +6750,7 @@ export class WalletController extends BaseController {
   //  ----------- cosmos support --------
 
   getCosmosKeyring = async (chainId: string) => {
-    if (!this.cosmosChainInfoMap[chainId]) {
+    if (!hasOwn(this.cosmosChainInfoMap, chainId)) {
       throw new Error('Not supported chainId')
     }
     if (!keyringService.memStore.getState().isUnlocked) {

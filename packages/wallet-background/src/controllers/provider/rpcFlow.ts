@@ -1,6 +1,6 @@
 import 'reflect-metadata'
 
-import { BUS_EVENTS, BUS_METHODS, ErrorCodes, WalletError } from '@unisat/wallet-shared'
+import { BUS_EVENTS, BUS_METHODS, ErrorCodes, WalletError, hasOwn } from '@unisat/wallet-shared'
 import { keyringService, permissionService } from '../../services'
 import { PromiseFlow, underline2Camelcase } from '../../utils'
 
@@ -49,7 +49,10 @@ const flowContext = flow
     } = ctx.request
     ctx.mapMethod = underline2Camelcase(method)
 
-    if (!providerController[ctx.mapMethod]) {
+    if (
+      !hasOwn(providerController, ctx.mapMethod) ||
+      typeof providerController[ctx.mapMethod] !== 'function'
+    ) {
       throw new WalletError(ErrorCodes.METHOD_NOT_FOUND, `Method [${method}] not found`)
     }
 
@@ -151,8 +154,17 @@ const flowContext = flow
     const {
       session: { origin },
     } = request
+    const providerHandler = hasOwn(providerController, mapMethod)
+      ? providerController[mapMethod]
+      : undefined
+    if (typeof providerHandler !== 'function') {
+      throw new WalletError(
+        ErrorCodes.METHOD_NOT_FOUND,
+        `Method [${request.data.method}] not found`
+      )
+    }
     const requestDefer = Promise.resolve(
-      providerController[mapMethod]({
+      providerHandler({
         ...request,
         approvalRes,
       })

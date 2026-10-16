@@ -13,6 +13,7 @@ import {
   SUPPORTED_LOCALES,
   getAutoLockTimes,
   getLockTimeInfo,
+  isSupportedChainType,
 } from '../src/constants/common'
 import { ChainType, NetworkType } from '@unisat/wallet-types'
 
@@ -43,6 +44,14 @@ describe('common constants', () => {
     expect(CHAINS).toHaveLength(Object.keys(CHAINS_MAP).length)
     expect(CHAIN_GROUPS.length).toBeGreaterThan(0)
   })
+
+  it.each(['constructor', 'toString', 'valueOf', '__proto__'])(
+    'does not accept inherited object key %s as a chain',
+    chainType => {
+      expect(isSupportedChainType(chainType)).toBe(false)
+      expect(CHAINS_MAP[chainType]).toBeUndefined()
+    }
+  )
 
   it('i18n locale constants are internally consistent', () => {
     expect(FALLBACK_LOCALE).toBe('en')

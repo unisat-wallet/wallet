@@ -15,7 +15,7 @@ import {
   walletApiService,
   walletController
 } from '@unisat/wallet-background';
-import { CHAINS_MAP, bgI18n, t } from '@unisat/wallet-shared';
+import { CHAINS_MAP, bgI18n, isSupportedChainType, t } from '@unisat/wallet-shared';
 import { BaseProxyStorageAdapter } from '@unisat/wallet-storage';
 import { ChainType } from '@unisat/wallet-types';
 
@@ -101,7 +101,7 @@ export async function restoreAppState() {
     ]);
 
     let chainType = preferenceService.getChainType();
-    if (!chainType || !CHAINS_MAP[chainType]) {
+    if (!isSupportedChainType(chainType)) {
       chainType = ChainType.BITCOIN_MAINNET;
       preferenceService.setChainType(chainType);
     }

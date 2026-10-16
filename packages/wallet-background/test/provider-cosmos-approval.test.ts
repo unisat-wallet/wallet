@@ -102,4 +102,12 @@ describe('Cosmos approval payload binding', () => {
       expect(approvalService.requestApproval).not.toHaveBeenCalled()
     }
   )
+
+  it.each(['constructor', 'toString', 'valueOf', '__proto__'])(
+    'rejects inherited provider method %s',
+    async method => {
+      await expect(rpcFlow(request(method, {}))).rejects.toThrow('not found')
+      expect(approvalService.requestApproval).not.toHaveBeenCalled()
+    }
+  )
 })

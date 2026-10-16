@@ -43,6 +43,7 @@ vi.mock('../src/services', () => ({
   preferenceService: {
     getCurrentKeyringIndex: vi.fn(),
     getChainType: vi.fn(() => ChainType.BITCOIN_MAINNET),
+    setChainType: vi.fn(),
     setCurrentKeyringIndex: vi.fn(),
     setCurrentAccount: vi.fn(),
     getCurrentAccount: vi.fn(),
@@ -53,6 +54,7 @@ vi.mock('../src/services', () => ({
   },
   walletApiService: {
     setClientAddress: vi.fn(),
+    setEndpoint: vi.fn(),
     bitcoin: {
       getBTCUtxos: vi.fn().mockResolvedValue([]),
       getAllBTCUtxos: vi.fn().mockResolvedValue([]),
@@ -73,6 +75,23 @@ vi.mock('../src/services/approval', () => ({
 
 const validCompressedPubkey = '0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798'
 const invalidPubkey = 'aa'.repeat(32)
+
+describe('chain type validation', () => {
+  it.each(['constructor', 'toString', 'valueOf', '__proto__'])(
+    'rejects inherited object key %s before persistence',
+    async chainType => {
+      const wallet = new WalletController()
+
+      await expect(wallet.setChainType(chainType as ChainType)).rejects.toThrow(
+        'Unsupported chain type'
+      )
+      expect(preferenceService.setChainType).not.toHaveBeenCalled()
+      expect(walletApiService.setEndpoint).not.toHaveBeenCalled()
+
+      await expect(wallet.getCosmosKeyring(chainType)).rejects.toThrow('Not supported chainId')
+    }
+  )
+})
 
 describe('RGB server clock', () => {
   it('keeps protocol time moving from the calibrated server time', () => {

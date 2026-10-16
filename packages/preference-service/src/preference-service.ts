@@ -8,6 +8,7 @@ import {
   BitcoinBalance,
   DEFAULT_LOCKTIME_ID,
   TxHistoryItem,
+  isSupportedChainType,
 } from '@unisat/wallet-shared'
 import { ProxyStorageAdapter } from '@unisat/wallet-storage'
 import { ChainType, NetworkType } from '@unisat/wallet-types'
@@ -145,6 +146,10 @@ export class PreferenceService extends EventEmitter<PreferenceServiceEvents> {
    * Validate and fix store data
    */
   private async validateAndFixStore(defaultLang: string): Promise<void> {
+    if (!isSupportedChainType(this.store.chainType)) {
+      this.store.chainType = ChainType.BITCOIN_MAINNET
+    }
+
     // Ensure locale is supported
     if (!this.supportedLocales.includes(this.store.locale)) {
       this.store.locale = defaultLang
@@ -332,6 +337,9 @@ export class PreferenceService extends EventEmitter<PreferenceServiceEvents> {
   }
 
   setChainType(chainType: ChainType): void {
+    if (!isSupportedChainType(chainType)) {
+      throw new Error(`Unsupported chain type: ${String(chainType)}`)
+    }
     this.store.chainType = chainType
   }
 

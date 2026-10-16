@@ -372,7 +372,18 @@ const PROD_CHAINS_MAP: { [key: string]: TypeChain } = {
 
 const DEV_CHAINS_MAP: { [key: string]: TypeChain } = {}
 
-export const CHAINS_MAP = PROD_CHAINS_MAP
+export const CHAINS_MAP: Record<string, TypeChain> = Object.assign(
+  Object.create(null),
+  PROD_CHAINS_MAP
+)
+
+export function hasOwn(object: object, key: PropertyKey): boolean {
+  return Object.prototype.hasOwnProperty.call(object, key)
+}
+
+export function isSupportedChainType(chainType: unknown): chainType is ChainType {
+  return typeof chainType === 'string' && hasOwn(CHAINS_MAP, chainType)
+}
 
 export const CHAINS = Object.values(CHAINS_MAP)
 

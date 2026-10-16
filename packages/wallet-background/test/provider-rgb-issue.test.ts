@@ -17,6 +17,7 @@ vi.mock('../src/services', () => ({
 vi.mock('../src/controllers/wallet', () => ({
   default: {
     getChainType: vi.fn(),
+    setChainType: vi.fn(),
     getNetworkType: vi.fn(),
     getCurrentAccount: vi.fn(),
     createRgbUtxosBegin: vi.fn(),
@@ -172,4 +173,18 @@ describe('provider RGB issue payment gate', () => {
       orderId, ticker: 'TOK', name: 'Token', precision: 0, amounts: ['100'],
     })
   })
+})
+
+describe('provider chain validation', () => {
+  it.each(['constructor', 'toString', 'valueOf', '__proto__'])(
+    'rejects inherited object key %s before switching',
+    async chain => {
+      const approval = Reflect.getMetadata('APPROVAL', providerController, 'switchChain')
+      await expect(approval[1]({ data: { params: { chain } } })).rejects.toThrow('chain is invalid')
+      await expect(
+        providerController.switchChain({ data: { params: { chain } } } as any)
+      ).rejects.toThrow('chain is invalid')
+      expect(wallet.setChainType).not.toHaveBeenCalled()
+    }
+  )
 })

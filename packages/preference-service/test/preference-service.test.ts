@@ -70,6 +70,43 @@ describe('PreferenceService', () => {
     })
   })
 
+  it.each(['constructor', 'toString', 'valueOf', '__proto__'])(
+    'repairs persisted invalid chain type %s during initialization',
+    async chainType => {
+      const rawStore: any = {
+        locale: 'en',
+        chainType,
+      }
+      storage.createPersistentProxy.mockResolvedValue(rawStore)
+
+      await service.init({
+        storage: storage as any,
+        logger: { debug: vi.fn(), error: vi.fn() },
+      })
+
+      expect(service.getChainType()).toBe(ChainType.BITCOIN_MAINNET)
+      expect(rawStore.chainType).toBe(ChainType.BITCOIN_MAINNET)
+    }
+  )
+
+  it.each(['constructor', 'toString', 'valueOf', '__proto__'])(
+    'rejects invalid chain type %s before persistence',
+    async chainType => {
+      const rawStore: any = {
+        locale: 'en',
+        chainType: ChainType.BITCOIN_MAINNET,
+      }
+      storage.createPersistentProxy.mockResolvedValue(rawStore)
+      await service.init({
+        storage: storage as any,
+        logger: { debug: vi.fn(), error: vi.fn() },
+      })
+
+      expect(() => service.setChainType(chainType as ChainType)).toThrow('Unsupported chain type')
+      expect(rawStore.chainType).toBe(ChainType.BITCOIN_MAINNET)
+    }
+  )
+
   it('updates and removes address balance/history maps', async () => {
     storage.createPersistentProxy.mockResolvedValue({
       locale: 'en',

@@ -1,5 +1,5 @@
 // Provider controller for handling RPC requests
-import { ErrorCodes, WalletError } from '@unisat/wallet-shared'
+import { ErrorCodes, WalletError, hasOwn } from '@unisat/wallet-shared'
 import { keyringService } from '../../services'
 import internalMethod from './internalMethod'
 import { ProviderMethodArgs, ProviderMethods } from './methodList'
@@ -22,8 +22,11 @@ class ProviderController {
       throw new WalletError(ErrorCodes.METHOD_NOT_FOUND, 'Missing method in request')
     }
 
-    if (internalMethod[method]) {
-      return internalMethod[method](req)
+    const internalHandler = hasOwn(internalMethod, method)
+      ? internalMethod[method as keyof typeof internalMethod]
+      : undefined
+    if (typeof internalHandler === 'function') {
+      return internalHandler(req as any)
     }
 
     const hasVault = keyringService.hasVault()

@@ -1,5 +1,12 @@
 import { keyBy } from 'lodash'
-import { AddressFlagType, CHAINS, CHAINS_MAP, NETWORK_TYPES } from '@unisat/wallet-shared'
+import {
+  AddressFlagType,
+  CHAINS,
+  CHAINS_MAP,
+  NETWORK_TYPES,
+  hasOwn,
+  isSupportedChainType,
+} from '@unisat/wallet-shared'
 import { ChainType } from '@unisat/wallet-types'
 
 declare global {
@@ -14,7 +21,7 @@ export { format }
 
 const chainsDict = keyBy(CHAINS, 'serverId')
 export const getChain = (chainId?: string) => {
-  if (!chainId) {
+  if (!chainId || !hasOwn(chainsDict, chainId)) {
     return null
   }
   return chainsDict[chainId]
@@ -26,6 +33,9 @@ export const checkAddressFlag = (currentFlag: number, flag: AddressFlagType): bo
 }
 
 export function getChainInfo(chainType: ChainType) {
+  if (!isSupportedChainType(chainType)) {
+    throw new Error(`Unsupported chain type: ${String(chainType)}`)
+  }
   const chain = CHAINS_MAP[chainType]!
   return {
     enum: chainType,
