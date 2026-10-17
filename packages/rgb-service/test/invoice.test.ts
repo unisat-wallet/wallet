@@ -9,11 +9,11 @@ import {
 describe('decodeRgbInvoice', () => {
   it('decodes invoice identity, amount and transport without a network request', () => {
     const invoice = decodeRgbInvoice(
-      'rgb:asset-id/schema-id/~/bc:wvout:A8cJ7Ww3-NIzADo3-Tzp_5aD-7CTBWmA-AAAAAAA-AAAAAAA-ALSQkcw?amount=42&endpoints=rpcs%3A%2F%2Fproxy.example'
+      'rgb:BQUFBQUF-BQUFBQU-FBQUFBQ-UFBQUFB-QUFBQUF-BQUFBQU/schema-id/~/bc:wvout:A8cJ7Ww3-NIzADo3-Tzp_5aD-7CTBWmA-AAAAAAA-AAAAAAA-ALSQkcw?amount=42&endpoints=rpcs%3A%2F%2Fproxy.example'
     )
 
     expect(invoice).toMatchObject({
-      assetId: 'rgb:asset-id',
+      assetId: 'rgb:BQUFBQUF-BQUFBQU-FBQUFBQ-UFBQUFB-QUFBQUF-BQUFBQU',
       amount: '42',
       recipientId: 'bc:wvout:A8cJ7Ww3-NIzADo3-Tzp_5aD-7CTBWmA-AAAAAAA-AAAAAAA-ALSQkcw',
       recipientType: 'witness',
@@ -26,7 +26,7 @@ describe('decodeRgbInvoice', () => {
 
   it('decodes and validates blind seals locally', () => {
     const invoice = decodeRgbInvoice(
-      'rgb:asset/schema/~/bc:utxob:xDfmDF9g-yNOjriV-6Anbe6H-MLJ__g6-lo7Dd4f-dhWBW8S-XYGBm'
+      'rgb:AQEBAQEB-AQEBAQE-BAQEBAQ-EBAQEBA-QEBAQEB-AQEBAQE/schema/~/bc:utxob:xDfmDF9g-yNOjriV-6Anbe6H-MLJ__g6-lo7Dd4f-dhWBW8S-XYGBm'
     )
     expect(invoice.recipientType).toBe('blind')
     expect(invoice.seal).toMatchObject({ type: 'confidential' })
@@ -36,13 +36,38 @@ describe('decodeRgbInvoice', () => {
   it('rejects malformed beneficiary seals before planning a transfer', () => {
     expect(() =>
       decodeRgbInvoice(
-        'rgb:asset/schema/~/bc:utxob:xDfmDF9g-yNOjriV-6Anbe6H-MLJ__g6-lo7Dd4f-dhWBW8S-XYGBn'
+        'rgb:AQEBAQEB-AQEBAQE-BAQEBAQ-EBAQEBA-QEBAQEB-AQEBAQE/schema/~/bc:utxob:xDfmDF9g-yNOjriV-6Anbe6H-MLJ__g6-lo7Dd4f-dhWBW8S-XYGBn'
       )
     ).toThrow('checksum')
-    expect(() => decodeRgbInvoice('rgb:asset/schema/~/bc:tapret:recipient')).toThrow(
+    expect(() => decodeRgbInvoice('rgb:AQEBAQEB-AQEBAQE-BAQEBAQ-EBAQEBA-QEBAQEB-AQEBAQE/schema/~/bc:tapret:recipient')).toThrow(
       'utxob or wvout'
     )
   })
+
+  it('rejects invoices whose payload does not contain exactly four path segments', () => {
+    const recipientId =
+      'bc:utxob:xDfmDF9g-yNOjriV-6Anbe6H-MLJ__g6-lo7Dd4f-dhWBW8S-XYGBm'
+    const assetId = 'AQEBAQEB-AQEBAQE-BAQEBAQ-EBAQEBA-QEBAQEB-AQEBAQE'
+
+    expect(() => decodeRgbInvoice(`rgb:${assetId}/extra/schema/~/${recipientId}`)).toThrow(
+      'Invalid RGB invoice payload'
+    )
+  })
+
+  it.each(['rgb:asset/~/~/bc:wvout:attacker', 'rgb:asset?assetId=attacker'])(
+    'rejects an asset ID that can rewrite a witness invoice: %s',
+    assetId => {
+      expect(() =>
+        encodeWitnessRgbInvoice({
+          network: 'mainnet',
+          scriptPubKey:
+            '512079be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798',
+          assetId,
+          transportEndpoints: ['rpcs://proxy.example/rgb/json-rpc'],
+        })
+      ).toThrow('BAID64 encoding is invalid')
+    }
+  )
 
   it('creates witness invoices with stable beneficiary and unique proxy routing', () => {
     const scriptPubKey = '512079be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798'

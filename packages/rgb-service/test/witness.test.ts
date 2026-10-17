@@ -4,7 +4,7 @@ import { decodeRgbInvoice, invoiceSealToScriptPubKey } from '../src'
 describe('invoiceSealToScriptPubKey', () => {
   it('uses the decoded Pay2Vout payload without an address-string round trip', () => {
     const invoice = decodeRgbInvoice(
-      'rgb:asset/schema/~/bc:wvout:A8cJ7Ww3-NIzADo3-Tzp_5aD-7CTBWmA-AAAAAAA-AAAAAAA-ALSQkcw'
+      'rgb:AQEBAQEB-AQEBAQE-BAQEBAQ-EBAQEBA-QEBAQEB-AQEBAQE/schema/~/bc:wvout:A8cJ7Ww3-NIzADo3-Tzp_5aD-7CTBWmA-AAAAAAA-AAAAAAA-ALSQkcw'
     )
     const script = invoiceSealToScriptPubKey(invoice.seal)
 
@@ -15,7 +15,7 @@ describe('invoiceSealToScriptPubKey', () => {
 
   it('does not create a Bitcoin output for a blind beneficiary', () => {
     const invoice = decodeRgbInvoice(
-      'rgb:asset/schema/~/bc:utxob:xDfmDF9g-yNOjriV-6Anbe6H-MLJ__g6-lo7Dd4f-dhWBW8S-XYGBm'
+      'rgb:AQEBAQEB-AQEBAQE-BAQEBAQ-EBAQEBA-QEBAQEB-AQEBAQE/schema/~/bc:utxob:xDfmDF9g-yNOjriV-6Anbe6H-MLJ__g6-lo7Dd4f-dhWBW8S-XYGBm'
     )
 
     expect(invoiceSealToScriptPubKey(invoice.seal)).toBeUndefined()

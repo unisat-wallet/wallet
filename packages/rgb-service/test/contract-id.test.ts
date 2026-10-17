@@ -16,4 +16,11 @@ describe('RGB ContractId encoding', () => {
     expect(rgbContractIdHex(`rgb:${baid64Id}`)).toBe(hexId)
     expect(encodeRgbContractId(decodeRgbContractId(`rgb:${hexId}`))).toBe(`rgb:${baid64Id}`)
   })
+
+  it.each(['rgb:asset/~/~/recipient', 'rgb:asset?assetId=other', 'rgb:asset'])(
+    'rejects a non-ContractId asset ID: %s',
+    assetId => {
+      expect(() => normalizeRgbAssetId(assetId)).toThrow('BAID64 encoding is invalid')
+    }
+  )
 })

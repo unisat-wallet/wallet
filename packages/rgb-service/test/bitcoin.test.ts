@@ -24,7 +24,7 @@ const feeFunding = {
 describe('createRgbOpretPsbt', () => {
   it('builds an unsigned local OpretFirst PSBT for a blind beneficiary', () => {
     const invoice = decodeRgbInvoice(
-      'rgb:asset/schema/~/bc:utxob:xDfmDF9g-yNOjriV-6Anbe6H-MLJ__g6-lo7Dd4f-dhWBW8S-XYGBm'
+      'rgb:AQEBAQEB-AQEBAQE-BAQEBAQ-EBAQEBA-QEBAQEB-AQEBAQE/schema/~/bc:utxob:xDfmDF9g-yNOjriV-6Anbe6H-MLJ__g6-lo7Dd4f-dhWBW8S-XYGBm'
     )
     const built = createRgbOpretPsbt({
       network: 'mainnet',
@@ -47,7 +47,7 @@ describe('createRgbOpretPsbt', () => {
 
   it('reserves fees for the final RGB commitment in the OP_RETURN host', () => {
     const invoice = decodeRgbInvoice(
-      'rgb:asset/schema/~/bc:utxob:xDfmDF9g-yNOjriV-6Anbe6H-MLJ__g6-lo7Dd4f-dhWBW8S-XYGBm'
+      'rgb:AQEBAQEB-AQEBAQE-BAQEBAQ-EBAQEBA-QEBAQEB-AQEBAQE/schema/~/bc:utxob:xDfmDF9g-yNOjriV-6Anbe6H-MLJ__g6-lo7Dd4f-dhWBW8S-XYGBm'
     )
     const built = createRgbOpretPsbt({
       network: 'mainnet',
@@ -65,7 +65,7 @@ describe('createRgbOpretPsbt', () => {
 
   it('uses the witness beneficiary script and reserves its output index', () => {
     const invoice = decodeRgbInvoice(
-      'rgb:asset/schema/~/bc:wvout:A8cJ7Ww3-NIzADo3-Tzp_5aD-7CTBWmA-AAAAAAA-AAAAAAA-ALSQkcw'
+      'rgb:AQEBAQEB-AQEBAQE-BAQEBAQ-EBAQEBA-QEBAQEB-AQEBAQE/schema/~/bc:wvout:A8cJ7Ww3-NIzADo3-Tzp_5aD-7CTBWmA-AAAAAAA-AAAAAAA-ALSQkcw'
     )
     const built = createRgbOpretPsbt({
       network: 'mainnet',
@@ -85,7 +85,7 @@ describe('createRgbOpretPsbt', () => {
 
   it('returns the RGB input satoshis to the ordinary BTC change output for a full transfer', () => {
     const invoice = decodeRgbInvoice(
-      'rgb:asset/schema/~/bc:utxob:xDfmDF9g-yNOjriV-6Anbe6H-MLJ__g6-lo7Dd4f-dhWBW8S-XYGBm'
+      'rgb:AQEBAQEB-AQEBAQE-BAQEBAQ-EBAQEBA-QEBAQEB-AQEBAQE/schema/~/bc:utxob:xDfmDF9g-yNOjriV-6Anbe6H-MLJ__g6-lo7Dd4f-dhWBW8S-XYGBm'
     )
     const built = createRgbOpretPsbt({
       network: 'mainnet',
@@ -104,7 +104,7 @@ describe('createRgbOpretPsbt', () => {
 
   it('accepts a P2WPKH BTC input for RGB transfer fees', () => {
     const invoice = decodeRgbInvoice(
-      'rgb:asset/schema/~/bc:utxob:xDfmDF9g-yNOjriV-6Anbe6H-MLJ__g6-lo7Dd4f-dhWBW8S-XYGBm'
+      'rgb:AQEBAQEB-AQEBAQE-BAQEBAQ-EBAQEBA-QEBAQEB-AQEBAQE/schema/~/bc:utxob:xDfmDF9g-yNOjriV-6Anbe6H-MLJ__g6-lo7Dd4f-dhWBW8S-XYGBm'
     )
     const built = createRgbOpretPsbt({
       network: 'mainnet',
@@ -131,7 +131,7 @@ describe('createRgbOpretPsbt', () => {
 
   it('requires an explicit dust-safe Bitcoin allocation for witness beneficiaries', () => {
     const invoice = decodeRgbInvoice(
-      'rgb:asset/schema/~/bc:wvout:A8cJ7Ww3-NIzADo3-Tzp_5aD-7CTBWmA-AAAAAAA-AAAAAAA-ALSQkcw'
+      'rgb:AQEBAQEB-AQEBAQE-BAQEBAQ-EBAQEBA-QEBAQEB-AQEBAQE/schema/~/bc:wvout:A8cJ7Ww3-NIzADo3-Tzp_5aD-7CTBWmA-AAAAAAA-AAAAAAA-ALSQkcw'
     )
     expect(() =>
       createRgbOpretPsbt({ network: 'mainnet', selectedUtxos: [utxo], recipientSeal: invoice.seal, feeRate: 2, preserveFundingOutput: true, feeFunding })

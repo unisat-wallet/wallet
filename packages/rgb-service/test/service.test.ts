@@ -25,7 +25,7 @@ const wallet: RgbWalletRef = {
 const blindRecipient = 'bc:utxob:xDfmDF9g-yNOjriV-6Anbe6H-MLJ__g6-lo7Dd4f-dhWBW8S-XYGBm'
 const proxyEndpoint = 'rpcs://proxy.example/json-rpc'
 const rgbInvoice = (amount = 60) =>
-  `rgb:asset/schema/~/${blindRecipient}?amount=${amount}&endpoints=${encodeURIComponent(proxyEndpoint)}`
+  `rgb:AQEBAQEB-AQEBAQE-BAQEBAQ-EBAQEBA-QEBAQEB-AQEBAQE/schema/~/${blindRecipient}?amount=${amount}&endpoints=${encodeURIComponent(proxyEndpoint)}`
 
 function swapPsbt(outpoints: Array<{ txid: string; vout: number }>) {
   const psbt = new Psbt()
@@ -60,7 +60,7 @@ function createDependencies(): RgbServiceDependencies {
             publicKey: '02' + '11'.repeat(32),
             allocations: [
               {
-                assetId: 'rgb:asset',
+                assetId: 'rgb:AQEBAQEB-AQEBAQE-BAQEBAQ-EBAQEBA-QEBAQEB-AQEBAQE',
                 amount: '40',
                 settled: true,
                 spendable: true,
@@ -77,7 +77,7 @@ function createDependencies(): RgbServiceDependencies {
             publicKey: '02' + '22'.repeat(32),
             allocations: [
               {
-                assetId: 'rgb:asset',
+                assetId: 'rgb:AQEBAQEB-AQEBAQE-BAQEBAQ-EBAQEBA-QEBAQEB-AQEBAQE',
                 amount: '60',
                 settled: true,
                 spendable: true,
@@ -90,7 +90,7 @@ function createDependencies(): RgbServiceDependencies {
         ],
       }),
       getValidationHistory: vi.fn().mockResolvedValue({
-        assetId: 'rgb:asset',
+        assetId: 'rgb:AQEBAQEB-AQEBAQE-BAQEBAQ-EBAQEBA-QEBAQEB-AQEBAQE',
         consignments: [],
       }),
       syncBroadcast: vi.fn(),
@@ -109,7 +109,7 @@ function createDependencies(): RgbServiceDependencies {
           {
             recipientId: 'recipient',
             payload: 'consignment',
-            assetId: 'rgb:asset',
+            assetId: 'rgb:AQEBAQEB-AQEBAQE-BAQEBAQ-EBAQEBA-QEBAQEB-AQEBAQE',
             opIds: ['d'.repeat(64)],
           },
         ],
@@ -143,7 +143,7 @@ describe('RgbService', () => {
     })
     await expect(
       service.prepareSend({
-        assetId: 'rgb:asset',
+        assetId: 'rgb:AQEBAQEB-AQEBAQE-BAQEBAQ-EBAQEBA-QEBAQEB-AQEBAQE',
         amount: '40',
         invoice: testnetInvoice,
         feeRate: 2,
@@ -170,7 +170,7 @@ describe('RgbService', () => {
       {
         invoice: 'rgb:invoice',
         recipientId: 'recipient-id',
-        assetId: 'rgb:asset',
+        assetId: 'rgb:AQEBAQEB-AQEBAQE-BAQEBAQ-EBAQEBA-QEBAQEB-AQEBAQE',
         amount: '50',
         createdAt: 123,
         seal: { txid: 'a'.repeat(64), vout: 0, blinding: 1n },
@@ -184,7 +184,7 @@ describe('RgbService', () => {
         {
           invoice: 'rgb:invoice',
           recipientId: 'recipient-id',
-          assetId: 'rgb:asset',
+          assetId: 'rgb:AQEBAQEB-AQEBAQE-BAQEBAQ-EBAQEBA-QEBAQEB-AQEBAQE',
           amount: '50',
           expirationTimestamp: undefined,
           createdAt: 123,
@@ -212,7 +212,7 @@ describe('RgbService', () => {
     checkpoint.mockClear()
 
     const prepared = await service.prepareSend(
-      { assetId: 'rgb:asset', amount: '60', invoice: rgbInvoice(), feeRate: 2 },
+      { assetId: 'rgb:AQEBAQEB-AQEBAQE-BAQEBAQ-EBAQEBA-QEBAQEB-AQEBAQE', amount: '60', invoice: rgbInvoice(), feeRate: 2 },
       { providerOrigin: 'https://dapp.example' }
     )
 
@@ -252,7 +252,7 @@ describe('RgbService', () => {
     await service.open(wallet)
     await service.sync()
     const prepared = await service.prepareSend(
-      { assetId: 'rgb:asset', amount: '60', invoice: rgbInvoice(), feeRate: 2 },
+      { assetId: 'rgb:AQEBAQEB-AQEBAQE-BAQEBAQ-EBAQEBA-QEBAQEB-AQEBAQE', amount: '60', invoice: rgbInvoice(), feeRate: 2 },
       { providerOrigin: 'https://dapp.example' }
     )
 
@@ -370,7 +370,7 @@ describe('RgbService', () => {
     await service.open(wallet)
     await service.sync()
 
-    const receive = await service.createBlindReceive({ assetId: 'rgb:asset', amount: '1' })
+    const receive = await service.createBlindReceive({ assetId: 'rgb:AQEBAQEB-AQEBAQE-BAQEBAQ-EBAQEBA-QEBAQEB-AQEBAQE', amount: '1' })
     const issueFunding = service.getAvailableIssueUtxos()
 
     expect(receive.seal).toMatchObject(fundingUtxos[0]!.outpoint)
@@ -385,7 +385,7 @@ describe('RgbService', () => {
     const witness = await service.createWitnessReceive({
       scriptPubKey: '512079be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798',
       publicKey: `02${'11'.repeat(32)}`,
-      assetId: 'rgb:asset',
+      assetId: 'rgb:AQEBAQEB-AQEBAQE-BAQEBAQ-EBAQEBA-QEBAQEB-AQEBAQE',
       amount: '1',
     })
     expect(witness.recipientType).toBe('witness')
@@ -454,7 +454,7 @@ describe('RgbService', () => {
     await service.open(wallet)
     ;(service as any).state.pendingAssetMetadata = [
       {
-        assetId: 'rgb:asset',
+        assetId: 'rgb:AQEBAQEB-AQEBAQE-BAQEBAQ-EBAQEBA-QEBAQEB-AQEBAQE',
         metadata: { ticker: 'TOK', name: 'Token', precision: 0, schema: 'NIA', issuedSupply: '1' },
       },
     ]
@@ -530,7 +530,7 @@ describe('RgbService', () => {
       wallet,
       snapshot: { syncedAt: 1, utxos: [] },
       pending: {
-        transfer: { request: { assetId: 'rgb:asset' }, prepared: {}, createdAt: 1 },
+        transfer: { request: { assetId: 'rgb:AQEBAQEB-AQEBAQE-BAQEBAQ-EBAQEBA-QEBAQEB-AQEBAQE' }, prepared: {}, createdAt: 1 },
       },
     }
 
@@ -658,7 +658,7 @@ describe('RgbService', () => {
       {
         invoice: rgbInvoice(),
         recipientId: 'recipient',
-        assetId: 'rgb:asset',
+        assetId: 'rgb:AQEBAQEB-AQEBAQE-BAQEBAQ-EBAQEBA-QEBAQEB-AQEBAQE',
         amount: '60',
         createdAt: 1,
         seal: { txid: 'a'.repeat(64), vout: 0, blinding: 1n },
@@ -714,7 +714,7 @@ describe('RgbService', () => {
           payload: 'consignment',
           txid: 'c'.repeat(64),
           endpoint: proxyEndpoint,
-          assetId: 'rgb:asset',
+          assetId: 'rgb:AQEBAQEB-AQEBAQE-BAQEBAQ-EBAQEBA-QEBAQEB-AQEBAQE',
           amount: '60',
           precision: 2,
           discoveredAt: 1,
@@ -723,22 +723,22 @@ describe('RgbService', () => {
     ]
     ;(service as any).state.pendingAssetMetadata = [
       {
-        assetId: 'rgb:asset',
+        assetId: 'rgb:AQEBAQEB-AQEBAQE-BAQEBAQ-EBAQEBA-QEBAQEB-AQEBAQE',
         metadata: { ticker: 'TOK', name: 'Token', precision: 0, schema: 'NIA', issuedSupply: '60' },
       },
     ]
 
-    await service.markAssetMetadataSynced('rgb:asset')
+    await service.markAssetMetadataSynced('rgb:AQEBAQEB-AQEBAQE-BAQEBAQ-EBAQEBA-QEBAQEB-AQEBAQE')
 
     expect((service as any).state.pendingReceives[0]).toMatchObject({ assetMetadataIndexed: true })
     expect(service.getPendingAssetMetadata()).toEqual([])
-    expect(service.getLocalAssetDetail('rgb:asset')).toMatchObject({
+    expect(service.getLocalAssetDetail('rgb:AQEBAQEB-AQEBAQE-BAQEBAQ-EBAQEBA-QEBAQEB-AQEBAQE')).toMatchObject({
       ticker: 'TOK', name: 'Token', precision: 0,
     })
     const reopened = new RgbService(dependencies)
     await reopened.open(wallet)
     expect(reopened.getPendingAssetMetadata()).toEqual([])
-    expect(reopened.getLocalAssetDetail('rgb:asset')).toMatchObject({
+    expect(reopened.getLocalAssetDetail('rgb:AQEBAQEB-AQEBAQE-BAQEBAQ-EBAQEBA-QEBAQEB-AQEBAQE')).toMatchObject({
       ticker: 'TOK', name: 'Token', precision: 0,
     })
     dependencies.transport.getConsignment = vi.fn().mockResolvedValue({
@@ -748,7 +748,7 @@ describe('RgbService', () => {
       endpoint: proxyEndpoint,
     })
     ;(service as any).validateIncomingConsignment = vi.fn().mockReturnValue({
-      assetId: 'rgb:asset',
+      assetId: 'rgb:AQEBAQEB-AQEBAQE-BAQEBAQ-EBAQEBA-QEBAQEB-AQEBAQE',
       amount: '60',
       txid: 'c'.repeat(64),
       decoded: {
@@ -840,7 +840,7 @@ describe('RgbService', () => {
       {
         invoice: rgbInvoice(),
         recipientId: 'recipient',
-        assetId: 'rgb:asset',
+        assetId: 'rgb:AQEBAQEB-AQEBAQE-BAQEBAQ-EBAQEBA-QEBAQEB-AQEBAQE',
         amount: '60',
         createdAt: 1,
         seal: { txid: 'a'.repeat(64), vout: 0, blinding: 1n },
@@ -854,7 +854,7 @@ describe('RgbService', () => {
       },
     ]
     ;(service as any).validateIncomingConsignment = vi.fn().mockReturnValue({
-      assetId: 'rgb:asset',
+      assetId: 'rgb:AQEBAQEB-AQEBAQE-BAQEBAQ-EBAQEBA-QEBAQEB-AQEBAQE',
       amount: '60',
       txid: 'c'.repeat(64),
       decoded: {
@@ -890,7 +890,7 @@ describe('RgbService', () => {
       pendingReceiveHistory: [
         {
           transferId: 'receive:recipient',
-          assetId: 'rgb:asset',
+          assetId: 'rgb:AQEBAQEB-AQEBAQE-BAQEBAQ-EBAQEBA-QEBAQEB-AQEBAQE',
           amount: '60',
           txid: 'c'.repeat(64),
           createdAt: 1,
@@ -989,7 +989,7 @@ describe('RgbService', () => {
     await service.open(wallet)
     await service.sync()
     ;(service as any).state.contracts = {
-      'rgb:asset': {
+      'rgb:AQEBAQEB-AQEBAQE-BAQEBAQ-EBAQEBA-QEBAQEB-AQEBAQE': {
         consignment: 'local-consignment',
         createdAt: 1,
         metadata: {
@@ -1006,7 +1006,7 @@ describe('RgbService', () => {
       total: 1,
       list: [
         expect.objectContaining({
-          assetId: 'rgb:asset',
+          assetId: 'rgb:AQEBAQEB-AQEBAQE-BAQEBAQ-EBAQEBA-QEBAQEB-AQEBAQE',
           balance: '100',
           settled: '100',
           spendable: '100',
@@ -1017,9 +1017,9 @@ describe('RgbService', () => {
         }),
       ],
     })
-    expect(service.getLocalAssetBalance('rgb:asset')).toMatchObject({ balance: '100' })
-    expect(service.getLocalAssetDetail('rgb:asset')).toMatchObject({
-      assetId: 'rgb:asset',
+    expect(service.getLocalAssetBalance('rgb:AQEBAQEB-AQEBAQE-BAQEBAQ-EBAQEBA-QEBAQEB-AQEBAQE')).toMatchObject({ balance: '100' })
+    expect(service.getLocalAssetDetail('rgb:AQEBAQEB-AQEBAQE-BAQEBAQ-EBAQEBA-QEBAQEB-AQEBAQE')).toMatchObject({
+      assetId: 'rgb:AQEBAQEB-AQEBAQE-BAQEBAQ-EBAQEBA-QEBAQEB-AQEBAQE',
       name: 'Local token',
       issuedSupply: '100',
     })
@@ -1033,9 +1033,9 @@ describe('RgbService', () => {
 
     await expect(
       service.prepareSend({
-        assetId: 'rgb:asset',
+        assetId: 'rgb:AQEBAQEB-AQEBAQE-BAQEBAQ-EBAQEBA-QEBAQEB-AQEBAQE',
         amount: '60',
-        invoice: `rgb:asset/schema/~/${blindRecipient}?amount=60`,
+        invoice: `rgb:AQEBAQEB-AQEBAQE-BAQEBAQ-EBAQEBA-QEBAQEB-AQEBAQE/schema/~/${blindRecipient}?amount=60`,
         feeRate: 2,
       })
     ).rejects.toThrow('RGB invoice has no proxy transport endpoint')
@@ -1059,7 +1059,7 @@ describe('RgbService', () => {
 
     await expect(
       service.prepareSend({
-        assetId: 'rgb:asset',
+        assetId: 'rgb:AQEBAQEB-AQEBAQE-BAQEBAQ-EBAQEBA-QEBAQEB-AQEBAQE',
         amount: '40',
         invoice: rgbInvoice(40),
         feeRate: 2,
@@ -1077,7 +1077,7 @@ describe('RgbService', () => {
       () =>
         new Promise<RgbValidationHistory>(resolve => {
           signalHistoryStarted!()
-          releaseHistory = () => resolve({ assetId: 'rgb:asset', consignments: [] })
+          releaseHistory = () => resolve({ assetId: 'rgb:AQEBAQEB-AQEBAQE-BAQEBAQ-EBAQEBA-QEBAQEB-AQEBAQE', consignments: [] })
         })
     )
     const service = new RgbService(dependencies)
@@ -1085,14 +1085,14 @@ describe('RgbService', () => {
     await service.sync()
 
     const first = service.prepareSend({
-      assetId: 'rgb:asset',
+      assetId: 'rgb:AQEBAQEB-AQEBAQE-BAQEBAQ-EBAQEBA-QEBAQEB-AQEBAQE',
       amount: '60',
       invoice: rgbInvoice(),
       feeRate: 2,
     })
     await historyStarted
     const second = service.prepareSend({
-      assetId: 'rgb:asset',
+      assetId: 'rgb:AQEBAQEB-AQEBAQE-BAQEBAQ-EBAQEBA-QEBAQEB-AQEBAQE',
       amount: '60',
       invoice: rgbInvoice(),
       feeRate: 2,
@@ -1111,7 +1111,7 @@ describe('RgbService', () => {
     await service.open(wallet)
     await service.sync()
     const request = {
-      assetId: 'rgb:asset',
+      assetId: 'rgb:AQEBAQEB-AQEBAQE-BAQEBAQ-EBAQEBA-QEBAQEB-AQEBAQE',
       amount: '60',
       invoice: rgbInvoice(),
       feeRate: 2,
@@ -1123,7 +1123,7 @@ describe('RgbService', () => {
 
     expect(retried).toEqual(first)
     expect(dependencies.encoder.prepareTransfer).toHaveBeenCalledTimes(1)
-    expect(service.getLocalAssetBalance('rgb:asset')?.spendable).toBe('40')
+    expect(service.getLocalAssetBalance('rgb:AQEBAQEB-AQEBAQE-BAQEBAQ-EBAQEBA-QEBAQEB-AQEBAQE')?.spendable).toBe('40')
   })
 
   it('selects RGB allocations only from inputs committed by a swap PSBT', async () => {
@@ -1138,7 +1138,7 @@ describe('RgbService', () => {
           publicKey: `02${'11'.repeat(32)}`,
           allocations: [
             {
-              assetId: 'rgb:asset',
+              assetId: 'rgb:AQEBAQEB-AQEBAQE-BAQEBAQ-EBAQEBA-QEBAQEB-AQEBAQE',
               amount: '20',
               settled: true,
               spendable: true,
@@ -1155,7 +1155,7 @@ describe('RgbService', () => {
           publicKey: `02${'22'.repeat(32)}`,
           allocations: [
             {
-              assetId: 'rgb:asset',
+              assetId: 'rgb:AQEBAQEB-AQEBAQE-BAQEBAQ-EBAQEBA-QEBAQEB-AQEBAQE',
               amount: '60',
               settled: true,
               spendable: true,
@@ -1172,7 +1172,7 @@ describe('RgbService', () => {
           publicKey: `02${'33'.repeat(32)}`,
           allocations: [
             {
-              assetId: 'rgb:asset',
+              assetId: 'rgb:AQEBAQEB-AQEBAQE-BAQEBAQ-EBAQEBA-QEBAQEB-AQEBAQE',
               amount: '40',
               settled: true,
               spendable: true,
@@ -1198,7 +1198,7 @@ describe('RgbService', () => {
     await service.sync()
 
     await service.prepareSend({
-      assetId: 'rgb:asset',
+      assetId: 'rgb:AQEBAQEB-AQEBAQE-BAQEBAQ-EBAQEBA-QEBAQEB-AQEBAQE',
       amount: '60',
       invoice: rgbInvoice(),
       feeRate: 2,
@@ -1226,7 +1226,7 @@ describe('RgbService', () => {
 
     await expect(
       service.prepareSend({
-        assetId: 'rgb:asset',
+        assetId: 'rgb:AQEBAQEB-AQEBAQE-BAQEBAQ-EBAQEBA-QEBAQEB-AQEBAQE',
         amount: '60',
         invoice: rgbInvoice(),
         feeRate: 2,
@@ -1277,13 +1277,13 @@ describe('RgbService', () => {
     await service.sync()
 
     await service.prepareSend({
-      assetId: 'rgb:asset',
+      assetId: 'rgb:AQEBAQEB-AQEBAQE-BAQEBAQ-EBAQEBA-QEBAQEB-AQEBAQE',
       amount: '40',
       invoice: rgbInvoice(40),
       feeRate: 2,
     })
     await service.prepareSend({
-      assetId: 'rgb:asset',
+      assetId: 'rgb:AQEBAQEB-AQEBAQE-BAQEBAQ-EBAQEBA-QEBAQEB-AQEBAQE',
       amount: '60',
       invoice: rgbInvoice(60),
       feeRate: 2,
@@ -1305,7 +1305,7 @@ describe('RgbService', () => {
         chainStatus: 'confirmed' as const,
         allocations: [
           {
-            assetId: 'rgb:issued',
+            assetId: 'rgb:BgYGBgYG-BgYGBgY-GBgYGBg-YGBgYGB-gYGBgYG-BgYGBgY',
             amount: '1',
             settled: true,
             spendable: true,
@@ -1318,7 +1318,7 @@ describe('RgbService', () => {
     ]
 
     await service.queueIssue({
-      assetId: 'rgb:issued',
+      assetId: 'rgb:BgYGBgYG-BgYGBgY-GBgYGBg-YGBgYGB-gYGBgYG-BgYGBgY',
       contract: Uint8Array.from([1]),
       genesis: Uint8Array.from([2]),
       asset: {
@@ -1339,13 +1339,13 @@ describe('RgbService', () => {
     await reopened.open(wallet)
     expect(reopened.getPendingIssues()).toEqual([
       expect.objectContaining({
-        assetId: 'rgb:issued',
+        assetId: 'rgb:BgYGBgYG-BgYGBgY-GBgYGBg-YGBgYGB-gYGBgYG-BgYGBgY',
         utxoSync: { txid: outpoints[0]!.outpoint.txid, outpoints },
       }),
     ])
     expect(reopened.getIssueHistory()).toEqual([
       expect.objectContaining({
-        assetId: 'rgb:issued',
+        assetId: 'rgb:BgYGBgYG-BgYGBgY-GBgYGBg-YGBgYGB-gYGBgYG-BgYGBgY',
         amount: '1',
         txid: outpoints[0]!.outpoint.txid,
         chainStatus: 'confirmed',
@@ -1354,10 +1354,10 @@ describe('RgbService', () => {
     ])
     ;(reopened as any).state.snapshot.utxos[0].chainStatus = 'mempool'
     expect(reopened.getIssueHistory()).toEqual([
-      expect.objectContaining({ assetId: 'rgb:issued', chainStatus: 'mempool' }),
+      expect.objectContaining({ assetId: 'rgb:BgYGBgYG-BgYGBgY-GBgYGBg-YGBgYGB-gYGBgYG-BgYGBgY', chainStatus: 'mempool' }),
     ])
     ;(reopened as any).state.snapshot.utxos[0].chainStatus = 'confirmed'
-    await reopened.markIssueSynced('rgb:issued')
+    await reopened.markIssueSynced('rgb:BgYGBgYG-BgYGBgY-GBgYGBg-YGBgYGB-gYGBgYG-BgYGBgY')
     expect(reopened.getIssueHistory()).toHaveLength(1)
     expect(reopened.getSnapshot().utxos).toEqual(outpoints)
   })
@@ -1386,7 +1386,7 @@ describe('RgbService', () => {
 
     await expect(
       service.queueIssue({
-        assetId: 'rgb:issued',
+        assetId: 'rgb:BgYGBgYG-BgYGBgY-GBgYGBg-YGBgYGB-gYGBgYG-BgYGBgY',
         contract: Uint8Array.from([1]),
         genesis: Uint8Array.from([2]),
         asset: { ticker: 'ISS', name: 'Issued', precision: 0, schema: 'NIA', issuedSupply: '1' },
@@ -1395,7 +1395,7 @@ describe('RgbService', () => {
     ).rejects.toThrow('recovery unavailable')
 
     expect(service.getPendingIssues()).toEqual([])
-    expect(service.getContractConsignment('rgb:issued')).toBeUndefined()
+    expect(service.getContractConsignment('rgb:BgYGBgYG-BgYGBgY-GBgYGBg-YGBgYGB-gYGBgYG-BgYGBgY')).toBeUndefined()
   })
 
   it('retains already-broadcast RGB funding UTXOs when recovery checkpointing fails', async () => {
@@ -1431,7 +1431,7 @@ describe('RgbService', () => {
     await service.open(wallet)
     await service.sync()
     const prepared = await service.prepareSend({
-      assetId: 'rgb:asset',
+      assetId: 'rgb:AQEBAQEB-AQEBAQE-BAQEBAQ-EBAQEBA-QEBAQEB-AQEBAQE',
       amount: '60',
       invoice: rgbInvoice(),
       feeRate: 2,
@@ -1464,8 +1464,8 @@ describe('RgbService', () => {
     await service.sync()
 
     await expect(
-      service.createBlindReceive({ assetId: 'rgb:asset', amount: '1' })
-    ).resolves.toMatchObject({ assetId: 'rgb:asset' })
+      service.createBlindReceive({ assetId: 'rgb:AQEBAQEB-AQEBAQE-BAQEBAQ-EBAQEBA-QEBAQEB-AQEBAQE', amount: '1' })
+    ).resolves.toMatchObject({ assetId: 'rgb:AQEBAQEB-AQEBAQE-BAQEBAQ-EBAQEBA-QEBAQEB-AQEBAQE' })
     expect(service.getAvailableReceiveUtxos()).toEqual([])
   })
 
@@ -1485,7 +1485,7 @@ describe('RgbService', () => {
     await service.open(wallet)
 
     await expect(
-      service.createBlindReceive({ assetId: 'rgb:asset', amount: '18446744073709551616' })
+      service.createBlindReceive({ assetId: 'rgb:AQEBAQEB-AQEBAQE-BAQEBAQ-EBAQEBA-QEBAQEB-AQEBAQE', amount: '18446744073709551616' })
     ).rejects.toThrow('exceeds the maximum u64 value')
   })
 
@@ -1519,7 +1519,7 @@ describe('RgbService', () => {
 
     let completed = false
     const creating = service
-      .createBlindReceive({ assetId: 'rgb:asset', amount: '1' })
+      .createBlindReceive({ assetId: 'rgb:AQEBAQEB-AQEBAQE-BAQEBAQ-EBAQEBA-QEBAQEB-AQEBAQE', amount: '1' })
       .then(result => {
         completed = true
         return result
@@ -1528,7 +1528,7 @@ describe('RgbService', () => {
 
     expect(dependencies.onStatePersisted).toHaveBeenCalledWith(
       expect.objectContaining({
-        pendingReceives: [expect.objectContaining({ assetId: 'rgb:asset' })],
+        pendingReceives: [expect.objectContaining({ assetId: 'rgb:AQEBAQEB-AQEBAQE-BAQEBAQ-EBAQEBA-QEBAQEB-AQEBAQE' })],
       }),
       { reason: 'state_change', kind: 'normal' }
     )
@@ -1539,7 +1539,7 @@ describe('RgbService', () => {
     expect(checkpointState).not.toHaveProperty('recoveryCheckpointRevision')
     expect(completed).toBe(false)
     finishCheckpoint?.()
-    await expect(creating).resolves.toMatchObject({ assetId: 'rgb:asset' })
+    await expect(creating).resolves.toMatchObject({ assetId: 'rgb:AQEBAQEB-AQEBAQE-BAQEBAQ-EBAQEBA-QEBAQEB-AQEBAQE' })
   })
 
   it('does not report a new blind invoice as created when its recovery checkpoint fails', async () => {
@@ -1564,7 +1564,7 @@ describe('RgbService', () => {
     await service.sync()
     service.enableRecoveryBackup()
 
-    await expect(service.createBlindReceive({ assetId: 'rgb:asset', amount: '1' })).rejects.toThrow(
+    await expect(service.createBlindReceive({ assetId: 'rgb:AQEBAQEB-AQEBAQE-BAQEBAQ-EBAQEBA-QEBAQEB-AQEBAQE', amount: '1' })).rejects.toThrow(
       'recovery unavailable'
     )
     expect(service.getPendingReceives()).toEqual([])
@@ -1598,11 +1598,11 @@ describe('RgbService', () => {
 
     await expect(
       service.createBlindReceive({
-        assetId: 'rgb:asset',
+        assetId: 'rgb:AQEBAQEB-AQEBAQE-BAQEBAQ-EBAQEBA-QEBAQEB-AQEBAQE',
         amount: '1',
         deferRecoveryCheckpoint: true,
       })
-    ).resolves.toMatchObject({ assetId: 'rgb:asset' })
+    ).resolves.toMatchObject({ assetId: 'rgb:AQEBAQEB-AQEBAQE-BAQEBAQ-EBAQEBA-QEBAQEB-AQEBAQE' })
 
     expect(dependencies.onStatePersisted).not.toHaveBeenCalled()
     await expect(service.claimPendingReceives()).resolves.toEqual({ claimed: 1 })
@@ -1625,12 +1625,12 @@ describe('RgbService', () => {
     service.enableRecoveryBackup()
 
     await expect(
-      service.prepareSend({ assetId: 'rgb:asset', amount: '60', feeRate: 1, invoice: rgbInvoice() })
+      service.prepareSend({ assetId: 'rgb:AQEBAQEB-AQEBAQE-BAQEBAQ-EBAQEBA-QEBAQEB-AQEBAQE', amount: '60', feeRate: 1, invoice: rgbInvoice() })
     ).rejects.toThrow('recovery unavailable')
 
     expect(service.getPendingTransfers()).toEqual([])
     await expect(
-      service.prepareSend({ assetId: 'rgb:asset', amount: '60', feeRate: 1, invoice: rgbInvoice() })
+      service.prepareSend({ assetId: 'rgb:AQEBAQEB-AQEBAQE-BAQEBAQ-EBAQEBA-QEBAQEB-AQEBAQE', amount: '60', feeRate: 1, invoice: rgbInvoice() })
     ).rejects.toThrow('recovery unavailable')
   })
 
@@ -1644,13 +1644,13 @@ describe('RgbService', () => {
     await service.open(wallet)
     await service.enableRecoveryBackup()
 
-    await expect(service.storeContract('rgb:new', Uint8Array.from([1]))).rejects.toThrow(
+    await expect(service.storeContract('rgb:BwcHBwcH-BwcHBwc-HBwcHBw-cHBwcHB-wcHBwcH-BwcHBwc', Uint8Array.from([1]))).rejects.toThrow(
       'conflicts with a newer remote state'
     )
 
     expect(service.hasRecoveryConflict()).toBe(true)
     expect(service.isRecoveryBackupEnabled()).toBe(false)
-    expect(service.getContractConsignment('rgb:new')).toBeUndefined()
+    expect(service.getContractConsignment('rgb:BwcHBwcH-BwcHBwc-HBwcHBw-cHBwcHB-wcHBwcH-BwcHBwc')).toBeUndefined()
   })
 
   it('persists dirty recovery status and retries it after reopening', async () => {
@@ -1721,9 +1721,9 @@ describe('RgbService', () => {
     await service.sync()
 
     await expect(
-      service.createBlindReceive({ assetId: 'rgb:asset', amount: '1' })
+      service.createBlindReceive({ assetId: 'rgb:AQEBAQEB-AQEBAQE-BAQEBAQ-EBAQEBA-QEBAQEB-AQEBAQE', amount: '1' })
     ).resolves.toMatchObject({
-      assetId: 'rgb:asset',
+      assetId: 'rgb:AQEBAQEB-AQEBAQE-BAQEBAQ-EBAQEBA-QEBAQEB-AQEBAQE',
     })
     expect(service.getPendingConfirmationReceiveUtxos()).toEqual([])
   })
@@ -1755,7 +1755,7 @@ describe('RgbService', () => {
           confirmations: 0,
           allocations: [
             {
-              assetId: 'rgb:asset',
+              assetId: 'rgb:AQEBAQEB-AQEBAQE-BAQEBAQ-EBAQEBA-QEBAQEB-AQEBAQE',
               amount: '60',
               settled: true,
               spendable: true,
@@ -1773,7 +1773,7 @@ describe('RgbService', () => {
 
     await expect(
       service.prepareSend({
-        assetId: 'rgb:asset',
+        assetId: 'rgb:AQEBAQEB-AQEBAQE-BAQEBAQ-EBAQEBA-QEBAQEB-AQEBAQE',
         amount: '60',
         invoice: rgbInvoice(),
         feeRate: 2,
@@ -1793,7 +1793,7 @@ describe('RgbService', () => {
     await service.sync()
 
     await service.prepareSend({
-      assetId: 'rgb:asset',
+      assetId: 'rgb:AQEBAQEB-AQEBAQE-BAQEBAQ-EBAQEBA-QEBAQEB-AQEBAQE',
       amount: '60',
       invoice: rgbInvoice(),
       feeRate: 2,
@@ -1813,7 +1813,7 @@ describe('RgbService', () => {
       })
     )
     expect(dependencies.stateSource.getValidationHistory).toHaveBeenCalledWith(wallet, {
-      assetId: 'rgb:asset',
+      assetId: 'rgb:AQEBAQEB-AQEBAQE-BAQEBAQ-EBAQEBA-QEBAQEB-AQEBAQE',
       allocations: [
         {
           outpoint: { txid: 'b'.repeat(64), vout: 1 },
@@ -1825,7 +1825,7 @@ describe('RgbService', () => {
     })
     await expect(
       service.prepareSend({
-        assetId: 'rgb:asset',
+        assetId: 'rgb:AQEBAQEB-AQEBAQE-BAQEBAQ-EBAQEBA-QEBAQEB-AQEBAQE',
         amount: '60',
         invoice: rgbInvoice(),
         feeRate: 2,
@@ -1839,7 +1839,7 @@ describe('RgbService', () => {
     await service.open(wallet)
     await service.sync()
     await service.prepareSend({
-      assetId: 'rgb:asset',
+      assetId: 'rgb:AQEBAQEB-AQEBAQE-BAQEBAQ-EBAQEBA-QEBAQEB-AQEBAQE',
       amount: '60',
       invoice: rgbInvoice(),
       feeRate: 2,
@@ -1862,9 +1862,9 @@ describe('RgbService', () => {
 
     await expect(
       service.prepareSend({
-        assetId: 'rgb:asset',
+        assetId: 'rgb:AQEBAQEB-AQEBAQE-BAQEBAQ-EBAQEBA-QEBAQEB-AQEBAQE',
         amount: '60',
-        invoice: `rgb:other/schema/~/${blindRecipient}`,
+        invoice: `rgb:AgICAgIC-AgICAgI-CAgICAg-ICAgICA-gICAgIC-AgICAgI/schema/~/${blindRecipient}`,
         feeRate: 2,
       })
     ).rejects.toThrow('RGB invoice asset does not match the requested asset')
@@ -1878,7 +1878,7 @@ describe('RgbService', () => {
     await service.sync()
 
     await service.prepareSend({
-      assetId: 'rgb:asset',
+      assetId: 'rgb:AQEBAQEB-AQEBAQE-BAQEBAQ-EBAQEBA-QEBAQEB-AQEBAQE',
       invoice: rgbInvoice(),
       feeRate: 2,
     })
@@ -1896,20 +1896,20 @@ describe('RgbService', () => {
     const service = new RgbService(dependencies)
     await service.open(wallet)
     await service.sync()
-    await service.storeContract('rgb:asset', Uint8Array.from([1, 2, 3]))
+    await service.storeContract('rgb:AQEBAQEB-AQEBAQE-BAQEBAQ-EBAQEBA-QEBAQEB-AQEBAQE', Uint8Array.from([1, 2, 3]))
 
     await service.prepareSend({
-      assetId: 'rgb:asset',
+      assetId: 'rgb:AQEBAQEB-AQEBAQE-BAQEBAQ-EBAQEBA-QEBAQEB-AQEBAQE',
       amount: '60',
-      invoice: `rgb:asset/schema/~/${blindRecipient}?amount=60&endpoints=${encodeURIComponent(proxyEndpoint)}`,
+      invoice: `rgb:AQEBAQEB-AQEBAQE-BAQEBAQ-EBAQEBA-QEBAQEB-AQEBAQE/schema/~/${blindRecipient}?amount=60&endpoints=${encodeURIComponent(proxyEndpoint)}`,
       feeRate: 2,
     })
 
     expect(dependencies.encoder.prepareTransfer).toHaveBeenCalledWith(
       expect.objectContaining({
         validationHistory: {
-          assetId: 'rgb:asset',
-          consignments: [{ opId: 'asset', payload: Buffer.from([1, 2, 3]).toString('base64') }],
+          assetId: 'rgb:AQEBAQEB-AQEBAQE-BAQEBAQ-EBAQEBA-QEBAQEB-AQEBAQE',
+          consignments: [{ opId: '01'.repeat(32), payload: Buffer.from([1, 2, 3]).toString('base64') }],
           localContract: Buffer.from([1, 2, 3]).toString('base64'),
           knownBlindSeals: [],
         },
@@ -1923,7 +1923,7 @@ describe('RgbService', () => {
     await service.open(wallet)
     await service.sync()
     ;(service as any).state.contracts = {
-      'rgb:asset': {
+      'rgb:AQEBAQEB-AQEBAQE-BAQEBAQ-EBAQEBA-QEBAQEB-AQEBAQE': {
         consignment: 'Y29tcGxldGUtbG9jYWwtaGlzdG9yeQ==',
         createdAt: 1,
         history: {
@@ -1946,7 +1946,7 @@ describe('RgbService', () => {
 
     await expect(
       reopened.prepareSend({
-        assetId: 'rgb:asset',
+        assetId: 'rgb:AQEBAQEB-AQEBAQE-BAQEBAQ-EBAQEBA-QEBAQEB-AQEBAQE',
         amount: '100',
         invoice: rgbInvoice(100),
         feeRate: 2,
@@ -1957,7 +1957,7 @@ describe('RgbService', () => {
     expect(dependencies.encoder.prepareTransfer).toHaveBeenLastCalledWith(
       expect.objectContaining({
         validationHistory: expect.objectContaining({
-          consignments: [{ opId: 'asset', payload: 'Y29tcGxldGUtbG9jYWwtaGlzdG9yeQ==' }],
+          consignments: [{ opId: '01'.repeat(32), payload: 'Y29tcGxldGUtbG9jYWwtaGlzdG9yeQ==' }],
         }),
       })
     )
@@ -1969,7 +1969,7 @@ describe('RgbService', () => {
     await service.open(wallet)
     await service.sync()
     ;(service as any).state.contracts = {
-      'rgb:asset': {
+      'rgb:AQEBAQEB-AQEBAQE-BAQEBAQ-EBAQEBA-QEBAQEB-AQEBAQE': {
         consignment: 'Y29tcGxldGUtbG9jYWwtaGlzdG9yeQ==',
         createdAt: 1,
         history: {
@@ -1990,13 +1990,13 @@ describe('RgbService', () => {
         lockedOutpoints: [{ txid: 'b'.repeat(64), vout: 1 }],
       })
     vi.mocked(dependencies.stateSource.getValidationHistory).mockResolvedValueOnce({
-      assetId: 'rgb:asset',
+      assetId: 'rgb:AQEBAQEB-AQEBAQE-BAQEBAQ-EBAQEBA-QEBAQEB-AQEBAQE',
       consignments: [{ opId: 'd'.repeat(64), payload: 'cmVtb3RlLWhpc3Rvcnk=' }],
     })
 
     await expect(
       service.prepareSend({
-        assetId: 'rgb:asset',
+        assetId: 'rgb:AQEBAQEB-AQEBAQE-BAQEBAQ-EBAQEBA-QEBAQEB-AQEBAQE',
         amount: '100',
         invoice: rgbInvoice(100),
         feeRate: 2,
@@ -2013,7 +2013,7 @@ describe('RgbService', () => {
     await service.open(wallet)
     await service.sync()
     await service.prepareSend({
-      assetId: 'rgb:asset',
+      assetId: 'rgb:AQEBAQEB-AQEBAQE-BAQEBAQ-EBAQEBA-QEBAQEB-AQEBAQE',
       amount: '60',
       precision: 7,
       invoice: rgbInvoice(),
@@ -2025,7 +2025,7 @@ describe('RgbService', () => {
     expect(dependencies.transport.publishConsignment).toHaveBeenCalledWith({
       recipientId: blindRecipient,
       payload: 'consignment',
-      assetId: 'rgb:asset',
+      assetId: 'rgb:AQEBAQEB-AQEBAQE-BAQEBAQ-EBAQEBA-QEBAQEB-AQEBAQE',
       opIds: ['d'.repeat(64)],
       transportId: 'transfer-1:0',
       txid: 'c'.repeat(64),
@@ -2062,7 +2062,7 @@ describe('RgbService', () => {
     await service.open(wallet)
     await service.sync()
     await service.prepareSend({
-      assetId: 'rgb:asset',
+      assetId: 'rgb:AQEBAQEB-AQEBAQE-BAQEBAQ-EBAQEBA-QEBAQEB-AQEBAQE',
       amount: '60',
       invoice: rgbInvoice(),
       feeRate: 2,
@@ -2116,7 +2116,7 @@ describe('RgbService', () => {
       {
         invoice: rgbInvoice(),
         recipientId: 'recipient',
-        assetId: 'rgb:asset',
+        assetId: 'rgb:AQEBAQEB-AQEBAQE-BAQEBAQ-EBAQEBA-QEBAQEB-AQEBAQE',
         amount: '60',
         createdAt: 1,
         seal: { txid: 'a'.repeat(64), vout: 0, blinding: 1n },
@@ -2124,7 +2124,7 @@ describe('RgbService', () => {
           payload: 'consignment',
           txid: 'c'.repeat(64),
           endpoint: proxyEndpoint,
-          assetId: 'rgb:asset',
+          assetId: 'rgb:AQEBAQEB-AQEBAQE-BAQEBAQ-EBAQEBA-QEBAQEB-AQEBAQE',
           amount: '60',
           precision: 2,
           discoveredAt: 1,
@@ -2138,11 +2138,11 @@ describe('RgbService', () => {
       status: 'accepted',
     })
     expect((service as any).state.pendingReceives[0].receivedConsignment).toMatchObject({
-      assetId: 'rgb:asset',
+      assetId: 'rgb:AQEBAQEB-AQEBAQE-BAQEBAQ-EBAQEBA-QEBAQEB-AQEBAQE',
       amount: '60',
       precision: 2,
     })
-    expect(service.getLocalAssetBalance('rgb:asset')).toMatchObject({
+    expect(service.getLocalAssetBalance('rgb:AQEBAQEB-AQEBAQE-BAQEBAQ-EBAQEBA-QEBAQEB-AQEBAQE')).toMatchObject({
       settled: '0', spendable: '0', pending: '60', incomingPending: '60',
     })
 
@@ -2169,7 +2169,7 @@ describe('RgbService', () => {
       allocations: [],
     }]
     state.pendingAssetMetadata = [{
-      assetId: 'rgb:new-asset',
+      assetId: 'rgb:CAgICAgI-CAgICAg-ICAgICA-gICAgIC-AgICAgI-CAgICAg',
       metadata: {
         ticker: 'NEW', name: 'New Asset', precision: 2,
         schema: 'NIA', issuedSupply: '100',
@@ -2182,16 +2182,16 @@ describe('RgbService', () => {
       receivedConsignment: {
         accepted: false,
         txid: 'c'.repeat(64),
-        assetId: 'rgb:new-asset',
+        assetId: 'rgb:CAgICAgI-CAgICAg-ICAgICA-gICAgIC-AgICAgI-CAgICAg',
         amount: '2',
         precision: 0,
         receivedAt: 1,
       },
     }]
-    expect(service.getLocalAssetBalance('rgb:new-asset')).toBeUndefined()
+    expect(service.getLocalAssetBalance('rgb:CAgICAgI-CAgICAg-ICAgICA-gICAgIC-AgICAgI-CAgICAg')).toBeUndefined()
 
     state.pendingReceives[0].receivedConsignment.accepted = true
-    expect(service.getLocalAssetBalance('rgb:new-asset')).toMatchObject({
+    expect(service.getLocalAssetBalance('rgb:CAgICAgI-CAgICAg-ICAgICA-gICAgIC-AgICAgI-CAgICAg')).toMatchObject({
       settled: '0',
       spendable: '0',
       pending: '2',
@@ -2199,23 +2199,23 @@ describe('RgbService', () => {
       ticker: 'NEW',
       precision: 2,
     })
-    expect(service.getLocalAssetList().list.some(item => item.assetId === 'rgb:new-asset')).toBe(true)
+    expect(service.getLocalAssetList().list.some(item => item.assetId === 'rgb:CAgICAgI-CAgICAg-ICAgICA-gICAgIC-AgICAgI-CAgICAg')).toBe(true)
 
     state.pendingReceives[0].receivedConsignment.broadcastDetectedAt = 2
-    expect(service.getLocalAssetBalance('rgb:new-asset')).toMatchObject({
+    expect(service.getLocalAssetBalance('rgb:CAgICAgI-CAgICAg-ICAgICA-gICAgIC-AgICAgI-CAgICAg')).toMatchObject({
       spendable: '0', pending: '2', incomingPending: '2',
     })
 
     state.snapshot.utxos[0].allocations.push({
-      assetId: 'rgb:new-asset', amount: '2', settled: false, spendable: false,
+      assetId: 'rgb:CAgICAgI-CAgICAg-ICAgICA-gICAgIC-AgICAgI-CAgICAg', amount: '2', settled: false, spendable: false,
     })
-    expect(service.getLocalAssetBalance('rgb:new-asset')).toMatchObject({
+    expect(service.getLocalAssetBalance('rgb:CAgICAgI-CAgICAg-ICAgICA-gICAgIC-AgICAgI-CAgICAg')).toMatchObject({
       settled: '0', pending: '2', incomingPending: '2',
     })
 
     state.snapshot.utxos[0].allocations.at(-1).settled = true
     state.snapshot.utxos[0].allocations.at(-1).spendable = true
-    expect(service.getLocalAssetBalance('rgb:new-asset')).toMatchObject({
+    expect(service.getLocalAssetBalance('rgb:CAgICAgI-CAgICAg-ICAgICA-gICAgIC-AgICAgI-CAgICAg')).toMatchObject({
       settled: '2', spendable: '2', pending: '0', incomingPending: '0',
     })
   })
@@ -2240,14 +2240,14 @@ describe('RgbService', () => {
       recipientId,
       proxyRecipientId: `proxy-${recipientId}`,
       recipientType: 'witness',
-      assetId: 'rgb:asset',
+      assetId: 'rgb:AQEBAQEB-AQEBAQE-BAQEBAQ-EBAQEBA-QEBAQEB-AQEBAQE',
       amount: String(60 + index),
       createdAt: index + 1,
       pendingAccept: {
         payload: `consignment-${recipientId}`,
         txid: String(index + 1).repeat(64),
         endpoint: proxyEndpoint,
-        assetId: 'rgb:asset',
+        assetId: 'rgb:AQEBAQEB-AQEBAQE-BAQEBAQ-EBAQEBA-QEBAQEB-AQEBAQE',
         amount: String(60 + index),
         precision: 2,
         discoveredAt: index + 1,
@@ -2315,7 +2315,7 @@ describe('RgbService', () => {
       receivedConsignment: {
         txid: 'c'.repeat(64),
         receivedAt: 2,
-        assetId: 'rgb:received-asset',
+        assetId: 'rgb:CQkJCQkJ-CQkJCQk-JCQkJCQ-kJCQkJC-QkJCQkJ-CQkJCQk',
         amount: '125',
         accepted: true,
       },
@@ -2324,13 +2324,13 @@ describe('RgbService', () => {
     ;(service as any).recordReceiveOutcome(receive, 'settled', 'c'.repeat(64))
 
     expect(service.getPendingReceiveHistory()).toEqual([
-      expect.objectContaining({ assetId: 'rgb:received-asset', amount: '125' }),
+      expect.objectContaining({ assetId: 'rgb:CQkJCQkJ-CQkJCQk-JCQkJCQ-kJCQkJC-QkJCQkJ-CQkJCQk', amount: '125' }),
     ])
     ;(service as any).state.pendingReceiveHistory[0].assetId = ''
     ;(service as any).state.pendingReceiveHistory[0].amount = ''
 
     expect(service.getPendingReceiveHistory()).toEqual([
-      expect.objectContaining({ assetId: 'rgb:received-asset', amount: '125' }),
+      expect.objectContaining({ assetId: 'rgb:CQkJCQkJ-CQkJCQk-JCQkJCQ-kJCQkJC-QkJCQkJ-CQkJCQk', amount: '125' }),
     ])
   })
 
@@ -2343,7 +2343,7 @@ describe('RgbService', () => {
       {
         invoice: rgbInvoice(),
         recipientId: 'recipient',
-        assetId: 'rgb:asset',
+        assetId: 'rgb:AQEBAQEB-AQEBAQE-BAQEBAQ-EBAQEBA-QEBAQEB-AQEBAQE',
         amount: '60',
         createdAt: 1,
         seal: { txid: 'a'.repeat(64), vout: 0, blinding: 1n },
@@ -2357,7 +2357,7 @@ describe('RgbService', () => {
       },
     ]
     ;(service as any).validateIncomingConsignment = vi.fn().mockReturnValue({
-      assetId: 'rgb:asset',
+      assetId: 'rgb:AQEBAQEB-AQEBAQE-BAQEBAQ-EBAQEBA-QEBAQEB-AQEBAQE',
       amount: '60',
       txid: 'c'.repeat(64),
       decoded: {
@@ -2395,7 +2395,7 @@ describe('RgbService', () => {
       {
         invoice: rgbInvoice(),
         recipientId: 'recipient',
-        assetId: 'rgb:asset',
+        assetId: 'rgb:AQEBAQEB-AQEBAQE-BAQEBAQ-EBAQEBA-QEBAQEB-AQEBAQE',
         amount: '60',
         createdAt: 1,
         seal: { txid: 'a'.repeat(64), vout: 0, blinding: 1n },
@@ -2403,7 +2403,7 @@ describe('RgbService', () => {
           payload: 'consignment',
           txid: 'c'.repeat(64),
           endpoint: proxyEndpoint,
-          assetId: 'rgb:asset',
+          assetId: 'rgb:AQEBAQEB-AQEBAQE-BAQEBAQ-EBAQEBA-QEBAQEB-AQEBAQE',
           amount: '60',
           discoveredAt: 1,
         },
@@ -2417,7 +2417,7 @@ describe('RgbService', () => {
       },
     ]
     ;(service as any).validateIncomingConsignment = vi.fn().mockReturnValue({
-      assetId: 'rgb:asset',
+      assetId: 'rgb:AQEBAQEB-AQEBAQE-BAQEBAQ-EBAQEBA-QEBAQEB-AQEBAQE',
       amount: '60',
       txid: 'c'.repeat(64),
       decoded: {
@@ -2455,7 +2455,7 @@ describe('RgbService', () => {
       {
         invoice: rgbInvoice(),
         recipientId: 'recipient',
-        assetId: 'rgb:asset',
+        assetId: 'rgb:AQEBAQEB-AQEBAQE-BAQEBAQ-EBAQEBA-QEBAQEB-AQEBAQE',
         amount: '60',
         createdAt: 1,
         seal: { txid: 'a'.repeat(64), vout: 0, blinding: 1n },
@@ -2463,7 +2463,7 @@ describe('RgbService', () => {
           payload: 'consignment',
           txid: 'c'.repeat(64),
           endpoint: proxyEndpoint,
-          assetId: 'rgb:asset',
+          assetId: 'rgb:AQEBAQEB-AQEBAQE-BAQEBAQ-EBAQEBA-QEBAQEB-AQEBAQE',
           amount: '60',
           discoveredAt: 1,
         },
@@ -2477,7 +2477,7 @@ describe('RgbService', () => {
       },
     ]
     ;(service as any).validateIncomingConsignment = vi.fn().mockReturnValue({
-      assetId: 'rgb:asset',
+      assetId: 'rgb:AQEBAQEB-AQEBAQE-BAQEBAQ-EBAQEBA-QEBAQEB-AQEBAQE',
       amount: '60',
       txid: 'c'.repeat(64),
       decoded: {
@@ -2524,7 +2524,7 @@ describe('RgbService', () => {
       {
         invoice: rgbInvoice(),
         recipientId: 'recipient',
-        assetId: 'rgb:asset',
+        assetId: 'rgb:AQEBAQEB-AQEBAQE-BAQEBAQ-EBAQEBA-QEBAQEB-AQEBAQE',
         amount: '60',
         createdAt: 1,
         seal: { txid: 'a'.repeat(64), vout: 0, blinding: 1n },
@@ -2532,7 +2532,7 @@ describe('RgbService', () => {
           payload: 'consignment',
           txid: 'c'.repeat(64),
           endpoint: proxyEndpoint,
-          assetId: 'rgb:asset',
+          assetId: 'rgb:AQEBAQEB-AQEBAQE-BAQEBAQ-EBAQEBA-QEBAQEB-AQEBAQE',
           amount: '60',
           discoveredAt: 1,
         },
@@ -2546,7 +2546,7 @@ describe('RgbService', () => {
       },
     ]
     ;(service as any).validateIncomingConsignment = vi.fn().mockReturnValue({
-      assetId: 'rgb:asset',
+      assetId: 'rgb:AQEBAQEB-AQEBAQE-BAQEBAQ-EBAQEBA-QEBAQEB-AQEBAQE',
       amount: '60',
       txid: 'c'.repeat(64),
       decoded: {
@@ -2593,7 +2593,7 @@ describe('RgbService', () => {
       {
         invoice: rgbInvoice(),
         recipientId: 'recipient',
-        assetId: 'rgb:asset',
+        assetId: 'rgb:AQEBAQEB-AQEBAQE-BAQEBAQ-EBAQEBA-QEBAQEB-AQEBAQE',
         amount: '60',
         createdAt: 1,
         seal: { txid: 'a'.repeat(64), vout: 0, blinding: 1n },
@@ -2601,7 +2601,7 @@ describe('RgbService', () => {
           payload: 'consignment',
           txid: 'c'.repeat(64),
           endpoint: proxyEndpoint,
-          assetId: 'rgb:asset',
+          assetId: 'rgb:AQEBAQEB-AQEBAQE-BAQEBAQ-EBAQEBA-QEBAQEB-AQEBAQE',
           amount: '60',
           discoveredAt: 1,
         },
@@ -2623,7 +2623,7 @@ describe('RgbService', () => {
       {
         invoice: rgbInvoice(),
         recipientId: 'recipient',
-        assetId: 'rgb:asset',
+        assetId: 'rgb:AQEBAQEB-AQEBAQE-BAQEBAQ-EBAQEBA-QEBAQEB-AQEBAQE',
         amount: '60',
         createdAt: 1,
         seal: { txid: 'a'.repeat(64), vout: 0, blinding: 1n },
@@ -2631,7 +2631,7 @@ describe('RgbService', () => {
           payload: 'consignment',
           txid: 'c'.repeat(64),
           endpoint: proxyEndpoint,
-          assetId: 'rgb:asset',
+          assetId: 'rgb:AQEBAQEB-AQEBAQE-BAQEBAQ-EBAQEBA-QEBAQEB-AQEBAQE',
           amount: '60',
           discoveredAt: 1,
         },
@@ -2670,7 +2670,7 @@ describe('RgbService', () => {
       {
         invoice: rgbInvoice(),
         recipientId: 'recipient',
-        assetId: 'rgb:asset',
+        assetId: 'rgb:AQEBAQEB-AQEBAQE-BAQEBAQ-EBAQEBA-QEBAQEB-AQEBAQE',
         amount: '60',
         expirationTimestamp: 1,
         createdAt: 1,
@@ -2683,7 +2683,7 @@ describe('RgbService', () => {
       },
     ]
     ;(service as any).validateIncomingConsignment = vi.fn().mockReturnValue({
-      assetId: 'rgb:asset',
+      assetId: 'rgb:AQEBAQEB-AQEBAQE-BAQEBAQ-EBAQEBA-QEBAQEB-AQEBAQE',
       amount: '60',
       txid: 'c'.repeat(64),
       decoded: {
@@ -2722,7 +2722,7 @@ describe('RgbService', () => {
       {
         invoice: rgbInvoice(),
         recipientId: 'recipient',
-        assetId: 'rgb:asset',
+        assetId: 'rgb:AQEBAQEB-AQEBAQE-BAQEBAQ-EBAQEBA-QEBAQEB-AQEBAQE',
         amount: '60',
         createdAt: 1,
         seal: { txid: 'a'.repeat(64), vout: 0, blinding: 1n },
@@ -2736,7 +2736,7 @@ describe('RgbService', () => {
       },
     ]
     ;(service as any).validateIncomingConsignment = vi.fn().mockReturnValue({
-      assetId: 'rgb:asset',
+      assetId: 'rgb:AQEBAQEB-AQEBAQE-BAQEBAQ-EBAQEBA-QEBAQEB-AQEBAQE',
       amount: '60',
       txid: 'c'.repeat(64),
       decoded: {
@@ -2763,7 +2763,7 @@ describe('RgbService', () => {
       {
         invoice: rgbInvoice(),
         recipientId: 'recipient',
-        assetId: 'rgb:asset',
+        assetId: 'rgb:AQEBAQEB-AQEBAQE-BAQEBAQ-EBAQEBA-QEBAQEB-AQEBAQE',
         amount: '60',
         createdAt: 1,
         seal: { txid: 'a'.repeat(64), vout: 0, blinding: 1n },
@@ -2797,7 +2797,7 @@ describe('RgbService', () => {
       {
         invoice: rgbInvoice(),
         recipientId: 'recipient',
-        assetId: 'rgb:asset',
+        assetId: 'rgb:AQEBAQEB-AQEBAQE-BAQEBAQ-EBAQEBA-QEBAQEB-AQEBAQE',
         amount: '60',
         createdAt: 1,
         seal: { txid: 'a'.repeat(64), vout: 0, blinding: 1n },
@@ -2809,7 +2809,7 @@ describe('RgbService', () => {
       },
     ]
     ;(service as any).validateIncomingConsignment = vi.fn().mockReturnValue({
-      assetId: 'rgb:asset',
+      assetId: 'rgb:AQEBAQEB-AQEBAQE-BAQEBAQ-EBAQEBA-QEBAQEB-AQEBAQE',
       amount: '60',
       txid: 'c'.repeat(64),
       decoded: {
@@ -2842,7 +2842,7 @@ describe('RgbService', () => {
       {
         invoice: rgbInvoice(),
         recipientId: 'recipient',
-        assetId: 'rgb:asset',
+        assetId: 'rgb:AQEBAQEB-AQEBAQE-BAQEBAQ-EBAQEBA-QEBAQEB-AQEBAQE',
         amount: '60',
         createdAt: 1,
         seal: { txid: 'a'.repeat(64), vout: 0, blinding: 1n },
@@ -2850,7 +2850,7 @@ describe('RgbService', () => {
           payload: 'consignment',
           txid: 'c'.repeat(64),
           endpoint: proxyEndpoint,
-          assetId: 'rgb:asset',
+          assetId: 'rgb:AQEBAQEB-AQEBAQE-BAQEBAQ-EBAQEBA-QEBAQEB-AQEBAQE',
           amount: '60',
           discoveredAt: 1,
         },
@@ -2881,7 +2881,7 @@ describe('RgbService', () => {
     await service.open(wallet)
     await service.sync()
     await service.prepareSend({
-      assetId: 'rgb:asset',
+      assetId: 'rgb:AQEBAQEB-AQEBAQE-BAQEBAQ-EBAQEBA-QEBAQEB-AQEBAQE',
       amount: '60',
       invoice: rgbInvoice(),
       feeRate: 2,
@@ -2915,7 +2915,7 @@ describe('RgbService', () => {
                   {
                     recipientId: 'recipient',
                     payload: 'consignment',
-                    assetId: 'rgb:asset',
+                    assetId: 'rgb:AQEBAQEB-AQEBAQE-BAQEBAQ-EBAQEBA-QEBAQEB-AQEBAQE',
                     opIds: ['d'.repeat(64)],
                   },
                 ],
@@ -2929,7 +2929,7 @@ describe('RgbService', () => {
     await service.open(wallet)
     await service.sync()
     await service.prepareSend({
-      assetId: 'rgb:asset',
+      assetId: 'rgb:AQEBAQEB-AQEBAQE-BAQEBAQ-EBAQEBA-QEBAQEB-AQEBAQE',
       amount: '60',
       invoice: rgbInvoice(),
       feeRate: 2,
@@ -2960,7 +2960,7 @@ describe('RgbService', () => {
       {
         invoice: rgbInvoice(),
         recipientId: 'recipient',
-        assetId: 'rgb:asset',
+        assetId: 'rgb:AQEBAQEB-AQEBAQE-BAQEBAQ-EBAQEBA-QEBAQEB-AQEBAQE',
         amount: '60',
         createdAt: 1,
         seal: { txid: 'a'.repeat(64), vout: 0, blinding: 1n },
@@ -2968,7 +2968,7 @@ describe('RgbService', () => {
           payload: 'consignment',
           txid: 'c'.repeat(64),
           endpoint: proxyEndpoint,
-          assetId: 'rgb:asset',
+          assetId: 'rgb:AQEBAQEB-AQEBAQE-BAQEBAQ-EBAQEBA-QEBAQEB-AQEBAQE',
           amount: '60',
           discoveredAt: 1,
         },
@@ -3026,7 +3026,7 @@ describe('RgbService', () => {
           issuedSupply: '1000',
         },
       },
-      assetId: 'rgb:asset',
+      assetId: 'rgb:AQEBAQEB-AQEBAQE-BAQEBAQ-EBAQEBA-QEBAQEB-AQEBAQE',
       amount: '1000',
       txid: 'c'.repeat(64),
       opId: 'd'.repeat(64),
@@ -3045,7 +3045,7 @@ describe('RgbService', () => {
     await service.open(wallet)
     await service.sync()
     await service.prepareSend({
-      assetId: 'rgb:asset',
+      assetId: 'rgb:AQEBAQEB-AQEBAQE-BAQEBAQ-EBAQEBA-QEBAQEB-AQEBAQE',
       amount: '60',
       invoice: rgbInvoice(),
       feeRate: 2,
@@ -3083,7 +3083,7 @@ describe('RgbService', () => {
     await service.open(wallet)
     await service.sync()
     await service.prepareSend({
-      assetId: 'rgb:asset',
+      assetId: 'rgb:AQEBAQEB-AQEBAQE-BAQEBAQ-EBAQEBA-QEBAQEB-AQEBAQE',
       amount: '60',
       invoice: rgbInvoice(),
       feeRate: 2,
@@ -3104,7 +3104,7 @@ describe('RgbService', () => {
     await service.open(wallet)
     await service.sync()
     await service.prepareSend({
-      assetId: 'rgb:asset',
+      assetId: 'rgb:AQEBAQEB-AQEBAQE-BAQEBAQ-EBAQEBA-QEBAQEB-AQEBAQE',
       amount: '60',
       invoice: rgbInvoice(),
       feeRate: 2,
@@ -3150,7 +3150,7 @@ describe('RgbService', () => {
     await service.open(wallet)
     await service.sync()
     await service.prepareSend({
-      assetId: 'rgb:asset',
+      assetId: 'rgb:AQEBAQEB-AQEBAQE-BAQEBAQ-EBAQEBA-QEBAQEB-AQEBAQE',
       amount: '60',
       invoice: rgbInvoice(),
       feeRate: 2,
@@ -3196,7 +3196,7 @@ describe('RgbService', () => {
     await service.open(wallet)
     await service.sync()
     await service.prepareSend({
-      assetId: 'rgb:asset',
+      assetId: 'rgb:AQEBAQEB-AQEBAQE-BAQEBAQ-EBAQEBA-QEBAQEB-AQEBAQE',
       amount: '60',
       invoice: rgbInvoice(),
       feeRate: 2,
@@ -3223,7 +3223,7 @@ describe('RgbService', () => {
     await service.sync()
     const retainCompletedLocalHistory = vi.spyOn(service as any, 'retainCompletedLocalHistory')
     await service.prepareSend({
-      assetId: 'rgb:asset',
+      assetId: 'rgb:AQEBAQEB-AQEBAQE-BAQEBAQ-EBAQEBA-QEBAQEB-AQEBAQE',
       amount: '60',
       invoice: rgbInvoice(),
       feeRate: 2,
@@ -3260,7 +3260,7 @@ describe('RgbService', () => {
     await service.open(wallet)
     await service.sync()
     await service.prepareSend({
-      assetId: 'rgb:asset',
+      assetId: 'rgb:AQEBAQEB-AQEBAQE-BAQEBAQ-EBAQEBA-QEBAQEB-AQEBAQE',
       amount: '60',
       invoice: rgbInvoice(),
       feeRate: 2,
@@ -3288,7 +3288,7 @@ describe('RgbService', () => {
     await service.open(wallet)
     await service.sync()
     await service.prepareSend({
-      assetId: 'rgb:asset',
+      assetId: 'rgb:AQEBAQEB-AQEBAQE-BAQEBAQ-EBAQEBA-QEBAQEB-AQEBAQE',
       amount: '60',
       invoice: rgbInvoice(),
       feeRate: 2,
@@ -3321,7 +3321,7 @@ describe('RgbService', () => {
     const receive = {
       invoice: rgbInvoice(),
       recipientId: 'recipient',
-      assetId: 'rgb:asset',
+      assetId: 'rgb:AQEBAQEB-AQEBAQE-BAQEBAQ-EBAQEBA-QEBAQEB-AQEBAQE',
       amount: '60',
       createdAt: 1,
       seal: { txid: 'a'.repeat(64), vout: 0, blinding: 1n },
@@ -3345,7 +3345,7 @@ describe('RgbService', () => {
     await service.open(wallet)
     await service.sync()
     const prepared = await service.prepareSend({
-      assetId: 'rgb:asset',
+      assetId: 'rgb:AQEBAQEB-AQEBAQE-BAQEBAQ-EBAQEBA-QEBAQEB-AQEBAQE',
       amount: '60',
       invoice: rgbInvoice(),
       feeRate: 2,
@@ -3371,7 +3371,7 @@ describe('RgbService', () => {
     await service.open(wallet)
     await service.sync()
     await service.prepareSend({
-      assetId: 'rgb:asset',
+      assetId: 'rgb:AQEBAQEB-AQEBAQE-BAQEBAQ-EBAQEBA-QEBAQEB-AQEBAQE',
       amount: '60',
       invoice: rgbInvoice(),
       feeRate: 2,
@@ -3404,7 +3404,7 @@ describe('RgbService', () => {
     await service.open(wallet)
     await service.sync()
     await service.prepareSend({
-      assetId: 'rgb:asset',
+      assetId: 'rgb:AQEBAQEB-AQEBAQE-BAQEBAQ-EBAQEBA-QEBAQEB-AQEBAQE',
       amount: '60',
       invoice: rgbInvoice(),
       feeRate: 2,
@@ -3437,7 +3437,7 @@ describe('RgbService', () => {
         {
           recipientId: 'recipient',
           payload: 'consignment',
-          assetId: 'rgb:asset',
+          assetId: 'rgb:AQEBAQEB-AQEBAQE-BAQEBAQ-EBAQEBA-QEBAQEB-AQEBAQE',
           opIds: ['d'.repeat(64)],
         },
       ],
@@ -3450,7 +3450,7 @@ describe('RgbService', () => {
           publicKey: '02' + '22'.repeat(32),
           allocations: [
             {
-              assetId: 'rgb:asset',
+              assetId: 'rgb:AQEBAQEB-AQEBAQE-BAQEBAQ-EBAQEBA-QEBAQEB-AQEBAQE',
               amount: '40',
               settled: true,
               spendable: true,
@@ -3467,7 +3467,7 @@ describe('RgbService', () => {
     await service.open(wallet)
     await service.sync()
     await service.prepareSend({
-      assetId: 'rgb:asset',
+      assetId: 'rgb:AQEBAQEB-AQEBAQE-BAQEBAQ-EBAQEBA-QEBAQEB-AQEBAQE',
       amount: '60',
       invoice: rgbInvoice(),
       feeRate: 2,
@@ -3479,7 +3479,7 @@ describe('RgbService', () => {
       { txid: 'a'.repeat(64), vout: 0 },
       { txid: 'e'.repeat(64), vout: 1 },
     ])
-    expect(service.getLocalAssetBalance('rgb:asset')).toMatchObject({
+    expect(service.getLocalAssetBalance('rgb:AQEBAQEB-AQEBAQE-BAQEBAQ-EBAQEBA-QEBAQEB-AQEBAQE')).toMatchObject({
       settled: '40',
       spendable: '40',
       pending: '40',
@@ -3505,7 +3505,7 @@ describe('RgbService', () => {
           publicKey: '02' + '11'.repeat(32),
           allocations: [
             {
-              assetId: 'rgb:asset',
+              assetId: 'rgb:AQEBAQEB-AQEBAQE-BAQEBAQ-EBAQEBA-QEBAQEB-AQEBAQE',
               amount: '40',
               settled: true,
               spendable: true,
@@ -3522,7 +3522,7 @@ describe('RgbService', () => {
           publicKey: '02' + '22'.repeat(32),
           allocations: [
             {
-              assetId: 'rgb:asset',
+              assetId: 'rgb:AQEBAQEB-AQEBAQE-BAQEBAQ-EBAQEBA-QEBAQEB-AQEBAQE',
               amount: '40',
               settled: true,
               spendable: true,
@@ -3536,7 +3536,7 @@ describe('RgbService', () => {
     })
     await service.sync()
     expect(service.getSnapshot().syncedAt).toBe(2)
-    expect(service.getLocalAssetBalance('rgb:asset')).toMatchObject({ balance: '80' })
+    expect(service.getLocalAssetBalance('rgb:AQEBAQEB-AQEBAQE-BAQEBAQ-EBAQEBA-QEBAQEB-AQEBAQE')).toMatchObject({ balance: '80' })
   })
 
   it('checkpoints only irreversible RGB send milestones', async () => {
@@ -3549,7 +3549,7 @@ describe('RgbService', () => {
     vi.mocked(dependencies.onStatePersisted).mockClear()
 
     await service.prepareSend({
-      assetId: 'rgb:asset',
+      assetId: 'rgb:AQEBAQEB-AQEBAQE-BAQEBAQ-EBAQEBA-QEBAQEB-AQEBAQE',
       amount: '60',
       invoice: rgbInvoice(),
       feeRate: 2,

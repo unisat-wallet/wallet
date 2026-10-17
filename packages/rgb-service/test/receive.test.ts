@@ -4,8 +4,8 @@ import { concealBlindSeal, decodeRgbInvoice, encodeBlindRgbInvoice } from '../sr
 describe('blind RGB receive', () => {
   it.each([
     { name: 'any asset', assetId: undefined, amount: undefined },
-    { name: 'fixed asset, any amount', assetId: 'rgb:aa', amount: undefined },
-    { name: 'fixed asset, fixed amount', assetId: 'rgb:aa', amount: '9007199254740993' },
+    { name: 'fixed asset, any amount', assetId: 'rgb:CgoKCgoK-CgoKCgo-KCgoKCg-oKCgoKC-goKCgoK-CgoKCgo', amount: undefined },
+    { name: 'fixed asset, fixed amount', assetId: 'rgb:CgoKCgoK-CgoKCgo-KCgoKCg-oKCgoKC-goKCgoK-CgoKCgo', amount: '9007199254740993' },
   ])('preserves $name query fields when URLSearchParams.size is undefined', ({ assetId, amount }) => {
     const input = {
       network: 'mainnet' as const,
@@ -48,18 +48,31 @@ describe('blind RGB receive', () => {
     )
   })
 
+  it.each(['rgb:asset/~/~/bc:utxob:attacker', 'rgb:asset?assetId=attacker'])(
+    'rejects an asset ID that can rewrite invoice fields: %s',
+    assetId => {
+      expect(() =>
+        encodeBlindRgbInvoice({
+          network: 'mainnet',
+          seal: { txid: '11'.repeat(32), vout: 2, blinding: 3n },
+          assetId,
+        })
+      ).toThrow('BAID64 encoding is invalid')
+    }
+  )
+
   it('creates a parseable invoice from a persistent blinded UTXO seal', () => {
     const seal = { txid: '11'.repeat(32), vout: 2, blinding: 3n }
     const invoice = encodeBlindRgbInvoice({
       network: 'mainnet',
       seal,
-      assetId: 'rgb:aa',
+      assetId: 'rgb:CgoKCgoK-CgoKCgo-KCgoKCg-oKCgoKC-goKCgoK-CgoKCgo',
       amount: '42',
     })
     const decoded = decodeRgbInvoice(invoice)
 
     expect(decoded).toMatchObject({
-      assetId: 'rgb:aa',
+      assetId: 'rgb:CgoKCgoK-CgoKCgo-KCgoKCg-oKCgoKC-goKCgoK-CgoKCgo',
       amount: '42',
       recipientType: 'blind',
       network: 'mainnet',

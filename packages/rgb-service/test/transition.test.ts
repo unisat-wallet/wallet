@@ -6,7 +6,7 @@ const outpoint = { txid: 'a'.repeat(64), vout: 0 }
 describe('planFungibleTransition', () => {
   it('conserves the transferred allocation and records asset change', () => {
     const plan = planFungibleTransition({
-      assetId: 'rgb:asset-a',
+      assetId: 'rgb:AwMDAwMD-AwMDAwM-DAwMDAw-MDAwMDA-wMDAwMD-AwMDAwM',
       amount: '40',
       recipientId: 'bc:tapret:recipient',
       selectedUtxos: [
@@ -15,7 +15,7 @@ describe('planFungibleTransition', () => {
           satoshis: 1000,
           scriptPubKey: '5120' + '00'.repeat(32),
           publicKey: '02' + '11'.repeat(32),
-          allocations: [{ assetId: 'rgb:asset-a', amount: '60', settled: true, spendable: true }],
+          allocations: [{ assetId: 'rgb:AwMDAwMD-AwMDAwM-DAwMDAw-MDAwMDA-wMDAwMD-AwMDAwM', amount: '60', settled: true, spendable: true }],
         },
       ],
     })
@@ -29,7 +29,7 @@ describe('planFungibleTransition', () => {
 
   it('requires preservation transitions for other assets on a selected UTXO', () => {
     const plan = planFungibleTransition({
-      assetId: 'rgb:asset-a',
+      assetId: 'rgb:AwMDAwMD-AwMDAwM-DAwMDAw-MDAwMDA-wMDAwMD-AwMDAwM',
       amount: '60',
       recipientId: 'bc:tapret:recipient',
       selectedUtxos: [
@@ -39,13 +39,13 @@ describe('planFungibleTransition', () => {
           scriptPubKey: '5120' + '00'.repeat(32),
           publicKey: '02' + '11'.repeat(32),
           allocations: [
-            { assetId: 'rgb:asset-a', amount: '60', settled: true, spendable: true },
-            { assetId: 'rgb:asset-b', amount: '5', settled: true, spendable: true },
+            { assetId: 'rgb:AwMDAwMD-AwMDAwM-DAwMDAw-MDAwMDA-wMDAwMD-AwMDAwM', amount: '60', settled: true, spendable: true },
+            { assetId: 'rgb:BAQEBAQE-BAQEBAQ-EBAQEBA-QEBAQEB-AQEBAQE-BAQEBAQ', amount: '5', settled: true, spendable: true },
           ],
         },
       ],
     })
 
-    expect(plan.preservedAllocations).toEqual([{ outpoint, assetId: 'rgb:asset-b', amount: '5' }])
+    expect(plan.preservedAllocations).toEqual([{ outpoint, assetId: 'rgb:BAQEBAQE-BAQEBAQ-EBAQEBA-QEBAQEB-AQEBAQE-BAQEBAQ', amount: '5' }])
   })
 })

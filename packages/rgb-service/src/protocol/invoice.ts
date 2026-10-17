@@ -326,8 +326,10 @@ export function decodeRgbInvoice(invoice: string): RgbInvoice {
   if (!match) throw new Error('Invalid RGB invoice scheme')
 
   const [path, query = ''] = match[1]!.split('?', 2)
-  const segments = path.split('/').filter(Boolean)
-  if (segments.length < 4) throw new Error('Invalid RGB invoice payload')
+  const segments = path.split('/')
+  if (segments.length !== 4 || segments.some(segment => !segment)) {
+    throw new Error('Invalid RGB invoice payload')
+  }
 
   const recipientId = segments[3]!
   const seal = decodeInvoiceSeal(recipientId)
@@ -377,12 +379,9 @@ export function encodeWitnessRgbInvoice(input: {
     throw new RgbServiceError('RGB invoice amount is invalid')
   if (input.amount !== undefined && BigInt(input.amount) > 0xffff_ffff_ffff_ffffn)
     throw new RgbServiceError('RGB invoice amount exceeds the maximum u64 value')
-  if (!/^(5120)[0-9a-f]{64}$/i.test(input.scriptPubKey)) {
-    throw new RgbServiceError('RGB witness invoices currently require a P2TR funding script')
-  }
-  if (!input.transportEndpoints.length) throw new RgbServiceError('RGB proxy endpoint is not configured')
-  const pay2vout = Uint8Array.from([5, ...Buffer.from(input.scriptPubKey.slice(4), 'hex')])
-  const recipientId = `${networkPrefix(input.network)}:${baid64WithChecksum('wvout', pay2vout)}`
+  if (!input.transportEndpoints.length)
+    throw new RgbServiceError('RGB proxy endpoint is not configured')
+  const recipientId = witnessRgbInvoiceRecipientId(input.network, input.scriptPubKey)
   const assetId = input.assetId ? normalizeRgbAssetId(input.assetId).replace(/^rgb:/, '') : '~'
   const query = new URLSearchParams()
   if (input.amount !== undefined) query.set('amount', input.amount)
@@ -390,4 +389,12 @@ export function encodeWitnessRgbInvoice(input: {
     query.set('expirationTimestamp', String(input.expirationTimestamp))
   query.set('endpoints', input.transportEndpoints.join(','))
   return `rgb:${assetId}/~/${input.amount === undefined ? '~' : '~'}/${recipientId}?${query}`
+}
+
+export function witnessRgbInvoiceRecipientId(network: RgbNetwork, scriptPubKey: string) {
+  if (!/^(5120)[0-9a-f]{64}$/i.test(scriptPubKey)) {
+    throw new RgbServiceError('RGB witness invoices currently require a P2TR funding script')
+  }
+  const pay2vout = Uint8Array.from([5, ...Buffer.from(scriptPubKey.slice(4), 'hex')])
+  return `${networkPrefix(network)}:${baid64WithChecksum('wvout', pay2vout)}`
 }

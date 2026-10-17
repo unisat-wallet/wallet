@@ -10,6 +10,7 @@ import {
   appendRgbInvoiceRecipientNonce,
   decodeRgbInvoice,
   encodeWitnessRgbInvoice,
+  witnessRgbInvoiceRecipientId,
 } from './protocol/invoice'
 import { normalizeRgbAssetId, rgbContractIdHex } from './protocol/contract-id'
 import {
@@ -20,7 +21,11 @@ import {
 } from './protocol/nia-consignment'
 import { mergeNiaConsignmentHistory } from './protocol/nia-history'
 import { encodeNiaTransferConsignment } from './protocol/nia-contract'
-import { concealBlindSeal, encodeBlindRgbInvoice } from './protocol/receive'
+import {
+  blindRgbInvoiceRecipientId,
+  concealBlindSeal,
+  encodeBlindRgbInvoice,
+} from './protocol/receive'
 import { getSwapPsbtInputOutpoints } from './protocol/opret-transfer'
 import { planFungibleTransition } from './protocol/transition'
 import type {
@@ -584,7 +589,15 @@ export class RgbService {
       expirationTimestamp,
       transportEndpoints,
     })
-    const recipientId = decodeRgbInvoice(invoice).recipientId
+    const decoded = decodeRgbInvoice(invoice)
+    const recipientId = blindRgbInvoiceRecipientId(state.wallet.network, seal)
+    if (
+      decoded.recipientType !== 'blind' ||
+      decoded.recipientId !== recipientId ||
+      decoded.assetId !== assetId
+    ) {
+      throw new RgbServiceError('Created RGB blind invoice does not match the local receive seal')
+    }
     const pending = {
       invoice,
       recipientId,
@@ -652,11 +665,17 @@ export class RgbService {
       transportEndpoints,
     })
     const decoded = decodeRgbInvoice(invoice)
-    if (decoded.recipientType !== 'witness')
-      throw new RgbServiceError('RGB witness invoice is invalid')
+    const recipientId = witnessRgbInvoiceRecipientId(state.wallet.network, input.scriptPubKey)
+    if (
+      decoded.recipientType !== 'witness' ||
+      decoded.recipientId !== recipientId ||
+      decoded.assetId !== assetId
+    ) {
+      throw new RgbServiceError('Created RGB witness invoice does not match the local receive seal')
+    }
     const pending = {
       invoice,
-      recipientId: decoded.recipientId,
+      recipientId,
       proxyRecipientId: decoded.proxyRecipientId,
       recipientType: 'witness' as const,
       witnessScriptPubKey: input.scriptPubKey.toLowerCase(),

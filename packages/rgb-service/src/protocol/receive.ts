@@ -106,6 +106,10 @@ export function concealBlindSeal(seal: RgbBlindSeal) {
   )
 }
 
+export function blindRgbInvoiceRecipientId(network: RgbNetwork, seal: RgbBlindSeal) {
+  return `${networkPrefix(network)}:${baid64WithChecksum('utxob', concealBlindSeal(seal))}`
+}
+
 export function encodeBlindRgbInvoice(input: {
   network: RgbNetwork
   seal: RgbBlindSeal
@@ -118,7 +122,7 @@ export function encodeBlindRgbInvoice(input: {
     throw new RgbServiceError('RGB invoice amount is invalid')
   if (input.amount !== undefined && BigInt(input.amount) > 0xffff_ffff_ffff_ffffn)
     throw new RgbServiceError('RGB invoice amount exceeds the maximum u64 value')
-  const recipientId = `${networkPrefix(input.network)}:${baid64WithChecksum('utxob', concealBlindSeal(input.seal))}`
+  const recipientId = blindRgbInvoiceRecipientId(input.network, input.seal)
   const assetId = input.assetId ? normalizeRgbAssetId(input.assetId).replace(/^rgb:/, '') : '~'
   const query = new URLSearchParams()
   if (input.amount !== undefined) query.set('amount', input.amount)

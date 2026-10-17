@@ -8,7 +8,7 @@ function toHex(bytes: Uint8Array) {
 describe('encodeNiaTransition', () => {
   it('requires indexed parent operation data', () => {
     expect(() =>
-      niaInputFromAllocation({ assetId: 'rgb:asset', amount: '1', settled: true, spendable: true })
+      niaInputFromAllocation({ assetId: 'rgb:AQEBAQEB-AQEBAQE-BAQEBAQ-EBAQEBA-QEBAQEB-AQEBAQE', amount: '1', settled: true, spendable: true })
     ).toThrow('parent operation output')
   })
 

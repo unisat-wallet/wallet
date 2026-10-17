@@ -77,14 +77,5 @@ export function rgbContractIdHex(value: string): string {
 
 /** Normalize legacy hex IDs and official BAID64 IDs to the RGB display form. */
 export function normalizeRgbAssetId(value: string): string {
-  const payload = value.trim().replace(/^rgb:/i, '')
-  if (/^[0-9a-fA-F]{64}$/.test(payload)) {
-    return encodeRgbContractId(Uint8Array.from(Buffer.from(payload, 'hex')))
-  }
-  const compact = payload.replace(/-/g, '')
-  if (compact.length === 43 && /^[A-Za-z0-9_~]+$/.test(compact)) {
-    return encodeRgbContractId(decodeBaid64(payload))
-  }
-  // Keep test doubles and non-ContractId placeholders usable at protocol boundaries.
-  return `rgb:${payload}`
+  return encodeRgbContractId(decodeRgbContractId(value))
 }
