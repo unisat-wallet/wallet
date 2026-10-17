@@ -2118,7 +2118,11 @@ export class WalletController extends BaseController {
   }
 
   signMessage = async (params: ToSignMessage): Promise<SignedMessage> => {
-    if (!params.text || params.text.length > 10000) {
+    if (
+      typeof params.text !== 'string' ||
+      params.text.length === 0 ||
+      params.text.length > 10000
+    ) {
       throw new Error('Invalid message length')
     }
 

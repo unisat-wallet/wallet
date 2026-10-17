@@ -234,7 +234,17 @@ function getToSignMessages(toSignMessages?: ToSignMessage[]) {
   if (!toSignMessages?.length) {
     throw new Error('invalid message')
   }
+  toSignMessages.forEach(message => assertValidMessageText(message.text))
   return toSignMessages
+}
+
+function assertValidMessageText(text: unknown): asserts text is string {
+  if (typeof text !== 'string' || text.length === 0) {
+    throw new Error('text is required and must be a string')
+  }
+  if (text.length > 10000) {
+    throw new Error('text is too long')
+  }
 }
 
 class ProviderController extends BaseController {
@@ -542,9 +552,7 @@ class ProviderController extends BaseController {
     'SignMessage',
     async req => {
       const params: RequestMethodSignMessageParams = req.data.params
-      if (!params.text) {
-        throw new Error('text is required')
-      }
+      assertValidMessageText(params.text)
       params.toSignMessages = [
         { text: params.text, type: (params.type as any) || SignMessageType.ECDSA },
       ]
@@ -635,17 +643,12 @@ class ProviderController extends BaseController {
     'SignMessage',
     async req => {
       const params: RequestMethodSignMessagesParams = req.data.params
-      if (params.messages.length == 0) {
+      if (!Array.isArray(params.messages) || params.messages.length === 0) {
         throw new Error('data is required')
       }
       for (let i = 0; i < params.messages.length; i++) {
         const message = params.messages[i]!
-        if (!message.text) {
-          throw new Error('text is required')
-        }
-        if (message.text.length > 10000) {
-          throw new Error('text is too long')
-        }
+        assertValidMessageText(message?.text)
       }
 
       params.toSignMessages = params.messages.map(v => ({
