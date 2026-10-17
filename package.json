@@ -58,7 +58,6 @@
     },
     "patchedDependencies": {
       "bitcore-lib@10.0.0": "patches/bitcore-lib@10.0.0.patch",
-      "tiny-secp256k1@2.2.3": "patches/tiny-secp256k1@2.2.3.patch",
       "bitcoinjs-lib@6.1.6": "patches/bitcoinjs-lib@6.1.6.patch"
     }
   }

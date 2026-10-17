@@ -14,9 +14,6 @@ patchedDependencies:
   bitcore-lib@10.0.0:
     hash: u3dvb4yhlnk5fun7e4tf7v32ye
     path: patches/bitcore-lib@10.0.0.patch
-  tiny-secp256k1@2.2.3:
-    hash: 2qoyzwmpaczaj2mabgmoz6ccpy
-    path: patches/tiny-secp256k1@2.2.3.patch
 
 importers:
 
@@ -66,7 +63,7 @@ importers:
         version: 5.0.0
       tiny-secp256k1:
         specifier: ^2.2.1
-        version: 2.2.3(patch_hash=2qoyzwmpaczaj2mabgmoz6ccpy)
+        version: 2.2.3
       tsup:
         specifier: ^7.0.0
         version: 7.2.0(typescript@5.2.2)
@@ -1224,7 +1221,7 @@ importers:
         version: 2.1.0
       tiny-secp256k1:
         specifier: ^2.2.3
-        version: 2.2.3(patch_hash=2qoyzwmpaczaj2mabgmoz6ccpy)
+        version: 2.2.3
       varuint-bitcoin:
         specifier: ^1.1.2
         version: 1.1.2
@@ -21939,12 +21936,11 @@ packages:
       process: 0.11.10
     dev: false
 
-  /tiny-secp256k1@2.2.3(patch_hash=2qoyzwmpaczaj2mabgmoz6ccpy):
+  /tiny-secp256k1@2.2.3:
     resolution: {integrity: sha512-SGcL07SxcPN2nGKHTCvRMkQLYPSoeFcvArUSCYtjVARiFAWU44cCIqYS0mYAU6nY7XfvwURuTIGo2Omt3ZQr0Q==}
     engines: {node: '>=14.0.0'}
     dependencies:
       uint8array-tools: 0.0.7
-    patched: true
 
   /tinybench@2.9.0:
     resolution: {integrity: sha512-0+DUvqWMValLmha6lr4kD8iAMK1HzV0/aKnCtWb9v9641TnP/MFb7Pc2bxoxQjTXAErryXVgUOfv2YqNllqGeg==}
