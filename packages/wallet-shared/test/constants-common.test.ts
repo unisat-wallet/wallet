@@ -37,11 +37,14 @@ describe('common constants', () => {
   })
 
   it('chain map and chain list are consistent', () => {
-    expect(CHAINS_MAP[ChainType.BITCOIN_MAINNET]?.unit).toBe('BTC')
-    expect(CHAINS_MAP[ChainType.BITCOIN_TESTNET]?.networkType).toBe(NetworkType.TESTNET)
-    expect(CHAINS_MAP[ChainType.FRACTAL_BITCOIN_MAINNET]?.isFractal).toBe(true)
-
-    expect(CHAINS).toHaveLength(Object.keys(CHAINS_MAP).length)
+    expect(CHAINS).toEqual(Object.values(CHAINS_MAP))
+    for (const [chainType, chain] of Object.entries(CHAINS_MAP)) {
+      expect(chain.enum).toBe(chainType)
+    }
+    const groupedChains = CHAIN_GROUPS.flatMap(group =>
+      group.type === 'single' ? [group.chain] : group.items || []
+    )
+    expect(groupedChains.every(chain => chain && CHAINS.includes(chain))).toBe(true)
     expect(CHAIN_GROUPS.length).toBeGreaterThan(0)
   })
 

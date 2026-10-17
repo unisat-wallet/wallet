@@ -1,11 +1,50 @@
-import { describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 
-import { KeyringType } from '@unisat/wallet-shared'
-import { ChainType } from '@unisat/wallet-types'
+import { CHAINS_MAP, KeyringType } from '@unisat/wallet-shared'
+import { ChainType, NetworkType } from '@unisat/wallet-types'
 import { getSupportedAssets } from '../../src/hooks/ui'
 import { AssetTabKey } from '../../src/types/ui'
 
 describe('getSupportedAssets', () => {
+  const configuredChains = new Map(
+    [
+      ChainType.BITCOIN_MAINNET,
+      ChainType.BITCOIN_TESTNET,
+      ChainType.BITCOIN_TESTNET4,
+      ChainType.BITCOIN_SIGNET,
+    ].map(chainType => [chainType, CHAINS_MAP[chainType]])
+  )
+
+  beforeEach(() => {
+    const mainnet = CHAINS_MAP[ChainType.BITCOIN_MAINNET]!
+    CHAINS_MAP[ChainType.BITCOIN_MAINNET] = { ...mainnet, rgbProxyEndpoints: undefined }
+    CHAINS_MAP[ChainType.BITCOIN_TESTNET] = {
+      ...mainnet,
+      enum: ChainType.BITCOIN_TESTNET,
+      networkType: NetworkType.TESTNET,
+      rgbProxyEndpoints: undefined,
+    }
+    CHAINS_MAP[ChainType.BITCOIN_TESTNET4] = {
+      ...mainnet,
+      enum: ChainType.BITCOIN_TESTNET4,
+      networkType: NetworkType.TESTNET,
+      rgbProxyEndpoints: ['rpcs://rgb-test.example/json-rpc'],
+    }
+    CHAINS_MAP[ChainType.BITCOIN_SIGNET] = {
+      ...mainnet,
+      enum: ChainType.BITCOIN_SIGNET,
+      networkType: NetworkType.TESTNET,
+      rgbProxyEndpoints: undefined,
+    }
+  })
+
+  afterEach(() => {
+    for (const [chainType, chain] of configuredChains) {
+      if (chain) CHAINS_MAP[chainType] = chain
+      else delete CHAINS_MAP[chainType]
+    }
+  })
+
   it('shows the RGB asset tab for an HD wallet on an RGB-enabled network regardless of address type', () => {
     const p2wpkh = getSupportedAssets(
       ChainType.BITCOIN_TESTNET4,
@@ -38,7 +77,7 @@ describe('getSupportedAssets', () => {
     }
   )
 
-  it('hides RGB on Bitcoin Mainnet while its production proxy is disabled', () => {
+  it('hides RGB on Bitcoin Mainnet while its proxy is disabled', () => {
     const assets = getSupportedAssets(
       ChainType.BITCOIN_MAINNET,
       'bc1p5cyxnuxmeuwuvkwfem96llyxf9xq9tm9s2h2zs',
