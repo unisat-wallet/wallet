@@ -507,6 +507,7 @@ type RgbReceiveInvoiceRequest = {
   amount?: number | string
   durationSeconds?: number
   skipSync?: boolean
+  providerOrigin?: string
 }
 
 type RgbPendingReceiveInvoicesRequest = {
@@ -4249,6 +4250,7 @@ export class WalletController extends BaseController {
       ...(params.assetId === undefined ? {} : { assetId: params.assetId }),
       ...(params.amount === undefined ? {} : { amount: String(params.amount) }),
       ...(params.durationSeconds === undefined ? {} : { durationSeconds: params.durationSeconds }),
+      ...(params.providerOrigin === undefined ? {} : { providerOrigin: params.providerOrigin }),
       deferRecoveryCheckpoint: true,
     })
     await context.service.claimPendingReceives()
@@ -4268,7 +4270,7 @@ export class WalletController extends BaseController {
     return service.checkInvoiceAvailability(params.invoice)
   }
 
-  getRgbPendingReceiveInvoices = (params: { skipSync?: boolean } = {}) =>
+  getRgbPendingReceiveInvoices = (params: { skipSync?: boolean; providerOrigin?: string } = {}) =>
     this.rgbReceiveOperations.getPendingReceiveInvoices(params)
 
   /** Internal provider preflight for a buyer-side RGB/BTC swap. */
@@ -4288,6 +4290,7 @@ export class WalletController extends BaseController {
       amount: pending.amount,
       txid: pending.txid,
       accepted: receive.receivedConsignment?.accepted === true,
+      providerOrigin: receive.providerOrigin,
     }
   }
 

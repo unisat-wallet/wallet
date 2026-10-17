@@ -218,6 +218,8 @@ export interface RgbPendingTransfer {
 
 export interface RgbPendingReceive {
   invoice: string
+  /** dApp origin that created this invoice; local-only and excluded from recovery checkpoints. */
+  providerOrigin?: string
   /** RGB beneficiary; for witness invoices this is the stable wvout identifier. */
   recipientId: string
   /** Per-invoice proxy storage key. Defaults to recipientId for legacy blind invoices. */

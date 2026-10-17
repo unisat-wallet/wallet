@@ -333,10 +333,6 @@ export class BitcoinAPIMethods {
     return this.provider[requestMethodKey]({ method: 'applyRgbSellSwapAbort', params: { transferId } });
   };
 
-  getRgbSellSwapAbortOrigin = async (transferId: string) => {
-    return this.provider[requestMethodKey]({ method: 'getRgbSellSwapAbortOrigin', params: { transferId } });
-  };
-
   applyRgbBuySwapAbort = async (recipientId: string) => {
     return this.provider[requestMethodKey]({ method: 'applyRgbBuySwapAbort', params: { recipientId } });
   };

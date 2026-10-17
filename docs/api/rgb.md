@@ -9,11 +9,9 @@ const rgb = window.unisat.rgb
 
 RGB is available only when the currently selected wallet chain has RGB enabled.
 The dApp must first connect with `window.unisat.requestAccounts()`. Payment
-and swap operations are bound to the connected origin; an operation created by
-one origin cannot normally be queried, signed, or finalized by another origin.
-The explicitly approved swap-recovery methods described below are exceptions.
-Receive invoices are currently wallet-wide pending state, so a dApp must only
-accept/reject the recipient ID it created or was explicitly given.
+send, receive, and swap operations are bound to the connected origin; an
+operation created by one origin cannot be listed, accepted, rejected, signed,
+finalized, canceled, or aborted by another origin.
 
 ## Conventions
 
@@ -36,7 +34,7 @@ accept/reject the recipient ID it created or was explicitly given.
 | `getAssets` | No | Read local RGB balances. |
 | `getFundingUtxos` / `getFeeUtxos` | No | Read eligible inputs for a maker PSBT template. |
 | `createReceiveInvoice` | Yes | Create and persist a one-time RGB invoice. |
-| `getPendingReceives` | No | List local invoices and pending incoming consignments. |
+| `getPendingReceives` | No | List this dApp origin's invoices and pending incoming consignments. |
 | `acceptReceive` / `rejectReceive` | Yes | ACK or reject a validated incoming consignment. |
 | `preparePayment` | Yes | Build and lock a normal RGB payment. |
 | `signPayment` | Yes | Sign, deliver the consignment, wait for ACK, then broadcast. |
@@ -45,7 +43,6 @@ accept/reject the recipient ID it created or was explicitly given.
 | `signSellSwapAndPublishConsignment` | Yes | Add seller signatures and publish the consignment, without broadcasting. |
 | `confirmSellSwap` | No | Verify the buyer's returned signed PSBT and ACK; the dApp finalizes and broadcasts it. |
 | `applySellSwapAbort` / `applyBuySwapAbort` | Yes | Apply a mutually signed, terminal swap-abort agreement to local seller/buyer RGB state. |
-| `getSellSwapAbortOrigin` | No | Inspect the seller operation's original dApp origin before recovery. |
 | `cancelSwap` / `getOperationStatus` | Yes / No | Cancel or inspect a swap. |
 | `signBuySwapAndAcceptConsignment` | Yes | Sign buyer BTC inputs and accept the RGB consignment. |
 
@@ -327,11 +324,10 @@ await rgb.applySellSwapAbort(transferId)
 await rgb.applyBuySwapAbort(recipientId)
 ```
 
-Before the seller action, `getSellSwapAbortOrigin(transferId)` returns the
-original dApp origin and whether it matches the current site. A mutually
-agreed abort is deliberately allowed from a different site after user
-approval. A pre-ACK `cancelSwap` is also allowed after cancellation approval;
-ordinary RGB payment operations remain origin-bound.
+Every dApp cancellation and abort operation is bound to the origin that
+created it. Cross-origin recovery is available only from the wallet's local
+pending transaction and receive lists, where the user selects the operation
+directly.
 
 These methods are intentionally local and idempotent. The dApp must not call
 either one before the market has verified both agreement signatures. A seller

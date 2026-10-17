@@ -20,6 +20,7 @@ export type RgbBlindReceiveParams = {
   assetId?: string
   amount?: number | string
   durationSeconds?: number
+  providerOrigin?: string
   skipSync?: boolean
 }
 
@@ -40,6 +41,7 @@ export class RgbReceiveOperations {
       ...(params.assetId === undefined ? {} : { assetId: params.assetId }),
       ...(params.amount === undefined ? {} : { amount: String(params.amount) }),
       ...(params.durationSeconds === undefined ? {} : { durationSeconds: params.durationSeconds }),
+      ...(params.providerOrigin === undefined ? {} : { providerOrigin: params.providerOrigin }),
       // The following claim updates this exact pending receive and performs
       // the durable checkpoint. Avoid uploading the intermediate, unclaimed
       // invoice state only to upload it again a few milliseconds later.
@@ -59,7 +61,7 @@ export class RgbReceiveOperations {
   }
 
   async getPendingReceiveInvoices(
-    params: { skipSync?: boolean } = {}
+    params: { skipSync?: boolean; providerOrigin?: string } = {}
   ): Promise<{ list: RgbPendingReceiveInvoice[] }> {
     let { service } = await (this.dependencies.getReadContext?.() ?? this.dependencies.getContext())
     if (!service.getPendingReceives().length) return { list: [] }
@@ -74,7 +76,11 @@ export class RgbReceiveOperations {
     return {
       list: service
         .getPendingReceives()
-        .map((item, batchTransferIdx) =>
+        .map((item, batchTransferIdx) => ({ item, batchTransferIdx }))
+        .filter(({ item }) =>
+          params.providerOrigin === undefined || item.providerOrigin === params.providerOrigin
+        )
+        .map(({ item, batchTransferIdx }) =>
           toPublicRgbPendingReceiveInvoice(
             item,
             batchTransferIdx,

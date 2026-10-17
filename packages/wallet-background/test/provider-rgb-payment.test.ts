@@ -16,8 +16,14 @@ vi.mock('../src/services', () => ({
 vi.mock('../src/controllers/wallet', () => ({
   default: {
     createRgbSendBegin: vi.fn(),
+    createRgbBlindReceive: vi.fn(),
     getRgbPaymentOrigin: vi.fn(),
     getRgbPaymentStatus: vi.fn(),
+    abortRgbAcknowledgedSwap: vi.fn(),
+    abortRgbVanillaTx: vi.fn(),
+    getRgbBuySwapReceive: vi.fn(),
+    getRgbPendingReceiveInvoices: vi.fn(),
+    abandonRgbAcceptedReceive: vi.fn(),
   },
 }))
 
@@ -41,6 +47,21 @@ describe('provider RGB payment ownership', () => {
     expect(wallet.createRgbSendBegin).toHaveBeenCalledWith({
       invoice: 'rgb:invoice',
       assetId: 'rgb:asset',
+      providerOrigin: 'https://dapp.example',
+    })
+  })
+
+  it('persists the trusted request origin while creating a receive invoice', async () => {
+    vi.mocked(wallet.createRgbBlindReceive).mockResolvedValue({ recipientId: 'recipient-1' } as any)
+
+    await providerController.createRgbReceiveInvoice({
+      data: { params: { assetId: 'rgb:asset', amount: '1' } },
+      session: { origin: 'https://dapp.example' },
+    })
+
+    expect(wallet.createRgbBlindReceive).toHaveBeenCalledWith({
+      assetId: 'rgb:asset',
+      amount: '1',
       providerOrigin: 'https://dapp.example',
     })
   })
@@ -90,5 +111,87 @@ describe('provider RGB payment ownership', () => {
         session: { origin: 'https://other.example' },
       })
     ).rejects.toThrow('RGB payment is not available to this site')
+  })
+
+  it.each(['applyRgbSellSwapAbort', 'cancelRgbSwap'])(
+    'rejects cross-origin %s before opening approval',
+    async method => {
+      vi.mocked(wallet.getRgbPaymentOrigin).mockResolvedValue('https://owner.example')
+      const approval = Reflect.getMetadata('APPROVAL', providerController, method)
+
+      await expect(
+        approval[1]({
+          data: { params: { transferId: 'transfer-1' } },
+          session: { origin: 'https://other.example' },
+        })
+      ).rejects.toThrow('RGB payment is not available to this site')
+      expect(wallet.abortRgbAcknowledgedSwap).not.toHaveBeenCalled()
+      expect(wallet.abortRgbVanillaTx).not.toHaveBeenCalled()
+    }
+  )
+
+  it('adds the origin-owned transaction identity to cancellation approval', async () => {
+    vi.mocked(wallet.getRgbPaymentOrigin).mockResolvedValue('https://owner.example')
+    vi.mocked(wallet.getRgbPaymentStatus).mockResolvedValue({
+      transferId: 'transfer-1',
+      assetId: 'rgb:asset',
+      amount: '10',
+      status: 'waiting_ack',
+    } as any)
+    const approval = Reflect.getMetadata('APPROVAL', providerController, 'cancelRgbSwap')
+    const request = {
+      data: { params: { transferId: 'transfer-1' } as Record<string, unknown> },
+      session: { origin: 'https://owner.example' },
+    }
+
+    await approval[1](request)
+
+    expect(request.data.params.payment).toMatchObject({
+      transferId: 'transfer-1',
+      assetId: 'rgb:asset',
+      amount: '10',
+      status: 'waiting_ack',
+    })
+  })
+
+  it('rejects a cross-origin buyer abort', async () => {
+    vi.mocked(wallet.getRgbBuySwapReceive).mockResolvedValue({
+      providerOrigin: 'https://owner.example',
+    } as any)
+
+    await expect(
+      providerController.applyRgbBuySwapAbort({
+        data: { params: { recipientId: 'recipient-1' } },
+        session: { origin: 'https://other.example' },
+      })
+    ).rejects.toThrow('RGB receive is not available to this site')
+    expect(wallet.abandonRgbAcceptedReceive).not.toHaveBeenCalled()
+  })
+
+  it('rejects a buyer abort before approval when the receive is not owned by the origin', async () => {
+    vi.mocked(wallet.getRgbPendingReceiveInvoices).mockResolvedValue({ list: [] } as any)
+    const approval = Reflect.getMetadata('APPROVAL', providerController, 'applyRgbBuySwapAbort')
+
+    await expect(
+      approval[1]({
+        data: { params: { recipientId: 'recipient-1' } },
+        session: { origin: 'https://other.example' },
+      })
+    ).rejects.toThrow('RGB receive is not available for swap abort')
+    expect(wallet.getRgbPendingReceiveInvoices).toHaveBeenCalledWith({
+      providerOrigin: 'https://other.example',
+    })
+  })
+
+  it('filters pending receives to the requesting origin', async () => {
+    vi.mocked(wallet.getRgbPendingReceiveInvoices).mockResolvedValue({ list: [] } as any)
+
+    await providerController.getRgbPendingReceives({
+      session: { origin: 'https://dapp.example' },
+    })
+
+    expect(wallet.getRgbPendingReceiveInvoices).toHaveBeenCalledWith({
+      providerOrigin: 'https://dapp.example',
+    })
   })
 })

@@ -826,6 +826,11 @@ export interface WalletController {
     [key: string]: any
   }>
 
+  abandonRgbAcceptedReceive(params: { recipientId: string }): Promise<{
+    abandoned: boolean
+    [key: string]: any
+  }>
+
   getRgbAllocationSummary(params?: { skipSync?: boolean }): Promise<{
     available?: boolean
     availableAllocationCount?: number

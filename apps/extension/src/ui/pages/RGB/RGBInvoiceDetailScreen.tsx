@@ -135,12 +135,24 @@ export default function RGBInvoiceDetailScreen() {
   }, [loadInvoice, releasing, routePendingInvoice]);
 
   const removeInvoice = async () => {
-    if (!invoice || (!isCancelableRgbPendingInvoice(invoice) && !isDeletableRgbWitnessInvoice(invoice)) || releasing)
+    const abandonAccepted = isRgbPendingInvoiceAwaitingSenderBroadcast(invoice);
+    if (
+      !invoice ||
+      (!isCancelableRgbPendingInvoice(invoice) && !isDeletableRgbWitnessInvoice(invoice) && !abandonAccepted) ||
+      releasing
+    )
       return;
-    const batchTransferIdx = invoice.batchTransferIdx;
-    if (typeof batchTransferIdx !== 'number') return;
     setReleasing(true);
     try {
+      if (abandonAccepted) {
+        if (!invoice.recipientId) return;
+        const result = await wallet.abandonRgbAcceptedReceive({ recipientId: invoice.recipientId });
+        if (!result.abandoned) throw new Error(t('rgb_cancel_send_failed'));
+        closeInvoice();
+        return;
+      }
+      const batchTransferIdx = invoice.batchTransferIdx;
+      if (typeof batchTransferIdx !== 'number') return;
       const result = await wallet.cancelRgbReceiveInvoice({ batchTransferIdx, skipSync: false });
       if (result.changed) {
         closeInvoice();
@@ -179,7 +191,9 @@ export default function RGBInvoiceDetailScreen() {
   const invoiceInUse = awaitingSenderBroadcast || awaitingSenderConfirmation;
   const recipientType =
     invoice?.kind === 'ReceiveWitness' || invoice?.transferKind === 'ReceiveWitness' ? 'witness' : 'blind';
-  const canRemoveInvoice = isCancelableRgbPendingInvoice(invoice) || isDeletableRgbWitnessInvoice(invoice);
+  const canAbandonAccepted = awaitingSenderBroadcast;
+  const canRemoveInvoice =
+    isCancelableRgbPendingInvoice(invoice) || isDeletableRgbWitnessInvoice(invoice) || canAbandonAccepted;
   const isWitnessInvoice = recipientType === 'witness';
   const invoiceAsset = invoice?.assetId
     ? rgbItems.find((item) => getRgbAssetId(item) === invoice.assetId) || { assetId: invoice.assetId }
@@ -292,7 +306,16 @@ export default function RGBInvoiceDetailScreen() {
               }}
               style={{ padding: '0 20px 24px', boxSizing: 'border-box' }}
             >
-              <Text text={t(isWitnessInvoice ? 'delete_invoice' : 'release_invoice')} size="sm" />
+              <Text
+                text={t(
+                  canAbandonAccepted
+                    ? 'rgb_approval_cancel_payment'
+                    : isWitnessInvoice
+                      ? 'delete_invoice'
+                      : 'release_invoice'
+                )}
+                size="sm"
+              />
             </Row>
           </Column>
         </BottomModal>
@@ -308,13 +331,23 @@ export default function RGBInvoiceDetailScreen() {
               containerStyle={{ position: 'absolute', top: 30, right: 22, opacity: releasing ? 0.45 : 1 }}
             />
             <Text
-              text={t(isWitnessInvoice ? 'delete_witness_invoice_confirm_title' : 'release_invoice_confirm_title')}
+              text={t(
+                canAbandonAccepted
+                  ? 'rgb_approval_cancel_payment_title'
+                  : isWitnessInvoice
+                    ? 'delete_witness_invoice_confirm_title'
+                    : 'release_invoice_confirm_title'
+              )}
               color="white"
               size="md"
               textCenter
             />
             <Text
-              text={t('remove_invoice_confirm_description')}
+              text={t(
+                canAbandonAccepted
+                  ? 'rgb_approval_cancel_payment_description'
+                  : 'remove_invoice_confirm_description'
+              )}
               color="white_muted2"
               size="sm"
               wrap
@@ -324,8 +357,14 @@ export default function RGBInvoiceDetailScreen() {
               <Button
                 text={
                   releasing
-                    ? t(isWitnessInvoice ? 'deleting_invoice' : 'releasing_invoice')
-                    : t(isWitnessInvoice ? 'delete_invoice' : 'release_invoice')
+                    ? t(canAbandonAccepted ? 'loading' : isWitnessInvoice ? 'deleting_invoice' : 'releasing_invoice')
+                    : t(
+                        canAbandonAccepted
+                          ? 'rgb_approval_cancel_payment'
+                          : isWitnessInvoice
+                            ? 'delete_invoice'
+                            : 'release_invoice'
+                      )
                 }
                 preset="default"
                 disabled={releasing}

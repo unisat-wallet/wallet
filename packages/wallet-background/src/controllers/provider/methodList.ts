@@ -118,10 +118,6 @@ export type ProviderMethodList = {
   applyRgbSellSwapAbort: {
     transferId: string
   }
-  /** Read the original dApp origin before applying a mutually agreed seller abort. */
-  getRgbSellSwapAbortOrigin: {
-    transferId: string
-  }
   /** Mark an ACKed but mutually abandoned RGB receipt as canceled locally. */
   applyRgbBuySwapAbort: {
     recipientId: string

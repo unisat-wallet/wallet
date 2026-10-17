@@ -670,14 +670,19 @@ function RgbPaymentApproval({ data, session }: { data: Props['params']['data']; 
   );
 }
 
-export function RgbPaymentCancel({ params: { session } }: Props) {
+export function RgbPaymentCancel({ params: { data, session } }: Props) {
   const { t } = useI18n();
   return (
     <RgbApprovalLayout
       session={session}
       title={t('rgb_approval_cancel_payment_title')}
       description={t('rgb_approval_cancel_payment_description')}
-      rows={[]}
+      rows={[
+        [t('transaction_id'), data.transferId || '-'],
+        [t('status'), data.payment?.status || '-'],
+        ...(data.payment?.assetId ? [[t('asset'), data.payment.assetId]] : []),
+        ...(data.payment?.amount ? [[t('amount'), String(data.payment.amount)]] : [])
+      ]}
       confirmText={t('rgb_approval_cancel_payment')}
       confirmPreset="danger"
     />

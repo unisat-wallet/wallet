@@ -215,6 +215,11 @@ describe('RgbService', () => {
       { assetId: 'rgb:AQEBAQEB-AQEBAQE-BAQEBAQ-EBAQEBA-QEBAQEB-AQEBAQE', amount: '60', invoice: rgbInvoice(), feeRate: 2 },
       { providerOrigin: 'https://dapp.example' }
     )
+    const receive = await service.createWitnessReceive({
+      scriptPubKey: `5120${'33'.repeat(32)}`,
+      publicKey: `02${'44'.repeat(32)}`,
+      providerOrigin: 'https://dapp.example',
+    })
 
     await expect(service.getTransferProviderOrigin(prepared.id)).resolves.toBe(
       'https://dapp.example'
@@ -225,12 +230,17 @@ describe('RgbService', () => {
     await expect(restarted.getTransferProviderOrigin(prepared.id)).resolves.toBe(
       'https://dapp.example'
     )
+    expect(
+      restarted.getPendingReceives().find(item => item.recipientId === receive.recipientId)
+    ).toMatchObject({ providerOrigin: 'https://dapp.example' })
 
     await restarted.queueFeePoolUtxos([])
     const recovery = checkpoint.mock.calls.at(-1)?.[0] as {
       pending: Record<string, { providerOrigin?: string }>
+      pendingReceives?: Array<{ providerOrigin?: string }>
     }
     expect(recovery.pending[prepared.id]?.providerOrigin).toBeUndefined()
+    expect(recovery.pendingReceives?.[0]?.providerOrigin).toBeUndefined()
 
     await restarted.abortSend(prepared.id, { discardUnsigned: true })
     await expect(restarted.getTransferProviderOrigin(prepared.id)).resolves.toBe(

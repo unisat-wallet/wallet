@@ -34,7 +34,6 @@ export class UnisatProvider extends EventEmitter {
     signSellSwapAndPublishConsignment: (transferId: string, makerSignedPsbt: string) => Promise<any>;
     confirmSellSwap: (transferId: string, signedPsbt: string) => Promise<any>;
     applySellSwapAbort: (transferId: string) => Promise<any>;
-    getSellSwapAbortOrigin: (transferId: string) => Promise<any>;
     applyBuySwapAbort: (recipientId: string) => Promise<any>;
     cancelSwap: (transferId: string) => Promise<any>;
     getOperationStatus: (transferId: string) => Promise<any>;
@@ -66,7 +65,6 @@ export class UnisatProvider extends EventEmitter {
       signSellSwapAndPublishConsignment: (transferId, makerSignedPsbt) => this.bitcoinAPI.signRgbSellSwapAndPublishConsignment(transferId, makerSignedPsbt),
       confirmSellSwap: (transferId, signedPsbt) => this.bitcoinAPI.confirmRgbSellSwap(transferId, signedPsbt),
       applySellSwapAbort: transferId => this.bitcoinAPI.applyRgbSellSwapAbort(transferId),
-      getSellSwapAbortOrigin: transferId => this.bitcoinAPI.getRgbSellSwapAbortOrigin(transferId),
       applyBuySwapAbort: recipientId => this.bitcoinAPI.applyRgbBuySwapAbort(recipientId),
       cancelSwap: transferId => this.bitcoinAPI.cancelRgbSwap(transferId),
       getOperationStatus: transferId => this.bitcoinAPI.getRgbSwapStatus(transferId),

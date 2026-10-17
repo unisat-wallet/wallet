@@ -545,6 +545,7 @@ export class RgbService {
     assetId?: string
     amount?: string
     durationSeconds?: number
+    providerOrigin?: string
     /** The caller will immediately claim the recipient and persist the combined state. */
     deferRecoveryCheckpoint?: boolean
   }) {
@@ -601,6 +602,7 @@ export class RgbService {
     const pending = {
       invoice,
       recipientId,
+      ...(input.providerOrigin ? { providerOrigin: input.providerOrigin } : {}),
       assetId,
       amount: input.amount,
       expirationTimestamp,
@@ -626,6 +628,7 @@ export class RgbService {
     assetId?: string
     amount?: string
     durationSeconds?: number
+    providerOrigin?: string
     deferRecoveryCheckpoint?: boolean
   }) {
     const state = this.requireState()
@@ -676,6 +679,7 @@ export class RgbService {
     const pending = {
       invoice,
       recipientId,
+      ...(input.providerOrigin ? { providerOrigin: input.providerOrigin } : {}),
       proxyRecipientId: decoded.proxyRecipientId,
       recipientType: 'witness' as const,
       witnessScriptPubKey: input.scriptPubKey.toLowerCase(),
@@ -3312,6 +3316,14 @@ function recoverySnapshot(state: ReturnType<typeof persistState>) {
   } = state
   return {
     ...snapshot,
+    ...(snapshot.pendingReceives
+      ? {
+          pendingReceives: snapshot.pendingReceives.map(receive => {
+            const { providerOrigin: _providerOrigin, ...recoveryReceive } = receive
+            return recoveryReceive
+          }),
+        }
+      : {}),
     pending: Object.fromEntries(
       Object.entries(pending).map(([transferId, transfer]) => {
         const { providerOrigin: _providerOrigin, ...recoveryTransfer } = transfer
@@ -3335,6 +3347,7 @@ function recoverySnapshot(state: ReturnType<typeof persistState>) {
 
 function stripProviderOrigins(state: RgbServiceState) {
   Object.values(state.pending).forEach(transfer => delete transfer.providerOrigin)
+  state.pendingReceives?.forEach(receive => delete receive.providerOrigin)
   state.pendingSendHistory?.forEach(item => {
     delete item.providerOrigin
     delete item.providerOriginExpiresAt
