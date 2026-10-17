@@ -46,7 +46,8 @@ const createSession = (id: string | number, data?: SessionData): Session => {
   return session
 }
 
-const deleteSession = (id: string | number): void => {
+const deleteSession = (id: string | number, expectedSession?: Session): void => {
+  if (expectedSession && sessionMap.get(id) !== expectedSession) return
   sessionMap.delete(id)
 }
 
@@ -80,6 +81,7 @@ const broadcastEvent = (ev: string, data?: any, origin?: string): void => {
 class SessionService {
   getSession = getSession
   getOrCreateSession = getOrCreateSession
+  createSession = createSession
   deleteSession = deleteSession
   broadcastEvent = broadcastEvent
 
@@ -97,6 +99,7 @@ export const sessionService = new SessionService()
 export default {
   getSession,
   getOrCreateSession,
+  createSession,
   deleteSession,
   broadcastEvent,
 }

@@ -32,6 +32,8 @@ export { initPersistStoreStorage } from './utils/persistStore'
 
 export { bgEventBus } from './utils/eventBus'
 
+export { getTrustedProviderOrigin } from './utils/provider-origin'
+
 export {
   isAllowedUiControllerMethod,
   isValidUiDevelopmentRequest,

@@ -1,4 +1,5 @@
 import { keyringService, permissionService } from '../../services'
+import { getTrustedProviderOrigin } from '../../utils/provider-origin'
 
 import wallet from '../wallet'
 
@@ -9,15 +10,11 @@ const tabCheckin = ({
   session,
   port,
 }) => {
-  // Get the trusted origin from the port's sender tab URL
-  const trustedOrigin = port?.sender?.tab?.url ? new URL(port.sender.tab.url).origin : null
-
-  // If we can't verify the origin, reject the request
-  if (!trustedOrigin) {
-    throw new Error('Cannot verify request origin')
+  const trustedOrigin = getTrustedProviderOrigin(port?.sender)
+  if (session.origin && session.origin !== trustedOrigin) {
+    throw new Error('Request origin changed')
   }
 
-  // Use the verified trusted origin instead of trusting client-provided values
   session.setProp({ origin: trustedOrigin, name, icon })
 }
 

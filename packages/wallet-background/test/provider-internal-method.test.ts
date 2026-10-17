@@ -29,6 +29,47 @@ describe('provider internal methods', () => {
     vi.mocked(wallet.getLegacyNetworkName).mockReturnValue('livenet')
   })
 
+  it('binds a tab check-in to the sending document instead of the current tab URL', () => {
+    const session = { origin: '', setProp: vi.fn() }
+
+    internalMethod.tabCheckin({
+      data: { params: { name: 'Example', icon: 'https://example.com/icon.png' } },
+      session,
+      port: {
+        sender: {
+          url: 'https://example.com/connect',
+          tab: { url: 'chrome://newtab/' },
+        },
+      },
+    })
+
+    expect(session.setProp).toHaveBeenCalledWith({
+      origin: 'https://example.com',
+      name: 'Example',
+      icon: 'https://example.com/icon.png',
+    })
+  })
+
+  it('rejects non-web provider origins', () => {
+    expect(() =>
+      internalMethod.tabCheckin({
+        data: { params: { name: 'New tab', icon: '' } },
+        session: { origin: '', setProp: vi.fn() },
+        port: { sender: { url: 'chrome://newtab/' } },
+      })
+    ).toThrow('Unsupported request origin')
+  })
+
+  it('does not let a check-in replace the origin bound to its port session', () => {
+    expect(() =>
+      internalMethod.tabCheckin({
+        data: { params: { name: 'Other', icon: '' } },
+        session: { origin: 'https://example.com', setProp: vi.fn() },
+        port: { sender: { url: 'https://other.example/' } },
+      })
+    ).toThrow('Request origin changed')
+  })
+
   it('does not disclose accounts to an unconnected origin', async () => {
     vi.mocked(permissionService.hasPermission).mockReturnValue(false)
     vi.mocked(wallet.getCurrentAccount).mockResolvedValue({ address: 'bc1qunconnected' } as any)

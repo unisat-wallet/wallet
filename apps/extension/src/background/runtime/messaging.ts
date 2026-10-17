@@ -1,6 +1,7 @@
 import PortMessage from '@/shared/utils/message/portMessage';
 import {
   bgEventBus,
+  getTrustedProviderOrigin,
   isAllowedUiControllerMethod,
   isValidUiDevelopmentRequest,
   isValidUiMessageParams,
@@ -83,11 +84,23 @@ export function initMessaging() {
       return;
     } else {
       // page provider port
-      pm.listen(async (data) => {
-        const sessionId = port.sender?.tab?.id;
-        const session = sessionService.getOrCreateSession(sessionId) as any;
+      const sessionId = port.sender?.tab?.id;
+      let session: ReturnType<typeof sessionService.createSession> | undefined;
 
-        const req = { data, session, port };
+      pm.listen(async (data) => {
+        if (sessionId === undefined) {
+          throw new Error('Cannot identify provider tab');
+        }
+        if (!session) {
+          const origin = getTrustedProviderOrigin(port.sender);
+          session = sessionService.createSession(sessionId, {
+            origin,
+            icon: '',
+            name: origin
+          });
+        }
+
+        const req = { data, session: session as any, port };
         // for background push to respective page
         req.session.pushMessage = (event, data) => {
           // Send a message to the page( SESSION_EVENTS)
@@ -100,10 +113,8 @@ export function initMessaging() {
       });
 
       port.onDisconnect.addListener(() => {
-        // Clean up session if needed
-        const sessionId = port.sender?.tab?.id;
-        if (sessionId) {
-          // Consider session cleanup here if needed
+        if (sessionId !== undefined && session) {
+          sessionService.deleteSession(sessionId, session);
         }
       });
     }
