@@ -20,6 +20,8 @@ export {
   makeADR36AminoSignDoc,
   encodeSecp256k1Pubkey,
   encodeSecp256k1Signature,
+  assertValidCosmosMemo,
+  MAX_COSMOS_MEMO_LENGTH,
   objToUint8Array,
   directSignDocToBytesHex,
   arbitrarySignDocToBytesHex,

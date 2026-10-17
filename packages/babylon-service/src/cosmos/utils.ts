@@ -1,6 +1,18 @@
 import { Buffer } from 'buffer'
 import * as encoding from '@cosmjs/encoding'
 import { makeSignBytes } from '@cosmjs/proto-signing'
+
+export const MAX_COSMOS_MEMO_LENGTH = 256
+
+export function assertValidCosmosMemo(memo: unknown): asserts memo is string {
+  if (typeof memo !== 'string') {
+    throw new Error('Invalid Cosmos memo')
+  }
+  if (Array.from(memo).length > MAX_COSMOS_MEMO_LENGTH) {
+    throw new Error(`Cosmos memo must not exceed ${MAX_COSMOS_MEMO_LENGTH} characters`)
+  }
+}
+
 export function sortObjectByKey(obj: Record<string, any>): any {
   if (typeof obj !== 'object' || obj === null) {
     return obj

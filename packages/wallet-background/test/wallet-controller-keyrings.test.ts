@@ -25,6 +25,12 @@ vi.mock('@unisat/babylon-service', () => ({
   directSignDocToBytesHex: vi.fn(),
   arbitrarySignDocToBytesHex: vi.fn(),
   encodeSignature: vi.fn(),
+  assertValidCosmosMemo: vi.fn((memo: unknown) => {
+    if (typeof memo !== 'string') throw new Error('Invalid Cosmos memo')
+    if (Array.from(memo).length > 256) {
+      throw new Error('Cosmos memo must not exceed 256 characters')
+    }
+  }),
   getDelegationsV2: vi.fn(),
   CosmosKeyring: vi.fn(),
 }))
@@ -89,6 +95,39 @@ describe('chain type validation', () => {
       expect(walletApiService.setEndpoint).not.toHaveBeenCalled()
 
       await expect(wallet.getCosmosKeyring(chainType)).rejects.toThrow('Not supported chainId')
+    }
+  )
+})
+
+describe('Cosmos memo validation', () => {
+  it.each(['createSendTokenStep1', 'simulateBabylonGas'] as const)(
+    'rejects oversized memos before resolving the keyring in %s',
+    async method => {
+      const wallet = new WalletController()
+      const getCosmosKeyring = vi.spyOn(wallet, 'getCosmosKeyring')
+
+      if (method === 'createSendTokenStep1') {
+        await expect(
+          wallet.createSendTokenStep1(
+            'bbn-1',
+            { denom: 'ubbn', amount: '1' },
+            'bbn1recipient',
+            'a'.repeat(257),
+            { gasLimit: 100_000, gasPrice: '0.01', gasAdjustment: 1 }
+          )
+        ).rejects.toThrow('Cosmos memo must not exceed 256 characters')
+      } else {
+        await expect(
+          wallet.simulateBabylonGas(
+            'bbn-1',
+            'bbn1recipient',
+            { denom: 'ubbn', amount: '1' },
+            'a'.repeat(257)
+          )
+        ).rejects.toThrow('Cosmos memo must not exceed 256 characters')
+      }
+
+      expect(getCosmosKeyring).not.toHaveBeenCalled()
     }
   )
 })

@@ -7,6 +7,7 @@ import {
   CosmosChainInfo,
   CosmosKeyring,
   DelegationV2StakingState,
+  assertValidCosmosMemo,
   getDelegationsV2,
 } from '@unisat/babylon-service'
 import { ColdWalletKeyring, KeystoneKeyring } from '@unisat/keyring-service'
@@ -6943,6 +6944,7 @@ export class WalletController extends BaseController {
       gasAdjustment: number
     }
   ) => {
+    assertValidCosmosMemo(memo)
     const keyring = await this.getCosmosKeyring(chainId)
     if (!keyring) return null
     const result = await keyring.createSendTokenStep1(tokenBalance, recipient, memo, {
@@ -6974,6 +6976,7 @@ export class WalletController extends BaseController {
     amount: { denom: string; amount: string },
     memo: string
   ) => {
+    assertValidCosmosMemo(memo)
     const keyring = await this.getCosmosKeyring(chainId)
     if (!keyring) return null
     const result = await keyring.simulateBabylonGas(recipient, amount, memo)

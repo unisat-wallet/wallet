@@ -21,7 +21,7 @@ import {
 } from '@cosmjs/stargate'
 import { Tendermint34Client } from '@cosmjs/tendermint-rpc'
 
-import { encodeSecp256k1Pubkey } from './utils'
+import { assertValidCosmosMemo, encodeSecp256k1Pubkey } from './utils'
 import { PubKeySecp256k1 } from './crypto'
 import type { Key, CosmosBalance, CosmosChainInfo } from '../types/cosmos'
 import { DEFAULT_BBN_GAS_PRICE } from '../types'
@@ -204,6 +204,7 @@ export class CosmosKeyring {
       gasAdjustment?: number
     }
   ) {
+    assertValidCosmosMemo(memo)
     const chainInfo = this.provider.cosmosChainInfoMap[this.chainId]!
 
     const fromAddress = this.getKey().bech32Address
@@ -282,6 +283,7 @@ export class CosmosKeyring {
     amount: { denom: string; amount: string },
     memo: string
   ) {
+    assertValidCosmosMemo(memo)
     try {
       const chainInfo = this.provider.cosmosChainInfoMap[this.chainId]!
 

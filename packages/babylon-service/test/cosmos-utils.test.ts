@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
 import {
+  assertValidCosmosMemo,
   arbitrarySignDocToBytesHex,
   directSignDocToBytesHex,
   encodeSecp256k1Pubkey,
@@ -14,6 +15,15 @@ import {
 } from '../src/cosmos/utils'
 
 describe('cosmos utils', () => {
+  it('limits Cosmos memos to 256 Unicode characters', () => {
+    expect(() => assertValidCosmosMemo('a'.repeat(256))).not.toThrow()
+    expect(() => assertValidCosmosMemo('😀'.repeat(256))).not.toThrow()
+    expect(() => assertValidCosmosMemo('a'.repeat(257))).toThrow(
+      'Cosmos memo must not exceed 256 characters'
+    )
+    expect(() => assertValidCosmosMemo([])).toThrow('Invalid Cosmos memo')
+  })
+
   it('sortObjectByKey recursively sorts object keys and keeps array order', () => {
     const input = {
       z: 1,
