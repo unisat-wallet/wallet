@@ -8,6 +8,8 @@ import type {
   WalletListenerParams,
   ChainType,
 } from '../types';
+import { ALL_CHAIN_TYPES, getChainFlags } from '../types';
+import { getBitcoinAddressNetwork } from '../utils';
 
 /**
  * Abstract base class for wallet implementations
@@ -52,7 +54,40 @@ export abstract class BaseWallet {
    * Set current chain type
    */
   setChainType(chainType: ChainType): void {
+    if (!(ALL_CHAIN_TYPES as readonly unknown[]).includes(chainType)) {
+      throw new Error(this.t('networkNotSupported', `${String(chainType)} not supported`, {
+        chain: chainType,
+      }));
+    }
+    if (!this.config.supportChain.includes(chainType)) {
+      throw new Error(this.t('networkNotSupported', `${chainType} not supported`, {
+        chain: chainType,
+      }));
+    }
     this.chainType = chainType;
+  }
+
+  /** Reject provider accounts whose address encoding belongs to another network. */
+  protected assertAccountNetwork(account: Account): Account {
+    if (!this.chainType) {
+      throw new Error(this.t('chainTypeNotSet', 'Chain type not set'));
+    }
+
+    const flags = getChainFlags(this.chainType);
+    const network = flags.isBitcoinMainnet || flags.isFractalMainnet ? 'mainnet' : 'testnet';
+    const addresses = [account.address, account.paymentAccount?.address].filter(
+      (value): value is string => typeof value === 'string' && value.length > 0
+    );
+
+    if (!addresses.length || addresses.some(value => getBitcoinAddressNetwork(value) !== network)) {
+      throw new Error(
+        this.t('accountNetworkMismatch', `Account does not belong to ${this.chainType}`, {
+          chain: this.chainType,
+        })
+      );
+    }
+
+    return account;
   }
 
   /**

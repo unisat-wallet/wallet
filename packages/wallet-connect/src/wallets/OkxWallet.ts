@@ -73,10 +73,10 @@ export class OkxWallet extends BaseWallet {
     const provider = this.getProvider()
     const account = await provider.connect()
 
-    return {
+    return this.assertAccountNetwork({
       address: account.address,
       pubKey: account.compressedPublicKey,
-    }
+    })
   }
 
   async getAccount(): Promise<Account | undefined> {
@@ -91,10 +91,10 @@ export class OkxWallet extends BaseWallet {
       return undefined
     }
 
-    return {
+    return this.assertAccountNetwork({
       address: account.address,
       pubKey: account.compressedPublicKey,
-    }
+    })
   }
 
   addListener(params: WalletListenerParams): void {
@@ -118,6 +118,9 @@ export class OkxWallet extends BaseWallet {
   }
 
   async signPsbt(psbt: string, opt?: { toSignInputs?: ToSignInput[] }): Promise<string> {
+    if (!(await this.getAccount())) {
+      throw new Error(this.t('accountNotFound', 'Account not found'))
+    }
     const params: { autoFinalized: boolean; toSignInputs?: ToSignInput[] } = {
       autoFinalized: false,
     }

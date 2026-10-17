@@ -42,6 +42,16 @@ class DummyWallet extends BaseWallet {
   exposeShowWarning() {
     this.showNotInstalledWarning()
   }
+
+  exposeValidateAccount(address: string, paymentAddress?: string) {
+    return this.assertAccountNetwork({
+      address,
+      pubKey: 'pubkey',
+      ...(paymentAddress
+        ? { paymentAccount: { address: paymentAddress, pubKey: 'payment-pubkey' } }
+        : {}),
+    })
+  }
 }
 
 describe('BaseWallet', () => {
@@ -81,5 +91,31 @@ describe('BaseWallet', () => {
       'https://example.com/download',
       '_blank'
     )
+  })
+
+  it('rejects unsupported chain values before storing them', () => {
+    const wallet = new DummyWallet()
+
+    expect(() => wallet.setChainType(ChainType.BITCOIN_TESTNET)).toThrow('not supported')
+    expect(() => wallet.setChainType('constructor' as ChainType)).toThrow('not supported')
+  })
+
+  it('rejects an account address from another network', () => {
+    const wallet = new DummyWallet()
+    wallet.setChainType(ChainType.BITCOIN_MAINNET)
+
+    expect(() => wallet.exposeValidateAccount('tb1qzyg3zyg3zyg3zyg3zyg3zyg3zyg3zyg3apj6d3')).toThrow(
+      'does not belong to BITCOIN_MAINNET'
+    )
+    expect(wallet.exposeValidateAccount('bc1qzyg3zyg3zyg3zyg3zyg3zyg3zyg3zyg3h8ffkz')).toEqual({
+      address: 'bc1qzyg3zyg3zyg3zyg3zyg3zyg3zyg3zyg3h8ffkz',
+      pubKey: 'pubkey',
+    })
+    expect(() =>
+      wallet.exposeValidateAccount(
+        'bc1qzyg3zyg3zyg3zyg3zyg3zyg3zyg3zyg3h8ffkz',
+        'tb1qzyg3zyg3zyg3zyg3zyg3zyg3zyg3zyg3apj6d3'
+      )
+    ).toThrow('does not belong to BITCOIN_MAINNET')
   })
 })

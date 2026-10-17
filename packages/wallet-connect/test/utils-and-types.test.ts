@@ -6,6 +6,7 @@ import {
 } from '../src/types'
 import {
   hexToBase64,
+  getBitcoinAddressNetwork,
   isP2WPKH,
   isSupportedAddressType,
   isTaproot,
@@ -44,6 +45,13 @@ describe('utils and types', () => {
 
     expect(isSupportedAddressType('tb1pabc')).toBe(true)
     expect(isSupportedAddressType('1legacy')).toBe(false)
+  })
+
+  it('detects the network encoded by standard Bitcoin addresses', () => {
+    expect(getBitcoinAddressNetwork('bc1qzyg3zyg3zyg3zyg3zyg3zyg3zyg3zyg3h8ffkz')).toBe('mainnet')
+    expect(getBitcoinAddressNetwork('tb1qzyg3zyg3zyg3zyg3zyg3zyg3zyg3zyg3apj6d3')).toBe('testnet')
+    expect(getBitcoinAddressNetwork('bc1Qmixedcase')).toBeUndefined()
+    expect(getBitcoinAddressNetwork('constructor')).toBeUndefined()
   })
 
   it('sleep resolves after timeout', async () => {

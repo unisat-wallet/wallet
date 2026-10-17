@@ -39,3 +39,21 @@ export function isTaproot(address: string): boolean {
 export function isSupportedAddressType(address: string): boolean {
   return isP2WPKH(address) || isTaproot(address);
 }
+
+export type BitcoinAddressNetwork = 'mainnet' | 'testnet';
+
+/** Infer the Bitcoin network encoded by a standard SegWit or Base58 address. */
+export function getBitcoinAddressNetwork(address: string): BitcoinAddressNetwork | undefined {
+  if (!address || address !== address.trim()) return undefined;
+
+  const hasLower = address !== address.toUpperCase();
+  const hasUpper = address !== address.toLowerCase();
+  if (hasLower && hasUpper) return undefined;
+
+  const normalized = address.toLowerCase();
+  if (/^bc1[ac-hj-np-z02-9]{11,87}$/.test(normalized)) return 'mainnet';
+  if (/^tb1[ac-hj-np-z02-9]{11,87}$/.test(normalized)) return 'testnet';
+  if (/^[13][1-9A-HJ-NP-Za-km-z]{25,34}$/.test(address)) return 'mainnet';
+  if (/^[mn2][1-9A-HJ-NP-Za-km-z]{25,34}$/.test(address)) return 'testnet';
+  return undefined;
+}

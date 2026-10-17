@@ -49,10 +49,10 @@ export class UniSatWallet extends BaseWallet {
       return undefined
     }
 
-    return {
+    return this.assertAccountNetwork({
       address,
       pubKey: publicKey,
-    }
+    })
   }
 
   async getAccount(): Promise<Account | undefined> {
@@ -70,10 +70,10 @@ export class UniSatWallet extends BaseWallet {
     const addresses = await window.unisat.getAccounts()
     if (addresses[0]) {
       const publicKey = await window.unisat.getPublicKey()
-      return {
+      return this.assertAccountNetwork({
         address: addresses[0],
         pubKey: publicKey,
-      }
+      })
     }
 
     return undefined
@@ -119,6 +119,9 @@ export class UniSatWallet extends BaseWallet {
     }
 
     await this.checkNetwork()
+    if (!(await this.getAccount())) {
+      throw new Error(this.t('accountNotFound', 'Account not found'))
+    }
 
     const params: { autoFinalized: boolean; toSignInputs?: ToSignInput[] } = {
       autoFinalized: false,
@@ -136,6 +139,9 @@ export class UniSatWallet extends BaseWallet {
     }
 
     await this.checkNetwork()
+    if (!(await this.getAccount())) {
+      throw new Error(this.t('accountNotFound', 'Account not found'))
+    }
 
     const opts = params.map(p => {
       const opt: { autoFinalized: boolean; toSignInputs?: ToSignInput[] } = {
@@ -156,6 +162,10 @@ export class UniSatWallet extends BaseWallet {
   async signMessage(message: string, type?: string): Promise<string> {
     if (!window.unisat) {
       throw new Error(this.t('walletNotConnected', 'Wallet not connected'))
+    }
+    await this.checkNetwork()
+    if (!(await this.getAccount())) {
+      throw new Error(this.t('accountNotFound', 'Account not found'))
     }
     return window.unisat.signMessage(message, type)
   }

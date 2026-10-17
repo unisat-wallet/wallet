@@ -101,14 +101,14 @@ export class XverseWallet extends BaseWallet {
             reject(new Error(this.t('invalidResponse', 'Invalid response from wallet')))
             return
           }
-          this.account = {
+          this.account = this.assertAccountNetwork({
             address: ordinals.address,
             pubKey: ordinals.publicKey,
             paymentAccount: {
               address: payment.address,
               pubKey: payment.publicKey,
             },
-          }
+          })
           resolve(this.account)
         },
         onCancel: () => {
@@ -137,6 +137,10 @@ export class XverseWallet extends BaseWallet {
   }
 
   async signPsbt(psbt: string, opt?: { toSignInputs?: ToSignInput[] }): Promise<string> {
+    if (!this.account) {
+      throw new Error(this.t('accountNotFound', 'Account not found'))
+    }
+    this.assertAccountNetwork(this.account)
     // Dynamic import sats-connect
     let satsConnect: typeof import('sats-connect')
     try {
@@ -185,6 +189,7 @@ export class XverseWallet extends BaseWallet {
     if (!this.account) {
       throw new Error(this.t('accountNotFound', 'Account not found'))
     }
+    this.assertAccountNetwork(this.account)
 
     // Dynamic import sats-connect
     let satsConnect: typeof import('sats-connect')

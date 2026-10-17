@@ -3,11 +3,11 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { ChainType } from '../src/types'
 import { OkxWallet } from '../src/wallets/OkxWallet'
 
-function createProvider() {
+function createProvider(address = 'bc1qzyg3zyg3zyg3zyg3zyg3zyg3zyg3zyg3h8ffkz') {
   return {
     selectedAccount: undefined,
     connect: vi.fn().mockResolvedValue({
-      address: 'bc1qokx',
+      address,
       publicKey: 'pk',
       compressedPublicKey: 'cpk',
     }),
@@ -29,7 +29,7 @@ describe('OkxWallet', () => {
 
   it('uses testnet provider when chain is BITCOIN_TESTNET', async () => {
     const bitcoin = createProvider()
-    const bitcoinTestnet = createProvider()
+    const bitcoinTestnet = createProvider('tb1qzyg3zyg3zyg3zyg3zyg3zyg3zyg3zyg3apj6d3')
     const fractalBitcoin = createProvider()
 
     ;(globalThis as any).window = {
@@ -43,7 +43,10 @@ describe('OkxWallet', () => {
     const account = await wallet.requestAccount()
     const balance = await wallet.getBalance()
 
-    expect(account).toEqual({ address: 'bc1qokx', pubKey: 'cpk' })
+    expect(account).toEqual({
+      address: 'tb1qzyg3zyg3zyg3zyg3zyg3zyg3zyg3zyg3apj6d3',
+      pubKey: 'cpk',
+    })
     expect(bitcoinTestnet.connect).toHaveBeenCalledTimes(1)
     expect(bitcoin.connect).not.toHaveBeenCalled()
     expect(balance.total).toBe(3)
@@ -71,8 +74,18 @@ describe('OkxWallet', () => {
     }
 
     const wallet = new OkxWallet()
-    wallet.setChainType(ChainType.FRACTAL_BITCOIN_TESTNET)
+    expect(() => wallet.setChainType(ChainType.FRACTAL_BITCOIN_TESTNET)).toThrow('not supported')
+  })
 
-    expect(() => wallet.getBalance()).toThrow('not supported')
+  it('rejects an account returned by the selected provider for another network', async () => {
+    const provider = createProvider('tb1qzyg3zyg3zyg3zyg3zyg3zyg3zyg3zyg3apj6d3')
+    ;(globalThis as any).window = {
+      okxwallet: { bitcoin: provider, bitcoinTestnet: createProvider(), fractalBitcoin: createProvider() },
+    }
+    const wallet = new OkxWallet()
+    wallet.setChainType(ChainType.BITCOIN_MAINNET)
+    wallet.installed = true
+
+    await expect(wallet.requestAccount()).rejects.toThrow('does not belong to BITCOIN_MAINNET')
   })
 })

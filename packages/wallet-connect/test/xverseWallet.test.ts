@@ -37,4 +37,18 @@ describe('XverseWallet', () => {
     // still expected to fail because account is cleared
     await expect(wallet.signMessage('hello')).rejects.toThrow('Account not found')
   })
+
+  it('rejects a cached account after the selected network changes', async () => {
+    const wallet = new XverseWallet()
+    wallet.setChainType(ChainType.BITCOIN_MAINNET)
+    ;(wallet as any).account = {
+      address: 'bc1qzyg3zyg3zyg3zyg3zyg3zyg3zyg3zyg3h8ffkz',
+      pubKey: 'pubkey',
+    }
+    wallet.setChainType(ChainType.BITCOIN_TESTNET)
+
+    await expect(wallet.signMessage('hello')).rejects.toThrow(
+      'does not belong to BITCOIN_TESTNET'
+    )
+  })
 })
