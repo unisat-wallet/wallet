@@ -5,14 +5,18 @@ import { describe, expect, it } from 'vitest'
 import { PsbtDecoder, createDummyTx, getSighashSingleInputIndexes } from '../src'
 import { LocalWallet } from '../src/wallet/local-wallet'
 
-async function decodeWithSighashType(sighashType: number) {
+async function decodeWithSighashType(
+  sighashType: number,
+  inputIndex = 0,
+  txType = DummyTxType.SEND_BTC
+) {
   const wallet = LocalWallet.fromRandom(AddressType.P2TR, NetworkType.MAINNET)
   const { psbt, toSignInputs } = createDummyTx({
     address: wallet.address,
     pubkey: wallet.pubkey,
-    txType: DummyTxType.SEND_BTC,
+    txType,
   })
-  psbt.data.inputs[0]!.sighashType = sighashType
+  psbt.data.inputs[inputIndex]!.sighashType = sighashType
 
   const decoder = new PsbtDecoder({
     toSignData: {
@@ -66,6 +70,14 @@ describe('decode psbt sighash risk detection', () => {
       bitcoin.Transaction.SIGHASH_SINGLE | bitcoin.Transaction.SIGHASH_ANYONECANPAY
     )
     expect(safe.risks.some(r => r.type === RiskType.SIGHASH_NONE)).toBe(false)
+  })
+
+  it.each([
+    bitcoin.Transaction.SIGHASH_SINGLE,
+    bitcoin.Transaction.SIGHASH_SINGLE | bitcoin.Transaction.SIGHASH_ANYONECANPAY,
+  ])('detects out-of-range SIGHASH_SINGLE variant 0x%s as dangerous', async sighashType => {
+    const dangerous = await decodeWithSighashType(sighashType, 1, DummyTxType.MERGE_BTC)
+    expect(dangerous.risks.some(r => r.type === RiskType.SIGHASH_NONE)).toBe(true)
   })
 
   it('does not flag SIGHASH_ALL as dangerous', async () => {

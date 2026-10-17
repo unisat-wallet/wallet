@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
 
+import { bitcoin } from '@unisat/wallet-bitcoin'
 import { KeyringService } from '../src/keyring-service'
 
 const password = 'correct horse battery staple'
@@ -15,6 +16,41 @@ const legacyVault = JSON.stringify({
   salt: 'legacy-vault-salt',
 })
 const emptyKeyringVault = [{ type: 'Empty', data: null, addressType: 0 }]
+
+describe('KeyringService PSBT signing guards', () => {
+  it('rejects an out-of-range SIGHASH_SINGLE before calling the keyring signer', () => {
+    const service = new KeyringService()
+    const signTransaction = vi.fn()
+    const psbt = {
+      txOutputs: [{}],
+      data: {
+        inputs: [{}, { sighashType: bitcoin.Transaction.SIGHASH_SINGLE }],
+      },
+    } as any
+
+    expect(() =>
+      service.signTransaction({ signTransaction } as any, psbt, [
+        { index: 1, publicKey: '', sighashTypes: [bitcoin.Transaction.SIGHASH_SINGLE] },
+      ])
+    ).toThrow('SIGHASH_SINGLE input has no corresponding output')
+    expect(signTransaction).not.toHaveBeenCalled()
+  })
+
+  it('allows in-range SIGHASH_SINGLE | ANYONECANPAY', () => {
+    const service = new KeyringService()
+    const signTransaction = vi.fn().mockReturnValue('signed')
+    const sighashType =
+      bitcoin.Transaction.SIGHASH_SINGLE | bitcoin.Transaction.SIGHASH_ANYONECANPAY
+    const psbt = {
+      txOutputs: [{}],
+      data: { inputs: [{ sighashType }] },
+    } as any
+    const inputs = [{ index: 0, publicKey: '', sighashTypes: [sighashType] }]
+
+    expect(service.signTransaction({ signTransaction } as any, psbt, inputs)).toBe('signed')
+    expect(signTransaction).toHaveBeenCalledWith(psbt, inputs)
+  })
+})
 
 describe('KeyringService booted KDF migration', () => {
   it('persists feature state encrypted and clears its decrypted cache when locked', async () => {

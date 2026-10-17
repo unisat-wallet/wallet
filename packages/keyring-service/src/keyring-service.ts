@@ -1100,6 +1100,18 @@ export class KeyringService extends EventEmitter {
    * @returns  The signed transactio object.
    */
   signTransaction = (keyring: Keyring, psbt: bitcoin.Psbt, inputs: ToSignInput[]) => {
+    const outputCount = psbt.txOutputs.length
+    for (const input of inputs) {
+      const sighashType = psbt.data.inputs[input.index]?.sighashType
+      if (
+        typeof sighashType === 'number' &&
+        (sighashType & bitcoin.Transaction.SIGHASH_OUTPUT_MASK) ===
+          bitcoin.Transaction.SIGHASH_SINGLE &&
+        input.index >= outputCount
+      ) {
+        throw new Error('SIGHASH_SINGLE input has no corresponding output')
+      }
+    }
     return keyring.signTransaction(psbt, inputs)
   }
 

@@ -8,10 +8,17 @@ import {
 } from '@unisat/wallet-shared'
 import { NetworkType } from '@unisat/wallet-types'
 
-function isDangerousSighashType(sighashType?: number): boolean {
+function isDangerousSighashType(
+  sighashType: number | undefined,
+  inputIndex: number,
+  outputCount: number
+): boolean {
   if (typeof sighashType !== 'number') return false
   const outputType = sighashType & bitcoin.Transaction.SIGHASH_OUTPUT_MASK
-  return outputType === bitcoin.Transaction.SIGHASH_NONE
+  return (
+    outputType === bitcoin.Transaction.SIGHASH_NONE ||
+    (outputType === bitcoin.Transaction.SIGHASH_SINGLE && inputIndex >= outputCount)
+  )
 }
 
 interface InputInfo {
@@ -308,8 +315,9 @@ export class PsbtDecoder {
   }
 
   checkSigHashTypes() {
-    const foundDangerousSighash = this._psbt.data.inputs.some(v =>
-      isDangerousSighashType(v.sighashType)
+    const outputCount = this._psbt.txOutputs.length
+    const foundDangerousSighash = this._psbt.data.inputs.some((input, inputIndex) =>
+      isDangerousSighashType(input.sighashType, inputIndex, outputCount)
     )
     if (foundDangerousSighash) {
       this.risks.push({
