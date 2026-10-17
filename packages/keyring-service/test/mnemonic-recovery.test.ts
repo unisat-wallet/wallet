@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
 
-import { KeyringService, SimpleEncryptor, normalizeMnemonic } from '../src'
+import { KeyringService, WebCryptoVaultEncryptor, normalizeMnemonic } from '../src'
 import { AddressType } from '@unisat/wallet-types'
 
 const mnemonic =
@@ -18,7 +18,7 @@ function createService() {
     init: async () => {
       await service.init({
         storage: storage as any,
-        encryptor: new SimpleEncryptor(),
+        encryptor: new WebCryptoVaultEncryptor(),
         logger: { debug: vi.fn(), info: vi.fn(), error: vi.fn() },
         t: (key: string) => key,
       })
