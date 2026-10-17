@@ -1,10 +1,12 @@
 import PortMessage from '@/shared/utils/message/portMessage';
 import {
   bgEventBus,
+  isAllowedUiControllerMethod,
+  isValidUiDevelopmentRequest,
+  isValidUiMessageParams,
   preferenceService,
   providerController,
   sessionService,
-  walletApiService,
   walletController
 } from '@unisat/wallet-background';
 import { BUS_EVENTS, MESSAGE_TYPE, PORT_CHANNELS } from '@unisat/wallet-shared';
@@ -19,34 +21,40 @@ export function initMessaging() {
     // UI ports — only accept connections from this extension
     if (['popup', 'notification', 'tab', 'sidepanel'].includes(portName)) {
       const selfId = browser.runtime?.id;
-      if (port.sender?.id && selfId && port.sender.id !== selfId) {
+      if (!selfId || port.sender?.id !== selfId) {
         port.disconnect();
         return;
       }
 
       // listen the message from UI
       pm.listen((data) => {
-        if (!data?.type) return;
+        if (!data || typeof data !== 'object' || typeof data.type !== 'string') {
+          throw new Error('Invalid UI message');
+        }
         switch (data.type) {
           case MESSAGE_TYPE.UI_BROADCAST:
-            bgEventBus.emit(data.method, data.params);
-            break;
+            throw new Error('UI broadcasts are not allowed');
           case MESSAGE_TYPE.UI_REQUEST_METHOD:
             if (process.env.NODE_ENV === 'development') {
+              if (!isValidUiDevelopmentRequest(data.params)) {
+                throw new Error('Invalid UI development request');
+              }
               return providerController.handleRequest(data.params);
             } else {
               throw new Error('UI_REQUEST_METHOD is only available in development mode');
             }
           case MESSAGE_TYPE.UI_OPENAPI:
-            if (typeof walletApiService[data.method] === 'function') {
-              return walletApiService[data.method](...data.params);
-            }
-            break;
+            throw new Error('UI OpenAPI calls are not allowed');
           case MESSAGE_TYPE.UI_CONTROLLER:
-          default:
-            if (typeof walletController[data.method] === 'function') {
-              return walletController[data.method](...data.params);
+            if (
+              !isAllowedUiControllerMethod(data.method) ||
+              !isValidUiMessageParams(data.params)
+            ) {
+              throw new Error('Invalid UI controller request');
             }
+            return walletController[data.method](...data.params);
+          default:
+            throw new Error('Unsupported UI message type');
         }
       });
 

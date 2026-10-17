@@ -31,3 +31,9 @@ export { brc20Utils } from './utils/brc20-utils'
 export { initPersistStoreStorage } from './utils/persistStore'
 
 export { bgEventBus } from './utils/eventBus'
+
+export {
+  isAllowedUiControllerMethod,
+  isValidUiDevelopmentRequest,
+  isValidUiMessageParams,
+} from './utils/ui-message-policy'
