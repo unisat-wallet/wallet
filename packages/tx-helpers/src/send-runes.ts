@@ -34,6 +34,11 @@ export async function sendRunes({
   feeRate: number
   enableRBF?: boolean
 }) {
+  if (!/^[1-9]\d*$/.test(runeAmount)) {
+    throw new Error('Rune amount must be a positive integer')
+  }
+  const parsedRuneAmount = BigInt(runeAmount)
+
   // safe check
   if (utxoHelper.hasInscription(assetUtxos)) {
     throw new WalletError(ErrorCodes.NOT_SAFE_UTXOS)
@@ -71,7 +76,7 @@ export async function sendRunes({
     }
   })
 
-  const changedRuneAmount = fromRuneAmount.minus(bigInt(runeAmount))
+  const changedRuneAmount = fromRuneAmount.minus(bigInt(parsedRuneAmount.toString()))
 
   if (changedRuneAmount.lt(0)) {
     throw new WalletError(ErrorCodes.INSUFFICIENT_ASSET_UTXO)
@@ -97,7 +102,7 @@ export async function sendRunes({
     : []
   const script = encodeRunestoneProtostone({
     pointer: changeOutput,
-    edicts: [{ id: runeId, amount: BigInt(runeAmount), output: runeOutput }],
+    edicts: [{ id: runeId, amount: parsedRuneAmount, output: runeOutput }],
     protostones,
   }).encodedRunestone
 

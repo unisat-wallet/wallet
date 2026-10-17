@@ -17,6 +17,27 @@ describe('send runes', () => {
     // AddressType.M44_P2TR, // deprecated
     // AddressType.M44_P2WPKH, // deprecated
   ]
+
+  it.each(['0', '00', '0x0', '0X0', '-0', ' 0', 'abc', '1.5'])(
+    'rejects invalid rune edict amount %j',
+    async runeAmount => {
+      await expect(
+        sendRunes({
+          assetUtxos: [],
+          btcUtxos: [],
+          assetAddress: '',
+          btcAddress: '',
+          toAddress: '',
+          networkType: NetworkType.MAINNET,
+          runeid: '1000:10',
+          runeAmount,
+          outputValue: 546,
+          feeRate: 1,
+        })
+      ).rejects.toThrow('Rune amount must be a positive integer')
+    }
+  )
+
   testAddressTypes.forEach(addressType => {
     const fromBtcWallet = LocalWallet.fromRandom(addressType, NetworkType.MAINNET)
     const fromAssetWallet = LocalWallet.fromRandom(addressType, NetworkType.MAINNET)

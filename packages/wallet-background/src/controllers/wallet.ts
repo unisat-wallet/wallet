@@ -6492,8 +6492,8 @@ export class WalletController extends BaseController {
     enableRBF?: boolean
   }): Promise<ToSignData> => {
     runeAmount = paramsUtils.formatAmount(runeAmount)
-    if (runeAmount === '0') {
-      throw new Error('Amount must be greater than 0')
+    if (!/^[1-9]\d*$/.test(runeAmount)) {
+      throw new Error('Rune amount must be a positive integer')
     }
 
     const account = preferenceService.getCurrentAccount()

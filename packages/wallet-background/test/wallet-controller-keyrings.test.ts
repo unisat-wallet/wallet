@@ -93,6 +93,26 @@ describe('chain type validation', () => {
   )
 })
 
+describe('Runes amount validation', () => {
+  it.each(['0', '00', '0x0', '0X0', '-0', ' 0', 'abc'])(
+    'rejects invalid amount %j before selecting UTXOs',
+    async runeAmount => {
+      const wallet = new WalletController()
+      const getAssetUtxos = vi.spyOn(wallet, 'getAssetUtxosRunes')
+
+      await expect(
+        wallet.createSendRunesPsbt({
+          to: 'bc1pdestination',
+          runeid: '1:0',
+          runeAmount,
+          feeRate: 1,
+        })
+      ).rejects.toThrow()
+      expect(getAssetUtxos).not.toHaveBeenCalled()
+    }
+  )
+})
+
 describe('RGB server clock', () => {
   it('keeps protocol time moving from the calibrated server time', () => {
     const now = vi.spyOn(performance, 'now')

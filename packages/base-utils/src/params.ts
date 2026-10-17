@@ -11,15 +11,15 @@ function formatAmount<T extends string | number>(val: T): T {
       stringValue = stringValue.slice(0, -1)
     }
 
-    const result = bnUtils.compareAmount(stringValue, '0')
-    if (result && result <= 0) {
+    const amount = bnUtils.toBigNumber(stringValue)
+    if (!amount.isFinite() || !amount.isGreaterThan(0)) {
       throw new Error('Amount must be greater than 0')
     }
 
-    return stringValue as T
+    return amount.toFixed() as T
   } else {
     const numberValue = val as number
-    if (numberValue <= 0) {
+    if (!Number.isFinite(numberValue) || numberValue <= 0) {
       throw new Error('Amount must be greater than 0')
     }
     return numberValue as T
