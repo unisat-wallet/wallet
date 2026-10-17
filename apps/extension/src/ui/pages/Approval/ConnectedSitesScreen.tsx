@@ -4,7 +4,7 @@ import { Card, Column, Content, Header, Icon, Image, Layout, Row, Text } from '@
 import { Empty } from '@/ui/components/Empty';
 import { fontSizes } from '@/ui/theme/font';
 import { useI18n, useWallet } from '@unisat/wallet-state';
-import { formatSessionIcon } from '@/ui/utils';
+import { DEFAULT_SESSION_ICON, formatSessionIcon } from '@/ui/utils';
 import { ConnectedSite } from '@unisat/wallet-shared';
 
 export default function ConnectedSitesScreen() {
@@ -42,7 +42,7 @@ export default function ConnectedSitesScreen() {
                 <Card key={item.origin}>
                   <Row full justifyBetween itemsCenter>
                     <Row itemsCenter>
-                      <Image src={formatSessionIcon(item)} size={fontSizes.logo} />
+                      <Image src={formatSessionIcon(item)} fallbackSrc={DEFAULT_SESSION_ICON} size={fontSizes.logo} />
                       <Text text={item.origin} preset="sub" />
                     </Row>
                     <Column justifyCenter>

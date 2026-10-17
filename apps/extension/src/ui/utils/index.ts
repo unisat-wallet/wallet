@@ -2,6 +2,7 @@ import { bech32 } from 'bech32';
 import BigNumber from 'bignumber.js';
 
 export * from './hooks';
+export { DEFAULT_SESSION_ICON, formatSessionIcon } from './sessionIcon';
 
 const UI_TYPE = {
   Tab: 'index',
@@ -228,14 +229,6 @@ export function showLongNumber(num: string | number | undefined, maxFixed = 8, i
 }
 
 BigNumber.config({ EXPONENTIAL_AT: 1e9, DECIMAL_PLACES: 38 });
-
-export function formatSessionIcon(session: { origin: string; icon: string; name: string }) {
-  let iconUrl = session.icon;
-  if (iconUrl && iconUrl.indexOf('/') === 0) {
-    iconUrl = `${session.origin}${iconUrl}`;
-  }
-  return iconUrl;
-}
 
 export function isValidBech32Address(address: string) {
   try {
