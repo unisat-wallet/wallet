@@ -116,11 +116,6 @@ export async function sleep(timeSec: number) {
   });
 }
 
-export function isValidAddress(address: string) {
-  if (!address) return false;
-  return true;
-}
-
 export const copyToClipboard = (textToCopy: string | number) => {
   if (navigator.clipboard && window.isSecureContext) {
     return navigator.clipboard.writeText(textToCopy.toString());
