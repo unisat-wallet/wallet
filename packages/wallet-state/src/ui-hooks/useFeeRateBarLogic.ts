@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import { MAX_FEE_RATE } from '@unisat/base-utils'
 import { useI18n, useWallet } from '../context'
 import { useChain, useFeeRateBar, useUpdateFeeRateBar } from '../hooks'
 import { useAsyncEffect } from '../utils/ui-utils'
@@ -23,7 +24,6 @@ const translationKeys = {
   [FeeRateType.FAST]: { type: FeeRateType.FAST, title: 'fast', desc: 'feerate_fast_desc' },
 } as const
 
-const MAX_FEE_RATE = 10000
 const DEFAULT_FEE_RATE = 1
 const AVG_OPTION_INDEX = 1
 

@@ -5,6 +5,7 @@ import {
   decodeRgbInvoice,
 } from '@unisat/rgb-service'
 import type { ToSignInput } from '@unisat/keyring-service/types'
+import { assertValidFeeRate } from '@unisat/base-utils'
 import { toRgbDisplayAmount, type ToSignData } from '@unisat/wallet-shared'
 
 import { psbtFromString } from '../utils/psbt-utils'
@@ -57,7 +58,7 @@ export class RgbSendOperations {
     await this.dependencies.assertContext?.({ service, wallet })
     const feeRate = params.feeRate ?? (await this.dependencies.getFeeRate())
     await this.dependencies.assertContext?.({ service, wallet })
-    if (!feeRate || feeRate <= 0) throw new Error('Invalid RGB transaction fee rate')
+    const validatedFeeRate = assertValidFeeRate(feeRate, { supportLowFeeMode: true })
 
     await service.sync()
     await this.dependencies.assertContext?.({ service, wallet })
@@ -65,7 +66,7 @@ export class RgbSendOperations {
       {
         assetId: params.assetId,
         invoice: params.invoice,
-        feeRate,
+        feeRate: validatedFeeRate,
         ...(params.precision === undefined ? {} : { precision: params.precision }),
         ...(params.amount === undefined ? {} : { amount: String(params.amount) }),
         ...(params.donation === undefined ? {} : { donation: params.donation }),

@@ -11,6 +11,6 @@ const translationKeys = {
   [FeeRateType.FAST]: { title: 'fast', desc: 'feerate_fast_desc' }
 };
 
-const MAX_FEE_RATE = 10000;
+export { MAX_FEE_RATE } from '@unisat/base-utils';
 
-export { FeeRateType, MAX_FEE_RATE, translationKeys };
+export { FeeRateType, translationKeys };

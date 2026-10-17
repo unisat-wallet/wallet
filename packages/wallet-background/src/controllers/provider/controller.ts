@@ -1,4 +1,5 @@
 import { bitcoin, scriptPkToAddress, toPsbtNetwork, verifyMessageOfBIP322Simple, verifyMessageOfECDSA } from '@unisat/wallet-bitcoin'
+import { assertValidFeeRate } from '@unisat/base-utils'
 import {
   RequestMethodDeriveContextHashParams,
   RequestMethodGetInscriptionsParams,
@@ -39,6 +40,11 @@ import {
 } from '@unisat/wallet-shared'
 import { NetworkType } from '@unisat/wallet-types'
 import { formatPsbtHex } from '../../utils/psbt-utils'
+
+function validateRgbProviderFeeRate(req: { data: { params: { feeRate?: number } } }) {
+  const { feeRate } = req.data.params
+  if (feeRate !== undefined) assertValidFeeRate(feeRate, { supportLowFeeMode: true })
+}
 
 function assertReadonlyMessageSignature(
   account: Awaited<ReturnType<typeof wallet.getCurrentAccount>>,
@@ -855,7 +861,7 @@ class ProviderController extends BaseController {
     return wallet.rejectRgbReceive({ recipientId: params.recipientId })
   }
 
-  @Reflect.metadata('APPROVAL', ['RgbPayment'])
+  @Reflect.metadata('APPROVAL', ['RgbPayment', validateRgbProviderFeeRate])
   prepareRgbPayment = async ({
     data: { params },
     session: { origin },
@@ -863,6 +869,7 @@ class ProviderController extends BaseController {
     data: { params: { invoice: string; assetId: string; amount?: string; feeRate?: number } }
     session: { origin: string }
   }) => {
+    validateRgbProviderFeeRate({ data: { params } })
     if (!params.invoice) throw new Error('invoice is required')
     if (!params.assetId) throw new Error('assetId is required')
     const prepared = await wallet.createRgbSendBegin({
@@ -937,7 +944,7 @@ class ProviderController extends BaseController {
    * Prepare a seller-side RGB/BTC swap. The local RGB encoder validates the
    * maker template and replaces only its empty Opret host with the commitment.
    */
-  @Reflect.metadata('APPROVAL', ['RgbPayment'])
+  @Reflect.metadata('APPROVAL', ['RgbPayment', validateRgbProviderFeeRate])
   prepareRgbSwap = async ({
     data: { params },
     session: { origin },
@@ -945,6 +952,7 @@ class ProviderController extends BaseController {
     data: { params: { invoice: string; assetId: string; amount: string; btcReceiveAmount: string; feeRate?: number; psbt: string } }
     session: { origin: string }
   }) => {
+    validateRgbProviderFeeRate({ data: { params } })
     if (!params.invoice || !params.assetId || !params.amount || !params.btcReceiveAmount || !params.psbt) {
       throw new Error('invoice, assetId, amount, btcReceiveAmount and psbt are required')
     }

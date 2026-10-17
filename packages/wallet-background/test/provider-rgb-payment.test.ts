@@ -23,6 +23,7 @@ vi.mock('../src/controllers/wallet', () => ({
 
 import providerController from '../src/controllers/provider/controller'
 import wallet from '../src/controllers/wallet'
+import { MAX_FEE_RATE } from '@unisat/base-utils'
 
 describe('provider RGB payment ownership', () => {
   beforeEach(() => {
@@ -42,6 +43,28 @@ describe('provider RGB payment ownership', () => {
       assetId: 'rgb:asset',
       providerOrigin: 'https://dapp.example',
     })
+  })
+
+  it('rejects an excessive payment fee rate before opening approval', async () => {
+    const approval = Reflect.getMetadata('APPROVAL', providerController, 'prepareRgbPayment')
+    const request = {
+      data: { params: { invoice: 'rgb:invoice', assetId: 'rgb:asset', feeRate: MAX_FEE_RATE + 1 } },
+      session: { origin: 'https://dapp.example' },
+    }
+
+    expect(() => approval[1](request)).toThrow('fee rate must be between')
+    expect(wallet.createRgbSendBegin).not.toHaveBeenCalled()
+  })
+
+  it('rejects an excessive swap fee rate before opening approval', () => {
+    const approval = Reflect.getMetadata('APPROVAL', providerController, 'prepareRgbSwap')
+    const request = {
+      data: { params: { feeRate: MAX_FEE_RATE + 1 } },
+      session: { origin: 'https://dapp.example' },
+    }
+
+    expect(() => approval[1](request)).toThrow('fee rate must be between')
+    expect(wallet.createRgbSendBegin).not.toHaveBeenCalled()
   })
 
   it('authorizes payment status from the persisted owner after a worker restart', async () => {

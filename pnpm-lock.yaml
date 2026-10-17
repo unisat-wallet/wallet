@@ -1002,6 +1002,9 @@ importers:
       '@noble/hashes':
         specifier: ^1.3.0
         version: 1.8.0
+      '@unisat/base-utils':
+        specifier: workspace:*
+        version: link:../base-utils
       bitcoinjs-lib:
         specifier: ^6.1.5
         version: 6.1.6(patch_hash=endiwip2ry2tlbgod6aak5qlwa)

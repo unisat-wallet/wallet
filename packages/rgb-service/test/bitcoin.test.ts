@@ -63,6 +63,16 @@ describe('createRgbOpretPsbt', () => {
     expect(built.fee).toBe(255)
   })
 
+  it('rejects a dust-path fee that consumes too much of the RGB fee pool', () => {
+    const invoice = decodeRgbInvoice(
+      'rgb:AQEBAQEB-AQEBAQE-BAQEBAQ-EBAQEBA-QEBAQEB-AQEBAQE/schema/~/bc:utxob:xDfmDF9g-yNOjriV-6Anbe6H-MLJ__g6-lo7Dd4f-dhWBW8S-XYGBm'
+    )
+    expect(() => createRgbOpretPsbt({
+      network: 'mainnet', selectedUtxos: [utxo], recipientSeal: invoice.seal,
+      feeRate: 40, preserveFundingOutput: true, feeFunding,
+    })).toThrow('fee pool safety limit')
+  })
+
   it('uses the witness beneficiary script and reserves its output index', () => {
     const invoice = decodeRgbInvoice(
       'rgb:AQEBAQEB-AQEBAQE-BAQEBAQ-EBAQEBA-QEBAQEB-AQEBAQE/schema/~/bc:wvout:A8cJ7Ww3-NIzADo3-Tzp_5aD-7CTBWmA-AAAAAAA-AAAAAAA-ALSQkcw'

@@ -1,4 +1,5 @@
 import { Psbt, networks } from 'bitcoinjs-lib'
+import { assertValidFeeRate } from '@unisat/base-utils'
 import { RgbServiceError } from '../errors'
 import type { RgbFeeFunding, RgbFeeUtxo, RgbNetwork, RgbUtxo } from '../types'
 import type { RgbInvoiceSeal } from './invoice'
@@ -105,10 +106,14 @@ function bitcoinNetwork(network: RgbNetwork) {
 function validateRequest(input: RgbOpretPsbtRequest) {
   if (!input.selectedUtxos.length)
     throw new RgbServiceError('RGB PSBT requires at least one funding UTXO')
-  if (!Number.isFinite(input.feeRate) || input.feeRate <= 0) {
-    throw new RgbServiceError('RGB PSBT fee rate must be positive')
+  try {
+    assertValidFeeRate(input.feeRate, { supportLowFeeMode: true })
+  } catch (error) {
+    throw new RgbServiceError(error instanceof Error ? error.message : 'Invalid RGB PSBT fee rate')
   }
 }
+
+const MAX_FEE_POOL_SPEND_RATIO = 0.5
 
 /**
  * Build the Bitcoin half of an OpretFirst RGB transfer. RGB transition and MPC
@@ -190,6 +195,10 @@ export function createRgbOpretPsbt(input: RgbOpretPsbtRequest): RgbOpretPsbt {
   }
   if (!fee)
     throw new RgbServiceError('Ordinary BTC UTXOs do not cover the RGB transfer network fee')
+  const feePoolValue = feeUtxos.reduce((total, utxo) => total + utxo.satoshis, 0)
+  if (fee > Math.floor(feePoolValue * MAX_FEE_POOL_SPEND_RATIO)) {
+    throw new RgbServiceError('RGB transfer network fee exceeds the fee pool safety limit')
+  }
 
   const psbt = new Psbt({ network: bitcoinNetwork(input.network) })
   input.selectedUtxos.forEach(utxo => {
