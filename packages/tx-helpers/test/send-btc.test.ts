@@ -1,12 +1,41 @@
 import { ErrorCodes, UnspentOutput } from '@unisat/wallet-shared'
 import { AddressType, NetworkType } from '@unisat/wallet-types'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { LocalWallet, sendAllBTC, sendBTC, Transaction } from '../src'
+import { LocalWallet, assertValidBitcoinMemo, sendAllBTC, sendBTC, Transaction } from '../src'
 import { dummySendAllBTC, dummySendBTC, expectFeeRate, genDummyUtxo, genDummyUtxos } from './utils'
 
 describe('sendBTC', () => {
   beforeEach(() => {
     // todo
+  })
+
+  describe('memo validation', () => {
+    it('accepts an OP_RETURN script at the 83-byte limit', () => {
+      expect(() => assertValidBitcoinMemo('z'.repeat(80))).not.toThrow()
+      expect(() => assertValidBitcoinMemo('ab'.repeat(80))).not.toThrow()
+      expect(() =>
+        assertValidBitcoinMemo(undefined, ['x'.repeat(40), 'y'.repeat(40)])
+      ).not.toThrow()
+    })
+
+    it('rejects memo data that exceeds the OP_RETURN script limit', () => {
+      expect(() => assertValidBitcoinMemo('z'.repeat(81))).toThrow(
+        'Bitcoin memo OP_RETURN must not exceed 83 bytes'
+      )
+      expect(() => assertValidBitcoinMemo('ab'.repeat(81))).toThrow(
+        'Bitcoin memo OP_RETURN must not exceed 83 bytes'
+      )
+      expect(() => assertValidBitcoinMemo(undefined, ['x'.repeat(40), 'y'.repeat(41)])).toThrow(
+        'Bitcoin memo OP_RETURN must not exceed 83 bytes'
+      )
+    })
+
+    it('rejects invalid memo types and mixed hex encoding', () => {
+      expect(() => assertValidBitcoinMemo(1024)).toThrow('Bitcoin memo must be a string')
+      expect(() => assertValidBitcoinMemo(undefined, ['aa', 'not-hex'])).toThrow(
+        'Bitcoin hex memos must contain complete lowercase hex bytes'
+      )
+    })
   })
 
   it('creates the Pay-to-Anchor output script for a P2A recipient', async () => {

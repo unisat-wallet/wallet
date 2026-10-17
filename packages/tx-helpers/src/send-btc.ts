@@ -5,6 +5,51 @@ import { NetworkType } from '@unisat/wallet-types'
 import { createTx } from './transaction/transaction'
 import { utxoHelper } from './transaction/utxo'
 import { UnspentOutput } from './types'
+
+export const MAX_OP_RETURN_SCRIPT_BYTES = 83
+
+function pushDataPrefixBytes(length: number) {
+  if (length <= 75) return 1
+  if (length <= 0xff) return 2
+  if (length <= 0xffff) return 3
+  return 5
+}
+
+function isCanonicalHex(value: string) {
+  return value.length % 2 === 0 && /^[0-9a-f]*$/.test(value)
+}
+
+export function assertValidBitcoinMemo(memo?: unknown, memos?: unknown): void {
+  if (memo !== undefined && typeof memo !== 'string') {
+    throw new Error('Bitcoin memo must be a string')
+  }
+  if (memos !== undefined && !Array.isArray(memos)) {
+    throw new Error('Bitcoin memos must be an array')
+  }
+
+  const values = memo ? [memo] : memos
+  if (values === undefined) return
+  if (values.length === 0) {
+    throw new Error('Bitcoin memos must not be empty')
+  }
+  if (values.some(value => typeof value !== 'string')) {
+    throw new Error('Bitcoin memo must be a string')
+  }
+
+  const useHex = isCanonicalHex(values[0] as string)
+  let scriptBytes = 1 // OP_RETURN
+  for (const value of values as string[]) {
+    if (useHex && !isCanonicalHex(value)) {
+      throw new Error('Bitcoin hex memos must contain complete lowercase hex bytes')
+    }
+    const dataBytes = useHex ? value.length / 2 : Buffer.byteLength(value)
+    scriptBytes += pushDataPrefixBytes(dataBytes) + dataBytes
+    if (scriptBytes > MAX_OP_RETURN_SCRIPT_BYTES) {
+      throw new Error(`Bitcoin memo OP_RETURN must not exceed ${MAX_OP_RETURN_SCRIPT_BYTES} bytes`)
+    }
+  }
+}
+
 export async function sendBTC({
   btcUtxos,
   tos,
@@ -30,6 +75,8 @@ export async function sendBTC({
   psbt: bitcoin.Psbt
   toSignInputs: any[]
 }> {
+  assertValidBitcoinMemo(memo, memos)
+
   if (utxoHelper.hasAnyAssets(btcUtxos)) {
     throw new WalletError(ErrorCodes.NOT_SAFE_UTXOS)
   }

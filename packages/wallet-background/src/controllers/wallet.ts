@@ -2373,6 +2373,7 @@ export class WalletController extends BaseController {
     psbtHex: string
     toSignInputs: ToSignInput[]
   }> => {
+    txHelpers.assertValidBitcoinMemo(memo, memos)
     amount = paramsUtils.formatAmount(amount)
 
     const account = preferenceService.getCurrentAccount()

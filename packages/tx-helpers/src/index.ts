@@ -1,6 +1,6 @@
 // Transaction helpers for Bitcoin operations
 export { createDummyTx } from './dummy-tx'
-export { sendAllBTC, sendBTC } from './send-btc'
+export { MAX_OP_RETURN_SCRIPT_BYTES, assertValidBitcoinMemo, sendAllBTC, sendBTC } from './send-btc'
 export { sendInscription } from './send-inscription'
 export { sendInscriptions } from './send-inscriptions'
 export { sendAlkanes } from './send-alkanes'
