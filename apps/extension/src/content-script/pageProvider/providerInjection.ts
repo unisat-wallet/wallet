@@ -42,7 +42,10 @@ export function createProviderProxy(provider: any, requestMethodKey: symbol): an
     getOwnPropertyDescriptor: (target, prop) =>
       isPrivateProperty(prop) ? undefined : Reflect.getOwnPropertyDescriptor(target, prop),
     has: (target, prop) => !isPrivateProperty(prop) && Reflect.has(target, prop),
-    ownKeys: (target) => Reflect.ownKeys(target).filter((prop) => !isPrivateProperty(prop))
+    ownKeys: (target) => Reflect.ownKeys(target).filter((prop) => !isPrivateProperty(prop)),
+    // A non-extensible target requires ownKeys to expose every own property.
+    // Keep the target extensible so private properties can remain hidden.
+    preventExtensions: () => false
   });
 }
 
