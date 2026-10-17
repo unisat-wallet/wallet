@@ -55,18 +55,17 @@ interface Props {
 }
 
 export default function Connect({ params: { session } }: Props) {
-  const { resolveApproval, rejectApproval } = useApproval();
+  const { rejectApproval } = useApproval();
   const { t } = useI18n();
+  const wallet = useWallet();
 
   const handleCancel = () => {
     rejectApproval(t('user_rejected_the_request'));
   };
 
   const handleConnect = async () => {
-    resolveApproval();
+    await wallet.resolveConnectApproval(session.origin);
   };
-
-  const wallet = useWallet();
 
   const currentKeyring = useCurrentKeyring();
   const currentAccount = useCurrentAccount();

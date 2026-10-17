@@ -2,7 +2,7 @@ import { useCallback } from 'react'
 
 import { AddressType } from '@unisat/wallet-types'
 
-import { AppState, useApproval, useNavigation } from '..'
+import { AppState, useNavigation } from '..'
 import { useWallet } from '../context/WalletContext'
 import { globalActions } from '../reducers/global'
 import { TabOption } from '../types'
@@ -211,12 +211,11 @@ export function useLockCallback() {
 export function useUnlockCallback() {
   const dispatch = useAppDispatch()
   const wallet = useWallet()
-  const { resolveApproval } = useApproval()
   return useCallback(
     async (password: string) => {
       await wallet.unlock(password)
       dispatch(globalActions.update({ isUnlocked: true }))
-      resolveApproval()
+      await wallet.resolveUnlockApproval()
     },
     [dispatch, wallet]
   )

@@ -1191,6 +1191,8 @@ export class WalletController extends BaseController {
     return approvalService.getApproval()
   }
   resolveApproval = approvalService.resolveApproval
+  resolveUnlockApproval = approvalService.resolveUnlockApproval
+  resolveConnectApproval = approvalService.resolveConnectApproval
   rejectApproval = approvalService.rejectApproval
 
   hasVault = () => keyringService.hasVault()

@@ -93,6 +93,8 @@ export interface WalletController {
 
   getApproval(): Promise<any>
   resolveApproval(data?: any, data2?: any): Promise<void>
+  resolveUnlockApproval(): Promise<boolean>
+  resolveConnectApproval(origin: string): Promise<boolean>
   rejectApproval(data?: any, data2?: any, data3?: any): Promise<void>
 
   hasVault(): Promise<boolean>

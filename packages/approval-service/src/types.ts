@@ -1,5 +1,6 @@
 export interface Approval {
   data: {
+    lock?: boolean
     state: number
     params?: any
     origin?: string

@@ -31,6 +31,21 @@ export class ApprovalService extends EventEmitter {
     this.emit('resolve', data)
   }
 
+  resolveUnlockApproval = async () => {
+    if (!this.approval?.data?.lock) return false
+    await this.resolveApproval()
+    return true
+  }
+
+  resolveConnectApproval = async (origin: string) => {
+    const approval = this.approval?.data
+    if (approval?.approvalComponent !== 'Connect' || approval.params?.session?.origin !== origin) {
+      return false
+    }
+    await this.resolveApproval({ approved: true, origin })
+    return true
+  }
+
   rejectApproval = async (err?: string, stay = false, isInternal = false) => {
     if (!this.approval) return
     if (isInternal) {

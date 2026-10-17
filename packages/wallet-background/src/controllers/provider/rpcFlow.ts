@@ -87,7 +87,7 @@ const flowContext = flow
           return []
         }
         ctx.request.requestedApproval = true
-        await approvalService.requestApproval(
+        const approvalResult = await approvalService.requestApproval(
           {
             params: {
               method: 'connect',
@@ -98,6 +98,9 @@ const flowContext = flow
           },
           { height: windowHeight }
         )
+        if (approvalResult?.approved !== true || approvalResult.origin !== origin) {
+          throw new WalletError(ErrorCodes.UserCancel, 'Connection was not approved')
+        }
         await permissionService.addConnectedSite(origin, name, icon, ChainType.BITCOIN_MAINNET)
       }
     }
