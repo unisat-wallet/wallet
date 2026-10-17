@@ -9,7 +9,7 @@ import logger from 'loglevel'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useApproval, useI18n, useTools, useWallet } from 'src/context'
 import { useCurrentAccountCapabilities } from 'src/hooks'
-import { shortAddress, useAsyncEffect } from 'src/utils/ui-utils'
+import { shortAddress } from 'src/utils/ui-utils'
 export interface SignMessageProps {
   header?: React.ReactNode
   params: {
@@ -38,7 +38,10 @@ export function useSignMessageLogic(props: SignMessageProps) {
 
   const { resolveApproval, rejectApproval } = useApproval()
 
-  const [loading, setLoading] = useState(false)
+  const [websiteCheckStatus, setWebsiteCheckStatus] = useState<'checking' | 'complete' | 'failed'>(
+    session?.origin ? 'checking' : 'complete'
+  )
+  const [checkedWebsite, setCheckedWebsite] = useState<string | undefined>(undefined)
   const [isKeystoneSigning, setIsKeystoneSigning] = useState(false)
   const [isColdWalletSigning, setIsColdWalletSigning] = useState(false)
   const [readonlySignature, setReadonlySignature] = useState('')
@@ -77,28 +80,59 @@ export function useSignMessageLogic(props: SignMessageProps) {
     setAllowQuickMultiSign(websiteResult.allowQuickMultiSign && toSignMessages.length > 1)
   }, [websiteResult, accountCapabilities, toSignMessages.length])
 
-  useAsyncEffect(async () => {
+  useEffect(() => {
+    let active = true
     const website = session?.origin
-    if (website) {
-      const result = await wallet.checkWebsite(website)
-      setWebsiteResult(result)
-
-      // Also check local user-granted trust
-      if (!result.allowQuickMultiSign && toSignMessages.length > 1) {
-        const sites = await wallet.getConnectedSites()
-        const site = sites.find(s => s.origin === website)
-        if (site?.allowQuickMultiSign) {
-          setAllowQuickMultiSign(true)
-        }
-      }
+    if (!website) {
+      setCheckedWebsite(undefined)
+      setWebsiteResult({ isScammer: false, warning: '', allowQuickMultiSign: false })
+      setWebsiteCheckStatus('complete')
+      return undefined
     }
-  }, [])
+
+    setCheckedWebsite(undefined)
+    setWebsiteResult({ isScammer: false, warning: '', allowQuickMultiSign: false })
+    setWebsiteCheckStatus('checking')
+    setAllowQuickMultiSign(false)
+
+    void (async () => {
+      try {
+        const result = await wallet.checkWebsite(website)
+        if (!active) return
+        setWebsiteResult(result)
+
+        // Also check local user-granted trust
+        if (!result.allowQuickMultiSign && toSignMessages.length > 1) {
+          const sites = await wallet.getConnectedSites()
+          if (!active) return
+          const site = sites.find(s => s.origin === website)
+          if (site?.allowQuickMultiSign) {
+            setAllowQuickMultiSign(true)
+          }
+        }
+
+        setCheckedWebsite(website)
+        setWebsiteCheckStatus('complete')
+      } catch (error) {
+        if (!active) return
+        logger.error('Failed to check signing request origin:', error)
+        setWebsiteCheckStatus('failed')
+      }
+    })()
+
+    return () => {
+      active = false
+    }
+  }, [session?.origin, toSignMessages.length, wallet])
 
   const currentToSignMessage = toSignMessages[signingTxIndex]
 
   const signedMessages = useRef<SignedMessage[]>([])
 
   const isScammer = websiteResult ? websiteResult.isScammer : false
+  const canSign =
+    websiteCheckStatus === 'complete' && checkedWebsite === session?.origin && !isScammer
+  const loading = websiteCheckStatus === 'checking'
 
   const isAllSigned = signedStates.every(state => state === SignState.SUCCESS)
   const signedCount = signedStates.filter(state => state === SignState.SUCCESS).length
@@ -151,10 +185,12 @@ export function useSignMessageLogic(props: SignMessageProps) {
   }
 
   const onClickSign = () => {
+    if (!canSign) return
     onNextStep()
   }
 
   const onTryMultiSign = async () => {
+    if (!canSign) return
     setDisclaimerVisible(true)
   }
 
@@ -166,6 +202,7 @@ export function useSignMessageLogic(props: SignMessageProps) {
   }
 
   const onQuickMultiSign = async () => {
+    if (!canSign) return
     for (let i = 0; i < toSignMessages.length; i++) {
       try {
         const toSignMessage = toSignMessages[i]
@@ -192,6 +229,7 @@ export function useSignMessageLogic(props: SignMessageProps) {
   }
 
   const onNextStep = () => {
+    if (!canSign) return
     switch (accountCapabilities.signMethod) {
       case AccountSignMethod.Keystone:
         setIsKeystoneSigning(true)
@@ -295,6 +333,7 @@ export function useSignMessageLogic(props: SignMessageProps) {
 
     // state
     isScammer,
+    canSign,
     allowQuickMultiSign,
 
     // multiple sign state

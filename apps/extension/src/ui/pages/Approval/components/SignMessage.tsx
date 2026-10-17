@@ -31,6 +31,7 @@ export default function SignMessage(props: SignMessageProps) {
 
     // state
     isScammer,
+    canSign,
     allowQuickMultiSign,
 
     // multiple sign state
@@ -156,6 +157,7 @@ export default function SignMessage(props: SignMessageProps) {
                   onTryMultiSign();
                 }
               }}
+              disabled={!canSign}
               full
             />
           </Row>
@@ -238,7 +240,7 @@ export default function SignMessage(props: SignMessageProps) {
       <Footer>
         <Row full>
           <Button preset="default" text={t('reject')} onClick={onClickBack} full />
-          <Button preset="primary" text={t('sign')} onClick={onClickSign} full />
+          <Button preset="primary" text={t('sign')} onClick={onClickSign} disabled={!canSign} full />
         </Row>
       </Footer>
     </Layout>

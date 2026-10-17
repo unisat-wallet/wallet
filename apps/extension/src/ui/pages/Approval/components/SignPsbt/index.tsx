@@ -128,6 +128,7 @@ export default function SignPsbt(props: SignPsbtProps) {
     hasRisk,
     showFeeSection,
     isScammer,
+    canSign,
     allowQuickMultiSign,
 
     // actions
@@ -281,6 +282,7 @@ export default function SignPsbt(props: SignPsbtProps) {
                 onTryMultiSign();
               }}
               icon={allowQuickMultiSign ? undefined : 'alert'}
+              disabled={!canSign}
               full
             />
           </Row>
@@ -406,7 +408,7 @@ export default function SignPsbt(props: SignPsbtProps) {
             icon={hasRisk ? 'risk' : undefined}
             text={t('sign')}
             onClick={onClickSign}
-            disabled={!isValid}
+            disabled={!isValid || !canSign}
             full
             data-testid="sign-psbt-button"
           />

@@ -84,6 +84,10 @@ export function useSignPsbtLogic(props: SignPsbtProps) {
   const { resolveApproval, rejectApproval } = useApproval()
 
   const [loading, setLoading] = useState(false)
+  const [websiteCheckStatus, setWebsiteCheckStatus] = useState<'checking' | 'complete' | 'failed'>(
+    session?.origin ? 'checking' : 'complete'
+  )
+  const [checkedWebsite, setCheckedWebsite] = useState<string | undefined>(undefined)
   const [isPsbtSigning, setIsPsbtSigning] = useState(false)
   const [isPsbtRiskPopoverVisible, setIsPsbtRiskPopoverVisible] = useState(false)
   const [isKeystoneSigning, setIsKeystoneSigning] = useState(false)
@@ -130,22 +134,50 @@ export function useSignPsbtLogic(props: SignPsbtProps) {
     setAllowQuickMultiSign(websiteResult.allowQuickMultiSign && toSignDatas.length > 1)
   }, [websiteResult, accountCapabilities])
 
-  useAsyncEffect(async () => {
+  useEffect(() => {
+    let active = true
     const website = session?.origin
-    if (website) {
-      const result = await wallet.checkWebsite(website)
-      setWebsiteResult(result)
-
-      // Also check local user-granted trust
-      if (!result.allowQuickMultiSign && toSignDatas.length > 1) {
-        const sites = await wallet.getConnectedSites()
-        const site = sites.find(s => s.origin === website)
-        if (site?.allowQuickMultiSign) {
-          setAllowQuickMultiSign(true)
-        }
-      }
+    if (!website) {
+      setCheckedWebsite(undefined)
+      setWebsiteResult({ isScammer: false, warning: '', allowQuickMultiSign: false })
+      setWebsiteCheckStatus('complete')
+      return undefined
     }
-  }, [])
+
+    setCheckedWebsite(undefined)
+    setWebsiteResult({ isScammer: false, warning: '', allowQuickMultiSign: false })
+    setWebsiteCheckStatus('checking')
+    setAllowQuickMultiSign(false)
+
+    void (async () => {
+      try {
+        const result = await wallet.checkWebsite(website)
+        if (!active) return
+        setWebsiteResult(result)
+
+        // Also check local user-granted trust
+        if (!result.allowQuickMultiSign && toSignDatas.length > 1) {
+          const sites = await wallet.getConnectedSites()
+          if (!active) return
+          const site = sites.find(s => s.origin === website)
+          if (site?.allowQuickMultiSign) {
+            setAllowQuickMultiSign(true)
+          }
+        }
+
+        setCheckedWebsite(website)
+        setWebsiteCheckStatus('complete')
+      } catch (error) {
+        if (!active) return
+        logger.error('Failed to check signing request origin:', error)
+        setWebsiteCheckStatus('failed')
+      }
+    })()
+
+    return () => {
+      active = false
+    }
+  }, [session?.origin, toSignDatas.length, wallet])
 
   const currentToSignData = toSignDatas[signingTxIndex]
 
@@ -232,6 +264,8 @@ export function useSignPsbtLogic(props: SignPsbtProps) {
   if (websiteResult && websiteResult.isScammer == true) {
     isScammer = true
   }
+  const canSign =
+    websiteCheckStatus === 'complete' && checkedWebsite === session?.origin && !isScammer
 
   const isAllSigned = signedStates.every(state => state === SignState.SUCCESS)
   const signedCount = signedStates.filter(state => state === SignState.SUCCESS).length
@@ -285,6 +319,7 @@ export function useSignPsbtLogic(props: SignPsbtProps) {
   }
 
   const onClickSign = () => {
+    if (!canSign) return
     if (currentDecodedPsbt?.risks?.length > 0) {
       setIsPsbtRiskPopoverVisible(true)
       return
@@ -303,6 +338,7 @@ export function useSignPsbtLogic(props: SignPsbtProps) {
   }, [])
 
   const onTryMultiSign = async () => {
+    if (!canSign) return
     setDisclaimerVisible(true)
   }
 
@@ -314,6 +350,7 @@ export function useSignPsbtLogic(props: SignPsbtProps) {
   }
 
   const onQuickMultiSign = async () => {
+    if (!canSign) return
     // Run analysis if not yet done (user clicked before async summary completed)
 
     try {
@@ -378,6 +415,7 @@ export function useSignPsbtLogic(props: SignPsbtProps) {
   }
 
   const onNextStep = () => {
+    if (!canSign) return
     switch (accountCapabilities.signMethod) {
       case AccountSignMethod.Keystone:
         setIsKeystoneSigning(true)
@@ -474,7 +512,7 @@ export function useSignPsbtLogic(props: SignPsbtProps) {
 
   const isWaitingData = showMultiSignView == false && (!currentDecodedPsbt || !currentToSignData)
 
-  const showLoading = isWaitingData || loading || isPsbtSigning
+  const showLoading = isWaitingData || loading || isPsbtSigning || websiteCheckStatus === 'checking'
 
   const backButtonText = isMultipleViewMode ? t('back') : t('reject')
 
@@ -510,6 +548,7 @@ export function useSignPsbtLogic(props: SignPsbtProps) {
     hasRisk,
     showFeeSection,
     isScammer,
+    canSign,
     allowQuickMultiSign,
 
     // multiple sign state
