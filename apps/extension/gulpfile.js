@@ -7,7 +7,6 @@ var jsoncombine = require('gulp-jsoncombine');
 var minimist = require('minimist');
 var packageConfig = require('./package.json');
 const { exit } = require('process');
-const uglify = require('gulp-uglify');
 
 //parse arguments
 var knownOptions = {
@@ -98,16 +97,6 @@ function task_webpack(cb) {
   );
 }
 
-function task_uglify(cb) {
-  if (options.env == 'pro') {
-    return gulp
-      .src(`dist/${options.browser}/**/*.js`)
-      .pipe(uglify())
-      .pipe(gulp.dest(`dist/${options.browser}`));
-  }
-  cb();
-}
-
 function task_package(cb) {
   if (options.env == 'pro') {
     if (options.browser == 'firefox') {
@@ -131,6 +120,5 @@ exports.build = gulp.series(
   task_merge_manifest,
   task_clean_tmps,
   task_webpack,
-  task_uglify,
   task_package
 );

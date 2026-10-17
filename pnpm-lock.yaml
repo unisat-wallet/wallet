@@ -593,9 +593,6 @@ importers:
       gulp-jsoncombine:
         specifier: ^1.0.4
         version: 1.0.4
-      gulp-uglify:
-        specifier: ^3.0.2
-        version: 3.0.2
       gulp-zip:
         specifier: ^5.1.0
         version: 5.1.0(gulp@4.0.2)
@@ -13614,21 +13611,6 @@ packages:
       plugin-error: 0.1.2
       through: 2.3.8
       vinyl: 2.2.1
-    dev: true
-
-  /gulp-uglify@3.0.2:
-    resolution: {integrity: sha512-gk1dhB74AkV2kzqPMQBLA3jPoIAPd/nlNzP2XMDSG8XZrqnlCiDGAqC+rZOumzFvB5zOphlFh6yr3lgcAb/OOg==}
-    dependencies:
-      array-each: 1.0.1
-      extend-shallow: 3.0.2
-      gulplog: 1.0.0
-      has-gulplog: 0.1.0
-      isobject: 3.0.1
-      make-error-cause: 1.2.2
-      safe-buffer: 5.2.1
-      through2: 2.0.5
-      uglify-js: 3.19.3
-      vinyl-sourcemaps-apply: 0.2.1
     dev: true
 
   /gulp-zip@5.1.0(gulp@4.0.2):
