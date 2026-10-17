@@ -14,6 +14,7 @@ const legacyVault = JSON.stringify({
   iv: 'legacy-vault-iv',
   salt: 'legacy-vault-salt',
 })
+const emptyKeyringVault = [{ type: 'Empty', data: null, addressType: 0 }]
 
 describe('KeyringService booted KDF migration', () => {
   it('persists feature state encrypted and clears its decrypted cache when locked', async () => {
@@ -23,7 +24,10 @@ describe('KeyringService booted KDF migration', () => {
       set: vi.fn(async (key: string, value: any) => void values.set(key, value)),
     }
     const encryptor = {
-      encrypt: vi.fn(async (valuePassword: string, value: any) => `cipher:${valuePassword}:${btoa(JSON.stringify(value))}`),
+      encrypt: vi.fn(
+        async (valuePassword: string, value: any) =>
+          `cipher:${valuePassword}:${btoa(JSON.stringify(value))}`
+      ),
       decrypt: vi.fn(async (valuePassword: string, encrypted: string) => {
         const prefix = `cipher:${valuePassword}:`
         if (!encrypted.startsWith(prefix)) throw new Error('Incorrect password')
@@ -39,11 +43,15 @@ describe('KeyringService booted KDF migration', () => {
     })
     ;(service as any).password = password
 
-    await service.setEncryptedStorageItem('rgb-service-v1', 'wallet-state', { blind: 'secret-value' })
+    await service.setEncryptedStorageItem('rgb-service-v1', 'wallet-state', {
+      blind: 'secret-value',
+    })
 
     const stored = values.get('encryptedFeatureStorage:rgb-service-v1')
     expect(stored).not.toContain('secret-value')
-    expect(await service.getEncryptedStorageItem('rgb-service-v1', 'wallet-state')).toEqual({ blind: 'secret-value' })
+    expect(await service.getEncryptedStorageItem('rgb-service-v1', 'wallet-state')).toEqual({
+      blind: 'secret-value',
+    })
 
     await service.setLocked()
     await expect(service.getEncryptedStorageItem('rgb-service-v1', 'wallet-state')).rejects.toThrow(
@@ -58,8 +66,9 @@ describe('KeyringService booted KDF migration', () => {
       set: vi.fn(async (key: string, value: any) => void values.set(key, value)),
     }
     const encryptor = {
-      encrypt: vi.fn(async (valuePassword: string, value: any) =>
-        `cipher:${valuePassword}:${btoa(JSON.stringify(value))}`
+      encrypt: vi.fn(
+        async (valuePassword: string, value: any) =>
+          `cipher:${valuePassword}:${btoa(JSON.stringify(value))}`
       ),
       decrypt: vi.fn(async (valuePassword: string, encrypted: string) => {
         const prefix = `cipher:${valuePassword}:`
@@ -100,9 +109,19 @@ describe('KeyringService booted KDF migration', () => {
       return JSON.parse(atob(payload.data))
     }
     const values = new Map<string, any>([
-      ['keyringState', { booted: encode(oldPassword, boostValue), vault: encode(oldPassword, []), boostValue }],
+      [
+        'keyringState',
+        {
+          booted: encode(oldPassword, boostValue),
+          vault: encode(oldPassword, emptyKeyringVault),
+          boostValue,
+        },
+      ],
       ['encryptedStorageRegistry', ['rgb-service-v1']],
-      ['encryptedFeatureStorage:rgb-service-v1', encode(oldPassword, { 'wallet-state': { blind: 'secret-value' } })],
+      [
+        'encryptedFeatureStorage:rgb-service-v1',
+        encode(oldPassword, { 'wallet-state': { blind: 'secret-value' } }),
+      ],
     ])
     const storage = {
       get: vi.fn(async (key: string) => values.get(key)),
@@ -111,7 +130,10 @@ describe('KeyringService booted KDF migration', () => {
     const service = new KeyringService()
     await service.init({
       storage: storage as any,
-      encryptor: { encrypt: vi.fn(async (valuePassword, value) => encode(valuePassword, value)), decrypt: vi.fn(async (valuePassword, value) => decode(valuePassword, value)) },
+      encryptor: {
+        encrypt: vi.fn(async (valuePassword, value) => encode(valuePassword, value)),
+        decrypt: vi.fn(async (valuePassword, value) => decode(valuePassword, value)),
+      },
       logger: { debug: vi.fn(), info: vi.fn(), error: vi.fn() },
       t: (key: string) => key,
     })
@@ -140,6 +162,167 @@ describe('KeyringService booted KDF migration', () => {
     expect(service.keyrings).toEqual([])
   })
 
+  it('does not let a pending unlock override a lock request', async () => {
+    let releaseVaultDecrypt!: () => void
+    const vaultDecryptStarted = new Promise<void>(resolve => {
+      releaseVaultDecrypt = resolve
+    })
+    let signalVaultDecrypt!: () => void
+    const vaultDecryptSignal = new Promise<void>(resolve => {
+      signalVaultDecrypt = resolve
+    })
+    const booted = `cipher:${password}:${btoa(JSON.stringify(boostValue))}`
+    const vault = `cipher:${password}:${btoa(JSON.stringify(emptyKeyringVault))}`
+    const service = new KeyringService()
+    await service.init({
+      storage: {
+        get: vi.fn(async () => ({ booted, vault, boostValue })),
+        set: vi.fn(),
+      } as any,
+      encryptor: {
+        encrypt: vi.fn(),
+        decrypt: vi.fn(async (_password: string, encrypted: string) => {
+          if (encrypted === vault) {
+            signalVaultDecrypt()
+            await vaultDecryptStarted
+            return emptyKeyringVault
+          }
+          return boostValue
+        }),
+      },
+      logger: { debug: vi.fn(), info: vi.fn(), error: vi.fn() },
+      t: (key: string) => key,
+    })
+
+    const unlocking = service.submitPassword(password)
+    await vaultDecryptSignal
+    const locking = service.setLocked()
+    releaseVaultDecrypt()
+    await Promise.all([unlocking, locking])
+
+    expect(service.getMemStore().isUnlocked).toBe(false)
+    expect(service.password).toBeNull()
+    expect(service.keyrings).toEqual([])
+  })
+
+  it('keeps the old verifier and vault if preparing the new vault fails', async () => {
+    const oldPassword = 'old password'
+    const newPassword = 'new password'
+    const encode = (valuePassword: string, value: any) =>
+      JSON.stringify({ password: valuePassword, data: btoa(JSON.stringify(value)) })
+    const decode = (valuePassword: string, encrypted: string) => {
+      const payload = JSON.parse(encrypted)
+      if (payload.password !== valuePassword) throw new Error('Incorrect password')
+      return JSON.parse(atob(payload.data))
+    }
+    const oldBooted = encode(oldPassword, boostValue)
+    const oldVault = encode(oldPassword, emptyKeyringVault)
+    const service = new KeyringService()
+    await service.init({
+      storage: {
+        get: vi.fn(async () => ({ booted: oldBooted, vault: oldVault, boostValue })),
+        set: vi.fn(),
+      } as any,
+      encryptor: {
+        decrypt: vi.fn(async (valuePassword, encrypted) => decode(valuePassword, encrypted)),
+        encrypt: vi.fn(async (valuePassword, value) => {
+          if (valuePassword === newPassword && Array.isArray(value)) {
+            throw new Error('vault encryption interrupted')
+          }
+          return encode(valuePassword, value)
+        }),
+      },
+      logger: { debug: vi.fn(), info: vi.fn(), error: vi.fn() },
+      t: (key: string) => key,
+    })
+
+    await expect(service.changePassword(oldPassword, newPassword)).rejects.toThrow(
+      'change_password_failed'
+    )
+
+    expect(service.store.getState()).toMatchObject({ booted: oldBooted, vault: oldVault })
+    expect(await service.verifyPassword(oldPassword)).toBe(true)
+    expect(await service.verifyPassword(newPassword)).toBe(false)
+  })
+
+  it('refuses to overwrite an existing vault with an empty keyring set', async () => {
+    const vault = 'existing-vault'
+    const service = new KeyringService()
+    await service.init({
+      storage: {
+        get: vi.fn(async () => ({ booted: 'booted', vault, boostValue })),
+        set: vi.fn(),
+      } as any,
+      encryptor: { decrypt: vi.fn(), encrypt: vi.fn() },
+      logger: { debug: vi.fn(), info: vi.fn(), error: vi.fn() },
+      t: (key: string) => key,
+    })
+    service.password = password
+    service.keyrings = []
+
+    await expect(service.persistAllKeyrings()).rejects.toThrow(
+      'Cannot persist an empty keyring vault'
+    )
+    expect(service.store.getState().vault).toBe(vault)
+  })
+
+  it('waits for keyring restoration before persisting the vault', async () => {
+    const encode = (value: any) => JSON.stringify(value)
+    const vault = encode(emptyKeyringVault)
+    let releaseRestore!: () => void
+    const restoreGate = new Promise<void>(resolve => {
+      releaseRestore = resolve
+    })
+    let signalRestore!: () => void
+    const restoreStarted = new Promise<void>(resolve => {
+      signalRestore = resolve
+    })
+    const encrypt = vi.fn(async (_password: string, value: any) => encode(value))
+    const service = new KeyringService()
+    await service.init({
+      storage: {
+        get: vi.fn(async () => ({ booted: 'booted', vault, boostValue })),
+        set: vi.fn(),
+      } as any,
+      encryptor: {
+        decrypt: vi.fn(async (_password: string, encrypted: string) => JSON.parse(encrypted)),
+        encrypt,
+      },
+      logger: { debug: vi.fn(), info: vi.fn(), error: vi.fn() },
+      t: (key: string) => key,
+    })
+    service.password = password
+    const previousKeyring = {
+      type: 'Empty',
+      serialize: vi.fn(async () => ({})),
+      clearSensitiveData: vi.fn(),
+    } as any
+    service.keyrings = [previousKeyring]
+    service.addressTypes = [0]
+    const restoreKeyring = (service as any)._restoreKeyring.bind(service)
+    vi.spyOn(service as any, '_restoreKeyring').mockImplementation(async (serialized: any) => {
+      signalRestore()
+      await restoreGate
+      return restoreKeyring(serialized)
+    })
+
+    const unlocking = service.unlockKeyrings(password)
+    await restoreStarted
+    const persisting = service.persistAllKeyrings()
+
+    expect(service.keyrings).toEqual([previousKeyring])
+    expect(encrypt).not.toHaveBeenCalled()
+
+    releaseRestore()
+    await Promise.all([unlocking, persisting])
+
+    expect(encrypt).toHaveBeenCalledWith(
+      password,
+      expect.arrayContaining([expect.objectContaining({ type: 'Empty' })])
+    )
+    expect(encrypt).not.toHaveBeenCalledWith(password, [])
+  })
+
   it('re-encrypts a legacy booted payload after validating the password', async () => {
     const storage = {
       get: vi.fn().mockResolvedValue({ booted: legacyBooted, vault: null, boostValue }),
@@ -147,9 +330,16 @@ describe('KeyringService booted KDF migration', () => {
     }
     const encryptor = {
       decrypt: vi.fn().mockResolvedValue(boostValue),
-      encrypt: vi.fn().mockResolvedValue(
-        JSON.stringify({ data: 'current-ciphertext', iv: 'current-iv', salt: 'current-salt', iterations: 600000 })
-      ),
+      encrypt: vi
+        .fn()
+        .mockResolvedValue(
+          JSON.stringify({
+            data: 'current-ciphertext',
+            iv: 'current-iv',
+            salt: 'current-salt',
+            iterations: 600000,
+          })
+        ),
     }
     const logger = { debug: vi.fn(), info: vi.fn(), error: vi.fn() }
     const service = new KeyringService()
@@ -219,14 +409,24 @@ describe('KeyringService booted KDF migration', () => {
       set: vi.fn().mockResolvedValue(undefined),
     }
     const encryptor = {
-      decrypt: vi.fn().mockResolvedValueOnce(boostValue).mockResolvedValueOnce([]),
+      decrypt: vi.fn().mockResolvedValueOnce(boostValue).mockResolvedValueOnce(emptyKeyringVault),
       encrypt: vi
         .fn()
         .mockResolvedValueOnce(
-          JSON.stringify({ data: 'current-booted', iv: 'current-iv', salt: 'current-salt', iterations: 600000 })
+          JSON.stringify({
+            data: 'current-booted',
+            iv: 'current-iv',
+            salt: 'current-salt',
+            iterations: 600000,
+          })
         )
         .mockResolvedValueOnce(
-          JSON.stringify({ data: 'current-vault', iv: 'current-iv', salt: 'current-salt', iterations: 600000 })
+          JSON.stringify({
+            data: 'current-vault',
+            iv: 'current-iv',
+            salt: 'current-salt',
+            iterations: 600000,
+          })
         ),
     }
     const service = new KeyringService()
@@ -240,7 +440,9 @@ describe('KeyringService booted KDF migration', () => {
     await service.submitPassword(password)
 
     expect(encryptor.decrypt).toHaveBeenCalledWith(password, legacyVault)
-    expect(encryptor.encrypt).toHaveBeenLastCalledWith(password, [])
+    expect(encryptor.encrypt).toHaveBeenLastCalledWith(password, [
+      { ...emptyKeyringVault[0], data: {} },
+    ])
     expect(JSON.parse(service.store.getState().vault!)).toMatchObject({ iterations: 600000 })
   })
 })

@@ -152,7 +152,7 @@ export class KeyringService extends EventEmitter {
   public addressTypes: AddressType[] = []
   public password: string | null = null
   private unlockingMutex: SimpleMutex = new SimpleMutex()
-  private passwordChangeMutex: SimpleMutex = new SimpleMutex()
+  private keyringStateMutex: SimpleMutex = new SimpleMutex()
   private cachedDisplayedKeyring: DisplayedKeyring[] | null = null
   private initialBoostValue: string = 'true'
   private storageKey: string = 'keyringState'
@@ -268,7 +268,9 @@ export class KeyringService extends EventEmitter {
   resetAllData = async () => {
     const encryptedStorageNamespaces = await this.getEncryptedStorageNamespaces()
     await Promise.all(
-      encryptedStorageNamespaces.map(namespace => this.storage.set(this.encryptedStorageKey(namespace), null))
+      encryptedStorageNamespaces.map(namespace =>
+        this.storage.set(this.encryptedStorageKey(namespace), null)
+      )
     )
     await this.storage.set(this.encryptedStorageRegistryKey, [])
     this.encryptedStorageCache.clear()
@@ -529,7 +531,11 @@ export class KeyringService extends EventEmitter {
     if (typeof passphrase !== 'string') {
       throw new Error(this.t('mnemonic_phrase_is_invalid'))
     }
-    if (!Number.isSafeInteger(accountCount) || accountCount < 1 || accountCount > MAX_HD_ACCOUNT_COUNT) {
+    if (
+      !Number.isSafeInteger(accountCount) ||
+      accountCount < 1 ||
+      accountCount > MAX_HD_ACCOUNT_COUNT
+    ) {
       throw new Error(this.t('keyring_error_account_count'))
     }
 
@@ -623,20 +629,24 @@ export class KeyringService extends EventEmitter {
    * @returns {Promise<Object>} A Promise that resolves to the state.
    */
   setLocked = async (): Promise<MemStoreState> => {
-    // set locked
-    this.password = null
-    this.encryptedStorageCache.clear()
-    this.memStore.updateState({ isUnlocked: false })
+    return this.unlockingMutex.lock(() =>
+      this.keyringStateMutex.lock(async () => {
+        // set locked
+        this.password = null
+        this.encryptedStorageCache.clear()
+        this.memStore.updateState({ isUnlocked: false })
 
-    // remove keyrings
-    this._clearKeyringSecrets()
-    this.keyrings = []
-    this.addressTypes = []
-    this.cachedDisplayedKeyring = null
+        // remove keyrings
+        this._clearKeyringSecrets()
+        this.keyrings = []
+        this.addressTypes = []
+        this.cachedDisplayedKeyring = null
 
-    await this._updateMemStoreKeyrings()
-    this.emit('lock')
-    return this.fullUpdate()
+        await this._updateMemStoreKeyrings()
+        this.emit('lock')
+        return this.fullUpdate()
+      })
+    )
   }
 
   /**
@@ -682,37 +692,50 @@ export class KeyringService extends EventEmitter {
   }
 
   changePassword = async (oldPassword: string, newPassword: string) => {
-    return this.passwordChangeMutex
+    return this.unlockingMutex
       .lock(async () => {
         const isValidPassword = await this.verifyPassword(oldPassword)
         if (!isValidPassword) {
           throw new Error(this.t('password_error'))
         }
-        await this.unlockKeyrings(oldPassword, true)
-        await this.reencryptEncryptedStorage(oldPassword, newPassword)
-        this.password = newPassword
+        await this.keyringStateMutex.lock(async () => {
+          await this._unlockKeyrings(oldPassword, true)
 
-        const boostValue = this.getBoostValue()
-        // Re-encrypt with current boost value (upgraded if applicable)
-        const encryptBooted = await this.encryptor.encrypt(newPassword, boostValue)
-        this.store.updateState({ booted: encryptBooted, boostValue })
+          const boostValue = this.getBoostValue()
+          const [vault, booted, encryptedStorage, preMnemonics] = await Promise.all([
+            this.encryptKeyrings(newPassword),
+            this.encryptor.encrypt(newPassword, boostValue),
+            this.prepareReencryptedStorage(oldPassword, newPassword),
+            this.reencryptPreMnemonics(oldPassword, newPassword),
+          ])
 
-        if (this.memStore.getState().preMnemonics) {
-          const mnemonic = await this.encryptor.decrypt(
-            oldPassword,
-            this.memStore.getState().preMnemonics
-          )
-          const preMnemonics = await this.encryptor.encrypt(newPassword, mnemonic)
-          this.memStore.updateState({ preMnemonics })
-        }
+          await this.commitReencryptedStorage(encryptedStorage)
 
-        await this.persistAllKeyrings()
-        await this._updateMemStoreKeyrings()
-        await this.fullUpdate()
+          // The verifier and vault must change together so an interrupted password
+          // change cannot leave a password that verifies but cannot decrypt the vault.
+          this.store.updateState({ booted, boostValue, vault })
+          this.password = newPassword
+          if (preMnemonics !== undefined) {
+            this.memStore.updateState({ preMnemonics })
+          }
+          this._clearKeyringRecoveryData()
+          await this._updateMemStoreKeyrings()
+          await this.fullUpdate()
+        })
       })
-      .catch(e => {
+      .catch(() => {
         throw new Error(this.t('change_password_failed'))
       })
+  }
+
+  private reencryptPreMnemonics = async (
+    oldPassword: string,
+    newPassword: string
+  ): Promise<string | undefined> => {
+    const encryptedMnemonic = this.memStore.getState().preMnemonics
+    if (!encryptedMnemonic) return undefined
+    const mnemonic = await this.encryptor.decrypt(oldPassword, encryptedMnemonic)
+    return this.encryptor.encrypt(newPassword, mnemonic)
   }
 
   private getBoostValue = (): string => {
@@ -778,7 +801,10 @@ export class KeyringService extends EventEmitter {
     return entries
   }
 
-  private async persistEncryptedStorage(namespace: string, entries: Record<string, unknown>): Promise<void> {
+  private async persistEncryptedStorage(
+    namespace: string,
+    entries: Record<string, unknown>
+  ): Promise<void> {
     if (!this.password) throw new Error(this.t('you_need_to_unlock_wallet_first'))
     await this.ensureEncryptedStorageNamespace(namespace)
     const encrypted = await this.encryptor.encrypt(this.password, entries)
@@ -786,7 +812,10 @@ export class KeyringService extends EventEmitter {
     this.encryptedStorageCache.set(namespace, entries)
   }
 
-  private async reencryptEncryptedStorage(oldPassword: string, newPassword: string): Promise<void> {
+  private async prepareReencryptedStorage(
+    oldPassword: string,
+    newPassword: string
+  ): Promise<{ namespace: string; entries: Record<string, unknown>; encrypted: string }[]> {
     const namespaces = await this.getEncryptedStorageNamespaces()
     const decrypted = await Promise.all(
       namespaces.map(async namespace => {
@@ -799,19 +828,26 @@ export class KeyringService extends EventEmitter {
         return { namespace, entries: entries as Record<string, unknown> }
       })
     )
-    const reencrypted = await Promise.all(
+    return Promise.all(
       decrypted.map(async ({ namespace, entries }) => ({
         namespace,
         entries,
         encrypted: await this.encryptor.encrypt(newPassword, entries),
       }))
     )
+  }
+
+  private async commitReencryptedStorage(
+    reencrypted: { namespace: string; entries: Record<string, unknown>; encrypted: string }[]
+  ): Promise<void> {
     await Promise.all(
-      reencrypted.map(({ namespace, entries, encrypted }) => {
-        this.encryptedStorageCache.set(namespace, entries)
-        return this.storage.set(this.encryptedStorageKey(namespace), encrypted)
-      })
+      reencrypted.map(({ namespace, encrypted }) =>
+        this.storage.set(this.encryptedStorageKey(namespace), encrypted)
+      )
     )
+    reencrypted.forEach(({ namespace, entries }) => {
+      this.encryptedStorageCache.set(namespace, entries)
+    })
   }
 
   private encryptedStorageKey(namespace: string) {
@@ -820,7 +856,9 @@ export class KeyringService extends EventEmitter {
 
   private async getEncryptedStorageNamespaces(): Promise<string[]> {
     const value = await this.storage.get(this.encryptedStorageRegistryKey)
-    return Array.isArray(value) ? value.filter((item): item is string => typeof item === 'string') : []
+    return Array.isArray(value)
+      ? value.filter((item): item is string => typeof item === 'string')
+      : []
   }
 
   private async ensureEncryptedStorageNamespace(namespace: string): Promise<void> {
@@ -1103,8 +1141,22 @@ export class KeyringService extends EventEmitter {
    * @returns {Promise<boolean>} Resolves to true once keyrings are persisted.
    */
   persistAllKeyrings = async (): Promise<boolean> => {
+    return this.keyringStateMutex.lock(() => this._persistAllKeyrings())
+  }
+
+  private _persistAllKeyrings = async (): Promise<boolean> => {
     if (!this.password || typeof this.password !== 'string') {
       throw new Error(this.t('keyringcontroller_password_is_not_a_string'))
+    }
+    const encryptedString = await this.encryptKeyrings(this.password)
+    this.store.updateState({ vault: encryptedString })
+    this._clearKeyringRecoveryData()
+    return true
+  }
+
+  private encryptKeyrings = async (password: string): Promise<string> => {
+    if (this.keyrings.length === 0) {
+      throw new Error('Cannot persist an empty keyring vault')
     }
     const serializedKeyrings = await Promise.all(
       this.keyrings.map((keyring, index) => {
@@ -1120,13 +1172,7 @@ export class KeyringService extends EventEmitter {
     )
 
     await this._restoreRecoveryDataForPersistence(serializedKeyrings)
-    const encryptedString = await this.encryptor.encrypt(
-      this.password,
-      serializedKeyrings as unknown as Buffer
-    )
-    this.store.updateState({ vault: encryptedString })
-    this._clearKeyringRecoveryData()
-    return true
+    return this.encryptor.encrypt(password, serializedKeyrings as unknown as Buffer)
   }
 
   /**
@@ -1139,20 +1185,36 @@ export class KeyringService extends EventEmitter {
    * @returns {Promise<Array<Keyring>>} The keyrings.
    */
   unlockKeyrings = async (password: string, retainRecoveryData = false): Promise<any[]> => {
+    return this.keyringStateMutex.lock(() => this._unlockKeyrings(password, retainRecoveryData))
+  }
+
+  private _unlockKeyrings = async (
+    password: string,
+    retainRecoveryData = false
+  ): Promise<any[]> => {
     const encryptedVault = this.store.getState().vault
     if (!encryptedVault) {
       throw new Error(this.t('cannot_unlock_without_a_previous_vault'))
     }
 
-    await this.clearKeyrings()
     const vault = await this.encryptor.decrypt(password, encryptedVault)
-
+    const restoredKeyrings: Keyring[] = []
+    const restoredAddressTypes: AddressType[] = []
     const arr = Array.from(vault)
-    for (let i = 0; i < arr.length; i++) {
-      const { keyring, addressType } = await this._restoreKeyring(arr[i])
-      this.keyrings.push(keyring)
-      this.addressTypes.push(addressType)
+    try {
+      for (let i = 0; i < arr.length; i++) {
+        const { keyring, addressType } = await this._restoreKeyring(arr[i])
+        restoredKeyrings.push(keyring)
+        restoredAddressTypes.push(addressType)
+      }
+    } catch (error) {
+      restoredKeyrings.forEach(keyring => this._clearKeyringSecret(keyring))
+      throw error
     }
+
+    this._clearKeyringSecrets()
+    this.keyrings = restoredKeyrings
+    this.addressTypes = restoredAddressTypes
     this.cachedDisplayedKeyring = null
 
     await this._updateMemStoreKeyrings()
@@ -1407,9 +1469,7 @@ export class KeyringService extends EventEmitter {
   private _restoreRecoveryDataForPersistence = async (serializedKeyrings: any[]) => {
     const requiresRecoveryData = serializedKeyrings.some(
       keyring =>
-        keyring.type === KeyringType.HdKeyring &&
-        !keyring.data?.mnemonic &&
-        !keyring.data?.xpriv
+        keyring.type === KeyringType.HdKeyring && !keyring.data?.mnemonic && !keyring.data?.xpriv
     )
     if (!requiresRecoveryData) {
       return
