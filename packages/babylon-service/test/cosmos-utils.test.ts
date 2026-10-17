@@ -8,6 +8,7 @@ import {
   encodeSignature,
   escapeHTML,
   makeADR36AminoSignDoc,
+  objToUint8Array,
   sortObjectByKey,
   sortedJsonByKeyStringify,
 } from '../src/cosmos/utils'
@@ -57,7 +58,9 @@ describe('cosmos utils', () => {
 
     const badPubKey = new Uint8Array(33)
     badPubKey[0] = 0x04
-    expect(() => encodeSecp256k1Pubkey(badPubKey)).toThrow('Public key must be compressed secp256k1')
+    expect(() => encodeSecp256k1Pubkey(badPubKey)).toThrow(
+      'Public key must be compressed secp256k1'
+    )
   })
 
   it('encodeSecp256k1Signature validates fixed 64-byte signature', () => {
@@ -88,6 +91,13 @@ describe('cosmos utils', () => {
     expect(directHex).toMatch(/^[0-9a-f]+$/)
     expect(arbitraryHex).toMatch(/^[0-9a-f]+$/)
     expect(arbitraryHex.length).toBeGreaterThan(0)
+  })
+
+  it('converts only dense byte-indexed objects without sparse allocation', () => {
+    expect(objToUint8Array({ 2: 3, 0: 1, 1: 2 })).toEqual(new Uint8Array([1, 2, 3]))
+    expect(() => objToUint8Array({ 1000000000: 1 })).toThrow('Invalid byte array index')
+    expect(() => objToUint8Array({ 0: 256 })).toThrow('Invalid byte array value')
+    expect(() => objToUint8Array({ '01': 1 })).toThrow('Invalid byte array index')
   })
 
   it('encodeSignature composes pubkey and signature from hex', () => {

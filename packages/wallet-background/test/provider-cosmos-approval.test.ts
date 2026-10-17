@@ -103,6 +103,21 @@ describe('Cosmos approval payload binding', () => {
     }
   )
 
+  it.each(['bodyBytes', 'authInfoBytes'] as const)(
+    'rejects a sparse Direct %s object before approval',
+    async field => {
+      await expect(
+        rpcFlow(
+          request('cosmos_signDirect', {
+            signerAddress,
+            signDoc: { ...signDoc(), [field]: { 1000000000: 1 } },
+          })
+        )
+      ).rejects.toThrow('Invalid byte array index')
+      expect(approvalService.requestApproval).not.toHaveBeenCalled()
+    }
+  )
+
   it.each(['constructor', 'toString', 'valueOf', '__proto__'])(
     'rejects inherited provider method %s',
     async method => {

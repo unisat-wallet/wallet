@@ -23,6 +23,7 @@ export {
   makeADR36AminoSignDoc,
   encodeSecp256k1Pubkey,
   encodeSecp256k1Signature,
+  objToUint8Array,
   directSignDocToBytesHex,
   arbitrarySignDocToBytesHex,
   encodeSignature,

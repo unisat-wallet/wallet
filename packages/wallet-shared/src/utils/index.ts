@@ -4,6 +4,7 @@ export { getAccountDerivationPath, isChangeAddressHdPath, isKeystoneAccountHdPat
 export { toRgbDisplayAmount } from './rgbAmount'
 export { getSighashSingleInputIndexes } from './sighash'
 export { getHistoryAssetChanges, type HistoryAssetChange } from './historyAssetChanges'
+export { objToUint8Array } from './bytes'
 export {
   AccountSignMethod,
   getAccountCapabilities,

@@ -6,8 +6,11 @@ import {
   NETWORK_TYPES,
   hasOwn,
   isSupportedChainType,
+  objToUint8Array,
 } from '@unisat/wallet-shared'
 import { ChainType } from '@unisat/wallet-types'
+
+export { objToUint8Array }
 
 declare global {
   const langLocales: Record<string, Record<'message', string>>
@@ -42,12 +45,4 @@ export function getChainInfo(chainType: ChainType) {
     name: chain.label,
     network: NETWORK_TYPES[chain.networkType]!.name,
   }
-}
-
-export const objToUint8Array = (obj: any) => {
-  const arr: number[] = []
-  for (const id in obj) {
-    arr[parseInt(id)] = obj[id]
-  }
-  return Uint8Array.from(arr)
 }
