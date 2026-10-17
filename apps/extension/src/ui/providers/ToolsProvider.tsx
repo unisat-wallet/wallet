@@ -112,8 +112,8 @@ function TipContainer({ handler }: { handler: ToolsContextType }) {
 
 function CopyContainer({ handler }: { handler: ToolsContextType }) {
   const { t } = useI18n();
-  handler.copyToClipboard = useCallback((text: string) => {
-    copyToClipboard(text).then(() => {
+  handler.copyToClipboard = useCallback((text, options) => {
+    copyToClipboard(text, options).then(() => {
       handler.toastSuccess(t('copied'));
     });
   }, []);

@@ -116,12 +116,42 @@ export async function sleep(timeSec: number) {
   });
 }
 
-export const copyToClipboard = (textToCopy: string | number) => {
+type CopyToClipboardOptions = {
+  clearAfterMs?: number;
+};
+
+let clipboardClearTimer: number | undefined;
+
+const scheduleClipboardClear = (copiedText: string, clearAfterMs?: number) => {
+  if (clipboardClearTimer !== undefined) {
+    window.clearTimeout(clipboardClearTimer);
+    clipboardClearTimer = undefined;
+  }
+  if (!clearAfterMs || clearAfterMs <= 0) return;
+
+  clipboardClearTimer = window.setTimeout(async () => {
+    clipboardClearTimer = undefined;
+    try {
+      if (!navigator.clipboard || !window.isSecureContext) return;
+      if ((await navigator.clipboard.readText()) === copiedText) {
+        await navigator.clipboard.writeText('');
+      }
+    } catch {
+      // Clipboard access may be revoked after the copy operation.
+    }
+  }, clearAfterMs);
+};
+
+export const copyToClipboard = async (
+  textToCopy: string | number,
+  options: CopyToClipboardOptions = {}
+) => {
+  const text = textToCopy.toString();
   if (navigator.clipboard && window.isSecureContext) {
-    return navigator.clipboard.writeText(textToCopy.toString());
+    await navigator.clipboard.writeText(text);
   } else {
     const textArea = document.createElement('textarea');
-    textArea.value = textToCopy.toString();
+    textArea.value = text;
     textArea.style.position = 'absolute';
     textArea.style.opacity = '0';
     textArea.style.left = '-999999px';
@@ -129,11 +159,12 @@ export const copyToClipboard = (textToCopy: string | number) => {
     document.body.appendChild(textArea);
     textArea.focus();
     textArea.select();
-    return new Promise<void>((res, rej) => {
+    await new Promise<void>((res, rej) => {
       document.execCommand('copy') ? res() : rej();
       textArea.remove();
     });
   }
+  scheduleClipboardClear(text, options.clearAfterMs);
 };
 
 export function formatDate(date: Date, fmt = 'yyyy-MM-dd hh:mm:ss') {
