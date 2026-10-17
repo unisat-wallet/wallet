@@ -464,6 +464,9 @@ class ProviderController extends BaseController {
       if (!params.sendBitcoinParams.satoshis) {
         throw new Error('satoshis is required')
       }
+      if (params.sendBitcoinParams.feeRate !== undefined) {
+        assertValidFeeRate(params.sendBitcoinParams.feeRate, { supportLowFeeMode: true })
+      }
       const toSignData = await wallet.createSendBTCPsbt({
         to: params.sendBitcoinParams.toAddress,
         amount: params.sendBitcoinParams.satoshis,
@@ -502,6 +505,9 @@ class ProviderController extends BaseController {
       }
       if (!params.sendInscriptionParams.inscriptionId) {
         throw new Error('inscriptionId is required')
+      }
+      if (params.sendInscriptionParams.feeRate !== undefined) {
+        assertValidFeeRate(params.sendInscriptionParams.feeRate, { supportLowFeeMode: true })
       }
       const toSignData = await wallet.createSendInscriptionPsbt({
         to: params.sendInscriptionParams.toAddress,
@@ -542,6 +548,9 @@ class ProviderController extends BaseController {
       }
       if (!params.sendRunesParams.amount) {
         throw new Error('amount is required')
+      }
+      if (params.sendRunesParams.feeRate !== undefined) {
+        assertValidFeeRate(params.sendRunesParams.feeRate, { supportLowFeeMode: true })
       }
       const toSignData = await wallet.createSendRunesPsbt({
         to: params.sendRunesParams.toAddress,

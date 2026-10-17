@@ -89,7 +89,7 @@ import { chainTypeToCanonicalNetwork } from '../shared/utils/deriveContextHash'
 import { bgEventBus } from '../utils/eventBus'
 import { getEstimateFee, psbtFromString } from '../utils/psbt-utils'
 
-import { baseUtils, bnUtils, paramsUtils } from '@unisat/base-utils'
+import { assertValidFeeRate, baseUtils, bnUtils, paramsUtils } from '@unisat/base-utils'
 import {
   ADDRESS_TYPES,
   AddressFlagType,
@@ -2374,6 +2374,7 @@ export class WalletController extends BaseController {
     psbtHex: string
     toSignInputs: ToSignInput[]
   }> => {
+    if (feeRate !== undefined) assertValidFeeRate(feeRate, { supportLowFeeMode: true })
     txHelpers.assertValidBitcoinMemo(memo, memos)
     amount = paramsUtils.formatAmount(amount)
 
@@ -2395,10 +2396,11 @@ export class WalletController extends BaseController {
       throw new Error('Invalid address.')
     }
 
-    if (!feeRate) {
+    if (feeRate === undefined) {
       const feeSummary = await this.getFeeSummary()
       feeRate = feeSummary.list[1]?.feeRate! // use normal fee rate
     }
+    feeRate = assertValidFeeRate(feeRate, { supportLowFeeMode: true })
 
     const { psbt, toSignInputs } = await txHelpers.sendBTC({
       btcUtxos: btcUtxos!,
@@ -2524,6 +2526,7 @@ export class WalletController extends BaseController {
     btcUtxos?: txHelpers.UnspentOutput[]
     enableRBF?: boolean
   }): Promise<ToSignData> => {
+    if (feeRate !== undefined) assertValidFeeRate(feeRate, { supportLowFeeMode: true })
     const account = preferenceService.getCurrentAccount()
     if (!account) throw new Error('no current account')
     assertCanCreateSigningRequest(account)
@@ -2549,10 +2552,11 @@ export class WalletController extends BaseController {
       outputValue = assetUtxo.satoshis
     }
 
-    if (!feeRate) {
+    if (feeRate === undefined) {
       const feeSummary = await this.getFeeSummary()
       feeRate = feeSummary.list[1]?.feeRate! // use normal fee rate
     }
+    feeRate = assertValidFeeRate(feeRate, { supportLowFeeMode: true })
 
     const { psbt, toSignInputs } = await txHelpers.sendInscription({
       assetUtxo,
@@ -6516,6 +6520,7 @@ export class WalletController extends BaseController {
     outputValue?: number
     enableRBF?: boolean
   }): Promise<ToSignData> => {
+    if (feeRate !== undefined) assertValidFeeRate(feeRate, { supportLowFeeMode: true })
     runeAmount = paramsUtils.formatAmount(runeAmount)
     if (!/^[1-9]\d*$/.test(runeAmount)) {
       throw new Error('Rune amount must be a positive integer')
@@ -6531,10 +6536,11 @@ export class WalletController extends BaseController {
       assetUtxos = await this.getAssetUtxosRunes(runeid)
     }
 
-    if (!feeRate) {
+    if (feeRate === undefined) {
       const feeSummary = await this.getFeeSummary()
       feeRate = feeSummary.list[1]?.feeRate! // use normal fee rate
     }
+    feeRate = assertValidFeeRate(feeRate, { supportLowFeeMode: true })
 
     const _assetUtxos: UnspentOutput[] = []
 
