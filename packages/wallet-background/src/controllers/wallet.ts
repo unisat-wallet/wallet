@@ -5330,16 +5330,32 @@ export class WalletController extends BaseController {
       throw new Error('RGB payment is not awaiting a signature')
     }
     const psbt = params.psbt ? psbtFromString(params.psbt).toHex() : pending.prepared.psbt
+    const signingPsbt = bitcoin.Psbt.fromHex(psbt)
     if (params.psbt) {
-      const candidate = bitcoin.Psbt.fromHex(psbt)
       const prepared = bitcoin.Psbt.fromHex(pending.prepared.psbt)
-      if (!sameUnsignedTransaction(candidate, prepared)) {
+      if (!sameUnsignedTransaction(signingPsbt, prepared)) {
         throw new Error('RGB swap PSBT changed the prepared transaction')
       }
     }
+    if (
+      signingPsbt.data.inputs.some(
+        input =>
+          input.sighashType !== undefined &&
+          input.sighashType !== bitcoin.Transaction.SIGHASH_DEFAULT &&
+          input.sighashType !== bitcoin.Transaction.SIGHASH_ALL
+      )
+    ) {
+      throw new Error('RGB swap PSBT must use SIGHASH_ALL')
+    }
+    const toSignInputs = pending.prepared.toSignInputs.map(input => {
+      const psbtInput = signingPsbt.data.inputs[input.index]
+      if (!psbtInput) throw new Error('RGB signing input is missing from PSBT')
+      psbtInput.sighashType = bitcoin.Transaction.SIGHASH_ALL
+      return { ...input, sighashTypes: [bitcoin.Transaction.SIGHASH_ALL] }
+    })
     return this.getRgbToSignData({
-      psbt,
-      toSignInputs: pending.prepared.toSignInputs,
+      psbt: signingPsbt.toHex(),
+      toSignInputs,
       action: {
         name: 'Send RGB',
         description: '',

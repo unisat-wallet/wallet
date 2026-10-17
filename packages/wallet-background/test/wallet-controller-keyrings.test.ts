@@ -166,6 +166,79 @@ describe('RGB server clock', () => {
   })
 })
 
+describe('RGB seller swap sighash validation', () => {
+  function createPreparedPsbt() {
+    return new bitcoin.Psbt()
+      .addInput({
+        hash: '11'.repeat(32),
+        index: 0,
+        witnessUtxo: {
+          script: Buffer.from(`5120${'22'.repeat(32)}`, 'hex'),
+          value: 1_000,
+        },
+      })
+      .addOutput({ script: Buffer.from('6a', 'hex'), value: 0 })
+  }
+
+  function mockPreparedSwap(wallet: WalletController, preparedPsbt: bitcoin.Psbt) {
+    const toSignInputs = [
+      {
+        index: 0,
+        publicKey: validCompressedPubkey.slice(2),
+      },
+    ]
+    vi.spyOn(wallet as any, 'getLocalRgbService').mockResolvedValue({
+      service: {
+        getPendingTransfers: () => [
+          {
+            id: 'swap-1',
+            prepared: { psbt: preparedPsbt.toHex(), toSignInputs },
+          },
+        ],
+      },
+    })
+    return vi.spyOn(wallet, 'getRgbToSignData').mockImplementation(async input => input as any)
+  }
+
+  it('rejects SIGHASH_NONE added by the swap counterparty', async () => {
+    const wallet = new WalletController()
+    const preparedPsbt = createPreparedPsbt()
+    mockPreparedSwap(wallet, preparedPsbt)
+    const candidate = bitcoin.Psbt.fromHex(preparedPsbt.toHex())
+    candidate.data.inputs[0]!.sighashType = bitcoin.Transaction.SIGHASH_NONE
+
+    await expect(
+      wallet.getRgbPaymentSigningData({ transferId: 'swap-1', psbt: candidate.toHex() })
+    ).rejects.toThrow('RGB swap PSBT must use SIGHASH_ALL')
+  })
+
+  it.each([undefined, bitcoin.Transaction.SIGHASH_DEFAULT, bitcoin.Transaction.SIGHASH_ALL])(
+    'forces an allowed counterparty sighash %s to SIGHASH_ALL for wallet inputs',
+    async sighashType => {
+      const wallet = new WalletController()
+      const preparedPsbt = createPreparedPsbt()
+      const getToSignData = mockPreparedSwap(wallet, preparedPsbt)
+      const candidate = bitcoin.Psbt.fromHex(preparedPsbt.toHex())
+      if (sighashType !== undefined) candidate.data.inputs[0]!.sighashType = sighashType
+
+      await wallet.getRgbPaymentSigningData({ transferId: 'swap-1', psbt: candidate.toHex() })
+
+      expect(getToSignData).toHaveBeenCalledWith(
+        expect.objectContaining({
+          toSignInputs: [
+            expect.objectContaining({
+              index: 0,
+              sighashTypes: [bitcoin.Transaction.SIGHASH_ALL],
+            }),
+          ],
+        })
+      )
+      const signingPsbt = bitcoin.Psbt.fromHex(getToSignData.mock.calls[0]![0].psbt)
+      expect(signingPsbt.data.inputs[0]?.sighashType).toBe(bitcoin.Transaction.SIGHASH_ALL)
+    }
+  )
+})
+
 describe('address asset overview', () => {
   beforeEach(() => vi.clearAllMocks())
 
