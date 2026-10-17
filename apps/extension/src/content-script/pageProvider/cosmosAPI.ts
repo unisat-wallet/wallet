@@ -8,10 +8,14 @@ import { CosmosChainInfo } from '@unisat/babylon-service';
 import { requestMethodKey } from './providerState';
 
 export class CosmosAPIMethods {
-  constructor(private provider: any) {}
+  #provider: any;
+
+  constructor(provider: any) {
+    this.#provider = provider;
+  }
 
   enable = async (chainId: string) => {
-    return this.provider[requestMethodKey]({
+    return this.#provider[requestMethodKey]({
       method: 'cosmos_enable',
       params: {
         chainId
@@ -20,7 +24,7 @@ export class CosmosAPIMethods {
   };
 
   experimentalSuggestChain = async (chainData: CosmosChainInfo) => {
-    return this.provider[requestMethodKey]({
+    return this.#provider[requestMethodKey]({
       method: 'cosmos_experimentalSuggestChain',
       params: {
         chainData
@@ -29,7 +33,7 @@ export class CosmosAPIMethods {
   };
 
   getKey = async (chainId: string) => {
-    const _key: any = await this.provider[requestMethodKey]({
+    const _key: any = await this.#provider[requestMethodKey]({
       method: 'cosmos_getKey',
       params: {
         chainId
@@ -45,11 +49,11 @@ export class CosmosAPIMethods {
   };
 
   getOfflineSigner = (chainId: string, signOptions?: any) => {
-    return new CosmJSOfflineSigner(chainId, this.provider, signOptions);
+    return new CosmJSOfflineSigner(chainId, this.#provider, signOptions);
   };
 
   signArbitrary = async (chainId: string, signerAddress: string, data: string | Uint8Array) => {
-    return this.provider[requestMethodKey]({
+    return this.#provider[requestMethodKey]({
       method: 'cosmos_signArbitrary',
       params: {
         chainId,
@@ -63,14 +67,18 @@ export class CosmosAPIMethods {
 }
 
 export class CosmJSOfflineSigner {
+  #provider: any;
+
   constructor(
     protected readonly chainId: string,
-    protected readonly provider: any,
+    provider: any,
     protected readonly signOptions?: any
-  ) {}
+  ) {
+    this.#provider = provider;
+  }
 
   async getAccounts() {
-    const cosmosAPI = new CosmosAPIMethods(this.provider);
+    const cosmosAPI = new CosmosAPIMethods(this.#provider);
     const key: any = await cosmosAPI.getKey(this.chainId);
     return [
       {
@@ -82,7 +90,7 @@ export class CosmJSOfflineSigner {
   }
 
   async signDirect(signerAddress: string, signDoc: any) {
-    const response: any = await this.provider[requestMethodKey]({
+    const response: any = await this.#provider[requestMethodKey]({
       method: 'cosmos_signDirect',
       params: {
         signerAddress,

@@ -20,6 +20,9 @@ export function defineUnwritablePropertyIfPossible(o: any, p: string, value: any
 }
 
 export function createProviderProxy(provider: any, requestMethodKey: symbol): any {
+  const isPrivateProperty = (prop: string | symbol) =>
+    prop === requestMethodKey || (typeof prop === 'string' && (prop.startsWith('_') || prop === 'bitcoinAPI'));
+
   return new Proxy(provider, {
     deleteProperty: () => true,
     get: (target, prop) => {
@@ -28,14 +31,18 @@ export function createProviderProxy(provider: any, requestMethodKey: symbol): an
       }
 
       // Block access to methods starting with underscore or Symbol methods
-      if ((typeof prop === 'string' && prop.startsWith('_')) || prop === requestMethodKey) {
+      if (isPrivateProperty(prop)) {
         console.warn(
           `[UniSat] Attempted access to private method: ${String(prop)} is not allowed for security reasons`
         );
         return undefined;
       }
       return target[prop];
-    }
+    },
+    getOwnPropertyDescriptor: (target, prop) =>
+      isPrivateProperty(prop) ? undefined : Reflect.getOwnPropertyDescriptor(target, prop),
+    has: (target, prop) => !isPrivateProperty(prop) && Reflect.has(target, prop),
+    ownKeys: (target) => Reflect.ownKeys(target).filter((prop) => !isPrivateProperty(prop))
   });
 }
 
