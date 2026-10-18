@@ -38,7 +38,7 @@ export function useRGBBalanceCardLogic(props: RGBBalanceCardProps) {
       ? (tokenBalance['iconInfo'] as { iconUrl?: string })
       : undefined
   const iconInfo = {
-    isConfiguredUsdt: tokenBalance?.['configuredUsdt'] === true,
+    assetId: tokenBalance?.assetId,
     iconUrl:
       (typeof existingIcon?.iconUrl === 'string' && existingIcon.iconUrl) ||
       (typeof tokenBalance?.['iconUrl'] === 'string' ? tokenBalance['iconUrl'] : ''),

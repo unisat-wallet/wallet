@@ -197,6 +197,7 @@ function RgbReceiveApproval({ data, session }: { data: Props['params']['data']; 
               <Row justifyBetween gap="md" fullX style={{ alignItems: 'flex-start' }}>
                 <Row gap="md" itemsCenter style={{ minWidth: 0, flex: 1 }}>
                   <RGBAssetIcon
+                    assetId={data.assetId}
                     iconInfo={getRgbTokenIconInfo(assetMetadata, ticker || assetName || 'RGB')}
                     ticker={ticker}
                     name={assetName}
@@ -555,6 +556,7 @@ function RgbPaymentApproval({ data, session }: { data: Props['params']['data']; 
               <Row justifyBetween gap="md" fullX style={{ alignItems: 'flex-start' }}>
                 <Row gap="md" itemsCenter style={{ minWidth: 0, flex: 1 }}>
                   <RGBAssetIcon
+                    assetId={data.assetId}
                     iconInfo={getRgbTokenIconInfo(assetMetadata, ticker || assetName || 'RGB')}
                     ticker={ticker}
                     name={assetName}

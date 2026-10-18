@@ -144,10 +144,8 @@ function AssetOverviewContent({ address, isRgbActive, rgbUsdtAssetId }: { addres
 
   const overviewItems = result?.address === address ? result.items : null;
   const configuredUsdtId = isRgbActive ? rgbUsdtAssetId : '';
-  const isRgbUsdt = (item: AddressAssetOverviewItem) => item.kind === 'rgb' && (
-    item.symbol.toUpperCase() === 'USDT' ||
-    (!!configuredUsdtId && item.tokenId.replace(/^rgb:/i, '') === configuredUsdtId.replace(/^rgb:/i, ''))
-  );
+  const isRgbUsdt = (item: AddressAssetOverviewItem) => item.kind === 'rgb' &&
+    !!configuredUsdtId && item.tokenId.replace(/^rgb:/i, '') === configuredUsdtId.replace(/^rgb:/i, '');
   const items = overviewItems?.filter(item => !(
     isRgbUsdt(item) && isToken(item) && /^0+(?:\.0+)?$/.test(item.balance.trim())
   )) ?? null;

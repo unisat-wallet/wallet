@@ -1,15 +1,17 @@
 import { CSSProperties } from 'react';
+import { useWalletConfig } from '@unisat/wallet-state';
 
 import { Icon } from '../Icon';
 import { Image } from '../Image';
 
 export type RGBAssetIconInfo = {
+  assetId?: string;
   iconShortName?: string;
   iconUrl?: string;
-  isConfiguredUsdt?: boolean;
 };
 
 type RGBAssetIconProps = {
+  assetId?: string;
   iconInfo?: RGBAssetIconInfo;
   ticker?: string;
   name?: string;
@@ -51,15 +53,18 @@ export function getRgbPlaceholderLetters(name?: string, ticker?: string) {
   return Array.from(source).slice(0, 2).join('').toUpperCase() || 'RG';
 }
 
-function resolveRgbAssetIconUrl(iconInfo?: RGBAssetIconInfo, ticker?: string) {
-  if (iconInfo?.isConfiguredUsdt) return USDT_LOGO;
+function resolveRgbAssetIconUrl(iconInfo?: RGBAssetIconInfo, isConfiguredUsdt?: boolean) {
+  if (isConfiguredUsdt) return USDT_LOGO;
   if (iconInfo?.iconUrl) return iconInfo.iconUrl;
-  if ((ticker || '').toUpperCase() === 'USDT') return USDT_LOGO;
   return '';
 }
 
-export function RGBAssetIcon({ iconInfo, ticker, name, size = 24, isAnyRgbAsset, style }: RGBAssetIconProps) {
-  const iconUrl = resolveRgbAssetIconUrl(iconInfo, ticker);
+export function RGBAssetIcon({ assetId, iconInfo, ticker, name, size = 24, isAnyRgbAsset, style }: RGBAssetIconProps) {
+  const configuredUsdtAssetId = useWalletConfig().rgbUsdtAssetId?.trim() || '';
+  const resolvedAssetId = assetId || iconInfo?.assetId || '';
+  const isConfiguredUsdt = !!configuredUsdtAssetId && !!resolvedAssetId &&
+    resolvedAssetId.replace(/^rgb:/i, '') === configuredUsdtAssetId.replace(/^rgb:/i, '');
+  const iconUrl = resolveRgbAssetIconUrl(iconInfo, isConfiguredUsdt);
   const showImage = !isAnyRgbAsset && !!iconUrl;
   const isUsdtLogo = iconUrl === USDT_LOGO;
   const placeholderLetters = getRgbPlaceholderLetters(name, ticker);

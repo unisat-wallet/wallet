@@ -6,17 +6,16 @@ import { useDispatch, useSelector } from 'react-redux'
 import { AppState, uiActions } from '..'
 import { useI18n } from '../context'
 import { useChain } from '../hooks'
+import { useWalletConfig } from '../hooks/settings'
 import type { RgbBalance } from '../types'
 import { getRgbTokenPrecision, toRgbDisplayAmount } from '../utils/rgb-amount-utils'
+import { isSameRgbAssetId } from './useRGBListLogic'
 
 const DEBOUNCE_DELAY = 1000
 
-function findUsdtToken(items: RgbBalance[]) {
-  return items.find((item) => {
-    const ticker = (item.ticker || '').toUpperCase()
-    const name = (item.name || '').toUpperCase()
-    return ticker === 'USDT' || name === 'USDT'
-  })
+function findUsdtToken(items: RgbBalance[], configuredAssetId: string) {
+  if (!configuredAssetId) return undefined
+  return items.find(item => isSameRgbAssetId(item.assetId, configuredAssetId))
 }
 
 function splitAmountParts(amount: string) {
@@ -44,8 +43,12 @@ type RgbListSource = {
 export function useRGBUsdtBalanceCardLogic({ items, onRefresh }: RgbListSource) {
   const { t } = useI18n()
   const chain = useChain()
+  const configuredUsdtAssetId = useWalletConfig().rgbUsdtAssetId?.trim() || ''
   const dispatch = useDispatch()
-  const usdtToken = useMemo(() => findUsdtToken(items), [items])
+  const usdtToken = useMemo(
+    () => findUsdtToken(items, configuredUsdtAssetId),
+    [items, configuredUsdtAssetId]
+  )
   const balanceValue = toRgbDisplayAmount(
     usdtToken?.spendable,
     getRgbTokenPrecision(usdtToken)

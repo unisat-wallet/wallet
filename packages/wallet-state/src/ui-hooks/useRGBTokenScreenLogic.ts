@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 
 import type { RgbActivityItem, RgbActivityType, RgbAssetDetail, RgbBalance } from '..'
-import { useI18n, useNavigation, useWallet, useWalletConfig } from '..'
+import { useI18n, useNavigation, useWallet } from '..'
 import { getRgbIconShortName } from '../utils/rgb-amount-utils'
 import { useInfiniteList } from './useInfiniteList'
 import { UNCONFIGURED_RGB_USDT_ASSET_ID } from './useRGBListLogic'
@@ -26,8 +26,6 @@ function hasPositiveAmount(value?: string | number | null) {
 export function useRGBTokenScreenLogic() {
   const nav = useNavigation()
   const { assetId, tokenBalance } = nav.getRouteState<'RGBTokenScreen'>()
-  const configuredUsdtAssetId = useWalletConfig().rgbUsdtAssetId?.trim()
-  const isConfiguredUsdt = !!configuredUsdtAssetId && isSameRgbAssetId(assetId, configuredUsdtAssetId)
   const isUnconfiguredUsdt = assetId === UNCONFIGURED_RGB_USDT_ASSET_ID
   const wallet = useWallet()
   const { t } = useI18n()
@@ -204,7 +202,7 @@ export function useRGBTokenScreenLogic() {
     'RGB'
   const name = detail?.name || resolvedTokenBalance?.name || ticker
   const iconInfo = {
-    isConfiguredUsdt,
+    assetId,
     iconUrl: detail?.['iconUrl'] || resolvedTokenBalance?.['iconUrl'] || '',
     iconShortName: getRgbIconShortName(name, ticker),
   }

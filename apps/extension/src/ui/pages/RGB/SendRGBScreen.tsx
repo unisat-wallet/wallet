@@ -55,6 +55,7 @@ export default function SendRGBScreen() {
   const {
     step,
     t,
+    assetId,
     ticker,
     name,
     assetPrecision,
@@ -129,7 +130,7 @@ export default function SendRGBScreen() {
       <Content>
         <Column style={{ paddingTop: 12, gap: spacing.extraLarge }}>
           <Row justifyCenter>
-            <RGBAssetIcon iconInfo={iconInfo} ticker={ticker} name={name} size={68} />
+            <RGBAssetIcon assetId={assetId} iconInfo={iconInfo} ticker={ticker} name={name} size={68} />
           </Row>
 
           <Column gap="md">

@@ -19,7 +19,7 @@ describe('useRGBTokenScreenLogic', () => {
     balance: '12',
   }
 
-  it('marks the configured token for the USDT icon even when its metadata uses another ticker', async () => {
+  it('passes the selected asset ID to the icon even when its metadata uses another ticker', async () => {
     const { store, wrapper, wallet } = createHookTestHarness({ routeState: { assetId } })
     store.dispatch(settingsActions.updateSettings({
       walletConfig: { ...store.getState().settings.walletConfig, rgbUsdtAssetId: assetId },
@@ -29,7 +29,7 @@ describe('useRGBTokenScreenLogic', () => {
     wallet.getRGBAssetActivity.mockResolvedValue({ list: [], total: 0 })
 
     const { result } = renderHook(() => useRGBTokenScreenLogic(), { wrapper })
-    await waitFor(() => expect(result.current.iconInfo.isConfiguredUsdt).toBe(true))
+    await waitFor(() => expect(result.current.iconInfo.assetId).toBe(assetId))
   })
 
   it('shows the unconfigured USDT item without loading an invalid asset or allowing transfers', async () => {

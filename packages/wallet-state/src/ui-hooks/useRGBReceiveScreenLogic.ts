@@ -191,7 +191,7 @@ export const getRgbTokenIconInfo = (value: unknown, ticker: string) => {
   const name = readStringPath(tokenInfo, ['name']) || readStringPath(record, ['name'])
   const iconUrl = readStringPath(iconInfo, ['iconUrl']) || readStringPath(record, ['iconUrl']) || ''
   const iconShortName = getRgbIconShortName(name, ticker)
-  return { iconUrl, iconShortName, isConfiguredUsdt: record?.['configuredUsdt'] === true }
+  return { assetId: getRgbAssetId(value), iconUrl, iconShortName }
 }
 
 const getPendingInvoiceList = (value: unknown): RgbPendingReceiveInvoice[] => {
