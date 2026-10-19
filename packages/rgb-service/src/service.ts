@@ -20,7 +20,7 @@ import {
   validateNiaConsignmentParentState,
 } from './protocol/nia-consignment'
 import { mergeNiaConsignmentHistory } from './protocol/nia-history'
-import { encodeNiaTransferConsignment } from './protocol/nia-contract'
+import { encodeNiaContract, encodeNiaTransferConsignment } from './protocol/nia-contract'
 import {
   blindRgbInvoiceRecipientId,
   concealBlindSeal,
@@ -1739,6 +1739,22 @@ export class RgbService {
   getContractConsignment(assetId: string) {
     const contract = this.requireState().contracts?.[normalizeAssetId(assetId)]
     return contract ? Buffer.from(contract.consignment, 'base64').toString('base64') : undefined
+  }
+
+  /** Export the history-free RGB Contract strict body for an asset known locally. */
+  exportContractConsignment(assetId: string): Uint8Array {
+    const normalized = normalizeAssetId(assetId)
+    const contract = this.requireState().contracts?.[normalized]
+    if (!contract) throw new RgbServiceError(`RGB contract ${normalized} is not known locally`)
+
+    // Received assets keep transfer history in `consignment`; rebuilding from
+    // Genesis ensures that no ownership history leaks into a contract export.
+    const stored = Uint8Array.from(Buffer.from(contract.consignment, 'base64'))
+    const decoded = decodeNiaConsignment(stored)
+    if (decoded.assetId !== normalized) {
+      throw new RgbServiceError('Stored RGB contract ID does not match its Genesis')
+    }
+    return encodeNiaContract(decoded.genesis).strict
   }
 
   /**

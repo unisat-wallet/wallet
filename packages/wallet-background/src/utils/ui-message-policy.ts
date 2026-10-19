@@ -54,6 +54,7 @@ const UI_CONTROLLER_METHODS = new Set([
   'deriveAccountsFromXpub',
   'deriveNewAccountFromMnemonic',
   'enableRgbFeature',
+  'exportRgbAssetContract',
   'exportRgbHdBackup',
   'findGroupAssets',
   'genSignCosmosUr',

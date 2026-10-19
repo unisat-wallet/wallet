@@ -3735,6 +3735,14 @@ export class WalletController extends BaseController {
     return service.getLocalAssetDetail(assetId)
   }
 
+  /** Export a standard RGB Contract file, encoded as base64 for the wallet RPC boundary. */
+  exportRgbAssetContract = async (assetId: string): Promise<string> => {
+    await this.assertRgbEnabled()
+    const { service } = await this.getLocalRgbReadService()
+    const contract = service.exportContractConsignment(assetId)
+    return Buffer.concat([Buffer.from('RGB\0CON'), Buffer.from(contract)]).toString('base64')
+  }
+
   getRGBAssetDetail = async (_address: string, assetId: string) => {
     const detail = await this.getRgbAssetDetail(assetId)
     // Local RGB details keep balance fields flat, while the wallet UI's

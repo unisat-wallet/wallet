@@ -11,6 +11,7 @@ import {
   encodeNiaContract,
   encodeNiaGenesis,
   encodeRgbContractId,
+  decodeNiaConsignment,
   RgbInsufficientBalanceError,
   RgbService,
   RgbServiceError,
@@ -800,6 +801,31 @@ describe('RgbService', () => {
       ticker: 'ARRIVE', name: 'Arriving Asset', precision: 2,
       pending: '2', incomingPending: '2', spendable: '0',
     })
+  })
+
+  it('exports a history-free NIA contract from local wallet state', async () => {
+    const genesis = encodeNiaGenesis({
+      ticker: 'USDT',
+      name: 'Test USDT',
+      precision: 6,
+      timestamp: 1_713_261_744,
+      network: 'mainnet',
+      allocations: [{ txid: 'a'.repeat(64), vout: 0, blinding: 1n, amount: 100n }],
+    })
+    const assetId = encodeRgbContractId(genesis.assetId)
+    const service = new RgbService(createDependencies())
+    await service.open(wallet)
+    await service.storeContract(assetId, encodeNiaContract(genesis).strict, genesis.strict)
+
+    const exported = service.exportContractConsignment(assetId)
+    const decoded = decodeNiaConsignment(exported)
+    expect(decoded.assetId).toBe(assetId)
+    expect(decoded.transfer).toBe(false)
+    expect(decoded.witnessBundles).toEqual([])
+    expect(decoded.terminals).toEqual([])
+    expect(decoded.metadata).toMatchObject({ ticker: 'USDT', name: 'Test USDT', precision: 6 })
+    expect(() => service.exportContractConsignment(encodeRgbContractId(new Uint8Array(32))))
+      .toThrow('is not known locally')
   })
 
   it('archives an invalid receive when the proxy ACK is already immutable', async () => {

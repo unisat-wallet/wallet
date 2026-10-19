@@ -621,6 +621,9 @@ export interface WalletController {
 
   getRGBAssetDetail(address: string, assetId: string): Promise<RgbAssetDetail>
 
+  /** Base64 of a standard RGB\0CON contract file (NIA only). */
+  exportRgbAssetContract(assetId: string): Promise<string>
+
   getRGBAssetActivity(
     address: string,
     assetId: string,
