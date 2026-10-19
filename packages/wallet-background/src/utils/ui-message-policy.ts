@@ -234,6 +234,7 @@ function isValidUiMessageValue(
   state.nodes++
   if (depth > MAX_UI_MESSAGE_DEPTH || state.nodes > MAX_UI_MESSAGE_NODES) return false
   if (
+    value === undefined ||
     value === null ||
     typeof value === 'string' ||
     typeof value === 'boolean' ||
@@ -247,15 +248,19 @@ function isValidUiMessageValue(
   if (seen.has(value)) return false
   seen.add(value)
 
+  let valid: boolean
   if (Array.isArray(value)) {
-    return value.every(item => isValidUiMessageValue(item, depth + 1, seen, state))
+    valid = value.every(item => isValidUiMessageValue(item, depth + 1, seen, state))
+  } else if (!isPlainObject(value)) {
+    valid = false
+  } else {
+    valid = Object.entries(value).every(
+      ([key, item]) =>
+        !FORBIDDEN_OBJECT_KEYS.has(key) && isValidUiMessageValue(item, depth + 1, seen, state)
+    )
   }
-  if (!isPlainObject(value)) return false
-
-  return Object.entries(value).every(
-    ([key, item]) =>
-      !FORBIDDEN_OBJECT_KEYS.has(key) && isValidUiMessageValue(item, depth + 1, seen, state)
-  )
+  seen.delete(value)
+  return valid
 }
 
 function isPlainObject(value: unknown): value is Record<string, unknown> {
