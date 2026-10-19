@@ -8,6 +8,7 @@ import {
 describe('UI message policy', () => {
   it('allows UI methods and rejects controller internals or prototype members', () => {
     expect(isAllowedUiControllerMethod('getCurrentAccount')).toBe(true)
+    expect(isAllowedUiControllerMethod('getRgbFeatureStatus')).toBe(true)
     expect(isAllowedUiControllerMethod('signPsbtV2')).toBe(true)
     expect(isAllowedUiControllerMethod('resetAllData')).toBe(false)
     expect(isAllowedUiControllerMethod('_signPsbt')).toBe(false)

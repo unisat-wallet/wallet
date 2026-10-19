@@ -220,7 +220,16 @@ export class HttpClient implements BaseHttpClient {
     if (this.isApiResponse(data)) {
       if (data.code !== 0) {
         // Assuming 0 is success
-        throw new ApiClientError(data.msg || 'API error', data.code, data.data)
+        const rawMessage: unknown = data.msg
+        const nestedMessage = rawMessage && typeof rawMessage === 'object' && 'message' in rawMessage
+          ? rawMessage.message
+          : undefined
+        const message = typeof rawMessage === 'string' && rawMessage.trim()
+          ? rawMessage
+          : typeof nestedMessage === 'string' && nestedMessage.trim()
+            ? nestedMessage
+            : `API error (code ${data.code})`
+        throw new ApiClientError(message, data.code, data.data)
       }
       return data.data
     }

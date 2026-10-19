@@ -127,6 +127,7 @@ const UI_CONTROLLER_METHODS = new Set([
   'getRgbAllocationSummary',
   'getRgbFeePoolInspection',
   'getRgbFeePoolStatus',
+  'getRgbFeatureStatus',
   'getRgbFundingAddress',
   'getRgbHdBackupPlan',
   'getRgbPendingReceiveInvoices',

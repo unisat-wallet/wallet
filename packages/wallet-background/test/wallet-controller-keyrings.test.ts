@@ -1048,7 +1048,8 @@ describe('RGB wallet references', () => {
     }
     vi.spyOn(wallet as any, 'rgbRecoveryKey').mockResolvedValue(recoveryKey)
 
-    await (wallet as any).restoreRgbRecoveryIfNeeded({ service, wallet: walletRef })
+    await expect((wallet as any).restoreRgbRecoveryIfNeeded({ service, wallet: walletRef }))
+      .rejects.toThrow('RGB recovery checkpoint has changed on another installation')
 
     expect(service.restoreRecoveryState).not.toHaveBeenCalled()
     expect(service.markRecoveryConflict).toHaveBeenCalledTimes(1)

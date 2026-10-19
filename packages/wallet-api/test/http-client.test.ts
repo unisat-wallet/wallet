@@ -55,6 +55,22 @@ describe('HttpClient', () => {
     })
   })
 
+  it('preserves a structured API error message instead of showing an object', async () => {
+    const fetchMock = vi.mocked(globalThis.fetch as any)
+    fetchMock.mockResolvedValueOnce(jsonResponse({
+      code: 1002,
+      msg: { message: 'RGB recovery checkpoint is unavailable' },
+      data: { retryable: true },
+    }))
+
+    const client = new HttpClient({ endpoint: 'https://api.example.com' })
+    await expect(client.get('/v1/test')).rejects.toMatchObject<Partial<ApiClientError>>({
+      code: 1002,
+      message: 'RGB recovery checkpoint is unavailable',
+      details: { retryable: true },
+    })
+  })
+
   it('throws RateLimitError on 429 and parses Retry-After header', async () => {
     const fetchMock = vi.mocked(globalThis.fetch as any)
     fetchMock.mockResolvedValueOnce(

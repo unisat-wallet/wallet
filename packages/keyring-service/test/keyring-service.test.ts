@@ -89,6 +89,18 @@ describe('KeyringService booted KDF migration', () => {
       blind: 'secret-value',
     })
 
+    const reopenedService = new KeyringService()
+    await reopenedService.init({
+      storage: storage as any,
+      encryptor,
+      logger: { debug: vi.fn(), info: vi.fn(), error: vi.fn() },
+      t: (key: string) => key,
+    })
+    ;(reopenedService as any).password = password
+    expect(await reopenedService.getEncryptedStorageItem('rgb-service-v1', 'wallet-state')).toEqual({
+      blind: 'secret-value',
+    })
+
     await service.setLocked()
     await expect(service.getEncryptedStorageItem('rgb-service-v1', 'wallet-state')).rejects.toThrow(
       'you_need_to_unlock_wallet_first'

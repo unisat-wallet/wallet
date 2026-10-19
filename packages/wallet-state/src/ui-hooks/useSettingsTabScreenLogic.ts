@@ -8,7 +8,14 @@ import {
 } from '@unisat/wallet-shared'
 import { useEffect, useMemo, useState } from 'react'
 import { useDevice, useI18n, useNavigation, useTools, useWallet } from 'src/context'
-import { useChain, useCurrentAccount, useCurrentKeyring, useVersionInfo } from 'src/hooks'
+import {
+  useChain,
+  useCurrentAccount,
+  useCurrentKeyring,
+  useIsUnlocked,
+  useVersionInfo,
+  useWallTabFocusRefresh,
+} from 'src/hooks'
 
 export interface SettingsItemType {
   key: string
@@ -28,6 +35,8 @@ export function useSettingsTabScreenLogic() {
   const currentAccount = useCurrentAccount()
   const chain = useChain()
   const wallet = useWallet()
+  const isUnlocked = useIsUnlocked()
+  const walletTabFocusRefresh = useWallTabFocusRefresh()
   const tools = useTools()
   const [connected, setConnected] = useState(false)
   const versionInfo = useVersionInfo()
@@ -45,18 +54,27 @@ export function useSettingsTabScreenLogic() {
         active = false
       }
     }
+    if (!isUnlocked) {
+      setRgbFeatureStatus({ contextKey: '', enabled: false })
+      return () => {
+        active = false
+      }
+    }
     void wallet
       .getRgbFeatureStatus()
       .then(status => {
         if (active) setRgbFeatureStatus({ contextKey: rgbContextKey, enabled: status.enabled && status.supported })
       })
-      .catch(() => {
-        if (active) setRgbFeatureStatus({ contextKey: rgbContextKey, enabled: false })
+      .catch(error => {
+        if (active) {
+          console.error('Failed to read RGB feature status in settings', error)
+          setRgbFeatureStatus({ contextKey: '', enabled: false })
+        }
       })
     return () => {
       active = false
     }
-  }, [rgbContextKey, chain.rgbProxyEndpoints, currentKeyring.type, wallet])
+  }, [rgbContextKey, chain.rgbProxyEndpoints, currentKeyring.type, isUnlocked, walletTabFocusRefresh, wallet])
 
   const { isExtensionInExpandView } = useDevice()
 

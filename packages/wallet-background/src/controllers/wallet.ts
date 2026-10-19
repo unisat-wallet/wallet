@@ -5765,6 +5765,7 @@ export class WalletController extends BaseController {
         if (service.needsRecoveryRestore?.() || service.hasRecoveryConflict()) {
           await service.disableRecoveryBackup()
         }
+        throw error
       }
       if (recoveryReady) {
         await service.enableRecoveryBackup()

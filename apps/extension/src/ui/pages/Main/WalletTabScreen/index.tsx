@@ -15,8 +15,8 @@ import { AddressAssetSummary, Brc20TickFilter, VersionDetail } from '@unisat/wal
 import '@unisat/wallet-state';
 import {
   AssetTabKey,
-  UNCONFIGURED_RGB_USDT_ASSET_ID,
   MoreAssetTabKey,
+  UNCONFIGURED_RGB_USDT_ASSET_ID,
   getReadyRgbBroadcasts,
   selectReadyRgbBroadcastId,
   uiActions,
@@ -201,15 +201,25 @@ export default function WalletTabScreen({
   const [rgbFeatureEnabled, setRgbFeatureEnabled] = useState(false);
   const [rgbRemoteRecoveryAvailable, setRgbRemoteRecoveryAvailable] = useState(false);
   const [rgbStatusContextKey, setRgbStatusContextKey] = useState('');
+  const [rgbStatusErrorKey, setRgbStatusErrorKey] = useState('');
+  const [rgbStatusRetry, setRgbStatusRetry] = useState({ contextKey: '', count: 0 });
   const [rgbActivationOpen, setRgbActivationOpen] = useState(false);
   const [rgbActivationLoading, setRgbActivationLoading] = useState(false);
 
   useEffect(() => {
     let active = true;
+    let retryTimer: ReturnType<typeof setTimeout> | undefined;
     if (!supportedAssets.assets.rgb) {
       setRgbFeatureEnabled(false);
       setRgbRemoteRecoveryAvailable(false);
+      setRgbStatusErrorKey('');
       setRgbStatusContextKey(rgbContextKey);
+      return () => {
+        active = false;
+      };
+    }
+    if (!isUnlocked) {
+      setRgbStatusContextKey('');
       return () => {
         active = false;
       };
@@ -220,19 +230,25 @@ export default function WalletTabScreen({
         if (!active) return;
         setRgbFeatureEnabled(status.enabled && status.supported);
         setRgbRemoteRecoveryAvailable(!status.enabled && status.supported && status.remoteRecoveryAvailable);
+        setRgbStatusErrorKey('');
         setRgbStatusContextKey(rgbContextKey);
       })
-      .catch(() => {
+      .catch((error) => {
         if (active) {
-          setRgbFeatureEnabled(false);
-          setRgbRemoteRecoveryAvailable(false);
-          setRgbStatusContextKey(rgbContextKey);
+          console.error('Failed to read RGB feature status', error);
+          if (rgbStatusRetry.contextKey !== rgbContextKey || rgbStatusRetry.count === 0) {
+            retryTimer = setTimeout(() => setRgbStatusRetry({ contextKey: rgbContextKey, count: 1 }), 500);
+          } else {
+            setRgbStatusErrorKey(rgbContextKey);
+            setRgbStatusContextKey(rgbContextKey);
+          }
         }
       });
     return () => {
       active = false;
+      if (retryTimer) clearTimeout(retryTimer);
     };
-  }, [rgbContextKey, supportedAssets.assets.rgb, wallet]);
+  }, [rgbContextKey, supportedAssets.assets.rgb, isUnlocked, walletTabFocusRefresh, rgbStatusRetry, wallet]);
 
   useEffect(() => {
     setRgbActivationOpen(false);
@@ -241,6 +257,7 @@ export default function WalletTabScreen({
   const onRgbFeatureEnabled = useCallback(() => {
     setRgbFeatureEnabled(true);
     setRgbRemoteRecoveryAvailable(false);
+    setRgbStatusErrorKey('');
     setRgbStatusContextKey(rgbContextKey);
   }, [rgbContextKey]);
 
@@ -280,13 +297,7 @@ export default function WalletTabScreen({
     return () => {
       active = false;
     };
-  }, [
-    screen,
-    assetContextKey,
-    walletTabFocusRefresh,
-    supportedAssets.assets.brc20,
-    wallet
-  ]);
+  }, [screen, assetContextKey, walletTabFocusRefresh, supportedAssets.assets.brc20, wallet]);
 
   useEffect(() => {
     if (screen !== 'assets' || !currentAccount.address || !isRgbActive) return;
@@ -315,7 +326,8 @@ export default function WalletTabScreen({
   }, [screen, rgbContextKey, walletTabFocusRefresh, isRgbActive, rgbUsdtAssetId, wallet]);
 
   const effectiveAssetTabKey = assetTabKey === AssetTabKey.MORE ? AssetTabKey.ALKANES : assetTabKey;
-  const isRgbAssetTab = screen === 'assets' && restoredTabContextKey === assetContextKey && effectiveAssetTabKey === AssetTabKey.RGB;
+  const isRgbAssetTab =
+    screen === 'assets' && restoredTabContextKey === assetContextKey && effectiveAssetTabKey === AssetTabKey.RGB;
   const rgbList = useRGBListLogic({
     autoRefresh: true,
     enabled: isRgbActive && isRgbAssetTab,
@@ -440,11 +452,30 @@ export default function WalletTabScreen({
       setRgbActivationOpen(false);
       onRgbFeatureEnabled();
     } catch (error) {
-      tools.toastError(error instanceof Error ? error.message : String(error));
+      console.error('Failed to enable RGB', error);
+      const rawMessage = error && typeof error === 'object' && 'message' in error ? error.message : error;
+      const nestedMessage =
+        rawMessage && typeof rawMessage === 'object' && 'message' in rawMessage ? rawMessage.message : undefined;
+      const candidate = typeof rawMessage === 'string' ? rawMessage : nestedMessage;
+      const code = error && typeof error === 'object' && 'code' in error ? error.code : undefined;
+      const message =
+        typeof candidate === 'string' && candidate && candidate !== 'Object' && candidate !== '[object Object]'
+          ? candidate
+          : `${t('unknown_error')}${typeof code === 'number' ? ` (${code})` : ''}`;
+      tools.toastError(message);
+      void wallet
+        .getRgbFeatureStatus()
+        .then((status) => {
+          if (status.enabled && status.supported) {
+            setRgbActivationOpen(false);
+            onRgbFeatureEnabled();
+          }
+        })
+        .catch(() => undefined);
     } finally {
       setRgbActivationLoading(false);
     }
-  }, [onRgbFeatureEnabled, tools, wallet]);
+  }, [onRgbFeatureEnabled, t, tools, wallet]);
 
   const counts = assetCounts?.key === assetContextKey ? assetCounts : null;
   const assetTabsLoading =
@@ -509,22 +540,35 @@ export default function WalletTabScreen({
     } catch {
       // Asset tabs still work when browser storage is unavailable.
     }
-    const requestedTab = preferredAssetTab && tabCounts.find(({ assetTabKey, moreAssetTabKey, supported }) =>
-      supported && assetTabKey === preferredAssetTab.assetTabKey &&
-      (preferredAssetTab.moreAssetTabKey === undefined || moreAssetTabKey === preferredAssetTab.moreAssetTabKey)
-    );
+    const requestedTab =
+      preferredAssetTab &&
+      tabCounts.find(
+        ({ assetTabKey, moreAssetTabKey, supported }) =>
+          supported &&
+          assetTabKey === preferredAssetTab.assetTabKey &&
+          (preferredAssetTab.moreAssetTabKey === undefined || moreAssetTabKey === preferredAssetTab.moreAssetTabKey)
+      );
     const savedTab = tabCounts.find(({ key, supported }) => supported && key === savedTabKey);
     const initialTab = requestedTab || savedTab || tabCounts.find(({ supported }) => supported);
     const pinnedTab = requestedTab || savedTab;
     setPinnedSelection(pinnedTab ? { contextKey: assetContextKey, tabKey: pinnedTab.key } : null);
     if (initialTab) {
-      dispatch(uiActions.updateAssetTabScreen({
-        assetTabKey: initialTab.assetTabKey,
-        ...(initialTab.moreAssetTabKey ? { moreAssetTabKey: initialTab.moreAssetTabKey } : {})
-      }));
+      dispatch(
+        uiActions.updateAssetTabScreen({
+          assetTabKey: initialTab.assetTabKey,
+          ...(initialTab.moreAssetTabKey ? { moreAssetTabKey: initialTab.moreAssetTabKey } : {})
+        })
+      );
     }
     setRestoredTabContextKey(assetContextKey);
-  }, [screen, assetContextKey, supportedAssets.key, preferredAssetTab?.assetTabKey, preferredAssetTab?.moreAssetTabKey, dispatch]);
+  }, [
+    screen,
+    assetContextKey,
+    supportedAssets.key,
+    preferredAssetTab?.assetTabKey,
+    preferredAssetTab?.moreAssetTabKey,
+    dispatch
+  ]);
   const selectedTabKey =
     effectiveAssetTabKey === AssetTabKey.ALKANES && moreAssetTabKey === MoreAssetTabKey.ALKANES_COLLECTION
       ? ALKANES_COLLECTION_TAB_KEY
@@ -580,20 +624,30 @@ export default function WalletTabScreen({
         items.push({
           key,
           label: label(t('rgb')),
-          children: rgbStatusContextKey !== rgbContextKey ? (
-            <Text text={t('loading')} color="white_muted" />
-          ) : isRgbActive ? (
-            <RGBHomeTabs key={`${chain.enum}:${currentAccount.key}`} transfers={rgbTransfers} list={rgbList} />
-          ) : (
-            <Column itemsCenter gap="md">
-              <Text text={t('rgb_assets')} color="white_muted" />
-              <Button
-                text={t(rgbRecoveryAvailable ? 'restore_rgb' : 'enable_rgb')}
-                preset="primary"
-                onClick={() => setRgbActivationOpen(true)}
-              />
-            </Column>
-          )
+          children:
+            rgbStatusContextKey !== rgbContextKey ? (
+              <Text text={t('loading')} color="white_muted" />
+            ) : rgbStatusErrorKey === rgbContextKey ? (
+              <Column itemsCenter gap="md">
+                <Text text={t('load_failed')} color="white_muted" />
+                <Button
+                  text={t('try_again')}
+                  preset="primary"
+                  onClick={() => setRgbStatusRetry((value) => ({ contextKey: rgbContextKey, count: value.count + 1 }))}
+                />
+              </Column>
+            ) : isRgbActive ? (
+              <RGBHomeTabs key={`${chain.enum}:${currentAccount.key}`} transfers={rgbTransfers} list={rgbList} />
+            ) : (
+              <Column itemsCenter gap="md">
+                <Text text={t('rgb_assets')} color="white_muted" />
+                <Button
+                  text={t(rgbRecoveryAvailable ? 'restore_rgb' : 'enable_rgb')}
+                  preset="primary"
+                  onClick={() => setRgbActivationOpen(true)}
+                />
+              </Column>
+            )
         });
       if (key === String(AssetTabKey.ALKANES))
         items.push({ key, label: label(t('alkanes')), children: <AlkanesList /> });
@@ -607,6 +661,7 @@ export default function WalletTabScreen({
     t,
     isRgbActive,
     rgbStatusContextKey,
+    rgbStatusErrorKey,
     rgbContextKey,
     rgbTransfers,
     rgbList,
