@@ -39,6 +39,12 @@ interface Props {
       toSignData?: ToSignData;
       invoice?: string;
       receive?: Receive;
+      transferId?: string;
+      payment?: {
+        status?: string;
+        assetId?: string;
+        amount?: string | number;
+      };
     };
     session: {
       origin: string;
@@ -674,17 +680,19 @@ function RgbPaymentApproval({ data, session }: { data: Props['params']['data']; 
 
 export function RgbPaymentCancel({ params: { data, session } }: Props) {
   const { t } = useI18n();
+  const rows: Array<[string, string]> = [
+    [t('transaction_id'), data.transferId || '-'],
+    [t('status'), data.payment?.status || '-']
+  ];
+  if (data.payment?.assetId) rows.push([t('asset'), data.payment.assetId]);
+  if (data.payment?.amount != null) rows.push([t('amount'), String(data.payment.amount)]);
+
   return (
     <RgbApprovalLayout
       session={session}
       title={t('rgb_approval_cancel_payment_title')}
       description={t('rgb_approval_cancel_payment_description')}
-      rows={[
-        [t('transaction_id'), data.transferId || '-'],
-        [t('status'), data.payment?.status || '-'],
-        ...(data.payment?.assetId ? [[t('asset'), data.payment.assetId]] : []),
-        ...(data.payment?.amount ? [[t('amount'), String(data.payment.amount)]] : [])
-      ]}
+      rows={rows}
       confirmText={t('rgb_approval_cancel_payment')}
       confirmPreset="danger"
     />

@@ -9,7 +9,7 @@
     },
     "noImplicitAny": false,
     "downlevelIteration": true,
-    "types": ["chrome", "node", "react", "react-dom"],
+    "types": ["chrome", "node", "react", "react-dom", "jest"],
     "allowJs": true,
     "skipLibCheck": true,
     "esModuleInterop": true,
