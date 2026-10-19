@@ -47,11 +47,12 @@ export function initMessaging() {
           case MESSAGE_TYPE.UI_OPENAPI:
             throw new Error('UI OpenAPI calls are not allowed');
           case MESSAGE_TYPE.UI_CONTROLLER:
-            if (
-              !isAllowedUiControllerMethod(data.method) ||
-              !isValidUiMessageParams(data.params)
-            ) {
-              throw new Error('Invalid UI controller request');
+            if (!isAllowedUiControllerMethod(data.method)) {
+              const method = typeof data.method === 'string' ? data.method.slice(0, 100) : '<invalid>';
+              throw new Error(`Invalid UI controller method: ${method}`);
+            }
+            if (!isValidUiMessageParams(data.params)) {
+              throw new Error(`Invalid UI controller params for ${data.method}`);
             }
             return walletController[data.method](...data.params);
           default:

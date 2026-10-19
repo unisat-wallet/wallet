@@ -16,8 +16,29 @@ describe('UI message policy', () => {
     expect(isAllowedUiControllerMethod('__proto__')).toBe(false)
   })
 
+  it('allows controller methods used by wallet screens and RGB receive', () => {
+    for (const method of [
+      'boot',
+      'createBuyCoinPaymentUrl',
+      'createRgbBlindReceive',
+      'createRgbWitnessReceive',
+      'getBlockActiveInfo',
+      'getBRC20RecentHistory',
+      'getBRC20Summary',
+      'getBuyCoinChannelList',
+      'getCoinPrice',
+      'getRgbInvoiceExpirySeconds',
+      'queryDomainInfo',
+      'setRgbInvoiceExpirySeconds',
+    ]) {
+      expect(isAllowedUiControllerMethod(method), method).toBe(true)
+    }
+  })
+
   it('accepts safe params and rejects malformed or dangerous values', () => {
     expect(isValidUiMessageParams([{ address: 'bc1qexample', indexes: [0, 1] }])).toBe(true)
+    expect(isValidUiMessageParams([{ durationSeconds: 86_400, skipSync: true }])).toBe(true)
+    expect(isValidUiMessageParams([{ assetId: 'rgb:example', amount: '1', durationSeconds: 86_400 }])).toBe(true)
     expect(isValidUiMessageParams({ address: 'bc1qexample' })).toBe(false)
     expect(isValidUiMessageParams(new Array(11).fill(null))).toBe(false)
     expect(isValidUiMessageParams([Number.POSITIVE_INFINITY])).toBe(false)
