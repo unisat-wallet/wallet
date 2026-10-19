@@ -55,15 +55,17 @@ export function useRGBTransfersLogic({
         assetIds.map(async assetId => {
           const detailKey = `${cacheKey}:${assetId}`
           const cachedDetail = rgbAssetDetailCache.get(detailKey)
-          if (cachedDetail) {
-            details.set(assetId, cachedDetail)
-            return
-          }
+          if (cachedDetail) details.set(assetId, cachedDetail)
+          if (cachedDetail?.precision !== undefined) return
           try {
             const detail = await wallet.getRGBAssetDetail('', assetId)
             if (detail) {
               details.set(assetId, detail)
-              if (detail.name || detail.ticker) rgbAssetDetailCache.set(detailKey, detail)
+              // Name-only details can arrive before the local contract is ready.
+              // Retry until precision is known; zero is a valid precision.
+              if (detail.precision !== undefined && (detail.name || detail.ticker)) {
+                rgbAssetDetailCache.set(detailKey, detail)
+              }
             }
           } catch {
             // Retry on the next refresh when local asset metadata becomes available.

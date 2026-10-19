@@ -1,6 +1,7 @@
 import { act, renderHook, waitFor } from '@testing-library/react'
 import { describe, expect, it } from 'vitest'
 
+import { uiActions } from '../../src/reducers/ui'
 import {
   ANY_RGB_ASSET,
   isCancelableRgbPendingInvoice,
@@ -517,6 +518,23 @@ describe('useRGBReceiveScreenLogic', () => {
     expect(wallet.createRgbUtxosBegin).toHaveBeenCalledWith(
       expect.objectContaining({ num: 5, upTo: true })
     )
+    expect(result.current.error).toBe('')
+  })
+
+  it('uses the backend default fee when the custom fee input is unfinished', async () => {
+    const { wrapper, wallet, store } = createHookTestHarness()
+    store.dispatch(uiActions.updateFeeRateBar({ feeRate: 0, feeRateInputVal: '0', feeOptionIndex: 3 }))
+    wallet.getRgbAllocationSummary.mockResolvedValue({ available: false })
+    wallet.createRgbUtxosBegin.mockResolvedValue({
+      toSignData: { psbtHex: '00', toSignInputs: [] },
+    })
+
+    const { result } = renderHook(() => useRGBReceiveScreenLogic(), { wrapper })
+    await act(async () => {
+      await result.current.onCreateInvoice()
+    })
+
+    expect(wallet.createRgbUtxosBegin).toHaveBeenCalledWith({ upTo: true, num: 5 })
     expect(result.current.error).toBe('')
   })
 })

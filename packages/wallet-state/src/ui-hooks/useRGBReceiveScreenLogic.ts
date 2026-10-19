@@ -520,7 +520,7 @@ export function useRGBReceiveScreenLogic(
       upTo: true,
       // One funding transaction amortizes several future blind invoices.
       num: 5,
-      feeRate,
+      ...(Number.isFinite(feeRate) && feeRate > 0 ? { feeRate } : {}),
     })
     const beginResultRecord =
       beginResult && typeof beginResult === 'object'

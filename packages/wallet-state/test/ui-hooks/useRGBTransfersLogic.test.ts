@@ -107,6 +107,51 @@ describe('useRGBTransfersLogic', () => {
     expect(wallet.getRGBAssetDetail).toHaveBeenCalledTimes(2)
   })
 
+  it('retries named asset details until precision becomes available', async () => {
+    const assetId = 'rgb:detail-retry-missing-precision'
+    const { wrapper, wallet } = createHookTestHarness()
+    wallet.getRgbTransfers.mockResolvedValue({
+      list: [{ ...confirmingReceive, assetId }],
+      total: 1,
+    })
+    wallet.getRGBAssetDetail
+      .mockResolvedValueOnce({ assetId, name: 'Example Token', ticker: 'EXM' })
+      .mockResolvedValue({ assetId, name: 'Example Token', ticker: 'EXM', precision: 2 })
+
+    const { result } = renderHook(
+      () => useRGBTransfersLogic({ initialFullSync: true, pollingEnabled: false }),
+      { wrapper }
+    )
+
+    await waitFor(() => expect(result.current.items[0]?.precision).toBe(0))
+    await act(async () => {
+      await result.current.onRefresh()
+    })
+    await waitFor(() => expect(result.current.items[0]?.precision).toBe(2))
+    expect(wallet.getRGBAssetDetail).toHaveBeenCalledTimes(2)
+  })
+
+  it('caches an asset with zero precision', async () => {
+    const assetId = 'rgb:detail-zero-precision'
+    const { wrapper, wallet } = createHookTestHarness()
+    wallet.getRgbTransfers.mockResolvedValue({
+      list: [{ ...confirmingReceive, assetId }],
+      total: 1,
+    })
+    wallet.getRGBAssetDetail.mockResolvedValue({ assetId, name: 'Indivisible Token', precision: 0 })
+
+    const { result } = renderHook(
+      () => useRGBTransfersLogic({ initialFullSync: true, pollingEnabled: false }),
+      { wrapper }
+    )
+
+    await waitFor(() => expect(result.current.items[0]?.name).toBe('Indivisible Token'))
+    await act(async () => {
+      await result.current.onRefresh()
+    })
+    expect(wallet.getRGBAssetDetail).toHaveBeenCalledTimes(1)
+  })
+
   it('does not notify for a broadcast that completed before the list was opened', async () => {
     const { wrapper, wallet } = createHookTestHarness()
     wallet.getRgbTransfers.mockResolvedValue({
