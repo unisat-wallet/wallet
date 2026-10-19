@@ -1,5 +1,11 @@
 # @unisat/wallet-connect
 
+## 0.3.0
+
+### Minor Changes
+
+- Export Bitcoin address network detection and reject connected accounts on the wrong network.
+
 ## 0.2.1
 
 ### Patch Changes

@@ -1,5 +1,16 @@
 # @unisat/approval-service
 
+## 1.2.0
+
+### Minor Changes
+
+- Add helpers to resolve unlock and connected-site approvals against the active request.
+
+### Patch Changes
+
+- Updated dependencies
+  - @unisat/wallet-shared@1.0.0
+
 ## 1.1.4
 
 ### Patch Changes

@@ -1,5 +1,11 @@
 # @unisat/base-utils
 
+## 0.6.0
+
+### Minor Changes
+
+- Export fee-rate validation and reject non-finite or non-positive amounts.
+
 ## 0.5.0
 
 ### Minor Changes

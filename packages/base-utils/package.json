@@ -1,6 +1,6 @@
 {
   "name": "@unisat/base-utils",
-  "version": "0.5.0",
+  "version": "0.6.0",
   "description": "Base utils for UniSat Wallet",
   "main": "lib/index.js",
   "module": "lib/index.mjs",

@@ -1,5 +1,15 @@
 # @unisat/notification-service
 
+## 1.1.5
+
+### Patch Changes
+
+- Remove notifications from local state when the server no longer publishes them.
+- Updated dependencies
+  - @unisat/wallet-api@2.0.0
+  - @unisat/wallet-shared@1.0.0
+  - @unisat/wallet-storage@0.2.5
+
 ## 1.1.4
 
 ### Patch Changes

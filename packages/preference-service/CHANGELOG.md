@@ -1,5 +1,14 @@
 # @unisat/preference-service
 
+## 0.5.1
+
+### Patch Changes
+
+- Reject unsupported chain selections and recover from unsupported persisted chain settings.
+- Updated dependencies
+  - @unisat/wallet-shared@1.0.0
+  - @unisat/wallet-storage@0.2.5
+
 ## 0.5.0
 
 ### Minor Changes

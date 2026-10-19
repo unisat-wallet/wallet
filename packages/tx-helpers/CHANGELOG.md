@@ -1,5 +1,19 @@
 # @unisat/tx-helpers
 
+## 1.5.0
+
+### Minor Changes
+
+- Export Bitcoin memo validation and SIGHASH_SINGLE helpers; reject PSBTs whose SINGLE input has no matching output.
+
+### Patch Changes
+
+- Updated dependencies
+- Updated dependencies
+  - @unisat/keyring-service@2.0.0
+  - @unisat/wallet-shared@1.0.0
+  - @unisat/wallet-bitcoin@1.3.1
+
 ## 1.4.1
 
 ### Patch Changes

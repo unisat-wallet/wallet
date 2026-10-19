@@ -1,5 +1,30 @@
 # @unisat/wallet-background
 
+## 10.0.0
+
+### Minor Changes
+
+- Add RGB issuance, swap, backup, and recovery flows, plus stricter provider origin and signing checks.
+
+### Patch Changes
+
+- Updated dependencies
+- Updated dependencies
+- Updated dependencies
+  - @unisat/keyring-service@2.0.0
+  - @unisat/rgb-service@2.0.0
+  - @unisat/wallet-api@2.0.0
+  - @unisat/wallet-shared@1.0.0
+  - @unisat/approval-service@1.2.0
+  - @unisat/babylon-service@1.4.0
+  - @unisat/base-utils@0.6.0
+  - @unisat/tx-helpers@1.5.0
+  - @unisat/notification-service@1.1.5
+  - @unisat/preference-service@0.5.1
+  - @unisat/wallet-bitcoin@1.3.1
+  - @unisat/contact-book@1.1.4
+  - @unisat/permission-service@1.3.1
+
 ## 9.0.0
 
 ### Minor Changes

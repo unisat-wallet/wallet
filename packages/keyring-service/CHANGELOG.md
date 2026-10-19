@@ -1,5 +1,19 @@
 # @unisat/keyring-service
 
+## 2.0.0
+
+### Major Changes
+
+- Remove the public development-only `SimpleEncryptor` export; serialize vault lifecycle operations and reject invalid SIGHASH_SINGLE signing requests.
+
+### Patch Changes
+
+- Updated dependencies
+- Updated dependencies
+  - @unisat/wallet-shared@1.0.0
+  - @unisat/wallet-bitcoin@1.3.1
+  - @unisat/wallet-storage@0.2.5
+
 ## 1.7.0
 
 ### Minor Changes

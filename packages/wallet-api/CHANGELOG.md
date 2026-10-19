@@ -1,5 +1,17 @@
 # @unisat/wallet-api
 
+## 2.0.0
+
+### Major Changes
+
+- Add RGB recovery metadata, broadcast-failure endpoints, and clock-skew retry. Remove obsolete RGB activity and transfer address fields from public types.
+
+### Patch Changes
+
+- Updated dependencies
+  - @unisat/wallet-shared@1.0.0
+  - @unisat/wallet-storage@0.2.5
+
 ## 1.4.0
 
 ### Minor Changes

@@ -1,5 +1,11 @@
 # @unisat/babylon-service
 
+## 1.4.0
+
+### Minor Changes
+
+- Export Cosmos memo and byte-array validators and reject oversized memos or malformed byte arrays.
+
 ## 1.3.0
 
 ### Minor Changes

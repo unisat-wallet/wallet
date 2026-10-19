@@ -1,5 +1,11 @@
 # @unisat/wallet-shared
 
+## 1.0.0
+
+### Major Changes
+
+- Add history, asset overview, and PSBT sighash types; require SIGHASH_SINGLE metadata in PSBT summaries and switch the shared chain configuration to T0 networks.
+
 ## 0.8.0
 
 ### Minor Changes

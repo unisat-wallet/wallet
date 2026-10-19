@@ -1,5 +1,20 @@
 # @unisat/wallet-state
 
+## 2.0.0
+
+### Major Changes
+
+- Replace the public RGB history hook with new RGB home flows and add transfer, amount, and fee-pool helpers.
+
+### Patch Changes
+
+- Updated dependencies
+- Updated dependencies
+  - @unisat/keyring-service@2.0.0
+  - @unisat/wallet-shared@1.0.0
+  - @unisat/babylon-service@1.4.0
+  - @unisat/base-utils@0.6.0
+
 ## 1.9.0
 
 ### Minor Changes

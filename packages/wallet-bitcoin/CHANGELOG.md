@@ -1,5 +1,11 @@
 # @unisat/wallet-bitcoin
 
+## 1.3.1
+
+### Patch Changes
+
+- Verify that BIP322 P2WPKH signatures use the public key for the claimed address.
+
 ## 1.3.0
 
 ### Minor Changes
