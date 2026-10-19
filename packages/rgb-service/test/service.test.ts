@@ -126,6 +126,99 @@ function createDependencies(): RgbServiceDependencies {
 }
 
 describe('RgbService', () => {
+  it('reopens an Any Asset receive canceled before its asset was known', async () => {
+    const dependencies = createDependencies()
+    const service = new RgbService(dependencies)
+    const storageKey = (service as any).storageKey(wallet)
+    await dependencies.storage.set(storageKey, {
+      version: 1,
+      wallet,
+      snapshot: { syncedAt: 0, utxos: [] },
+      pending: {},
+      pendingReceiveHistory: [{
+        transferId: 'receive:any-asset-recipient',
+        assetId: '',
+        amount: '',
+        txid: 'c'.repeat(64),
+        createdAt: 1,
+        status: 'canceled',
+      }],
+    })
+
+    await expect(service.open(wallet)).resolves.toBeUndefined()
+    expect(service.getPendingReceiveHistory()).toEqual([
+      expect.objectContaining({ assetId: '', status: 'canceled' }),
+    ])
+    expect(await dependencies.storage.get<any>(storageKey)).toMatchObject({
+      pendingReceiveHistory: [expect.objectContaining({ assetId: '' })],
+    })
+  })
+
+  it.each(['canceled', 'rejected'] as const)(
+    'normalizes a prefix-only asset ID in %s receive history',
+    async status => {
+      const dependencies = createDependencies()
+      const service = new RgbService(dependencies)
+      const storageKey = (service as any).storageKey(wallet)
+      await dependencies.storage.set(storageKey, {
+        version: 1,
+        wallet,
+        snapshot: { syncedAt: 0, utxos: [] },
+        pending: {},
+        pendingReceiveHistory: [{
+          transferId: 'receive:recipient',
+          assetId: 'rgb:',
+          amount: '',
+          txid: 'c'.repeat(64),
+          createdAt: 1,
+          status,
+        }],
+      })
+
+      await expect(service.open(wallet)).resolves.toBeUndefined()
+      expect(service.getPendingReceiveHistory()).toEqual([
+        expect.objectContaining({ assetId: '', status }),
+      ])
+      expect(await dependencies.storage.get<any>(storageKey)).toMatchObject({
+        pendingReceiveHistory: [expect.objectContaining({ assetId: '', status })],
+      })
+    }
+  )
+
+  it.each(['settled', 'canceled'] as const)(
+    'still rejects a malformed non-empty asset ID in %s receive history',
+    async status => {
+      const dependencies = createDependencies()
+      const service = new RgbService(dependencies)
+      const warning = vi.spyOn(console, 'warn').mockImplementation(() => undefined)
+      const storageKey = (service as any).storageKey(wallet)
+      const stored = {
+        version: 1,
+        wallet,
+        snapshot: { syncedAt: 0, utxos: [] },
+        pending: {},
+        pendingReceiveHistory: [{
+          transferId: 'receive:recipient',
+          assetId: 'rgb:invalid',
+          amount: '1',
+          txid: 'c'.repeat(64),
+          createdAt: 1,
+          status,
+        }],
+      }
+      await dependencies.storage.set(storageKey, stored)
+
+      await expect(service.open(wallet)).rejects.toThrow('RGB receive history contains an invalid asset ID')
+      expect(await dependencies.storage.get(storageKey)).toEqual(stored)
+      expect(warning).toHaveBeenCalledWith('RGB receive history contains an invalid asset ID', {
+        index: 0,
+        status,
+        assetId: 'rgb:invalid',
+      })
+      warning.mockRestore()
+    }
+  )
+
   it('accepts the shared tb invoice prefix for a Testnet4 wallet', async () => {
     const dependencies = createDependencies()
     const service = new RgbService(dependencies)

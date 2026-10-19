@@ -45,6 +45,7 @@ function formatBaid64(value: string): string {
 /** Keep API transport and response IDs on RGB's canonical display encoding. */
 export function normalizeRgbAssetId(value: string): string {
   const payload = value.trim().replace(/^rgb:/i, '')
+  if (!payload) return ''
   let bytes: Uint8Array | undefined
   if (/^[0-9a-fA-F]{64}$/.test(payload)) {
     bytes = Uint8Array.from(Buffer.from(payload, 'hex'))

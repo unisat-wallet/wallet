@@ -1,9 +1,16 @@
 import { describe, expect, it, vi } from 'vitest'
 
 import { RGB_CLOCK_SKEW_ERROR_CODE, RgbService } from '../src/services/rgb'
+import { normalizeRgbAssetId, normalizeRgbAssetRecord } from '../src/services/rgb-contract-id'
 import { ApiClientError } from '../src/utils/errors'
 
 describe('RgbService', () => {
+  it('keeps an absent RGB asset ID empty instead of producing a prefix-only ID', () => {
+    expect(normalizeRgbAssetId('')).toBe('')
+    expect(normalizeRgbAssetId('rgb:')).toBe('')
+    expect(normalizeRgbAssetRecord({ assetId: '' })).toEqual({ assetId: '' })
+  })
+
   it('re-signs once with server time when RGB authorization detects clock skew', async () => {
     const httpClient = {
       post: vi.fn()

@@ -3615,7 +3615,25 @@ function normalizeStateAssetIds(state: RgbServiceState): RgbServiceState {
     if (receive.receivedConsignment?.assetId)
       receive.receivedConsignment.assetId = normalizeAssetId(receive.receivedConsignment.assetId)
   })
-  state.pendingReceiveHistory?.forEach(item => (item.assetId = normalizeAssetId(item.assetId)))
+  // Older Any Asset cancellations may store a missing ID as either '' or
+  // 'rgb:'. Normalize the latter to the former without discarding the record.
+  state.pendingReceiveHistory?.forEach((item, index) => {
+    if (!item.assetId) return
+    if ((item.status === 'canceled' || item.status === 'rejected') && item.assetId.trim().toLowerCase() === 'rgb:') {
+      item.assetId = ''
+      return
+    }
+    try {
+      item.assetId = normalizeAssetId(item.assetId)
+    } catch {
+      console.warn('RGB receive history contains an invalid asset ID', {
+        index,
+        status: item.status ?? 'unknown',
+        assetId: item.assetId,
+      })
+      throw new RgbServiceError('RGB receive history contains an invalid asset ID')
+    }
+  })
   state.pendingSendHistory?.forEach(item => (item.assetId = normalizeAssetId(item.assetId)))
   state.pendingIssues?.forEach(item => (item.assetId = normalizeAssetId(item.assetId)))
   state.issueHistory?.forEach(item => (item.assetId = normalizeAssetId(item.assetId)))
