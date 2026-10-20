@@ -345,7 +345,7 @@ export function useRGBReceiveScreenLogic(
     rgbWallet
       .getRgbInvoiceExpirySeconds()
       .then(value => {
-        if (active && !invoiceExpiryChanged.current) setInvoiceExpirySecondsState(value)
+        if (active && !invoiceExpiryChanged.current) setInvoiceExpirySecondsState(value > 0 ? value : 7 * 24 * 60 * 60)
       })
       .catch(() => undefined)
     return () => {

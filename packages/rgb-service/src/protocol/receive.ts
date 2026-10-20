@@ -2,6 +2,7 @@ import { sha256 } from '@noble/hashes/sha256'
 import { RgbServiceError } from '../errors'
 import type { RgbNetwork } from '../types'
 import { normalizeRgbAssetId } from './contract-id'
+import { rgbProxyInvoiceId } from './invoice'
 
 const BAID64_ALPHABET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789_~'
 const TAG_SECRET_SEAL = 'urn:lnp-bp:seals:secret#2024-02-03'
@@ -117,6 +118,7 @@ export function encodeBlindRgbInvoice(input: {
   amount?: string
   expirationTimestamp?: number
   transportEndpoints?: string[]
+  proxyPublicKey?: string
 }) {
   if (input.amount !== undefined && !/^(0|[1-9][0-9]*)$/.test(input.amount))
     throw new RgbServiceError('RGB invoice amount is invalid')
@@ -130,6 +132,10 @@ export function encodeBlindRgbInvoice(input: {
     query.set('expirationTimestamp', String(input.expirationTimestamp))
   if (input.transportEndpoints?.length)
     query.set('endpoints', input.transportEndpoints.join(','))
+  if (input.proxyPublicKey) {
+    rgbProxyInvoiceId(recipientId, input.proxyPublicKey)
+    query.set('pk', input.proxyPublicKey)
+  }
   // Expo's URLSearchParams polyfill supports serialization but has no size property.
   const queryString = query.toString()
   return `rgb:${assetId}/~/${input.amount === undefined ? '~' : '~'}/${recipientId}${queryString ? `?${queryString}` : ''}`

@@ -171,12 +171,22 @@ export interface RgbConsignment {
 export interface RgbTransportConsignment extends RgbConsignment {
   txid: string
   endpoints: string[]
+  /** Proxy v1 send details, present only for invoices carrying `pk`. */
+  proxyInvoiceId?: string
+  proxyRecipientPublicKey?: string
+  proxySenderPrivateKey?: string
+  signedRawTx?: string
+  proxyExpirationTimestamp?: number
 }
 
 export interface RgbReceivedConsignment {
   recipientId: string
   payload: string
   txid: string
+  proxyTransferId?: string
+  proxySenderPublicKey?: string
+  proxySenderEndpoint?: string
+  proxyConsignmentHash?: string
   /** The endpoint which returned the payload and must receive the ACK/NACK. */
   endpoint?: string
 }
@@ -186,6 +196,8 @@ export interface RgbPendingTransfer {
   /** The amount is resolved from the request or a fixed-amount invoice. */
   request: RgbTransferRequest & { amount: string }
   createdAt: number
+  /** Stable per-send Ed25519 key for idempotent proxy v1 retries. */
+  proxySenderPrivateKey?: string
   /**
    * Provider origin that created this transfer. This is encrypted local
    * state only and is deliberately omitted from recovery checkpoints.
@@ -218,6 +230,10 @@ export interface RgbPendingTransfer {
 
 export interface RgbPendingReceive {
   invoice: string
+  /** Ed25519 key reserved for this invoice by an RGB proxy v1 endpoint. */
+  proxyPrivateKey?: string
+  proxyPublicKey?: string
+  proxyInvoiceId?: string
   /** Confirmations required before this receipt becomes settled. */
   minConfirmations?: number
   /** dApp origin that created this invoice; local-only and excluded from recovery checkpoints. */
@@ -249,6 +265,10 @@ export interface RgbPendingReceive {
     payload: string
     txid: string
     endpoint?: string
+    proxyTransferId?: string
+    proxySenderPublicKey?: string
+    proxySenderEndpoint?: string
+    proxyConsignmentHash?: string
     assetId: string
     amount: string
     /** Contract precision decoded from the validated consignment. */
@@ -277,6 +297,10 @@ export interface RgbPendingReceive {
     payload?: string
     /** Proxy endpoint which supplied the validated payload. */
     endpoint?: string
+    proxyTransferId?: string
+    proxySenderPublicKey?: string
+    proxySenderEndpoint?: string
+    proxyConsignmentHash?: string
     /** Set when the sender's Bitcoin transaction is visible in the chain source. */
     broadcastDetectedAt?: number
     counterpartyScriptPubKeys?: string[]
@@ -486,18 +510,25 @@ export interface RgbStateSource {
 export interface RgbTransport {
   /** Endpoints advertised in locally created blind invoices. */
   getEndpoints?(): string[]
+  prepareInvoice?(input: {
+    recipientId: string
+    endpoints: string[]
+    expirationTimestamp?: number
+  }): Promise<{ publicKey: string; privateKey: string; invoiceId: string; expirationTimestamp: number } | undefined>
   publishConsignment(consignment: RgbTransportConsignment): Promise<void>
   /** `undefined` means the receiver has not acknowledged the consignment yet. */
   getAcknowledgement?(consignment: RgbTransportConsignment): Promise<boolean | undefined>
   getConsignment?(input: {
     recipientId: string
     endpoints: string[]
+    proxyPrivateKey?: string
   }): Promise<RgbReceivedConsignment | undefined>
   /** Optional extension for fetching several receive invoices from a trusted proxy in one request. */
   getConsignments?(
     input: Array<{
       recipientId: string
       endpoints: string[]
+      proxyPrivateKey?: string
     }>
   ): Promise<RgbReceivedConsignment[]>
   /** Read-only check that at least one invoice endpoint has no consignment for this recipient ID. */
@@ -509,6 +540,18 @@ export interface RgbTransport {
     recipientId: string
     endpoints: string[]
     acknowledged: boolean
+    proxyPrivateKey?: string
+    proxyTransferId?: string
+    proxySenderPublicKey?: string
+    proxySenderEndpoint?: string
+    proxyConsignmentHash?: string
+  }): Promise<void>
+  /** Clear an unreleased proxy v1 signed transaction before releasing local inputs. */
+  cancelConsignment?(input: {
+    proxyInvoiceId: string
+    proxySenderPrivateKey: string
+    endpoints: string[]
+    allowMissing: boolean
   }): Promise<void>
 }
 

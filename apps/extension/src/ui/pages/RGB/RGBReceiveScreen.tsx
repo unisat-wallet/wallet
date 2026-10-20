@@ -159,8 +159,7 @@ const invoiceTypeTagStyle = {
 const invoiceExpiryOptions = [
   { seconds: 60 * 60, label: 'rgb_invoice_expiry_1h' },
   { seconds: 24 * 60 * 60, label: 'rgb_invoice_expiry_24h' },
-  { seconds: 7 * 24 * 60 * 60, label: 'rgb_invoice_expiry_7d' },
-  { seconds: 0, label: 'rgb_invoice_expiry_never' }
+  { seconds: 7 * 24 * 60 * 60, label: 'rgb_invoice_expiry_7d' }
 ] as const;
 
 type InvoiceCreationStep = 'select_asset' | 'configure_invoice';

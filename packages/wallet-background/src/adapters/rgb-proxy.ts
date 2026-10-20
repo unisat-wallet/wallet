@@ -3,7 +3,20 @@ import type {
   RgbTransport,
   RgbTransportConsignment,
 } from '@unisat/rgb-service'
+import { rgbProxyInvoiceId } from '@unisat/rgb-service'
+import { ed25519 } from '@noble/curves/ed25519'
 import log from 'loglevel'
+
+import {
+  proxyV1DecryptSignedTx,
+  proxyV1EncryptSignedTx,
+  proxyV1Hash,
+  proxyV1Pow,
+  proxyV1PublicKey,
+  proxyV1Sign,
+  proxyV1TransferId,
+  proxyV1Verify,
+} from './rgb-proxy-v1'
 
 type JsonRpcResponse<T> = {
   result?: T
@@ -17,6 +30,25 @@ type ProxyConsignment = {
 
 type ProxyBatchConsignment = ProxyConsignment & {
   recipient_id: string
+}
+
+type ProxyServerInfo = {
+  protocol_version: string
+  current_time: string
+  max_expiry_secs: string
+}
+
+type ProxyV1Consignment = {
+  consignment: string
+  sender_transport_endpoint: string
+  sender_pk: string
+  consignment_hash: string
+  batch: boolean
+}
+
+type ProxyV1AckResult = {
+  acks: Record<string, boolean>
+  signatures: Record<string, string>
 }
 
 const NOT_FOUND_CODES = new Set([-302, -400])
@@ -158,6 +190,132 @@ async function postConsignment(endpoint: string, consignment: RgbTransportConsig
   })
 }
 
+async function postProxyV1Consignment(endpoint: string, consignment: RgbTransportConsignment, senderEndpoint: string) {
+  const invoiceId = consignment.proxyInvoiceId
+  const recipientPublicKey = consignment.proxyRecipientPublicKey
+  const senderPrivateKey = consignment.proxySenderPrivateKey
+  const rawTx = consignment.signedRawTx
+  if (!invoiceId || !recipientPublicKey || !senderPrivateKey || !rawTx) {
+    throw new Error('RGB proxy v1 send state is incomplete')
+  }
+  const senderPublicKey = proxyV1PublicKey(senderPrivateKey)
+  const transferId = proxyV1TransferId(invoiceId, senderPublicKey)
+  const file = base64ToBytes(consignment.payload)
+  const consignmentHash = proxyV1Hash(file)
+  const check = await postJson<Record<string, { status: string; pow_difficulty: string }>>(endpoint, 'invoice.check', {
+    invoice_ids: [invoiceId],
+  })
+  if (check.error) throw new Error(`RGB proxy invoice.check failed: ${check.error.message || check.error.code}`)
+  const invoiceStatus = check.result?.[invoiceId]
+  if (!invoiceStatus || invoiceStatus.status === 'unknown') {
+    throw new Error('RGB invoice is unavailable on the proxy')
+  }
+  const signedTx = await proxyV1EncryptSignedTx(rawTx, senderPrivateKey, recipientPublicKey, transferId)
+  const senderInfo = await postJson<ProxyServerInfo>(senderEndpoint, 'server.info', {})
+  if (senderInfo.error || senderInfo.result?.protocol_version !== '1.0') {
+    throw new Error('RGB sender proxy does not support protocol v1')
+  }
+  const expiresAt = consignment.proxyExpirationTimestamp
+  if (!expiresAt || expiresAt <= Number(senderInfo.result.current_time) ||
+    expiresAt > Number(senderInfo.result.current_time) + Number(senderInfo.result.max_expiry_secs)) {
+    throw new Error('RGB proxy sender operation expiration is invalid')
+  }
+  const prepared = await postJson<boolean>(senderEndpoint, 'ack.prepare', {
+    transfer_data: {
+      [transferId]: {
+        recipient_pk: recipientPublicKey,
+        consignment_hash: consignmentHash,
+        signed_tx: signedTx,
+      },
+    },
+    expires_at: String(expiresAt),
+    signed_tx_hash: proxyV1Hash(Buffer.from(rawTx, 'hex')),
+    sender_pk: senderPublicKey,
+  })
+  if (prepared.error) throw new Error(`RGB proxy ack.prepare failed: ${prepared.error.message || prepared.error.code}`)
+
+  const timestamp = String(Math.floor(Date.now() / 1000))
+  const nonce = await proxyV1Pow(transferId, Number(invoiceStatus.pow_difficulty), timestamp)
+  const boundary = `----unisat-rgb-${rpcId()}`
+  const fields = [
+    ['jsonrpc', '2.0'],
+    ['id', rpcId()],
+    ['method', 'consignment.post'],
+    ['params[invoice_id]', invoiceId],
+    ['params[transfer_id]', transferId],
+    ['params[sender_transport_endpoint]', senderEndpoint],
+    ['params[sender_pk]', senderPublicKey],
+    ['params[consignment_hash]', consignmentHash],
+    ['params[batch]', 'false'],
+    ['params[file_size]', String(file.length)],
+    ['params[signature]', proxyV1Sign(senderPrivateKey, transferId + consignmentHash + consignmentHash)],
+    ['params[pow_timestamp]', timestamp],
+    ['params[pow_nonce]', nonce],
+  ]
+  const encoder = new TextEncoder()
+  const prefix = encoder.encode(
+    fields.map(([name, value]) =>
+      `--${boundary}\r\nContent-Disposition: form-data; name="${name}"\r\n\r\n${value}\r\n`
+    ).join('') +
+    `--${boundary}\r\nContent-Disposition: form-data; name="file"; filename="consignment.rgb"\r\nContent-Type: application/octet-stream\r\n\r\n`
+  )
+  const suffix = encoder.encode(`\r\n--${boundary}--\r\n`)
+  const multipart = new Uint8Array(prefix.length + file.length + suffix.length)
+  multipart.set(prefix)
+  multipart.set(file, prefix.length)
+  multipart.set(suffix, prefix.length + file.length)
+  const response = await fetchWithTimeout(toHttpEndpoint(endpoint), {
+    method: 'POST',
+    headers: { 'Content-Type': `multipart/form-data; boundary=${boundary}` },
+    body: multipart.buffer,
+  })
+  const body = await readRpcResponse<boolean>(response)
+  if (body.error) throw new Error(`RGB proxy consignment.post failed: ${body.error.message || body.error.code}`)
+}
+
+async function getProxyV1Consignment(input: {
+  recipientId: string
+  endpoints: string[]
+  proxyPrivateKey?: string
+}): Promise<RgbReceivedConsignment | undefined> {
+  const privateKey = input.proxyPrivateKey
+  if (!privateKey) throw new Error('RGB proxy v1 invoice signing key is missing')
+  const timestamp = String(Math.floor(Date.now() / 1000))
+  for (const endpoint of input.endpoints) {
+    const listed = await postJson<Record<string, string>>(endpoint, 'transfer.list', {
+      invoice_id: input.recipientId,
+      timestamp,
+      signature: proxyV1Sign(privateKey, input.recipientId + timestamp),
+    })
+    if (listed.error) throw new Error(`RGB proxy transfer.list failed: ${listed.error.message || listed.error.code}`)
+    const transferId = Object.entries(listed.result || {}).find(([, status]) => status === 'pending')?.[0]
+    if (!transferId) continue
+    const received = await postJson<ProxyV1Consignment>(endpoint, 'consignment.get', { transfer_id: transferId })
+    if (received.error) throw new Error(`RGB proxy consignment.get failed: ${received.error.message || received.error.code}`)
+    const result = received.result
+    if (!result?.consignment || !result.sender_pk || !result.consignment_hash || !result.sender_transport_endpoint) {
+      throw new Error('RGB proxy returned an incomplete v1 consignment')
+    }
+    if (proxyV1TransferId(input.recipientId, result.sender_pk) !== transferId) {
+      throw new Error('RGB proxy returned a transfer with an invalid ID')
+    }
+    if (proxyV1Hash(base64ToBytes(result.consignment)) !== result.consignment_hash) {
+      throw new Error('RGB proxy returned a consignment with an invalid hash')
+    }
+    return {
+      recipientId: input.recipientId,
+      payload: result.consignment,
+      txid: '',
+      endpoint,
+      proxyTransferId: transferId,
+      proxySenderPublicKey: result.sender_pk,
+      proxySenderEndpoint: result.sender_transport_endpoint,
+      proxyConsignmentHash: result.consignment_hash,
+    }
+  }
+  return undefined
+}
+
 async function tryEndpoints<T>(endpoints: string[], request: (endpoint: string) => Promise<T>) {
   let lastError: unknown
   for (const endpoint of endpoints) {
@@ -223,13 +381,87 @@ export function createRgbProxyTransport(proxyEndpoints: string[] = []): RgbTrans
   return {
     getEndpoints: () => endpoints,
 
+    prepareInvoice: async ({ recipientId, endpoints: invoiceEndpoints, expirationTimestamp }) => {
+      const serverInfos = await Promise.all(invoiceEndpoints.map(async endpoint => {
+        const body = await postJson<ProxyServerInfo>(endpoint, 'server.info', {})
+        if (body.error?.code === -32601) return { protocol_version: '0.2' } as ProxyServerInfo
+        if (body.error || !body.result?.protocol_version) {
+          throw new Error(`RGB proxy server.info failed: ${body.error?.message || body.error?.code || 'invalid response'}`)
+        }
+        return body.result
+      }))
+      if (serverInfos.every(info => info.protocol_version === '0.2')) return undefined
+      if (!serverInfos.every(info => info.protocol_version === '1.0')) {
+        throw new Error('RGB invoice endpoints use incompatible proxy protocol versions')
+      }
+      const now = Math.floor(Date.now() / 1000)
+      const expiresAt = expirationTimestamp ?? now + 7 * 24 * 60 * 60
+      if (!Number.isSafeInteger(expiresAt) || expiresAt <= now) {
+        throw new Error('RGB proxy v1 invoice requires a future expiration time')
+      }
+      for (const info of serverInfos) {
+        const serverNow = Number(info.current_time)
+        const maxExpiry = Number(info.max_expiry_secs)
+        if (!Number.isSafeInteger(serverNow) || !Number.isSafeInteger(maxExpiry) ||
+          expiresAt <= serverNow || expiresAt > serverNow + maxExpiry) {
+          throw new Error('RGB invoice expiration exceeds the proxy v1 limit')
+        }
+      }
+      const privateKey = ed25519.utils.randomPrivateKey()
+      const publicKey = Buffer.from(ed25519.getPublicKey(privateKey)).toString('hex')
+      const invoiceId = rgbProxyInvoiceId(recipientId, publicKey)
+      for (const endpoint of invoiceEndpoints) {
+        const body = await postJson<boolean>(endpoint, 'invoice.prepare', {
+          invoice_id: invoiceId,
+          expires_at: String(expiresAt),
+          recipient_pk: publicKey,
+          quota: '1',
+        })
+        if (body.error) throw new Error(`RGB proxy invoice.prepare failed: ${body.error.message || body.error.code}`)
+      }
+      return {
+        publicKey,
+        privateKey: Buffer.from(privateKey).toString('hex'),
+        invoiceId,
+        expirationTimestamp: expiresAt,
+      }
+    },
+
     publishConsignment: async consignment => {
       if (!consignment.endpoints.length)
         throw new Error('RGB invoice has no proxy transport endpoint')
+      if (consignment.proxyInvoiceId) {
+        await tryEndpoints(consignment.endpoints, endpoint =>
+          postProxyV1Consignment(endpoint, consignment, endpoints[0] || endpoint)
+        )
+        return
+      }
       await tryEndpoints(consignment.endpoints, endpoint => postConsignment(endpoint, consignment))
     },
 
     getAcknowledgement: async consignment => {
+      if (consignment.proxyInvoiceId) {
+        const privateKey = consignment.proxySenderPrivateKey
+        const publicKey = consignment.proxyRecipientPublicKey
+        if (!privateKey || !publicKey) throw new Error('RGB proxy v1 sender key is missing')
+        const transferId = proxyV1TransferId(consignment.proxyInvoiceId, proxyV1PublicKey(privateKey))
+        const timestamp = String(Math.floor(Date.now() / 1000))
+        const senderEndpoint = endpoints[0] || consignment.endpoints[0]
+        const body = await postJson<ProxyV1AckResult>(senderEndpoint, 'ack.get', {
+          transfer_ids: [transferId],
+          timestamp,
+          signature: proxyV1Sign(privateKey, transferId + timestamp),
+        })
+        if (body.error) throw new Error(`RGB proxy ack.get failed: ${body.error.message || body.error.code}`)
+        const ack = body.result?.acks?.[transferId]
+        if (ack === undefined) return undefined
+        const consignmentHash = proxyV1Hash(base64ToBytes(consignment.payload))
+        if (!proxyV1Verify(publicKey, body.result?.signatures?.[transferId] || '',
+          transferId + String(ack) + consignmentHash)) {
+          throw new Error('RGB proxy acknowledgement signature is invalid')
+        }
+        return ack
+      }
       let pending = false
       let lastError: unknown
       for (const endpoint of consignment.endpoints) {
@@ -254,12 +486,18 @@ export function createRgbProxyTransport(proxyEndpoints: string[] = []): RgbTrans
       throw lastError || new Error('RGB invoice has no proxy transport endpoint')
     },
 
-    getConsignment: getConsignmentFromEndpoints,
+    getConsignment: input => input.proxyPrivateKey
+      ? getProxyV1Consignment(input)
+      : getConsignmentFromEndpoints(input),
 
     getConsignments: async inputs => {
       const grouped = new Map<string, Array<(typeof inputs)[number]>>()
       const individual: typeof inputs = []
       for (const input of inputs) {
+        if (input.proxyPrivateKey) {
+          individual.push(input)
+          continue
+        }
         const [endpoint] = input.endpoints
         if (
           input.endpoints.length === 1 &&
@@ -316,7 +554,9 @@ export function createRgbProxyTransport(proxyEndpoints: string[] = []): RgbTrans
         )
       )
       const individuallyFetched = await Promise.all(
-        individual.map(input => getConsignmentFromEndpoints(input))
+        individual.map(input => input.proxyPrivateKey
+          ? getProxyV1Consignment(input)
+          : getConsignmentFromEndpoints(input))
       )
       return [...batched.flat(), ...individuallyFetched].filter(
         (item): item is RgbReceivedConsignment => !!item
@@ -324,6 +564,16 @@ export function createRgbProxyTransport(proxyEndpoints: string[] = []): RgbTrans
     },
 
     checkConsignmentAvailability: async ({ recipientId, endpoints: invoiceEndpoints }) => {
+      if (/^[0-9a-f]{64}$/.test(recipientId)) {
+        const statuses = await Promise.all(invoiceEndpoints.map(async endpoint => {
+          const body = await postJson<Record<string, { status: string }>>(endpoint, 'invoice.check', {
+            invoice_ids: [recipientId],
+          })
+          if (body.error) throw new Error(`RGB proxy invoice.check failed: ${body.error.message || body.error.code}`)
+          return body.result?.[recipientId]?.status
+        }))
+        return statuses.some(status => status === 'available')
+      }
       let occupiedEndpoints = 0
       let lastError: unknown
       for (const endpoint of invoiceEndpoints) {
@@ -353,7 +603,36 @@ export function createRgbProxyTransport(proxyEndpoints: string[] = []): RgbTrans
       throw lastError || new Error('Unable to check RGB invoice transport endpoint')
     },
 
-    acknowledgeConsignment: async ({ recipientId, endpoints, acknowledged }) => {
+    acknowledgeConsignment: async ({ recipientId, endpoints, acknowledged, proxyPrivateKey,
+      proxyTransferId, proxySenderPublicKey, proxySenderEndpoint, proxyConsignmentHash }) => {
+      if (proxyPrivateKey) {
+        if (!proxyTransferId || !proxySenderPublicKey || !proxySenderEndpoint || !proxyConsignmentHash) {
+          throw new Error('RGB proxy v1 acknowledgement state is incomplete')
+        }
+        const body = await postJson<{
+          sender_pk?: string; signed_tx?: string; signed_tx_hash?: string
+        }>(proxySenderEndpoint, 'ack.post', {
+          transfer_id: proxyTransferId,
+          ack: acknowledged,
+          signature: proxyV1Sign(proxyPrivateKey,
+            proxyTransferId + String(acknowledged) + proxyConsignmentHash),
+        })
+        if (body.error) throw new Error(`RGB proxy ack.post failed: ${body.error.message || body.error.code}`)
+        if (acknowledged) {
+          if (!body.result?.signed_tx || !body.result.sender_pk || !body.result.signed_tx_hash) {
+            throw new Error('RGB proxy signed transaction was cleared by sender')
+          }
+          if (body.result.sender_pk !== proxySenderPublicKey) {
+            throw new Error('RGB proxy returned a different signed transaction sender')
+          }
+          const rawTx = await proxyV1DecryptSignedTx(body.result.signed_tx,
+            proxyPrivateKey, body.result.sender_pk, proxyTransferId)
+          if (proxyV1Hash(Buffer.from(rawTx, 'hex')) !== body.result.signed_tx_hash) {
+            throw new Error('RGB proxy returned a signed transaction with an invalid hash')
+          }
+        }
+        return
+      }
       await tryEndpoints(endpoints, async endpoint => {
         const body = await postJson<boolean>(endpoint, 'ack.post', {
           recipient_id: recipientId,
@@ -362,6 +641,19 @@ export function createRgbProxyTransport(proxyEndpoints: string[] = []): RgbTrans
         if (body.error)
           throw new Error(`RGB proxy ack.post failed: ${body.error.message || body.error.code}`)
       })
+    },
+
+    cancelConsignment: async ({ proxyInvoiceId, proxySenderPrivateKey, allowMissing }) => {
+      const transferId = proxyV1TransferId(proxyInvoiceId, proxyV1PublicKey(proxySenderPrivateKey))
+      const endpoint = endpoints[0]
+      if (!endpoint) throw new Error('RGB sender proxy endpoint is missing')
+      const body = await postJson<boolean>(endpoint, 'ack.clean', {
+        transfer_ids: [transferId],
+        signature: proxyV1Sign(proxySenderPrivateKey, transferId),
+      })
+      if (body.error && !(allowMissing && body.error.code === -104)) {
+        throw new Error(`RGB proxy ack.clean failed: ${body.error.message || body.error.code}`)
+      }
     },
   }
 }

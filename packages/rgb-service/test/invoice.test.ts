@@ -3,6 +3,7 @@ import {
   appendRgbInvoiceRecipientNonce,
   decodeRgbInvoice,
   encodeWitnessRgbInvoice,
+  rgbProxyInvoiceId,
   witnessSealToScriptPubKey,
 } from '../src'
 
@@ -88,5 +89,18 @@ describe('decodeRgbInvoice', () => {
     expect(first.recipientId).toBe(second.recipientId)
     expect(first.proxyRecipientId).not.toBe(second.proxyRecipientId)
     expect(first.proxyRecipientId).toMatch(/^[0-9a-f]{64}$/)
+  })
+
+  it('carries the proxy v1 signing key and derives the registered invoice ID', () => {
+    const publicKey = 'ab'.repeat(32)
+    const invoice = decodeRgbInvoice(encodeWitnessRgbInvoice({
+      network: 'mainnet',
+      scriptPubKey: '512079be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798',
+      transportEndpoints: ['rpcs://proxy.example'],
+      proxyPublicKey: publicKey,
+    }))
+    expect(invoice.proxyPublicKey).toBe(publicKey)
+    expect(invoice.proxyInvoiceId).toBe(rgbProxyInvoiceId(invoice.recipientId, publicKey))
+    expect(invoice.proxyRecipientId).toBe(invoice.proxyInvoiceId)
   })
 })

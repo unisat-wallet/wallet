@@ -25,10 +25,13 @@ export type RgbInvoiceSeal =
 
 export interface RgbInvoice {
   raw: string
+  /** Proxy v1 invoice signing key; distinct from the Bitcoin funding key. */
+  proxyPublicKey?: string
+  proxyInvoiceId?: string
   assetId?: string
   amount?: string
   recipientId: string
-  /** Per-invoice transport key. Equals recipientId unless the invoice carries rid_nonce. */
+  /** Per-invoice proxy key: v1 invoice ID, legacy nonce key, or beneficiary. */
   proxyRecipientId: string
   recipientType: RgbInvoiceRecipientType
   seal: RgbInvoiceSeal
@@ -38,6 +41,7 @@ export interface RgbInvoice {
 }
 
 const OMITTED = '~'
+const PROXY_INVOICE_ID_PREFIX = 'rgb-proxy-server/invoice/v1'
 const AMOUNT_ALPHABET = 'abcdefghkmnABCDEFGHKMNPQRSTVWXYZ'
 const BAID64_ALPHABET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789_~'
 const SECP256K1_FIELD_PRIME = 0xfffffffffffffffffffffffffffffffffffffffffffffffffffffffefffffc2fn
@@ -46,6 +50,13 @@ const baid64Decoder = new Map(BAID64_ALPHABET.split('').map((char, index) => [ch
 
 function hex(value: Uint8Array) {
   return Buffer.from(value).toString('hex')
+}
+
+export function rgbProxyInvoiceId(recipientId: string, publicKey: string) {
+  if (!/^[0-9a-f]{64}$/.test(publicKey)) {
+    throw new RgbServiceError('RGB proxy invoice public key is invalid')
+  }
+  return hex(sha256(new TextEncoder().encode(PROXY_INVOICE_ID_PREFIX + recipientId + publicKey)))
 }
 
 function decodePart(value: string) {
@@ -336,6 +347,10 @@ export function decodeRgbInvoice(invoice: string): RgbInvoice {
   const [queryAmount] = getQueryValues(query, 'amount')
   const [queryAssetId] = getQueryValues(query, 'assetId')
   const [expiration] = getQueryValues(query, 'expirationTimestamp')
+  const [proxyPublicKey] = getQueryValues(query, 'pk')
+  if (proxyPublicKey && !/^[0-9a-f]{64}$/.test(proxyPublicKey)) {
+    throw new RgbServiceError('RGB proxy invoice public key is invalid')
+  }
   const transportEndpoints = getQueryValues(query, 'endpoints').flatMap(value =>
     value
       .split(',')
@@ -349,10 +364,13 @@ export function decodeRgbInvoice(invoice: string): RgbInvoice {
 
   return {
     raw,
+    ...(proxyPublicKey ? { proxyPublicKey, proxyInvoiceId: rgbProxyInvoiceId(recipientId, proxyPublicKey) } : {}),
     assetId: normalizeAssetId(queryAssetId || segments[0]),
     amount,
     recipientId,
-    proxyRecipientId: rgbInvoiceProxyRecipientId(recipientId, transportEndpoints),
+    proxyRecipientId: proxyPublicKey
+      ? rgbProxyInvoiceId(recipientId, proxyPublicKey)
+      : rgbInvoiceProxyRecipientId(recipientId, transportEndpoints),
     recipientType: seal.type === 'confidential' ? 'blind' : 'witness',
     seal,
     network: invoiceNetwork(recipientId),
@@ -374,6 +392,7 @@ export function encodeWitnessRgbInvoice(input: {
   amount?: string
   expirationTimestamp?: number
   transportEndpoints: string[]
+  proxyPublicKey?: string
 }) {
   if (!/^(0|[1-9][0-9]*)$/.test(input.amount ?? '0'))
     throw new RgbServiceError('RGB invoice amount is invalid')
@@ -388,6 +407,10 @@ export function encodeWitnessRgbInvoice(input: {
   if (input.expirationTimestamp !== undefined)
     query.set('expirationTimestamp', String(input.expirationTimestamp))
   query.set('endpoints', input.transportEndpoints.join(','))
+  if (input.proxyPublicKey) {
+    rgbProxyInvoiceId(recipientId, input.proxyPublicKey)
+    query.set('pk', input.proxyPublicKey)
+  }
   return `rgb:${assetId}/~/${input.amount === undefined ? '~' : '~'}/${recipientId}?${query}`
 }
 

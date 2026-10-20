@@ -12,6 +12,8 @@ import {
   encodeNiaGenesis,
   encodeRgbContractId,
   decodeNiaConsignment,
+  decodeRgbInvoice,
+  rgbProxyInvoiceId,
   RgbInsufficientBalanceError,
   RgbService,
   RgbServiceError,
@@ -1632,6 +1634,45 @@ describe('RgbService', () => {
       service.createBlindReceive({ assetId: 'rgb:AQEBAQEB-AQEBAQE-BAQEBAQ-EBAQEBA-QEBAQEB-AQEBAQE', amount: '1' })
     ).resolves.toMatchObject({ assetId: 'rgb:AQEBAQEB-AQEBAQE-BAQEBAQ-EBAQEBA-QEBAQEB-AQEBAQE' })
     expect(service.getAvailableReceiveUtxos()).toEqual([])
+  })
+
+  it('stores a proxy v1 invoice key alongside the registered blind receive', async () => {
+    const dependencies = createDependencies()
+    vi.mocked(dependencies.stateSource.getSnapshot).mockResolvedValue({
+      syncedAt: 1,
+      utxos: [{
+        outpoint: { txid: 'f'.repeat(64), vout: 0 },
+        satoshis: 1_000,
+        scriptPubKey: '5120' + '11'.repeat(32),
+        publicKey: '02' + '22'.repeat(32),
+        chainStatus: 'confirmed',
+        confirmations: 1,
+        allocations: [],
+      }],
+    })
+    const publicKey = 'ab'.repeat(32)
+    const privateKey = 'cd'.repeat(32)
+    const expiresAt = Math.floor(Date.now() / 1000) + 3600
+    dependencies.transport.prepareInvoice = vi.fn(async ({ recipientId }) => ({
+      publicKey,
+      privateKey,
+      invoiceId: rgbProxyInvoiceId(recipientId, publicKey),
+      expirationTimestamp: expiresAt,
+    }))
+    const service = new RgbService(dependencies)
+    await service.open(wallet)
+    await service.sync()
+    const receive = await service.createBlindReceive({ durationSeconds: 3600 })
+    const invoice = decodeRgbInvoice(receive.invoice)
+    expect(invoice.proxyPublicKey).toBe(publicKey)
+    expect(invoice.proxyRecipientId).toBe(receive.proxyRecipientId)
+    expect(receive).toMatchObject({
+      proxyPrivateKey: privateKey,
+      proxyPublicKey: publicKey,
+      proxyInvoiceId: invoice.proxyInvoiceId,
+      expirationTimestamp: expiresAt,
+    })
+    expect(service.getPendingReceives()[0]?.proxyPrivateKey).toBe(privateKey)
   })
 
   it('rejects a fixed receive amount when the invoice does not name an RGB asset', async () => {
