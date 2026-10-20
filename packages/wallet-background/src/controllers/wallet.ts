@@ -6294,6 +6294,19 @@ export class WalletController extends BaseController {
       await this.ensureRgbWriteLease(context, options)
       return true
     } catch (error) {
+      if (String(error).includes('RGB lease checkpoint revision is stale')) {
+        try {
+          // The checkpoint may have finished uploading after our last read.
+          // Reconcile it before retrying; never acquire against a revision we
+          // have not authenticated or overwrite divergent local state.
+          await this.refreshRgbRecoveryForWrite(context)
+          await this.ensureRgbWriteLease(context, options)
+          return true
+        } catch (retryError) {
+          log.warn('RGB checkpoint reconciliation blocked background synchronization', retryError)
+          return false
+        }
+      }
       log.debug('RGB index write deferred because another device holds the lease', error)
       return false
     }

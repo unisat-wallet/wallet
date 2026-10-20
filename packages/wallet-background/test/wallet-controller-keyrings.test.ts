@@ -2172,6 +2172,63 @@ describe('RGB wallet references', () => {
     })
   })
 
+  it('reconciles a stale checkpoint before retrying background RGB synchronization', async () => {
+    const wallet = new WalletController()
+    const walletRef = { walletId: 'wallet-1', fundingAddress: 'bc1p-rgb-funding', network: 'mainnet' }
+    let revision = 'a'.repeat(24)
+    const context = {
+      service: { getRecoveryCheckpointRevision: () => revision },
+      wallet: walletRef,
+    }
+    const acquireRgbWriteLease = vi
+      .fn()
+      .mockRejectedValueOnce(new Error('RGB lease checkpoint revision is stale'))
+      .mockResolvedValueOnce({
+        leaseId: 'c'.repeat(24),
+        fencingToken: 2,
+        expiresAt: Date.now() + 60_000,
+      })
+    ;(walletApiService as any).rgb = { acquireRgbWriteLease }
+    vi.spyOn(wallet as any, 'getRgbDeviceId').mockResolvedValue('device_abcdefghijklmnop')
+    const refresh = vi
+      .spyOn(wallet as any, 'refreshRgbRecoveryForWrite')
+      .mockImplementation(async () => {
+        revision = 'b'.repeat(24)
+      })
+
+    await expect((wallet as any).tryEnsureRgbWriteLease(context, { forceRenew: true })).resolves.toBe(
+      true
+    )
+
+    expect(refresh).toHaveBeenCalledOnce()
+    expect(acquireRgbWriteLease).toHaveBeenCalledTimes(2)
+    expect(acquireRgbWriteLease.mock.calls.map(([request]) => request.checkpointRevision)).toEqual([
+      'a'.repeat(24),
+      'b'.repeat(24),
+    ])
+  })
+
+  it('does not retry a stale lease when recovery state conflicts', async () => {
+    const wallet = new WalletController()
+    const context = {
+      service: { getRecoveryCheckpointRevision: () => 'a'.repeat(24) },
+      wallet: { walletId: 'wallet-1', fundingAddress: 'bc1p-rgb-funding', network: 'mainnet' },
+    }
+    const acquireRgbWriteLease = vi
+      .fn()
+      .mockRejectedValue(new Error('RGB lease checkpoint revision is stale'))
+    ;(walletApiService as any).rgb = { acquireRgbWriteLease }
+    vi.spyOn(wallet as any, 'getRgbDeviceId').mockResolvedValue('device_abcdefghijklmnop')
+    vi.spyOn(wallet as any, 'refreshRgbRecoveryForWrite').mockRejectedValue(
+      new Error('RGB recovery checkpoint has changed on another installation')
+    )
+
+    await expect((wallet as any).tryEnsureRgbWriteLease(context, { forceRenew: true })).resolves.toBe(
+      false
+    )
+    expect(acquireRgbWriteLease).toHaveBeenCalledOnce()
+  })
+
   it('retries a durable received-allocation UTXO replacement after a backend failure', async () => {
     const wallet = new WalletController()
     let pendingUtxoSync: any = {
