@@ -28,7 +28,7 @@ export default function RgbBackupExportScreen() {
       setPlan(nextPlan);
       setStep(2);
     } catch (error) {
-      tools.toastError(error instanceof Error ? error.message : String(error));
+      tools.toastError((error as any).message);
     } finally {
       setBusy(false);
     }
@@ -50,7 +50,7 @@ export default function RgbBackupExportScreen() {
     } catch (error) {
       setPlan(undefined);
       setStep(1);
-      tools.toastError(error instanceof Error ? error.message : String(error));
+      tools.toastError((error as any).message);
     } finally {
       setBusy(false);
     }
@@ -64,7 +64,9 @@ export default function RgbBackupExportScreen() {
           <RgbBackupStepBar
             step={step}
             labels={[t('rgb_export_step_prepare'), t('rgb_export_step_review'), t('rgb_export_step_done')]}
-            onStepClick={(target) => { if (!busy && step !== 3) setStep(target); }}
+            onStepClick={(target) => {
+              if (!busy && step !== 3) setStep(target);
+            }}
           />
           {step === 1 ? (
             <>
@@ -72,17 +74,39 @@ export default function RgbBackupExportScreen() {
                 <Text text={t('rgb_backup_download_description')} color="white" size="sm" wrap />
                 <Text text={t('rgb_backup_safety_description')} color="textDim" size="xs" wrap />
               </Card>
-              <Button text={t('rgb_review_backup_scope')} preset="primary" disabled={busy} onClick={() => void reviewExport()} />
+              <Button
+                text={t('rgb_review_backup_scope')}
+                preset="primary"
+                disabled={busy}
+                onClick={() => void reviewExport()}
+              />
             </>
           ) : null}
           {step === 2 && plan ? (
             <>
               <Card style={{ flexDirection: 'column', alignItems: 'stretch', gap: 8 }}>
                 <Text text={t('rgb_backup_network', { network: plan.network })} color="textDim" size="xs" />
-                <Text text={t('rgb_backup_account_count', { count: plan.accountIndexes.length })} color="white" size="sm" preset="bold" />
-                <Text text={t('rgb_backup_accounts', { accounts: plan.accountIndexes.map(index => index + 1).join(', ') })} color="textDim" size="xs" wrap />
+                <Text
+                  text={t('rgb_backup_account_count', { count: plan.accountIndexes.length })}
+                  color="white"
+                  size="sm"
+                  preset="bold"
+                />
+                <Text
+                  text={t('rgb_backup_accounts', {
+                    accounts: plan.accountIndexes.map((index) => index + 1).join(', ')
+                  })}
+                  color="textDim"
+                  size="xs"
+                  wrap
+                />
               </Card>
-              <Button text={t('rgb_confirm_export_backup', { count: plan.accountIndexes.length })} preset="primary" disabled={busy} onClick={() => void exportBackup()} />
+              <Button
+                text={t('rgb_confirm_export_backup', { count: plan.accountIndexes.length })}
+                preset="primary"
+                disabled={busy}
+                onClick={() => void exportBackup()}
+              />
             </>
           ) : null}
           {step === 3 ? (
