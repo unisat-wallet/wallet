@@ -17,7 +17,7 @@ import {
 import { keyringService, preferenceService, walletApiService } from '../src/services'
 import { bgEventBus } from '../src/utils/eventBus'
 import { encryptRgbRecoveryCheckpoint } from '../src/rgb/RgbRecoveryCheckpoint'
-import { createRgbBackupPackage } from '../src/rgb/RgbBackupPackage'
+import { createRgbBackupPackage, readRgbBackupPackage } from '../src/rgb/RgbBackupPackage'
 import { createRgbHdBackupPackage, readRgbHdBackupPackage } from '../src/rgb/RgbHdBackupPackage'
 
 vi.mock('@unisat/babylon-service', () => ({
@@ -393,6 +393,62 @@ describe('RGB HD backup orchestration', () => {
   ]
 
   beforeEach(() => vi.clearAllMocks())
+
+  it('exports a verified checkpoint without acquiring a write lease', async () => {
+    const controller = new WalletController()
+    const state = { wallet: { walletId: 'wallet-0', network: 'mainnet', fundingAddress: 'funding-0' } }
+    const status = { dirty: false, verified: true }
+    const service = {
+      getRecoveryCheckpointStatus: vi.fn(() => status),
+      retryRecoveryCheckpoint: vi.fn(),
+      exportRecoveryState: vi.fn(() => state),
+    }
+    const context = { wallet: state.wallet, service }
+    const lease = vi.spyOn(controller as any, 'ensureRgbWriteLease').mockRejectedValue(
+      new Error('RGB write lease is held by another device')
+    )
+    vi.spyOn(controller as any, 'rgbBackupKey').mockResolvedValue('11'.repeat(32))
+
+    const payload = await (controller as any).exportRgbBackupForContext(context)
+    expect((await readRgbBackupPackage(payload, '11'.repeat(32))).state).toEqual(state)
+    expect(lease).not.toHaveBeenCalled()
+    expect(service.retryRecoveryCheckpoint).not.toHaveBeenCalled()
+
+    status.dirty = true
+    await expect((controller as any).exportRgbBackupForContext(context)).rejects.toThrow(
+      'RGB write lease is held by another device'
+    )
+    expect(service.retryRecoveryCheckpoint).not.toHaveBeenCalled()
+  })
+
+  it('takes over the writer lease only after a backup replacement is approved', async () => {
+    const controller = new WalletController()
+    const state = { walletId: 'wallet-0' }
+    const wallet = { walletId: 'wallet-0', network: 'mainnet', fundingAddress: 'funding-0' }
+    const service = {
+      canRestoreRecoveryState: vi.fn(() => true),
+      restoreRecoveryState: vi.fn().mockResolvedValue(true),
+      retryRecoveryCheckpoint: vi.fn().mockResolvedValue(true),
+    }
+    const context = { wallet, service }
+    const lease = vi.spyOn(controller as any, 'ensureRgbWriteLease').mockResolvedValue(undefined)
+    vi.spyOn(controller as any, 'rgbBackupKey').mockResolvedValue('11'.repeat(32))
+    vi.spyOn(controller as any, 'getLocalRgbService').mockResolvedValue(context)
+    const payload = await createRgbBackupPackage(state, '11'.repeat(32), 123)
+
+    await expect(controller.restoreRgbBackup({ payload, replaceRemote: false })).rejects.toThrow(
+      'explicit replacement confirmation'
+    )
+    expect(lease).not.toHaveBeenCalled()
+    await expect(controller.restoreRgbBackup({ payload, replaceRemote: true })).resolves.toEqual({
+      restored: true,
+      createdAt: 123,
+    })
+    expect(lease).toHaveBeenCalledWith(context, { forceRenew: true, takeover: true })
+    expect(service.restoreRecoveryState).toHaveBeenCalledWith(state)
+    expect(service.retryRecoveryCheckpoint).toHaveBeenCalledWith('replacement', true)
+    expect(lease.mock.invocationCallOrder[0]).toBeLessThan(service.restoreRecoveryState.mock.invocationCallOrder[0]!)
+  })
 
   it('exports both created accounts without switching the selected account', async () => {
     const controller = new WalletController()
@@ -2119,7 +2175,7 @@ describe('RGB wallet references', () => {
     expect((wallet as any).rgbWriteLeases.size).toEqual(0)
   })
 
-  it('only takes over RGB writing through the explicit activation action', async () => {
+  it('takes over RGB writing through the explicit activation action', async () => {
     const wallet = new WalletController()
     const walletRef = { walletId: 'wallet-1', fundingAddress: 'bc1p-rgb-funding', network: 'mainnet' }
     const context = { service: {}, wallet: walletRef }

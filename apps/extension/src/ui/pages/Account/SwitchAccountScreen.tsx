@@ -189,7 +189,7 @@ export default function SwitchAccountScreen() {
     }
 
     return _items;
-  }, []);
+  }, [keyring.accounts]);
 
   const currentAccount = useCurrentAccount();
   const currentIndex = keyring.accounts.findIndex((v) => v.pubkey == currentAccount.pubkey);
@@ -205,7 +205,7 @@ export default function SwitchAccountScreen() {
     });
 
     return () => clearTimeout(timeoutId);
-  }, []);
+  }, [currentAccount.address, currentIndex]);
 
   const layoutHeight = Math.ceil((window.innerHeight - 64) / ITEM_HEIGHT) * ITEM_HEIGHT;
   const canCreateAccount = ACCOUNT_CREATABLE_KEYRING_TYPES.includes(keyring.type as KeyringType);

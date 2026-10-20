@@ -4431,11 +4431,16 @@ export class WalletController extends BaseController {
   }
 
   private exportRgbBackupForContext = async (context: LocalRgbServiceContext) => {
-    await this.ensureRgbWriteLease(context, { forceRenew: true })
-    if (!(await context.service.retryRecoveryCheckpoint())) {
-      throw new Error(
-        'RGB recovery checkpoint is not verified; retry after synchronization completes'
-      )
+    const checkpoint = context.service.getRecoveryCheckpointStatus()
+    // A clean, verified checkpoint only needs a local read. Acquiring a
+    // writer lease here blocks exports while another installation is active.
+    if (checkpoint.dirty || !checkpoint.verified) {
+      await this.ensureRgbWriteLease(context, { forceRenew: true })
+      if (!(await context.service.retryRecoveryCheckpoint())) {
+        throw new Error(
+          'RGB recovery checkpoint is not verified; retry after synchronization completes'
+        )
+      }
     }
     const status = context.service.getRecoveryCheckpointStatus()
     if (status.dirty || !status.verified) {
@@ -4486,8 +4491,10 @@ export class WalletController extends BaseController {
       throw new Error('RGB backup package does not belong to this wallet')
     }
     // replaceRemote is the explicit user confirmation to discard any current
-    // local state. A backup is a replacement, never a merge mechanism.
-    await this.ensureRgbWriteLease(context, { forceRenew: true })
+    // local state. A backup is a replacement, never a merge mechanism. Fence
+    // an older installation holding the writer lease; the checkpoint revision
+    // still prevents replacing a newer unknown state.
+    await this.ensureRgbWriteLease(context, { forceRenew: true, takeover: true })
     if (!(await context.service.restoreRecoveryState(backup.state))) {
       throw new Error('RGB backup package could not be restored')
     }

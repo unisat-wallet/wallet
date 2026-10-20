@@ -2,7 +2,7 @@ import { type ChangeEvent, useRef, useState } from 'react';
 
 import { Button, Card, Column, Content, Header, Layout, Row, Text } from '@/ui/components';
 import { Popover } from '@/ui/components/Popover';
-import { useI18n, useNavigation, useTools, useWallet } from '@unisat/wallet-state';
+import { useI18n, useNavigation, useReloadAccounts, useTools, useWallet } from '@unisat/wallet-state';
 
 import { RgbBackupStepBar } from './RgbBackupStepBar';
 
@@ -24,6 +24,7 @@ export default function RgbBackupRestoreScreen() {
   const wallet = useWallet();
   const nav = useNavigation();
   const tools = useTools();
+  const reloadAccounts = useReloadAccounts();
   const { t } = useI18n();
   const fileInput = useRef<HTMLInputElement>(null);
   const [step, setStep] = useState<1 | 2 | 3>(1);
@@ -39,12 +40,14 @@ export default function RgbBackupRestoreScreen() {
     const message = errorMessage(error);
     if (!message) return t(stage === 'read' ? 'rgb_import_error_read_failed' : 'rgb_import_error_restore_failed');
     if (/RGB account \d+ failed to restore/.test(message)) {
-      const match = message.match(/RGB account (\d+) failed to restore; completed accounts: ([^.]+)\./);
+      const match = message.match(/RGB account (\d+) failed to restore; completed accounts: ([^.]+)\.\s*(.*)/s);
       if (match) {
-        return t('rgb_import_error_partial', {
+        const summary = t('rgb_import_error_partial', {
           account: match[1],
           completed: match[2] === 'none' ? t('rgb_import_error_none') : match[2]
         });
+        const reason = match[3]?.replace(/^Error:\s*/, '').trim();
+        return reason ? `${summary} ${reason}` : summary;
       }
     }
     if (/RGB account (\d+) has not been created/.test(message)) {
@@ -97,6 +100,7 @@ export default function RgbBackupRestoreScreen() {
         replaceRemote: true,
         createMissingAccounts: (preview.missingAccountIndexes?.length || 0) > 0
       });
+      await reloadAccounts().catch(error => console.error('Failed to refresh accounts after RGB restore', error));
       setConfirmRestore(false);
       setStep(3);
       tools.toastSuccess(t('rgb_backup_restored'));
