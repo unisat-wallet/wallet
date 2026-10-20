@@ -169,7 +169,7 @@ export function Tooltip({
 
   const tooltipNode =
     visible && title ? (
-      <div ref={tooltipRef} style={defaultTooltipStyle}>
+      <div ref={tooltipRef} style={defaultTooltipStyle} role="tooltip">
         {title}
       </div>
     ) : null;
@@ -184,7 +184,8 @@ export function Tooltip({
           display: block ? 'block' : 'inline-block',
           width: block ? '100%' : undefined,
           minWidth: block ? 0 : undefined,
-          overflow: block ? 'hidden' : undefined
+          overflow: block ? 'hidden' : undefined,
+          cursor: title ? 'help' : undefined
         }}>
         {children}
       </div>

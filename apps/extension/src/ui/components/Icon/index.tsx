@@ -53,6 +53,7 @@ export const svgRegistry = {
   search: '/images/icons/action/search.svg',
   filter: '/images/icons/action/filter.svg',
   add_liquidity: '/images/icons/action/add_liquidity.svg',
+  plus: '/images/icons/action/plus.svg',
   issue: '/images/icons/action/issue.svg',
 
   // status
@@ -218,6 +219,7 @@ const iconImgList: Array<IconTypes> = [
   'balance-right',
   'balance-question',
   'balance-unlock-right',
+  'plus',
   'brc20-single-step',
   'arrow-right',
   'version-notice',

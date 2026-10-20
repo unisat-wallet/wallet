@@ -917,6 +917,9 @@
   "history": {
     "message": "Historial"
   },
+  "history_rgb_not_included": {
+    "message": "Las transacciones RGB no están incluidas. Consulta RGB History (solo local)."
+  },
   "history_count": {
     "message": "Total de transacciones"
   },
@@ -1556,6 +1559,9 @@
   },
   "new": {
     "message": "¡nuevo!"
+  },
+  "new_badge": {
+    "message": "New"
   },
   "new_account": {
     "message": "Nueva cuenta"
@@ -2881,10 +2887,10 @@
     "message": "Usa esta dirección para recibir $unit en $chain"
   },
   "rgb_invoice": {
-    "message": "Factura RGB"
+    "message": "Factura RGB del destinatario"
   },
   "paste_rgb_invoice": {
-    "message": "Pega la factura RGB"
+    "message": "Pega la factura RGB del destinatario"
   },
   "enter_amount_greater_than_0": {
     "message": "Introduce un importe mayor que 0."
@@ -2951,6 +2957,18 @@
   },
   "create_invoice": {
     "message": "Crear factura"
+  },
+  "rgb_invoices": {
+    "message": "Facturas RGB"
+  },
+  "create_rgb_invoice": {
+    "message": "Crear factura RGB"
+  },
+  "share_existing_rgb_invoice": {
+    "message": "Comparte una factura existente con el remitente"
+  },
+  "create_new_rgb_invoice_to_share": {
+    "message": "Crea una nueva factura para compartir con el remitente"
   },
   "rgb_sent": {
     "message": "RGB enviado"
@@ -3385,7 +3403,7 @@
     "message": "La vista previa no está disponible en esta red. Consulta las transacciones en el explorador."
   },
   "view_all": {
-    "message": "Ver todo"
+    "message": "Todos los activos"
   },
   "any_rgb_asset": {
     "message": "Cualquier activo RGB"

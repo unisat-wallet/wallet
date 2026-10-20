@@ -30,6 +30,8 @@ export interface BasePreferenceStore {
   currency: string
   externalLinkAck: boolean
   showSafeNotice: boolean
+  /** Addresses that have dismissed the Assets tab "New" badge */
+  assetsNewBadgeDismissedByAddressV4: Record<string, boolean>
 
   // Network and address configuration
   chainType: ChainType

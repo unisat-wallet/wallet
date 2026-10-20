@@ -327,7 +327,31 @@ export default function RGBReceiveScreen({ initialStep = 'create_invoice' }: { i
             <Text text={title} size="sm" style={{ color: selected ? '#EFC133' : '#FFFFFF' }} />
             <Text text={description} size="xs" style={{ color: '#898989' }} />
           </Column>
-          {selected ? <Icon icon="checked" color="gold" size={20} /> : null}
+          {selected ? (
+            <Icon icon="checked" color="gold" size={20} />
+          ) : (
+            <div
+              style={{
+                width: 20,
+                height: 20,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                flexShrink: 0
+              }}
+            >
+              {/* Match checked.svg circle diameter (~17px inside 20px viewBox) */}
+              <div
+                style={{
+                  width: 17,
+                  height: 17,
+                  borderRadius: '50%',
+                  border: '1.5px solid rgba(255, 255, 255, 0.45)',
+                  boxSizing: 'border-box'
+                }}
+              />
+            </div>
+          )}
         </Row>
         {selected && children ? <div onClick={(e) => e.stopPropagation()}>{children}</div> : null}
       </Column>
@@ -718,7 +742,7 @@ export default function RGBReceiveScreen({ initialStep = 'create_invoice' }: { i
       <Layout>
         <Header onBack={onCloseInvoice} title={t('invoice_created')} />
         <Content>
-          <Column gap="lg">
+          <Column gap="zero">
             <ReceiveQRCodeCard
               title={
                 <Column fullX itemsCenter gap="sm">
@@ -751,7 +775,14 @@ export default function RGBReceiveScreen({ initialStep = 'create_invoice' }: { i
               qrTopSpacing={0}
             />
 
-            {error ? <Text text={error} size="xs" color="danger" wrap /> : null}
+            <Button
+              text={t('done')}
+              preset="default"
+              onClick={onCloseInvoice}
+              style={{ marginTop: 16 }}
+            />
+
+            {error ? <Text text={error} size="xs" color="danger" wrap style={{ marginTop: 12 }} /> : null}
           </Column>
         </Content>
         {writeLeaseModal}

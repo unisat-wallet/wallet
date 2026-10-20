@@ -917,6 +917,9 @@
   "history": {
     "message": "История"
   },
+  "history_rgb_not_included": {
+    "message": "RGB-транзакции не включены. Смотрите RGB History (только локально)."
+  },
   "history_count": {
     "message": "Общее количество транзакций"
   },
@@ -1556,6 +1559,9 @@
   },
   "new": {
     "message": "новое!"
+  },
+  "new_badge": {
+    "message": "New"
   },
   "new_account": {
     "message": "Новый аккаунт"
@@ -2890,10 +2896,10 @@
     "message": "Используйте этот адрес для получения $unit в $chain"
   },
   "rgb_invoice": {
-    "message": "RGB-инвойс"
+    "message": "RGB инвойс получателя"
   },
   "paste_rgb_invoice": {
-    "message": "Вставьте RGB-инвойс"
+    "message": "Вставьте RGB-инвойс получателя"
   },
   "enter_amount_greater_than_0": {
     "message": "Введите сумму больше 0."
@@ -2960,6 +2966,18 @@
   },
   "create_invoice": {
     "message": "Создать инвойс"
+  },
+  "rgb_invoices": {
+    "message": "RGB инвойсы"
+  },
+  "create_rgb_invoice": {
+    "message": "Создать RGB инвойс"
+  },
+  "share_existing_rgb_invoice": {
+    "message": "Поделиться существующим инвойсом с отправителем"
+  },
+  "create_new_rgb_invoice_to_share": {
+    "message": "Создать новый инвойс, чтобы поделиться с отправителем"
   },
   "rgb_sent": {
     "message": "RGB отправлен"
@@ -3394,7 +3412,7 @@
     "message": "Предпросмотр недоступен в этой сети. Посмотрите транзакции в обозревателе."
   },
   "view_all": {
-    "message": "Показать все"
+    "message": "Все активы"
   },
   "any_rgb_asset": {
     "message": "Любой RGB-актив"

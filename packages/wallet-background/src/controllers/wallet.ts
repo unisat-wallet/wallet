@@ -3546,6 +3546,14 @@ export class WalletController extends BaseController {
     return preferenceService.setShowSafeNotice(show)
   }
 
+  getAssetsNewBadgeDismissed = (address: string) => {
+    return preferenceService.getAssetsNewBadgeDismissed(address)
+  }
+
+  setAssetsNewBadgeDismissed = (address: string, dismissed = true) => {
+    return preferenceService.setAssetsNewBadgeDismissed(address, dismissed)
+  }
+
   getVersionDetail = (version: string) => {
     return walletApiService.config.getVersionDetail(version)
   }

@@ -1,14 +1,17 @@
+/* Figma Assets (116:4965 / 136:4762 family) — source tokens from node dump */
 .section {
   position: relative;
   box-sizing: border-box;
   width: calc(100% + 32px);
   margin: 0 -16px;
-  padding: 12px 0 20px;
-  border-top: 1px solid rgba(255, 255, 255, 0.05);
+  /* Frame 376×132; header @ y+12, cards 60px → bottom pad 20 */
+  padding: 12px 0 24px;
   border-bottom: 1px solid rgba(255, 255, 255, 0.02);
-  background: linear-gradient(180deg, rgba(244, 182, 44, 0.15) 0%, rgba(244, 182, 44, 0) 45%);
+  /* Assets Background: fill opacity 0.15, #f4b62c → transparent, handle ends ~44.7% */
+  background: linear-gradient(180deg, rgba(244, 182, 44, 0.15) 0%, rgba(244, 182, 44, 0) 44.7%);
 }
 
+/* Top 1px gold light hairline */
 .section::before {
   position: absolute;
   top: 0;
@@ -33,6 +36,13 @@
   padding: 0 16px;
 }
 
+.titleRow {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
 .title {
   color: #fff;
   font-family: Inter-Regular, sans-serif;
@@ -49,7 +59,7 @@
   padding: 0;
   border: 0;
   background: none;
-  color: #f4b62c;
+  color: rgba(244, 182, 44, 0.85);
   font-family: Inter-Regular, sans-serif;
   font-size: 14px;
   font-weight: 500;
@@ -124,9 +134,12 @@
   height: 60px;
   gap: 8px;
   padding: 8px;
-  border: 1px solid rgba(255, 255, 255, 0.06);
+  /* Figma panel: Fill #F4B62C 15%; Stroke #F4B62C 25% Inside 1 */
+  appearance: none;
+  border: 0;
   border-radius: 16px;
-  background: #1e1f24;
+  background-color: rgba(244, 182, 44, 0.15);
+  box-shadow: inset 0 0 0 1px rgba(244, 182, 44, 0.25);
   color: #fff;
   text-align: left;
   cursor: pointer;
@@ -146,7 +159,7 @@
   display: block;
   width: 28px;
   height: 28px;
-  border-radius: 8px;
+  border-radius: 50%;
 }
 
 .iconImage {
@@ -164,6 +177,8 @@
   align-items: center;
   justify-content: center;
   background: #343742;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  box-sizing: border-box;
   color: rgba(255, 255, 255, 0.9);
   font-size: 11px;
   font-weight: 500;
@@ -193,7 +208,7 @@
   font-family: Inter-Regular, sans-serif;
   font-size: 14px;
   font-weight: 500;
-  line-height: 20px;
+  line-height: 17px;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -202,7 +217,7 @@
 .itemCount {
   overflow: hidden;
   font-size: 12px;
-  line-height: 16px;
+  line-height: 15px;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -214,6 +229,7 @@
 
 .itemCount {
   color: rgba(255, 255, 255, 0.6);
+  font-weight: 400;
 }
 
 .emptyRow {

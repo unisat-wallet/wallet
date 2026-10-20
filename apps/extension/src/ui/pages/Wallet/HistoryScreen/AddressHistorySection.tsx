@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react';
 
 import { IMAGE_SOURCE_MAP } from '@/shared/constant';
-import { Column, Row, Text } from '@/ui/components';
+import { Column, Icon, Row, Text, Tooltip } from '@/ui/components';
 import { Pagination } from '@/ui/components/Pagination';
+import { fontSizes } from '@/ui/theme/font';
 import { shortAddress } from '@/ui/utils';
 import type {
   AddressHistoryAssetItem,
@@ -66,6 +67,27 @@ function HistoryChange({ change }: { change: HistoryAssetChange }) {
   );
 }
 
+type HistoryAssetCategoryTone = 'brc20' | 'runes' | 'alkanes' | 'cat20' | 'inscription' | 'default';
+
+function getHistoryAssetCategory(kind: AddressHistoryAssetItem['kind'], unit: string, t: (key: string) => string) {
+  if (kind === 'coin') return { label: unit, tone: 'default' as const };
+  if (kind === 'inscription') return { label: t('inscriptions'), tone: 'inscription' as const };
+  if (kind === 'brc20' || kind === 'brc20_prog') return { label: t('brc20'), tone: 'brc20' as const };
+  if (kind === 'runes') return { label: t('runes'), tone: 'runes' as const };
+  if (kind === 'alkanes') return { label: t('alkanes'), tone: 'alkanes' as const };
+  if (kind === 'cat20' || kind === 'cat20_v2') return { label: 'CAT20', tone: 'cat20' as const };
+  return { label: kind.replaceAll('_', '-').toUpperCase(), tone: 'default' as const };
+}
+
+const assetCategoryToneClass: Record<HistoryAssetCategoryTone, string> = {
+  brc20: styles.assetCategory_brc20,
+  runes: styles.assetCategory_runes,
+  alkanes: styles.assetCategory_alkanes,
+  cat20: styles.assetCategory_cat20,
+  inscription: styles.assetCategory_inscription,
+  default: styles.assetCategory_default
+};
+
 function HistoryRow({ item, onClick }: { item: AddressHistorySummaryItem; onClick: () => void }) {
   const { t } = useI18n();
   const chain = useChain();
@@ -80,12 +102,7 @@ function HistoryRow({ item, onClick }: { item: AddressHistorySummaryItem; onClic
     : primary.sign === '+'
     ? t('receive')
     : t('send');
-  const assetKind = primary.asset.kind;
-  const subtitle = isSelfTransfer
-    ? `${t('network_fee')}${item.status === 'pending' ? ` · ${t('history_pending')}` : ''}`
-    : item.status === 'pending'
-    ? t('history_pending')
-    : '';
+  const { label: assetCategory, tone } = getHistoryAssetCategory(primary.asset.kind, chain.unit, t);
 
   return (
     <button type="button" className={styles.historyRow} onClick={onClick} data-testid={`history-${item.txid}`}>
@@ -93,7 +110,13 @@ function HistoryRow({ item, onClick }: { item: AddressHistorySummaryItem; onClic
         <HistoryAssetIcon asset={primary.asset} />
         <span className={styles.rowLabels}>
           <span className={styles.rowTitle}>{directionLabel}</span>
-          <span className={styles.rowSubtitle}>{subtitle}</span>
+          <span className={styles.rowSubtitle}>
+            <span className={`${styles.assetCategoryTag} ${assetCategoryToneClass[tone]}`}>{assetCategory}</span>
+            {isSelfTransfer ? <span> · {t('network_fee')}</span> : null}
+            {item.status === 'pending' ? (
+              <span className={styles.rowPending}> · {t('history_pending')}</span>
+            ) : null}
+          </span>
           {item.toAddress && (
             <span className={styles.rowSubtitle} title={item.toAddress}>
               {t('to')}: {shortAddress(item.toAddress, 5)}
@@ -123,15 +146,24 @@ type HistoryFilter = 'all' | 'receive' | 'send';
 /** Displays address history as asset changes, with transaction details one tap away. */
 export function AddressHistorySection({
   preview = false,
-  unavailable = false
+  unavailable = false,
+  showRgbHistoryHint = false
 }: {
   preview?: boolean;
   unavailable?: boolean;
+  showRgbHistoryHint?: boolean;
 }) {
   const address = useCurrentAddress();
   const chainType = useChainType();
   if (unavailable && preview) return <AddressHistoryUnavailable address={address} />;
-  return <AddressHistoryContent key={`${chainType}:${address}`} address={address} preview={preview} />;
+  return (
+    <AddressHistoryContent
+      key={`${chainType}:${address}`}
+      address={address}
+      preview={preview}
+      showRgbHistoryHint={showRgbHistoryHint}
+    />
+  );
 }
 
 function AddressHistoryUnavailable({ address }: { address: string }) {
@@ -156,7 +188,15 @@ function AddressHistoryUnavailable({ address }: { address: string }) {
   );
 }
 
-function AddressHistoryContent({ address, preview }: { address: string; preview: boolean }) {
+function AddressHistoryContent({
+  address,
+  preview,
+  showRgbHistoryHint
+}: {
+  address: string;
+  preview: boolean;
+  showRgbHistoryHint: boolean;
+}) {
   const wallet = useWallet();
   const nav = useNavigation();
   const { t } = useI18n();
@@ -217,7 +257,34 @@ function AddressHistoryContent({ address, preview }: { address: string; preview:
   return (
     <Column gap="lg" fullX classname={styles.historySection}>
       <div className={styles.historyHeader}>
-        {preview && <Text text={t('history')} size="md" color="white" />}
+        {preview && (
+          <div className={styles.historyTitle}>
+            <Text text={t('history')} size="md" color="white" />
+            {showRgbHistoryHint ? (
+              <Tooltip
+                title={t('history_rgb_not_included')}
+                placement="top"
+                overlayStyle={{
+                  fontSize: fontSizes.xs,
+                  maxWidth: 280,
+                  lineHeight: '16px'
+                }}
+              >
+                <div className={styles.historyHint} aria-label={t('history_rgb_not_included')}>
+                  <Icon
+                    icon="balance-question"
+                    size={18}
+                    containerStyle={{
+                      display: 'block',
+                      filter: 'brightness(0) invert(1)',
+                      opacity: 0.65
+                    }}
+                  />
+                </div>
+              </Tooltip>
+            ) : null}
+          </div>
+        )}
         {!preview && (
           <div className={styles.filterContainer}>
             <button

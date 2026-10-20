@@ -442,6 +442,8 @@ export interface WalletController {
 
   getShowSafeNotice(): Promise<boolean>
   setShowSafeNotice(show: boolean): Promise<void>
+  getAssetsNewBadgeDismissed(address: string): Promise<boolean>
+  setAssetsNewBadgeDismissed(address: string, dismissed?: boolean): Promise<void>
 
   // address flag
   addAddressFlag(account: Account, flag: AddressFlagType): Promise<Account>

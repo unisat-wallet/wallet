@@ -917,6 +917,9 @@
   "history": {
     "message": "Historique"
   },
+  "history_rgb_not_included": {
+    "message": "Les transactions RGB ne sont pas incluses. Consultez RGB History (local uniquement)."
+  },
   "history_count": {
     "message": "Total de transactions"
   },
@@ -1556,6 +1559,9 @@
   },
   "new": {
     "message": "nouveau !"
+  },
+  "new_badge": {
+    "message": "New"
   },
   "new_account": {
     "message": "Nouveau compte"
@@ -2890,10 +2896,10 @@
     "message": "Utilisez cette adresse pour recevoir $unit sur $chain"
   },
   "rgb_invoice": {
-    "message": "Facture RGB"
+    "message": "Facture RGB du destinataire"
   },
   "paste_rgb_invoice": {
-    "message": "Collez la facture RGB"
+    "message": "Collez la facture RGB du destinataire"
   },
   "enter_amount_greater_than_0": {
     "message": "Saisissez un montant supérieur à 0."
@@ -2960,6 +2966,18 @@
   },
   "create_invoice": {
     "message": "Créer une facture"
+  },
+  "rgb_invoices": {
+    "message": "Factures RGB"
+  },
+  "create_rgb_invoice": {
+    "message": "Créer une facture RGB"
+  },
+  "share_existing_rgb_invoice": {
+    "message": "Partager une facture existante avec l'expéditeur"
+  },
+  "create_new_rgb_invoice_to_share": {
+    "message": "Créer une nouvelle facture à partager avec l'expéditeur"
   },
   "rgb_sent": {
     "message": "RGB envoyé"
@@ -3394,7 +3412,7 @@
     "message": "L’aperçu n’est pas disponible sur ce réseau. Consultez les transactions dans l’explorateur."
   },
   "view_all": {
-    "message": "Tout voir"
+    "message": "Tous les actifs"
   },
   "any_rgb_asset": {
     "message": "N’importe quel actif RGB"

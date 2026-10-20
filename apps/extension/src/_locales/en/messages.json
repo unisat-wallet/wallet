@@ -210,7 +210,7 @@
     "message": "Available"
   },
   "available_balance": {
-    "message": "available Balance"
+    "message": "Available Balance"
   },
   "average": {
     "message": "Average"
@@ -923,6 +923,9 @@
   "history": {
     "message": "History"
   },
+  "history_rgb_not_included": {
+    "message": "RGB transactions aren’t included. Check RGB History (local only)."
+  },
   "history_count": {
     "message": "transactions"
   },
@@ -1562,6 +1565,9 @@
   },
   "new": {
     "message": "new!"
+  },
+  "new_badge": {
+    "message": "New"
   },
   "new_account": {
     "message": "New account"
@@ -2953,10 +2959,10 @@
     "message": "Use this address to receive $unit on $chain"
   },
   "rgb_invoice": {
-    "message": "RGB Invoice"
+    "message": "Recipient RGB Invoice"
   },
   "paste_rgb_invoice": {
-    "message": "Paste RGB invoice"
+    "message": "Paste the recipient’s RGB invoice"
   },
   "enter_amount_greater_than_0": {
     "message": "Enter an amount greater than 0."
@@ -3023,6 +3029,18 @@
   },
   "create_invoice": {
     "message": "Create Invoice"
+  },
+  "rgb_invoices": {
+    "message": "RGB Invoices"
+  },
+  "create_rgb_invoice": {
+    "message": "Create RGB Invoice"
+  },
+  "share_existing_rgb_invoice": {
+    "message": "Share an existing invoice with the sender"
+  },
+  "create_new_rgb_invoice_to_share": {
+    "message": "Create a new invoice to share with the sender"
   },
   "rgb_sent": {
     "message": "RGB Sent"
@@ -3408,7 +3426,7 @@
     "message": "Preview is unavailable on this network. View transactions in the explorer."
   },
   "view_all": {
-    "message": "View All"
+    "message": "All Assets"
   },
   "any_rgb_asset": {
     "message": "Any RGB asset"

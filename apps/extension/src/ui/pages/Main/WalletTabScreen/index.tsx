@@ -9,6 +9,7 @@ import { NoticePopover } from '@/ui/components/NoticePopover';
 import { SwitchNetworkBar } from '@/ui/components/SwitchNetworkBar';
 import { Tabs } from '@/ui/components/Tabs';
 import { VersionNotice } from '@/ui/components/VersionNotice';
+import { dismissAssetsNewBadge } from '@/ui/utils/assetsNewBadge';
 import { getCurrentTab } from '@/ui/web/tabs';
 import { KeyringType } from '@unisat/keyring-service/types';
 import { AddressAssetSummary, Brc20TickFilter, VersionDetail } from '@unisat/wallet-shared';
@@ -155,6 +156,15 @@ export default function WalletTabScreen({
     };
     run();
   }, []);
+
+  // Entering Assets dismisses the "New" badge for the current address only.
+  useEffect(() => {
+    if (screen !== 'assets') return;
+    const address = currentAccount?.address;
+    if (!address) return;
+    dismissAssetsNewBadge(address);
+    void wallet.setAssetsNewBadgeDismissed(address, true);
+  }, [screen, wallet, currentAccount?.address]);
 
   useEffect(() => {
     const run = async () => {
@@ -691,7 +701,11 @@ export default function WalletTabScreen({
               rgbUsdtAssetId={rgbUsdtAssetId}
               unavailable={chain.supportsAssetOverview === false}
             />
-            <AddressHistorySection preview unavailable={chain.supportsAddressHistory === false} />
+            <AddressHistorySection
+              preview
+              unavailable={chain.supportsAddressHistory === false}
+              showRgbHistoryHint={isRgbActive}
+            />
           </Column>
         </>
       ) : (

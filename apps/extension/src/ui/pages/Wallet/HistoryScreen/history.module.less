@@ -10,6 +10,20 @@
   min-height: 32px;
 }
 
+.historyTitle {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.historyHint {
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+  width: 18px;
+  height: 18px;
+}
+
 .filterContainer {
   position: relative;
   margin-left: auto;
@@ -171,11 +185,66 @@
 }
 
 .rowSubtitle {
+  display: flex;
+  align-items: center;
+  min-width: 0;
   overflow: hidden;
-  color: rgba(255, 255, 255, 0.45);
+}
+
+/* Protocol tags from 产品规范-组件库 (stroked, transparent fill). */
+.assetCategoryTag {
+  display: inline-flex;
+  align-items: center;
+  box-sizing: border-box;
+  height: 18px;
+  max-width: 100%;
+  padding: 0 6px;
+  overflow: hidden;
+  border: 1px solid;
+  border-radius: 4px;
+  background: transparent;
   font-size: 11px;
+  font-weight: 400;
   line-height: 16px;
   text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.assetCategory_brc20 {
+  color: #f4b62c;
+  border-color: rgba(244, 182, 44, 0.25);
+}
+
+.assetCategory_runes {
+  color: #e0784c;
+  border-color: rgba(224, 120, 76, 0.25);
+}
+
+.assetCategory_alkanes {
+  color: #3c7ce0;
+  border-color: rgba(60, 124, 224, 0.25);
+}
+
+.assetCategory_cat20 {
+  color: #77a1f2;
+  border-color: rgba(119, 161, 242, 0.25);
+}
+
+.assetCategory_inscription {
+  color: #94a0b8;
+  border-color: rgba(148, 160, 184, 0.25);
+}
+
+.assetCategory_default {
+  color: #a8a8a8;
+  border-color: rgba(168, 168, 168, 0.25);
+}
+
+.rowPending {
+  flex-shrink: 0;
+  color: rgba(255, 255, 255, 0.45);
+  font-size: 11px;
+  line-height: 1.4;
   white-space: nowrap;
 }
 

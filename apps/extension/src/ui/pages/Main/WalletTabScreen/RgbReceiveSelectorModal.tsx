@@ -55,20 +55,40 @@ export function RgbReceiveSelectorModal({
             onClick={invoicesDisabled ? undefined : onViewInvoices}
             data-testid="view-rgb-invoices-option"
             style={{
-              minHeight: 56,
+              minHeight: 64,
+              height: 64,
               padding: '10px 12px',
               borderRadius: 10,
               cursor: invoicesDisabled ? 'default' : 'pointer',
-              opacity: invoicesDisabled ? 0.45 : 1
+              opacity: invoicesDisabled ? 0.45 : 1,
+              boxSizing: 'border-box'
             }}
           >
-            <Row itemsCenter gap="md" style={{ flex: 1 }}>
+            <Row itemsCenter gap="md" style={{ flex: 1, minWidth: 0 }}>
               <Icon icon="invoice" color="ticker_color2" size={20} />
-              <Text
-                text={typeof invoiceCount === 'number' ? `${t('pending_invoices')}(${invoiceCount})` : t('pending_invoices')}
-                size="sm"
-              />
+              <Column gap="zero" style={{ flex: 1, minWidth: 0 }}>
+                <Text text={t('rgb_invoices')} size="sm" />
+                <Text text={t('share_existing_rgb_invoice')} size="xs" color="textDim" style={{ marginTop: 2 }} />
+              </Column>
             </Row>
+            {typeof invoiceCount === 'number' ? (
+              <div
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  minWidth: 20,
+                  height: 20,
+                  padding: '0 6px',
+                  borderRadius: 999,
+                  backgroundColor: 'rgba(255, 255, 255, 0.1)',
+                  boxSizing: 'border-box',
+                  flexShrink: 0
+                }}
+              >
+                <Text text={String(invoiceCount)} size="xs" style={{ lineHeight: '20px' }} />
+              </div>
+            ) : null}
             <SelectorChevron />
           </Card>
           <Card
@@ -76,11 +96,21 @@ export function RgbReceiveSelectorModal({
             itemsCenter
             onClick={onCreateInvoice}
             data-testid="create-rgb-invoice-option"
-            style={{ minHeight: 56, padding: '10px 12px', borderRadius: 10, cursor: 'pointer' }}
+            style={{
+              minHeight: 64,
+              height: 64,
+              padding: '10px 12px',
+              borderRadius: 10,
+              cursor: 'pointer',
+              boxSizing: 'border-box'
+            }}
           >
-            <Row itemsCenter gap="md" style={{ flex: 1 }}>
-              <Icon icon="rgb" color="ticker_color2" size={20} />
-              <Text text={t('create_invoice')} size="sm" />
+            <Row itemsCenter gap="md" style={{ flex: 1, minWidth: 0 }}>
+              <Icon icon="plus" size={20} containerStyle={{ opacity: 0.85, flexShrink: 0 }} />
+              <Column gap="zero" style={{ flex: 1, minWidth: 0 }}>
+                <Text text={t('create_rgb_invoice')} size="sm" />
+                <Text text={t('create_new_rgb_invoice_to_share')} size="xs" color="textDim" style={{ marginTop: 2 }} />
+              </Column>
             </Row>
             <SelectorChevron />
           </Card>

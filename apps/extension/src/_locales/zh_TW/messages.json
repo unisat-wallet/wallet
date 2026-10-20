@@ -926,6 +926,9 @@
   "history_more_on_uniscan_count": {
     "message": "UniScan 上 +$1 更多"
   },
+  "history_rgb_not_included": {
+    "message": "不含 RGB 交易。請在 RGB History 查看（僅本地）。"
+  },
   "history_no_transactions": {
     "message": "無交易記錄"
   },
@@ -1559,6 +1562,9 @@
   },
   "new": {
     "message": "新！"
+  },
+  "new_badge": {
+    "message": "New"
   },
   "new_account": {
     "message": "新帳戶"
@@ -2950,10 +2956,10 @@
     "message": "使用此地址在 $chain 接收 $unit"
   },
   "rgb_invoice": {
-    "message": "RGB 發票"
+    "message": "收款人 RGB 發票"
   },
   "paste_rgb_invoice": {
-    "message": "貼上 RGB 發票"
+    "message": "貼上收款人的 RGB 發票"
   },
   "enter_amount_greater_than_0": {
     "message": "請輸入大於 0 的數量。"
@@ -3020,6 +3026,18 @@
   },
   "create_invoice": {
     "message": "建立發票"
+  },
+  "rgb_invoices": {
+    "message": "RGB 發票"
+  },
+  "create_rgb_invoice": {
+    "message": "建立 RGB 發票"
+  },
+  "share_existing_rgb_invoice": {
+    "message": "與發送方分享既有發票"
+  },
+  "create_new_rgb_invoice_to_share": {
+    "message": "建立新發票並與發送方分享"
   },
   "rgb_sent": {
     "message": "RGB 已送出"
@@ -3397,7 +3415,7 @@
     "message": "此網路不支援預覽，請前往區塊瀏覽器查看交易。"
   },
   "view_all": {
-    "message": "查看全部"
+    "message": "全部資產"
   },
   "any_rgb_asset": {
     "message": "任意 RGB 資產"

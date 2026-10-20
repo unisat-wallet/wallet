@@ -55,12 +55,12 @@ export function Tabs({ preset, items, defaultActiveKey, activeKey, onTabClick, t
   const tabBar = useMemo(() => {
     if (preset == 'style2') {
       return (
-        <Row
+        <div
           style={{
-            flexWrap: 'wrap',
+            display: 'grid',
+            gridTemplateColumns: 'repeat(3, minmax(0, 1fr))',
             gap: 8,
-            rowGap: 8,
-            alignItems: 'flex-start'
+            width: '100%'
           }}
         >
           {items.map((item) => {
@@ -72,11 +72,11 @@ export function Tabs({ preset, items, defaultActiveKey, activeKey, onTabClick, t
                 itemsCenter
                 justifyCenter
                 style={{
-                  height: 32,
-                  padding: '0 12px',
-                  borderRadius: 16,
+                  width: '100%',
+                  height: 40,
+                  padding: '0 8px',
+                  borderRadius: 8,
                   boxSizing: 'border-box',
-                  flexShrink: 0,
                   backgroundColor: isActiveItem ? '#322D1F' : 'rgba(255, 255, 255, 0.08)',
                   border: isActiveItem ? `1px solid ${colors.gold}` : '1px solid transparent',
                   cursor: 'pointer'
@@ -86,7 +86,10 @@ export function Tabs({ preset, items, defaultActiveKey, activeKey, onTabClick, t
                 {typeof item.label === 'string' ? (
                   <Text
                     text={item.label}
+                    textCenter
+                    ellipsis
                     style={{
+                      width: '100%',
                       fontSize: 13,
                       color: isActiveItem ? colors.gold : 'rgba(255, 255, 255, 0.65)'
                     }}
@@ -97,7 +100,7 @@ export function Tabs({ preset, items, defaultActiveKey, activeKey, onTabClick, t
               </Column>
             );
           })}
-        </Row>
+        </div>
       );
     } else {
       const bleedStyle = {
@@ -160,13 +163,27 @@ export function Tabs({ preset, items, defaultActiveKey, activeKey, onTabClick, t
     }
   }, [items, activeTab, onTabClick, preset, trailingAction, hideScrollbar]);
 
+  const resolvedContentGap = contentGap ?? spacingGap.sm + spacingGap.md;
+  const style2DividerGap = 12;
+
   return (
     <Column gap="zero">
       {/* Tab Bar */}
       {tabBar}
 
+      {preset === 'style2' ? (
+        <div
+          style={{
+            width: '100%',
+            height: 1,
+            marginTop: style2DividerGap,
+            backgroundColor: 'rgba(255, 255, 255, 0.15)'
+          }}
+        />
+      ) : null}
+
       {/* Content */}
-      <Column style={{ marginTop: contentGap ?? (spacingGap.sm + spacingGap.md) }}>
+      <Column style={{ marginTop: preset === 'style2' ? style2DividerGap : resolvedContentGap }}>
         {items.map((item) => {
           if (!renderedTabs.current.has(item.key)) return null;
 

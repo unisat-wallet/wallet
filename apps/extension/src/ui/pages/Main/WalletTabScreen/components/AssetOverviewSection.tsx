@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 
+import { Icon } from '@/ui/components';
 import type { AddressAssetOverviewItem } from '@unisat/wallet-shared';
 import { AssetTabKey, MoreAssetTabKey, useChainType, useCurrentAddress, useI18n, useNavigation, useWallTabFocusRefresh, useWallet } from '@unisat/wallet-state';
 
@@ -213,7 +214,10 @@ function AssetOverviewContent({ address, isRgbActive, rgbUsdtAssetId }: { addres
   return (
     <section className={styles.section} aria-label={t('assets')}>
       <div className={styles.header}>
-        <span className={styles.title}>{t('assets')}</span>
+        <div className={styles.titleRow}>
+          <Icon icon="assets" size={14} style={{ backgroundColor: '#FFFFFF' }} />
+          <span className={styles.title}>{t('assets')}</span>
+        </div>
         <button type="button" className={styles.viewAll} onClick={openAssets}>
           {t('view_all')}
           <svg className={styles.viewAllArrow} viewBox="0 0 12 6.7301" aria-hidden="true">

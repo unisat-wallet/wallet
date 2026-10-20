@@ -46,6 +46,7 @@ const defaultTemplate: BasePreferenceStore = {
     readTabTime: 1,
   },
   showSafeNotice: true,
+  assetsNewBadgeDismissedByAddressV4: {},
   addressFlags: {},
   autoLockTimeId: DEFAULT_LOCKTIME_ID,
   rgbInvoiceExpirySeconds: 24 * 60 * 60,
@@ -166,6 +167,14 @@ export class PreferenceService extends EventEmitter<PreferenceServiceEvents> {
 
     if (typeof this.store.showSafeNotice !== 'boolean') {
       this.store.showSafeNotice = true
+    }
+
+    if (
+      !this.store.assetsNewBadgeDismissedByAddressV4 ||
+      typeof this.store.assetsNewBadgeDismissedByAddressV4 !== 'object' ||
+      Array.isArray(this.store.assetsNewBadgeDismissedByAddressV4)
+    ) {
+      this.store.assetsNewBadgeDismissedByAddressV4 = {}
     }
 
     if (!this.store.balanceMap) {
@@ -482,6 +491,23 @@ export class PreferenceService extends EventEmitter<PreferenceServiceEvents> {
 
   setShowSafeNotice(showSafeNotice: boolean): void {
     this.store.showSafeNotice = showSafeNotice
+  }
+
+  getAssetsNewBadgeDismissed(address: string): boolean {
+    if (!address) return false
+    return !!this.store.assetsNewBadgeDismissedByAddressV4?.[address]
+  }
+
+  setAssetsNewBadgeDismissed(address: string, dismissed = true): void {
+    if (!address) return
+    if (!this.store.assetsNewBadgeDismissedByAddressV4) {
+      this.store.assetsNewBadgeDismissedByAddressV4 = {}
+    }
+    if (dismissed) {
+      this.store.assetsNewBadgeDismissedByAddressV4[address] = true
+    } else {
+      delete this.store.assetsNewBadgeDismissedByAddressV4[address]
+    }
   }
 
   /**
