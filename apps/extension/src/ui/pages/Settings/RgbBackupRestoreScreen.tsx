@@ -77,7 +77,7 @@ export default function RgbBackupRestoreScreen() {
       setFilename(file.name);
       setPreview(nextPreview);
       setStep(2);
-      tools.toastSuccess(t('rgb_backup_verified'));
+      if (!nextPreview.missingAccountIndexes?.length) tools.toastSuccess(t('rgb_backup_verified'));
     } catch (error) {
       const message = importErrorText(error, 'read');
       setErrorText(message);
@@ -92,7 +92,11 @@ export default function RgbBackupRestoreScreen() {
     setRestoring(true);
     setErrorText(undefined);
     try {
-      await wallet.restoreRgbBackupFile({ payload, replaceRemote: true });
+      await wallet.restoreRgbBackupFile({
+        payload,
+        replaceRemote: true,
+        createMissingAccounts: (preview.missingAccountIndexes?.length || 0) > 0
+      });
       setConfirmRestore(false);
       setStep(3);
       tools.toastSuccess(t('rgb_backup_restored'));
@@ -134,10 +138,25 @@ export default function RgbBackupRestoreScreen() {
                 <Text text={t('rgb_backup_network', { network: preview.network })} color="textDim" size="xs" />
                 <Text text={t('rgb_restore_account_count', { count: preview.accountIndexes.length })} color="white" size="sm" preset="bold" />
                 <Text text={t('rgb_backup_accounts', { accounts: preview.accountIndexes.map(index => index + 1).join(', ') })} color="textDim" size="xs" wrap />
+                {!!preview.accountsToCreateIndexes?.length && (
+                  <Text
+                    text={t('rgb_restore_missing_accounts', {
+                      accounts: preview.accountsToCreateIndexes.map(index => index + 1).join(', ')
+                    })}
+                    color="warning"
+                    size="xs"
+                    wrap
+                  />
+                )}
               </Card>
               <Text text={t('rgb_replace_state_description')} color="textDim" size="xs" wrap />
               <Button text={t('rgb_choose_backup_file')} preset="default" disabled={reading || restoring} onClick={() => fileInput.current?.click()} />
-              <Button text={t('rgb_restore_selected_backup')} preset="primary" disabled={reading || restoring} onClick={() => setConfirmRestore(true)} />
+              <Button
+                text={t(preview.accountsToCreateIndexes?.length ? 'rgb_restore_create_and_restore' : 'rgb_restore_selected_backup')}
+                preset="primary"
+                disabled={reading || restoring}
+                onClick={() => setConfirmRestore(true)}
+              />
               {errorText ? <Text text={errorText} color="error" size="xs" wrap /> : null}
             </>
           ) : null}
@@ -161,10 +180,26 @@ export default function RgbBackupRestoreScreen() {
             {preview ? (
               <Text text={t('rgb_confirm_restore_scope', { count: preview.accountIndexes.length, accounts: preview.accountIndexes.map(index => index + 1).join(', ') })} color="white" size="sm" wrap />
             ) : null}
+            {!!preview?.accountsToCreateIndexes?.length && (
+              <Text
+                text={t('rgb_restore_missing_accounts', {
+                  accounts: preview.accountsToCreateIndexes.map(index => index + 1).join(', ')
+                })}
+                color="warning"
+                size="sm"
+                wrap
+              />
+            )}
             <Text text={t('rgb_replace_state_description')} color="textDim" size="sm" wrap />
             <Row fullX>
               <Button text={t('cancel')} preset="defaultV2" full disabled={restoring} onClick={() => setConfirmRestore(false)} />
-              <Button text={t(restoring ? 'restoring_rgb' : 'rgb_replace_and_restore')} preset="primaryV2" full disabled={restoring} onClick={() => void restoreBackup()} />
+              <Button
+                text={t(restoring ? 'restoring_rgb' : preview?.accountsToCreateIndexes?.length ? 'rgb_restore_create_and_restore' : 'rgb_replace_and_restore')}
+                preset="primaryV2"
+                full
+                disabled={restoring}
+                onClick={() => void restoreBackup()}
+              />
             </Row>
           </Column>
         </Popover>

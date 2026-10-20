@@ -3063,6 +3063,8 @@
   "rgb_verifying_backup": { "message": "Vérification…" },
   "rgb_choose_backup_file": { "message": "Choisir un fichier de sauvegarde" },
   "rgb_restore_selected_backup": { "message": "Restaurer la sauvegarde sélectionnée" },
+  "rgb_restore_missing_accounts": { "message": "Les comptes $accounts n’ont pas encore été créés. Ils seront créés avant la restauration de cette sauvegarde." },
+  "rgb_restore_create_and_restore": { "message": "Créer les comptes et restaurer" },
   "rgb_recover_latest_cloud_state": { "message": "Récupérer le dernier état cloud" },
   "rgb_replace_state_title": { "message": "Remplacer l’état RGB ?" },
   "rgb_replace_state_description": { "message": "L’état RGB local et le point de récupération cloud de chaque compte du fichier seront remplacés. Les comptes sont restaurés un par un ; si une étape échoue, les précédentes peuvent déjà être restaurées." },

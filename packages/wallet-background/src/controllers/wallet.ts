@@ -4564,30 +4564,80 @@ export class WalletController extends BaseController {
     return createRgbHdBackupPackage(network, entries, key)
   }
 
-  /** Authenticate every entry before offering a destructive restore. */
+  /** Authenticate the HD manifest and every account that already exists locally. */
   inspectRgbHdBackup = async (payload: string) => {
     const backup = await readRgbHdBackupPackage(payload, await this.rgbHdBackupKey())
     const accounts = await this.getRgbHdBackupAccounts()
     const network = (await this.getCurrentLocalRgbWallet()).network
     if (backup.network !== network) throw new Error('RGB backup network does not match')
+    const missingAccountIndexes: number[] = []
     for (const entry of backup.accounts) {
       const account = accounts.find(item => item.index === entry.index)
-      if (!account) throw new Error(`RGB account ${entry.index + 1} has not been created`)
+      if (!account) {
+        missingAccountIndexes.push(entry.index)
+        continue
+      }
       const wallet = await this.getRgbWalletRefForAccount(account)
       await this.withRgbHdBackupWallet(wallet, async () => {
         const context = await this.getLocalRgbServiceForWallet(wallet)
         await this.inspectRgbBackupForContext(entry.payload, context)
       })
     }
-    return { createdAt: backup.createdAt, network, accountIndexes: backup.accounts.map(item => item.index) }
+    const highestCreatedIndex = Math.max(...accounts.map(account => account.index!))
+    const highestBackupIndex = Math.max(...backup.accounts.map(entry => entry.index))
+    if (missingAccountIndexes.some(index => index <= highestCreatedIndex)) {
+      throw new Error('RGB backup requires an account in a gap of this HD wallet')
+    }
+    if (highestBackupIndex - highestCreatedIndex > 1000) {
+      throw new Error('RGB backup requires too many new accounts')
+    }
+    const accountsToCreateIndexes = Array.from(
+      { length: Math.max(0, highestBackupIndex - highestCreatedIndex) },
+      (_, offset) => highestCreatedIndex + offset + 1
+    )
+    return {
+      createdAt: backup.createdAt,
+      network,
+      accountIndexes: backup.accounts.map(item => item.index),
+      missingAccountIndexes,
+      accountsToCreateIndexes,
+    }
   }
 
   /** Restore each account through the existing fenced replacement path. */
-  restoreRgbHdBackup = async (params: { payload: string; replaceRemote: boolean }) => {
+  restoreRgbHdBackup = async (params: { payload: string; replaceRemote: boolean; createMissingAccounts?: boolean }) => {
     if (!params?.replaceRemote) {
       throw new Error('Restoring an RGB backup requires explicit replacement confirmation')
     }
-    await this.inspectRgbHdBackup(params.payload)
+    const preview = await this.inspectRgbHdBackup(params.payload)
+    if (preview.missingAccountIndexes.length > 0) {
+      if (!params.createMissingAccounts) {
+        throw new Error(`RGB account ${preview.missingAccountIndexes[0]! + 1} has not been created`)
+      }
+      const originalAccount = preferenceService.getCurrentAccount()
+      const keyring = await this.getCurrentKeyring()
+      if (!keyring || keyring.type !== KeyringType.HdKeyring || !originalAccount) {
+        throw new Error('RGB HD backup requires an HD wallet')
+      }
+      const hdKeyring = keyringService.keyrings[keyring.index]
+      if (!hdKeyring) throw new Error('RGB HD wallet keyring is unavailable')
+      try {
+        for (const index of preview.accountsToCreateIndexes) {
+          await keyringService.addNewAccount(hdKeyring)
+          const updatedKeyring = await this.getCurrentKeyring()
+          if (updatedKeyring?.accounts[updatedKeyring.accounts.length - 1]?.index !== index) {
+            throw new Error('RGB account creation did not match the backup account index')
+          }
+        }
+      } finally {
+        const updatedKeyring = await this.getCurrentKeyring()
+        if (updatedKeyring) await this.changeKeyring(updatedKeyring, originalAccount.index)
+      }
+      const verified = await this.inspectRgbHdBackup(params.payload)
+      if (verified.missingAccountIndexes.length > 0) {
+        throw new Error(`RGB account ${verified.missingAccountIndexes[0]! + 1} has not been created`)
+      }
+    }
     const backup = await readRgbHdBackupPackage(params.payload, await this.rgbHdBackupKey())
     const accounts = await this.getRgbHdBackupAccounts()
     const restoredIndexes: number[] = []
@@ -4647,7 +4697,7 @@ export class WalletController extends BaseController {
     }
   }
 
-  restoreRgbBackupFile = async (params: { payload: string; replaceRemote: boolean }) => {
+  restoreRgbBackupFile = async (params: { payload: string; replaceRemote: boolean; createMissingAccounts?: boolean }) => {
     if (isRgbHdBackupPackage(params.payload)) return this.restoreRgbHdBackup(params)
     if (!params.replaceRemote) {
       throw new Error('Restoring an RGB backup requires explicit replacement confirmation')

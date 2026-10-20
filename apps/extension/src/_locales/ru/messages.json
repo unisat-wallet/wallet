@@ -3063,6 +3063,8 @@
   "rgb_verifying_backup": { "message": "Проверка копии…" },
   "rgb_choose_backup_file": { "message": "Выбрать файл копии" },
   "rgb_restore_selected_backup": { "message": "Восстановить выбранную копию" },
+  "rgb_restore_missing_accounts": { "message": "Аккаунты $accounts ещё не созданы. Они будут созданы перед восстановлением этой копии." },
+  "rgb_restore_create_and_restore": { "message": "Создать аккаунты и восстановить" },
   "rgb_recover_latest_cloud_state": { "message": "Восстановить последнее облачное состояние" },
   "rgb_replace_state_title": { "message": "Заменить состояние RGB?" },
   "rgb_replace_state_description": { "message": "Для каждого аккаунта из файла будут заменены локальное RGB-состояние и облачная копия. Аккаунты восстанавливаются по очереди; при ошибке предыдущие аккаунты могут уже быть восстановлены." },

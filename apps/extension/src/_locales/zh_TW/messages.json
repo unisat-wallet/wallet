@@ -3123,6 +3123,8 @@
   "rgb_verifying_backup": { "message": "正在驗證備份…" },
   "rgb_choose_backup_file": { "message": "選擇備份檔案" },
   "rgb_restore_selected_backup": { "message": "恢復所選備份" },
+  "rgb_restore_missing_accounts": { "message": "帳戶 $accounts 尚未建立。恢復此備份前會先建立這些帳戶。" },
+  "rgb_restore_create_and_restore": { "message": "建立帳戶並恢復" },
   "rgb_recover_latest_cloud_state": { "message": "恢復最新雲端狀態" },
   "rgb_replace_state_title": { "message": "取代 RGB 狀態？" },
   "rgb_replace_state_description": { "message": "檔案所列每個帳戶的本機 RGB 狀態及雲端檢查點都會被取代。帳戶會逐一恢復；若後續失敗，先前帳戶可能已恢復。" },

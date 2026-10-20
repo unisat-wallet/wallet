@@ -41,6 +41,7 @@ vi.mock('../src/services', () => ({
     getKeyringForAccount: vi.fn(),
     createTmpKeyring: vi.fn(),
     displayForKeyring: vi.fn(),
+    addNewAccount: vi.fn(),
     importPublicKeyOnly: vi.fn(),
     getEncryptedStorageItem: vi.fn(),
     setEncryptedStorageItem: vi.fn(),
@@ -476,6 +477,68 @@ describe('RGB HD backup orchestration', () => {
     )
     expect(inspect).toHaveBeenCalledTimes(2)
     expect(restore).not.toHaveBeenCalled()
+  })
+
+  it('previews all missing RGB accounts and creates them only after confirmation', async () => {
+    const controller = new WalletController()
+    const createdAccounts = [0, 1].map(index => ({ index, key: `keyring_0#${index}`, address: `address-${index}` }))
+    let currentAccount = createdAccounts[1]!
+    const payload = await createRgbHdBackupPackage(
+      'mainnet',
+      [0, 1, 2, 3, 4].map(index => ({ index, payload: `encrypted-${index}` })),
+      '11'.repeat(32)
+    )
+    vi.spyOn(controller as any, 'rgbHdBackupKey').mockResolvedValue('11'.repeat(32))
+    vi.spyOn(controller as any, 'getRgbHdBackupAccounts').mockImplementation(async () => createdAccounts)
+    vi.spyOn(controller, 'getCurrentKeyring').mockImplementation(async () => ({
+      type: KeyringType.HdKeyring,
+      index: 0,
+      accounts: createdAccounts,
+    } as any))
+    vi.mocked(preferenceService.getCurrentAccount).mockImplementation(() => currentAccount as any)
+    vi.spyOn(controller as any, 'getCurrentLocalRgbWallet').mockResolvedValue({ network: 'mainnet' })
+    vi.spyOn(controller as any, 'getRgbWalletRefForAccount').mockImplementation(async (account: any) => ({
+      walletId: `wallet-${account.index}`,
+      network: 'mainnet',
+      fundingAddress: `funding-${account.index}`,
+    }))
+    vi.spyOn(controller as any, 'getLocalRgbServiceForWallet').mockImplementation(async (wallet: any) => ({
+      service: {},
+      wallet,
+    }))
+    vi.spyOn(controller as any, 'inspectRgbBackupForContext').mockResolvedValue({})
+    const restore = vi.spyOn(controller as any, 'restoreRgbBackupForContext').mockResolvedValue({ restored: true })
+    keyringService.keyrings[0] = {} as any
+    const create = vi.mocked(keyringService.addNewAccount).mockImplementation(async () => {
+      const index = createdAccounts.length
+      const account = { index, key: `keyring_0#${index}`, address: `address-${index}` }
+      createdAccounts.push(account)
+      return []
+    })
+    vi.spyOn(controller, 'changeKeyring').mockImplementation(async (_keyring, index = 0) => {
+      currentAccount = createdAccounts[index]!
+    })
+
+    await expect(controller.inspectRgbBackupFile(payload)).resolves.toMatchObject({
+      accountIndexes: [0, 1, 2, 3, 4],
+      missingAccountIndexes: [2, 3, 4],
+      accountsToCreateIndexes: [2, 3, 4],
+    })
+    await expect(controller.restoreRgbHdBackup({ payload, replaceRemote: true })).rejects.toThrow(
+      'RGB account 3 has not been created'
+    )
+    expect(create).not.toHaveBeenCalled()
+    expect(restore).not.toHaveBeenCalled()
+
+    await expect(controller.restoreRgbHdBackup({
+      payload,
+      replaceRemote: true,
+      createMissingAccounts: true,
+    })).resolves.toMatchObject({ accountIndexes: [0, 1, 2, 3, 4] })
+    expect(create).toHaveBeenCalledTimes(3)
+    expect(currentAccount.index).toBe(1)
+    expect(restore).toHaveBeenCalledTimes(5)
+    keyringService.keyrings.length = 0
   })
 
   it('routes old single-account files to their matching account', async () => {

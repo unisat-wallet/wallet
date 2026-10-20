@@ -724,9 +724,11 @@ export interface WalletController {
     createdAt: number
     network: string
     accountIndexes: number[]
+    missingAccountIndexes?: number[]
+    accountsToCreateIndexes?: number[]
   }>
 
-  restoreRgbBackupFile(params: { payload: string; replaceRemote: boolean }): Promise<{
+  restoreRgbBackupFile(params: { payload: string; replaceRemote: boolean; createMissingAccounts?: boolean }): Promise<{
     restored: true
     createdAt: number
     accountIndexes: number[]

@@ -3126,6 +3126,8 @@
   "rgb_verifying_backup": { "message": "Verifying backup…" },
   "rgb_choose_backup_file": { "message": "Choose backup file" },
   "rgb_restore_selected_backup": { "message": "Restore selected backup" },
+  "rgb_restore_missing_accounts": { "message": "Accounts $accounts are not yet created. They will be created before restoring this backup." },
+  "rgb_restore_create_and_restore": { "message": "Create accounts and restore" },
   "rgb_recover_latest_cloud_state": { "message": "Recover latest cloud state" },
   "rgb_replace_state_title": { "message": "Replace RGB state?" },
   "rgb_replace_state_description": { "message": "For every account listed in this backup, its RGB state on this device and its cloud checkpoint will be replaced. Accounts are restored one at a time; a later failure may leave earlier accounts restored." },
