@@ -48,6 +48,8 @@ export interface AddressHistorySummaryItem {
   confirmations: number
   status: 'pending' | 'confirmed'
   direction: 'receive' | 'send' | 'mixed' | 'self'
+  /** Unique destination from the history API, when available. */
+  toAddress?: string
   feeSatoshis: number
   received: AddressHistoryAssetItem[]
   sent: AddressHistoryAssetItem[]

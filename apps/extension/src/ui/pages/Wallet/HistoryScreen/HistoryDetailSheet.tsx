@@ -83,11 +83,12 @@ export function HistoryDetailSheet({ summary, onClose }: { summary: AddressHisto
   const isReceive = primary?.sign === '+';
   const isSelfTransfer = resolvedSummary.direction === 'self';
   const isCoin = primary?.asset.kind === 'coin';
+  const externalOutputAddresses = [...new Set(detail?.outputs.map((output) => output.address).filter((value) => value && value !== address) || [])];
   const counterparty = isSelfTransfer
     ? address
     : isReceive
     ? detail?.inputs.find((input) => !input.isMine)?.address || detail?.inputs[0]?.address
-    : detail?.outputs.find((output) => !output.isMine)?.address || detail?.outputs[0]?.address;
+    : (externalOutputAddresses.length === 1 ? externalOutputAddresses[0] : undefined) || summary.toAddress;
   const fee = detail?.fee ?? (resolvedSummary.feeSatoshis / 100_000_000).toFixed(8);
   const coinUnit = chain.unit;
   const assetLabel = isCoin

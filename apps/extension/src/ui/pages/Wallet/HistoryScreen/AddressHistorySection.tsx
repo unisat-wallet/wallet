@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react';
 import { IMAGE_SOURCE_MAP } from '@/shared/constant';
 import { Column, Row, Text } from '@/ui/components';
 import { Pagination } from '@/ui/components/Pagination';
+import { shortAddress } from '@/ui/utils';
 import type {
   AddressHistoryAssetItem,
   AddressHistorySummaryItem,
@@ -38,18 +39,25 @@ function HistoryAssetIcon({ asset }: { asset: AddressHistoryAssetItem }) {
   return (
     <span className={styles.assetIconFrame} aria-hidden="true">
       <img src="/images/history/asset-base.svg" alt="" className={styles.assetIconBase} />
-      <HistoryTokenIcon asset={asset} className={styles.assetIcon} fallback={protocolIcon ? (
-        <img src={protocolIcon} alt="" className={styles.protocolIcon} />
-      ) : (
-        <span className={styles.assetInitial}>{(asset.symbol || asset.kind).slice(0, 2).toUpperCase()}</span>
-      )} />
+      <HistoryTokenIcon
+        asset={asset}
+        className={styles.assetIcon}
+        fallback={
+          protocolIcon ? (
+            <img src={protocolIcon} alt="" className={styles.protocolIcon} />
+          ) : (
+            <span className={styles.assetInitial}>{(asset.symbol || asset.kind).slice(0, 2).toUpperCase()}</span>
+          )
+        }
+      />
     </span>
   );
 }
 
 function HistoryChange({ change }: { change: HistoryAssetChange }) {
   const chain = useChain();
-  const label = change.asset.kind === 'coin' ? chain.unit : change.asset.displayName || change.asset.symbol || change.asset.kind;
+  const label =
+    change.asset.kind === 'coin' ? chain.unit : change.asset.displayName || change.asset.symbol || change.asset.kind;
   const value = `${change.sign}${change.asset.amount} ${label}`;
   return (
     <span className={change.sign === '+' ? styles.receivedAmount : styles.sentAmount} title={value}>
@@ -65,11 +73,17 @@ function HistoryRow({ item, onClick }: { item: AddressHistorySummaryItem; onClic
   const { changes, total } = getHistoryAssetChanges(item);
   const primary = changes[0];
   if (!primary) return null;
-  const directionLabel = isSelfTransfer ? t('self_transfer') : item.direction === 'mixed' ? t('mixed') : primary.sign === '+' ? t('receive') : t('send');
+  const directionLabel = isSelfTransfer
+    ? t('self_transfer')
+    : item.direction === 'mixed'
+    ? t('mixed')
+    : primary.sign === '+'
+    ? t('receive')
+    : t('send');
   const assetKind = primary.asset.kind;
   const assetCategory =
     assetKind === 'coin'
-      ? chain.unit
+      ? ''
       : assetKind === 'inscription'
       ? t('ordinals')
       : assetKind === 'runes' || assetKind === 'alkanes' || assetKind === 'brc20'
@@ -77,7 +91,9 @@ function HistoryRow({ item, onClick }: { item: AddressHistorySummaryItem; onClic
       : assetKind.replaceAll('_', '-').toUpperCase();
   const subtitle = isSelfTransfer
     ? `${t('network_fee')}${item.status === 'pending' ? ` · ${t('history_pending')}` : ''}`
-    : item.status === 'pending' ? `${assetCategory} · ${t('history_pending')}` : assetCategory;
+    : item.status === 'pending'
+    ? `${assetCategory} · ${t('history_pending')}`
+    : assetCategory;
 
   return (
     <button type="button" className={styles.historyRow} onClick={onClick} data-testid={`history-${item.txid}`}>
@@ -85,14 +101,19 @@ function HistoryRow({ item, onClick }: { item: AddressHistorySummaryItem; onClic
         <HistoryAssetIcon asset={primary.asset} />
         <span className={styles.rowLabels}>
           <span className={styles.rowTitle}>{directionLabel}</span>
-          <span className={styles.rowSubtitle}>
-            {subtitle}
-          </span>
+          <span className={styles.rowSubtitle}>{subtitle}</span>
+          {item.toAddress && (
+            <span className={styles.rowSubtitle} title={item.toAddress}>
+              {t('to')}: {shortAddress(item.toAddress, 5)}
+            </span>
+          )}
         </span>
       </span>
       <span className={styles.rowAmounts}>
         {isSelfTransfer ? (
-          <span className={styles.sentAmount}>-{(item.feeSatoshis / 100_000_000).toFixed(8)} {chain.unit}</span>
+          <span className={styles.sentAmount}>
+            -{(item.feeSatoshis / 100_000_000).toFixed(8)} {chain.unit}
+          </span>
         ) : (
           <>
             <HistoryChange change={primary} />
@@ -183,8 +204,7 @@ function AddressHistoryContent({ address, preview }: { address: string; preview:
               className={styles.filterButton}
               aria-label={t('filter')}
               aria-expanded={filterOpen}
-              onClick={() => setFilterOpen((open) => !open)}
-            >
+              onClick={() => setFilterOpen((open) => !open)}>
               <img src="/images/history/filter.svg" alt="" />
             </button>
             {filterOpen && (
@@ -197,8 +217,7 @@ function AddressHistoryContent({ address, preview }: { address: string; preview:
                     onClick={() => {
                       setFilter(key);
                       setFilterOpen(false);
-                    }}
-                  >
+                    }}>
                     {t(key)}
                   </button>
                 ))}
