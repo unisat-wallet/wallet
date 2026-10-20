@@ -732,7 +732,7 @@ export default function RGBReceiveScreen({ initialStep = 'create_invoice' }: { i
   }
 
   if (invoice) {
-    const expirationMatch = invoice.match(/[?&]expirationTimestamp=(-?\d+)/);
+    const expirationMatch = invoice.match(/[?&]expiry=(-?\d+)/);
     const invoiceExpirationTimestamp =
       selectedPendingInvoice?.expirationTimestamp ??
       (expirationMatch ? Number(expirationMatch[1]) : undefined);

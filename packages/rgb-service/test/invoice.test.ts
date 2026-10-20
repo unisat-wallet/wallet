@@ -91,6 +91,18 @@ describe('decodeRgbInvoice', () => {
     expect(first.proxyRecipientId).toMatch(/^[0-9a-f]{64}$/)
   })
 
+  it('writes and reads standard expiry in witness invoices', () => {
+    const invoice = encodeWitnessRgbInvoice({
+      network: 'mainnet',
+      scriptPubKey: '512079be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798',
+      transportEndpoints: ['rpcs://proxy.example'],
+      expirationTimestamp: 1_800_000_000,
+    })
+    expect(invoice).toContain('expiry=1800000000')
+    expect(invoice).not.toContain('expirationTimestamp=')
+    expect(decodeRgbInvoice(invoice).expirationTimestamp).toBe(1_800_000_000)
+  })
+
   it('carries the proxy v1 signing key and derives the registered invoice ID', () => {
     const publicKey = 'ab'.repeat(32)
     const invoice = decodeRgbInvoice(encodeWitnessRgbInvoice({

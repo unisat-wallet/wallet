@@ -47,6 +47,11 @@ describe('rgb invoice utils', () => {
     expect(decoded.needsAmount).toBe(true)
   })
 
+  it('reads standard expiry from invoices', () => {
+    const invoice = 'rgb:~/~/~/bc:utxob:test?expiry=1800000000'
+    expect(decodeRgbInvoice(invoice).expirationTimestamp).toBe(1_800_000_000)
+  })
+
   it('decodes compatible JSON invoice payloads', () => {
     const invoice = 'rgb:test-asset/~/~/bc:utxob:test?amount=42'
     const decoded = decodeRgbInvoice(

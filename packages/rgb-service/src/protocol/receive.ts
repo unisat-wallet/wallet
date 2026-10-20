@@ -129,7 +129,7 @@ export function encodeBlindRgbInvoice(input: {
   const query = new URLSearchParams()
   if (input.amount !== undefined) query.set('amount', input.amount)
   if (input.expirationTimestamp !== undefined)
-    query.set('expirationTimestamp', String(input.expirationTimestamp))
+    query.set('expiry', String(input.expirationTimestamp))
   if (input.transportEndpoints?.length)
     query.set('endpoints', input.transportEndpoints.join(','))
   if (input.proxyPublicKey) {

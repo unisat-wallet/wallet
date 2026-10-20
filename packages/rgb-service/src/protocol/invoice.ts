@@ -346,7 +346,7 @@ export function decodeRgbInvoice(invoice: string): RgbInvoice {
   const seal = decodeInvoiceSeal(recipientId)
   const [queryAmount] = getQueryValues(query, 'amount')
   const [queryAssetId] = getQueryValues(query, 'assetId')
-  const [expiration] = getQueryValues(query, 'expirationTimestamp')
+  const [expiration] = getQueryValues(query, 'expiry')
   const [proxyPublicKey] = getQueryValues(query, 'pk')
   if (proxyPublicKey && !/^[0-9a-f]{64}$/.test(proxyPublicKey)) {
     throw new RgbServiceError('RGB proxy invoice public key is invalid')
@@ -405,7 +405,7 @@ export function encodeWitnessRgbInvoice(input: {
   const query = new URLSearchParams()
   if (input.amount !== undefined) query.set('amount', input.amount)
   if (input.expirationTimestamp !== undefined)
-    query.set('expirationTimestamp', String(input.expirationTimestamp))
+    query.set('expiry', String(input.expirationTimestamp))
   query.set('endpoints', input.transportEndpoints.join(','))
   if (input.proxyPublicKey) {
     rgbProxyInvoiceId(recipientId, input.proxyPublicKey)

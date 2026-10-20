@@ -285,7 +285,7 @@ export function decodeRgbInvoice(invoice: string): DecodedRgbInvoice {
   const queryAssetId = getQueryValue(query, 'assetId')
   const assetId = normalizeRgbAssetId(queryAssetId || contractId)
   const assignmentName = getQueryValue(query, 'assignment_name')
-  const expirationText = getQueryValue(query, 'expirationTimestamp')
+  const expirationText = getQueryValue(query, 'expiry')
   const expirationTimestamp = expirationText && /^-?[0-9]+$/.test(expirationText)
     ? Number(expirationText)
     : undefined

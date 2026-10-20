@@ -23,6 +23,8 @@ describe('blind RGB receive', () => {
       expect(new URLSearchParams().size).toBeUndefined()
       const invoice = encodeBlindRgbInvoice(input)
       expect(invoice).toBe(expected)
+      expect(invoice).toContain('expiry=1800000000')
+      expect(invoice).not.toContain('expirationTimestamp=')
       expect(decodeRgbInvoice(invoice)).toMatchObject({
         assetId,
         amount,

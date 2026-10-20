@@ -208,7 +208,7 @@ export default function RGBInvoiceDetailScreen() {
   const invoiceDescription = isAnyRgbAsset
     ? t('use_this_invoice_to_receive_any_rgb_asset')
     : t('use_this_invoice_to_receive', { ticker: invoiceName });
-  const expirationMatch = invoiceText.match(/[?&]expirationTimestamp=(-?\d+)/);
+  const expirationMatch = invoiceText.match(/[?&]expiry=(-?\d+)/);
   const invoiceExpirationTimestamp =
     invoice?.expirationTimestamp ?? (expirationMatch ? Number(expirationMatch[1]) : undefined);
 
