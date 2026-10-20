@@ -545,6 +545,14 @@ export interface RgbServiceDependencies {
     getFeeFunding(wallet: RgbWalletRef): Promise<RgbFeeFunding>
   }
   encoder: RgbProtocolEncoder
+  /** Local BFA validation with Bitcoin status and EVM finality supplied by the host. */
+  validateBfaConsignment?: (input: {
+    wallet: RgbWalletRef
+    payload: Uint8Array
+    pendingWitnessTxid?: string
+    allowPendingLastWitness?: boolean
+    knownBlindSeals: import('./protocol/receive').RgbBlindSeal[]
+  }) => Promise<import('./protocol/bfa-validator').ValidatedBfaConsignment>
   transport: RgbTransport
   broadcaster: BitcoinBroadcaster
   /**

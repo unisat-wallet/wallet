@@ -59,6 +59,28 @@ the RGB reference implementation for OPRET hosts, OPRET commitments and RGB
 transitions. It accepts strict-serialized transition bytes from the caller;
 schema-specific transition serialization remains a separate step.
 
+## BFA local codec
+
+`protocol/local-bfa-encoder.ts` builds the BFA transfer PSBT, Transition,
+Opret commitment and signed v1 WitnessBundle in the extension. The existing
+blind and witness invoice encoders also run in the extension and are independent
+of the asset schema. `protocol/bfa-consignment.ts` wraps the new bundle with
+the validated BFA Genesis and ancestor bundles in the v1 transfer format.
+
+The send codec requires `ValidatedBfaTransferHistory`: a BFA Genesis, exact
+ancestor v1 WitnessBundles and proved `OS_ASSET` allocations. The local
+`validateBfaTransferConsignment` implementation checks the supported v1
+mint/transfer profile, operation IDs, Bitcoin witness commitments and parent
+seals, and finalized EVM `FundsIn` events. It requires a Bitcoin confirmation
+resolver and an EVM JSON-RPC transport. The wallet background selects the RPC
+from `rgbEvmRpcUrls` in `wallet-shared/src/constants/common.ts` by the chain ID
+committed in Genesis. The T0 map is intentionally empty until a bridge RPC is
+configured. Unsupported contract features fail closed. The wallet routes BFA
+send and receive through this validator and local encoder; received and sent
+histories are merged into the encrypted local checkpoint. If Bitcoin or EVM
+chain data is temporarily unavailable, a BFA receive remains pending instead
+of being rejected.
+
 ## Enablement requirement
 
 The address-scoped UTXO snapshot supplies only the parent operation pointer
@@ -68,10 +90,8 @@ transfer/bundle on the allocation's validation path. Those opaque RGB payloads
 may be fetched from a transport or restored from encrypted local storage, but
 they must never be reconstructed by a backend wallet service.
 
-Until that local history source and the strict Consignment encoder are wired,
-the background safety gate must remain enabled. The local modules can build
-and verify the committed PSBT, but they must not publish or broadcast it as an
-RGB transfer.
+The BFA path requires complete validated ancestry before a send. It does not
+attempt to reconstruct missing transitions from an address-scoped balance.
 
 ## Synthetic round-trip stress test
 

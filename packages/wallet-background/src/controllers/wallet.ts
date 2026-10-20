@@ -14,7 +14,11 @@ import { ColdWalletKeyring, KeystoneKeyring } from '@unisat/keyring-service'
 import { DisplayedKeyring, Keyring, KeyringType, ToSignInput } from '@unisat/keyring-service/types'
 import {
   RgbService as LocalRgbService,
-  localNiaProtocolEncoder,
+  RgbBfaValidationUnavailableError,
+  createBfaEvmRpc,
+  createLocalRgbProtocolEncoder,
+  validateBfaTransferConsignment,
+  type RgbServiceDependencies,
   type RgbNetwork,
 } from '@unisat/rgb-service'
 import * as txHelpers from '@unisat/tx-helpers'
@@ -6435,6 +6439,32 @@ export class WalletController extends BaseController {
     const networkType = this.getNetworkType()
     const chainType = this.getChainType()
     let service: LocalRgbService | undefined
+    const validateBfaConsignment: NonNullable<RgbServiceDependencies['validateBfaConsignment']> = async input => {
+      await this.assertActiveRgbWallet(localWallet)
+      const network = input.wallet.network === 'mainnet' || input.wallet.network === 'fractal-mainnet'
+        || input.wallet.network === 'fractal-test' ? 0
+        : input.wallet.network === 'testnet' ? 1
+          : input.wallet.network === 'testnet4' ? 2 : 3
+      const result = await validateBfaTransferConsignment(input.payload, {
+        network,
+        ...(input.pendingWitnessTxid ? { pendingWitnessTxid: input.pendingWitnessTxid } : {}),
+        ...(input.allowPendingLastWitness ? { allowPendingLastWitness: true } : {}),
+        knownBlindSeals: input.knownBlindSeals,
+        isBitcoinTxConfirmed: async txid => {
+          const status = await getRgbApiService().getRgbTransactionStatus(txid, { wallet: input.wallet })
+          return status.status === 'confirmed'
+        },
+        getEvmRpc: chainId => {
+          if (chainId > BigInt(Number.MAX_SAFE_INTEGER))
+            throw new RgbBfaValidationUnavailableError('BFA EVM chain ID exceeds configured range')
+          const url = CHAINS_MAP[chainType]?.rgbEvmRpcUrls?.[Number(chainId)]
+          if (!url) throw new RgbBfaValidationUnavailableError(`BFA EVM RPC is not configured for chain ${chainId}`)
+          return createBfaEvmRpc(url, fetch)
+        },
+      })
+      await this.assertActiveRgbWallet(localWallet)
+      return result
+    }
     service = createRgbService({
       storage: {
         get: key => keyringService.getEncryptedStorageItem(RGB_ENCRYPTED_STORAGE_NAMESPACE, key),
@@ -6481,7 +6511,8 @@ export class WalletController extends BaseController {
           }
         },
       },
-      encoder: localNiaProtocolEncoder,
+      encoder: createLocalRgbProtocolEncoder(validateBfaConsignment),
+      validateBfaConsignment,
       transport: createRgbProxyTransport(CHAINS_MAP[chainType]?.rgbProxyEndpoints || []),
       broadcaster: {
         broadcast: async rawTx => {

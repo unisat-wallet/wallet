@@ -1,4 +1,5 @@
 import {
+  RgbBfaValidationUnavailableError,
   RgbInvoiceUnavailableError,
   RgbInsufficientBalanceError,
   RgbServiceError,
@@ -20,6 +21,8 @@ import {
   validateNiaConsignmentParentState,
 } from './protocol/nia-consignment'
 import { mergeNiaConsignmentHistory } from './protocol/nia-history'
+import { encodeBfaContractConsignment, isBfaTransferConsignment } from './protocol/bfa-consignment'
+import { mergeBfaValidatedHistories } from './protocol/bfa-validator'
 import { encodeNiaContract, encodeNiaTransferConsignment } from './protocol/nia-contract'
 import {
   blindRgbInvoiceRecipientId,
@@ -1051,7 +1054,7 @@ export class RgbService {
       if (receiveIndex < 0) continue
       const receive = pending[receiveIndex]!
       try {
-        const match = this.validateIncomingConsignment(receive, item)
+        const match = await this.validateIncomingConsignment(receive, item)
         if (!match) {
           await this.rejectInvalidProxyConsignment(receive, item)
           pending.splice(receiveIndex, 1)
@@ -1160,7 +1163,7 @@ export class RgbService {
             amount: match.amount,
             precision,
             discoveredAt: receive.receivedConsignment?.receivedAt || this.now(),
-            counterpartyScriptPubKeys: niaConsignmentSpendableOutputScripts(item.payload),
+            counterpartyScriptPubKeys: match.counterpartyScriptPubKeys,
           }
           // `assetId` and `amount` are the invoice's original constraints.
           // An Any Asset / Any Amount invoice must remain unconstrained after
@@ -1172,6 +1175,7 @@ export class RgbService {
           changed = true
         }
       } catch (error) {
+        if (error instanceof RgbBfaValidationUnavailableError) continue
         if (receive.receivedConsignment?.accepted) {
           // ACK is immutable once accepted. A local settlement failure (for
           // example, while merging recovered history) is retriable and must
@@ -1346,11 +1350,42 @@ export class RgbService {
     return { abandoned: true, recipientId }
   }
 
-  private validateIncomingConsignment(
+  private async validateIncomingConsignment(
     receive: import('./types').RgbPendingReceive,
     item: { recipientId: string; payload: string; txid?: string; endpoint?: string }
   ) {
-    const decoded = decodeNiaConsignment(Uint8Array.from(Buffer.from(item.payload, 'base64')))
+    const payload = Uint8Array.from(Buffer.from(item.payload, 'base64'))
+    if (isBfaTransferConsignment(payload)) {
+      const validate = this.dependencies.validateBfaConsignment
+      if (!validate) throw new RgbServiceError('BFA receive validation is unavailable')
+      const bfa = await validate({
+        wallet: this.requireState().wallet, payload,
+        ...(item.txid ? { pendingWitnessTxid: item.txid } : { allowPendingLastWitness: true }),
+        knownBlindSeals: this.getKnownBlindSeals(),
+      })
+      const assetId = bfa.assetId
+      if (receive.assetId && receive.assetId !== assetId) return undefined
+      const secret = receive.seal ? Buffer.from(concealBlindSeal(receive.seal)).toString('hex') : undefined
+      const candidate = bfa.terminalAssignments.find(assignment => {
+        if (item.txid && assignment.txid !== item.txid) return false
+        if (receive.recipientType === 'witness')
+          return assignment.output?.scriptPubKey.toLowerCase() === receive.witnessScriptPubKey?.toLowerCase()
+        return assignment.secretSeal === secret && bfa.terminals.some(terminal =>
+          terminal.bundleId === assignment.bundleId && terminal.secretSeals.includes(secret!))
+      })
+      if (!candidate || (receive.amount && receive.amount !== candidate.amount)) return undefined
+      const output = candidate.output
+      return {
+        decoded: { metadata: bfa.metadata, genesis: { strict: bfa.genesis } },
+        witness: { outputs: output && candidate.vout >= 0 ? Array.from({ length: candidate.vout + 1 }, (_, index) =>
+          index === candidate.vout ? output : undefined) : [] },
+        assetId, amount: candidate.amount, txid: candidate.txid,
+        vout: receive.seal?.vout ?? candidate.vout,
+        opId: candidate.opId, assignmentIndex: candidate.assignmentIndex,
+        counterpartyScriptPubKeys: bfa.witnessOutputScripts,
+      }
+    }
+    const decoded = decodeNiaConsignment(payload)
     validateNiaConsignmentParentSpends(decoded)
     if (receive.recipientType === 'witness') {
       const expectedScript = receive.witnessScriptPubKey?.toLowerCase()
@@ -1398,6 +1433,7 @@ export class RgbService {
         vout: match.assignment.seal.vout,
         opId: match.transition.opId,
         assignmentIndex: match.assignmentIndex,
+        counterpartyScriptPubKeys: niaConsignmentSpendableOutputScripts(item.payload),
       }
     }
     if (!receive.seal) return undefined
@@ -1444,13 +1480,14 @@ export class RgbService {
       txid: witness.txid,
       opId: match.transition.opId,
       assignmentIndex: match.assignmentIndex,
+      counterpartyScriptPubKeys: niaConsignmentSpendableOutputScripts(item.payload),
     }
   }
 
   private async advanceAcceptedReceive(
     receive: import('./types').RgbPendingReceive,
     item: { recipientId: string; payload: string; txid?: string; endpoint?: string },
-    validated: NonNullable<ReturnType<RgbService['validateIncomingConsignment']>>,
+    validated: NonNullable<Awaited<ReturnType<RgbService['validateIncomingConsignment']>>>,
     deferConfirmedSettlement: boolean
   ) {
     const state = this.requireState()
@@ -1500,13 +1537,17 @@ export class RgbService {
     // Do this before mutating the allocation/receive state. A conflicting or
     // malformed branch must reject atomically rather than leave a spendable
     // UTXO whose required DAG was not durably retained.
-    this.storeAcceptedHistory({
-      assetId,
-      payload: item.payload,
-      opId: validated.opId,
-      genesis: Buffer.from(validated.decoded.genesis.strict).toString('base64'),
-      metadata: validated.decoded.metadata,
-    })
+    if (isBfaTransferConsignment(Uint8Array.from(Buffer.from(item.payload, 'base64')))) {
+      await this.storeAcceptedBfaHistory(assetId, item.payload)
+    } else {
+      this.storeAcceptedHistory({
+        assetId,
+        payload: item.payload,
+        opId: validated.opId,
+        genesis: Buffer.from(validated.decoded.genesis.strict).toString('base64'),
+        metadata: validated.decoded.metadata,
+      })
+    }
     if (
       !utxo.allocations.some(
         allocation =>
@@ -1749,6 +1790,10 @@ export class RgbService {
     // Received assets keep transfer history in `consignment`; rebuilding from
     // Genesis ensures that no ownership history leaks into a contract export.
     const stored = Uint8Array.from(Buffer.from(contract.consignment, 'base64'))
+    if (isBfaTransferConsignment(stored)) {
+      if (!contract.genesis) throw new RgbServiceError('Stored BFA Genesis is missing')
+      return encodeBfaContractConsignment(Uint8Array.from(Buffer.from(contract.genesis, 'base64')))
+    }
     const decoded = decodeNiaConsignment(stored)
     if (decoded.assetId !== normalized) {
       throw new RgbServiceError('Stored RGB contract ID does not match its Genesis')
@@ -1844,6 +1889,43 @@ export class RgbService {
     }
     state.pendingAssetMetadata = state.pendingAssetMetadata?.filter(
       item => item.assetId !== input.assetId || !item.synced
+    )
+  }
+
+  private async storeAcceptedBfaHistory(assetId: string, payload: string, pendingWitnessTxid?: string) {
+    const validate = this.dependencies.validateBfaConsignment
+    if (!validate) throw new RgbServiceError('BFA receive validation is unavailable')
+    const state = this.requireState()
+    const existing = state.contracts?.[assetId]
+    const existingPayload = existing?.history?.payload ?? existing?.consignment
+    const knownBlindSeals = this.getKnownBlindSeals()
+    const inputs = [...new Set([existingPayload, payload].filter((item): item is string => Boolean(item)))]
+    const validated = await Promise.all(inputs.map(item => validate({
+      wallet: state.wallet, payload: Uint8Array.from(Buffer.from(item, 'base64')),
+      ...(pendingWitnessTxid ? { pendingWitnessTxid } : {}), knownBlindSeals,
+    })))
+    if (validated.some(item => item.assetId !== assetId))
+      throw new RgbServiceError('BFA history asset ID mismatch')
+    const canonical = mergeBfaValidatedHistories(validated)
+    const complete = await validate({
+      wallet: state.wallet, payload: canonical,
+      ...(pendingWitnessTxid ? { pendingWitnessTxid } : {}), knownBlindSeals,
+    })
+    const canonicalPayload = Buffer.from(canonical).toString('base64')
+    const opIds = complete.bundles.flatMap(bundle => bundle.operationIds)
+    if (canonicalPayload.length > MAX_RECOVERY_HISTORY_PAYLOAD_LENGTH ||
+      opIds.length > MAX_RECOVERY_HISTORY_OPERATION_IDS)
+      throw new RgbServiceError('BFA history exceeds recovery checkpoint limits')
+    const contracts = state.contracts || (state.contracts = {})
+    contracts[assetId] = {
+      consignment: canonicalPayload,
+      genesis: Buffer.from(complete.genesis).toString('base64'),
+      metadata: complete.metadata,
+      createdAt: existing?.createdAt || this.now(),
+      history: { payload: canonicalPayload, opIds, updatedAt: this.now() },
+    }
+    state.pendingAssetMetadata = state.pendingAssetMetadata?.filter(
+      item => item.assetId !== assetId || !item.synced
     )
   }
 
@@ -2656,13 +2738,16 @@ export class RgbService {
    * test-only encoders are allowed to return opaque placeholder consignments;
    * those cannot be promoted to verified local history.
    */
-  private retainCompletedLocalHistory(completed: RgbCompletedTransfer) {
+  private async retainCompletedLocalHistory(completed: RgbCompletedTransfer) {
     for (const consignment of completed.consignments) {
       try {
         const assetId = normalizeAssetId(consignment.assetId)
-        const decoded = decodeNiaConsignment(
-          Uint8Array.from(Buffer.from(consignment.payload, 'base64'))
-        )
+        const bytes = Uint8Array.from(Buffer.from(consignment.payload, 'base64'))
+        if (isBfaTransferConsignment(bytes)) {
+          await this.storeAcceptedBfaHistory(assetId, consignment.payload, completed.txid)
+          continue
+        }
+        const decoded = decodeNiaConsignment(bytes)
         if (decoded.assetId !== assetId) continue
         const opId = consignment.opIds.find(candidate =>
           decoded.transitions.some(transition => transition.opId === candidate)
@@ -2740,7 +2825,7 @@ export class RgbService {
     const chain = await getTransactionStatus(state.wallet, delivery.completed.txid)
     if (chain.status !== 'mempool' && chain.status !== 'confirmed') return undefined
     this.applyFundingUpdate(delivery.completed)
-    this.retainCompletedLocalHistory(delivery.completed)
+    await this.retainCompletedLocalHistory(delivery.completed)
     pending.broadcast = { completed: delivery.completed, broadcastAt: this.now() }
     delete pending.delivery
     await this.persist({ waitForRecovery: true })
@@ -2885,7 +2970,7 @@ export class RgbService {
       throw new RgbServiceError('Broadcast transaction ID does not match the RGB transfer')
     }
     this.applyFundingUpdate(delivery.completed)
-    this.retainCompletedLocalHistory(delivery.completed)
+    await this.retainCompletedLocalHistory(delivery.completed)
     pending.broadcast = { completed: delivery.completed, broadcastAt: this.now() }
     delete pending.delivery
     await this.persist({ waitForRecovery: true })
@@ -2909,7 +2994,7 @@ export class RgbService {
         const chain = await getTransactionStatus(state.wallet, delivery.completed.txid)
         if (chain.status === 'mempool' || chain.status === 'confirmed') {
           this.applyFundingUpdate(delivery.completed)
-          this.retainCompletedLocalHistory(delivery.completed)
+          await this.retainCompletedLocalHistory(delivery.completed)
           pending.broadcast = { completed: delivery.completed, broadcastAt: this.now() }
           delete pending.delivery
           await this.persist({ waitForRecovery: true })

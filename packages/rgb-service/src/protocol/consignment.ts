@@ -124,6 +124,30 @@ export function serializeNiaOpretWitnessBundle(input: {
   }
 }
 
+/**
+ * RGB 0.11.2 V1 carries the complete transaction directly and an optional SPV
+ * proof before the anchor. The transition, MPC proof and Opret proof remain
+ * locally constructed exactly as in the legacy witness bundle.
+ */
+export function serializeBfaOpretWitnessBundle(
+  input: Parameters<typeof serializeNiaOpretWitnessBundle>[0]
+): NiaOpretWitnessBundle {
+  const legacy = serializeNiaOpretWitnessBundle(input)
+  const transaction = serializeStrictBitcoinTransaction(input.witnessTx)
+  if (legacy.strict[0] !== 1) {
+    throw new RgbServiceError('RGB witness bundle has an unsupported transaction variant')
+  }
+  return {
+    strict: concat(
+      transaction,
+      // Option<SpvProof>::None. A validator can resolve chain state later.
+      Uint8Array.from([0]),
+      legacy.strict.slice(1 + transaction.length)
+    ),
+    bundleId: legacy.bundleId,
+  }
+}
+
 export interface RgbTransferTerminal {
   bundleId: Uint8Array
   secretSeals: Uint8Array[]

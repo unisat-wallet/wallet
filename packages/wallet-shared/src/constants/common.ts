@@ -216,6 +216,8 @@ export type TypeChain = {
   endpoints: string[]
   /** Enables RGB on this chain when it contains at least one proxy endpoint. */
   rgbProxyEndpoints?: string[]
+  /** EVM JSON-RPC endpoints used to validate BFA mint anchors, keyed by EIP-155 chain ID. */
+  rgbEvmRpcUrls?: Record<number, string>
   mempoolSpaceUrl: string
   unisatUrl: string
   ordinalsUrl: string

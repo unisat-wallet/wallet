@@ -5,6 +5,14 @@ export class RgbServiceError extends Error {
   }
 }
 
+/** Chain data needed for BFA validation is temporarily unavailable. Keep the invoice pending. */
+export class RgbBfaValidationUnavailableError extends RgbServiceError {
+  constructor(message: string) {
+    super(message)
+    this.name = 'RgbBfaValidationUnavailableError'
+  }
+}
+
 export class RgbInsufficientBalanceError extends RgbServiceError {
   constructor(assetId: string, amount: string) {
     super(`Insufficient spendable RGB balance for ${assetId}: ${amount}`)
