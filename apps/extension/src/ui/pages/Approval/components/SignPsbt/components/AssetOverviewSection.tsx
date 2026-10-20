@@ -1,6 +1,6 @@
 import { useState } from 'react';
 
-import { Card, Column, Grid, Row, Text } from '@/ui/components';
+import { Card, Column, Grid, Icon, Row, Text } from '@/ui/components';
 import AlkanesNFTPreview from '@/ui/components/AlkanesNFTPreview';
 import { AlkaneBalance } from '@/ui/components/AlkanesPreviewCard';
 import AlkanesPreviewCard from '@/ui/components/AlkanesPreviewCard/AlkanesPreviewCard';
@@ -51,6 +51,7 @@ export default function AssetOverviewSection({
   );
 
   const [selectedAssetType, setSelectedAssetType] = useState<string | null>(null);
+  const [showSighashSingleDetails, setShowSighashSingleDetails] = useState(false);
 
   const inscriptionArray = Object.values(decodedPsbt.inscriptions);
 
@@ -252,18 +253,10 @@ export default function AssetOverviewSection({
 
             {sighashSingleInputIndexes.length > 0 && (
               <InfoCard
-                title={t('sighash_single_warning_title')}
-                value={sighashSingleInputIndexes.length.toString()}
-                icon="alert"
-                status="warning"
-                subContent={
-                  <Column gap="sm" itemsCenter style={{ marginTop: 8 }}>
-                    <Text text={t('sighash_single_warning_description')} size="xs" color="textDim" />
-                    {hasSighashSingleAnyoneCanPay && (
-                      <Text text={t('sighash_single_anyonecanpay_description')} size="xs" color="textDim" />
-                    )}
-                  </Column>
-                }
+                title="SighashType"
+                value="SIGHASH_SINGLE"
+                subtitle={`(${sighashSingleInputIndexes.length})`}
+                onClick={() => setShowSighashSingleDetails(true)}
               />
             )}
 
@@ -273,6 +266,39 @@ export default function AssetOverviewSection({
           </Grid>
         </Column>
       </Card>
+      {showSighashSingleDetails && (
+        <Popover
+          onClose={() => setShowSighashSingleDetails(false)}
+          contentStyle={{ width: 343, boxSizing: 'border-box', padding: '24px 16px', backgroundColor: '#181A1F' }}
+          closeStyle={{ top: 24, right: 16 }}>
+          <Column gap="lg" fullX>
+            <Text text="SIGHASH_SINGLE" size="md" preset="bold" textCenter />
+            <Column fullX gap="zero" style={{ border: '1px solid rgba(255, 255, 255, 0.15)', borderRadius: 8 }}>
+              <Row itemsCenter gap="sm" style={{ padding: '10px 12px' }}>
+                <Icon icon="alert" size={16} color="warning" />
+                <Text text={t('sighash_single_warning_title')} size="xs" color="warning" />
+              </Row>
+              <Text
+                text={t('sighash_single_warning_description')}
+                size="sm"
+                color="textDim"
+                style={{ borderTop: '1px solid rgba(255, 255, 255, 0.15)', padding: 12, lineHeight: '20px' }}
+              />
+            </Column>
+            {hasSighashSingleAnyoneCanPay && (
+              <Column fullX gap="zero" style={{ border: '1px solid rgba(255, 255, 255, 0.15)', borderRadius: 8 }}>
+                <Text text="ANYONECANPAY" size="xs" color="warning" style={{ padding: '10px 12px' }} />
+                <Text
+                  text={t('sighash_single_anyonecanpay_description')}
+                  size="sm"
+                  color="textDim"
+                  style={{ borderTop: '1px solid rgba(255, 255, 255, 0.15)', padding: 12, lineHeight: '20px' }}
+                />
+              </Column>
+            )}
+          </Column>
+        </Popover>
+      )}
       {selectedAssetType && (
         <Popover
           onClose={() => {

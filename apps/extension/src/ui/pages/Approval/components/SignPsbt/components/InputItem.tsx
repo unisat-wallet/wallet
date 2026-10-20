@@ -98,7 +98,7 @@ export function InputItem(props: {
               <Icon icon="psbt_output" size={28} />
             ))}
 
-          <Column>
+          <Column style={{ minWidth: 0, flex: 1 }}>
             <Row>
               <Text
                 text={`${numUtils.satoshisToAmount(itemInfo.value)} ${btcUnit}`}
@@ -106,7 +106,7 @@ export function InputItem(props: {
               />
             </Row>
 
-            <Row itemsCenter style={{ gap: 4 }}>
+            <Row itemsCenter fullX style={{ gap: 4, flexWrap: 'wrap', minWidth: 0 }}>
               <AddressText address={itemInfo.address} color={highLightAddress ? 'ticker_color2' : 'textDim'} />
 
               {isRgbAddress && <RgbAddressBadge />}
@@ -135,12 +135,11 @@ export function InputItem(props: {
               )}
               {inputInfo && props.isSighashSingle && (
                 <Row style={{ padding: '2px 4px', backgroundColor: 'rgba(244, 182, 44, 0.15)', borderRadius: 4 }}>
-                  <Text text="SIGHASH_SINGLE" color="warning" size="xxs" />
-                </Row>
-              )}
-              {inputInfo && props.isSighashSingle && (inputInfo.sighashType & 0x80) !== 0 && (
-                <Row style={{ padding: '2px 4px', backgroundColor: 'rgba(244, 182, 44, 0.15)', borderRadius: 4 }}>
-                  <Text text="ANYONECANPAY" color="warning" size="xxs" />
+                  <Text
+                    text={`SIGHASH_SINGLE${(inputInfo.sighashType & 0x80) !== 0 ? '|ANYONECANPAY' : ''}`}
+                    color="warning"
+                    size="xxs"
+                  />
                 </Row>
               )}
             </Row>
