@@ -1,5 +1,6 @@
 import { bitcoin, scriptPkToAddress, toPsbtNetwork, verifyMessageOfBIP322Simple, verifyMessageOfECDSA } from '@unisat/wallet-bitcoin'
 import { assertValidFeeRate } from '@unisat/base-utils'
+import { decodeRgbInvoice as decodeLocalRgbInvoice } from '@unisat/rgb-service'
 import {
   RequestMethodDeriveContextHashParams,
   RequestMethodGetInscriptionsParams,
@@ -44,6 +45,18 @@ import { formatPsbtHex } from '../../utils/psbt-utils'
 function validateRgbProviderFeeRate(req: { data: { params: { feeRate?: number } } }) {
   const { feeRate } = req.data.params
   if (feeRate !== undefined) assertValidFeeRate(feeRate, { supportLowFeeMode: true })
+}
+
+function webRgbInvalid(message: string): never {
+  const error = new Error(message) as Error & { code: string }
+  error.code = 'INVALID_PARAMS'
+  throw error
+}
+
+function webRgbSafeNumber(value: string | number | undefined, name: string): number {
+  const parsed = Number(value ?? 0)
+  if (!Number.isSafeInteger(parsed) || parsed < 0) webRgbInvalid(`${name} exceeds the WebRGB number range`)
+  return parsed
 }
 
 function assertReadonlyMessageSignature(
@@ -730,6 +743,131 @@ class ProviderController extends BaseController {
     return wallet.getRGBList('', page, pageSize, { skipSync: true })
   }
 
+  /** WebRGB uses the existing site connection prompt, but never connects on a read call. */
+  @Reflect.metadata('SAFE', true)
+  webRgbEnable = async ({ session: { origin } }: { session: { origin: string } }) => {
+    if (!permissionService.hasPermission(origin)) throw new Error('WebRGB connection was not approved')
+  }
+
+  @Reflect.metadata('SAFE', true)
+  webRgbGetInfo = async () => {
+    const feature = await wallet.getRgbFeatureStatus()
+    const ready = feature.enabled && feature.supported
+    return {
+      ready,
+      network: ready ? (await wallet.getCurrentRgbWalletRef()).network : wallet.getChainType(),
+      protocol: ready ? 'RGB_L1' : null,
+      methods: ready
+        ? ['enable', 'getInfo', 'getAddress', 'blindReceive', 'witnessReceive', 'listAssets',
+          'getAssetBalance', 'sendAsset', 'listTransfers', 'getTransferStatus',
+          'decodeRgbInvoice', 'on', 'off']
+        : ['enable', 'getInfo'],
+    }
+  }
+
+  @Reflect.metadata('SAFE', true)
+  webRgbGetAddress = async () => wallet.getRgbFundingAddress()
+
+  @Reflect.metadata('SAFE', true)
+  webRgbListAssets = async () => {
+    const assets: any[] = []
+    for (let page = 1; page <= 1000; page++) {
+      const result = await wallet.getRGBList('', page, 50, { skipSync: true })
+      assets.push(...result.list.map(asset => ({ ...asset, id: asset.assetId, asset_id: asset.assetId })))
+      if (assets.length >= result.total || result.list.length === 0) return assets
+    }
+    throw new Error('RGB asset list exceeds the provider pagination limit')
+  }
+
+  @Reflect.metadata('SAFE', true)
+  webRgbGetAssetBalance = async ({ data: { params } }: { data: { params: { assetId: string } } }) => {
+    if (typeof params?.assetId !== 'string' || !params.assetId) webRgbInvalid('assetId is required')
+    const balance = await wallet.getRGBAssetBalance('', params.assetId)
+    if (!balance) {
+      const error = new Error('RGB asset was not found') as Error & { code: string }
+      error.code = 'ASSET_NOT_FOUND'
+      throw error
+    }
+    return { assetId: params.assetId, balance: webRgbSafeNumber(balance.balance, 'balance'), raw: balance }
+  }
+
+  @Reflect.metadata('SAFE', true)
+  webRgbListTransfers = async ({ data: { params } }: { data: { params?: { assetId?: string } } }) => {
+    if (params?.assetId !== undefined && (typeof params.assetId !== 'string' || !params.assetId))
+      webRgbInvalid('assetId must be a nonempty string')
+    const transfers: any[] = []
+    for (let page = 1; page <= 1000; page++) {
+      const result = await wallet.getRgbTransfers(page, 50, { skipSync: true })
+      transfers.push(...result.list)
+      if (transfers.length >= result.total || result.list.length === 0) {
+        return params?.assetId
+          ? transfers.filter(transfer => transfer.assetId === params.assetId)
+          : transfers
+      }
+    }
+    throw new Error('RGB transfer list exceeds the provider pagination limit')
+  }
+
+  @Reflect.metadata('SAFE', true)
+  webRgbGetTransferStatus = async ({ data: { params } }: {
+    data: { params: { transferId: string; assetId?: string } }
+  }) => {
+    if (typeof params?.transferId !== 'string' || !params.transferId)
+      webRgbInvalid('transferId is required')
+    const transfers = await this.webRgbListTransfers({ data: { params: params.assetId ? { assetId: params.assetId } : {} } })
+    const transfer = transfers.find(item =>
+      [item.transferId, item.recipientId, item.txid, item.id].some(id => id !== undefined && id !== null && String(id) === params.transferId))
+    return transfer
+      ? { found: true, status: transfer.status || null, transfer }
+      : { found: false, status: null, transfer: null }
+  }
+
+  @Reflect.metadata('SAFE', true)
+  webRgbDecodeInvoice = async ({ data: { params } }: { data: { params: { invoice: string } } }) => {
+    if (typeof params?.invoice !== 'string' || !params.invoice.trim())
+      webRgbInvalid('invoice is required')
+    let decoded: ReturnType<typeof decodeLocalRgbInvoice>
+    try { decoded = decodeLocalRgbInvoice(params.invoice) }
+    catch (error) { webRgbInvalid(`invoice is invalid: ${String(error)}`) }
+    return {
+      assetId: decoded.assetId,
+      amount: decoded.amount && decoded.amount !== '0'
+        ? webRgbSafeNumber(decoded.amount, 'invoice amount') : null,
+      recipientId: decoded.recipientId,
+      expirationTimestamp: decoded.expirationTimestamp,
+      network: decoded.network,
+      transportEndpoints: decoded.transportEndpoints,
+    }
+  }
+
+  @Reflect.metadata('SAFE', true)
+  webRgbBuildInvoice = async ({ data: { params } }: {
+    data: { params: { assetId: string; amount: number; recipientId: string; transportEndpoints?: string[] } }
+  }) => {
+    if (typeof params?.assetId !== 'string' || !params.assetId) webRgbInvalid('assetId is required')
+    if (!Number.isSafeInteger(params.amount) || params.amount <= 0) webRgbInvalid('amount must be a positive safe integer')
+    if (typeof params.recipientId !== 'string' || !params.recipientId) webRgbInvalid('recipientId is required')
+    const endpoints = params.transportEndpoints ?? CHAINS_MAP[wallet.getChainType()]?.rgbProxyEndpoints
+    if (!Array.isArray(endpoints) || !endpoints.length || endpoints.some(item => typeof item !== 'string' || !item))
+      webRgbInvalid('transportEndpoints are unavailable')
+    const query = new URLSearchParams({ amount: String(params.amount), endpoints: endpoints.join(',') })
+    const invoice = `rgb:${params.assetId.replace(/^rgb:/, '')}/~/~/${params.recipientId}?${query}`
+    try { decodeLocalRgbInvoice(invoice) }
+    catch (error) { webRgbInvalid(`recipientId or assetId is invalid: ${String(error)}`) }
+    return { invoice }
+  }
+
+  /** Release only this origin's unsigned reservation after the signing prompt is dismissed. */
+  @Reflect.metadata('SAFE', true)
+  webRgbReleasePreparedPayment = async ({ data: { params }, session: { origin } }: {
+    data: { params: { transferId: string } }; session: { origin: string }
+  }) => {
+    if (typeof params?.transferId !== 'string' || !params.transferId)
+      webRgbInvalid('transferId is required')
+    await assertRgbPaymentOrigin(params.transferId, origin)
+    return wallet.abortRgbVanillaTx({ txid: params.transferId })
+  }
+
   @Reflect.metadata('SAFE', true)
   getRgbFundingUtxos = async ({ data: { params } }: { data: { params: { assetId: string } } }) => {
     if (!params.assetId) throw new Error('assetId is required')
@@ -843,13 +981,14 @@ class ProviderController extends BaseController {
     data: { params },
     session: { origin },
   }: {
-    data: { params: { assetId?: string; amount?: string; durationSeconds?: number; recipientType?: 'blind' | 'witness' } }
+    data: { params: { assetId?: string; amount?: string; durationSeconds?: number; recipientType?: 'blind' | 'witness'; minConfirmations?: number } }
     session: { origin: string }
   }) => {
     const receiveParams = {
       ...(params.assetId === undefined ? {} : { assetId: params.assetId }),
       ...(params.amount === undefined ? {} : { amount: params.amount }),
       ...(params.durationSeconds === undefined ? {} : { durationSeconds: params.durationSeconds }),
+      ...(params.minConfirmations === undefined ? {} : { minConfirmations: params.minConfirmations }),
       providerOrigin: origin,
     }
     return params.recipientType === 'witness'

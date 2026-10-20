@@ -6,7 +6,10 @@ vi.mock('../src/services', () => ({
   permissionService: { hasPermission: () => false, addConnectedSite: vi.fn() },
 }))
 vi.mock('../src/controllers/provider/controller', () => ({
-  default: { getPublicKey: vi.fn().mockResolvedValue('public-key') },
+  default: {
+    getPublicKey: vi.fn().mockResolvedValue('public-key'),
+    webRgbGetInfo: vi.fn().mockResolvedValue({ ready: true }),
+  },
 }))
 vi.mock('src/services/approval', () => ({
   default: { requestApproval: vi.fn(), unLock: vi.fn() },
@@ -47,5 +50,13 @@ describe('provider connection approval', () => {
       '',
       expect.anything()
     )
+  })
+
+  it('rejects WebRGB reads before enable without raising a connection prompt', async () => {
+    await expect(rpcFlow({
+      ...request(),
+      data: { method: 'webRgbGetInfo', params: {} },
+    })).rejects.toMatchObject({ code: 'NOT_ENABLED' })
+    expect(approvalService.requestApproval).not.toHaveBeenCalled()
   })
 })

@@ -547,11 +547,14 @@ export class RgbService {
     assetId?: string
     amount?: string
     durationSeconds?: number
+    minConfirmations?: number
     providerOrigin?: string
     /** The caller will immediately claim the recipient and persist the combined state. */
     deferRecoveryCheckpoint?: boolean
   }) {
     const state = this.requireState()
+    if (input.minConfirmations !== undefined && (!Number.isSafeInteger(input.minConfirmations) || input.minConfirmations < 1))
+      throw new RgbServiceError('RGB receive minConfirmations must be a positive integer')
     if (!state.snapshot.syncedAt) await this.sync()
     const assetId = input.assetId ? normalizeAssetId(input.assetId) : undefined
     if (input.amount !== undefined && !assetId) {
@@ -604,6 +607,7 @@ export class RgbService {
     const pending = {
       invoice,
       recipientId,
+      ...(input.minConfirmations === undefined ? {} : { minConfirmations: input.minConfirmations }),
       ...(input.providerOrigin ? { providerOrigin: input.providerOrigin } : {}),
       assetId,
       amount: input.amount,
@@ -630,10 +634,13 @@ export class RgbService {
     assetId?: string
     amount?: string
     durationSeconds?: number
+    minConfirmations?: number
     providerOrigin?: string
     deferRecoveryCheckpoint?: boolean
   }) {
     const state = this.requireState()
+    if (input.minConfirmations !== undefined && (!Number.isSafeInteger(input.minConfirmations) || input.minConfirmations < 1))
+      throw new RgbServiceError('RGB receive minConfirmations must be a positive integer')
     const assetId = input.assetId ? normalizeAssetId(input.assetId) : undefined
     if (input.amount !== undefined && !assetId) {
       throw new RgbServiceError('A fixed RGB receive amount requires an asset ID')
@@ -681,6 +688,7 @@ export class RgbService {
     const pending = {
       invoice,
       recipientId,
+      ...(input.minConfirmations === undefined ? {} : { minConfirmations: input.minConfirmations }),
       ...(input.providerOrigin ? { providerOrigin: input.providerOrigin } : {}),
       proxyRecipientId: decoded.proxyRecipientId,
       recipientType: 'witness' as const,
@@ -1503,7 +1511,7 @@ export class RgbService {
     ) {
       receive.receivedConsignment.broadcastDetectedAt = this.now()
     }
-    if (chain.status !== 'confirmed') return false
+    if (chain.status !== 'confirmed' || chain.confirmations < (receive.minConfirmations || 1)) return false
 
     let utxo = state.snapshot.utxos.find(candidate =>
       receive.recipientType === 'witness'

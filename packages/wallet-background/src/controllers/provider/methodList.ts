@@ -52,6 +52,21 @@ export type ProviderMethodList = {
     page?: number
     pageSize?: number
   }
+  webRgbEnable: undefined
+  webRgbGetInfo: undefined
+  webRgbGetAddress: undefined
+  webRgbListAssets: undefined
+  webRgbGetAssetBalance: { assetId: string }
+  webRgbListTransfers: { assetId?: string }
+  webRgbGetTransferStatus: { transferId: string; assetId?: string }
+  webRgbDecodeInvoice: { invoice: string }
+  webRgbBuildInvoice: {
+    assetId: string
+    amount: number
+    recipientId: string
+    transportEndpoints?: string[]
+  }
+  webRgbReleasePreparedPayment: { transferId: string }
   getRgbFundingUtxos: {
     assetId: string
   }
@@ -70,6 +85,7 @@ export type ProviderMethodList = {
     amount?: string
     durationSeconds?: number
     recipientType?: 'blind' | 'witness'
+    minConfirmations?: number
   }
   getRgbPendingReceives: undefined
   acceptRgbReceive: {

@@ -20,6 +20,7 @@ export type RgbBlindReceiveParams = {
   assetId?: string
   amount?: number | string
   durationSeconds?: number
+  minConfirmations?: number
   providerOrigin?: string
   skipSync?: boolean
 }
@@ -41,6 +42,7 @@ export class RgbReceiveOperations {
       ...(params.assetId === undefined ? {} : { assetId: params.assetId }),
       ...(params.amount === undefined ? {} : { amount: String(params.amount) }),
       ...(params.durationSeconds === undefined ? {} : { durationSeconds: params.durationSeconds }),
+      ...(params.minConfirmations === undefined ? {} : { minConfirmations: params.minConfirmations }),
       ...(params.providerOrigin === undefined ? {} : { providerOrigin: params.providerOrigin }),
       // The following claim updates this exact pending receive and performs
       // the durable checkpoint. Avoid uploading the intermediate, unclaimed

@@ -10,6 +10,7 @@ export type RgbPendingReceiveInvoice = {
   transferKind?: string
   batchTransferIdx?: number
   expirationTimestamp?: number
+  minConfirmations?: number
   createdAt?: number
   [key: string]: unknown
 }
@@ -27,6 +28,7 @@ export function toPublicRgbPendingReceiveInvoice(
     assetId?: string
     amount?: string
     expirationTimestamp?: number
+    minConfirmations?: number
     createdAt?: number
   recipientType?: 'blind' | 'witness'
   witnessScriptPubKey?: string
@@ -52,6 +54,7 @@ export function toPublicRgbPendingReceiveInvoice(
     ...(item.expirationTimestamp === undefined
       ? {}
       : { expirationTimestamp: item.expirationTimestamp }),
+    ...(item.minConfirmations === undefined ? {} : { minConfirmations: item.minConfirmations }),
     ...(item.createdAt === undefined ? {} : { createdAt: item.createdAt }),
     kind: item.recipientType === 'witness' ? 'ReceiveWitness' : 'ReceiveBlind',
     ...(item.recipientType === 'witness' && item.witnessScriptPubKey

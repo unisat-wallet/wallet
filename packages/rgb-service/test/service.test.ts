@@ -2550,6 +2550,26 @@ describe('RgbService', () => {
     )
   })
 
+  it('keeps a WebRGB receive unsettled below its requested confirmation floor', async () => {
+    const dependencies = createDependencies()
+    dependencies.stateSource.getTransactionStatus = vi.fn().mockResolvedValue({
+      status: 'confirmed', confirmations: 2,
+    })
+    const service = new RgbService(dependencies)
+    await service.open(wallet)
+    const receive = {
+      invoice: rgbInvoice(), recipientId: 'recipient', createdAt: 1,
+      minConfirmations: 3,
+      receivedConsignment: { txid: 'c'.repeat(64), receivedAt: 1, accepted: true },
+    }
+    const result = await (service as any).advanceAcceptedReceive(
+      receive, { recipientId: 'recipient', payload: 'consignment' },
+      { txid: 'c'.repeat(64) }, false
+    )
+    expect(result).toBe(false)
+    expect(dependencies.stateSource.getTransactionStatus).toHaveBeenCalledWith(wallet, 'c'.repeat(64))
+  })
+
   it('reconciles a persisted ACK intent after restart without requiring the proxy payload', async () => {
     const dependencies = createDependencies()
     dependencies.transport.getConsignment = vi.fn()

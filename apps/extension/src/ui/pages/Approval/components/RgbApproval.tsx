@@ -31,6 +31,7 @@ interface Props {
       assetId?: string;
       amount?: string;
       durationSeconds?: number;
+      minConfirmations?: number;
       recipientType?: 'blind' | 'witness';
       ticker?: string;
       name?: string;
@@ -283,6 +284,9 @@ function RgbReceiveApproval({ data, session }: { data: Props['params']['data']; 
                   }
                 />
                 <RgbReceiveDetail label={t('rgb_approval_expiry')} value={expiry} />
+                {data.minConfirmations !== undefined ? (
+                  <RgbReceiveDetail label={t('history_confirmations')} value={`≥ ${data.minConfirmations}`} />
+                ) : null}
               </Column>
             </RgbApprovalAccordion>
           </Card>

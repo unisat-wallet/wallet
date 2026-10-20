@@ -510,6 +510,7 @@ type RgbReceiveInvoiceRequest = {
   assetId?: string
   amount?: number | string
   durationSeconds?: number
+  minConfirmations?: number
   skipSync?: boolean
   providerOrigin?: string
 }
@@ -4291,6 +4292,7 @@ export class WalletController extends BaseController {
       ...(params.assetId === undefined ? {} : { assetId: params.assetId }),
       ...(params.amount === undefined ? {} : { amount: String(params.amount) }),
       ...(params.durationSeconds === undefined ? {} : { durationSeconds: params.durationSeconds }),
+      ...(params.minConfirmations === undefined ? {} : { minConfirmations: params.minConfirmations }),
       ...(params.providerOrigin === undefined ? {} : { providerOrigin: params.providerOrigin }),
       deferRecoveryCheckpoint: true,
     })

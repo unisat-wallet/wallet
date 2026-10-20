@@ -8,6 +8,7 @@ import { createProviderProxy, injectProviderToWindow } from './providerInjection
 import { _unisatProviderPrivate, requestMethodKey } from './providerState';
 import PushEventHandlers from './pushEventHandlers';
 import { Interceptor } from './types';
+import { announceWebRgbProvider, WebRgbProvider } from './webRgb';
 
 export { Interceptor };
 
@@ -21,7 +22,7 @@ export class UnisatProvider extends EventEmitter {
     getFeeUtxos: () => Promise<any>;
     getIssueAvailability: () => Promise<any>;
     issueNia: (params: { orderId: string; ticker: string; name: string; precision: number; amount: string; paymentTxid?: string }) => Promise<any>;
-    createReceiveInvoice: (params: { assetId?: string; amount?: string; durationSeconds?: number; recipientType?: 'blind' | 'witness' }) => Promise<any>;
+    createReceiveInvoice: (params: { assetId?: string; amount?: string; durationSeconds?: number; recipientType?: 'blind' | 'witness'; minConfirmations?: number }) => Promise<any>;
     getPendingReceives: () => Promise<any>;
     acceptReceive: (recipientId: string) => Promise<any>;
     rejectReceive: (recipientId: string) => Promise<any>;
@@ -131,3 +132,4 @@ declare global {
 const provider = new UnisatProvider();
 const providerProxy = createProviderProxy(provider, requestMethodKey);
 injectProviderToWindow(providerProxy);
+announceWebRgbProvider(new WebRgbProvider((method, params) => provider[requestMethodKey]({ method, params })));

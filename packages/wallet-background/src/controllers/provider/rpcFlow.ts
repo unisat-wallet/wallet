@@ -60,6 +60,12 @@ const flowContext = flow
   })
   .use(async (ctx, next) => {
     const { mapMethod } = ctx
+    if (mapMethod.startsWith('webRgb') && mapMethod !== 'webRgbEnable' &&
+        !permissionService.hasPermission(ctx.request.session.origin)) {
+      const error = new Error('WebRGB provider is not enabled for this site') as Error & { code: string }
+      error.code = 'NOT_ENABLED'
+      throw error
+    }
     if (!Reflect.getMetadata('SAFE', providerController, mapMethod)) {
       // check lock
       const isUnlock = keyringService.memStore.getState().isUnlocked
