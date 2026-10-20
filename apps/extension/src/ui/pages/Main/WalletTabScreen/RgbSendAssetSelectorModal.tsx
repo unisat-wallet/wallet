@@ -32,15 +32,21 @@ export function RgbSendAssetSelectorModal({
   const { t } = useI18n();
 
   return (
-    <BottomModal onClose={onClose} bodyStyle={{ padding: 0 }}>
-      <Column fullX gap="zero">
-        <BottomSheetHeader title={t('select_asset')} onClose={onClose} />
+    <BottomModal
+      onClose={onClose}
+      bodyStyle={{ padding: 0, maxHeight: 'min(80vh, 600px)', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+      <Column fullX gap="zero" style={{ minHeight: 0 }}>
+        <BottomSheetHeader title={t('select_asset')} onClose={onClose} style={{ flexShrink: 0 }} />
         <Column
           fullX
           style={{
             padding: '0 20px 20px',
             boxSizing: 'border-box',
-            minHeight: 200
+            flex: '1 1 auto',
+            minHeight: 0,
+            overflowY: 'auto',
+            overscrollBehaviorY: 'contain',
+            WebkitOverflowScrolling: 'touch'
           }}
         >
           <InfiniteList

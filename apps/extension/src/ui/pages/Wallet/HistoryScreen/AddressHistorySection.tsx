@@ -112,10 +112,7 @@ function HistoryRow({ item, onClick }: { item: AddressHistorySummaryItem; onClic
           <span className={styles.rowTitle}>{directionLabel}</span>
           <span className={styles.rowSubtitle}>
             <span className={`${styles.assetCategoryTag} ${assetCategoryToneClass[tone]}`}>{assetCategory}</span>
-            {isSelfTransfer ? <span> · {t('network_fee')}</span> : null}
-            {item.status === 'pending' ? (
-              <span className={styles.rowPending}> · {t('history_pending')}</span>
-            ) : null}
+            {item.status === 'pending' ? <span className={styles.rowPending}> · {t('history_pending')}</span> : null}
           </span>
           {item.toAddress && (
             <span className={styles.rowSubtitle} title={item.toAddress}>
@@ -268,8 +265,7 @@ function AddressHistoryContent({
                   fontSize: fontSizes.xs,
                   maxWidth: 280,
                   lineHeight: '16px'
-                }}
-              >
+                }}>
                 <div className={styles.historyHint} aria-label={t('history_rgb_not_included')}>
                   <Icon
                     icon="balance-question"
