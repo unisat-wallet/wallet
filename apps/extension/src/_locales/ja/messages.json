@@ -3378,6 +3378,12 @@
   "pending_invoices": {
     "message": "インボイス"
   },
+  "home_assets_shortcut_description": {
+    "message": "このネットワークではプレビューを利用できません。資産タブで確認してください。"
+  },
+  "home_history_shortcut_description": {
+    "message": "このネットワークではプレビューを利用できません。エクスプローラーで取引を確認してください。"
+  },
   "view_all": {
     "message": "すべて表示"
   },

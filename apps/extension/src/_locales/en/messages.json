@@ -3392,6 +3392,12 @@
   "pending_invoices": {
     "message": "Invoices"
   },
+  "home_assets_shortcut_description": {
+    "message": "Preview is unavailable on this network. View assets in the Assets tab."
+  },
+  "home_history_shortcut_description": {
+    "message": "Preview is unavailable on this network. View transactions in the explorer."
+  },
   "view_all": {
     "message": "View All"
   },

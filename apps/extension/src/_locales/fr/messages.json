@@ -3378,6 +3378,12 @@
   "pending_invoices": {
     "message": "Factures"
   },
+  "home_assets_shortcut_description": {
+    "message": "L’aperçu n’est pas disponible sur ce réseau. Consultez vos actifs dans l’onglet Actifs."
+  },
+  "home_history_shortcut_description": {
+    "message": "L’aperçu n’est pas disponible sur ce réseau. Consultez les transactions dans l’explorateur."
+  },
   "view_all": {
     "message": "Tout voir"
   },

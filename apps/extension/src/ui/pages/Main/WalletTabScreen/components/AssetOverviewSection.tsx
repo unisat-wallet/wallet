@@ -77,10 +77,41 @@ function AssetOverviewCard({ item, onClick, isUsdt }: { item: AddressAssetOvervi
 }
 
 /** Small homepage preview of the address's assets. */
-export function AssetOverviewSection({ isRgbActive, rgbUsdtAssetId }: { isRgbActive: boolean; rgbUsdtAssetId: string }) {
+export function AssetOverviewSection({
+  isRgbActive,
+  rgbUsdtAssetId,
+  unavailable = false
+}: {
+  isRgbActive: boolean;
+  rgbUsdtAssetId: string;
+  unavailable?: boolean;
+}) {
   const address = useCurrentAddress();
   const chainType = useChainType();
+  if (unavailable) return <AssetOverviewUnavailable />;
   return <AssetOverviewContent key={`${chainType}:${address}`} address={address} isRgbActive={isRgbActive} rgbUsdtAssetId={rgbUsdtAssetId} />;
+}
+
+function AssetOverviewUnavailable() {
+  const nav = useNavigation();
+  const { t } = useI18n();
+  return (
+    <section className={styles.section} aria-label={t('assets')}>
+      <div className={styles.header}>
+        <span className={styles.title}>{t('assets')}</span>
+        <button type="button" className={styles.viewAll} onClick={() => nav.navigate('AssetsTabScreen')}>
+          {t('view_all')}
+          <svg className={styles.viewAllArrow} viewBox="0 0 12 6.7301" aria-hidden="true">
+            <path
+              d="M6 6.7301C5.83324 6.7301 5.67344 6.66297 5.55671 6.54385L0.177404 1.05516C-0.0625558 0.810352 -0.0585774 0.417367 0.18625 0.177428C0.431056 -0.0624896 0.824063 -0.0585535 1.06398 0.186274L6 5.22266L10.936 0.186274C11.1759 -0.0585747 11.5689 -0.0625742 11.8137 0.177428C12.0586 0.417388 12.0625 0.810352 11.8226 1.05516L6.44328 6.54385C6.32655 6.66297 6.16678 6.7301 6 6.7301Z"
+              fill="currentColor"
+            />
+          </svg>
+        </button>
+      </div>
+      <div className={styles.emptyRow}>{t('home_assets_shortcut_description')}</div>
+    </section>
+  );
 }
 
 function AssetOverviewContent({ address, isRgbActive, rgbUsdtAssetId }: { address: string; isRgbActive: boolean; rgbUsdtAssetId: string }) {

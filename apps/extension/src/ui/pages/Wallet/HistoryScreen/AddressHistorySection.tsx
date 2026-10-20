@@ -129,10 +129,39 @@ function HistoryRow({ item, onClick }: { item: AddressHistorySummaryItem; onClic
 type HistoryFilter = 'all' | 'receive' | 'send';
 
 /** Displays address history as asset changes, with transaction details one tap away. */
-export function AddressHistorySection({ preview = false }: { preview?: boolean }) {
+export function AddressHistorySection({
+  preview = false,
+  unavailable = false
+}: {
+  preview?: boolean;
+  unavailable?: boolean;
+}) {
   const address = useCurrentAddress();
   const chainType = useChainType();
+  if (unavailable && preview) return <AddressHistoryUnavailable address={address} />;
   return <AddressHistoryContent key={`${chainType}:${address}`} address={address} preview={preview} />;
+}
+
+function AddressHistoryUnavailable({ address }: { address: string }) {
+  const chain = useChain();
+  const nav = useNavigation();
+  const { t } = useI18n();
+  return (
+    <Column gap="lg" fullX classname={styles.historySection}>
+      <div className={styles.historyHeader}>
+        <Text text={t('history')} size="md" color="white" />
+      </div>
+      <Text text={t('home_history_shortcut_description')} color="textDim" size="sm" />
+      {address && (
+        <button type="button" className={styles.viewAllButton} onClick={() => nav.navToExplorerAddress(address)}>
+          {t(chain.unisatExplorerUrl ? 'view_on_uniscan' : 'view_on_explorer')}
+          <span className={styles.viewAllArrow} aria-hidden="true">
+            <img src="/images/history/view-all-arrow.svg" alt="" />
+          </span>
+        </button>
+      )}
+    </Column>
+  );
 }
 
 function AddressHistoryContent({ address, preview }: { address: string; preview: boolean }) {

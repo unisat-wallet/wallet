@@ -3369,6 +3369,12 @@
   "pending_invoices": {
     "message": "Facturas"
   },
+  "home_assets_shortcut_description": {
+    "message": "La vista previa no está disponible en esta red. Consulta tus activos en la pestaña Activos."
+  },
+  "home_history_shortcut_description": {
+    "message": "La vista previa no está disponible en esta red. Consulta las transacciones en el explorador."
+  },
   "view_all": {
     "message": "Ver todo"
   },

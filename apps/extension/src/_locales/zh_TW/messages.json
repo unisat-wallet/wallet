@@ -3381,6 +3381,12 @@
   "pending_invoices": {
     "message": "發票"
   },
+  "home_assets_shortcut_description": {
+    "message": "此網路不支援預覽，請前往「資產」標籤頁查看。"
+  },
+  "home_history_shortcut_description": {
+    "message": "此網路不支援預覽，請前往區塊瀏覽器查看交易。"
+  },
   "view_all": {
     "message": "查看全部"
   },

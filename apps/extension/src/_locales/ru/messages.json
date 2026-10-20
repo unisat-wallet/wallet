@@ -3378,6 +3378,12 @@
   "pending_invoices": {
     "message": "Инвойсы"
   },
+  "home_assets_shortcut_description": {
+    "message": "Предпросмотр недоступен в этой сети. Посмотрите активы на вкладке «Активы»."
+  },
+  "home_history_shortcut_description": {
+    "message": "Предпросмотр недоступен в этой сети. Посмотрите транзакции в обозревателе."
+  },
   "view_all": {
     "message": "Показать все"
   },

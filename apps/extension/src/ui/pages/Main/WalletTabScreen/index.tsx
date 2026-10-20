@@ -686,8 +686,12 @@ export default function WalletTabScreen({
             <BalanceCard />
             <WalletActions chain={chain} />
             <AnnouncementCard />
-            <AssetOverviewSection isRgbActive={isRgbActive} rgbUsdtAssetId={rgbUsdtAssetId} />
-            <AddressHistorySection preview />
+            <AssetOverviewSection
+              isRgbActive={isRgbActive}
+              rgbUsdtAssetId={rgbUsdtAssetId}
+              unavailable={chain.supportsAssetOverview === false}
+            />
+            <AddressHistorySection preview unavailable={chain.supportsAddressHistory === false} />
           </Column>
         </>
       ) : (
