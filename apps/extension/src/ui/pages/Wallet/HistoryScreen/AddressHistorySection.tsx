@@ -81,19 +81,11 @@ function HistoryRow({ item, onClick }: { item: AddressHistorySummaryItem; onClic
     ? t('receive')
     : t('send');
   const assetKind = primary.asset.kind;
-  const assetCategory =
-    assetKind === 'coin'
-      ? ''
-      : assetKind === 'inscription'
-      ? t('ordinals')
-      : assetKind === 'runes' || assetKind === 'alkanes' || assetKind === 'brc20'
-      ? t(assetKind)
-      : assetKind.replaceAll('_', '-').toUpperCase();
   const subtitle = isSelfTransfer
     ? `${t('network_fee')}${item.status === 'pending' ? ` · ${t('history_pending')}` : ''}`
     : item.status === 'pending'
-    ? `${assetCategory} · ${t('history_pending')}`
-    : assetCategory;
+    ? t('history_pending')
+    : '';
 
   return (
     <button type="button" className={styles.historyRow} onClick={onClick} data-testid={`history-${item.txid}`}>
