@@ -156,9 +156,6 @@ export default function SignPsbt(props: SignPsbtProps) {
     currentDecodedPsbt && currentToSignData
       ? getSighashSingleInputIndexes(currentToSignData, currentDecodedPsbt.inputInfos)
       : [];
-  const hasSighashSingleAnyoneCanPay = sighashSingleInputIndexes.some(
-    (index) => ((currentDecodedPsbt?.inputInfos[index]?.sighashType || 0) & 0x80) !== 0
-  );
   const listResetKey = getIncrementalListResetKey(currentToSignData?.psbtHex || '');
 
   const ForwardTransactionItem = forwardRef(TransactionItem);
@@ -309,27 +306,12 @@ export default function SignPsbt(props: SignPsbtProps) {
         <Column gap="xl">
           <ActionOverviewSection decodedPsbt={currentDecodedPsbt} action={currentToSignData.action!} />
 
-          {sighashSingleInputIndexes.length > 0 && (
-            <Card style={{ backgroundColor: 'rgba(244, 182, 44, 0.1)', border: '1px solid #F4B62C' }}>
-              <Column gap="sm" fullX>
-                <Text
-                  text={`${t('sighash_single_warning_title')} (${sighashSingleInputIndexes.length})`}
-                  color="warning"
-                  preset="bold"
-                />
-                <Text text={t('sighash_single_warning_description')} size="xs" color="textDim" />
-                {hasSighashSingleAnyoneCanPay && (
-                  <Text text={t('sighash_single_anyonecanpay_description')} size="xs" color="textDim" />
-                )}
-              </Column>
-            </Card>
-          )}
-
           <AssetOverviewSection
             decodedPsbt={currentDecodedPsbt}
             runesPriceMap={runesPriceMap}
             brc20PriceMap={brc20PriceMap}
             networkFee={networkFee}
+            sighashSingleInputIndexes={sighashSingleInputIndexes}
           />
           <SignPsbtSection title={t('transaction_details')}>
             {isValidData && (

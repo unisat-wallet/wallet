@@ -1,6 +1,6 @@
 import { useState } from 'react';
 
-import { Card, Column, Grid, Row } from '@/ui/components';
+import { Card, Column, Grid, Row, Text } from '@/ui/components';
 import AlkanesNFTPreview from '@/ui/components/AlkanesNFTPreview';
 import { AlkaneBalance } from '@/ui/components/AlkanesPreviewCard';
 import AlkanesPreviewCard from '@/ui/components/AlkanesPreviewCard/AlkanesPreviewCard';
@@ -25,13 +25,15 @@ interface AssetOverviewSectionProps {
   runesPriceMap?: { [key: string]: TickPriceItem };
   brc20PriceMap?: { [key: string]: TickPriceItem };
   networkFee: any;
+  sighashSingleInputIndexes: number[];
 }
 
 export default function AssetOverviewSection({
   decodedPsbt,
   networkFee,
   runesPriceMap,
-  brc20PriceMap
+  brc20PriceMap,
+  sighashSingleInputIndexes
 }: AssetOverviewSectionProps) {
   const btcUnit = useBTCUnit();
   const { t } = useI18n();
@@ -44,6 +46,9 @@ export default function AssetOverviewSection({
   const title = t('transaction_overview');
 
   const showNetworkFee = decodedPsbt.isCompleted == true;
+  const hasSighashSingleAnyoneCanPay = sighashSingleInputIndexes.some(
+    (index) => ((decodedPsbt.inputInfos[index]?.sighashType || 0) & 0x80) !== 0
+  );
 
   const [selectedAssetType, setSelectedAssetType] = useState<string | null>(null);
 
@@ -203,7 +208,7 @@ export default function AssetOverviewSection({
     }
   };
 
-  if (showNetworkFee === false && assetCards.length === 0) {
+  if (showNetworkFee === false && assetCards.length === 0 && sighashSingleInputIndexes.length === 0) {
     return null;
   }
 
@@ -241,6 +246,23 @@ export default function AssetOverviewSection({
                 status={getFeeRateStatus()}
                 iconColor={
                   getFeeRateStatus() === 'warning' ? '#FFC107' : getFeeRateStatus() === 'error' ? '#F44336' : undefined
+                }
+              />
+            )}
+
+            {sighashSingleInputIndexes.length > 0 && (
+              <InfoCard
+                title={t('sighash_single_warning_title')}
+                value={sighashSingleInputIndexes.length.toString()}
+                icon="alert"
+                status="warning"
+                subContent={
+                  <Column gap="sm" itemsCenter style={{ marginTop: 8 }}>
+                    <Text text={t('sighash_single_warning_description')} size="xs" color="textDim" />
+                    {hasSighashSingleAnyoneCanPay && (
+                      <Text text={t('sighash_single_anyonecanpay_description')} size="xs" color="textDim" />
+                    )}
+                  </Column>
                 }
               />
             )}
