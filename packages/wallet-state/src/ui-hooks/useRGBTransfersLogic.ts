@@ -37,8 +37,9 @@ export function useRGBTransfersLogic({
   const currentKeyring = useCurrentKeyring()
   const currentAccount = useCurrentAccount()
   const chainType = useChainType()
-  const cacheKey = `${chainType}:${currentKeyring?.key || ''}:${currentAccount?.key || ''}:${enabled ? '1' : '0'}`
+  const cacheKey = `${chainType}:${currentKeyring?.key || ''}:${currentAccount?.key || ''}:${currentAccount?.address || ''}:${enabled ? '1' : '0'}`
   const [loadedCacheKey, setLoadedCacheKey] = useState('')
+  const [pendingReceivePoll, setPendingReceivePoll] = useState<{ key: string; pending: boolean }>()
   const skipSyncRef = useRef(!initialFullSync)
   const requestFullSyncRef = useRef(false)
 
@@ -49,6 +50,14 @@ export function useRGBTransfersLogic({
       skipSyncRef.current = true
       const result = await wallet.getRgbTransfers(page, pageSize, { skipSync })
       if (skipSync && page === 1) requestFullSyncRef.current = true
+      if (page === 1) {
+        // An invoice has no transfer row until its consignment is discovered.
+        // Keep polling even when the activity list is otherwise empty.
+        const invoices = await wallet
+          .getRgbPendingReceiveInvoices({ skipSync: true })
+          .catch(() => undefined)
+        if (invoices) setPendingReceivePoll({ key: cacheKey, pending: invoices.list.length > 0 })
+      }
       const assetIds = [...new Set(result.list.map(item => item.assetId).filter(Boolean))] as string[]
       const details = new Map<string, RgbAssetDetail>()
       await Promise.all(
@@ -100,12 +109,20 @@ export function useRGBTransfersLogic({
     onLoadMore,
   } = useInfiniteList<RgbTransferItem>({
     fetcher: fetchTransfers,
-    dependencies: [chainType, currentKeyring?.key, currentAccount?.key, enabled],
+    dependencies: [
+      chainType,
+      currentKeyring?.key,
+      currentAccount?.key,
+      currentAccount?.address,
+      enabled,
+    ],
   })
   const cached = rgbTransferListCache.get(cacheKey)
   const visibleItems = loading && items.length === 0 && cached?.list.length ? cached.list : items
   const visibleTotal = loading && items.length === 0 && cached ? cached.total : total
   const hasInProgressTransfer = visibleItems.some(isInProgress)
+  const hasPendingReceiveInvoice =
+    pendingReceivePoll?.key === cacheKey && pendingReceivePoll.pending
   const previousStatusByTransfer = useRef(new Map<string, string>())
   const notifiedTransferEvents = useRef(new Set<string>())
   const [notifications, setNotifications] = useState<RgbTransferNotification[]>([])
@@ -157,13 +174,13 @@ export function useRGBTransfersLogic({
   }, [items])
 
   useEffect(() => {
-    if (!pollingEnabled || !hasInProgressTransfer) return undefined
+    if (!pollingEnabled || (!hasInProgressTransfer && !hasPendingReceiveInvoice)) return undefined
     const intervalId = setInterval(() => {
       skipSyncRef.current = false
       onRefresh()
     }, 10_000)
     return () => clearInterval(intervalId)
-  }, [hasInProgressTransfer, onRefresh, pollingEnabled])
+  }, [hasInProgressTransfer, hasPendingReceiveInvoice, onRefresh, pollingEnabled])
 
   return {
     items: visibleItems,

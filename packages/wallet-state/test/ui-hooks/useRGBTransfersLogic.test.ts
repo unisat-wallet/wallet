@@ -2,6 +2,7 @@ import { act, renderHook, waitFor } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
 
 import { useRGBTransfersLogic } from '../../src/ui-hooks/useRGBTransfersLogic'
+import { accountActions } from '../../src/reducers/accounts'
 import { createHookTestHarness } from './testHelpers'
 
 const confirmingReceive = {
@@ -17,6 +18,54 @@ const confirmingReceive = {
 }
 
 describe('useRGBTransfersLogic', () => {
+  it('polls an outstanding invoice even before it has a transfer row', async () => {
+    const { wrapper, wallet } = createHookTestHarness()
+    wallet.getRgbPendingReceiveInvoices.mockResolvedValue({ list: [{ invoice: 'rgb:witness-invoice' }] })
+    wallet.getRgbTransfers
+      .mockResolvedValueOnce({ list: [], total: 0 })
+      .mockResolvedValue({
+        list: [{ ...confirmingReceive, status: 'pending_accept' }],
+        total: 1,
+      })
+    const intervalSpy = vi.spyOn(globalThis, 'setInterval')
+
+    try {
+      const { result, unmount } = renderHook(
+        () => useRGBTransfersLogic({ initialFullSync: true }),
+        { wrapper }
+      )
+      await waitFor(() => expect(result.current.isCurrentAccountLoaded).toBe(true))
+      await waitFor(() => expect(result.current.loading).toBe(false))
+      await waitFor(() => expect(intervalSpy).toHaveBeenCalledWith(expect.any(Function), 10_000))
+
+      const poll = intervalSpy.mock.calls.find(([, interval]) => interval === 10_000)?.[0]
+      expect(poll).toBeTypeOf('function')
+      act(() => (poll as () => void)())
+      await waitFor(() => expect(result.current.items[0]?.status).toBe('pending_accept'))
+      unmount()
+    } finally {
+      intervalSpy.mockRestore()
+    }
+  })
+
+  it('reloads RGB activity when the same account changes its Bitcoin address type', async () => {
+    const { wrapper, wallet, store } = createHookTestHarness()
+    const { result } = renderHook(
+      () => useRGBTransfersLogic({ initialFullSync: true, pollingEnabled: false }),
+      { wrapper }
+    )
+    await waitFor(() => expect(result.current.isCurrentAccountLoaded).toBe(true))
+    await waitFor(() => expect(wallet.getRgbTransfers).toHaveBeenCalledTimes(1))
+
+    const account = store.getState().accounts.current!
+    act(() => {
+      store.dispatch(accountActions.setCurrent({ ...account, address: '3nested-segwit-address' }))
+    })
+
+    await waitFor(() => expect(wallet.getRgbTransfers).toHaveBeenCalledTimes(2))
+    await waitFor(() => expect(result.current.isCurrentAccountLoaded).toBe(true))
+  })
+
   it('loads the full activity once when the history screen requests an initial sync', async () => {
     const { wrapper, wallet } = createHookTestHarness()
     wallet.getRgbTransfers.mockResolvedValue({
