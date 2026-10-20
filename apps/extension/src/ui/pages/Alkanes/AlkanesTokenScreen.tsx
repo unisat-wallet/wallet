@@ -139,6 +139,7 @@ export default function AlkanesTokenScreen() {
                   : '--'
               }`}
               maxLength={100}
+              wrapValue
             />
             <Line />
 
@@ -157,6 +158,7 @@ export default function AlkanesTokenScreen() {
                     )} `
                   : '--'
               }
+              wrapValue
             />
 
             <ViewOnExplorerAction onClick={onClickViewOnExplorer} />
