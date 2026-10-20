@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { createRgbProxyTransport } from '../src/adapters/rgb-proxy'
-import { proxyV1Hash, proxyV1TransferId, proxyV1Verify } from '../src/adapters/rgb-proxy-v1'
+import { proxyV1DecryptBlob, proxyV1EncryptBlob, proxyV1Hash, proxyV1PublicKey, proxyV1TransferId, proxyV1Verify } from '../src/adapters/rgb-proxy-v1'
 
 const endpoint = 'rpcs://proxy.example'
 const recipientId = 'bc:utxob:recipient'
@@ -80,6 +80,7 @@ describe('RGB proxy transport', () => {
     let transferId = ''
     let senderPk = ''
     let consignmentHash = ''
+    let postedPayload = ''
     let signedTx = ''
     let signedTxHash = ''
     let ackSignature = ''
@@ -115,16 +116,20 @@ describe('RGB proxy transport', () => {
         case 'consignment.post': {
           consignmentHash = params.consignment_hash
           const file = Buffer.from(await (form!.get('file') as File).arrayBuffer())
-          expect(proxyV1Hash(file)).toBe(consignmentHash)
+          const blobHash = proxyV1Hash(file)
+          expect(blobHash).not.toBe(consignmentHash)
+          expect(file[0]).toBe(1)
+          postedPayload = file.toString('base64')
+          expect(Buffer.from(proxyV1DecryptBlob(file, prepared!.privateKey, senderPk, consignmentHash)).toString('base64')).toBe(payload)
           expect(params.transfer_id).toBe(transferId)
-          expect(proxyV1Verify(senderPk, params.signature, transferId + consignmentHash + consignmentHash)).toBe(true)
+          expect(proxyV1Verify(senderPk, params.signature, transferId + consignmentHash + blobHash)).toBe(true)
           return rpcResponse(true)
         }
         case 'transfer.list':
           expect(proxyV1Verify(recipientPk, params.signature, invoiceId + params.timestamp)).toBe(true)
           return rpcResponse({ [transferId]: 'pending' })
         case 'consignment.get':
-          return rpcResponse({ consignment: payload, sender_transport_endpoint: endpoint, sender_pk: senderPk, consignment_hash: consignmentHash, batch: false })
+          return rpcResponse({ consignment: postedPayload, sender_transport_endpoint: endpoint, sender_pk: senderPk, consignment_hash: consignmentHash, batch: false })
         case 'ack.post':
           ack = params.ack
           ackSignature = params.signature
@@ -157,6 +162,7 @@ describe('RGB proxy transport', () => {
     await transport.publishConsignment(consignment)
     const received = await transport.getConsignment?.({ recipientId: invoiceId, endpoints: [endpoint], proxyPrivateKey: prepared!.privateKey })
     expect(received?.proxyTransferId).toBe(transferId)
+    expect(received?.payload).toBe(payload)
     await transport.acknowledgeConsignment?.({
       recipientId: invoiceId,
       endpoints: [endpoint],
@@ -168,6 +174,19 @@ describe('RGB proxy transport', () => {
       proxyConsignmentHash: received!.proxyConsignmentHash,
     })
     await expect(transport.getAcknowledgement?.(consignment)).resolves.toBe(true)
+  })
+
+  it('decrypts proxy v1 consignments across the 64 KiB chunk boundary and rejects altered ciphertext', () => {
+    const senderKey = '11'.repeat(32)
+    const recipientKey = '22'.repeat(32)
+    const senderPk = proxyV1PublicKey(senderKey)
+    const recipientPk = proxyV1PublicKey(recipientKey)
+    const plaintext = Uint8Array.from({ length: 65_537 }, (_, index) => index % 251)
+    const encrypted = proxyV1EncryptBlob(plaintext, senderKey, recipientPk)
+    expect(proxyV1EncryptBlob(plaintext, senderKey, recipientPk)).toEqual(encrypted)
+    expect(proxyV1DecryptBlob(encrypted, recipientKey, senderPk, proxyV1Hash(plaintext))).toEqual(plaintext)
+    encrypted[encrypted.length - 1] ^= 1
+    expect(() => proxyV1DecryptBlob(encrypted, recipientKey, senderPk, proxyV1Hash(plaintext))).toThrow()
   })
 
   it('keeps legacy invoices unchanged when server.info is unavailable', async () => {

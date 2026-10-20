@@ -9,6 +9,8 @@ import log from 'loglevel'
 
 import {
   proxyV1DecryptSignedTx,
+  proxyV1DecryptBlob,
+  proxyV1EncryptBlob,
   proxyV1EncryptSignedTx,
   proxyV1Hash,
   proxyV1Pow,
@@ -200,8 +202,10 @@ async function postProxyV1Consignment(endpoint: string, consignment: RgbTranspor
   }
   const senderPublicKey = proxyV1PublicKey(senderPrivateKey)
   const transferId = proxyV1TransferId(invoiceId, senderPublicKey)
-  const file = base64ToBytes(consignment.payload)
-  const consignmentHash = proxyV1Hash(file)
+  const plaintext = base64ToBytes(consignment.payload)
+  const consignmentHash = proxyV1Hash(plaintext)
+  const file = proxyV1EncryptBlob(plaintext, senderPrivateKey, recipientPublicKey)
+  const blobHash = proxyV1Hash(file)
   const check = await postJson<Record<string, { status: string; pow_difficulty: string }>>(endpoint, 'invoice.check', {
     invoice_ids: [invoiceId],
   })
@@ -210,7 +214,7 @@ async function postProxyV1Consignment(endpoint: string, consignment: RgbTranspor
   if (!invoiceStatus || invoiceStatus.status === 'unknown') {
     throw new Error('RGB invoice is unavailable on the proxy')
   }
-  const signedTx = await proxyV1EncryptSignedTx(rawTx, senderPrivateKey, recipientPublicKey, transferId)
+  const signedTx = await proxyV1EncryptSignedTx(rawTx, senderPrivateKey, recipientPublicKey)
   const senderInfo = await postJson<ProxyServerInfo>(senderEndpoint, 'server.info', {})
   if (senderInfo.error || senderInfo.result?.protocol_version !== '1.0') {
     throw new Error('RGB sender proxy does not support protocol v1')
@@ -248,7 +252,7 @@ async function postProxyV1Consignment(endpoint: string, consignment: RgbTranspor
     ['params[consignment_hash]', consignmentHash],
     ['params[batch]', 'false'],
     ['params[file_size]', String(file.length)],
-    ['params[signature]', proxyV1Sign(senderPrivateKey, transferId + consignmentHash + consignmentHash)],
+    ['params[signature]', proxyV1Sign(senderPrivateKey, transferId + consignmentHash + blobHash)],
     ['params[pow_timestamp]', timestamp],
     ['params[pow_nonce]', nonce],
   ]
@@ -299,12 +303,21 @@ async function getProxyV1Consignment(input: {
     if (proxyV1TransferId(input.recipientId, result.sender_pk) !== transferId) {
       throw new Error('RGB proxy returned a transfer with an invalid ID')
     }
-    if (proxyV1Hash(base64ToBytes(result.consignment)) !== result.consignment_hash) {
+    const blob = base64ToBytes(result.consignment)
+    let plaintext: Uint8Array
+    try {
+      plaintext = proxyV1Hash(blob) === result.consignment_hash
+        ? blob
+        : proxyV1DecryptBlob(blob, privateKey, result.sender_pk, result.consignment_hash)
+    } catch {
+      throw new Error('RGB proxy returned a consignment with an invalid hash')
+    }
+    if (proxyV1Hash(plaintext) !== result.consignment_hash) {
       throw new Error('RGB proxy returned a consignment with an invalid hash')
     }
     return {
       recipientId: input.recipientId,
-      payload: result.consignment,
+      payload: Buffer.from(plaintext).toString('base64'),
       txid: '',
       endpoint,
       proxyTransferId: transferId,
@@ -626,7 +639,7 @@ export function createRgbProxyTransport(proxyEndpoints: string[] = []): RgbTrans
             throw new Error('RGB proxy returned a different signed transaction sender')
           }
           const rawTx = await proxyV1DecryptSignedTx(body.result.signed_tx,
-            proxyPrivateKey, body.result.sender_pk, proxyTransferId)
+            proxyPrivateKey, body.result.sender_pk, body.result.signed_tx_hash)
           if (proxyV1Hash(Buffer.from(rawTx, 'hex')) !== body.result.signed_tx_hash) {
             throw new Error('RGB proxy returned a signed transaction with an invalid hash')
           }

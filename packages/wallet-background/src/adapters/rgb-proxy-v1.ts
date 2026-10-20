@@ -1,4 +1,6 @@
 import { ed25519, edwardsToMontgomeryPriv, edwardsToMontgomeryPub, x25519 } from '@noble/curves/ed25519'
+import { xchacha20poly1305 } from '@noble/ciphers/chacha'
+import { hkdf } from '@noble/hashes/hkdf'
 import { sha256 } from '@noble/hashes/sha256'
 
 const encoder = new TextEncoder()
@@ -53,53 +55,67 @@ export function proxyV1Verify(publicKey: string, signature: string, message: str
   }
 }
 
-async function aesKey(privateKey: string, peerPublicKey: string, transferId: string) {
+const CHUNK_SIZE = 65_536
+const TAG_SIZE = 16
+
+function sharedKey(privateKey: string, peerPublicKey: string) {
   const shared = x25519.getSharedSecret(
     edwardsToMontgomeryPriv(Buffer.from(privateKey, 'hex')),
     edwardsToMontgomeryPub(Buffer.from(peerPublicKey, 'hex'))
   )
-  const key = sha256(concat(bytes('rgb-proxy-server/signed-tx/v1'), shared, bytes(transferId)))
-  return globalThis.crypto.subtle.importKey('raw', key, 'AES-GCM', false, ['encrypt', 'decrypt'])
+  return hkdf(sha256, shared, undefined, bytes('rgb-proxy-server/enc/v1'), 32)
+}
+
+function chunkNonce(plaintextHash: Uint8Array, counter: number, isFinal: boolean) {
+  const nonce = new Uint8Array(24)
+  nonce.set(plaintextHash.subarray(13), 0)
+  new DataView(nonce.buffer).setUint32(19, counter, false)
+  nonce[23] = Number(isFinal)
+  return nonce
+}
+
+/** Proxy v1 encrypts the file; its declared hash always identifies the plaintext. */
+export function proxyV1EncryptBlob(plaintext: Uint8Array, privateKey: string, peerPublicKey: string) {
+  const plaintextHash = sha256(plaintext)
+  const key = sharedKey(privateKey, peerPublicKey)
+  const parts: Uint8Array[] = [Uint8Array.from([1])]
+  for (let offset = 0, counter = 0; ; offset += CHUNK_SIZE, counter++) {
+    const chunk = plaintext.subarray(offset, offset + CHUNK_SIZE)
+    const isFinal = offset + CHUNK_SIZE >= plaintext.length
+    parts.push(xchacha20poly1305(key, chunkNonce(plaintextHash, counter, isFinal)).encrypt(chunk))
+    if (isFinal) break
+  }
+  return concat(...parts)
+}
+
+export function proxyV1DecryptBlob(blob: Uint8Array, privateKey: string, peerPublicKey: string, plaintextHashHex: string) {
+  if (!/^[0-9a-f]{64}$/i.test(plaintextHashHex) || blob[0] !== 1 || blob.length < 1 + TAG_SIZE) {
+    throw new Error('RGB proxy encrypted blob is invalid')
+  }
+  const plaintextHash = Buffer.from(plaintextHashHex, 'hex')
+  const key = sharedKey(privateKey, peerPublicKey)
+  const parts: Uint8Array[] = []
+  for (let offset = 1, counter = 0; offset < blob.length; offset += CHUNK_SIZE + TAG_SIZE, counter++) {
+    const end = Math.min(offset + CHUNK_SIZE + TAG_SIZE, blob.length)
+    const isFinal = end === blob.length
+    if (end - offset < TAG_SIZE) throw new Error('RGB proxy encrypted blob is truncated')
+    parts.push(xchacha20poly1305(key, chunkNonce(plaintextHash, counter, isFinal)).decrypt(blob.subarray(offset, end)))
+  }
+  const plaintext = concat(...parts)
+  if (proxyV1Hash(plaintext) !== plaintextHashHex.toLowerCase()) {
+    throw new Error('RGB proxy returned a consignment with an invalid hash')
+  }
+  return plaintext
 }
 
 /** Stable ciphertext makes an idempotent ack.prepare retry byte-for-byte identical. */
-export async function proxyV1EncryptSignedTx(
-  rawTx: string,
-  senderPrivateKey: string,
-  recipientPublicKey: string,
-  transferId: string
-) {
+export async function proxyV1EncryptSignedTx(rawTx: string, senderPrivateKey: string, recipientPublicKey: string) {
   if (!/^(?:[0-9a-f]{2})+$/i.test(rawTx)) throw new Error('RGB signed transaction is invalid')
-  const iv = sha256(concat(
-    bytes('rgb-proxy-server/signed-tx-iv/v1'),
-    Buffer.from(senderPrivateKey, 'hex'),
-    bytes(transferId),
-    Buffer.from(rawTx, 'hex')
-  )).slice(0, 12)
-  const key = await aesKey(senderPrivateKey, recipientPublicKey, transferId)
-  const ciphertext = new Uint8Array(await globalThis.crypto.subtle.encrypt(
-    { name: 'AES-GCM', iv, additionalData: bytes(transferId) },
-    key,
-    Buffer.from(rawTx, 'hex')
-  ))
-  return Buffer.from(concat(Uint8Array.from([1]), iv, ciphertext)).toString('base64')
+  return Buffer.from(proxyV1EncryptBlob(Buffer.from(rawTx, 'hex'), senderPrivateKey, recipientPublicKey)).toString('base64')
 }
 
-export async function proxyV1DecryptSignedTx(
-  encrypted: string,
-  recipientPrivateKey: string,
-  senderPublicKey: string,
-  transferId: string
-) {
-  const payload = Buffer.from(encrypted, 'base64')
-  if (payload.length < 30 || payload[0] !== 1) throw new Error('RGB proxy signed transaction is invalid')
-  const key = await aesKey(recipientPrivateKey, senderPublicKey, transferId)
-  const plaintext = await globalThis.crypto.subtle.decrypt(
-    { name: 'AES-GCM', iv: payload.subarray(1, 13), additionalData: bytes(transferId) },
-    key,
-    payload.subarray(13)
-  )
-  return hex(new Uint8Array(plaintext))
+export async function proxyV1DecryptSignedTx(encrypted: string, recipientPrivateKey: string, senderPublicKey: string, signedTxHash: string) {
+  return hex(proxyV1DecryptBlob(Buffer.from(encrypted, 'base64'), recipientPrivateKey, senderPublicKey, signedTxHash))
 }
 
 export async function proxyV1Pow(transferId: string, difficulty: number, timestamp: string) {
