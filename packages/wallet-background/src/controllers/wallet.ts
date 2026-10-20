@@ -3980,18 +3980,33 @@ export class WalletController extends BaseController {
   /** User consent is required before opening local RGB state or contacting RGB services. */
   enableRgbFeature = async (): Promise<{ enabled: true }> => {
     const wallet = await this.getCurrentRgbWalletRef()
-    await keyringService.setEncryptedStorageItem(
-      RGB_ENCRYPTED_STORAGE_NAMESPACE,
-      this.rgbFeatureStorageKey(wallet),
-      {
-        enabled: true,
-        agreementVersion: RGB_FEATURE_TERMS_VERSION,
-        acceptedAt: Date.now(),
-      } satisfies RgbFeatureConsent
-    )
-    // First enable is intentionally the first point at which recovery is
-    // opened. This prevents an inactive RGB card from reading cloud state.
-    await this.getLocalRgbService()
+    const wasEnabled = await this.isRgbFeatureEnabled(wallet)
+    const consentKey = this.rgbFeatureStorageKey(wallet)
+    if (!wasEnabled) {
+      await keyringService.setEncryptedStorageItem(
+        RGB_ENCRYPTED_STORAGE_NAMESPACE,
+        consentKey,
+        {
+          enabled: true,
+          agreementVersion: RGB_FEATURE_TERMS_VERSION,
+          acceptedAt: Date.now(),
+        } satisfies RgbFeatureConsent
+      )
+    }
+    try {
+      // First enable is intentionally the first point at which recovery is
+      // opened. This prevents an inactive RGB card from reading cloud state.
+      await this.getLocalRgbService()
+    } catch (error) {
+      if (!wasEnabled) {
+        try {
+          await keyringService.removeEncryptedStorageItem(RGB_ENCRYPTED_STORAGE_NAMESPACE, consentKey)
+        } catch (rollbackError) {
+          log.warn('Failed to roll back RGB consent after recovery failed', rollbackError)
+        }
+      }
+      throw error
+    }
     return { enabled: true }
   }
 
@@ -5786,7 +5801,18 @@ export class WalletController extends BaseController {
             ...rgbRecoveryServiceSummary(service),
           })
           if (!restored) {
-            throw new Error('RGB recovery checkpoint does not belong to this wallet')
+            const recoveredWallet =
+              state && typeof state === 'object'
+                ? (state as { wallet?: Partial<LocalRgbWallet> }).wallet
+                : undefined
+            log.warn('RGB recovery checkpoint identity or structure mismatch', {
+              expectedWalletId: wallet.walletId,
+              recoveredWalletId: recoveredWallet?.walletId,
+              expectedNetwork: wallet.network,
+              recoveredNetwork: recoveredWallet?.network,
+              fundingAddressMatches: recoveredWallet?.fundingAddress === wallet.fundingAddress,
+            })
+            throw new Error('RGB recovery checkpoint is invalid or belongs to another wallet')
           }
           if (shouldFastForward) {
             log.debug('RGB recovery: clean local state fast-forwarded to newer checkpoint', {

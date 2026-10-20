@@ -610,7 +610,43 @@ describe('RgbService', () => {
         ...recovery,
         snapshot: { ...recovery.snapshot, syncedAt: -1 },
       })
-    ).resolves.toBe(false)
+    ).rejects.toThrow('RGB recovery checkpoint snapshot is invalid')
+  })
+
+  it('restores issuance history with wallet API RGB20 order IDs', async () => {
+    const service = new RgbService(createDependencies())
+    await service.open(wallet)
+    const assetId = 'rgb:BgYGBgYG-BgYGBgY-GBgYGBg-YGBgYGB-gYGBgYG-BgYGBgY'
+    const issue = {
+      assetId,
+      orderId: '202610-RGB20-ABC12345',
+      amount: '1',
+      txid: 'a'.repeat(64),
+      createdAt: 1,
+      asset: { ticker: 'ISS', name: 'Issued', precision: 0, schema: 'NIA', issuedSupply: '1' },
+    }
+    const recovery = {
+      version: 1 as const,
+      wallet,
+      snapshot: { syncedAt: 1, utxos: [] },
+      pending: {},
+      issueHistory: [issue],
+    }
+
+    await expect(service.restoreRecoveryState(recovery)).resolves.toBe(true)
+    expect(service.getIssueHistory()).toEqual([issue])
+    await expect(
+      service.restoreRecoveryState({
+        ...recovery,
+        issueHistory: [{ ...issue, orderId: 'f7f0e1f0-0000-4000-8000-000000000001' }],
+      })
+    ).resolves.toBe(true)
+    await expect(
+      service.restoreRecoveryState({
+        ...recovery,
+        issueHistory: [{ ...issue, orderId: 'invalid-order-id' }],
+      })
+    ).rejects.toThrow('RGB recovery checkpoint contains an invalid issue history item')
   })
 
   it('adopts a newer normal checkpoint without interpreting its RGB state machine', async () => {
@@ -672,7 +708,7 @@ describe('RgbService', () => {
     }
     dependencies.storage.set = vi.fn().mockRejectedValue(new Error('storage unavailable'))
 
-    await expect(service.restoreRecoveryState(recovery)).resolves.toBe(false)
+    await expect(service.restoreRecoveryState(recovery)).rejects.toThrow('storage unavailable')
     expect(service.getSnapshot()).toEqual({ utxos: [], syncedAt: 0 })
   })
 

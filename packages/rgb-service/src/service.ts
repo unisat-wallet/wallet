@@ -356,29 +356,28 @@ export class RgbService {
     const current = this.requireState()
     if (!isRgbServiceState(recovery) || !sameRecoveryWallet(recovery.wallet, current.wallet))
       return false
-    try {
-      const restored = normalizeStateAssetIds(hydrateState(recovery))
-      // Provider ownership is a local browser authorization boundary. Never
-      // accept it from a recovery checkpoint, even if an older/foreign client
-      // included the field unexpectedly.
-      stripProviderOrigins(restored)
-      validateRecoveredState(restored, current.wallet)
-      restored.recoveryRemoteStateKnown = true
-      // Checkpoint delivery metadata is installation-local and must never be
-      // accepted from a remote snapshot (including old snapshot formats).
-      // The authenticated checkpoint itself is the verification. Do not mark
-      // it dirty/unverified and immediately upload it again: a handoff may
-      // have advanced the remote revision between the read and that redundant
-      // write, falsely turning a successful restore into a CAS conflict.
-      restored.recoveryCheckpoint = { dirty: false, verified: true }
-      await this.dependencies.storage.set(this.storageKey(restored.wallet), persistState(restored))
-      this.state = restored
-      this.openedFromStorage = true
-      this.recoveryBackupEnabled = true
-      return true
-    } catch {
-      return false
-    }
+    // A matching wallet can still contain malformed legacy data or encounter
+    // a storage failure. Preserve the actual error instead of reporting those
+    // failures as a wallet identity mismatch.
+    const restored = normalizeStateAssetIds(hydrateState(recovery))
+    // Provider ownership is a local browser authorization boundary. Never
+    // accept it from a recovery checkpoint, even if an older/foreign client
+    // included the field unexpectedly.
+    stripProviderOrigins(restored)
+    validateRecoveredState(restored, current.wallet)
+    restored.recoveryRemoteStateKnown = true
+    // Checkpoint delivery metadata is installation-local and must never be
+    // accepted from a remote snapshot (including old snapshot formats).
+    // The authenticated checkpoint itself is the verification. Do not mark
+    // it dirty/unverified and immediately upload it again: a handoff may
+    // have advanced the remote revision between the read and that redundant
+    // write, falsely turning a successful restore into a CAS conflict.
+    restored.recoveryCheckpoint = { dirty: false, verified: true }
+    await this.dependencies.storage.set(this.storageKey(restored.wallet), persistState(restored))
+    this.state = restored
+    this.openedFromStorage = true
+    this.recoveryBackupEnabled = true
+    return true
   }
 
   /** Enable checkpoints only after a successful remote read (including an empty result). */
@@ -3514,9 +3513,11 @@ function validateRecoveredState(state: RgbServiceState, currentWallet: RgbWallet
         'RGB recovery checkpoint contains an invalid issue history asset ID'
       )
     }
+    // Accept the existing UUID-style IDs and wallet API's YYYYMM-RGB20-XXXXXXXX IDs.
     if (
       !/^(0|[1-9][0-9]*)$/.test(issue.amount) ||
-      (issue.orderId !== undefined && !/^[0-9a-f-]{36}$/i.test(issue.orderId)) ||
+      (issue.orderId !== undefined &&
+        !/^(?:[0-9a-f-]{36}|\d{6}-RGB20-[A-Z0-9]{8})$/i.test(issue.orderId)) ||
       !/^[0-9a-f]{64}$/i.test(issue.txid) ||
       !Number.isSafeInteger(issue.createdAt) ||
       issue.createdAt < 0 ||

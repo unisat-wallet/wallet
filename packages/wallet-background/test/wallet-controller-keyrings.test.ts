@@ -881,6 +881,42 @@ describe('RGB wallet references', () => {
     expect(openService).toHaveBeenCalledTimes(1)
   })
 
+  it('rolls back first-time RGB activation when checkpoint recovery fails', async () => {
+    const wallet = new WalletController()
+    const storage = new Map<string, unknown>()
+    const getEncryptedStorageItem = vi.fn(
+      (_namespace: string, key: string) => Promise.resolve(storage.get(key))
+    )
+    const setEncryptedStorageItem = vi.fn(
+      (_namespace: string, key: string, value: unknown) => {
+        storage.set(key, value)
+        return Promise.resolve()
+      }
+    )
+    const removeEncryptedStorageItem = vi.fn((_namespace: string, key: string) => {
+      storage.delete(key)
+      return Promise.resolve()
+    })
+    ;(keyringService as any).getEncryptedStorageItem = getEncryptedStorageItem
+    ;(keyringService as any).setEncryptedStorageItem = setEncryptedStorageItem
+    ;(keyringService as any).removeEncryptedStorageItem = removeEncryptedStorageItem
+    vi.spyOn(wallet, 'getCurrentRgbWalletRef').mockResolvedValue({
+      walletId: 'unisat-deadbeef-0',
+      network: 'mainnet',
+      fundingAddress: 'bc1p-rgb-funding',
+    })
+    vi.spyOn(wallet as any, 'getLocalRgbService').mockRejectedValue(
+      new Error('RGB recovery checkpoint contains an invalid issue history item')
+    )
+
+    await expect(wallet.enableRgbFeature()).rejects.toThrow('invalid issue history item')
+    expect(storage.has('rgb-feature-enabled:v1:unisat-deadbeef:mainnet')).toBe(false)
+    expect(removeEncryptedStorageItem).toHaveBeenCalledWith(
+      'rgb-service-v1',
+      'rgb-feature-enabled:v1:unisat-deadbeef:mainnet'
+    )
+  })
+
   it('shares RGB consent across accounts derived from the same wallet', async () => {
     const wallet = new WalletController()
     const storage = new Map<string, unknown>([
