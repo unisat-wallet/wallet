@@ -186,6 +186,7 @@ const UI_CONTROLLER_METHODS = new Set([
   'saveContactsOrder',
   'setAcceptLowFeeMode',
   'setAccountAlianName',
+  'setAssetsNewBadgeDismissed',
   'setAutoLockTimeId',
   'setChainType',
   'setDeveloperMode',
