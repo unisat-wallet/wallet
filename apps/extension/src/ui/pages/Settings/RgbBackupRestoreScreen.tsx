@@ -1,12 +1,41 @@
 import { type ChangeEvent, useRef, useState } from 'react';
 
-import { Button, Card, Column, Content, Header, Layout, Row, Text } from '@/ui/components';
+import { Button, Card, Checkbox, Column, Content, Header, Icon, Layout, Progress, Row, Spin, Text } from '@/ui/components';
 import { Popover } from '@/ui/components/Popover';
-import { useI18n, useNavigation, useReloadAccounts, useTools, useWallet } from '@unisat/wallet-state';
+import { colors } from '@/ui/theme/colors';
+import { uiEventBus, useI18n, useNavigation, useReloadAccounts, useTools, useWallet } from '@unisat/wallet-state';
+import { BUS_METHODS } from '@unisat/wallet-shared';
 
 import { RgbBackupStepBar } from './RgbBackupStepBar';
 
 type BackupPreview = Awaited<ReturnType<ReturnType<typeof useWallet>['inspectRgbBackupFile']>>;
+type RestoreProgressBase = {
+  progressId: string;
+  completed: number;
+  total: number;
+};
+type RestoreProgress = RestoreProgressBase & (
+  | { phase: 'preparing' }
+  | { phase: 'creating' | 'restoring' | 'restored'; accountNumber: number }
+);
+
+const restorePopoverStyle = {
+  width: 343,
+  boxSizing: 'border-box' as const,
+  padding: '24px 16px',
+  borderRadius: 12,
+  backgroundColor: '#181A1F',
+  maxHeight: 'calc(100vh - 40px)',
+  overflowY: 'auto' as const
+};
+
+const riskCardStyle = {
+  border: '1px solid rgba(255, 255, 255, 0.15)',
+  borderRadius: 8,
+  overflow: 'hidden'
+};
+
+const mutedTextStyle = { color: 'rgba(255, 255, 255, 0.65)', lineHeight: '16px' };
 
 function errorMessage(error: unknown): string | undefined {
   if (typeof error === 'string') {
@@ -34,7 +63,9 @@ export default function RgbBackupRestoreScreen() {
   const [filename, setFilename] = useState<string>();
   const [preview, setPreview] = useState<BackupPreview>();
   const [confirmRestore, setConfirmRestore] = useState(false);
+  const [riskAcknowledged, setRiskAcknowledged] = useState(false);
   const [errorText, setErrorText] = useState<string>();
+  const [restoreProgress, setRestoreProgress] = useState<RestoreProgress>();
 
   const importErrorText = (error: unknown, stage: 'read' | 'restore') => {
     const message = errorMessage(error);
@@ -91,14 +122,21 @@ export default function RgbBackupRestoreScreen() {
   };
 
   const restoreBackup = async () => {
-    if (!payload || !preview) return;
+    if (!payload || !preview || !riskAcknowledged) return;
+    const progressId = globalThis.crypto.randomUUID();
+    const onProgress = (progress?: RestoreProgress) => {
+      if (progress?.progressId === progressId) setRestoreProgress(progress);
+    };
+    uiEventBus.addEventListener(BUS_METHODS.RGB_BACKUP_RESTORE_PROGRESS, onProgress);
+    setRestoreProgress({ progressId, completed: 0, total: preview.accountIndexes.length, phase: 'preparing' });
     setRestoring(true);
     setErrorText(undefined);
     try {
       await wallet.restoreRgbBackupFile({
         payload,
         replaceRemote: true,
-        createMissingAccounts: (preview.missingAccountIndexes?.length || 0) > 0
+        createMissingAccounts: (preview.missingAccountIndexes?.length || 0) > 0,
+        progressId
       });
       await reloadAccounts().catch(error => console.error('Failed to refresh accounts after RGB restore', error));
       setConfirmRestore(false);
@@ -110,9 +148,21 @@ export default function RgbBackupRestoreScreen() {
       setErrorText(message);
       tools.toastError(message);
     } finally {
+      uiEventBus.removeEventListener(BUS_METHODS.RGB_BACKUP_RESTORE_PROGRESS, onProgress);
       setRestoring(false);
     }
   };
+
+  const progressText = restoreProgress?.phase === 'creating'
+    ? t('rgb_restore_progress_creating', { account: restoreProgress.accountNumber })
+    : restoreProgress?.phase === 'restoring'
+      ? t('rgb_restore_progress_restoring', { account: restoreProgress.accountNumber })
+      : restoreProgress?.phase === 'restored'
+        ? t('rgb_restore_progress_account_done', { account: restoreProgress.accountNumber })
+        : t('rgb_restore_progress_preparing');
+  const progressPercent = restoreProgress?.total
+    ? Math.round((restoreProgress.completed / restoreProgress.total) * 100)
+    : 0;
 
   return (
     <Layout>
@@ -159,7 +209,10 @@ export default function RgbBackupRestoreScreen() {
                 text={t(preview.accountsToCreateIndexes?.length ? 'rgb_restore_create_and_restore' : 'rgb_restore_selected_backup')}
                 preset="primary"
                 disabled={reading || restoring}
-                onClick={() => setConfirmRestore(true)}
+                onClick={() => {
+                  setRiskAcknowledged(false);
+                  setConfirmRestore(true);
+                }}
               />
               {errorText ? <Text text={errorText} color="error" size="xs" wrap /> : null}
             </>
@@ -178,33 +231,89 @@ export default function RgbBackupRestoreScreen() {
         </Column>
       </Content>
       {confirmRestore ? (
-        <Popover onClose={() => !restoring && setConfirmRestore(false)}>
-          <Column gap="md">
-            <Text text={t('rgb_replace_state_title')} preset="title-bold" />
-            {preview ? (
-              <Text text={t('rgb_confirm_restore_scope', { count: preview.accountIndexes.length, accounts: preview.accountIndexes.map(index => index + 1).join(', ') })} color="white" size="sm" wrap />
-            ) : null}
-            {!!preview?.accountsToCreateIndexes?.length && (
+        <Popover
+          onClose={restoring ? undefined : () => setConfirmRestore(false)}
+          contentStyle={restorePopoverStyle}
+          closeStyle={{ top: 24, right: 16 }}>
+          <Column fullX gap="xl">
+            <Column fullX gap="lg">
               <Text
-                text={t('rgb_restore_missing_accounts', {
-                  accounts: preview.accountsToCreateIndexes.map(index => index + 1).join(', ')
-                })}
-                color="warning"
-                size="sm"
-                wrap
+                text={t(restoring ? 'restoring_rgb' : 'rgb_replace_state_title')}
+                size="md"
+                style={{ fontWeight: 600, padding: '0 20px' }}
+                textCenter
               />
+              {!restoring && preview ? (
+                <Text
+                  text={t('rgb_confirm_restore_scope', {
+                    count: preview.accountIndexes.length,
+                    accounts: preview.accountIndexes.map(index => index + 1).join(', ')
+                  })}
+                  preset="sub"
+                  style={mutedTextStyle}
+                />
+              ) : null}
+            </Column>
+            {restoring ? (
+              <Column gap="sm" fullX>
+                <Row gap="sm">
+                  <Spin size="small" />
+                  <Text text={progressText} color="white" size="sm" wrap />
+                </Row>
+                <Progress percent={progressPercent} showInfo={false} strokeColor={colors.primary} />
+                <Text
+                  text={t('rgb_restore_progress_completed', {
+                    completed: restoreProgress?.completed || 0,
+                    total: restoreProgress?.total || preview?.accountIndexes.length || 1
+                  })}
+                  color="textDim"
+                  size="xs"
+                />
+              </Column>
+            ) : (
+              <>
+                {!!preview?.accountsToCreateIndexes?.length && (
+                  <Text
+                    text={t('rgb_restore_missing_accounts', {
+                      accounts: preview.accountsToCreateIndexes.map(index => index + 1).join(', ')
+                    })}
+                    color="warning"
+                    size="xs"
+                    wrap
+                  />
+                )}
+                <Column fullX gap="zero" style={riskCardStyle}>
+                  <Row fullX itemsCenter gap="md" style={{ minHeight: 36, padding: '0 8px' }}>
+                    <Icon icon="alert" color="red_light2" size={16} />
+                    <Text text={t('rgb_restore_file_risk_title')} size="xs" color="danger" />
+                  </Row>
+                  <div style={{ borderTop: '1px solid rgba(255, 255, 255, 0.15)' }} />
+                  <Column fullX gap="sm" style={{ padding: 8 }}>
+                    <Text text={t('rgb_restore_file_risk_description')} preset="sub" style={mutedTextStyle} />
+                    <Text text={t('rgb_restore_file_risk_guidance')} preset="sub" style={mutedTextStyle} />
+                  </Column>
+                </Column>
+                <Checkbox
+                  checked={riskAcknowledged}
+                  checkedColor={colors.red}
+                  checkColor={colors.white}
+                  onChange={event => setRiskAcknowledged(event.target.checked)}
+                  style={{ alignSelf: 'stretch', alignItems: 'flex-start' }}
+                  data-testid="rgb-backup-risk-checkbox">
+                  <Text text={t('rgb_restore_file_risk_ack')} preset="sub" style={{ ...mutedTextStyle, flex: 1 }} />
+                </Checkbox>
+                <Column fullX gap="md">
+                  <Button
+                    text={t(preview?.accountsToCreateIndexes?.length ? 'rgb_restore_create_and_restore' : 'rgb_replace_and_restore')}
+                    preset="delete"
+                    full
+                    disabled={!riskAcknowledged}
+                    onClick={() => void restoreBackup()}
+                  />
+                  <Button text={t('cancel')} preset="primary" full onClick={() => setConfirmRestore(false)} />
+                </Column>
+              </>
             )}
-            <Text text={t('rgb_replace_state_description')} color="textDim" size="sm" wrap />
-            <Row fullX>
-              <Button text={t('cancel')} preset="defaultV2" full disabled={restoring} onClick={() => setConfirmRestore(false)} />
-              <Button
-                text={t(restoring ? 'restoring_rgb' : preview?.accountsToCreateIndexes?.length ? 'rgb_restore_create_and_restore' : 'rgb_replace_and_restore')}
-                preset="primaryV2"
-                full
-                disabled={restoring}
-                onClick={() => void restoreBackup()}
-              />
-            </Row>
           </Column>
         </Popover>
       ) : null}

@@ -586,12 +586,20 @@ describe('RGB HD backup orchestration', () => {
     expect(create).not.toHaveBeenCalled()
     expect(restore).not.toHaveBeenCalled()
 
+    const progressEvents = vi.spyOn(bgEventBus, 'emit')
     await expect(controller.restoreRgbHdBackup({
       payload,
       replaceRemote: true,
       createMissingAccounts: true,
+      progressId: 'restore-test',
     })).resolves.toMatchObject({ accountIndexes: [0, 1, 2, 3, 4] })
     expect(create).toHaveBeenCalledTimes(3)
+    const progress = progressEvents.mock.calls
+      .filter(([event, data]) => event === BUS_EVENTS.broadcastToUI && data?.method === BUS_METHODS.RGB_BACKUP_RESTORE_PROGRESS)
+      .map(([, data]) => data.params)
+    expect(progress[0]).toEqual({ progressId: 'restore-test', completed: 0, total: 5, phase: 'preparing' })
+    expect(progress.filter(item => item.phase === 'creating').map(item => item.accountNumber)).toEqual([3, 4, 5])
+    expect(progress.filter(item => item.phase === 'restored').map(item => item.completed)).toEqual([1, 2, 3, 4, 5])
     expect(currentAccount.index).toBe(1)
     expect(restore).toHaveBeenCalledTimes(5)
     keyringService.keyrings.length = 0

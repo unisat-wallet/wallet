@@ -4627,11 +4627,27 @@ export class WalletController extends BaseController {
   }
 
   /** Restore each account through the existing fenced replacement path. */
-  restoreRgbHdBackup = async (params: { payload: string; replaceRemote: boolean; createMissingAccounts?: boolean }) => {
+  private reportRgbBackupRestoreProgress = (
+    progressId: string | undefined,
+    progress: { completed: number; total: number; phase: 'preparing' | 'creating' | 'restoring' | 'restored'; accountNumber?: number }
+  ) => {
+    if (!progressId || progressId.length > 128) return
+    bgEventBus.emit(BUS_EVENTS.broadcastToUI, {
+      method: BUS_METHODS.RGB_BACKUP_RESTORE_PROGRESS,
+      params: { progressId, ...progress },
+    })
+  }
+
+  restoreRgbHdBackup = async (params: { payload: string; replaceRemote: boolean; createMissingAccounts?: boolean; progressId?: string }) => {
     if (!params?.replaceRemote) {
       throw new Error('Restoring an RGB backup requires explicit replacement confirmation')
     }
     const preview = await this.inspectRgbHdBackup(params.payload)
+    this.reportRgbBackupRestoreProgress(params.progressId, {
+      completed: 0,
+      total: preview.accountIndexes.length,
+      phase: 'preparing',
+    })
     if (preview.missingAccountIndexes.length > 0) {
       if (!params.createMissingAccounts) {
         throw new Error(`RGB account ${preview.missingAccountIndexes[0]! + 1} has not been created`)
@@ -4645,6 +4661,12 @@ export class WalletController extends BaseController {
       if (!hdKeyring) throw new Error('RGB HD wallet keyring is unavailable')
       try {
         for (const index of preview.accountsToCreateIndexes) {
+          this.reportRgbBackupRestoreProgress(params.progressId, {
+            completed: 0,
+            total: preview.accountIndexes.length,
+            phase: 'creating',
+            accountNumber: index + 1,
+          })
           await keyringService.addNewAccount(hdKeyring)
           const updatedKeyring = await this.getCurrentKeyring()
           if (updatedKeyring?.accounts[updatedKeyring.accounts.length - 1]?.index !== index) {
@@ -4666,6 +4688,12 @@ export class WalletController extends BaseController {
     for (const entry of backup.accounts) {
       const account = accounts.find(item => item.index === entry.index)
       if (!account) throw new Error(`RGB account ${entry.index + 1} has not been created`)
+      this.reportRgbBackupRestoreProgress(params.progressId, {
+        completed: restoredIndexes.length,
+        total: backup.accounts.length,
+        phase: 'restoring',
+        accountNumber: entry.index + 1,
+      })
       try {
         const wallet = await this.getRgbWalletRefForAccount(account)
         await this.withRgbHdBackupWallet(wallet, async () => {
@@ -4673,6 +4701,12 @@ export class WalletController extends BaseController {
           await this.restoreRgbBackupForContext(entry.payload, context)
         })
         restoredIndexes.push(entry.index)
+        this.reportRgbBackupRestoreProgress(params.progressId, {
+          completed: restoredIndexes.length,
+          total: backup.accounts.length,
+          phase: 'restored',
+          accountNumber: entry.index + 1,
+        })
       } catch (error) {
         throw new Error(
           `RGB account ${entry.index + 1} failed to restore; completed accounts: ${restoredIndexes.map(index => index + 1).join(', ') || 'none'}. ${String(error)}`
@@ -4719,15 +4753,27 @@ export class WalletController extends BaseController {
     }
   }
 
-  restoreRgbBackupFile = async (params: { payload: string; replaceRemote: boolean; createMissingAccounts?: boolean }) => {
+  restoreRgbBackupFile = async (params: { payload: string; replaceRemote: boolean; createMissingAccounts?: boolean; progressId?: string }) => {
     if (isRgbHdBackupPackage(params.payload)) return this.restoreRgbHdBackup(params)
     if (!params.replaceRemote) {
       throw new Error('Restoring an RGB backup requires explicit replacement confirmation')
     }
     const { account, wallet } = await this.findLegacyRgbBackupAccount(params.payload)
+    this.reportRgbBackupRestoreProgress(params.progressId, {
+      completed: 0,
+      total: 1,
+      phase: 'restoring',
+      accountNumber: account.index! + 1,
+    })
     const result = await this.withRgbHdBackupWallet(wallet, async () => {
       const context = await this.getLocalRgbServiceForWallet(wallet)
       return this.restoreRgbBackupForContext(params.payload, context)
+    })
+    this.reportRgbBackupRestoreProgress(params.progressId, {
+      completed: 1,
+      total: 1,
+      phase: 'restored',
+      accountNumber: account.index! + 1,
     })
     return {
       ...result,

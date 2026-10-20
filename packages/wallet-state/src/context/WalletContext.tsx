@@ -728,7 +728,7 @@ export interface WalletController {
     accountsToCreateIndexes?: number[]
   }>
 
-  restoreRgbBackupFile(params: { payload: string; replaceRemote: boolean; createMissingAccounts?: boolean }): Promise<{
+  restoreRgbBackupFile(params: { payload: string; replaceRemote: boolean; createMissingAccounts?: boolean; progressId?: string }): Promise<{
     restored: true
     createdAt: number
     accountIndexes: number[]
