@@ -816,9 +816,7 @@ export default function WalletTabScreen({
             onCanceled={() => void rgbTransfers.onRefresh({ showLoading: false })}
           />
         ) : null}
-        {screen === 'home' && (
-          <RgbRecoveryConflictModal key={`${chain.enum}:${currentAccount.address}`} enabled={isRgbActive} />
-        )}
+        <RgbRecoveryConflictModal key={`${chain.enum}:${currentAccount.address}`} enabled={isUnlocked && isRgbActive} />
         {rgbActivationOpen && (
           <RgbFeatureActivationModal
             loading={rgbActivationLoading}
