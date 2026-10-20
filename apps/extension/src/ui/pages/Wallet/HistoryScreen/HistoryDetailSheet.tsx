@@ -81,8 +81,11 @@ export function HistoryDetailSheet({ summary, onClose }: { summary: AddressHisto
   }, [inscriptionId, wallet]);
 
   const isReceive = primary?.sign === '+';
+  const isSelfTransfer = resolvedSummary.direction === 'self';
   const isCoin = primary?.asset.kind === 'coin';
-  const counterparty = isReceive
+  const counterparty = isSelfTransfer
+    ? address
+    : isReceive
     ? detail?.inputs.find((input) => !input.isMine)?.address || detail?.inputs[0]?.address
     : detail?.outputs.find((output) => !output.isMine)?.address || detail?.outputs[0]?.address;
   const fee = detail?.fee ?? (resolvedSummary.feeSatoshis / 100_000_000).toFixed(8);
@@ -96,7 +99,7 @@ export function HistoryDetailSheet({ summary, onClose }: { summary: AddressHisto
     <BottomModal onClose={onClose} bodyStyle={{ padding: 0 }} borderRadius="20px 20px 0 0">
       <div className={styles.detailSheet}>
         <BottomSheetHeader
-          title={t(isReceive ? 'receive' : 'send')}
+          title={t(isSelfTransfer ? 'self_transfer' : isReceive ? 'receive' : 'send')}
           onClose={onClose}
           height={60}
           inset={16}
@@ -116,8 +119,8 @@ export function HistoryDetailSheet({ summary, onClose }: { summary: AddressHisto
                   </div>
                 )}
               </div>
-              <div className={styles.detailInscriptionAmount}>
-                {primary.sign}1 Inscription{inscriptionNumber ? ` #${String(inscriptionNumber).replace('#', '')}` : ''}
+              <div className={isSelfTransfer ? styles.detailSelfAmount : styles.detailInscriptionAmount}>
+                {isSelfTransfer ? t('self_transfer') : `${primary.sign}1 Inscription${inscriptionNumber ? ` #${String(inscriptionNumber).replace('#', '')}` : ''}`}
               </div>
             </div>
           ) : (
@@ -130,7 +133,7 @@ export function HistoryDetailSheet({ summary, onClose }: { summary: AddressHisto
                 </span>} /> : null
               )}
               <span>
-                {primary?.sign || ''}{primary?.asset.amount || '0'} {assetLabel}
+                {isSelfTransfer ? t('self_transfer') : `${primary?.sign || ''}${primary?.asset.amount || '0'} ${assetLabel}`}
               </span>
             </div>
           )}

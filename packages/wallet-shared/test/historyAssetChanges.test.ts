@@ -62,14 +62,33 @@ describe('getHistoryAssetChanges', () => {
     expect(result.total).toBe(17)
   })
 
-  it('does not report gross self-transfer outputs as asset loss', () => {
+  it('shows a self-transfer output without reporting it as asset loss', () => {
     const result = getHistoryAssetChanges({
       ...base,
       direction: 'self',
-      sent: [{ kind: 'coin', symbol: 'BTC', amount: '0.5' }],
+      feeSatoshis: 1000,
+      sent: [{ kind: 'coin', symbol: 'BTC', amount: '0.00099' }],
       sentCount: 1,
     })
 
-    expect(result).toEqual({ changes: [], total: 0 })
+    expect(result).toEqual({
+      changes: [{ asset: { kind: 'coin', symbol: 'BTC', amount: '0.00099' }, sign: '' }],
+      total: 1,
+    })
+  })
+
+  it('hides carrier sats while showing a self-transferred asset', () => {
+    const result = getHistoryAssetChanges({
+      ...base,
+      direction: 'self',
+      sent: [
+        { kind: 'coin', symbol: 'BTC', amount: '0.00000546' },
+        { kind: 'runes', symbol: 'PEPE', amount: '100' },
+      ],
+      sentCount: 2,
+    })
+
+    expect(result.changes.map(change => `${change.sign}${change.asset.symbol}`)).toEqual(['PEPE'])
+    expect(result.total).toBe(1)
   })
 })

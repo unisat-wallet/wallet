@@ -2,7 +2,8 @@ import type { AddressHistoryAssetItem, AddressHistorySummaryItem } from '../type
 
 export type HistoryAssetChange = {
   asset: AddressHistoryAssetItem
-  sign: '+' | '-'
+  /** An empty sign denotes a self-transfer output, not a net asset loss. */
+  sign: '+' | '-' | ''
 }
 
 const CARRIER_BTC_LIMIT = 0.00001 // 1,000 sats
@@ -14,13 +15,18 @@ function isCarrierCoin(asset: AddressHistoryAssetItem, hasOtherAsset: boolean) {
 }
 
 export function getHistoryAssetChanges(item: AddressHistorySummaryItem) {
-  // The history API reports gross outputs for self-transfers as sent assets.
-  // They have no net asset movement apart from the network fee.
-  if (item.direction === 'self') return { changes: [] as HistoryAssetChange[], total: 0 }
-
   const hasOtherAsset = [...item.received, ...item.sent].some(asset => asset.kind !== 'coin')
   const hiddenReceived = item.received.filter(asset => isCarrierCoin(asset, hasOtherAsset)).length
   const hiddenSent = item.sent.filter(asset => isCarrierCoin(asset, hasOtherAsset)).length
+  if (item.direction === 'self') {
+    // The API places all self-owned outputs, including change, in sent. Keep
+    // them neutral; their total is not the user-requested transfer amount.
+    const changes = item.sent
+      .filter(asset => !isCarrierCoin(asset, hasOtherAsset))
+      .map((asset): HistoryAssetChange => ({ asset, sign: '' }))
+    return { changes, total: Math.max(item.sentCount - hiddenSent, changes.length) }
+  }
+
   const received = item.received.filter(asset => !isCarrierCoin(asset, hasOtherAsset))
   const sent = item.sent.filter(asset => !isCarrierCoin(asset, hasOtherAsset))
   const changes: HistoryAssetChange[] = [

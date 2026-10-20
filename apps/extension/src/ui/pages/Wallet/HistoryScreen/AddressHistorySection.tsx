@@ -61,10 +61,11 @@ function HistoryChange({ change }: { change: HistoryAssetChange }) {
 function HistoryRow({ item, onClick }: { item: AddressHistorySummaryItem; onClick: () => void }) {
   const { t } = useI18n();
   const chain = useChain();
+  const isSelfTransfer = item.direction === 'self';
   const { changes, total } = getHistoryAssetChanges(item);
   const primary = changes[0];
   if (!primary) return null;
-  const directionLabel = item.direction === 'mixed' ? t('mixed') : primary.sign === '+' ? t('receive') : t('send');
+  const directionLabel = isSelfTransfer ? t('self_transfer') : item.direction === 'mixed' ? t('mixed') : primary.sign === '+' ? t('receive') : t('send');
   const assetKind = primary.asset.kind;
   const assetCategory =
     assetKind === 'coin'
@@ -74,7 +75,9 @@ function HistoryRow({ item, onClick }: { item: AddressHistorySummaryItem; onClic
       : assetKind === 'runes' || assetKind === 'alkanes' || assetKind === 'brc20'
       ? t(assetKind)
       : assetKind.replaceAll('_', '-').toUpperCase();
-  const subtitle = item.status === 'pending' ? `${assetCategory} · ${t('history_pending')}` : assetCategory;
+  const subtitle = isSelfTransfer
+    ? `${t('network_fee')}${item.status === 'pending' ? ` · ${t('history_pending')}` : ''}`
+    : item.status === 'pending' ? `${assetCategory} · ${t('history_pending')}` : assetCategory;
 
   return (
     <button type="button" className={styles.historyRow} onClick={onClick} data-testid={`history-${item.txid}`}>
@@ -88,9 +91,15 @@ function HistoryRow({ item, onClick }: { item: AddressHistorySummaryItem; onClic
         </span>
       </span>
       <span className={styles.rowAmounts}>
-        <HistoryChange change={primary} />
-        {changes[1] && <HistoryChange change={changes[1]} />}
-        {total > 2 && <span className={styles.moreCount}>{t('history_more_count', String(total - 2))}</span>}
+        {isSelfTransfer ? (
+          <span className={styles.sentAmount}>-{(item.feeSatoshis / 100_000_000).toFixed(8)} {chain.unit}</span>
+        ) : (
+          <>
+            <HistoryChange change={primary} />
+            {changes[1] && <HistoryChange change={changes[1]} />}
+            {total > 2 && <span className={styles.moreCount}>{t('history_more_count', String(total - 2))}</span>}
+          </>
+        )}
       </span>
     </button>
   );
@@ -151,6 +160,7 @@ function AddressHistoryContent({ address, preview }: { address: string; preview:
     .filter((item) => getHistoryAssetChanges(item).total > 0)
     .filter((item) => {
       if (filter === 'all') return true;
+      if (item.direction === 'self') return filter === 'send';
       return getHistoryAssetChanges(item).changes.some((change) => change.sign === (filter === 'receive' ? '+' : '-'));
     })
     .slice(0, preview ? PREVIEW_LIMIT : undefined);
