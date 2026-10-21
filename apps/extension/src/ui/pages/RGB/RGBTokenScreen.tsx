@@ -64,13 +64,7 @@ export default function RGBTokenScreen() {
     tokenBalance?.spendable === undefined ? '--' : toRgbDisplayAmount(tokenBalance.spendable, precision);
   const lockedAmount = toRgbDisplayAmount(tokenBalance?.lockedAmount, precision);
   const pendingAmount = toRgbDisplayAmount(tokenBalance?.pending, precision);
-  const displayBalance =
-    lockedAmount
-      ? spendable === '0'
-        ? `${lockedAmount} (${t('rgb_amount_locking')})`
-        : `${spendable} (${lockedAmount} ${t('rgb_amount_locking')})`
-      : spendable;
-  const balanceSize = displayBalance.length > 24 ? 'lg' : displayBalance.length > 16 ? 'xl' : 'xxl';
+  const balanceSize = spendable.length > 24 ? 'lg' : spendable.length > 16 ? 'xl' : 'xxl';
 
   const renderTabChildren = useMemo(() => {
     if (activeTab === RGBTokenScreenTabKey.DETAILS) {
@@ -163,7 +157,7 @@ export default function RGBTokenScreen() {
             </Column>
             <Column itemsCenter fullX justifyCenter>
               <Text
-                text={displayBalance}
+                text={spendable}
                 preset="bold"
                 textCenter
                 size={balanceSize}
@@ -175,6 +169,15 @@ export default function RGBTokenScreen() {
               {Number(tokenBalance?.pending || 0) > 0 ? (
                 <Text
                   text={`${pendingAmount} (${t('pending')})`}
+                  size="xs"
+                  color="gold"
+                  textCenter
+                  wrap
+                />
+              ) : null}
+              {Number(tokenBalance?.lockedAmount || 0) > 0 ? (
+                <Text
+                  text={`${lockedAmount} (${t('rgb_amount_locking')})`}
                   size="xs"
                   color="gold"
                   textCenter

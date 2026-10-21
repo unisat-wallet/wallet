@@ -25,8 +25,6 @@ export default function RGBBalanceCard(props: RGBBalanceCardProps) {
   const { t } = useI18n();
   const hasPendingBalance = pendingBalance.gt(0);
   const hasLockedBalance = lockedBalance.gt(0);
-  const displayedBalance = balance.isZero() && hasLockedBalance ? lockedBalanceStr : balanceStr;
-  const pendingOnly = balance.isZero() && hasPendingBalance && !hasLockedBalance;
 
   return (
     <Card fullX onClick={onClick} data-testid={props['data-testid']} style={getTokenBalanceCardStyle()}>
@@ -35,26 +33,15 @@ export default function RGBBalanceCard(props: RGBBalanceCardProps) {
         onIconClick={onClick}
         title={<TruncatedAssetName text={name || ticker || ''} size="sm" color="white" />}
         quantity={
-          pendingOnly ? (
-            <Row itemsCenter gap="sm">
-              <Text text={pendingBalanceStr} size="xs" digital />
-              <Text text={`(${t('pending')})`} size="xxs" color="gold" />
-            </Row>
-          ) : (
-            <Row itemsCenter gap="sm">
-              <Text text={displayedBalance} size="xs" digital />
-              {hasPendingBalance ? (
-                <Text text={`(${t('pending')})`} size="xxs" color="gold" />
-              ) : null}
-              {hasLockedBalance ? (
-                <Text
-                  text={`(${t('rgb_amount_locking')})`}
-                  size="xxs"
-                  color="gold"
-                />
-              ) : null}
-            </Row>
-          )
+          <Row itemsCenter gap="sm">
+            <Text text={balanceStr} size="xs" digital />
+            {hasPendingBalance ? (
+              <Text text={`${pendingBalanceStr} (${t('pending')})`} size="xxs" color="gold" />
+            ) : null}
+            {hasLockedBalance ? (
+              <Text text={`${lockedBalanceStr} (${t('rgb_amount_locking')})`} size="xxs" color="gold" />
+            ) : null}
+          </Row>
         }
         showPrice={showPrice}
         price={price}
