@@ -94,6 +94,25 @@ export function createBfaEvmRpc(url: string, transport: BfaHttpTransport): NonNu
   }
 }
 
+/** Deduplicate identical EVM reads while one wallet operation validates its histories. */
+export function cacheBfaEvmRpc(
+  rpc: NonNullable<BfaValidationOptions['evmRpc']>,
+  cache: Map<string, Promise<unknown>>,
+  url: string
+): NonNullable<BfaValidationOptions['evmRpc']> {
+  return (method, params) => {
+    const key = JSON.stringify([url, method, params])
+    const existing = cache.get(key)
+    if (existing) return existing
+    const request = Promise.resolve().then(() => rpc(method, params))
+    cache.set(key, request)
+    void request.catch(() => {
+      if (cache.get(key) === request) cache.delete(key)
+    })
+    return request
+  }
+}
+
 function fail(message: string): never { throw new RgbServiceError(`RGB v1: ${message}`) }
 function hex(bytes: Uint8Array): string { return Buffer.from(bytes).toString('hex') }
 function bytes(value: string): Uint8Array { return Uint8Array.from(Buffer.from(value, 'hex')) }

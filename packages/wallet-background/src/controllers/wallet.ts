@@ -15,6 +15,7 @@ import { DisplayedKeyring, Keyring, KeyringType, ToSignInput } from '@unisat/key
 import {
   RgbService as LocalRgbService,
   RgbBfaValidationUnavailableError,
+  cacheBfaEvmRpc,
   createBfaEvmRpc,
   createLocalRgbProtocolEncoder,
   validateBfaTransferConsignment,
@@ -6466,7 +6467,8 @@ export class WalletController extends BaseController {
             throw new RgbBfaValidationUnavailableError('BFA EVM chain ID exceeds configured range')
           const url = CHAINS_MAP[chainType]?.rgbEvmRpcUrls?.[Number(chainId)]
           if (!url) throw new RgbBfaValidationUnavailableError(`BFA EVM RPC is not configured for chain ${chainId}`)
-          return createBfaEvmRpc(url, fetch)
+          const rpc = createBfaEvmRpc(url, fetch)
+          return input.evmRpcCache ? cacheBfaEvmRpc(rpc, input.evmRpcCache, url) : rpc
         },
       })
       await this.assertActiveRgbWallet(localWallet)

@@ -615,6 +615,8 @@ export interface RgbServiceDependencies {
     pendingWitnessTxid?: string
     allowPendingLastWitness?: boolean
     knownBlindSeals: import('./protocol/receive').RgbBlindSeal[]
+    /** Shared only by validations within one operation; never persisted across sends. */
+    evmRpcCache?: Map<string, Promise<unknown>>
   }) => Promise<import('./protocol/bfa-validator').ValidatedBfaConsignment>
   transport: RgbTransport
   broadcaster: BitcoinBroadcaster

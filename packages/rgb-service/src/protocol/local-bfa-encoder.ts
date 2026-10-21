@@ -302,12 +302,13 @@ export function createLocalRgbProtocolEncoder(
       const knownBlindSeals = input.validationHistory.knownBlindSeals || []
       const transferPayloads = compatiblePayloads.filter(isSupportedV1TransferConsignment)
       if (!transferPayloads.length) throw new RgbServiceError('RGB v1 history has no transfer')
+      const evmRpcCache = new Map<string, Promise<unknown>>()
       const checked = await Promise.all(transferPayloads.map(payload => validateBfa({
-        wallet: input.wallet, payload, knownBlindSeals,
+        wallet: input.wallet, payload, knownBlindSeals, evmRpcCache,
       })))
       const merged = mergeBfaValidatedHistories(checked)
       const history = await validateBfa({
-        wallet: input.wallet, payload: merged, knownBlindSeals,
+        wallet: input.wallet, payload: merged, knownBlindSeals, evmRpcCache,
       })
       return prepareBfaTransfer({
         wallet: input.wallet, intent: input.intent, selectedUtxos: input.selectedUtxos,

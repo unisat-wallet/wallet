@@ -2132,16 +2132,17 @@ export class RgbService {
     }
     if (!transfers.length) throw new RgbServiceError('RGB v1 history has no transfer')
     const knownBlindSeals = this.getKnownBlindSeals()
+    const evmRpcCache = new Map<string, Promise<unknown>>()
     const validated = await Promise.all(transfers.map(bytes => validate({
       wallet: state.wallet, payload: bytes,
-      ...(pendingWitnessTxid ? { pendingWitnessTxid } : {}), knownBlindSeals,
+      ...(pendingWitnessTxid ? { pendingWitnessTxid } : {}), knownBlindSeals, evmRpcCache,
     })))
     if (validated.some(item => item.assetId !== assetId))
       throw new RgbServiceError('RGB v1 history asset ID mismatch')
     const canonical = mergeBfaValidatedHistories(validated)
     const complete = await validate({
       wallet: state.wallet, payload: canonical,
-      ...(pendingWitnessTxid ? { pendingWitnessTxid } : {}), knownBlindSeals,
+      ...(pendingWitnessTxid ? { pendingWitnessTxid } : {}), knownBlindSeals, evmRpcCache,
     })
     if (complete.assetId !== assetId)
       throw new RgbServiceError('RGB v1 merged history asset ID mismatch')
