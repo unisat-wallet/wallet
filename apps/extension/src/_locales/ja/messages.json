@@ -3441,7 +3441,14 @@
   "rgb_amount_locking": {
     "message": "ロック中"
   },
-  "rgb_burn": { "message": "バーン" },
+"rgb_burn": { "message": "バーン" },
+  "rgb_burn_network": { "message": "送金先ネットワーク" },
+  "rgb_burn_recipient_address": { "message": "受取アドレス" },
+  "rgb_burn_tron_placeholder": { "message": "Tronアドレスを入力" },
+  "rgb_burn_tron_invalid": { "message": "有効なTronアドレスを入力してください。" },
+  "rgb_burn_destination_v1_description": { "message": "この取り消せないバーンではネットワークと受取先を確定します。引き出しにはV1宛先に対応した運営者が必要です。詳細からバーン証明と宛先記録をダウンロードし、両方を運営者に提出してください。" },
+  "rgb_burn_destination_v1_confirm": { "message": "送金先ネットワークと受取先を確認し、このバーンを取り消せないことを理解しました。" },
+  "rgb_download_burn_destination": { "message": "送金先記録をダウンロード (.json)" },
   "rgb_burn_amount": { "message": "バーン数量" },
   "rgb_burn_minimum_amount": { "message": "バーンの最小数量は 1 {ticker} です。" },
   "rgb_burn_reason": { "message": "Arbitrum One受取アドレス" },

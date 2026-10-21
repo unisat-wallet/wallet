@@ -623,6 +623,8 @@ type RgbSendBeginRequest = {
   donation?: boolean
   burn?: boolean
   burnReason?: string
+  burnDestinationChainId?: number
+  burnDestination?: import('@unisat/rgb-service').BfaBurnDestinationV1
   /** Maker-built, unsigned swap template. */
   swapPsbt?: string
   /** Trusted provider origin for a dApp-created RGB payment. */
@@ -3766,6 +3768,12 @@ export class WalletController extends BaseController {
     await this.assertRgbEnabled()
     const { service } = await this.getLocalRgbReadService()
     return Buffer.from(service.exportBurnConsignment(txid)).toString('base64')
+  }
+
+  exportRgbBurnDestination = async (txid: string) => {
+    await this.assertRgbEnabled()
+    const { service } = await this.getLocalRgbReadService()
+    return service.exportBurnDestination(txid)
   }
 
   getRGBAssetDetail = async (_address: string, assetId: string) => {

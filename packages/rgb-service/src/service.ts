@@ -15,7 +15,7 @@ import {
   witnessRgbInvoiceRecipientId,
 } from './protocol/invoice'
 import { normalizeRgbAssetId, rgbContractIdHex } from './protocol/contract-id'
-import { normalizeBfaBurnDestination } from './protocol/bfa-burn-destination'
+import { hashBfaBurnDestinationV1, normalizeBfaBurnDestination } from './protocol/bfa-burn-destination'
 import {
   decodeNiaConsignment,
   niaConsignmentSpendableOutputScripts,
@@ -2654,6 +2654,20 @@ export class RgbService {
     return Uint8Array.from(Buffer.from(payload, 'base64'))
   }
 
+  /** The V1 record needed alongside a burn consignment for LayerZero release. */
+  exportBurnDestination(txid: string) {
+    const state = this.requireState()
+    const proof = state.burnProofs?.[txid]
+    const pending = Object.values(state.pending).find(item => item.request.burn &&
+      (item.delivery?.completed.txid === txid || item.broadcast?.completed.txid === txid))
+    const destination = proof?.burnDestination || pending?.request.burnDestination
+    if (!destination) throw new RgbServiceError('BFA V1 burn destination is unavailable')
+    const burnReason = hashBfaBurnDestinationV1(destination)
+    if (burnReason !== (proof?.burnReason || pending?.request.burnReason))
+      throw new RgbServiceError('BFA burn destination does not match the proof')
+    return { ...destination, burnReason }
+  }
+
   /** Observe a recorded burn on Bitcoin so its local history can show confirmation. */
   async getBurnTransactionStatus(txid: string): Promise<'confirmed' | 'mempool' | 'unknown'> {
     const state = this.requireState()
@@ -2788,7 +2802,11 @@ export class RgbService {
     }
     const resolvedRequest = {
       ...request, assetId: requestedAssetId, amount,
-      ...(burn ? { burnReason: normalizeBfaBurnDestination(request.burnReason) } : {}),
+      ...(burn ? {
+        burnReason: request.burnDestination
+          ? hashBfaBurnDestinationV1(request.burnDestination)
+          : normalizeBfaBurnDestination(request.burnReason),
+      } : {}),
     }
     // A market relay can fail after the wallet has already durably prepared a
     // seller swap. Reuse that exact template on retry so its RGB reservation
@@ -3367,6 +3385,9 @@ export class RgbService {
       txid: broadcast.completed.txid,
       invoice: pending.request.invoice,
       ...(pending.request.burn ? { burn: true } : {}),
+      ...(pending.request.burnDestination
+        ? { burnDestinationChainId: pending.request.burnDestination.destinationChainId }
+        : {}),
       ...(pending.request.donation ? { donation: true } : {}),
       ...(pending.request.donation && !pending.request.burn && !decodeRgbInvoice(pending.request.invoice).proxyInvoiceId
         ? { recipientAckExpected: true }
@@ -3491,6 +3512,7 @@ export class RgbService {
       assetId: pending.request.assetId, amount: pending.request.amount,
       payload: proof.payload, createdAt: this.now(),
       ...(pending.request.burnReason ? { burnReason: pending.request.burnReason } : {}),
+      ...(pending.request.burnDestination ? { burnDestination: pending.request.burnDestination } : {}),
     }
   }
 

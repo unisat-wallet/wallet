@@ -99,6 +99,8 @@ export interface RgbTransferRequest {
   burn?: boolean
   /** Required for BFA burn: EVM address or precomputed 32-byte destination hash. */
   burnReason?: string
+  /** V1 destination fields retained next to the burn proof for bridge redemption. */
+  burnDestination?: import('./protocol/bfa-burn-destination').BfaBurnDestinationV1
   minConfirmations?: number
   /**
    * A maker-built, unsigned Opret-first transaction template. It is accepted
@@ -346,6 +348,7 @@ export interface RgbPendingSendHistory {
   /** Broadcast-first send; its receiver may acknowledge after the Bitcoin broadcast. */
   donation?: boolean
   burn?: boolean
+  burnDestinationChainId?: number
   /** Legacy proxy supports an ACK/NACK after a broadcast-first send. */
   recipientAckExpected?: boolean
   /** Receiver decision is separate from the irreversible Bitcoin broadcast status. */
@@ -448,7 +451,7 @@ export interface RgbServiceState {
   pendingReceiveHistory?: RgbPendingReceiveHistory[]
   pendingSendHistory?: RgbPendingSendHistory[]
   /** Portable BFA burn proofs, retained independently of transient activity rows. */
-  burnProofs?: Record<string, { assetId: string; amount: string; payload: string; burnReason?: string; createdAt: number }>
+  burnProofs?: Record<string, { assetId: string; amount: string; payload: string; burnReason?: string; burnDestination?: import('./protocol/bfa-burn-destination').BfaBurnDestinationV1; createdAt: number }>
   pendingUtxoSync?: RgbPendingUtxoSync
   pendingIssues?: RgbPendingIssue[]
   issueHistory?: RgbIssueHistoryItem[]

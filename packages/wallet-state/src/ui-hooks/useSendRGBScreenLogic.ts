@@ -185,6 +185,7 @@ export function useSendRGBScreenLogic() {
   const [invoice, setInvoice] = useState('')
   const [amount, setAmount] = useState('')
   const [burnReason, setBurnReason] = useState('')
+  const [burnDestinationChainId, setBurnDestinationChainId] = useState(42161)
   const [donation, setDonation] = useState(false)
   const [error, setError] = useState('')
   const [feePoolRequirement, setFeePoolRequirement] = useState<RgbFeePoolRequirement>()
@@ -362,11 +363,14 @@ export function useSendRGBScreenLogic() {
       feeRate <= 0 ||
       !isAmountValid ||
       insufficientBalance ||
-      (burn && (!/^(?:0x)?[0-9a-f]{40}$/i.test(burnReason.trim()) ||
-        /^0+$/.test(burnReason.trim().replace(/^0x/i, '')))) ||
+      (burn && (burnDestinationChainId === 728126428
+        ? !(/^T[1-9A-HJ-NP-Za-km-z]{33}$/.test(burnReason.trim()) ||
+          /^(?:0x)?41[0-9a-f]{40}$/i.test(burnReason.trim()))
+        : !/^(?:0x)?[0-9a-f]{40}$/i.test(burnReason.trim()) ||
+          /^0+$/.test(burnReason.trim().replace(/^0x/i, '')))) ||
       !!blockingSendStatus
     )
-  }, [invoiceReadyForAmount, feeRate, isAmountValid, insufficientBalance, blockingSendStatus, invoiceAvailability, burn, burnReason])
+  }, [invoiceReadyForAmount, feeRate, isAmountValid, insufficientBalance, blockingSendStatus, invoiceAvailability, burn, burnReason, burnDestinationChainId])
 
   const onClickBack = () => {
     nav.goBack()
@@ -402,6 +406,7 @@ export function useSendRGBScreenLogic() {
       donation,
       burn,
       ...(burnReason.trim() ? { burnReason: burnReason.trim() } : {}),
+      ...(burn ? { burnDestinationChainId } : {}),
     })
     const toSignData = beginResult?.toSignData
     if (!toSignData) {
@@ -606,6 +611,11 @@ export function useSendRGBScreenLogic() {
     burn,
     burnReason,
     setBurnReason,
+    burnDestinationChainId,
+    setBurnDestinationChainId: (chainId: number) => {
+      setBurnDestinationChainId(chainId)
+      setBurnReason('')
+    },
     tokenBalance,
     ticker,
     name,

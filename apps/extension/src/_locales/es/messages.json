@@ -3432,7 +3432,14 @@
   "rgb_amount_locking": {
     "message": "Bloqueado"
   },
-  "rgb_burn": { "message": "Quemar" },
+"rgb_burn": { "message": "Quemar" },
+  "rgb_burn_network": { "message": "Red de destino" },
+  "rgb_burn_recipient_address": { "message": "Dirección destinataria" },
+  "rgb_burn_tron_placeholder": { "message": "Introduce una dirección de Tron" },
+  "rgb_burn_tron_invalid": { "message": "Introduce una dirección de Tron válida." },
+  "rgb_burn_destination_v1_description": { "message": "Esta quema irreversible fija la red y el destinatario. El canje requiere un operador compatible con destinos V1. Descarga la prueba y el registro de destino en los detalles y entrégalos juntos al operador." },
+  "rgb_burn_destination_v1_confirm": { "message": "He comprobado la red y el destinatario y entiendo que la quema no se puede revertir." },
+  "rgb_download_burn_destination": { "message": "Descargar registro de destino (.json)" },
   "rgb_burn_amount": { "message": "Cantidad a quemar" },
   "rgb_burn_minimum_amount": { "message": "La cantidad mínima para quemar es 1 {ticker}." },
   "rgb_burn_reason": { "message": "Dirección destinataria en Arbitrum One" },

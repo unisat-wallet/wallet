@@ -75,6 +75,8 @@ export interface RgbActivityItem {
   local?: boolean
   /** Unilateral BFA burn with a downloadable consignment proof. */
   burn?: boolean
+  /** Destination chain committed by a V1 burn. */
+  burnDestinationChainId?: number
   assetId: string
   ticker?: string
   name?: string
@@ -115,6 +117,8 @@ export interface RgbTransferItem {
   local?: boolean
   /** Unilateral BFA burn with a downloadable consignment proof. */
   burn?: boolean
+  /** Destination chain committed by a V1 burn. */
+  burnDestinationChainId?: number
   /** Bitcoin broadcast happened even if the receiver later rejected the RGB transfer. */
   broadcasted?: boolean
   /** Keep checking for a late legacy proxy ACK/NACK after Bitcoin confirmation. */

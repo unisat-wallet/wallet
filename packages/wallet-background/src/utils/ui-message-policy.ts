@@ -60,6 +60,7 @@ const UI_CONTROLLER_METHODS = new Set([
   'enableRgbFeature',
   'exportRgbAssetContract',
   'exportRgbBurnConsignment',
+  'exportRgbBurnDestination',
   'exportRgbHdBackup',
   'findGroupAssets',
   'genSignCosmosUr',

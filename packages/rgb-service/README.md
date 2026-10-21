@@ -89,13 +89,22 @@ an `RGB\0TFR` `.rgb` file from transfer details. Broadcast failures require an
 explicit retry; ordinary synchronization never rebroadcasts a burn. Burning
 does not submit a redemption request to an EVM bridge.
 
-For bridge redemption, a burn destination is mandatory. A 20-byte EVM address
-is left-padded with 12 zero bytes to the 32-byte `burnReason` field. This is a
-legacy direct-route burn for Arbitrum One; submitting its proof to an Ethereum
-or other LayerZero unlock route is rejected. A precomputed 32-byte V1
-destination hash can be supplied directly through the service API. The wallet
-UI does not derive the V1 hash or choose the release route, and the destination
-cannot be changed after broadcast.
+For Arbitrum One, the wallet keeps the legacy direct-route format: a 20-byte
+EVM address is left-padded with 12 zero bytes in `burnReason`. For Ethereum,
+Polygon PoS, Plasma, and Tron, it constructs the V1 destination record and
+commits its EIP-712-style hash as `burnReason`. The record contains
+`version`, `destinationChainId`, `dstEid`, and chain-native `recipient` bytes.
+The UI downloads the original record as JSON alongside the `.rgb` consignment;
+both are needed by the redemption operator. The wallet retains the record in
+its encrypted state and verifies its hash on export. The destination cannot
+be changed after signing. A V1 hash alone is insufficient to redeem a burn.
+
+The public UTEXO `/unlock` integration guide currently shows only the legacy
+request body and does not document how to submit the V1 record. Before using
+a V1 burn with real funds, confirm that the target operator accepts and
+forwards `EvmDestination.burn_destination` to the enclave, and that the chosen
+route and token are enabled in that deployment. This wallet does not submit
+the unlock request.
 
 ## Enablement requirement
 

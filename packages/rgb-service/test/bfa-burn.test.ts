@@ -1,16 +1,45 @@
 import { describe, expect, it } from 'vitest'
 import { BFA_SCHEMA_ID, encodeBfaTransferConsignment, isBfaTransferConsignment } from '../src/protocol/bfa-consignment'
 import { encodeBfaBurnTransition } from '../src/protocol/nia'
-import { normalizeBfaBurnDestination } from '../src/protocol/bfa-burn-destination'
+import {
+  createBfaBurnDestinationV1,
+  hashBfaBurnDestinationV1,
+  normalizeBfaBurnDestination,
+} from '../src/protocol/bfa-burn-destination'
 import { StrictReader } from '../src/protocol/strict'
 
 describe('BFA burn encoding', () => {
+  it('matches the official Ethereum and Tron V1 burn destination vectors', () => {
+    const ethereum = createBfaBurnDestinationV1(1, '0x' + '22'.repeat(20))
+    expect(ethereum).toEqual({
+      version: 1, destinationChainId: 1, dstEid: 30101, recipient: '22'.repeat(20),
+    })
+    expect(hashBfaBurnDestinationV1(ethereum)).toBe(
+      '9274beba7130d3f8a4ef95c5c4c555616718050c688f8478e23f8131762a9537'
+    )
+    const tron = createBfaBurnDestinationV1(728126428, '41' + '33'.repeat(20))
+    expect(hashBfaBurnDestinationV1(tron)).toBe(
+      '60c369ce30870783c2a8cee9e6018e78650ad4787c2e898c05c35cb85179eac0'
+    )
+    expect(() => createBfaBurnDestinationV1(1, '0x' + '00'.repeat(20))).toThrow()
+    expect(() => createBfaBurnDestinationV1(1, '0x' + 'a'.repeat(41))).toThrow()
+    expect(() => createBfaBurnDestinationV1(728126428, '41' + '00'.repeat(20))).toThrow()
+    expect(() => hashBfaBurnDestinationV1({ ...ethereum, dstEid: 0 })).toThrow()
+  })
   it('requires a destination and pads a 20-byte EVM address to bytes32', () => {
     expect(normalizeBfaBurnDestination('0xf39FD6e51aad88f6f4ce6ab8827279cfffb92266')).toBe(
       '000000000000000000000000f39fd6e51aad88f6f4ce6ab8827279cfffb92266'
     )
     expect(() => normalizeBfaBurnDestination(undefined)).toThrow('requires an EVM address')
     expect(() => normalizeBfaBurnDestination('0x' + '00'.repeat(20))).toThrow('requires an EVM address')
+  })
+
+  it('decodes Tron Base58Check addresses and rejects damaged checksums', () => {
+    const tron = createBfaBurnDestinationV1(728126428, 'TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t')
+    expect(tron.recipient).toMatch(/^41[0-9a-f]{40}$/)
+    expect(hashBfaBurnDestinationV1(tron)).toMatch(/^[0-9a-f]{64}$/)
+    expect(() => createBfaBurnDestinationV1(728126428, 'TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6u'))
+      .toThrow('checksum')
   })
 
   it('commits the burned amount and reason without a recipient assignment', () => {

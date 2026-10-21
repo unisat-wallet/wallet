@@ -134,6 +134,9 @@ export class RgbTransferQuery {
       ...localAssetMetadata(transfer.request.assetId),
       type: 'send' as const,
       ...(transfer.request.burn ? { burn: true } : {}),
+      ...(transfer.request.burnDestination
+        ? { burnDestinationChainId: transfer.request.burnDestination.destinationChainId }
+        : {}),
       amount: transfer.request.amount,
       precision: transfer.request.precision,
       txid: transfer.delivery?.completed.txid ?? transfer.broadcast?.completed.txid,
@@ -161,6 +164,7 @@ export class RgbTransferQuery {
       ...localAssetMetadata(send.assetId),
       type: 'send' as const,
       ...(send.burn ? { burn: true } : {}),
+      ...(send.burnDestinationChainId ? { burnDestinationChainId: send.burnDestinationChainId } : {}),
       amount: send.amount,
       precision: send.precision,
       txid: send.txid,

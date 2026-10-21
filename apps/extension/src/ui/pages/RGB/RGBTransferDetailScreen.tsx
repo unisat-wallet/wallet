@@ -139,6 +139,21 @@ export default function RGBTransferDetailScreen() {
     }
   };
 
+  const downloadBurnDestination = async () => {
+    if (!transfer?.txid) return;
+    try {
+      const destination = await wallet.exportRgbBurnDestination(transfer.txid);
+      const url = URL.createObjectURL(new Blob([JSON.stringify(destination, null, 2)], { type: 'application/json' }));
+      const anchor = document.createElement('a');
+      anchor.href = url;
+      anchor.download = `bfa-burn-destination-${transfer.txid}.json`;
+      anchor.click();
+      setTimeout(() => URL.revokeObjectURL(url), 0);
+    } catch (error) {
+      tools.toastError(error instanceof Error ? error.message : String(error));
+    }
+  };
+
   return (
     <Layout>
       <Header title={t('rgb_transfer_details')} onBack={onClickDone} />
@@ -225,14 +240,24 @@ export default function RGBTransferDetailScreen() {
       <Footer>
         <Column gap="sm">
           {transfer?.burn && transfer.txid ? (
-            <Button
-              full
-              text={t('rgb_download_burn_proof')}
-              preset="primary"
-              style={{ height: 50, minHeight: 50, borderRadius: 12 }}
-              onClick={() => void downloadBurnProof()}
-              data-testid="rgb-download-burn-proof"
-            />
+            <>
+              <Button
+                full
+                text={t('rgb_download_burn_proof')}
+                preset="primary"
+                style={{ height: 50, minHeight: 50, borderRadius: 12 }}
+                onClick={() => void downloadBurnProof()}
+                data-testid="rgb-download-burn-proof"
+              />
+              {transfer.burnDestinationChainId ? <Button
+                full
+                text={t('rgb_download_burn_destination')}
+                preset="default"
+                style={{ height: 50, minHeight: 50, borderRadius: 12 }}
+                onClick={() => void downloadBurnDestination()}
+                data-testid="rgb-download-burn-destination"
+              /> : null}
+            </>
           ) : null}
           {canAcceptReceive ? (
             <Row fullX gap="md">

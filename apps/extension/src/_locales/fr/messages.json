@@ -3441,7 +3441,14 @@
   "rgb_amount_locking": {
     "message": "Verrouillé"
   },
-  "rgb_burn": { "message": "Brûler" },
+"rgb_burn": { "message": "Brûler" },
+  "rgb_burn_network": { "message": "Réseau de destination" },
+  "rgb_burn_recipient_address": { "message": "Adresse du destinataire" },
+  "rgb_burn_tron_placeholder": { "message": "Saisir une adresse Tron" },
+  "rgb_burn_tron_invalid": { "message": "Saisissez une adresse Tron valide." },
+  "rgb_burn_destination_v1_description": { "message": "Cette destruction irréversible fixe le réseau et le destinataire. Le déblocage nécessite un opérateur compatible V1. Téléchargez la preuve et les données de destination dans les détails et transmettez-les ensemble à l'opérateur." },
+  "rgb_burn_destination_v1_confirm": { "message": "J’ai vérifié le réseau et le destinataire et je comprends que cette opération est irréversible." },
+  "rgb_download_burn_destination": { "message": "Télécharger la destination (.json)" },
   "rgb_burn_amount": { "message": "Montant à brûler" },
   "rgb_burn_minimum_amount": { "message": "Le montant minimum à brûler est de 1 {ticker}." },
   "rgb_burn_reason": { "message": "Adresse destinataire sur Arbitrum One" },

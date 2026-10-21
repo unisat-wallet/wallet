@@ -205,7 +205,15 @@ describe('RgbService', () => {
     expect(service.getLocalAssetBalance(assetId)?.spendable).toBe('40')
   })
 
-  it('broadcasts a BFA burn without proxy delivery and retains its exact consignment after reopening', async () => {
+  it.each([
+    { label: 'legacy direct', burnReason: '0xf39FD6e51aad88f6f4ce6ab8827279cfffb92266',
+      burnDestination: undefined,
+      expectedReason: '000000000000000000000000f39fd6e51aad88f6f4ce6ab8827279cfffb92266' },
+    { label: 'V1 LayerZero', burnReason: undefined,
+      burnDestination: { version: 1 as const, destinationChainId: 1, dstEid: 30101,
+        recipient: '22'.repeat(20) },
+      expectedReason: '9274beba7130d3f8a4ef95c5c4c555616718050c688f8478e23f8131762a9537' },
+  ])('broadcasts a $label BFA burn and retains its proof after reopening', async ({ burnReason, burnDestination, expectedReason }) => {
     const dependencies = createDependencies()
     const service = new RgbService(dependencies)
     const assetId = 'rgb:AQEBAQEB-AQEBAQE-BAQEBAQ-EBAQEBA-QEBAQEB-AQEBAQE'
@@ -240,11 +248,8 @@ describe('RgbService', () => {
     await service.sync()
     ;(service as any).state.snapshot.utxos[0].allocations[0].amount = '100'
     await expect(service.prepareBurn({ assetId, amount: '60', feeRate: 1 })).rejects.toThrow('requires an EVM address')
-    await service.prepareBurn({ assetId, amount: '60', feeRate: 1,
-      burnReason: '0xf39FD6e51aad88f6f4ce6ab8827279cfffb92266' })
-    expect(service.getPendingTransfers()[0]?.request.burnReason).toBe(
-      '000000000000000000000000f39fd6e51aad88f6f4ce6ab8827279cfffb92266'
-    )
+    await service.prepareBurn({ assetId, amount: '60', feeRate: 1, burnReason, burnDestination })
+    expect(service.getPendingTransfers()[0]?.request.burnReason).toBe(expectedReason)
     await service.completeSend('burn-1', 'signed-psbt')
 
     expect(dependencies.transport.publishConsignment).not.toHaveBeenCalled()
@@ -259,8 +264,14 @@ describe('RgbService', () => {
     await reopened.open(wallet)
     expect(reopened.getPendingUtxoSync()?.txid).toBe(txid)
     expect(Buffer.from(reopened.exportBurnConsignment(txid))).toEqual(proof)
+    if (burnDestination) {
+      expect(reopened.exportBurnDestination(txid)).toEqual({ ...burnDestination, burnReason: expectedReason })
+    } else {
+      expect(() => reopened.exportBurnDestination(txid)).toThrow('unavailable')
+    }
     expect(reopened.getPendingSendHistory()).toEqual([
-      expect.objectContaining({ burn: true, txid, amount: '60', status: 'broadcasted' }),
+      expect.objectContaining({ burn: true, txid, amount: '60', status: 'broadcasted',
+        ...(burnDestination ? { burnDestinationChainId: 1 } : {}) }),
     ])
   })
 

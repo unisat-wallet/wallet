@@ -3444,7 +3444,14 @@
   "rgb_amount_locking": {
     "message": "鎖定中"
   },
-  "rgb_burn": { "message": "銷毀" },
+"rgb_burn": { "message": "銷毀" },
+  "rgb_burn_network": { "message": "目標網路" },
+  "rgb_burn_recipient_address": { "message": "收款地址" },
+  "rgb_burn_tron_placeholder": { "message": "輸入 Tron 地址" },
+  "rgb_burn_tron_invalid": { "message": "請輸入有效的 Tron 地址。" },
+  "rgb_burn_destination_v1_description": { "message": "此不可撤銷的銷毀會鎖定所選網路及收款地址。解鎖需要支援 V1 目標的服務方。請從交易詳情下載銷毀證明與目標記錄，並一同提交給服務方。" },
+  "rgb_burn_destination_v1_confirm": { "message": "我已核對目標網路及收款地址，並了解此銷毀無法撤銷。" },
+  "rgb_download_burn_destination": { "message": "下載目標記錄 (.json)" },
   "rgb_burn_amount": { "message": "銷毀數量" },
   "rgb_burn_minimum_amount": { "message": "最低銷毀數量為 1 {ticker}。" },
   "rgb_burn_reason": { "message": "Arbitrum One 收款地址" },

@@ -3,7 +3,9 @@ import {
   RgbTransferCanceledError,
   RgbTransferRejectedError,
   decodeRgbInvoice,
+  createBfaBurnDestinationV1,
 } from '@unisat/rgb-service'
+import type { BfaBurnDestinationV1 } from '@unisat/rgb-service'
 import type { ToSignInput } from '@unisat/keyring-service/types'
 import { assertValidFeeRate } from '@unisat/base-utils'
 import { toRgbDisplayAmount, type ToSignData } from '@unisat/wallet-shared'
@@ -43,6 +45,8 @@ export type RgbSendBeginParams = {
   donation?: boolean
   burn?: boolean
   burnReason?: string
+  burnDestinationChainId?: number
+  burnDestination?: BfaBurnDestinationV1
   /** Maker-built, unsigned swap template. It is validated and colored locally. */
   swapPsbt?: string
   /** Trusted provider origin persisted with a dApp-created payment. */
@@ -61,6 +65,10 @@ export class RgbSendOperations {
     const feeRate = params.feeRate ?? (await this.dependencies.getFeeRate())
     await this.dependencies.assertContext?.({ service, wallet })
     const validatedFeeRate = assertValidFeeRate(feeRate, { supportLowFeeMode: true })
+    const burnDestination = params.burnDestination ||
+      (params.burn && params.burnDestinationChainId && params.burnDestinationChainId !== 42161
+        ? createBfaBurnDestinationV1(params.burnDestinationChainId, params.burnReason || '')
+        : undefined)
 
     await service.sync()
     await this.dependencies.assertContext?.({ service, wallet })
@@ -74,6 +82,7 @@ export class RgbSendOperations {
         ...(params.donation === undefined ? {} : { donation: params.donation }),
         ...(params.burn === undefined ? {} : { burn: params.burn }),
         ...(params.burnReason === undefined ? {} : { burnReason: params.burnReason }),
+        ...(burnDestination === undefined ? {} : { burnDestination }),
         ...(params.minConfirmations === undefined
           ? {}
           : { minConfirmations: params.minConfirmations }),
@@ -86,6 +95,7 @@ export class RgbSendOperations {
           feeRate: validatedFeeRate,
           ...(params.precision === undefined ? {} : { precision: params.precision }),
           ...(params.burnReason === undefined ? {} : { burnReason: params.burnReason }),
+          ...(burnDestination === undefined ? {} : { burnDestination }),
         })
       : await service.prepareSend(
           sendRequest,
