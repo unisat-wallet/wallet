@@ -84,6 +84,12 @@ function getRgbErrorMessage(error: unknown): string | undefined {
         : undefined
 }
 
+function isMissingRgbFeeFunding(error: unknown): boolean {
+  return getRgbErrorMessage(error)?.includes(
+    'RGB transfer requires an ordinary BTC UTXO to pay the network fee'
+  ) === true
+}
+
 export function getSendErrorMessage(
   error: unknown,
   fallback: string,
@@ -408,12 +414,10 @@ export function useSendRGBScreenLogic() {
       // recipient ID can be occupied after the debounce check completed.
       await checkInvoiceAvailability()
       if (inputVersion !== invoiceInputVersion.current) return
-      // Keep compatibility with lightweight wallet implementations while the
-      // background service rolls out the dedicated fee-pool RPCs.
-      const feePool = wallet.getRgbFeePoolStatus
-        ? await wallet.getRgbFeePoolStatus({ feeRate })
-        : { ready: true }
-      if (!feePool.ready) {
+      try {
+        await prepareRgbSend()
+      } catch (error) {
+        if (!isMissingRgbFeeFunding(error)) throw error
         const topUp = await wallet.createRgbFeePoolTopUpBegin({ feeRate })
         if (!topUp?.toSignData) throw new Error(t('rgb_send_transaction_unavailable'))
         transferData.current = {
@@ -422,9 +426,7 @@ export function useSendRGBScreenLogic() {
         }
         setSignRequestVersion(version => version + 1)
         setStep(SendRGBScreenStep.SIGN_TX)
-        return
       }
-      await prepareRgbSend()
     } catch (e) {
       if (inputVersion !== invoiceInputVersion.current) return
       const requirement = getRgbFeePoolRequirement(e)

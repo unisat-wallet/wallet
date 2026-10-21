@@ -18,6 +18,7 @@ describe('useSendRGBScreenLogic', () => {
     wallet.createRgbSendBegin = vi.fn().mockResolvedValue({
       txid: 'donation-transfer', toSignData: { psbtHex: 'unsigned-psbt' },
     })
+    wallet.getRgbFeePoolStatus = vi.fn().mockResolvedValue({ ready: true })
     const { result } = renderHook(() => useSendRGBScreenLogic(), { wrapper })
     act(() => {
       result.current.onInvoiceChange(invoice)
@@ -25,6 +26,7 @@ describe('useSendRGBScreenLogic', () => {
     })
     await act(async () => result.current.onClickNext())
     expect(wallet.createRgbSendBegin).toHaveBeenCalledWith(expect.objectContaining({ donation: true }))
+    expect(wallet.getRgbFeePoolStatus).not.toHaveBeenCalled()
   })
 
   it('discards the unsigned RGB send when signing is rejected', async () => {
@@ -191,7 +193,9 @@ describe('useSendRGBScreenLogic', () => {
         tokenBalance: { assetId, ticker: 'RGB', precision: 8, spendable: '150000000' },
       },
     })
-    wallet.getRgbFeePoolStatus = vi.fn().mockResolvedValue({ ready: false })
+    wallet.createRgbSendBegin = vi.fn().mockRejectedValue(
+      new Error('RGB transfer requires an ordinary BTC UTXO to pay the network fee')
+    )
     wallet.createRgbFeePoolTopUpBegin = vi.fn().mockRejectedValue({
       code: 'RGB_FEE_POOL_INSUFFICIENT_BTC',
       data: {
@@ -431,10 +435,12 @@ describe('useSendRGBScreenLogic', () => {
         tokenBalance: { assetId, ticker: 'RGB', precision: 8, spendable: '150000000' },
       },
     })
-    wallet.getRgbFeePoolStatus = vi.fn().mockResolvedValue({ ready: false })
     wallet.createRgbFeePoolTopUpBegin = vi.fn().mockResolvedValue({ toSignData: { psbtHex: 'top-up' } })
     wallet.createRgbFeePoolTopUpEnd = vi.fn().mockResolvedValue({ txid: 'fee-pool-tx' })
-    wallet.createRgbSendBegin = vi.fn().mockResolvedValue({ toSignData: { psbtHex: 'rgb-send' } })
+    wallet.getRgbFeePoolStatus = vi.fn().mockResolvedValue({ ready: false })
+    wallet.createRgbSendBegin = vi.fn()
+      .mockRejectedValueOnce(new Error('RGB transfer requires an ordinary BTC UTXO to pay the network fee'))
+      .mockResolvedValue({ toSignData: { psbtHex: 'rgb-send' } })
     const { result } = renderHook(() => useSendRGBScreenLogic(), { wrapper })
 
     act(() => {
@@ -446,7 +452,8 @@ describe('useSendRGBScreenLogic', () => {
     })
 
     expect(wallet.createRgbFeePoolTopUpBegin).toHaveBeenCalled()
-    expect(wallet.createRgbSendBegin).not.toHaveBeenCalled()
+    expect(wallet.createRgbSendBegin).toHaveBeenCalledTimes(1)
+    expect(wallet.getRgbFeePoolStatus).not.toHaveBeenCalled()
 
     await act(async () => {
       await result.current.onSignPsbtHandleConfirm([{ psbtHex: 'signed-top-up' }] as any)
