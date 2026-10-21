@@ -3433,11 +3433,12 @@
     "message": "Bloqueado"
   },
   "rgb_burn": { "message": "Quemar" },
-  "rgb_burn_reason": { "message": "Dirección EVM destinataria (obligatoria)" },
-  "rgb_burn_reason_placeholder": { "message": "0x seguido de 40 caracteres hexadecimales" },
+  "rgb_burn_amount": { "message": "Cantidad a quemar" },
+  "rgb_burn_reason": { "message": "Dirección EVM destinataria" },
+  "rgb_burn_reason_placeholder": { "message": "Introduce la dirección EVM" },
   "rgb_burn_reason_invalid": { "message": "Introduce una dirección EVM válida de 20 bytes." },
-  "rgb_burn_description": { "message": "La quema destruye permanentemente estos tokens BFA. Podrás descargar una prueba .rgb tras la difusión. El canje mediante un puente sigue las reglas de ese puente." },
-  "rgb_burn_confirm": { "message": "Entiendo que esta quema no se puede revertir." },
+  "rgb_burn_description": { "message": "La quema elimina permanentemente estos tokens BFA. Comprueba la dirección EVM de abajo: no podrá cambiarse tras la difusión. Podrás descargar la prueba en los detalles de la transacción." },
+  "rgb_burn_confirm": { "message": "He comprobado la dirección y entiendo que esta quema no se puede revertir." },
   "rgb_download_burn_proof": { "message": "Descargar prueba de quema (.rgb)" },
   "rgb_locked_balance_hint": {
     "message": "Tienes una transferencia pendiente. Ver transferencias"

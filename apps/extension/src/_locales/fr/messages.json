@@ -3442,11 +3442,12 @@
     "message": "Verrouillé"
   },
   "rgb_burn": { "message": "Brûler" },
-  "rgb_burn_reason": { "message": "Adresse EVM destinataire (obligatoire)" },
-  "rgb_burn_reason_placeholder": { "message": "0x suivi de 40 caractères hexadécimaux" },
+  "rgb_burn_amount": { "message": "Montant à brûler" },
+  "rgb_burn_reason": { "message": "Adresse EVM destinataire" },
+  "rgb_burn_reason_placeholder": { "message": "Saisissez l’adresse EVM" },
   "rgb_burn_reason_invalid": { "message": "Saisissez une adresse EVM valide de 20 octets." },
-  "rgb_burn_description": { "message": "Cette opération détruit définitivement les jetons BFA. Le portefeuille permet de télécharger une preuve .rgb après diffusion. Un rachat via un pont suit les règles de ce pont." },
-  "rgb_burn_confirm": { "message": "Je comprends que cette destruction est irréversible." },
+  "rgb_burn_description": { "message": "Cette opération supprime définitivement ces jetons BFA. Vérifiez l’adresse EVM ci-dessous : elle ne pourra plus être modifiée après diffusion. La preuve sera téléchargeable dans les détails de la transaction." },
+  "rgb_burn_confirm": { "message": "J’ai vérifié l’adresse et je comprends que cette opération est irréversible." },
   "rgb_download_burn_proof": { "message": "Télécharger la preuve de destruction (.rgb)" },
   "rgb_locked_balance_hint": {
     "message": "Vous avez un transfert en attente. Voir les transferts"

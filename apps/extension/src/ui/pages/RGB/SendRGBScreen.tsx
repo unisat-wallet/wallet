@@ -99,10 +99,15 @@ export default function SendRGBScreen() {
   const invoiceRef = useRef<HTMLTextAreaElement>(null);
   const [showDonationPopover, setShowDonationPopover] = useState(false);
   const [understandDonation, setUnderstandDonation] = useState(false);
+  const [showBurnPopover, setShowBurnPopover] = useState(false);
   const [understandBurn, setUnderstandBurn] = useState(false);
   const closeDonationPopover = () => {
     setShowDonationPopover(false);
     setUnderstandDonation(false);
+  };
+  const closeBurnPopover = () => {
+    setShowBurnPopover(false);
+    setUnderstandBurn(false);
   };
   const syncInvoiceHeight = useCallback(() => {
     const el = invoiceRef.current;
@@ -175,7 +180,7 @@ export default function SendRGBScreen() {
           </Column> : null}
 
           {invoiceReadyForAmount ? (
-            <TransferAmountSection>
+            <TransferAmountSection title={burn ? t('rgb_burn_amount') : undefined}>
               <TransferAmountCard
                 amount={displayAmount}
                 onAmountChange={onAmountChange}
@@ -210,10 +215,6 @@ export default function SendRGBScreen() {
                 /^0+$/.test(burnReason.replace(/^0x/i, ''))) ? (
                 <Text text={t('rgb_burn_reason_invalid')} size="xs" color="danger" wrap />
               ) : null}
-              <Text text={t('rgb_burn_description')} size="xs" color="textDim" wrap />
-              <Checkbox checked={understandBurn} onChange={(event) => setUnderstandBurn(event.target.checked)}>
-                <Text text={t('rgb_burn_confirm')} size="sm" wrap />
-              </Checkbox>
             </Column>
           ) : null}
 
@@ -235,10 +236,13 @@ export default function SendRGBScreen() {
           {error ? <Text text={error} color="error" wrap /> : null}
 
           <Button
-            disabled={disabled || (burn && !understandBurn)}
+            disabled={disabled}
             preset="primary"
             text={t('next')}
-            onClick={() => void requestWrite(onClickNext)}
+            onClick={() => {
+              if (burn) setShowBurnPopover(true);
+              else void requestWrite(onClickNext);
+            }}
             data-testid="send-rgb-next-button"
           />
         </Column>
@@ -276,6 +280,39 @@ export default function SendRGBScreen() {
                 onClick={() => {
                   setDonation(true);
                   closeDonationPopover();
+                }}
+              />
+            </Row>
+          </Column>
+        </Popover>
+      ) : null}
+      {showBurnPopover ? (
+        <Popover onClose={closeBurnPopover}>
+          <Column justifyCenter itemsCenter>
+            <Row itemsCenter>
+              <Icon icon="alert" color="yellow" size={16} />
+              <Text text={t('rgb_burn')} preset="title" />
+            </Row>
+            <Line />
+            <Column gap="md" fullX mb="md">
+              <Text text={t('rgb_burn_description')} mt="md" wrap />
+              <Text text={burnReason} size="xs" color="gold" wrap style={{ overflowWrap: 'anywhere' }} />
+              <Row justifyCenter mt="md">
+                <Checkbox checked={understandBurn} onChange={(event) => setUnderstandBurn(event.target.checked)}>
+                  <Text text={t('rgb_burn_confirm')} preset="sub" wrap />
+                </Checkbox>
+              </Row>
+            </Column>
+            <Row full>
+              <Button text={t('cancel')} preset="default" full onClick={closeBurnPopover} />
+              <Button
+                text={t('confirm')}
+                preset="primaryV2"
+                disabled={!understandBurn}
+                full
+                onClick={() => {
+                  closeBurnPopover();
+                  void requestWrite(onClickNext);
                 }}
               />
             </Row>

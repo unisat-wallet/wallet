@@ -3445,11 +3445,12 @@
     "message": "鎖定中"
   },
   "rgb_burn": { "message": "銷毀" },
-  "rgb_burn_reason": { "message": "EVM 收款地址（必填）" },
-  "rgb_burn_reason_placeholder": { "message": "0x 開頭、後接 40 個十六進位字元" },
+  "rgb_burn_amount": { "message": "銷毀數量" },
+  "rgb_burn_reason": { "message": "EVM 收款地址" },
+  "rgb_burn_reason_placeholder": { "message": "輸入 EVM 收款地址" },
   "rgb_burn_reason_invalid": { "message": "請輸入有效的 20 位元組 EVM 地址。" },
-  "rgb_burn_description": { "message": "EVM 收款地址會永久寫入銷毀證明，之後無法更改。錢包會按橋接文件將地址補齊為 32 位元組。廣播後可從轉帳詳情下載 .rgb 證明。" },
-  "rgb_burn_confirm": { "message": "我了解此銷毀操作無法撤銷。" },
+  "rgb_burn_description": { "message": "銷毀會永久移除這些 BFA 代幣。請仔細核對下方的 EVM 收款地址；廣播後無法更改。銷毀證明可從交易詳情下載。" },
+  "rgb_burn_confirm": { "message": "我已核對收款地址，並了解此銷毀操作無法撤銷。" },
   "rgb_download_burn_proof": { "message": "下載銷毀證明 (.rgb)" },
   "rgb_locked_balance_hint": {
     "message": "您有一筆待處理轉帳。查看轉帳"

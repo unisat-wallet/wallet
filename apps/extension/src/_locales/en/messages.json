@@ -3456,11 +3456,12 @@
     "message": "Locking"
   },
   "rgb_burn": { "message": "Burn" },
-  "rgb_burn_reason": { "message": "EVM recipient address (required)" },
-  "rgb_burn_reason_placeholder": { "message": "0x followed by 40 hexadecimal characters" },
+  "rgb_burn_amount": { "message": "Burn Amount" },
+  "rgb_burn_reason": { "message": "EVM recipient address" },
+  "rgb_burn_reason_placeholder": { "message": "Enter EVM address" },
   "rgb_burn_reason_invalid": { "message": "Enter a valid 20-byte EVM address." },
-  "rgb_burn_description": { "message": "The EVM address is permanently committed in the burn and cannot be changed later. The wallet pads it to 32 bytes for the documented bridge flow. You can download the .rgb proof from transfer details after broadcast." },
-  "rgb_burn_confirm": { "message": "I understand this burn cannot be reversed." },
+  "rgb_burn_description": { "message": "Burning permanently removes these BFA tokens. Check the EVM recipient below carefully; it cannot be changed after broadcast. You can download the burn proof from transaction details." },
+  "rgb_burn_confirm": { "message": "I have checked the recipient and understand this burn cannot be reversed." },
   "rgb_download_burn_proof": { "message": "Download burn proof (.rgb)" },
   "rgb_locked_balance_hint": {
     "message": "You have a pending transfer. View transfers"
