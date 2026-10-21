@@ -1,8 +1,8 @@
 import { useMemo, useState } from 'react';
 
 import {
-  Button,
   BottomSheetHeader,
+  Button,
   Column,
   Content,
   Footer,
@@ -20,16 +20,16 @@ import { colors } from '@/ui/theme/colors';
 import { fontSizes } from '@/ui/theme/font';
 import { formatRgbUsdtValue, isConfiguredRgbUsdt } from '@/ui/utils/rgbUsdtPrice';
 import { EllipsisOutlined } from '@ant-design/icons';
-import { RgbReceiveSelectorModal } from '../Main/WalletTabScreen/RgbReceiveSelectorModal';
 import {
-  getRgbTokenPrecision,
   RGBTokenScreenTabKey,
+  getRgbTokenPrecision,
   toRgbDisplayAmount,
   useChain,
   useRGBTokenScreenLogic,
   useWalletConfig
 } from '@unisat/wallet-state';
 
+import { RgbReceiveSelectorModal } from '../Main/WalletTabScreen/RgbReceiveSelectorModal';
 import { RGBTokenDetail } from './components/RGBTokenDetail';
 import { RGBTokenHistory } from './components/RGBTokenHistory';
 import { useRgbWriteLeaseGuard } from './components/useRgbWriteLeaseGuard';
@@ -144,8 +144,7 @@ export default function RGBTokenScreen() {
             <Icon
               style={{ fontSize: 24, color: 'rgba(255, 255, 255, 0.65)' }}
               onClick={() => setActionMenuVisible(true)}
-              data-testid="rgb-token-more-button"
-            >
+              data-testid="rgb-token-more-button">
               <EllipsisOutlined />
             </Icon>
           ) : null
@@ -161,14 +160,7 @@ export default function RGBTokenScreen() {
               size={52}
             />
             <Column itemsCenter gap="xs" fullX px="lg" style={{ minWidth: 0 }}>
-              <Text
-                text={name}
-                size="sm"
-                color="ticker_color2"
-                textCenter
-                max2Lines
-                style={{ width: '100%' }}
-              />
+              <Text text={name} size="sm" color="ticker_color2" textCenter max2Lines style={{ width: '100%' }} />
               <Text
                 text={`(ticker: ${ticker})`}
                 size="xs"
@@ -192,26 +184,13 @@ export default function RGBTokenScreen() {
               {showUsdtPrice ? (
                 <Column itemsCenter gap="zero">
                   <Text text={formatRgbUsdtValue(spendable)} size="md" color="textDim" textCenter disableTranslate />
-                  <Text text="$1.00 / USDT" size="xs" color="textDim" textCenter disableTranslate />
                 </Column>
               ) : null}
               {Number(tokenBalance?.pending || 0) > 0 ? (
-                <Text
-                  text={`${pendingAmount} (${t('pending')})`}
-                  size="xs"
-                  color="gold"
-                  textCenter
-                  wrap
-                />
+                <Text text={`${pendingAmount} (${t('pending')})`} size="xs" color="gold" textCenter wrap />
               ) : null}
               {Number(tokenBalance?.lockedAmount || 0) > 0 ? (
-                <Text
-                  text={`${lockedAmount} (${t('rgb_amount_locking')})`}
-                  size="xs"
-                  color="gold"
-                  textCenter
-                  wrap
-                />
+                <Text text={`${lockedAmount} (${t('rgb_amount_locking')})`} size="xs" color="gold" textCenter wrap />
               ) : null}
             </Column>
           </Column>
@@ -279,8 +258,7 @@ export default function RGBTokenScreen() {
                 void requestWrite(onClickBurn);
               }}
               style={{ padding: '0 20px 24px', boxSizing: 'border-box', opacity: enableTransfer ? 1 : 0.45 }}
-              data-testid="rgb-burn-menu-item"
-            >
+              data-testid="rgb-burn-menu-item">
               <Text text={t('rgb_burn')} size="sm" />
             </Row>
           </Column>
