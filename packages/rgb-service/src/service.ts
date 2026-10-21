@@ -28,7 +28,7 @@ import {
   isSupportedV1TransferConsignment,
   unwrapRgbContractConsignment,
 } from './protocol/bfa-consignment'
-import { mergeBfaValidatedHistories } from './protocol/bfa-validator'
+import { mergeBfaValidatedHistories, pruneConfirmedBfaWitnesses } from './protocol/bfa-validator'
 import { convertNiaV0ConsignmentToV1, unwrapNiaV0Contract } from './protocol/nia-v0-migration'
 import { encodeNiaContract, encodeNiaTransferConsignment } from './protocol/nia-contract'
 import {
@@ -149,6 +149,8 @@ export class RgbService {
             snapshot: { utxos: [], syncedAt: 0 },
             pending: {},
           }
+    if (this.state.confirmedBitcoinWitnesses)
+      pruneConfirmedBfaWitnesses(this.state.confirmedBitcoinWitnesses)
     this.pruneExpiredProviderOrigins()
     this.hydrateStoredContractMetadata()
     // A local open must never upload before the controller has authenticated a
@@ -1527,6 +1529,7 @@ export class RgbService {
         wallet: this.requireState().wallet, payload,
         ...(item.txid ? { pendingWitnessTxid: item.txid } : { allowPendingLastWitness: true }),
         knownBlindSeals: this.getKnownBlindSeals(),
+        confirmedBitcoinWitnesses: this.requireState().confirmedBitcoinWitnesses ||= {},
       })
       const assetId = bfa.assetId
       if (receive.assetId && receive.assetId !== assetId) return undefined
@@ -2133,16 +2136,18 @@ export class RgbService {
     if (!transfers.length) throw new RgbServiceError('RGB v1 history has no transfer')
     const knownBlindSeals = this.getKnownBlindSeals()
     const evmRpcCache = new Map<string, Promise<unknown>>()
+    const bitcoinStatusCache = new Map<string, Promise<boolean>>()
+    const confirmedBitcoinWitnesses = state.confirmedBitcoinWitnesses ||= {}
     const validated = await Promise.all(transfers.map(bytes => validate({
       wallet: state.wallet, payload: bytes,
-      ...(pendingWitnessTxid ? { pendingWitnessTxid } : {}), knownBlindSeals, evmRpcCache,
+      ...(pendingWitnessTxid ? { pendingWitnessTxid } : {}), knownBlindSeals, evmRpcCache, bitcoinStatusCache, confirmedBitcoinWitnesses,
     })))
     if (validated.some(item => item.assetId !== assetId))
       throw new RgbServiceError('RGB v1 history asset ID mismatch')
     const canonical = mergeBfaValidatedHistories(validated)
     const complete = await validate({
       wallet: state.wallet, payload: canonical,
-      ...(pendingWitnessTxid ? { pendingWitnessTxid } : {}), knownBlindSeals, evmRpcCache,
+      ...(pendingWitnessTxid ? { pendingWitnessTxid } : {}), knownBlindSeals, evmRpcCache, bitcoinStatusCache, confirmedBitcoinWitnesses,
     })
     if (complete.assetId !== assetId)
       throw new RgbServiceError('RGB v1 merged history asset ID mismatch')
@@ -2172,6 +2177,7 @@ export class RgbService {
       history: { payload: canonicalPayload, opIds, updatedAt: this.now(),
         ...(legacyPayloads.length ? { legacyPayloads } : {}) },
     }
+    if (state.validatedV1SendHistories) delete state.validatedV1SendHistories[assetId]
     state.pendingAssetMetadata = state.pendingAssetMetadata?.filter(
       item => item.assetId !== assetId || !item.synced
     )
@@ -2585,6 +2591,8 @@ export class RgbService {
       if (localContract) history.localContract = localContract
       if (localGenesis) history.localGenesis = localGenesis
       history.knownBlindSeals = this.getKnownBlindSeals()
+      history.confirmedBitcoinWitnesses = state.confirmedBitcoinWitnesses ||= {}
+      history.validatedV1SendHistories = state.validatedV1SendHistories ||= {}
       return history
     }
     let validationHistory = enrichValidationHistory(
@@ -3717,6 +3725,8 @@ function recoverySnapshot(state: ReturnType<typeof persistState>) {
     recoveryCheckpointKind: _recoveryCheckpointKind,
     recoveryRemoteStateKnown: _recoveryRemoteStateKnown,
     recoveryConflict: _recoveryConflict,
+    confirmedBitcoinWitnesses: _confirmedBitcoinWitnesses,
+    validatedV1SendHistories: _validatedV1SendHistories,
     pending,
     pendingSendHistory,
     ...snapshot

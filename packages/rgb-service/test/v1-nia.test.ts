@@ -1,5 +1,5 @@
 import { Psbt, Transaction } from 'bitcoinjs-lib'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { encodeNiaGenesis } from '../src/protocol/nia-genesis'
 import { prepareNiaOpretTransfer } from '../src/protocol/opret-transfer'
 import { serializeBfaOpretWitnessBundle, serializeNiaOpretWitnessBundle } from '../src/protocol/consignment'
@@ -10,7 +10,7 @@ import {
   isSupportedV1TransferConsignment,
   unwrapRgbContractConsignment,
 } from '../src/protocol/bfa-consignment'
-import { mergeBfaValidatedHistories, validateBfaTransferConsignment } from '../src/protocol/bfa-validator'
+import { mergeBfaValidatedHistories, restoreValidatedBfaHistory, selectBfaSpendHistory, validateBfaTransferConsignment } from '../src/protocol/bfa-validator'
 import { decodeRgbInvoice } from '../src/protocol/invoice'
 import { encodeRgbContractId } from '../src/protocol/contract-id'
 import { createLocalRgbProtocolEncoder } from '../src/protocol/local-bfa-encoder'
@@ -194,8 +194,10 @@ describe('NIA v1 transfer', () => {
     const invoice = decodeRgbInvoice(
       `rgb:${assetId.slice(4)}/schema/~/bc:utxob:xDfmDF9g-yNOjriV-6Anbe6H-MLJ__g6-lo7Dd4f-dhWBW8S-XYGBm?amount=10`
     )
-    const encoder = createLocalRgbProtocolEncoder(validate)
-    const prepared = await encoder.prepareTransfer({
+    const validateForSend = vi.fn(validate)
+    const encoder = createLocalRgbProtocolEncoder(validateForSend)
+    const validatedV1SendHistories: NonNullable<import('../src/types').RgbValidationHistory['validatedV1SendHistories']> = {}
+    const sendInput: Parameters<typeof encoder.prepareTransfer>[0] = {
       wallet: { walletId: 'test', fundingAddress: 'bc1p-test', network: 'mainnet' },
       snapshot: { utxos: [utxo], syncedAt: 1 },
       request: { assetId, amount: '10', invoice: invoice.raw, feeRate: 2 },
@@ -210,12 +212,26 @@ describe('NIA v1 transfer', () => {
         scriptPubKey: utxo.scriptPubKey, publicKey: utxo.publicKey,
       }], changeScriptPubKey: utxo.scriptPubKey, changeDustLimit: 330 },
       validationHistory: { assetId, consignments: [
-        { opId: assetId.slice(4), payload: Buffer.from(v0Consignment).toString('base64') },
         { opId: assetId.slice(4), payload: Buffer.from(consignment).toString('base64') },
-      ] },
-    })
+      ], confirmedBitcoinWitnesses: {
+        [transaction.getId()]: { checkedAt: Date.now(), confirmations: 3 },
+      }, validatedV1SendHistories },
+    }
+    const prepared = await encoder.prepareTransfer(sendInput)
     expect(prepared.metadata?.['schema']).toBe('NIA_V1')
     expect(prepared.psbt).toMatch(/^70736274ff/i)
+    expect(Object.keys(validatedV1SendHistories)).toHaveLength(1)
+    const saved = validatedV1SendHistories[assetId]!
+    expect(restoreValidatedBfaHistory(consignment, 0, [], saved)).toBeDefined()
+    expect(restoreValidatedBfaHistory(consignment, 0,
+      [{ txid: genesisTxid, vout: 0, blinding: 99n }], saved)).toBeUndefined()
+    const changedPayload = Uint8Array.from(consignment)
+    changedPayload[changedPayload.length - 1] ^= 1
+    expect(restoreValidatedBfaHistory(changedPayload, 0, [], saved)).toBeUndefined()
+    const checksAfterFirstSend = validateForSend.mock.calls.length
+    sendInput.validationHistory.validatedV1SendHistories = JSON.parse(JSON.stringify(validatedV1SendHistories))
+    await encoder.prepareTransfer(sendInput)
+    expect(validateForSend).toHaveBeenCalledTimes(checksAfterFirstSend)
     const completed = await encoder.completeTransfer({
       wallet: { walletId: 'test', fundingAddress: 'bc1p-test', network: 'mainnet' },
       pending: {
@@ -232,5 +248,69 @@ describe('NIA v1 transfer', () => {
     })
     expect(next.metadata.schema).toBe('NIA')
     expect(next.terminalAssignments).toContainEqual(expect.objectContaining({ amount: '10' }))
+  })
+
+  it('keeps only the selected branch in a consignment for the next recipient', async () => {
+    const genesis = encodeNiaGenesis({
+      ticker: 'NIA', name: 'Two branches', precision: 0, timestamp: 1_713_261_744,
+      network: 'mainnet', allocations: [
+        { txid: genesisTxid, vout: 0, blinding: 1n, amount: 100n },
+        { txid: genesisTxid, vout: 1, blinding: 2n, amount: 100n },
+      ],
+    })
+    const assetId = `rgb:${Buffer.from(genesis.assetId).toString('hex')}`
+    const invoice = decodeRgbInvoice(
+      `rgb:${assetId.slice(4)}/schema/~/bc:utxob:xDfmDF9g-yNOjriV-6Anbe6H-MLJ__g6-lo7Dd4f-dhWBW8S-XYGBm?amount=60`
+    )
+    const makeBranch = (vout: number) => {
+      const assignmentIndex = genesis.allocationIndexes.indexOf(vout)
+      const prepared = prepareNiaOpretTransfer({
+        network: 'mainnet', assetId, amount: '60',
+        selectedUtxos: [{
+          outpoint: { txid: genesisTxid, vout }, satoshis: 10_000,
+          scriptPubKey: `5120${'11'.repeat(32)}`, publicKey: `02${'22'.repeat(32)}`,
+          allocations: [{ assetId, amount: '100', settled: true, spendable: true,
+            opId: assetId.slice(4), assignmentIndex, assignmentType: 4000 }],
+        }],
+        recipientSeal: invoice.seal, feeRate: 2,
+        feeFunding: { utxos: [{
+          outpoint: { txid: (vout ? 'dd' : 'cc').repeat(32), vout: 1 }, satoshis: 10_000,
+          scriptPubKey: `5120${'11'.repeat(32)}`, publicKey: `02${'22'.repeat(32)}`,
+        }], changeScriptPubKey: `5120${'11'.repeat(32)}`, changeDustLimit: 330 },
+        nonce: BigInt(vout + 1), entropy: BigInt(vout + 2), recipientBlinding: 3n, changeBlinding: 4n,
+      })
+      const psbt = Psbt.fromHex(prepared.psbtHex)
+      const tx = ((psbt.data.globalMap.unsignedTx as any).tx || psbt.data.globalMap.unsignedTx).toBuffer()
+      const bundle = serializeBfaOpretWitnessBundle({
+        witnessTx: tx, contractId: assetId, transitionId: prepared.transitionId,
+        transition: prepared.transition,
+        inputs: [{ opId: assetId.slice(4), assignmentType: 4000, assignmentIndex }],
+        entropy: BigInt(vout + 2),
+      })
+      return { ...bundle, transitionId: prepared.transitionId }
+    }
+    const left = makeBranch(0)
+    const right = makeBranch(1)
+    const validate = (bundle: typeof left) => validateBfaTransferConsignment(
+      encodeBfaTransferConsignment({
+        genesis: genesis.strict, validatedWitnessBundles: [], witnessBundle: bundle.strict, terminals: [],
+      }), { network: 0, isBitcoinTxConfirmed: async () => true }
+    )
+    const merged = mergeBfaValidatedHistories(await Promise.all([validate(left), validate(right)]))
+    const complete = await validateBfaTransferConsignment(merged, {
+      network: 0, isBitcoinTxConfirmed: async () => true,
+    })
+    const leftOpId = Buffer.from(left.transitionId).toString('hex')
+    const selected = selectBfaSpendHistory(complete, [leftOpId])
+    expect(selected.witnessBundles).toHaveLength(1)
+    const portable = encodeBfaTransferConsignment({
+      genesis: selected.genesis, validatedWitnessBundles: [],
+      witnessBundle: selected.witnessBundles[0]!, terminals: [],
+    })
+    const recipientCheck = await validateBfaTransferConsignment(portable, {
+      network: 0, isBitcoinTxConfirmed: async () => true,
+    })
+    expect(recipientCheck.bundles).toHaveLength(1)
+    expect(recipientCheck.bundles[0]?.operationIds).toContain(leftOpId)
   })
 })

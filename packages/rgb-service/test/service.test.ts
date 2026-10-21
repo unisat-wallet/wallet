@@ -2451,12 +2451,12 @@ describe('RgbService', () => {
 
     expect(dependencies.encoder.prepareTransfer).toHaveBeenCalledWith(
       expect.objectContaining({
-        validationHistory: {
+        validationHistory: expect.objectContaining({
           assetId: 'rgb:AQEBAQEB-AQEBAQE-BAQEBAQ-EBAQEBA-QEBAQEB-AQEBAQE',
           consignments: [{ opId: '01'.repeat(32), payload: Buffer.from([1, 2, 3]).toString('base64') }],
           localContract: Buffer.from([1, 2, 3]).toString('base64'),
           knownBlindSeals: [],
-        },
+        }),
       })
     )
   })

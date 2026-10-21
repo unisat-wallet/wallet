@@ -122,6 +122,10 @@ export interface RgbValidationHistory {
   localGenesis?: string
   /** Locally encrypted blind receive seals; never part of an API response. */
   knownBlindSeals?: import('./protocol/receive').RgbBlindSeal[]
+  /** Local-only observations reused after a v1 Bitcoin witness reaches three confirmations. */
+  confirmedBitcoinWitnesses?: Record<string, { checkedAt: number; confirmations: number }>
+  /** Local-only summaries of exact v1 history payloads that completed validation. */
+  validatedV1SendHistories?: Record<string, import('./protocol/bfa-validator').CachedValidatedBfaHistory>
 }
 
 export interface RgbToSignInput {
@@ -422,6 +426,10 @@ export interface RgbServiceState {
     lastError?: string
   }
   snapshot: RgbWalletSnapshot
+  /** Local-only chain observations; three confirmations are treated as final. */
+  confirmedBitcoinWitnesses?: Record<string, { checkedAt: number; confirmations: number }>
+  /** Local-only send summaries; remote recovery always validates again. */
+  validatedV1SendHistories?: Record<string, import('./protocol/bfa-validator').CachedValidatedBfaHistory>
   pending: Record<string, RgbPendingTransfer>
   pendingReceives?: RgbPendingReceive[]
   /**
@@ -617,6 +625,8 @@ export interface RgbServiceDependencies {
     knownBlindSeals: import('./protocol/receive').RgbBlindSeal[]
     /** Shared only by validations within one operation; never persisted across sends. */
     evmRpcCache?: Map<string, Promise<unknown>>
+    bitcoinStatusCache?: Map<string, Promise<boolean>>
+    confirmedBitcoinWitnesses?: Record<string, { checkedAt: number; confirmations: number }>
   }) => Promise<import('./protocol/bfa-validator').ValidatedBfaConsignment>
   transport: RgbTransport
   broadcaster: BitcoinBroadcaster

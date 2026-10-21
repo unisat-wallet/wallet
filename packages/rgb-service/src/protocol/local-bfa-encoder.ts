@@ -13,7 +13,12 @@ import type {
 } from '../types'
 import { encodeBfaTransferConsignment, BFA_SCHEMA_ID, NIA_V1_SCHEMA_ID } from './bfa-consignment'
 import { isSupportedV1ContractConsignment, isSupportedV1TransferConsignment } from './bfa-consignment'
-import { mergeBfaValidatedHistories } from './bfa-validator'
+import {
+  cacheValidatedBfaHistory,
+  mergeBfaValidatedHistories,
+  restoreValidatedBfaHistory,
+  selectBfaSpendHistory,
+} from './bfa-validator'
 import { completeRgbOpretPsbt } from './complete'
 import { normalizeRgbAssetId } from './contract-id'
 import { serializeBfaOpretWitnessBundle } from './consignment'
@@ -302,17 +307,43 @@ export function createLocalRgbProtocolEncoder(
       const knownBlindSeals = input.validationHistory.knownBlindSeals || []
       const transferPayloads = compatiblePayloads.filter(isSupportedV1TransferConsignment)
       if (!transferPayloads.length) throw new RgbServiceError('RGB v1 history has no transfer')
-      const evmRpcCache = new Map<string, Promise<unknown>>()
-      const checked = await Promise.all(transferPayloads.map(payload => validateBfa({
-        wallet: input.wallet, payload, knownBlindSeals, evmRpcCache,
-      })))
-      const merged = mergeBfaValidatedHistories(checked)
-      const history = await validateBfa({
-        wallet: input.wallet, payload: merged, knownBlindSeals, evmRpcCache,
-      })
+      const singlePayload = transferPayloads.length === 1 ? transferPayloads[0] : undefined
+      const confirmedBitcoinWitnesses = input.validationHistory.confirmedBitcoinWitnesses
+      const cachedHistories = input.validationHistory.validatedV1SendHistories
+      const network = input.wallet.network === 'mainnet' || input.wallet.network === 'fractal-mainnet' ||
+        input.wallet.network === 'fractal-test' ? 0 : input.wallet.network === 'testnet' ? 1 :
+          input.wallet.network === 'testnet4' ? 2 : 3
+      let history = singlePayload && cachedHistories?.[input.intent.assetId]
+        ? restoreValidatedBfaHistory(singlePayload, network, knownBlindSeals, cachedHistories[input.intent.assetId]!)
+        : undefined
+      if (!history) {
+        const evmRpcCache = new Map<string, Promise<unknown>>()
+        const bitcoinStatusCache = new Map<string, Promise<boolean>>()
+        const checked = await Promise.all(transferPayloads.map(payload => validateBfa({
+          wallet: input.wallet, payload, knownBlindSeals, evmRpcCache, bitcoinStatusCache, confirmedBitcoinWitnesses,
+        })))
+        const merged = mergeBfaValidatedHistories(checked)
+        const validated = await validateBfa({
+          wallet: input.wallet, payload: merged, knownBlindSeals, evmRpcCache, bitcoinStatusCache, confirmedBitcoinWitnesses,
+        })
+        history = validated
+        // Only a fully verified, deeply confirmed local history can bypass
+        // repeat RGB/EVM validation on a later send.
+        const cacheSource = singlePayload ? checked[0] : undefined
+        if (singlePayload && cacheSource && !cacheSource.hasDynamicRejectList && cachedHistories && confirmedBitcoinWitnesses &&
+          cacheSource.bundles.every(bundle =>
+            (confirmedBitcoinWitnesses[bundle.txid.toLowerCase()]?.confirmations || 0) >= 3)) {
+          cachedHistories[input.intent.assetId] = cacheValidatedBfaHistory(
+            singlePayload, knownBlindSeals, cacheSource
+          )
+        }
+      }
+      const spendHistory = selectBfaSpendHistory(history, input.selectedUtxos.flatMap(utxo =>
+        utxo.allocations.map(allocation => allocation.opId || '')
+      ))
       return prepareBfaTransfer({
         wallet: input.wallet, intent: input.intent, selectedUtxos: input.selectedUtxos,
-        history, feeRate: input.request.feeRate,
+        history: spendHistory, feeRate: input.request.feeRate,
         ...(input.feeFunding ? { feeFunding: input.feeFunding } : {}),
         ...(input.request.swapPsbt ? { swapPsbt: input.request.swapPsbt } : {}),
       })

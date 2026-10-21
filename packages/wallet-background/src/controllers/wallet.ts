@@ -15,6 +15,8 @@ import { DisplayedKeyring, Keyring, KeyringType, ToSignInput } from '@unisat/key
 import {
   RgbService as LocalRgbService,
   RgbBfaValidationUnavailableError,
+  cacheBfaBitcoinStatus,
+  cacheConfirmedBfaWitnesses,
   cacheBfaEvmRpc,
   createBfaEvmRpc,
   createLocalRgbProtocolEncoder,
@@ -6458,10 +6460,10 @@ export class WalletController extends BaseController {
         ...(input.pendingWitnessTxid ? { pendingWitnessTxid: input.pendingWitnessTxid } : {}),
         ...(input.allowPendingLastWitness ? { allowPendingLastWitness: true } : {}),
         knownBlindSeals: input.knownBlindSeals,
-        isBitcoinTxConfirmed: async txid => {
-          const status = await getRgbApiService().getRgbTransactionStatus(txid, { wallet: input.wallet })
-          return status.status === 'confirmed'
-        },
+        isBitcoinTxConfirmed: cacheBfaBitcoinStatus(cacheConfirmedBfaWitnesses(
+          txid => getRgbApiService().getRgbTransactionStatus(txid, { wallet: input.wallet }),
+          input.confirmedBitcoinWitnesses || {}
+        ), input.bitcoinStatusCache || new Map()),
         getEvmRpc: chainId => {
           if (chainId > BigInt(Number.MAX_SAFE_INTEGER))
             throw new RgbBfaValidationUnavailableError('BFA EVM chain ID exceeds configured range')

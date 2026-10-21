@@ -39,6 +39,7 @@ type SealPatch = { start: number; end: number; replacement: Uint8Array }
 
 export interface ValidatedBfaConsignment extends ValidatedBfaTransferHistory {
   metadata: RgbContractMetadata
+  hasDynamicRejectList: boolean
   witnessOutputScripts: string[]
   terminals: Array<{ bundleId: string; secretSeals: string[] }>
   terminalAssignments: Array<{
@@ -46,7 +47,106 @@ export interface ValidatedBfaConsignment extends ValidatedBfaTransferHistory {
     txid: string; vout: number; secretSeal: string
     output?: { scriptPubKey: string; satoshis: number }
   }>
-  bundles: Array<{ id: string; strict: Uint8Array; operationIds: string[]; parentOpIds: string[] }>
+  bundles: Array<{ id: string; txid: string; strict: Uint8Array; operationIds: string[]; parentOpIds: string[] }>
+}
+
+/** Local-only validation summary; the canonical consignment remains the source of bundle bytes. */
+export interface CachedValidatedBfaHistory {
+  version: 1
+  fingerprint: string
+  assetId: string
+  allocations: ValidatedBfaTransferHistory['allocations']
+  bundles: Array<{ id: string; txid: string; operationIds: string[]; parentOpIds: string[] }>
+}
+
+function validatedHistoryFingerprint(payload: Uint8Array, knownBlindSeals: RgbBlindSeal[]): string {
+  const sealKeys = knownBlindSeals.map(seal =>
+    `${seal.txid.toLowerCase()}:${seal.vout}:${seal.blinding.toString()}`
+  ).sort()
+  return hex(sha256(new TextEncoder().encode(`${hex(sha256(payload))}|${sealKeys.join('|')}`)))
+}
+
+export function cacheValidatedBfaHistory(
+  payload: Uint8Array,
+  knownBlindSeals: RgbBlindSeal[],
+  history: ValidatedBfaConsignment
+): CachedValidatedBfaHistory {
+  return {
+    version: 1,
+    fingerprint: validatedHistoryFingerprint(payload, knownBlindSeals),
+    assetId: history.assetId,
+    allocations: history.allocations,
+    bundles: history.bundles.map(({ id, txid, operationIds, parentOpIds }) =>
+      ({ id, txid, operationIds, parentOpIds })),
+  }
+}
+
+/** Parse the same bytes again, while reusing the prior chain and RGB-state validation. */
+export function restoreValidatedBfaHistory(
+  payload: Uint8Array,
+  network: BfaValidationOptions['network'],
+  knownBlindSeals: RgbBlindSeal[],
+  cached: CachedValidatedBfaHistory
+): (ValidatedBfaTransferHistory & { bundles: ValidatedBfaConsignment['bundles'] }) | undefined {
+  if (cached?.version !== 1 ||
+    cached.fingerprint !== validatedHistoryFingerprint(payload, knownBlindSeals) ||
+    !Array.isArray(cached.bundles) || !Array.isArray(cached.allocations)) return undefined
+  const disclosed = revealBfaConsignmentBlindSeals(payload, network, knownBlindSeals)
+  const parsed = parseConsignment(disclosed, network)
+  const assetId = encodeRgbContractId(bytes(parsed.genesis.id))
+  if (assetId !== cached.assetId || parsed.bundles.length !== cached.bundles.length) return undefined
+  const bundles = parsed.bundles.map((bundle, index) => {
+    const saved = cached.bundles[index]
+    if (!saved || saved.id !== bundle.id || saved.txid !== bundle.txid ||
+      !Array.isArray(saved.operationIds) || !Array.isArray(saved.parentOpIds) ||
+      saved.operationIds.join(',') !== bundle.operations.map(operation => operation.id).join(',') ||
+      saved.parentOpIds.join(',') !== bundle.operations.flatMap(operation => operation.inputs.map(input => input.opId)).join(','))
+      return undefined
+    return { ...saved, strict: bundle.strict }
+  })
+  if (bundles.some(bundle => !bundle)) return undefined
+  return {
+    assetId, genesis: parsed.genesis.strict,
+    witnessBundles: parsed.bundles.map(bundle => bundle.strict),
+    allocations: cached.allocations,
+    bundles: bundles as ValidatedBfaConsignment['bundles'],
+  }
+}
+
+/** Carry only the ancestors of the allocations being spent to the next recipient. */
+export function selectBfaSpendHistory(
+  history: ValidatedBfaTransferHistory & { bundles: ValidatedBfaConsignment['bundles'] },
+  selectedOpIds: string[]
+): ValidatedBfaTransferHistory {
+  if (history.bundles.length !== history.witnessBundles.length)
+    fail('validated history bundle count mismatch')
+  const byOperation = new Map<string, number>()
+  history.bundles.forEach((bundle, index) => {
+    for (const opId of bundle.operationIds) byOperation.set(opId.toLowerCase(), index)
+  })
+  const needed = new Set<number>()
+  const visiting = new Set<number>()
+  const rootId = rgbContractIdHex(history.assetId)
+  const include = (opId: string) => {
+    if (opId.toLowerCase() === rootId) return
+    const index = byOperation.get(opId.toLowerCase())
+    if (index === undefined) fail('selected allocation is missing an ancestor')
+    if (needed.has(index)) return
+    if (visiting.has(index)) fail('cyclic witness history')
+    visiting.add(index)
+    for (const parent of history.bundles[index]!.parentOpIds) {
+      if (byOperation.get(parent.toLowerCase()) !== index) include(parent)
+    }
+    visiting.delete(index)
+    needed.add(index)
+  }
+  for (const opId of selectedOpIds) include(opId)
+  return {
+    assetId: history.assetId,
+    genesis: history.genesis,
+    witnessBundles: history.witnessBundles.filter((_, index) => needed.has(index)),
+    allocations: history.allocations,
+  }
 }
 
 export interface BfaValidationOptions {
@@ -110,6 +210,73 @@ export function cacheBfaEvmRpc(
       if (cache.get(key) === request) cache.delete(key)
     })
     return request
+  }
+}
+
+/** A witness is checked once per operation even when multiple histories contain it. */
+export function cacheBfaBitcoinStatus(
+  isConfirmed: BfaValidationOptions['isBitcoinTxConfirmed'],
+  cache: Map<string, Promise<boolean>>
+): BfaValidationOptions['isBitcoinTxConfirmed'] {
+  return txid => {
+    const key = txid.toLowerCase()
+    const existing = cache.get(key)
+    if (existing) return existing
+    const request = Promise.resolve().then(() => isConfirmed(txid))
+    cache.set(key, request)
+    void request.catch(() => {
+      if (cache.get(key) === request) cache.delete(key)
+    })
+    return request
+  }
+}
+
+const MIN_CACHED_WITNESS_CONFIRMATIONS = 3
+const MAX_CACHED_WITNESSES = 4096
+
+/** Remove malformed entries and bound encrypted local state, including on wallet open. */
+export function pruneConfirmedBfaWitnesses(
+  observations: Record<string, { checkedAt: number; confirmations: number }>
+): void {
+  for (const [txid, entry] of Object.entries(observations)) {
+    if (!/^[0-9a-f]{64}$/.test(txid) || !entry ||
+      !Number.isSafeInteger(entry.checkedAt) || !Number.isSafeInteger(entry.confirmations) ||
+      entry.checkedAt < 0 || entry.confirmations < MIN_CACHED_WITNESS_CONFIRMATIONS)
+      delete observations[txid]
+  }
+  const entries = Object.entries(observations)
+  if (entries.length > MAX_CACHED_WITNESSES) {
+    for (const [txid] of entries.sort((a, b) => a[1].checkedAt - b[1].checkedAt)
+      .slice(0, entries.length - MAX_CACHED_WITNESSES)) delete observations[txid]
+  }
+}
+
+/** Treat three-confirmation witnesses as final. A missing/replaced witness is never cached. */
+export function cacheConfirmedBfaWitnesses(
+  getStatus: (txid: string) => Promise<{ status: string; confirmations: number }>,
+  observations: Record<string, { checkedAt: number; confirmations: number }>,
+  now: () => number = Date.now
+): BfaValidationOptions['isBitcoinTxConfirmed'] {
+  pruneConfirmedBfaWitnesses(observations)
+  return async txid => {
+    const key = txid.toLowerCase()
+    const current = now()
+    const cached = Object.prototype.hasOwnProperty.call(observations, key) ? observations[key] : undefined
+    if (cached && Number.isSafeInteger(cached.checkedAt) && cached.checkedAt >= 0 &&
+      Number.isSafeInteger(cached.confirmations) && cached.confirmations >= MIN_CACHED_WITNESS_CONFIRMATIONS)
+      return true
+    const status = await getStatus(txid)
+    if (status.status === 'confirmed' && Number.isSafeInteger(status.confirmations) &&
+      status.confirmations >= MIN_CACHED_WITNESS_CONFIRMATIONS) {
+      observations[key] = { checkedAt: current, confirmations: status.confirmations }
+      if (Object.keys(observations).length > MAX_CACHED_WITNESSES) {
+        const oldest = Object.entries(observations)
+          .sort((a, b) => a[1].checkedAt - b[1].checkedAt)
+          .slice(0, Object.keys(observations).length - MAX_CACHED_WITNESSES)
+        for (const [oldKey] of oldest) delete observations[oldKey]
+      }
+    } else delete observations[key]
+    return status.status === 'confirmed'
   }
 }
 
@@ -663,13 +830,14 @@ export async function validateBfaTransferConsignment(
   return {
     assetId: encodeRgbContractId(bytes(genesis.id)), genesis: genesis.strict,
     witnessBundles: bundles.map(bundle => bundle.strict), allocations,
+    hasDynamicRejectList: Boolean(genesis.rejectListAddress),
     metadata: { ...genesis.metadata, issuedSupply: issuedSupply.toString() },
     witnessOutputScripts: bundles.at(-1)!.tx.outs
       .filter(output => output.script[0] !== 0x6a)
       .map(output => output.script.toString('hex')),
     terminals: terminals.map(item => ({ bundleId: item.bundleId, secretSeals: item.secrets })),
     terminalAssignments,
-    bundles: bundles.map(bundle => ({ id: bundle.id, strict: bundle.strict,
+    bundles: bundles.map(bundle => ({ id: bundle.id, txid: bundle.txid, strict: bundle.strict,
       operationIds: bundle.operations.map(operation => operation.id),
       parentOpIds: bundle.operations.flatMap(operation => operation.inputs.map(input => input.opId)),
     })),
