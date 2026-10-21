@@ -29,6 +29,7 @@ import {
   unwrapRgbContractConsignment,
 } from './protocol/bfa-consignment'
 import { mergeBfaValidatedHistories } from './protocol/bfa-validator'
+import { convertNiaV0ConsignmentToV1, unwrapNiaV0Contract } from './protocol/nia-v0-migration'
 import { encodeNiaContract, encodeNiaTransferConsignment } from './protocol/nia-contract'
 import {
   blindRgbInvoiceRecipientId,
@@ -1049,7 +1050,9 @@ export class RgbService {
       }
     }
     const proxyReceived = await this.getProxyConsignments()
-    const receivedItems: Array<RgbReceivedConsignment> = [...received.map(item => ({ ...item, txid: '' })), ...proxyReceived]
+    // Claimed consignments have no txid field. Let validation recover the
+    // witness txid from the payload instead of treating an empty ID as a match constraint.
+    const receivedItems: Array<RgbReceivedConsignment> = [...received, ...proxyReceived]
     const pending = state.pendingReceives || []
     // Once ACK intent is durable, the consignment itself is a local receipt.
     // Prefer it over refetching from transport so proxy cleanup or an
@@ -1299,6 +1302,7 @@ export class RgbService {
     }
     const acknowledgementWasPending = receive.receivedConsignment?.acknowledgementPending === true
     if (!acknowledgementWasPending) {
+      await this.preflightReceiveHistory(receive.pendingAccept.assetId, item.payload, item.txid)
       // Persist the local receipt before ACK. If the extension stops after
       // the proxy accepts it, recovery can reconcile ACK=true without losing
       // the payload needed for settlement.
@@ -1444,10 +1448,15 @@ export class RgbService {
       const assetId = bfa.assetId
       if (receive.assetId && receive.assetId !== assetId) return undefined
       const secret = receive.seal ? Buffer.from(concealBlindSeal(receive.seal)).toString('hex') : undefined
+      // V1 consignments include unspent ancestors; only the appended witness
+      // bundle can satisfy this invoice's witness output.
+      const latestBundleId = bfa.bundles.at(-1)?.id
       const candidate = bfa.terminalAssignments.find(assignment => {
         if (item.txid && assignment.txid !== item.txid) return false
-        if (receive.recipientType === 'witness')
+        if (receive.recipientType === 'witness') {
+          if (!latestBundleId || assignment.bundleId !== latestBundleId) return false
           return assignment.output?.scriptPubKey.toLowerCase() === receive.witnessScriptPubKey?.toLowerCase()
+        }
         return assignment.secretSeal === secret && bfa.terminals.some(terminal =>
           terminal.bundleId === assignment.bundleId && terminal.secretSeals.includes(secret!))
       })
@@ -1468,16 +1477,15 @@ export class RgbService {
     if (receive.recipientType === 'witness') {
       const expectedScript = receive.witnessScriptPubKey?.toLowerCase()
       if (!expectedScript) return undefined
-      const match = decoded.witnessBundles
-        .flatMap(witness =>
-          witness.transitions.flatMap(transition =>
-            transition.assignments.map((assignment, assignmentIndex) => ({
-              witness,
-              transition,
-              assignment,
-              assignmentIndex,
-            }))
-          )
+      const witness = decoded.witnessBundles.at(-1)
+      const match = witness?.transitions
+        .flatMap(transition =>
+          transition.assignments.map((assignment, assignmentIndex) => ({
+            witness,
+            transition,
+            assignment,
+            assignmentIndex,
+          }))
         )
         .find(({ witness, assignment }) => {
           if ('secretSeal' in assignment.seal) return false
@@ -1615,7 +1623,7 @@ export class RgbService {
     // Do this before mutating the allocation/receive state. A conflicting or
     // malformed branch must reject atomically rather than leave a spendable
     // UTXO whose required DAG was not durably retained.
-    if (isSupportedV1TransferConsignment(Uint8Array.from(Buffer.from(item.payload, 'base64')))) {
+    if (this.needsV1HistoryMerge(assetId, item.payload)) {
       await this.storeAcceptedBfaHistory(assetId, item.payload)
     } else {
       this.storeAcceptedHistory({
@@ -1985,16 +1993,64 @@ export class RgbService {
     )
   }
 
-  private async storeAcceptedBfaHistory(assetId: string, payload: string, pendingWitnessTxid?: string) {
+  private needsV1HistoryMerge(assetId: string, payload: string) {
+    const existing = this.requireState().contracts?.[assetId]
+    const existingPayload = existing?.history?.payload ?? existing?.consignment
+    return [existingPayload, payload].some(item => {
+      if (!item) return false
+      const bytes = Uint8Array.from(Buffer.from(item, 'base64'))
+      return isSupportedV1TransferConsignment(bytes) || isSupportedV1ContractConsignment(bytes)
+    })
+  }
+
+  /** Check the exact merge before ACK makes the receive irrevocable to the sender. */
+  private async preflightReceiveHistory(assetId: string, payload: string, pendingWitnessTxid?: string) {
+    const existing = this.requireState().contracts?.[assetId]
+    if (!existing) return
+    if (this.needsV1HistoryMerge(assetId, payload)) {
+      await this.prepareV1HistoryMerge(assetId, payload, pendingWitnessTxid)
+      return
+    }
+    mergeNiaConsignmentHistory({
+      assetId,
+      consignments: [
+        { opId: contractOperationId(assetId), payload: existing.history?.payload ?? existing.consignment },
+        { opId: contractOperationId(assetId), payload },
+      ],
+      requiredOpIds: [],
+      knownBlindSeals: this.getKnownBlindSeals(),
+    })
+  }
+
+  private async prepareV1HistoryMerge(assetId: string, payload: string, pendingWitnessTxid?: string) {
     const validate = this.dependencies.validateBfaConsignment
     if (!validate) throw new RgbServiceError('RGB v1 receive validation is unavailable')
     const state = this.requireState()
     const existing = state.contracts?.[assetId]
     const existingPayload = existing?.history?.payload ?? existing?.consignment
+    const originals = [...new Set([existingPayload, payload].filter((item): item is string => Boolean(item)))]
+    const legacyPayloads = [...(existing?.history?.legacyPayloads || [])]
+    const transfers: Uint8Array[] = []
+    const rootGenesises: string[] = []
+    for (const original of originals) {
+      const bytes = Uint8Array.from(Buffer.from(original, 'base64'))
+      const isV1 = isSupportedV1TransferConsignment(bytes) || isSupportedV1ContractConsignment(bytes)
+      if (!isV1) {
+        const decoded = decodeNiaConsignment(unwrapNiaV0Contract(bytes))
+        if (decoded.assetId !== assetId) throw new RgbServiceError('RGB v0 history asset ID mismatch')
+        if (!decoded.transfer) rootGenesises.push(Buffer.from(decoded.genesis.strict).toString('base64'))
+      } else if (isSupportedV1ContractConsignment(bytes)) {
+        const body = unwrapRgbContractConsignment(bytes)
+        rootGenesises.push(Buffer.from(body.slice(4, -4)).toString('base64'))
+      }
+      const converted = isV1 ? bytes : convertNiaV0ConsignmentToV1(bytes)
+      if (converted !== bytes && !legacyPayloads.includes(original)) legacyPayloads.push(original)
+      if (isSupportedV1TransferConsignment(converted)) transfers.push(converted)
+    }
+    if (!transfers.length) throw new RgbServiceError('RGB v1 history has no transfer')
     const knownBlindSeals = this.getKnownBlindSeals()
-    const inputs = [...new Set([existingPayload, payload].filter((item): item is string => Boolean(item)))]
-    const validated = await Promise.all(inputs.map(item => validate({
-      wallet: state.wallet, payload: Uint8Array.from(Buffer.from(item, 'base64')),
+    const validated = await Promise.all(transfers.map(bytes => validate({
+      wallet: state.wallet, payload: bytes,
       ...(pendingWitnessTxid ? { pendingWitnessTxid } : {}), knownBlindSeals,
     })))
     if (validated.some(item => item.assetId !== assetId))
@@ -2004,18 +2060,33 @@ export class RgbService {
       wallet: state.wallet, payload: canonical,
       ...(pendingWitnessTxid ? { pendingWitnessTxid } : {}), knownBlindSeals,
     })
+    if (complete.assetId !== assetId)
+      throw new RgbServiceError('RGB v1 merged history asset ID mismatch')
+    if (rootGenesises.some(item => item !== Buffer.from(complete.genesis).toString('base64')) ||
+      (existing?.genesis && existing.genesis !== Buffer.from(complete.genesis).toString('base64')))
+      throw new RgbServiceError('RGB v1 history Genesis mismatch')
     const canonicalPayload = Buffer.from(canonical).toString('base64')
     const opIds = complete.bundles.flatMap(bundle => bundle.operationIds)
     if (canonicalPayload.length > MAX_RECOVERY_HISTORY_PAYLOAD_LENGTH ||
-      opIds.length > MAX_RECOVERY_HISTORY_OPERATION_IDS)
+      opIds.length > MAX_RECOVERY_HISTORY_OPERATION_IDS ||
+      legacyPayloads.reduce((size, item) => size + item.length, 0) > MAX_RECOVERY_HISTORY_PAYLOAD_LENGTH)
       throw new RgbServiceError('RGB v1 history exceeds recovery checkpoint limits')
+    return { canonicalPayload, complete, opIds, legacyPayloads }
+  }
+
+  private async storeAcceptedBfaHistory(assetId: string, payload: string, pendingWitnessTxid?: string) {
+    const state = this.requireState()
+    const existing = state.contracts?.[assetId]
+    const { canonicalPayload, complete, opIds, legacyPayloads } =
+      await this.prepareV1HistoryMerge(assetId, payload, pendingWitnessTxid)
     const contracts = state.contracts || (state.contracts = {})
     contracts[assetId] = {
       consignment: canonicalPayload,
       genesis: Buffer.from(complete.genesis).toString('base64'),
       metadata: complete.metadata,
       createdAt: existing?.createdAt || this.now(),
-      history: { payload: canonicalPayload, opIds, updatedAt: this.now() },
+      history: { payload: canonicalPayload, opIds, updatedAt: this.now(),
+        ...(legacyPayloads.length ? { legacyPayloads } : {}) },
     }
     state.pendingAssetMetadata = state.pendingAssetMetadata?.filter(
       item => item.assetId !== assetId || !item.synced
@@ -2855,13 +2926,17 @@ export class RgbService {
           decoded.transitions.some(transition => transition.opId === candidate)
         )
         if (!opId) continue
-        this.storeAcceptedHistory({
-          assetId,
-          payload: consignment.payload,
-          opId,
-          genesis: Buffer.from(decoded.genesis.strict).toString('base64'),
-          metadata: decoded.metadata,
-        })
+        if (this.needsV1HistoryMerge(assetId, consignment.payload)) {
+          await this.storeAcceptedBfaHistory(assetId, consignment.payload, completed.txid)
+        } else {
+          this.storeAcceptedHistory({
+            assetId,
+            payload: consignment.payload,
+            opId,
+            genesis: Buffer.from(decoded.genesis.strict).toString('base64'),
+            metadata: decoded.metadata,
+          })
+        }
       } catch {
         // A history-less/mock encoder must not block persistence of a Bitcoin
         // transaction that was already broadcast. A later attempt will fail
@@ -3698,7 +3773,7 @@ function validateRecoveredState(state: RgbServiceState, currentWallet: RgbWallet
       throw new RgbServiceError('RGB recovery checkpoint contains an invalid contract')
     }
     if (contract.history) {
-      const { payload, opIds, updatedAt } = contract.history
+      const { payload, opIds, updatedAt, legacyPayloads } = contract.history
       // Check the JSON/base64 boundary here. Full strict decoding is repeated
       // by the local encoder before any spend, where asset and parent links
       // are also verified against the selected allocations.
@@ -3710,7 +3785,12 @@ function validateRecoveredState(state: RgbServiceState, currentWallet: RgbWallet
         opIds.length > MAX_RECOVERY_HISTORY_OPERATION_IDS ||
         !opIds.every(opId => typeof opId === 'string' && /^[0-9a-f]{64}$/i.test(opId)) ||
         !Number.isSafeInteger(updatedAt) ||
-        updatedAt < 0
+        updatedAt < 0 ||
+        (legacyPayloads !== undefined && (
+          !Array.isArray(legacyPayloads) ||
+          legacyPayloads.reduce((size, item) => size + (typeof item === 'string' ? item.length : 0), 0) > MAX_RECOVERY_HISTORY_PAYLOAD_LENGTH ||
+          !legacyPayloads.every(item => typeof item === 'string' && isBase64(item))
+        ))
       ) {
         throw new RgbServiceError('RGB recovery checkpoint contains an invalid local history')
       }

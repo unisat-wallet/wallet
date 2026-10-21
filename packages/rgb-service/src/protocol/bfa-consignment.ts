@@ -77,6 +77,9 @@ export function isBfaContractConsignment(value: Uint8Array): boolean {
 }
 
 export function isSupportedV1ContractConsignment(value: Uint8Array): boolean {
+  if (value.length >= 7 && value[0] === 0x52 && value[1] === 0x47 &&
+    value[2] === 0x42 && value[3] === 0 && value[4] === 0x54 &&
+    value[5] === 0x46 && value[6] === 0x52) return false
   const body = unwrapRgbContractConsignment(value)
   const reader = new StrictReader(body)
   if (reader.readU8() !== 1 || reader.readU8() !== 0 || reader.readU16() !== 0) return false

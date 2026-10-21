@@ -2,7 +2,7 @@ import { Psbt, Transaction } from 'bitcoinjs-lib'
 import { describe, expect, it } from 'vitest'
 import { encodeNiaGenesis } from '../src/protocol/nia-genesis'
 import { prepareNiaOpretTransfer } from '../src/protocol/opret-transfer'
-import { serializeBfaOpretWitnessBundle } from '../src/protocol/consignment'
+import { serializeBfaOpretWitnessBundle, serializeNiaOpretWitnessBundle } from '../src/protocol/consignment'
 import {
   encodeBfaContractConsignment,
   encodeBfaTransferConsignment,
@@ -14,6 +14,9 @@ import { mergeBfaValidatedHistories, validateBfaTransferConsignment } from '../s
 import { decodeRgbInvoice } from '../src/protocol/invoice'
 import { encodeRgbContractId } from '../src/protocol/contract-id'
 import { createLocalRgbProtocolEncoder } from '../src/protocol/local-bfa-encoder'
+import { encodeNiaTransferConsignment } from '../src/protocol/nia-contract'
+import { encodeNiaContract } from '../src/protocol/nia-contract'
+import { convertNiaV0ConsignmentToV1 } from '../src/protocol/nia-v0-migration'
 import { serializeStrictBitcoinTransaction } from '../src/protocol/fascia'
 import { StrictWriter } from '../src/protocol/strict'
 import { wrapRgbTransferConsignment } from '../src/protocol/consignment'
@@ -57,10 +60,41 @@ function fixture() {
       invoice.seal.type === 'confidential' ? invoice.seal.secretSeal : new Uint8Array(32),
     ] }],
   })
-  return { consignment, assetId, prepared, invoice, genesis, bundle, transaction: Transaction.fromBuffer(transaction) }
+  const v0Bundle = serializeNiaOpretWitnessBundle({
+    witnessTx: transaction, contractId: assetId, transitionId: prepared.transitionId,
+    transition: prepared.transition,
+    inputs: [{ opId: assetId.slice(4), assignmentType: 4000, assignmentIndex: 0 }], entropy: 2n,
+  })
+  const v0Consignment = encodeNiaTransferConsignment({
+    genesis, priorWitnessBundles: [], witnessBundle: v0Bundle.strict,
+    terminals: [{ bundleId: v0Bundle.bundleId, secretSeals: [
+      invoice.seal.type === 'confidential' ? invoice.seal.secretSeal : new Uint8Array(32),
+    ] }],
+  })
+  return { consignment, v0Consignment, assetId, prepared, invoice, genesis, bundle, transaction: Transaction.fromBuffer(transaction) }
 }
 
 describe('NIA v1 transfer', () => {
+  it('migrates a v0 NIA transfer without changing its asset, operation, or recipient', async () => {
+    const { v0Consignment, consignment, prepared } = fixture()
+    const migrated = convertNiaV0ConsignmentToV1(v0Consignment)
+    expect(migrated).toEqual(consignment)
+    const checked = await validateBfaTransferConsignment(migrated, {
+      network: 0, isBitcoinTxConfirmed: async () => true, allowPendingLastWitness: true,
+    })
+    expect(checked.terminalAssignments).toContainEqual(expect.objectContaining({
+      amount: '60', opId: Buffer.from(prepared.transitionId).toString('hex'),
+    }))
+  })
+
+  it('converts a v0 root contract while retaining its exact Genesis', () => {
+    const { genesis, v0Consignment } = fixture()
+    const root = encodeNiaContract(genesis).strict
+    expect(isSupportedV1ContractConsignment(v0Consignment)).toBe(false)
+    expect(convertNiaV0ConsignmentToV1(root)).toEqual(encodeBfaContractConsignment(genesis.strict))
+    const wrapped = Uint8Array.from([0x52, 0x47, 0x42, 0, 0x43, 0x4f, 0x4e, ...root])
+    expect(convertNiaV0ConsignmentToV1(wrapped)).toEqual(encodeBfaContractConsignment(genesis.strict))
+  })
   it('recognizes Rust NIA v1 contract files and exports their strict body', () => {
     const { genesis } = fixture()
     const body = encodeBfaContractConsignment(genesis.strict)
@@ -134,7 +168,7 @@ describe('NIA v1 transfer', () => {
   })
 
   it('uses validated v1 history when preparing a subsequent NIA send', async () => {
-    const { consignment, assetId, prepared: first, transaction } = fixture()
+    const { consignment, v0Consignment, assetId, prepared: first, transaction } = fixture()
     const validate = async (input: Parameters<NonNullable<import('../src/types').RgbServiceDependencies['validateBfaConsignment']>>[0]) =>
       validateBfaTransferConsignment(input.payload, {
         network: 0, isBitcoinTxConfirmed: async () => true,
@@ -175,7 +209,10 @@ describe('NIA v1 transfer', () => {
         outpoint: { txid: 'cc'.repeat(32), vout: 1 }, satoshis: 10_000,
         scriptPubKey: utxo.scriptPubKey, publicKey: utxo.publicKey,
       }], changeScriptPubKey: utxo.scriptPubKey, changeDustLimit: 330 },
-      validationHistory: { assetId, consignments: [{ opId: assetId.slice(4), payload: Buffer.from(consignment).toString('base64') }] },
+      validationHistory: { assetId, consignments: [
+        { opId: assetId.slice(4), payload: Buffer.from(v0Consignment).toString('base64') },
+        { opId: assetId.slice(4), payload: Buffer.from(consignment).toString('base64') },
+      ] },
     })
     expect(prepared.metadata?.['schema']).toBe('NIA_V1')
     expect(prepared.psbt).toMatch(/^70736274ff/i)

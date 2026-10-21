@@ -10,15 +10,20 @@ import type {
 import {
   encodeNiaContract,
   encodeNiaGenesis,
+  encodeNiaTransferConsignment,
+  encodeBlindRgbInvoice,
   encodeRgbContractId,
   decodeNiaConsignment,
   decodeRgbInvoice,
+  prepareNiaOpretTransfer,
+  serializeNiaOpretWitnessBundle,
   rgbProxyInvoiceId,
   RgbInsufficientBalanceError,
   RgbProxyOperationNotFoundError,
   RgbService,
   RgbServiceError,
 } from '../src'
+import { encodeBfaTransferConsignment, NIA_V1_SCHEMA_ID } from '../src/protocol/bfa-consignment'
 
 const wallet: RgbWalletRef = {
   walletId: 'rgb-wallet-1',
@@ -725,6 +730,198 @@ describe('RgbService', () => {
 
     expect(dependencies.stateSource.getClaimedConsignments).not.toHaveBeenCalled()
   })
+
+  it('matches a v1 witness receive only in the newest witness bundle', async () => {
+    const dependencies = createDependencies()
+    const scriptPubKey = `5120${'11'.repeat(32)}`
+    const oldTxid = 'a'.repeat(64)
+    const newTxid = 'b'.repeat(64)
+    const oldAssignment = {
+      opId: 'c'.repeat(64), assignmentIndex: 0, amount: '40',
+      bundleId: 'old-bundle', txid: oldTxid, vout: 1, secretSeal: '',
+      output: { scriptPubKey, satoshis: 330 },
+    }
+    const newAssignment = {
+      ...oldAssignment, opId: 'd'.repeat(64), amount: '10',
+      bundleId: 'new-bundle', txid: newTxid, vout: 2,
+    }
+    const validated = {
+      assetId: 'rgb:AQEBAQEB-AQEBAQE-BAQEBAQ-EBAQEBA-QEBAQEB-AQEBAQE',
+      genesis: new Uint8Array(),
+      metadata: { schema: 'NIA', ticker: 'NIA', name: 'NIA', precision: 0, issuedSupply: '100' },
+      witnessOutputScripts: [scriptPubKey], terminals: [],
+      bundles: [{ id: 'old-bundle' }, { id: 'new-bundle' }],
+      terminalAssignments: [oldAssignment, newAssignment],
+    }
+    dependencies.validateBfaConsignment = vi.fn().mockResolvedValue(validated)
+    const service = new RgbService(dependencies)
+    await service.open(wallet)
+    const payload = Buffer.from(Uint8Array.from([
+      1, 1, 0, 0, 0, 0, ...Buffer.from(NIA_V1_SCHEMA_ID, 'hex'),
+    ])).toString('base64')
+    const receive = { recipientType: 'witness', witnessScriptPubKey: scriptPubKey }
+    const item = { recipientId: 'recipient', payload }
+
+    await expect((service as any).validateIncomingConsignment(receive, item))
+      .resolves.toMatchObject({ txid: newTxid, amount: '10', opId: newAssignment.opId })
+    await expect((service as any).validateIncomingConsignment(receive, { ...item, txid: oldTxid }))
+      .resolves.toBeUndefined()
+    vi.mocked(dependencies.validateBfaConsignment!).mockResolvedValueOnce({
+      ...validated, terminalAssignments: [oldAssignment],
+    } as any)
+    await expect((service as any).validateIncomingConsignment(receive, item))
+      .resolves.toBeUndefined()
+  })
+
+  it('matches a v0 witness receive only in the newest witness bundle', async () => {
+    const parentTxids = [
+      '8d54c98d4c29a1ec4fd90635f543f0f7a871a78eb6a6e706342f831d92e3ba19',
+      'ff'.repeat(32),
+    ]
+    const genesis = encodeNiaGenesis({
+      ticker: 'HISTORY', name: 'Witness History', precision: 0,
+      timestamp: 1_713_261_744, network: 'mainnet',
+      allocations: parentTxids.map(txid => ({ txid, vout: 0, blinding: 1n, amount: 100n })),
+    })
+    const contractId = `rgb:${Buffer.from(genesis.assetId).toString('hex')}`
+    const allocations = decodeNiaConsignment(encodeNiaContract(genesis).strict).genesisAllocations
+    const witnessRecipient = 'bc:wvout:A8cJ7Ww3-NIzADo3-Tzp_5aD-7CTBWmA-AAAAAAA-AAAAAAA-ALSQkcw'
+    const makeBundle = (index: number, amount: string) => {
+      const assignmentIndex = allocations.findIndex(item => item.txid === parentTxids[index])
+      expect(assignmentIndex).toBeGreaterThanOrEqual(0)
+      const invoice = decodeRgbInvoice(
+        `rgb:${contractId.slice(4)}/schema/~/${witnessRecipient}?amount=${amount}`
+      )
+      const prepared = prepareNiaOpretTransfer({
+        network: 'mainnet', assetId: contractId, amount, recipientSeal: invoice.seal,
+        selectedUtxos: [{
+          outpoint: { txid: parentTxids[index]!, vout: 0 }, satoshis: 10_000,
+          scriptPubKey: `5120${'11'.repeat(32)}`, publicKey: `02${'22'.repeat(32)}`,
+          allocations: [{
+            assetId: contractId, amount: '100', settled: true, spendable: true,
+            opId: contractId.slice(4), assignmentIndex, assignmentType: 4000,
+          }],
+        }],
+        witnessAmountSat: 330, feeRate: 2,
+        feeFunding: {
+          utxos: [{
+            outpoint: { txid: index === 0 ? 'cc'.repeat(32) : 'dd'.repeat(32), vout: 1 },
+            satoshis: 10_000, scriptPubKey: `5120${'11'.repeat(32)}`,
+            publicKey: `02${'22'.repeat(32)}`,
+          }],
+          changeScriptPubKey: `5120${'11'.repeat(32)}`, changeDustLimit: 330,
+        },
+        nonce: BigInt(index + 1), entropy: BigInt(index + 2),
+        recipientBlinding: 3n, changeBlinding: 4n,
+      })
+      const psbt = Psbt.fromHex(prepared.psbtHex)
+      const witnessTx = ((psbt.data.globalMap.unsignedTx as any).tx || psbt.data.globalMap.unsignedTx).toBuffer()
+      return serializeNiaOpretWitnessBundle({
+        witnessTx, contractId, transitionId: prepared.transitionId,
+        transition: prepared.transition,
+        inputs: [{ opId: contractId.slice(4), assignmentType: 4000, assignmentIndex }],
+        entropy: BigInt(index + 2),
+      })
+    }
+    const oldBundle = makeBundle(0, '40')
+    const newBundle = makeBundle(1, '10')
+    const payload = Buffer.from(encodeNiaTransferConsignment({
+      genesis, priorWitnessBundles: [oldBundle.strict], witnessBundle: newBundle.strict, terminals: [],
+    })).toString('base64')
+    const decoded = decodeNiaConsignment(Uint8Array.from(Buffer.from(payload, 'base64')))
+    const scriptPubKey = decoded.witnessBundles[1]!.outputs[1]!.scriptPubKey
+    expect(decoded.witnessBundles[0]!.outputs[1]!.scriptPubKey).toBe(scriptPubKey)
+    const service = new RgbService(createDependencies())
+    await service.open(wallet)
+    const receive = { recipientType: 'witness', witnessScriptPubKey: scriptPubKey }
+    const item = { recipientId: 'recipient', payload }
+
+    await expect((service as any).validateIncomingConsignment(receive, item))
+      .resolves.toMatchObject({ txid: decoded.witnessBundles[1]!.txid, amount: '10' })
+    await expect((service as any).validateIncomingConsignment(receive, {
+      ...item, txid: decoded.witnessBundles[0]!.txid,
+    })).resolves.toBeUndefined()
+  })
+
+  it.each(['blind', 'witness'] as const)(
+    'stages a claimed %s NIA consignment without a backend txid',
+    async recipientType => {
+      const parentTxid = '8d54c98d4c29a1ec4fd90635f543f0f7a871a78eb6a6e706342f831d92e3ba19'
+      const genesis = encodeNiaGenesis({
+        ticker: 'PARSE', name: 'Parse NIA', precision: 0,
+        timestamp: 1_713_261_744, network: 'mainnet',
+        allocations: [{ txid: parentTxid, vout: 0, blinding: 1n, amount: 100n }],
+      })
+      const assetId = encodeRgbContractId(genesis.assetId)
+      const contractId = `rgb:${Buffer.from(genesis.assetId).toString('hex')}`
+      const seal = { txid: 'aa'.repeat(32), vout: 1, blinding: 7n }
+      const invoice = decodeRgbInvoice(recipientType === 'blind'
+        ? encodeBlindRgbInvoice({ network: 'mainnet', seal, assetId: contractId, amount: '60' })
+        : `rgb:${contractId.slice(4)}/schema/~/bc:wvout:A8cJ7Ww3-NIzADo3-Tzp_5aD-7CTBWmA-AAAAAAA-AAAAAAA-ALSQkcw?amount=60`)
+      const prepared = prepareNiaOpretTransfer({
+        network: 'mainnet', assetId: contractId, amount: '60', recipientSeal: invoice.seal,
+        selectedUtxos: [{
+          outpoint: { txid: parentTxid, vout: 0 }, satoshis: 10_000,
+          scriptPubKey: `5120${'11'.repeat(32)}`, publicKey: `02${'22'.repeat(32)}`,
+          allocations: [{
+            assetId: contractId, amount: '100', settled: true, spendable: true,
+            opId: contractId.slice(4), assignmentIndex: 0, assignmentType: 4000,
+          }],
+        }],
+        ...(recipientType === 'witness' ? { witnessAmountSat: 330 } : {}),
+        feeRate: 2,
+        feeFunding: {
+          utxos: [{
+            outpoint: { txid: 'cc'.repeat(32), vout: 1 }, satoshis: 10_000,
+            scriptPubKey: `5120${'11'.repeat(32)}`, publicKey: `02${'22'.repeat(32)}`,
+          }],
+          changeScriptPubKey: `5120${'11'.repeat(32)}`, changeDustLimit: 330,
+        },
+        nonce: 1n, entropy: 2n, recipientBlinding: 3n, changeBlinding: 4n,
+      })
+      const psbt = Psbt.fromHex(prepared.psbtHex)
+      const witnessTx = ((psbt.data.globalMap.unsignedTx as any).tx || psbt.data.globalMap.unsignedTx).toBuffer()
+      const bundle = serializeNiaOpretWitnessBundle({
+        witnessTx, contractId, transitionId: prepared.transitionId,
+        transition: prepared.transition,
+        inputs: [{ opId: contractId.slice(4), assignmentType: 4000, assignmentIndex: 0 }],
+        entropy: 2n,
+      })
+      const payload = Buffer.from(encodeNiaTransferConsignment({
+        genesis, witnessBundle: bundle.strict,
+        terminals: recipientType === 'blind' && invoice.seal.type === 'confidential'
+          ? [{ bundleId: bundle.bundleId, secretSeals: [invoice.seal.secretSeal] }]
+          : [],
+      })).toString('base64')
+      const decoded = decodeNiaConsignment(Uint8Array.from(Buffer.from(payload, 'base64')))
+      const witnessTxid = decoded.witnessBundles[0]!.txid
+      const dependencies = createDependencies()
+      dependencies.stateSource.getClaimedConsignments = vi.fn().mockResolvedValue([
+        { recipientId: invoice.proxyRecipientId, payload },
+      ])
+      dependencies.transport.acknowledgeConsignment = vi.fn()
+      const service = new RgbService(dependencies)
+      await service.open(wallet)
+      ;(service as any).state.pendingReceives = [{
+        invoice: invoice.raw, recipientId: invoice.recipientId,
+        proxyRecipientId: invoice.proxyRecipientId, recipientType, assetId,
+        amount: '60', createdAt: 1,
+        ...(recipientType === 'blind' ? { seal } : {
+          witnessScriptPubKey: decoded.witnessBundles[0]!.outputs[1]!.scriptPubKey,
+        }),
+      }]
+
+      await service.processClaimedReceives()
+
+      expect(service.getPendingReceives()).toEqual([
+        expect.objectContaining({
+          pendingAccept: expect.objectContaining({ txid: witnessTxid, payload }),
+        }),
+      ])
+      expect(service.getPendingReceiveHistory()).toEqual([])
+      expect(dependencies.transport.acknowledgeConsignment).not.toHaveBeenCalled()
+    }
+  )
 
   it('uses the optional batched proxy lookup for pending receive invoices', async () => {
     const dependencies = createDependencies()
@@ -2361,6 +2558,37 @@ describe('RgbService', () => {
       payload: 'consignment',
       endpoint: proxyEndpoint,
     })
+  })
+
+  it('checks a v0 and v1 history merge before sending ACK', async () => {
+    const dependencies = createDependencies()
+    dependencies.transport.acknowledgeConsignment = vi.fn()
+    dependencies.validateBfaConsignment = vi.fn().mockRejectedValue(new RgbServiceError('history conflict'))
+    const service = new RgbService(dependencies)
+    await service.open(wallet)
+    const genesis = encodeNiaGenesis({
+      ticker: 'NIA', name: 'Migration', precision: 0, timestamp: 1,
+      network: 'mainnet', allocations: [{ txid: 'a'.repeat(64), vout: 0, blinding: 1n, amount: 100n }],
+    })
+    const assetId = encodeRgbContractId(genesis.assetId)
+    const legacy = Buffer.from(encodeNiaContract(genesis).strict).toString('base64')
+    const incoming = Buffer.from(encodeBfaTransferConsignment({
+      genesis: genesis.strict, validatedWitnessBundles: [], witnessBundle: Uint8Array.of(1), terminals: [],
+    })).toString('base64')
+    ;(service as any).state.contracts = {
+      [assetId]: { consignment: legacy, genesis: Buffer.from(genesis.strict).toString('base64'), createdAt: 1 },
+    }
+    ;(service as any).state.pendingReceives = [{
+      invoice: rgbInvoice(), recipientId: 'recipient', assetId, amount: '60', createdAt: 1,
+      seal: { txid: 'a'.repeat(64), vout: 0, blinding: 1n },
+      pendingAccept: { payload: incoming, txid: 'c'.repeat(64), endpoint: proxyEndpoint,
+        assetId, amount: '60', precision: 0, discoveredAt: 1 },
+    }]
+
+    await expect(service.acceptReceive('recipient')).rejects.toThrow('history conflict')
+    expect(dependencies.validateBfaConsignment).toHaveBeenCalled()
+    expect(dependencies.transport.acknowledgeConsignment).not.toHaveBeenCalled()
+    expect((service as any).state.pendingReceives[0].receivedConsignment).toBeUndefined()
   })
 
   it('accepts a proxy v1 donation only after its Bitcoin witness is broadcast', async () => {

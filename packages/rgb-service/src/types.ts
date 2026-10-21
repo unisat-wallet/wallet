@@ -182,7 +182,8 @@ export interface RgbTransportConsignment extends RgbConsignment {
 export interface RgbReceivedConsignment {
   recipientId: string
   payload: string
-  txid: string
+  /** Absent for consignments claimed from the backend; recovered from the witness. */
+  txid?: string
   proxyTransferId?: string
   proxySenderPublicKey?: string
   proxySenderEndpoint?: string
@@ -443,7 +444,13 @@ export interface RgbServiceState {
        * contains each required WitnessBundle once, including all live branches.
        * This is wallet state, never a backend cache.
        */
-      history?: { payload: string; opIds: string[]; updatedAt: number }
+      history?: {
+        payload: string
+        opIds: string[]
+        updatedAt: number
+        /** Original v0 consignments kept for recovery after a verified v1 migration. */
+        legacyPayloads?: string[]
+      }
     }
   >
 }

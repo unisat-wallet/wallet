@@ -19,6 +19,7 @@ import { normalizeRgbAssetId } from './contract-id'
 import { serializeBfaOpretWitnessBundle } from './consignment'
 import { prepareNiaOpretTransfer } from './opret-transfer'
 import { localNiaProtocolEncoder } from './local-nia-encoder'
+import { convertNiaV0ConsignmentToV1 } from './nia-v0-migration'
 import { witnessSealDustLimit } from './witness'
 
 export interface ValidatedBfaTransferHistory {
@@ -289,11 +290,18 @@ export function createLocalRgbProtocolEncoder(
       const payloads = input.validationHistory.consignments.map(item =>
         Uint8Array.from(Buffer.from(item.payload, 'base64'))
       )
-      const transferPayloads = payloads.filter(payload => isSupportedV1TransferConsignment(payload))
-      if (!transferPayloads.length) return localNiaProtocolEncoder.prepareTransfer(input)
-      if (payloads.some(payload => !isSupportedV1TransferConsignment(payload) && !isSupportedV1ContractConsignment(payload)))
-        throw new RgbServiceError('RGB v1 history contains an unsupported consignment')
+      const hasV1 = payloads.some(payload =>
+        isSupportedV1TransferConsignment(payload) || isSupportedV1ContractConsignment(payload)
+      )
+      if (!hasV1) return localNiaProtocolEncoder.prepareTransfer(input)
+      const compatiblePayloads = payloads.map(payload =>
+        isSupportedV1TransferConsignment(payload) || isSupportedV1ContractConsignment(payload)
+          ? payload
+          : convertNiaV0ConsignmentToV1(payload)
+      )
       const knownBlindSeals = input.validationHistory.knownBlindSeals || []
+      const transferPayloads = compatiblePayloads.filter(isSupportedV1TransferConsignment)
+      if (!transferPayloads.length) throw new RgbServiceError('RGB v1 history has no transfer')
       const checked = await Promise.all(transferPayloads.map(payload => validateBfa({
         wallet: input.wallet, payload, knownBlindSeals,
       })))
