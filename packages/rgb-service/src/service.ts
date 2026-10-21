@@ -2382,6 +2382,7 @@ export class RgbService {
     const available = await this.dependencies.transport.checkConsignmentAvailability?.({
       recipientId: invoice.proxyRecipientId,
       endpoints: invoice.transportEndpoints,
+      protocol: invoice.proxyInvoiceId ? 'v1' : 'legacy',
     })
     if (available === false) throw new RgbInvoiceUnavailableError()
     return { available: true }

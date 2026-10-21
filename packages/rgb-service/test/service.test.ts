@@ -8,10 +8,12 @@ import type {
   RgbWalletSnapshot,
 } from '../src'
 import {
+  appendRgbInvoiceRecipientNonce,
   encodeNiaContract,
   encodeNiaGenesis,
   encodeNiaTransferConsignment,
   encodeBlindRgbInvoice,
+  encodeWitnessRgbInvoice,
   encodeRgbContractId,
   decodeNiaConsignment,
   decodeRgbInvoice,
@@ -261,6 +263,41 @@ describe('RgbService', () => {
 
     await expect(service.checkInvoiceAvailability(rgbInvoice())).rejects.toMatchObject({
       code: 'RGB_INVOICE_UNAVAILABLE',
+    })
+  })
+
+  it('passes the proxy protocol explicitly for nonce witness and v1 invoices', async () => {
+    const dependencies = createDependencies()
+    dependencies.transport.checkConsignmentAvailability = vi.fn().mockResolvedValue(true)
+    const service = new RgbService(dependencies)
+    await service.open(wallet)
+    const scriptPubKey = '512079be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798'
+    const legacyInvoice = encodeWitnessRgbInvoice({
+      network: 'mainnet',
+      scriptPubKey,
+      transportEndpoints: [appendRgbInvoiceRecipientNonce(proxyEndpoint, new Uint8Array(16).fill(1))],
+    })
+    const v1Invoice = encodeWitnessRgbInvoice({
+      network: 'mainnet',
+      scriptPubKey,
+      transportEndpoints: [proxyEndpoint],
+      proxyPublicKey: 'ab'.repeat(32),
+    })
+
+    await service.checkInvoiceAvailability(legacyInvoice)
+    await service.checkInvoiceAvailability(v1Invoice)
+
+    const check = vi.mocked(dependencies.transport.checkConsignmentAvailability!)
+    expect(decodeRgbInvoice(legacyInvoice).proxyRecipientId).toMatch(/^[0-9a-f]{64}$/)
+    expect(check).toHaveBeenNthCalledWith(1, {
+      recipientId: decodeRgbInvoice(legacyInvoice).proxyRecipientId,
+      endpoints: decodeRgbInvoice(legacyInvoice).transportEndpoints,
+      protocol: 'legacy',
+    })
+    expect(check).toHaveBeenNthCalledWith(2, {
+      recipientId: decodeRgbInvoice(v1Invoice).proxyRecipientId,
+      endpoints: decodeRgbInvoice(v1Invoice).transportEndpoints,
+      protocol: 'v1',
     })
   })
 

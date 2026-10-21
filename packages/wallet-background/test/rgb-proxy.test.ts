@@ -449,12 +449,39 @@ describe('RGB proxy transport', () => {
       transport.checkConsignmentAvailability?.({
         recipientId,
         endpoints: [endpoint, 'rpcs://backup.example'],
+        protocol: 'legacy',
       })
     ).resolves.toBe(true)
     expect(fetchMock).toHaveBeenCalledTimes(2)
     expect(fetchMock.mock.calls.every(([, options]) => String(options?.body).includes('consignment.get'))).toBe(
       true
     )
+  })
+
+  it('checks a legacy nonce recipient ID with consignment.get despite its 64-character hex shape', async () => {
+    const nonceRecipientId = 'ab'.repeat(32)
+    fetchMock.mockResolvedValueOnce(rpcError(-302, 'not found'))
+    const transport = createRgbProxyTransport([endpoint])
+
+    await expect(transport.checkConsignmentAvailability?.({
+      recipientId: nonceRecipientId,
+      endpoints: [endpoint],
+      protocol: 'legacy',
+    })).resolves.toBe(true)
+    expect(JSON.parse(fetchMock.mock.calls[0]![1].body).method).toBe('consignment.get')
+  })
+
+  it('checks a v1 invoice ID with invoice.check', async () => {
+    const invoiceId = 'ab'.repeat(32)
+    fetchMock.mockResolvedValueOnce(rpcResponse({ [invoiceId]: { status: 'available' } }))
+    const transport = createRgbProxyTransport([endpoint])
+
+    await expect(transport.checkConsignmentAvailability?.({
+      recipientId: invoiceId,
+      endpoints: [endpoint],
+      protocol: 'v1',
+    })).resolves.toBe(true)
+    expect(JSON.parse(fetchMock.mock.calls[0]![1].body).method).toBe('invoice.check')
   })
 
   it('marks an invoice unavailable when every endpoint already has a consignment', async () => {
@@ -471,6 +498,7 @@ describe('RGB proxy transport', () => {
       transport.checkConsignmentAvailability?.({
         recipientId,
         endpoints: [endpoint, 'rpcs://backup.example'],
+        protocol: 'legacy',
       })
     ).resolves.toBe(false)
   })

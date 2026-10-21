@@ -595,8 +595,8 @@ export function createRgbProxyTransport(proxyEndpoints: string[] = []): RgbTrans
       )
     },
 
-    checkConsignmentAvailability: async ({ recipientId, endpoints: invoiceEndpoints }) => {
-      if (/^[0-9a-f]{64}$/.test(recipientId)) {
+    checkConsignmentAvailability: async ({ recipientId, endpoints: invoiceEndpoints, protocol }) => {
+      if (protocol === 'v1') {
         const statuses = await Promise.all(invoiceEndpoints.map(async endpoint => {
           const body = await postJson<Record<string, { status: string }>>(endpoint, 'invoice.check', {
             invoice_ids: [recipientId],

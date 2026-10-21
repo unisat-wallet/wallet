@@ -542,10 +542,11 @@ export interface RgbTransport {
       proxyPrivateKey?: string
     }>
   ): Promise<RgbReceivedConsignment[]>
-  /** Read-only check that at least one invoice endpoint has no consignment for this recipient ID. */
+  /** Read-only availability check using the invoice's declared proxy protocol. */
   checkConsignmentAvailability?(input: {
     recipientId: string
     endpoints: string[]
+    protocol: 'legacy' | 'v1'
   }): Promise<boolean>
   acknowledgeConsignment?(input: {
     recipientId: string
