@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { RgbProxyOperationNotFoundError } from '@unisat/rgb-service'
 
 import { createRgbProxyTransport } from '../src/adapters/rgb-proxy'
-import { proxyV1DecryptBlob, proxyV1EncryptBlob, proxyV1Hash, proxyV1PublicKey, proxyV1TransferId, proxyV1Verify } from '../src/adapters/rgb-proxy-v1'
+import { proxyV1DecryptBlob, proxyV1EncryptBlob, proxyV1Hash, proxyV1PublicKey, proxyV1Sign, proxyV1TransferId, proxyV1Verify } from '../src/adapters/rgb-proxy-v1'
 
 const endpoint = 'rpcs://proxy.example'
 const recipientId = 'bc:utxob:recipient'
@@ -209,6 +209,70 @@ describe('RGB proxy transport', () => {
     expect(methods).toEqual(['invoice.check', 'consignment.post'])
   })
 
+  it.each([
+    { failedMethod: 'server.info', primaryAck: 'not-found' },
+    { failedMethod: 'ack.prepare', primaryAck: 'missing' },
+  ])('uses the next sender proxy when $failedMethod fails', async ({ failedMethod, primaryAck }) => {
+    const primarySender = 'rpcs://sender-primary.example/json-rpc'
+    const backupSender = 'rpcs://sender-backup.example/json-rpc'
+    const recipientEndpoint = 'rpcs://recipient.example/json-rpc'
+    const invoiceId = '22'.repeat(32)
+    const senderPrivateKey = '11'.repeat(32)
+    const recipientPrivateKey = '33'.repeat(32)
+    const recipientPublicKey = proxyV1PublicKey(recipientPrivateKey)
+    const transferId = proxyV1TransferId(invoiceId, proxyV1PublicKey(senderPrivateKey))
+    const payload = Buffer.from('sender fallback consignment').toString('base64')
+    const expiresAt = Math.floor(Date.now() / 1000) + 3600
+    const calls: Array<{ endpoint: string; method: string }> = []
+    fetchMock.mockImplementation(async (url: string, init: RequestInit) => {
+      const json = typeof init.body === 'string' ? JSON.parse(init.body) : undefined
+      const form = json ? undefined : await new Response(init.body, { headers: init.headers }).formData()
+      const method = json?.method || form?.get('method')
+      calls.push({ endpoint: url, method })
+      if (url === 'https://sender-primary.example/json-rpc' && method === failedMethod) {
+        return rpcError(-32603, 'sender unavailable')
+      }
+      if (method === 'invoice.check') {
+        return rpcResponse({ [invoiceId]: { status: 'available', pow_difficulty: '0' } })
+      }
+      if (method === 'server.info') {
+        return rpcResponse({ protocol_version: '1.0', current_time: String(Math.floor(Date.now() / 1000)), max_expiry_secs: '86400' })
+      }
+      if (method === 'ack.prepare') return rpcResponse(true)
+      if (method === 'consignment.post') {
+        expect(url).toBe('https://recipient.example/json-rpc')
+        expect(form?.get('params[sender_transport_endpoint]')).toBe(backupSender)
+        return rpcResponse(true)
+      }
+      if (method === 'ack.get') {
+        expect(json.params.transfer_ids[0]).toBe(transferId)
+        if (url === 'https://sender-primary.example/json-rpc') {
+          return primaryAck === 'not-found'
+            ? rpcError(-104, 'Operation not found')
+            : rpcResponse({ acks: {}, signatures: {} })
+        }
+        return rpcResponse({
+          acks: { [transferId]: true },
+          signatures: { [transferId]: proxyV1Sign(recipientPrivateKey,
+            transferId + 'true' + proxyV1Hash(Buffer.from(payload, 'base64'))) },
+        })
+      }
+      throw new Error(`Unexpected proxy method ${method}`)
+    })
+    const transport = createRgbProxyTransport([primarySender, backupSender])
+    const consignment = {
+      recipientId: invoiceId, payload, assetId: 'rgb:asset', opIds: ['aa'.repeat(32)],
+      txid: 'bb'.repeat(32), endpoints: [recipientEndpoint], proxyInvoiceId: invoiceId,
+      proxyRecipientPublicKey: recipientPublicKey, proxySenderPrivateKey: senderPrivateKey,
+      signedRawTx: '01000000', proxyExpirationTimestamp: expiresAt,
+    }
+
+    await expect(transport.publishConsignment(consignment)).resolves.toBeUndefined()
+    await expect(transport.getAcknowledgement?.(consignment)).resolves.toBe(true)
+    expect(calls).toContainEqual({ endpoint: 'https://sender-backup.example/json-rpc', method: 'ack.prepare' })
+    expect(calls).toContainEqual({ endpoint: 'https://sender-backup.example/json-rpc', method: 'ack.get' })
+  })
+
   it.each(['transfer.list', 'consignment.get'])(
     'tries the next v1 endpoint when %s fails', async failedMethod => {
       const firstEndpoint = 'rpcs://first.example/json-rpc'
@@ -317,6 +381,30 @@ describe('RGB proxy transport', () => {
       endpoints: [endpoint],
       allowMissing: false,
     })).resolves.toBeUndefined()
+  })
+
+  it('cleans the sender proxy that accepted a failover operation', async () => {
+    const primarySender = 'rpcs://sender-primary.example/json-rpc'
+    const backupSender = 'rpcs://sender-backup.example/json-rpc'
+    const cleanedEndpoints: string[] = []
+    fetchMock.mockImplementation(async (url: string, init: RequestInit) => {
+      expect(JSON.parse(init.body as string).method).toBe('ack.clean')
+      cleanedEndpoints.push(url)
+      return url === 'https://sender-primary.example/json-rpc'
+        ? rpcError(-104, 'Operation not found')
+        : rpcResponse(true)
+    })
+
+    await expect(createRgbProxyTransport([primarySender, backupSender]).cancelConsignment?.({
+      proxyInvoiceId: '22'.repeat(32),
+      proxySenderPrivateKey: '11'.repeat(32),
+      endpoints: ['rpcs://recipient.example/json-rpc'],
+      allowMissing: false,
+    })).resolves.toBeUndefined()
+    expect(cleanedEndpoints).toEqual([
+      'https://sender-primary.example/json-rpc',
+      'https://sender-backup.example/json-rpc',
+    ])
   })
 
   it('uploads exact binary bytes when native Blob rejects ArrayBuffer parts', async () => {

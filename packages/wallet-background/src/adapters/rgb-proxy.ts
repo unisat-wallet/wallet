@@ -199,7 +199,7 @@ async function postConsignment(endpoint: string, consignment: RgbTransportConsig
   })
 }
 
-async function postProxyV1Consignment(endpoint: string, consignment: RgbTransportConsignment, senderEndpoint: string) {
+async function postProxyV1Consignment(endpoint: string, consignment: RgbTransportConsignment, senderEndpoints: string[]) {
   const invoiceId = consignment.proxyInvoiceId
   const recipientPublicKey = consignment.proxyRecipientPublicKey
   const senderPrivateKey = consignment.proxySenderPrivateKey
@@ -221,30 +221,34 @@ async function postProxyV1Consignment(endpoint: string, consignment: RgbTranspor
   if (!invoiceStatus || invoiceStatus.status === 'unknown') {
     throw new Error('RGB invoice is unavailable on the proxy')
   }
+  let senderEndpoint = senderEndpoints[0] || endpoint
   if (!consignment.donation) {
     const signedTx = await proxyV1EncryptSignedTx(rawTx, senderPrivateKey, recipientPublicKey)
-    const senderInfo = await postJson<ProxyServerInfo>(senderEndpoint, 'server.info', {})
-    if (senderInfo.error || senderInfo.result?.protocol_version !== '1.0') {
-      throw new Error('RGB sender proxy does not support protocol v1')
-    }
-    const expiresAt = consignment.proxyExpirationTimestamp
-    if (!expiresAt || expiresAt <= Number(senderInfo.result.current_time) ||
-      expiresAt > Number(senderInfo.result.current_time) + Number(senderInfo.result.max_expiry_secs)) {
-      throw new Error('RGB proxy sender operation expiration is invalid')
-    }
-    const prepared = await postJson<boolean>(senderEndpoint, 'ack.prepare', {
-      transfer_data: {
-        [transferId]: {
-          recipient_pk: recipientPublicKey,
-          consignment_hash: consignmentHash,
-          signed_tx: signedTx,
+    senderEndpoint = await tryEndpoints(senderEndpoints.length ? senderEndpoints : [endpoint], async candidate => {
+      const senderInfo = await postJson<ProxyServerInfo>(candidate, 'server.info', {})
+      if (senderInfo.error || senderInfo.result?.protocol_version !== '1.0') {
+        throw new Error('RGB sender proxy does not support protocol v1')
+      }
+      const expiresAt = consignment.proxyExpirationTimestamp
+      if (!expiresAt || expiresAt <= Number(senderInfo.result.current_time) ||
+        expiresAt > Number(senderInfo.result.current_time) + Number(senderInfo.result.max_expiry_secs)) {
+        throw new Error('RGB proxy sender operation expiration is invalid')
+      }
+      const prepared = await postJson<boolean>(candidate, 'ack.prepare', {
+        transfer_data: {
+          [transferId]: {
+            recipient_pk: recipientPublicKey,
+            consignment_hash: consignmentHash,
+            signed_tx: signedTx,
+          },
         },
-      },
-      expires_at: String(expiresAt),
-      signed_tx_hash: proxyV1Hash(Buffer.from(rawTx, 'hex')),
-      sender_pk: senderPublicKey,
+        expires_at: String(expiresAt),
+        signed_tx_hash: proxyV1Hash(Buffer.from(rawTx, 'hex')),
+        sender_pk: senderPublicKey,
+      })
+      if (prepared.error) throw new Error(`RGB proxy ack.prepare failed: ${prepared.error.message || prepared.error.code}`)
+      return candidate
     })
-    if (prepared.error) throw new Error(`RGB proxy ack.prepare failed: ${prepared.error.message || prepared.error.code}`)
   }
 
   const timestamp = String(Math.floor(Date.now() / 1000))
@@ -464,7 +468,7 @@ export function createRgbProxyTransport(proxyEndpoints: string[] = []): RgbTrans
         throw new Error('RGB invoice has no proxy transport endpoint')
       if (consignment.proxyInvoiceId) {
         await tryEndpoints(consignment.endpoints, endpoint =>
-          postProxyV1Consignment(endpoint, consignment, endpoints[0] || endpoint)
+          postProxyV1Consignment(endpoint, consignment, endpoints)
         )
         return
       }
@@ -478,21 +482,40 @@ export function createRgbProxyTransport(proxyEndpoints: string[] = []): RgbTrans
         if (!privateKey || !publicKey) throw new Error('RGB proxy v1 sender key is missing')
         const transferId = proxyV1TransferId(consignment.proxyInvoiceId, proxyV1PublicKey(privateKey))
         const timestamp = String(Math.floor(Date.now() / 1000))
-        const senderEndpoint = endpoints[0] || consignment.endpoints[0]
-        const body = await postJson<ProxyV1AckResult>(senderEndpoint, 'ack.get', {
-          transfer_ids: [transferId],
-          timestamp,
-          signature: proxyV1Sign(privateKey, transferId + timestamp),
-        })
-        if (body.error) throw new Error(`RGB proxy ack.get failed: ${body.error.message || body.error.code}`)
-        const ack = body.result?.acks?.[transferId]
-        if (ack === undefined) return undefined
         const consignmentHash = proxyV1Hash(base64ToBytes(consignment.payload))
-        if (!proxyV1Verify(publicKey, body.result?.signatures?.[transferId] || '',
-          transferId + String(ack) + consignmentHash)) {
-          throw new Error('RGB proxy acknowledgement signature is invalid')
+        let lastError: unknown
+        let sawHealthyEndpoint = false
+        for (const senderEndpoint of endpoints.length ? endpoints : consignment.endpoints) {
+          let body: JsonRpcResponse<ProxyV1AckResult>
+          try {
+            body = await postJson<ProxyV1AckResult>(senderEndpoint, 'ack.get', {
+              transfer_ids: [transferId],
+              timestamp,
+              signature: proxyV1Sign(privateKey, transferId + timestamp),
+            })
+          } catch (error) {
+            lastError = error
+            continue
+          }
+          if (body.error) {
+            if (body.error.code === -104) {
+              sawHealthyEndpoint = true
+              continue
+            }
+            lastError = new Error(`RGB proxy ack.get failed: ${body.error.message || body.error.code}`)
+            continue
+          }
+          sawHealthyEndpoint = true
+          const ack = body.result?.acks?.[transferId]
+          if (ack === undefined) continue
+          if (!proxyV1Verify(publicKey, body.result?.signatures?.[transferId] || '',
+            transferId + String(ack) + consignmentHash)) {
+            throw new Error('RGB proxy acknowledgement signature is invalid')
+          }
+          return ack
         }
-        return ack
+        if (!sawHealthyEndpoint && lastError) throw lastError
+        return undefined
       }
       let pending = false
       let lastError: unknown
@@ -676,17 +699,29 @@ export function createRgbProxyTransport(proxyEndpoints: string[] = []): RgbTrans
       })
     },
 
-    cancelConsignment: async ({ proxyInvoiceId, proxySenderPrivateKey, allowMissing }) => {
+    cancelConsignment: async ({ proxyInvoiceId, proxySenderPrivateKey, endpoints: invoiceEndpoints, allowMissing }) => {
       const transferId = proxyV1TransferId(proxyInvoiceId, proxyV1PublicKey(proxySenderPrivateKey))
-      const endpoint = endpoints[0]
-      if (!endpoint) throw new Error('RGB sender proxy endpoint is missing')
-      const body = await postJson<boolean>(endpoint, 'ack.clean', {
-        transfer_ids: [transferId],
-        signature: proxyV1Sign(proxySenderPrivateKey, transferId),
-      })
-      if (body.error && !(allowMissing && body.error.code === -104)) {
-        throw new Error(`RGB proxy ack.clean failed: ${body.error.message || body.error.code}`)
+      const senderEndpoints = endpoints.length ? endpoints : invoiceEndpoints
+      if (!senderEndpoints.length) throw new Error('RGB sender proxy endpoint is missing')
+      let cleaned = false
+      let lastError: unknown
+      for (const endpoint of senderEndpoints) {
+        try {
+          const body = await postJson<boolean>(endpoint, 'ack.clean', {
+            transfer_ids: [transferId],
+            signature: proxyV1Sign(proxySenderPrivateKey, transferId),
+          })
+          if (body.error) {
+            if (body.error.code === -104) continue
+            throw new Error(`RGB proxy ack.clean failed: ${body.error.message || body.error.code}`)
+          }
+          cleaned = true
+        } catch (error) {
+          lastError = error
+        }
       }
+      if (lastError) throw lastError
+      if (!cleaned && !allowMissing) throw new RgbProxyOperationNotFoundError()
     },
   }
 }
