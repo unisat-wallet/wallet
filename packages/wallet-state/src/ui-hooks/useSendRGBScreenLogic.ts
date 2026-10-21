@@ -209,6 +209,12 @@ export function useSendRGBScreenLogic() {
   const invoiceAmount = decodedInvoice.amount
   const invoiceAssetId = decodedInvoice.assetId
   const invoiceAssetMismatch = !!invoiceAssetId && !isSameRgbAssetId(invoiceAssetId, assetId)
+  const isBfaAsset = String(tokenBalance?.schema || '').toUpperCase() === 'BFA'
+  const invoiceProxyPublicKey = decodedInvoice.query['pk']
+  const bfaInvoiceUnsupported =
+    isBfaAsset &&
+    invoice.trim().length > 0 &&
+    !(typeof invoiceProxyPublicKey === 'string' && /^[0-9a-f]{64}$/.test(invoiceProxyPublicKey))
   const hasTransportEndpoint = decodedInvoice.transportEndpoints.length > 0
   const invoiceInvalid =
     invoice.trim().length > 0 && (!decodedInvoice.valid || !hasTransportEndpoint)
@@ -216,16 +222,19 @@ export function useSendRGBScreenLogic() {
     invoice.trim().length > 0 &&
     decodedInvoice.valid &&
     hasTransportEndpoint &&
-    !invoiceAssetMismatch
+    !invoiceAssetMismatch &&
+    !bfaInvoiceUnsupported
   const invoiceValidationMessage = invoiceInvalid
     ? t('invalid_rgb_invoice')
     : invoiceAssetMismatch
       ? t('invoice_asset_mismatch')
-      : invoiceAvailability === 'unavailable'
-        ? t('rgb_invoice_unavailable')
-        : invoiceAvailability === 'error'
-          ? invoiceAvailabilityError || t('rgb_invoice_transport_unreachable')
-          : ''
+      : bfaInvoiceUnsupported
+        ? t('rgb_bfa_invoice_not_supported')
+        : invoiceAvailability === 'unavailable'
+          ? t('rgb_invoice_unavailable')
+          : invoiceAvailability === 'error'
+            ? invoiceAvailabilityError || t('rgb_invoice_transport_unreachable')
+            : ''
   const requiresAmount = invoice.trim().length > 0 && decodedInvoice.needsAmount
   const amountInput = amount.trim()
   const assetPrecision = getRgbTokenPrecision(tokenBalance)
@@ -293,7 +302,12 @@ export function useSendRGBScreenLogic() {
   }, [decodedInvoice.submissionInvoice, wallet])
 
   useEffect(() => {
-    if (!decodedInvoice.valid || !hasTransportEndpoint || invoiceAssetMismatch) {
+    if (
+      !decodedInvoice.valid ||
+      !hasTransportEndpoint ||
+      invoiceAssetMismatch ||
+      bfaInvoiceUnsupported
+    ) {
       setInvoiceAvailability('idle')
       setInvoiceAvailabilityError('')
       return undefined
@@ -325,7 +339,14 @@ export function useSendRGBScreenLogic() {
       canceled = true
       clearTimeout(timer)
     }
-  }, [decodedInvoice.submissionInvoice, decodedInvoice.valid, hasTransportEndpoint, invoiceAssetMismatch, wallet])
+  }, [
+    decodedInvoice.submissionInvoice,
+    decodedInvoice.valid,
+    hasTransportEndpoint,
+    invoiceAssetMismatch,
+    bfaInvoiceUnsupported,
+    wallet,
+  ])
 
   const disabled = useMemo(() => {
     return (
@@ -407,7 +428,12 @@ export function useSendRGBScreenLogic() {
             : t('rgb_transfer_broadcasting_description')
         )
       }
-      if (!decodedInvoice.valid || !hasTransportEndpoint || invoiceAssetMismatch) {
+      if (
+        !decodedInvoice.valid ||
+        !hasTransportEndpoint ||
+        invoiceAssetMismatch ||
+        bfaInvoiceUnsupported
+      ) {
         throw new Error(invoiceValidationMessage || t('invalid_rgb_invoice'))
       }
       // Always run one final, read-only probe before creating a PSBT: a

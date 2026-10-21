@@ -3495,6 +3495,7 @@
   "rgb_reject_transfer_success": { "message": "Перевод отклонён" },
   "rgb_accept_transfer_failed": { "message": "Не удалось принять перевод" },
   "rgb_reject_transfer_failed": { "message": "Не удалось отклонить перевод" },
+  "rgb_bfa_invoice_not_supported": { "message": "Этот инвойс не поддерживает выбранный актив. Попросите получателя создать новый инвойс." },
   "rgb_transfer_pending_accept_description": { "message": "Проверьте этот перевод и примите или отклоните его." },
   "rgb_transfer_broadcasting_description": { "message": "Получатель принял перевод. Транзакция отправляется в сеть." },
   "rgb_transfer_broadcasted_description": {

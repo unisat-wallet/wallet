@@ -3499,6 +3499,7 @@
   "rgb_reject_transfer_success": { "message": "Transfert refusé" },
   "rgb_accept_transfer_failed": { "message": "Échec de l'acceptation du transfert" },
   "rgb_reject_transfer_failed": { "message": "Échec du refus du transfert" },
+  "rgb_bfa_invoice_not_supported": { "message": "Cette facture ne prend pas en charge l’actif sélectionné. Demandez une nouvelle facture au destinataire." },
   "rgb_transfer_pending_accept_description": { "message": "Examinez ce transfert, puis acceptez-le ou refusez-le." },
   "rgb_transfer_broadcasting_description": { "message": "Le destinataire a accepté. Diffusion de la transaction." },
   "rgb_transfer_broadcasted_description": {

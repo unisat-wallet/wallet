@@ -3557,6 +3557,9 @@
   "rgb_reject_transfer_failed": {
     "message": "Failed to reject transfer"
   },
+  "rgb_bfa_invoice_not_supported": {
+    "message": "This invoice does not support the selected asset. Please ask the recipient for a new invoice."
+  },
   "rgb_transfer_pending_accept_description": {
     "message": "Review this transfer and accept or reject it."
   },

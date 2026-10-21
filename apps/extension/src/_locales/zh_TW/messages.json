@@ -3546,6 +3546,9 @@
   "rgb_reject_transfer_failed": {
     "message": "拒絕轉帳失敗"
   },
+  "rgb_bfa_invoice_not_supported": {
+    "message": "此發票不支援目前選擇的資產，請向收款方索取新的發票。"
+  },
   "rgb_transfer_pending_accept_description": {
     "message": "請查看此轉帳並選擇接受或拒絕。"
   },

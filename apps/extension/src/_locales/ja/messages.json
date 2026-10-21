@@ -3499,6 +3499,7 @@
   "rgb_reject_transfer_success": { "message": "送金を拒否しました" },
   "rgb_accept_transfer_failed": { "message": "送金を承認できませんでした" },
   "rgb_reject_transfer_failed": { "message": "送金を拒否できませんでした" },
+  "rgb_bfa_invoice_not_supported": { "message": "この請求書は選択した資産に対応していません。受取人に新しい請求書を依頼してください。" },
   "rgb_transfer_pending_accept_description": { "message": "この送金を確認し、承認または拒否してください。" },
   "rgb_transfer_broadcasting_description": {
     "message": "受信者が承認しました。トランザクションをブロードキャストしています。"

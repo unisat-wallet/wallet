@@ -3488,6 +3488,7 @@
   "rgb_reject_transfer_success": { "message": "Transferencia rechazada" },
   "rgb_accept_transfer_failed": { "message": "No se pudo aceptar la transferencia" },
   "rgb_reject_transfer_failed": { "message": "No se pudo rechazar la transferencia" },
+  "rgb_bfa_invoice_not_supported": { "message": "Esta factura no admite el activo seleccionado. Solicita una nueva factura al destinatario." },
   "rgb_transfer_pending_accept_description": { "message": "Revisa esta transferencia y acéptala o recházala." },
   "rgb_transfer_broadcasting_description": { "message": "El destinatario aceptó. Transmitiendo la transacción." },
   "rgb_transfer_broadcasted_description": {

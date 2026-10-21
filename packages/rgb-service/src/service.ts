@@ -2630,6 +2630,12 @@ export class RgbService {
     if (invoice.assetId && invoice.assetId !== requestedAssetId) {
       throw new RgbServiceError('RGB invoice asset does not match the requested asset')
     }
+    if (
+      this.getLocalAssetDetail(requestedAssetId).schema?.toUpperCase() === 'BFA' &&
+      !invoice.proxyPublicKey
+    ) {
+      throw new RgbServiceError('This invoice does not support the selected asset')
+    }
     if (invoice.network && !isCompatibleInvoiceNetwork(invoice.network, state.wallet.network)) {
       throw new RgbServiceError('RGB invoice network does not match the current wallet')
     }
