@@ -3629,5 +3629,7 @@
   "delete_invoice": { "message": "Delete Invoice" },
   "deleting_invoice": { "message": "Deleting invoice…" },
   "delete_witness_invoice_confirm_title": { "message": "Delete witness invoice?" },
-  "use_this_invoice_to_receive_any_rgb_asset": { "message": "Use this invoice to receive any RGB asset." }
+  "use_this_invoice_to_receive_any_rgb_asset": { "message": "Use this invoice to receive any RGB asset." },
+  "rgb_donation_send": { "message": "Send without waiting for acceptance" },
+  "rgb_donation_send_description": { "message": "Broadcasts after uploading the RGB transfer. The recipient cannot stop it; the Bitcoin transaction may confirm even if they cannot accept the asset." }
 }

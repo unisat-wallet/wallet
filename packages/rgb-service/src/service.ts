@@ -532,6 +532,10 @@ export class RgbService {
           if (pending.broadcast) await this.syncBroadcastedTransfer(transferId, pending)
           else if (pending.delivery?.externalBroadcast)
             await this.syncExternallyBroadcastTransfer(transferId, pending)
+          else if (pending.request.donation && pending.delivery?.broadcastError)
+            // A failed donation needs an explicit sender retry. Do not let an
+            // unavailable broadcaster interrupt synchronization of other sends.
+            return
           else if (pending.delivery && !pending.delivery.requiresCounterpartySignature)
             await this.advancePendingDelivery(transferId, pending)
         } catch (error) {
@@ -1387,17 +1391,23 @@ export class RgbService {
       throw new RgbServiceError(`RGB receive ${recipientId} was already accepted`)
     }
 
-    await this.acknowledgeProxyConsignment(
-      {
-        recipientId: receive.proxyRecipientId || receive.recipientId,
-        endpoint: pendingAccept!.endpoint,
-        proxyTransferId: pendingAccept!.proxyTransferId,
-        proxySenderPublicKey: pendingAccept!.proxySenderPublicKey,
-        proxySenderEndpoint: pendingAccept!.proxySenderEndpoint,
-        proxyConsignmentHash: pendingAccept!.proxyConsignmentHash,
-      },
-      false
-    )
+    try {
+      await this.acknowledgeProxyConsignment(
+        {
+          recipientId: receive.proxyRecipientId || receive.recipientId,
+          endpoint: pendingAccept!.endpoint,
+          proxyTransferId: pendingAccept!.proxyTransferId,
+          proxySenderPublicKey: pendingAccept!.proxySenderPublicKey,
+          proxySenderEndpoint: pendingAccept!.proxySenderEndpoint,
+          proxyConsignmentHash: pendingAccept!.proxyConsignmentHash,
+        },
+        false
+      )
+    } catch (error) {
+      // Donations have no sender ACK operation. Rejection is still a local
+      // decision even though the Bitcoin transaction may already be public.
+      if (!(error instanceof RgbProxyOperationNotFoundError)) throw error
+    }
     this.recordReceiveOutcome(receive, 'rejected', pendingAccept!.txid)
     // Proxy recipient IDs are single-use upload keys. Once a consignment has
     // been posted, a later transfer cannot replace its file even after NACK.
@@ -2403,6 +2413,9 @@ export class RgbService {
   /** Reserve RGB allocations and persist the pending transfer as one serialized operation. */
   private async prepareSendOnce(request: RgbTransferRequest, options: { providerOrigin?: string }) {
     const state = this.requireState()
+    if (request.donation && request.swapPsbt) {
+      throw new RgbServiceError('RGB donation cannot use a counterparty-signed swap')
+    }
     const invoice = decodeRgbInvoice(request.invoice)
     const requestedAssetId = normalizeAssetId(request.assetId)
     if (invoice.assetId && invoice.assetId !== requestedAssetId) {
@@ -2702,7 +2715,7 @@ export class RgbService {
     return this.runPendingTransferOperation(transferId, async () => {
       const pending = this.requireState().pending[transferId]
       if (
-        !pending?.delivery?.acknowledgedAt ||
+        !(pending?.delivery?.acknowledgedAt || pending?.delivery?.donationReadyAt) ||
         pending.delivery.externalBroadcast ||
         pending.delivery.requiresCounterpartySignature
       ) {
@@ -2798,7 +2811,8 @@ export class RgbService {
     // An acknowledged consignment is committed to the receiver and is about
     // to be broadcast. It is no longer safe to signal cancellation, including
     // while the broadcast request itself is in flight.
-    if (pending.broadcast || (pending.delivery?.acknowledgedAt && !allowAcknowledged))
+    if (pending.broadcast || (pending.delivery?.acknowledgedAt && !allowAcknowledged) ||
+      (pending.request.donation && pending.delivery?.publishedAt))
       return { aborted: false }
     if (allowAcknowledged && !pending.delivery) return { aborted: false }
 
@@ -2949,7 +2963,8 @@ export class RgbService {
     const state = this.requireState()
     const broadcast = pending.broadcast
     if (!broadcast) throw new RgbServiceError(`RGB transfer ${transferId} has not been broadcast`)
-    // Consignments were durably posted and acknowledged before this transaction was broadcast.
+    // Consignments were durably posted before this transaction was broadcast.
+    // Regular sends also waited for the recipient ACK.
     await this.dependencies.stateSource.syncBroadcast?.(
       state.wallet,
       transferId,
@@ -3022,6 +3037,7 @@ export class RgbService {
       transportId: `${transferId}:${index}`,
       txid: delivery.completed.txid,
       endpoints: delivery.endpoints,
+      ...(pending.request.donation ? { donation: true } : {}),
       ...(invoice.proxyInvoiceId ? {
         proxyInvoiceId: invoice.proxyInvoiceId,
         proxyRecipientPublicKey: invoice.proxyPublicKey,
@@ -3065,6 +3081,7 @@ export class RgbService {
       transportId: `${transferId}:${index}`,
       txid: delivery.completed.txid,
       endpoints: delivery.endpoints,
+      ...(pending.request.donation ? { donation: true } : {}),
       ...(invoice.proxyInvoiceId ? {
         proxyInvoiceId: invoice.proxyInvoiceId,
         proxyRecipientPublicKey: invoice.proxyPublicKey,
@@ -3095,47 +3112,56 @@ export class RgbService {
     }
     if (!delivery.publishedAt) {
       delivery.publishedAt = this.now()
-      // Publication is replayable from the signed checkpoint and does not
-      // require another remote backup before requesting the recipient ACK.
+      // Publication is replayable from the signed checkpoint. Donations get
+      // a durable pre-broadcast checkpoint below; regular sends await ACK.
       await this.persist({ skipRecovery: true })
     }
-    const getAcknowledgement = this.dependencies.transport.getAcknowledgement
-    if (!getAcknowledgement)
-      throw new RgbServiceError('RGB transport does not support acknowledgement')
-    const acknowledgements = await Promise.all(
-      consignments.map(consignment => getAcknowledgement(consignment))
-    )
-    if (acknowledgements.some(acknowledged => acknowledged === false)) {
-      const sendHistory = state.pendingSendHistory || (state.pendingSendHistory = [])
-      if (!sendHistory.some(item => item.transferId === transferId)) {
-        sendHistory.push({
-          transferId,
-          assetId: pending.request.assetId,
-          amount: pending.request.amount,
-          ...(pending.request.precision === undefined ? {} : { precision: pending.request.precision }),
-          txid: delivery.completed.txid,
-          invoice: pending.request.invoice,
-          createdAt: pending.createdAt,
-          status: 'rejected',
-          ...(pending.providerOrigin ? { providerOrigin: pending.providerOrigin } : {}),
-          ...(pending.providerOrigin
-            ? { providerOriginExpiresAt: this.now() + PROVIDER_ORIGIN_HISTORY_TTL_MS }
-            : {}),
-        })
+    if (pending.request.donation) {
+      if (!delivery.donationReadyAt) {
+        const rollback = snapshotState(state)
+        delivery.donationReadyAt = this.now()
+        // The signed transaction must be recoverable before it can be broadcast.
+        await this.persistWithRecoveryRollback(rollback)
       }
-      delete state.pending[transferId]
-      await this.persist()
-      throw new RgbTransferRejectedError(transferId, delivery.completed.txid)
-    }
-    if (acknowledgements.some(acknowledged => acknowledged === undefined)) {
-      throw new RgbTransferAwaitingAckError(transferId)
-    }
-    if (!delivery.acknowledgedAt) {
-      delivery.acknowledgedAt = this.now()
-      await this.persist({ waitForRecovery: true })
+    } else {
+      const getAcknowledgement = this.dependencies.transport.getAcknowledgement
+      if (!getAcknowledgement)
+        throw new RgbServiceError('RGB transport does not support acknowledgement')
+      const acknowledgements = await Promise.all(
+        consignments.map(consignment => getAcknowledgement(consignment))
+      )
+      if (acknowledgements.some(acknowledged => acknowledged === false)) {
+        const sendHistory = state.pendingSendHistory || (state.pendingSendHistory = [])
+        if (!sendHistory.some(item => item.transferId === transferId)) {
+          sendHistory.push({
+            transferId,
+            assetId: pending.request.assetId,
+            amount: pending.request.amount,
+            ...(pending.request.precision === undefined ? {} : { precision: pending.request.precision }),
+            txid: delivery.completed.txid,
+            invoice: pending.request.invoice,
+            createdAt: pending.createdAt,
+            status: 'rejected',
+            ...(pending.providerOrigin ? { providerOrigin: pending.providerOrigin } : {}),
+            ...(pending.providerOrigin
+              ? { providerOriginExpiresAt: this.now() + PROVIDER_ORIGIN_HISTORY_TTL_MS }
+              : {}),
+          })
+        }
+        delete state.pending[transferId]
+        await this.persist()
+        throw new RgbTransferRejectedError(transferId, delivery.completed.txid)
+      }
+      if (acknowledgements.some(acknowledged => acknowledged === undefined)) {
+        throw new RgbTransferAwaitingAckError(transferId)
+      }
+      if (!delivery.acknowledgedAt) {
+        delivery.acknowledgedAt = this.now()
+        await this.persist({ waitForRecovery: true })
+      }
     }
 
-    if (mode === 'manual') return delivery.completed
+    if (mode === 'manual' && !pending.request.donation) return delivery.completed
 
     if (mode === 'external') {
       delivery.externalBroadcast = true
@@ -3153,8 +3179,8 @@ export class RgbService {
       await this.persist({ waitForRecovery: true })
       const recovery = await this.reconcileFailedBroadcast(transferId, pending)
       if (recovery === 'broadcasted') return this.syncBroadcastedTransfer(transferId, pending)
-      // ACK=true cannot be changed to ACK=false by the proxy. Keep the signed
-      // transfer retryable until a reviewed cancellation is published.
+      // Keep the signed transfer retryable until a reviewed cancellation is
+      // published. A donation may already be broadcast by its recipient.
       try { await this.reportPendingBroadcastFailure(transferId, pending) }
       catch { /* Reporting is best effort; background polling retries it. */ }
       throw error
@@ -3285,7 +3311,8 @@ export class RgbService {
       // retry a NACK after the proxy has already settled that recipient ID.
       // This is terminal for the stale/mismatched local receive, not a reason
       // to surface the same error on every polling interval.
-      if (!String(error).includes('Cannot change ACK')) throw error
+      if (!(error instanceof RgbProxyOperationNotFoundError) &&
+        !String(error).includes('Cannot change ACK')) throw error
     }
     this.recordReceiveOutcome(
       receive,

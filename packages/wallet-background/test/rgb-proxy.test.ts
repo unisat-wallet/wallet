@@ -180,6 +180,35 @@ describe('RGB proxy transport', () => {
     await expect(transport.getAcknowledgement?.(consignment)).resolves.toBe(true)
   })
 
+  it('posts a proxy v1 donation without preparing an ACK operation', async () => {
+    const invoiceId = '22'.repeat(32)
+    const senderPrivateKey = '11'.repeat(32)
+    const senderPk = proxyV1PublicKey(senderPrivateKey)
+    const recipientPk = proxyV1PublicKey('33'.repeat(32))
+    const transferId = proxyV1TransferId(invoiceId, senderPk)
+    const methods: string[] = []
+    fetchMock.mockImplementation(async (_url, init: RequestInit) => {
+      const json = typeof init.body === 'string' ? JSON.parse(init.body) : undefined
+      const form = json ? undefined : await new Response(init.body, { headers: init.headers }).formData()
+      const method = json?.method || form?.get('method')
+      methods.push(method)
+      if (method === 'invoice.check') {
+        return rpcResponse({ [invoiceId]: { status: 'available', pow_difficulty: '0' } })
+      }
+      expect(method).toBe('consignment.post')
+      expect(form?.get('params[transfer_id]')).toBe(transferId)
+      return rpcResponse(true)
+    })
+    const transport = createRgbProxyTransport([endpoint])
+    await transport.publishConsignment({
+      recipientId: invoiceId, payload: Buffer.from('donation').toString('base64'),
+      assetId: 'rgb:asset', opIds: ['aa'.repeat(32)], txid: 'bb'.repeat(32),
+      endpoints: [endpoint], proxyInvoiceId: invoiceId, proxyRecipientPublicKey: recipientPk,
+      proxySenderPrivateKey: senderPrivateKey, signedRawTx: '01000000', donation: true,
+    })
+    expect(methods).toEqual(['invoice.check', 'consignment.post'])
+  })
+
   it('decrypts proxy v1 consignments across the 64 KiB chunk boundary and rejects altered ciphertext', () => {
     const senderKey = '11'.repeat(32)
     const recipientKey = '22'.repeat(32)

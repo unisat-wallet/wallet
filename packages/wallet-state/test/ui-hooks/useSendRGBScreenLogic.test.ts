@@ -9,6 +9,24 @@ import {
 import { createHookTestHarness } from './testHelpers'
 
 describe('useSendRGBScreenLogic', () => {
+  it('passes the selected donation mode to RGB send preparation', async () => {
+    const assetId = 'rgb:test-asset'
+    const invoice = 'rgb:test-asset/~/~/bc:utxob:test?amount=1&endpoints=rpc://proxy'
+    const { wrapper, wallet } = createHookTestHarness({
+      routeState: { assetId, tokenBalance: { assetId, ticker: 'RGB', precision: 8, spendable: '150000000' } },
+    })
+    wallet.createRgbSendBegin = vi.fn().mockResolvedValue({
+      txid: 'donation-transfer', toSignData: { psbtHex: 'unsigned-psbt' },
+    })
+    const { result } = renderHook(() => useSendRGBScreenLogic(), { wrapper })
+    act(() => {
+      result.current.onInvoiceChange(invoice)
+      result.current.setDonation(true)
+    })
+    await act(async () => result.current.onClickNext())
+    expect(wallet.createRgbSendBegin).toHaveBeenCalledWith(expect.objectContaining({ donation: true }))
+  })
+
   it('discards the unsigned RGB send when signing is rejected', async () => {
     const assetId = 'rgb:test-asset'
     const invoice = 'rgb:test-asset/~/~/bc:utxob:test?amount=1&endpoints=rpc://proxy'

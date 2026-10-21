@@ -221,29 +221,31 @@ async function postProxyV1Consignment(endpoint: string, consignment: RgbTranspor
   if (!invoiceStatus || invoiceStatus.status === 'unknown') {
     throw new Error('RGB invoice is unavailable on the proxy')
   }
-  const signedTx = await proxyV1EncryptSignedTx(rawTx, senderPrivateKey, recipientPublicKey)
-  const senderInfo = await postJson<ProxyServerInfo>(senderEndpoint, 'server.info', {})
-  if (senderInfo.error || senderInfo.result?.protocol_version !== '1.0') {
-    throw new Error('RGB sender proxy does not support protocol v1')
-  }
-  const expiresAt = consignment.proxyExpirationTimestamp
-  if (!expiresAt || expiresAt <= Number(senderInfo.result.current_time) ||
-    expiresAt > Number(senderInfo.result.current_time) + Number(senderInfo.result.max_expiry_secs)) {
-    throw new Error('RGB proxy sender operation expiration is invalid')
-  }
-  const prepared = await postJson<boolean>(senderEndpoint, 'ack.prepare', {
-    transfer_data: {
-      [transferId]: {
-        recipient_pk: recipientPublicKey,
-        consignment_hash: consignmentHash,
-        signed_tx: signedTx,
+  if (!consignment.donation) {
+    const signedTx = await proxyV1EncryptSignedTx(rawTx, senderPrivateKey, recipientPublicKey)
+    const senderInfo = await postJson<ProxyServerInfo>(senderEndpoint, 'server.info', {})
+    if (senderInfo.error || senderInfo.result?.protocol_version !== '1.0') {
+      throw new Error('RGB sender proxy does not support protocol v1')
+    }
+    const expiresAt = consignment.proxyExpirationTimestamp
+    if (!expiresAt || expiresAt <= Number(senderInfo.result.current_time) ||
+      expiresAt > Number(senderInfo.result.current_time) + Number(senderInfo.result.max_expiry_secs)) {
+      throw new Error('RGB proxy sender operation expiration is invalid')
+    }
+    const prepared = await postJson<boolean>(senderEndpoint, 'ack.prepare', {
+      transfer_data: {
+        [transferId]: {
+          recipient_pk: recipientPublicKey,
+          consignment_hash: consignmentHash,
+          signed_tx: signedTx,
+        },
       },
-    },
-    expires_at: String(expiresAt),
-    signed_tx_hash: proxyV1Hash(Buffer.from(rawTx, 'hex')),
-    sender_pk: senderPublicKey,
-  })
-  if (prepared.error) throw new Error(`RGB proxy ack.prepare failed: ${prepared.error.message || prepared.error.code}`)
+      expires_at: String(expiresAt),
+      signed_tx_hash: proxyV1Hash(Buffer.from(rawTx, 'hex')),
+      sender_pk: senderPublicKey,
+    })
+    if (prepared.error) throw new Error(`RGB proxy ack.prepare failed: ${prepared.error.message || prepared.error.code}`)
+  }
 
   const timestamp = String(Math.floor(Date.now() / 1000))
   const nonce = await proxyV1Pow(transferId, Number(invoiceStatus.pow_difficulty), timestamp)

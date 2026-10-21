@@ -121,11 +121,13 @@ export class RgbTransferQuery {
           ? 'broadcasting'
           : transfer.delivery?.acknowledgedAt
             ? 'ready_to_broadcast'
-            : transfer.delivery
-              ? 'waiting_ack'
-              : transfer.broadcast
-                ? 'broadcasted'
-                : 'signed',
+            : transfer.delivery?.donationReadyAt
+              ? 'broadcasting'
+              : transfer.delivery
+                ? 'waiting_ack'
+                : transfer.broadcast
+                  ? 'broadcasted'
+                  : 'signed',
       local: true,
     }))
     const localSendHistory = (service.getPendingSendHistory?.() || []).map(send => ({

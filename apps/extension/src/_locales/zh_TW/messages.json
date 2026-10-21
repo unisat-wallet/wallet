@@ -3618,5 +3618,7 @@
   "delete_invoice": { "message": "刪除發票" },
   "deleting_invoice": { "message": "正在刪除發票…" },
   "delete_witness_invoice_confirm_title": { "message": "刪除 Witness 發票？" },
-  "use_this_invoice_to_receive_any_rgb_asset": { "message": "使用此發票接收任意 RGB 資產。" }
+  "use_this_invoice_to_receive_any_rgb_asset": { "message": "使用此發票接收任意 RGB 資產。" },
+  "rgb_donation_send": { "message": "不等待收款方確認直接發送" },
+  "rgb_donation_send_description": { "message": "上傳 RGB 轉帳後立即廣播。收款方無法阻止；即使無法接收資產，Bitcoin 交易仍可能確認。" }
 }

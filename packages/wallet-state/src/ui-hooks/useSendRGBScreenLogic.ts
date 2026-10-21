@@ -178,6 +178,7 @@ export function useSendRGBScreenLogic() {
   const { feeRate } = useFeeRateBar()
   const [invoice, setInvoice] = useState('')
   const [amount, setAmount] = useState('')
+  const [donation, setDonation] = useState(false)
   const [error, setError] = useState('')
   const [feePoolRequirement, setFeePoolRequirement] = useState<RgbFeePoolRequirement>()
   const [step, setStep] = useState(SendRGBScreenStep.CREATE_TX)
@@ -358,6 +359,7 @@ export function useSendRGBScreenLogic() {
       name,
       precision: assetPrecision,
       feeRate,
+      donation,
     })
     const toSignData = beginResult?.toSignData
     if (!toSignData) {
@@ -562,6 +564,8 @@ export function useSendRGBScreenLogic() {
     setInvoice,
     amount,
     setAmount,
+    donation,
+    setDonation,
     onInvoiceChange,
     onAmountChange,
     onClickMaxAmount,

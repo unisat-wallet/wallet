@@ -171,6 +171,8 @@ export interface RgbConsignment {
 export interface RgbTransportConsignment extends RgbConsignment {
   txid: string
   endpoints: string[]
+  /** Broadcast after publication without waiting for a recipient ACK. */
+  donation?: boolean
   /** Proxy v1 send details, present only for invoices carrying `pk`. */
   proxyInvoiceId?: string
   proxyRecipientPublicKey?: string
@@ -209,6 +211,8 @@ export interface RgbPendingTransfer {
     completed: RgbCompletedTransfer
     endpoints: string[]
     publishedAt?: number
+    /** Donation publication and its signed transaction are durably recoverable. */
+    donationReadyAt?: number
     /** Set after every recipient endpoint has ACKed the consignment. */
     acknowledgedAt?: number
     /** Do not let background sync broadcast until the counterparty returns a final PSBT. */

@@ -3554,5 +3554,7 @@
   "delete_invoice": { "message": "Invoiceを削除" },
   "deleting_invoice": { "message": "Invoiceを削除中…" },
   "delete_witness_invoice_confirm_title": { "message": "Witness Invoiceを削除しますか？" },
-  "use_this_invoice_to_receive_any_rgb_asset": { "message": "このInvoiceを使用して任意のRGB資産を受け取ります。" }
+  "use_this_invoice_to_receive_any_rgb_asset": { "message": "このInvoiceを使用して任意のRGB資産を受け取ります。" },
+  "rgb_donation_send": { "message": "受取人の承認を待たずに送信" },
+  "rgb_donation_send_description": { "message": "RGB転送をアップロード後にブロードキャストします。受取人は停止できず、資産を受け取れなくてもBitcoin取引が承認される場合があります。" }
 }

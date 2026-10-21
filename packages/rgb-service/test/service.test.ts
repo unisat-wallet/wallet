@@ -3598,6 +3598,93 @@ describe('RgbService', () => {
     expect(service.getPendingTransfers()).toEqual([])
   })
 
+  it('publishes a donation before broadcasting without requesting an ACK', async () => {
+    const dependencies = createDependencies()
+    const steps: string[] = []
+    dependencies.transport.publishConsignment = vi.fn().mockImplementation(async input => {
+      expect(input.donation).toBe(true)
+      steps.push('publish')
+    })
+    dependencies.broadcaster.broadcast = vi.fn().mockImplementation(async () => {
+      steps.push('broadcast')
+      return 'c'.repeat(64)
+    })
+    const service = new RgbService(dependencies)
+    await service.open(wallet)
+    await service.sync()
+    await service.prepareSend({
+      assetId: 'rgb:AQEBAQEB-AQEBAQE-BAQEBAQ-EBAQEBA-QEBAQEB-AQEBAQE',
+      amount: '60', invoice: rgbInvoice(), feeRate: 2, donation: true,
+    })
+
+    await expect(service.completeSend('transfer-1', 'signed-psbt')).resolves.toMatchObject({
+      txid: 'c'.repeat(64),
+    })
+    expect(steps).toEqual(['publish', 'broadcast'])
+    expect(dependencies.transport.getAcknowledgement).not.toHaveBeenCalled()
+    expect(service.getPendingTransfers()).toEqual([])
+  })
+
+  it('keeps a published donation locked and retryable after broadcast failure', async () => {
+    const dependencies = createDependencies()
+    dependencies.broadcaster.broadcast = vi.fn()
+      .mockRejectedValueOnce(new Error('Bitcoin node unavailable'))
+      .mockResolvedValueOnce('c'.repeat(64))
+    const service = new RgbService(dependencies)
+    await service.open(wallet)
+    await service.sync()
+    await service.prepareSend({
+      assetId: 'rgb:AQEBAQEB-AQEBAQE-BAQEBAQ-EBAQEBA-QEBAQEB-AQEBAQE',
+      amount: '60', invoice: rgbInvoice(), feeRate: 2, donation: true,
+    })
+
+    await expect(service.completeSend('transfer-1', 'signed-psbt')).rejects.toThrow('Bitcoin node unavailable')
+    expect(service.getPendingTransfers()[0]?.delivery).toMatchObject({
+      donationReadyAt: expect.any(Number), broadcastError: 'Bitcoin node unavailable',
+    })
+    expect(dependencies.transport.getAcknowledgement).not.toHaveBeenCalled()
+    await expect(service.abortSend('transfer-1')).resolves.toEqual({ aborted: false })
+    const state = (service as any).state
+    state.pending['transfer-2'] = {
+      ...state.pending['transfer-1'],
+      request: { ...state.pending['transfer-1'].request, donation: false },
+      delivery: {
+        ...state.pending['transfer-1'].delivery,
+        broadcastError: undefined,
+        donationReadyAt: undefined,
+      },
+    }
+    await expect(service.syncPendingTransfers()).resolves.toBeUndefined()
+    expect(dependencies.broadcaster.broadcast).toHaveBeenCalledTimes(1)
+    expect(state.pending['transfer-1'].delivery.broadcastError).toBe('Bitcoin node unavailable')
+    expect(state.pending['transfer-2'].delivery.acknowledgedAt).toEqual(expect.any(Number))
+    await expect(service.broadcastPendingSend('transfer-1')).resolves.toMatchObject({ txid: 'c'.repeat(64) })
+    expect(dependencies.broadcaster.broadcast).toHaveBeenCalledTimes(2)
+    expect(service.getPendingTransfers().map(transfer => transfer.id)).toEqual(['transfer-2'])
+  })
+
+  it('allows rejecting a donation receive without a sender ACK operation', async () => {
+    const dependencies = createDependencies()
+    dependencies.transport.acknowledgeConsignment = vi.fn().mockRejectedValue(
+      new RgbProxyOperationNotFoundError()
+    )
+    const service = new RgbService(dependencies)
+    await service.open(wallet)
+    ;(service as any).state.pendingReceives = [{
+      invoice: rgbInvoice(), recipientId: 'recipient',
+      assetId: 'rgb:AQEBAQEB-AQEBAQE-BAQEBAQ-EBAQEBA-QEBAQEB-AQEBAQE',
+      amount: '60', createdAt: 1,
+      pendingAccept: {
+        payload: 'consignment', txid: 'c'.repeat(64), endpoint: proxyEndpoint,
+        assetId: 'rgb:AQEBAQEB-AQEBAQE-BAQEBAQ-EBAQEBA-QEBAQEB-AQEBAQE',
+        amount: '60', discoveredAt: 1,
+      },
+    }]
+
+    await expect(service.rejectReceive('recipient')).resolves.toEqual({ rejected: true })
+    expect(service.getPendingReceives()).toEqual([])
+  })
+
   it('explains when a proxy rejects an invoice that was already used', async () => {
     const dependencies = createDependencies()
     dependencies.transport.publishConsignment = vi

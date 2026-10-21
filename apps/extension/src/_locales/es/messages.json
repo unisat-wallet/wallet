@@ -3541,5 +3541,7 @@
   "delete_invoice": { "message": "Eliminar factura" },
   "deleting_invoice": { "message": "Eliminando factura…" },
   "delete_witness_invoice_confirm_title": { "message": "¿Eliminar la factura witness?" },
-  "use_this_invoice_to_receive_any_rgb_asset": { "message": "Usa esta factura para recibir cualquier activo RGB." }
+  "use_this_invoice_to_receive_any_rgb_asset": { "message": "Usa esta factura para recibir cualquier activo RGB." },
+  "rgb_donation_send": { "message": "Enviar sin esperar la aceptación" },
+  "rgb_donation_send_description": { "message": "Se transmite tras subir la transferencia RGB. El destinatario no puede detenerla; la transacción de Bitcoin puede confirmarse aunque no pueda aceptar el activo." }
 }

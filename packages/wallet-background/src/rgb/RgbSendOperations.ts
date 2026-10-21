@@ -83,7 +83,9 @@ export class RgbSendOperations {
       psbt: prepared.psbt,
       toSignInputs: prepared.toSignInputs,
       amountDisplay: getAmountDisplay(params),
-      actionName: `Send ${getAssetLabel(params)}`,
+      actionName: params.donation
+        ? `Send ${getAssetLabel(params)} without recipient acceptance`
+        : `Send ${getAssetLabel(params)}`,
     })
     this.dependencies.setActiveTransferId(wallet.fundingAddress, prepared.id)
     return {
@@ -188,7 +190,8 @@ export class RgbSendOperations {
     // the same authoritative lease check as signed completion.
     await this.dependencies.ensureWriteLease?.({ service, wallet }, { forceRenew: true })
     const transfer = service.getPendingTransfers().find(item => item.id === transferId)
-    if (!transfer?.delivery?.acknowledgedAt || transfer.delivery.externalBroadcast) {
+    if (!(transfer?.delivery?.acknowledgedAt || transfer?.delivery?.donationReadyAt) ||
+      transfer.delivery.externalBroadcast) {
       return { broadcast: false, status: 'not_retryable' as const }
     }
     try {

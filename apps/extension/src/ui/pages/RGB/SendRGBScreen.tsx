@@ -1,10 +1,12 @@
-import { useCallback, useEffect, useRef } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
 import {
   Button,
+  Checkbox,
   Column,
   Content,
   Header,
+  Icon,
   Layout,
   RGBAssetIcon,
   Row,
@@ -13,6 +15,8 @@ import {
   TransferAmountSection
 } from '@/ui/components';
 import { Spin } from '@/ui/components/Spin';
+import { Line } from '@/ui/components/Line';
+import { Popover } from '@/ui/components/Popover';
 import { FeeRateBar } from '@/ui/components/FeeRateBar';
 import { sendInputContainerStyle } from '@/ui/components/TransferAmountCard';
 import { spacing } from '@/ui/theme/spacing';
@@ -64,6 +68,8 @@ export default function SendRGBScreen() {
     invoice,
     onInvoiceChange,
     onAmountChange,
+    donation,
+    setDonation,
     onClickMaxAmount,
     requiresAmount,
     invoiceReadyForAmount,
@@ -88,6 +94,12 @@ export default function SendRGBScreen() {
   } = useSendRGBScreenLogic();
 
   const invoiceRef = useRef<HTMLTextAreaElement>(null);
+  const [showDonationPopover, setShowDonationPopover] = useState(false);
+  const [understandDonation, setUnderstandDonation] = useState(false);
+  const closeDonationPopover = () => {
+    setShowDonationPopover(false);
+    setUnderstandDonation(false);
+  };
   const syncInvoiceHeight = useCallback(() => {
     const el = invoiceRef.current;
     if (!el) return;
@@ -182,6 +194,17 @@ export default function SendRGBScreen() {
             <FeeRateBar />
           </Column>
 
+          {invoiceReadyForAmount ? (
+            <Checkbox
+              checked={donation}
+              onChange={(event) => {
+                if (event.target.checked) setShowDonationPopover(true);
+                else setDonation(false);
+              }}>
+              <Text text={t('rgb_donation_send')} size="sm" />
+            </Checkbox>
+          ) : null}
+
           {error ? <Text text={error} color="error" wrap /> : null}
 
           <Button
@@ -199,6 +222,38 @@ export default function SendRGBScreen() {
           onClose={dismissFeePoolRequirement}
           t={t}
         />
+      ) : null}
+      {showDonationPopover ? (
+        <Popover onClose={closeDonationPopover}>
+          <Column justifyCenter itemsCenter>
+            <Row itemsCenter>
+              <Icon icon="alert" color="yellow" size={16} />
+              <Text text={t('rgb_donation_send')} preset="title" />
+            </Row>
+            <Line />
+            <Column gap="md" fullX mb="md">
+              <Text text={t('rgb_donation_send_description')} mt="md" wrap />
+              <Row justifyCenter mt="md">
+                <Checkbox checked={understandDonation} onChange={(event) => setUnderstandDonation(event.target.checked)}>
+                  <Text text={t('i_understand')} preset="sub" />
+                </Checkbox>
+              </Row>
+            </Column>
+            <Row full>
+              <Button text={t('cancel')} preset="default" full onClick={closeDonationPopover} />
+              <Button
+                text={t('confirm')}
+                preset="primaryV2"
+                disabled={!understandDonation}
+                full
+                onClick={() => {
+                  setDonation(true);
+                  closeDonationPopover();
+                }}
+              />
+            </Row>
+          </Column>
+        </Popover>
       ) : null}
       {writeLeaseModal}
     </Layout>
