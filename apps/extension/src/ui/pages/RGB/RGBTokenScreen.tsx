@@ -23,6 +23,7 @@ import { EllipsisOutlined } from '@ant-design/icons';
 import {
   RGBTokenScreenTabKey,
   getRgbTokenPrecision,
+  getRgbTotalAtomicAmount,
   toRgbDisplayAmount,
   useChain,
   useRGBTokenScreenLogic,
@@ -70,13 +71,17 @@ export default function RGBTokenScreen() {
   const name = tokenInfo?.name || tokenBalance?.name || ticker;
   const assetId = routeAssetId || tokenInfo?.assetId || '';
   const precision = getRgbTokenPrecision(tokenBalance) || getRgbTokenPrecision(tokenInfo);
+  const totalAtomicAmount = getRgbTotalAtomicAmount(tokenBalance);
+  const totalBalance =
+    totalAtomicAmount === undefined ? '--' : toRgbDisplayAmount(totalAtomicAmount, precision);
   const spendable =
     tokenBalance?.spendable === undefined ? '--' : toRgbDisplayAmount(tokenBalance.spendable, precision);
   const lockedAmount = toRgbDisplayAmount(tokenBalance?.lockedAmount, precision);
   const pendingAmount = toRgbDisplayAmount(tokenBalance?.pending, precision);
-  const balanceSize = spendable.length > 24 ? 'lg' : spendable.length > 16 ? 'xl' : 'xxl';
+  const balanceSize = totalBalance.length > 24 ? 'lg' : totalBalance.length > 16 ? 'xl' : 'xxl';
   const isBfa = String(tokenInfo?.schema || tokenBalance?.schema || '').toUpperCase() === 'BFA';
-  const showUsdtPrice = chain.showPrice && isConfiguredRgbUsdt(assetId, configuredUsdtAssetId) && spendable !== '--';
+  const showUsdtPrice =
+    chain.showPrice && isConfiguredRgbUsdt(assetId, configuredUsdtAssetId) && totalBalance !== '--';
 
   const renderTabChildren = useMemo(() => {
     if (activeTab === RGBTokenScreenTabKey.DETAILS) {
@@ -171,8 +176,9 @@ export default function RGBTokenScreen() {
               />
             </Column>
             <Column itemsCenter fullX justifyCenter>
+              <Text text={t('total_balance')} size="xxs" color="textDim" textCenter />
               <Text
-                text={spendable}
+                text={totalBalance}
                 preset="bold"
                 textCenter
                 size={balanceSize}
@@ -183,14 +189,21 @@ export default function RGBTokenScreen() {
               />
               {showUsdtPrice ? (
                 <Column itemsCenter gap="zero">
-                  <Text text={formatRgbUsdtValue(spendable)} size="md" color="textDim" textCenter disableTranslate />
+                  <Text text={formatRgbUsdtValue(totalBalance)} size="md" color="textDim" textCenter disableTranslate />
                 </Column>
               ) : null}
+              <Text
+                text={`${t('available_balance')}: ${spendable}`}
+                size="xs"
+                color="textDim"
+                textCenter
+                wrap
+              />
               {Number(tokenBalance?.pending || 0) > 0 ? (
-                <Text text={`${pendingAmount} (${t('pending')})`} size="xs" color="gold" textCenter wrap />
+                <Text text={`${t('pending')}: ${pendingAmount}`} size="xs" color="gold" textCenter wrap />
               ) : null}
               {Number(tokenBalance?.lockedAmount || 0) > 0 ? (
-                <Text text={`${lockedAmount} (${t('rgb_amount_locking')})`} size="xs" color="gold" textCenter wrap />
+                <Text text={`${t('rgb_amount_locking')}: ${lockedAmount}`} size="xs" color="gold" textCenter wrap />
               ) : null}
             </Column>
           </Column>

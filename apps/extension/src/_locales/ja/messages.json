@@ -3441,6 +3441,9 @@
   "rgb_amount_locking": {
     "message": "ロック中"
   },
+  "rgb_balance_processing": {
+    "message": "処理中"
+  },
 "rgb_burn": { "message": "バーン" },
   "rgb_burn_network": { "message": "送金先ネットワーク" },
   "rgb_burn_recipient_address": { "message": "受取アドレス" },

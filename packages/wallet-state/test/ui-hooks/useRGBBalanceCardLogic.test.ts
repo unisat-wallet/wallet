@@ -5,7 +5,7 @@ import { useRGBBalanceCardLogic } from '../../src/ui-hooks/useRGBBalanceCardLogi
 import { createHookTestHarness } from './testHelpers'
 
 describe('useRGBBalanceCardLogic', () => {
-  it('formats pending RGB balances separately from settled balances', () => {
+  it('includes pending RGB balances in the displayed total balance', () => {
     const { wrapper } = createHookTestHarness()
     const { result } = renderHook(
       () =>
@@ -21,7 +21,7 @@ describe('useRGBBalanceCardLogic', () => {
       { wrapper }
     )
 
-    expect(result.current.balanceStr).toBe('0')
+    expect(result.current.balanceStr).toBe('987')
     expect(result.current.pendingBalanceStr).toBe('987')
   })
 
@@ -42,11 +42,11 @@ describe('useRGBBalanceCardLogic', () => {
       { wrapper }
     )
 
-    expect(result.current.balanceStr).toBe('9.5')
+    expect(result.current.balanceStr).toBe('10')
     expect(result.current.pendingBalanceStr).toBe('0.5')
   })
 
-  it('keeps a locally locked RGB balance distinct from pending balance', () => {
+  it('includes locked RGB balance once in the displayed total balance', () => {
     const { wrapper } = createHookTestHarness()
     const { result } = renderHook(
       () =>
@@ -64,7 +64,7 @@ describe('useRGBBalanceCardLogic', () => {
       { wrapper }
     )
 
-    expect(result.current.balanceStr).toBe('0')
+    expect(result.current.balanceStr).toBe('10.5')
     expect(result.current.pendingBalanceStr).toBe('0.5')
     expect(result.current.lockedBalanceStr).toBe('10')
   })

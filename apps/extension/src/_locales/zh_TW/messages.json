@@ -3444,6 +3444,9 @@
   "rgb_amount_locking": {
     "message": "鎖定中"
   },
+  "rgb_balance_processing": {
+    "message": "處理中"
+  },
 "rgb_burn": { "message": "銷毀" },
   "rgb_burn_network": { "message": "目標網路" },
   "rgb_burn_recipient_address": { "message": "收款地址" },

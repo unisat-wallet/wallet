@@ -31,6 +31,21 @@ export function getRgbTokenPrecision(value: unknown) {
   return Number.isInteger(precision) && precision >= 0 && precision <= 18 ? precision : 0
 }
 
+export function getRgbTotalAtomicAmount(value: unknown) {
+  if (!value || typeof value !== 'object') return undefined
+
+  const balance = value as Record<string, unknown>
+  const settled = balance['settled'] ?? balance['balance'] ?? balance['spendable']
+  const pending = balance['pending']
+  if (settled === undefined && pending === undefined) return undefined
+
+  try {
+    return (BigInt(String(settled ?? 0)) + BigInt(String(pending ?? 0))).toString()
+  } catch {
+    return settled === undefined ? undefined : String(settled)
+  }
+}
+
 export function getRgbIconShortName(name?: string, ticker?: string) {
   const source = (name || ticker || 'RGB').trim()
   return Array.from(source).slice(0, 2).join('').toUpperCase() || 'RG'

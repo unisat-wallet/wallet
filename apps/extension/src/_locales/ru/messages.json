@@ -3441,6 +3441,9 @@
   "rgb_amount_locking": {
     "message": "Заблокировано"
   },
+  "rgb_balance_processing": {
+    "message": "Обработка"
+  },
 "rgb_burn": { "message": "Сжечь" },
   "rgb_burn_network": { "message": "Сеть назначения" },
   "rgb_burn_recipient_address": { "message": "Адрес получателя" },

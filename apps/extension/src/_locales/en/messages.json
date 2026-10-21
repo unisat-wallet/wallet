@@ -3455,6 +3455,9 @@
   "rgb_amount_locking": {
     "message": "Locking"
   },
+  "rgb_balance_processing": {
+    "message": "Processing"
+  },
 "rgb_burn": { "message": "Burn" },
   "rgb_burn_network": { "message": "Destination network" },
   "rgb_burn_recipient_address": { "message": "Recipient address" },

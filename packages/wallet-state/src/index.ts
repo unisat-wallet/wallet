@@ -67,6 +67,7 @@ export {
   isValidRgbDecimalAmount,
   MAX_RGB_ATOMIC_AMOUNT,
   getRgbIconShortName,
+  getRgbTotalAtomicAmount,
   getRgbTokenPrecision,
   normalizeRgbAmountInput,
   toRgbAtomicAmount,

@@ -17,9 +17,7 @@ export default function RGBBalanceCard(props: RGBBalanceCardProps) {
     balance,
     balanceStr,
     pendingBalance,
-    pendingBalanceStr,
     lockedBalance,
-    lockedBalanceStr,
     showPrice,
     price,
     iconInfo
@@ -39,11 +37,8 @@ export default function RGBBalanceCard(props: RGBBalanceCardProps) {
         quantity={
           <Row itemsCenter gap="sm">
             <Text text={balanceStr} size="xs" digital />
-            {hasPendingBalance ? (
-              <Text text={`${pendingBalanceStr} (${t('pending')})`} size="xxs" color="gold" />
-            ) : null}
-            {hasLockedBalance ? (
-              <Text text={`${lockedBalanceStr} (${t('rgb_amount_locking')})`} size="xxs" color="gold" />
+            {hasPendingBalance || hasLockedBalance ? (
+              <Text text={`(${t('rgb_balance_processing')})`} size="xxs" color="gold" />
             ) : null}
           </Row>
         }

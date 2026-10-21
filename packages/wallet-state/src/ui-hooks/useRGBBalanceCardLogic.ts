@@ -3,7 +3,12 @@ import { TickPriceItem } from '@unisat/wallet-shared'
 import BigNumber from 'bignumber.js'
 import { useChain } from 'src/hooks'
 import type { RgbBalance } from 'src/types'
-import { getRgbIconShortName, getRgbTokenPrecision, toRgbDisplayAmount } from 'src/utils/rgb-amount-utils'
+import {
+  getRgbIconShortName,
+  getRgbTokenPrecision,
+  getRgbTotalAtomicAmount,
+  toRgbDisplayAmount,
+} from 'src/utils/rgb-amount-utils'
 
 export interface RGBBalanceCardProps {
   tokenBalance?: RgbBalance
@@ -17,7 +22,7 @@ export function useRGBBalanceCardLogic(props: RGBBalanceCardProps) {
   const ticker = tokenBalance?.ticker || 'RGB'
   const name = tokenBalance?.name || ticker
   const precision = getRgbTokenPrecision(tokenBalance)
-  const balanceValue = toRgbDisplayAmount(tokenBalance?.spendable, precision) || '0'
+  const balanceValue = toRgbDisplayAmount(getRgbTotalAtomicAmount(tokenBalance), precision) || '0'
   const balance = new BigNumber(balanceValue || 0)
   const balanceStr =
     balance.lt(0.0001) && balance.gt(0) ? '<0.0001' : numUtils.showLongNumber(balance.toString())

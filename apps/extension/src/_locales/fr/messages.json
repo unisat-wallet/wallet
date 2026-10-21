@@ -3441,6 +3441,9 @@
   "rgb_amount_locking": {
     "message": "Verrouillé"
   },
+  "rgb_balance_processing": {
+    "message": "En cours"
+  },
 "rgb_burn": { "message": "Brûler" },
   "rgb_burn_network": { "message": "Réseau de destination" },
   "rgb_burn_recipient_address": { "message": "Adresse du destinataire" },

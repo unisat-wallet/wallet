@@ -2,7 +2,12 @@ import { Column, Tooltip } from '@/ui/components';
 import { Line } from '@/ui/components/Line';
 import { Section } from '@/ui/components/Section';
 import { showLongNumber } from '@/ui/utils';
-import { getRgbTokenPrecision, toRgbDisplayAmount, useI18n } from '@unisat/wallet-state';
+import {
+  getRgbTokenPrecision,
+  getRgbTotalAtomicAmount,
+  toRgbDisplayAmount,
+  useI18n
+} from '@unisat/wallet-state';
 
 export function RGBTokenDetail(props: {
   assetId: string;
@@ -23,8 +28,10 @@ export function RGBTokenDetail(props: {
       ? showLongNumber(toRgbDisplayAmount(value, precision))
       : value.toString();
   };
-  const settled = formatNumber(tokenBalance?.settled);
-  const pending = formatNumber(tokenBalance?.pending);
+  const total = formatNumber(getRgbTotalAtomicAmount(tokenBalance));
+  const available = formatNumber(tokenBalance?.spendable);
+  const pending = formatNumber(tokenBalance?.pending ?? '0');
+  const locking = formatNumber(tokenBalance?.lockedAmount ?? '0');
 
   return (
     <Column
@@ -55,9 +62,13 @@ export function RGBTokenDetail(props: {
       <Line />
       <Section title={t('schema_rgb')} value={formatValue(tokenInfo?.schema)} />
       <Line />
-      <Section title={t('settled')} value={settled} maxLength={Number.POSITIVE_INFINITY} wrapValue />
+      <Section title={t('total_balance')} value={total} maxLength={Number.POSITIVE_INFINITY} wrapValue />
+      <Line />
+      <Section title={t('available_balance')} value={available} maxLength={Number.POSITIVE_INFINITY} wrapValue />
       <Line />
       <Section title={t('pending')} value={pending} maxLength={Number.POSITIVE_INFINITY} wrapValue />
+      <Line />
+      <Section title={t('rgb_amount_locking')} value={locking} maxLength={Number.POSITIVE_INFINITY} wrapValue />
     </Column>
   );
 }
