@@ -751,9 +751,14 @@ export class RgbService {
       item =>
         !item.expirationTimestamp ||
         item.expirationTimestamp > now ||
+        !!item.pendingAccept ||
         item.receivedConsignment?.accepted === true ||
         item.receivedConsignment?.acknowledgementPending === true
     )
+  }
+
+  hasStoredPendingReceives() {
+    return (this.requireState().pendingReceives?.length || 0) > 0
   }
 
   /** Fill the signing key omitted by witness invoices created before v1 support shipped. */
@@ -1248,6 +1253,38 @@ export class RgbService {
           throw error
         }
         pending.splice(receiveIndex, 1)
+        changed = true
+      }
+    }
+    // Expiration alone does not prove that an offline receiver has not been
+    // sent a consignment. Check the proxy once more before releasing an unused
+    // invoice, and keep it if the proxy is unavailable or has a payload.
+    const getConsignment = this.dependencies.transport.getConsignment
+    if (getConsignment) {
+      const now = Math.floor(this.now() / 1000)
+      for (let index = pending.length - 1; index >= 0; index--) {
+        const receive = pending[index]!
+        if (
+          !receive.expirationTimestamp || receive.expirationTimestamp > now ||
+          receive.pendingAccept || receive.receivedConsignment ||
+          receivedByRecipient.has(receive.proxyRecipientId || receive.recipientId)
+        ) continue
+        let endpoints: string[]
+        try {
+          endpoints = decodeRgbInvoice(receive.invoice).transportEndpoints
+          if (!endpoints.length) continue
+          const consignment = await getConsignment({
+            recipientId: receive.proxyRecipientId || receive.recipientId,
+            endpoints,
+            proxyPrivateKey: receive.proxyPrivateKey,
+          })
+          if (consignment) continue
+        } catch {
+          // A network or proxy failure cannot establish that this invoice is unused.
+          continue
+        }
+        pending.splice(index, 1)
+        this.recordReleasedReceiveRecipient(receive.recipientId)
         changed = true
       }
     }
@@ -2294,7 +2331,7 @@ export class RgbService {
     return {
       snapshot: state.snapshot,
       assetMetadata,
-      invoiceReservations: (state.pendingReceives || []).map(receive => ({
+      invoiceReservations: this.getPendingReceives().map(receive => ({
         invoice: receive.invoice,
         recipientId: receive.recipientId,
         ...(receive.proxyRecipientId ? { proxyRecipientId: receive.proxyRecipientId } : {}),

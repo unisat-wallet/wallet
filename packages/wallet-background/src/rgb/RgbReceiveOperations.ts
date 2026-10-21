@@ -66,7 +66,9 @@ export class RgbReceiveOperations {
     params: { skipSync?: boolean; providerOrigin?: string } = {}
   ): Promise<{ list: RgbPendingReceiveInvoice[] }> {
     let { service } = await (this.dependencies.getReadContext?.() ?? this.dependencies.getContext())
-    if (!service.getPendingReceives().length) return { list: [] }
+    // Hidden expired invoices still need a writer sync to release their
+    // durable reservations and recovery-checkpoint entries.
+    if (!service.hasStoredPendingReceives()) return { list: [] }
     if (!params.skipSync) {
       try {
         ;({ service } = await this.dependencies.syncReceivedAllocations())

@@ -580,6 +580,94 @@ describe('RgbService', () => {
     expect(reopened.getPendingReceives()[0]?.witnessPublicKey).toBe(`02${'22'.repeat(32)}`)
   })
 
+  it('durably releases an expired unused invoice after confirming the proxy is empty', async () => {
+    const dependencies = createDependencies()
+    let now = 1_000_000_000_000
+    dependencies.now = () => now
+    dependencies.transport.getConsignment = vi.fn().mockResolvedValue(undefined)
+    const service = new RgbService(dependencies)
+    await service.open(wallet)
+    await service.enableRecoveryBackup()
+    const receive = await service.createWitnessReceive({
+      scriptPubKey: '512079be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798',
+      publicKey: `02${'11'.repeat(32)}`,
+      assetId: 'rgb:AQEBAQEB-AQEBAQE-BAQEBAQ-EBAQEBA-QEBAQEB-AQEBAQE',
+      amount: '1',
+    })
+
+    now += 24 * 60 * 60 * 1000
+    expect(service.getPendingReceives()).toEqual([])
+    expect(service.hasStoredPendingReceives()).toBe(true)
+    await service.processClaimedReceives({ includeClaimed: false })
+
+    expect(dependencies.transport.getConsignment).toHaveBeenCalledWith({
+      recipientId: receive.proxyRecipientId,
+      endpoints: decodeRgbInvoice(receive.invoice).transportEndpoints,
+      proxyPrivateKey: receive.proxyPrivateKey,
+    })
+    expect(service.hasStoredPendingReceives()).toBe(false)
+    expect(service.getUtxoInspection().invoiceReservations).toEqual([])
+    expect(service.exportRecoveryState()).toMatchObject({
+      pendingReceives: [],
+      releasedReceiveRecipientIds: [receive.recipientId],
+    })
+    const reopened = new RgbService(dependencies)
+    await reopened.open(wallet)
+    expect(reopened.hasStoredPendingReceives()).toBe(false)
+  })
+
+  it('keeps expired invoices with a staged consignment or an uncertain proxy result', async () => {
+    const dependencies = createDependencies()
+    let now = 1_000_000_000_000
+    dependencies.now = () => now
+    dependencies.transport.getConsignment = vi.fn().mockRejectedValue(new Error('proxy unavailable'))
+    dependencies.transport.getConsignments = vi.fn().mockResolvedValue([])
+    const service = new RgbService(dependencies)
+    await service.open(wallet)
+    vi.spyOn(service as any, 'isReceiveCanceledBySender').mockResolvedValue(false)
+    const input = {
+      scriptPubKey: '512079be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798',
+      publicKey: `02${'11'.repeat(32)}`,
+      assetId: 'rgb:AQEBAQEB-AQEBAQE-BAQEBAQ-EBAQEBA-QEBAQEB-AQEBAQE',
+      amount: '1',
+    }
+    const staged = await service.createWitnessReceive(input)
+    const uncertain = await service.createWitnessReceive(input)
+    ;(service as any).state.pendingReceives[0].pendingAccept = {
+      payload: 'consignment', txid: 'c'.repeat(64), discoveredAt: now,
+    }
+    now += 24 * 60 * 60 * 1000
+
+    expect(service.getPendingReceives().map(item => item.recipientId)).toEqual([staged.recipientId])
+    await service.processClaimedReceives({ includeClaimed: false })
+    expect(service.hasStoredPendingReceives()).toBe(true)
+    expect(service.getPendingReceives().map(item => item.recipientId)).toEqual([staged.recipientId])
+    expect(service.exportRecoveryState().pendingReceives?.map(item => item.recipientId))
+      .toContain(uncertain.recipientId)
+  })
+
+  it('rolls back expired-invoice cleanup if its recovery checkpoint fails', async () => {
+    const dependencies = createDependencies()
+    let now = 1_000_000_000_000
+    dependencies.now = () => now
+    dependencies.transport.getConsignment = vi.fn().mockResolvedValue(undefined)
+    const service = new RgbService(dependencies)
+    await service.open(wallet)
+    await service.enableRecoveryBackup()
+    const receive = await service.createWitnessReceive({
+      scriptPubKey: '512079be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798',
+      publicKey: `02${'11'.repeat(32)}`,
+    })
+    now += 24 * 60 * 60 * 1000
+    dependencies.onStatePersisted = vi.fn().mockRejectedValue(new Error('recovery unavailable'))
+
+    await expect(service.processClaimedReceives({ includeClaimed: false }))
+      .rejects.toThrow('recovery unavailable')
+    expect(service.hasStoredPendingReceives()).toBe(true)
+    expect(service.exportRecoveryState().pendingReceives?.[0]?.recipientId).toBe(receive.recipientId)
+    expect(service.exportRecoveryState()).not.toHaveProperty('releasedReceiveRecipientIds')
+  })
+
   it('persists locally broadcast funding UTXOs until the indexer replacement succeeds', async () => {
     const dependencies = createDependencies()
     const service = new RgbService(dependencies)
