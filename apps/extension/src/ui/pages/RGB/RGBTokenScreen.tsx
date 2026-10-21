@@ -18,13 +18,16 @@ import { BottomModal } from '@/ui/components/BottomModal';
 import { TabBar } from '@/ui/components/TabBar';
 import { colors } from '@/ui/theme/colors';
 import { fontSizes } from '@/ui/theme/font';
+import { formatRgbUsdtValue, isConfiguredRgbUsdt } from '@/ui/utils/rgbUsdtPrice';
 import { EllipsisOutlined } from '@ant-design/icons';
 import { RgbReceiveSelectorModal } from '../Main/WalletTabScreen/RgbReceiveSelectorModal';
 import {
   getRgbTokenPrecision,
   RGBTokenScreenTabKey,
   toRgbDisplayAmount,
-  useRGBTokenScreenLogic
+  useChain,
+  useRGBTokenScreenLogic,
+  useWalletConfig
 } from '@unisat/wallet-state';
 
 import { RGBTokenDetail } from './components/RGBTokenDetail';
@@ -32,6 +35,8 @@ import { RGBTokenHistory } from './components/RGBTokenHistory';
 import { useRgbWriteLeaseGuard } from './components/useRgbWriteLeaseGuard';
 
 export default function RGBTokenScreen() {
+  const chain = useChain();
+  const configuredUsdtAssetId = useWalletConfig().rgbUsdtAssetId;
   const { requestWrite, writeLeaseModal } = useRgbWriteLeaseGuard();
   const [receiveSelectorOpen, setReceiveSelectorOpen] = useState(false);
   const [actionMenuVisible, setActionMenuVisible] = useState(false);
@@ -71,6 +76,7 @@ export default function RGBTokenScreen() {
   const pendingAmount = toRgbDisplayAmount(tokenBalance?.pending, precision);
   const balanceSize = spendable.length > 24 ? 'lg' : spendable.length > 16 ? 'xl' : 'xxl';
   const isBfa = String(tokenInfo?.schema || tokenBalance?.schema || '').toUpperCase() === 'BFA';
+  const showUsdtPrice = chain.showPrice && isConfiguredRgbUsdt(assetId, configuredUsdtAssetId) && spendable !== '--';
 
   const renderTabChildren = useMemo(() => {
     if (activeTab === RGBTokenScreenTabKey.DETAILS) {
@@ -183,6 +189,12 @@ export default function RGBTokenScreen() {
                 color="white"
                 style={{ width: '100%', overflowWrap: 'anywhere' }}
               />
+              {showUsdtPrice ? (
+                <Column itemsCenter gap="zero">
+                  <Text text={formatRgbUsdtValue(spendable)} size="md" color="textDim" textCenter disableTranslate />
+                  <Text text="$1.00 / USDT" size="xs" color="textDim" textCenter disableTranslate />
+                </Column>
+              ) : null}
               {Number(tokenBalance?.pending || 0) > 0 ? (
                 <Text
                   text={`${pendingAmount} (${t('pending')})`}

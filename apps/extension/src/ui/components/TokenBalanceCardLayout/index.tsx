@@ -91,6 +91,7 @@ export type TokenBalanceCardLayoutProps = {
   balance: string;
   showPrice?: boolean;
   price?: any;
+  priceContent?: ReactNode;
   titleExtra?: ReactNode;
   onIconClick?: () => void;
 };
@@ -102,6 +103,7 @@ export function TokenBalanceCardLayout({
   balance,
   showPrice,
   price,
+  priceContent,
   titleExtra,
   onIconClick
 }: TokenBalanceCardLayoutProps) {
@@ -118,7 +120,7 @@ export function TokenBalanceCardLayout({
             </div>
             <div style={quantityCellStyle}>{quantity}</div>
           </div>
-          <TokenBalancePrice showPrice={showPrice} price={price} balance={balance} />
+          {priceContent ?? <TokenBalancePrice showPrice={showPrice} price={price} balance={balance} />}
         </Column>
       </div>
       {titleExtra ? <div style={titleExtraStyle}>{titleExtra}</div> : null}

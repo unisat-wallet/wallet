@@ -1,4 +1,6 @@
-import { useI18n, useRGBBalanceCardLogic, type RGBBalanceCardProps } from '@unisat/wallet-state';
+import { useI18n, useRGBBalanceCardLogic, useWalletConfig, type RGBBalanceCardProps } from '@unisat/wallet-state';
+
+import { formatRgbUsdtValue, isConfiguredRgbUsdt } from '@/ui/utils/rgbUsdtPrice';
 
 import { Card } from '../Card';
 import { RGBAssetIcon } from '../RGBAssetIcon';
@@ -23,6 +25,8 @@ export default function RGBBalanceCard(props: RGBBalanceCardProps) {
     iconInfo
   } = useRGBBalanceCardLogic(props);
   const { t } = useI18n();
+  const configuredUsdtAssetId = useWalletConfig().rgbUsdtAssetId;
+  const showUsdtPrice = showPrice && isConfiguredRgbUsdt(props.tokenBalance?.assetId || '', configuredUsdtAssetId);
   const hasPendingBalance = pendingBalance.gt(0);
   const hasLockedBalance = lockedBalance.gt(0);
 
@@ -45,6 +49,12 @@ export default function RGBBalanceCard(props: RGBBalanceCardProps) {
         }
         showPrice={showPrice}
         price={price}
+        priceContent={showUsdtPrice ? (
+          <Row justifyBetween itemsCenter>
+            <Text text="$1.00" color="textDim" size="xs" />
+            <Text text={formatRgbUsdtValue(balance.toString())} color="textDim" size="xs" />
+          </Row>
+        ) : undefined}
         balance={balance.toString()}
       />
     </Card>
