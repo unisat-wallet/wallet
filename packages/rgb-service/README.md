@@ -90,9 +90,11 @@ explicit retry; ordinary synchronization never rebroadcasts a burn. Burning
 does not submit a redemption request to an EVM bridge.
 
 For bridge redemption, a burn destination is mandatory. A 20-byte EVM address
-is left-padded with 12 zero bytes to the 32-byte `burnReason` field. A
-precomputed 32-byte V1 destination hash can be supplied directly. The wallet
-does not derive the V1 hash or choose the release route, and the destination
+is left-padded with 12 zero bytes to the 32-byte `burnReason` field. This is a
+legacy direct-route burn for Arbitrum One; submitting its proof to an Ethereum
+or other LayerZero unlock route is rejected. A precomputed 32-byte V1
+destination hash can be supplied directly through the service API. The wallet
+UI does not derive the V1 hash or choose the release route, and the destination
 cannot be changed after broadcast.
 
 ## Enablement requirement

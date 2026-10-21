@@ -3443,11 +3443,11 @@
   },
   "rgb_burn": { "message": "バーン" },
   "rgb_burn_amount": { "message": "バーン数量" },
-  "rgb_burn_reason": { "message": "EVM受取アドレス" },
+  "rgb_burn_reason": { "message": "Arbitrum One受取アドレス" },
   "rgb_burn_reason_placeholder": { "message": "EVM受取アドレスを入力" },
   "rgb_burn_reason_invalid": { "message": "有効な20バイトのEVMアドレスを入力してください。" },
-  "rgb_burn_description": { "message": "バーンすると、これらのBFAトークンは永久に失われます。下のEVM受取アドレスを確認してください。送信後は変更できません。証明書は取引詳細からダウンロードできます。" },
-  "rgb_burn_confirm": { "message": "受取アドレスを確認し、このバーンを取り消せないことを理解しました。" },
+  "rgb_burn_description": { "message": "このバーンはArbitrum Oneでのみ解放できます。Ethereumや他のLayerZero経路には使用できません。受取アドレスを確認してください。バーンは取り消せず、アドレスも変更できません。証明は取引詳細からダウンロードできます。" },
+  "rgb_burn_confirm": { "message": "Arbitrum Oneの受取アドレスを確認し、このバーンを取り消せないことを理解しました。" },
   "rgb_download_burn_proof": { "message": "バーン証明をダウンロード (.rgb)" },
   "rgb_locked_balance_hint": {
     "message": "保留中の送金があります。送金を表示"

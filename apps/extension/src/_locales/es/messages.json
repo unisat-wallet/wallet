@@ -3434,11 +3434,11 @@
   },
   "rgb_burn": { "message": "Quemar" },
   "rgb_burn_amount": { "message": "Cantidad a quemar" },
-  "rgb_burn_reason": { "message": "Dirección EVM destinataria" },
+  "rgb_burn_reason": { "message": "Dirección destinataria en Arbitrum One" },
   "rgb_burn_reason_placeholder": { "message": "Introduce la dirección EVM" },
   "rgb_burn_reason_invalid": { "message": "Introduce una dirección EVM válida de 20 bytes." },
-  "rgb_burn_description": { "message": "La quema elimina permanentemente estos tokens BFA. Comprueba la dirección EVM de abajo: no podrá cambiarse tras la difusión. Podrás descargar la prueba en los detalles de la transacción." },
-  "rgb_burn_confirm": { "message": "He comprobado la dirección y entiendo que esta quema no se puede revertir." },
+  "rgb_burn_description": { "message": "Esta quema solo permite liberar fondos en Arbitrum One; no sirve para Ethereum ni otras rutas de LayerZero. Comprueba la dirección: la quema es irreversible y no podrás cambiarla. La prueba está en los detalles de la transacción." },
+  "rgb_burn_confirm": { "message": "He comprobado la dirección en Arbitrum One y entiendo que esta quema no se puede revertir." },
   "rgb_download_burn_proof": { "message": "Descargar prueba de quema (.rgb)" },
   "rgb_locked_balance_hint": {
     "message": "Tienes una transferencia pendiente. Ver transferencias"

@@ -3443,11 +3443,11 @@
   },
   "rgb_burn": { "message": "Brûler" },
   "rgb_burn_amount": { "message": "Montant à brûler" },
-  "rgb_burn_reason": { "message": "Adresse EVM destinataire" },
+  "rgb_burn_reason": { "message": "Adresse destinataire sur Arbitrum One" },
   "rgb_burn_reason_placeholder": { "message": "Saisissez l’adresse EVM" },
   "rgb_burn_reason_invalid": { "message": "Saisissez une adresse EVM valide de 20 octets." },
-  "rgb_burn_description": { "message": "Cette opération supprime définitivement ces jetons BFA. Vérifiez l’adresse EVM ci-dessous : elle ne pourra plus être modifiée après diffusion. La preuve sera téléchargeable dans les détails de la transaction." },
-  "rgb_burn_confirm": { "message": "J’ai vérifié l’adresse et je comprends que cette opération est irréversible." },
+  "rgb_burn_description": { "message": "Cette destruction ne permet un déblocage que sur Arbitrum One, pas sur Ethereum ni sur les autres routes LayerZero. Vérifiez l’adresse : la destruction est irréversible et l’adresse ne pourra plus être modifiée. La preuve figure dans les détails de la transaction." },
+  "rgb_burn_confirm": { "message": "J’ai vérifié l’adresse sur Arbitrum One et je comprends que cette opération est irréversible." },
   "rgb_download_burn_proof": { "message": "Télécharger la preuve de destruction (.rgb)" },
   "rgb_locked_balance_hint": {
     "message": "Vous avez un transfert en attente. Voir les transferts"

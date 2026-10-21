@@ -3446,11 +3446,11 @@
   },
   "rgb_burn": { "message": "銷毀" },
   "rgb_burn_amount": { "message": "銷毀數量" },
-  "rgb_burn_reason": { "message": "EVM 收款地址" },
+  "rgb_burn_reason": { "message": "Arbitrum One 收款地址" },
   "rgb_burn_reason_placeholder": { "message": "輸入 EVM 收款地址" },
   "rgb_burn_reason_invalid": { "message": "請輸入有效的 20 位元組 EVM 地址。" },
-  "rgb_burn_description": { "message": "銷毀會永久移除這些 BFA 代幣。請仔細核對下方的 EVM 收款地址；廣播後無法更改。銷毀證明可從交易詳情下載。" },
-  "rgb_burn_confirm": { "message": "我已核對收款地址，並了解此銷毀操作無法撤銷。" },
+  "rgb_burn_description": { "message": "這筆銷毀只能在 Arbitrum One 解鎖，不能用於 Ethereum 或其他 LayerZero 路線。請仔細核對收款地址：銷毀不可撤銷，地址也無法更改。證明可從交易詳情下載。" },
+  "rgb_burn_confirm": { "message": "我已核對 Arbitrum One 收款地址，並了解此銷毀操作無法撤銷。" },
   "rgb_download_burn_proof": { "message": "下載銷毀證明 (.rgb)" },
   "rgb_locked_balance_hint": {
     "message": "您有一筆待處理轉帳。查看轉帳"
