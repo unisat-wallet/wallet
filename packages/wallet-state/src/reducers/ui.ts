@@ -94,7 +94,7 @@ export const initialState: UIState = {
   },
   navigationSource: NavigationSource.NORMAL,
   isBalanceHidden: false,
-  balanceDetailExpanded: true,
+  balanceDetailExpanded: false,
   walletView: WalletView.BITCOIN,
 
   walletTopTabScreen: {
@@ -327,7 +327,7 @@ const slice: Slice<UIState> = createSlice({
         state.isBalanceHidden = false
       }
       if (state.balanceDetailExpanded === undefined) {
-        state.balanceDetailExpanded = true
+        state.balanceDetailExpanded = false
       }
     })
   },
