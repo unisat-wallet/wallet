@@ -108,7 +108,8 @@ export default function RGBTransferDetailScreen() {
   const statusLabel = getStatusLabel(status, t, transfer?.type);
   const canExplore =
     !!transfer?.txid &&
-    !['waiting_ack', 'ready_to_broadcast', 'broadcasting', 'broadcast_failed', 'pending_accept', 'rejected', 'canceled', 'cancelled'].includes(status.toLowerCase());
+    !['waiting_ack', 'ready_to_broadcast', 'broadcasting', 'broadcast_failed', 'pending_accept', 'canceled', 'cancelled'].includes(status.toLowerCase()) &&
+    (status.toLowerCase() !== 'rejected' || !!transfer.broadcasted);
   const assetId = transfer?.assetId?.trim();
 
   const isConfirmed = isConfirmedStatus(status);
@@ -163,7 +164,7 @@ export default function RGBTransferDetailScreen() {
               <Text text={t('amount')} color="textDim" />
               <Text text={displayAmount} color="ticker_color2" />
             </Row>
-            {status !== 'rejected' ? (
+            {status !== 'rejected' || transfer?.broadcasted ? (
               <Row justifyBetween itemsCenter>
                 <Text text={t(isIssue ? 'rgb_genesis_txid' : 'rgb_transfer_id')} color="textDim" />
                 {recordId ? (
@@ -176,6 +177,12 @@ export default function RGBTransferDetailScreen() {
                 ) : (
                   <Text text="--" color="ticker_color2" />
                 )}
+              </Row>
+            ) : null}
+            {status === 'rejected' && transfer?.broadcasted && transfer.txid ? (
+              <Row justifyBetween itemsCenter>
+                <Text text={t('transaction_id')} color="textDim" />
+                <CopyableAddress address={transfer.txid} copyPosition="after" len={10} color="ticker_color2" />
               </Row>
             ) : null}
           </Column>

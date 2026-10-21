@@ -54,7 +54,10 @@ export class RgbTransferQuery {
           error
         )
       }
-      if (service.getPendingTransfers().length) {
+      const hasLateAcknowledgement = (service.getPendingSendHistory?.() || []).some(send =>
+        send.status === 'broadcasted' && send.recipientAckExpected && send.recipientAck === undefined
+      )
+      if (service.getPendingTransfers().length || hasLateAcknowledgement) {
         try {
           await this.dependencies.syncPendingTransfers(service, context)
         } catch (error) {
@@ -104,6 +107,12 @@ export class RgbTransferQuery {
         return { name: undefined, ticker: undefined }
       }
     }
+    const confirmedActivityTxids = new Set(
+      activity.list
+        .filter(item => ['confirmed', 'settled'].includes(String(item.status ?? '').toLowerCase()))
+        .map(item => item.txid)
+        .filter((txid): txid is string => !!txid)
+    )
     const localSends = pendingTransfers.map(transfer => ({
       id: `local-send:${transfer.id}`,
       transferId: transfer.id,
@@ -140,7 +149,14 @@ export class RgbTransferQuery {
       precision: send.precision,
       txid: send.txid,
       timestamp: send.createdAt,
-      status: send.status,
+      status: send.recipientAck === false
+        ? 'rejected'
+        : send.recipientAckExpected && send.txid && confirmedActivityTxids.has(send.txid)
+          ? 'confirmed'
+          : send.status,
+      broadcasted: send.status === 'broadcasted',
+      awaitingRecipientAck: send.status === 'broadcasted' && send.recipientAckExpected && send.recipientAck === undefined,
+      recipientRejected: send.recipientAck === false,
       local: true,
     }))
     const localIssues = (service.getIssueHistory?.() || []).map(issue => ({
@@ -258,17 +274,22 @@ export class RgbTransferQuery {
       status: receive.status ?? 'settled',
       local: receive.status === 'canceled' || receive.status === 'rejected',
     }))
-    const confirmedActivityTxids = new Set(
-      activity.list
-        .filter(item => ['confirmed', 'settled'].includes(String(item.status ?? '').toLowerCase()))
-        .map(item => item.txid)
-        .filter((txid): txid is string => !!txid)
-    )
     const visibleLocalSendHistory = localSendHistory.filter(
-      send => send.status !== 'broadcasted' || !send.txid || !confirmedActivityTxids.has(send.txid)
+      send =>
+        !send.broadcasted ||
+        send.awaitingRecipientAck ||
+        send.recipientRejected ||
+        !send.txid ||
+        !confirmedActivityTxids.has(send.txid)
     )
     for (const send of localSendHistory) {
-      if (send.status !== 'broadcasted' || !send.txid || !confirmedActivityTxids.has(send.txid))
+      if (
+        !send.broadcasted ||
+        send.awaitingRecipientAck ||
+        send.recipientRejected ||
+        !send.txid ||
+        !confirmedActivityTxids.has(send.txid)
+      )
         continue
       try {
         await service.markSendHistoryConfirmed(send.transferId)
@@ -358,7 +379,7 @@ export class RgbTransferQuery {
       [
         ...localSends,
         ...localIssues,
-        ...localSendHistory.filter(send => send.status !== 'broadcasted'),
+        ...localSendHistory.filter(send => !send.broadcasted && (!send.txid || !confirmedActivityTxids.has(send.txid))),
         ...localReceives,
         ...localReceiveHistory,
       ]

@@ -951,6 +951,48 @@ export class RgbService {
     return this.requireState().pendingSendHistory || []
   }
 
+  /** Observe late legacy ACK/NACKs without changing the chain broadcast state. */
+  async syncBroadcastedSendAcknowledgements() {
+    const getAcknowledgement = this.dependencies.transport.getAcknowledgement
+    if (!getAcknowledgement) return
+    const history = this.requireState().pendingSendHistory || []
+    for (const send of history) {
+      if (
+        send.status !== 'broadcasted' ||
+        !send.recipientAckExpected ||
+        send.recipientAck !== undefined ||
+        !send.invoice ||
+        !send.txid
+      ) continue
+      let invoice: ReturnType<typeof decodeRgbInvoice>
+      try {
+        invoice = decodeRgbInvoice(send.invoice)
+      } catch {
+        continue
+      }
+      // Proxy v1 donations have no ACK operation. Only the legacy proxy can
+      // report a decision after the sender has already broadcast.
+      if (invoice.proxyInvoiceId) continue
+      let ack: boolean | undefined
+      try {
+        ack = await getAcknowledgement({
+          recipientId: invoice.proxyRecipientId,
+          endpoints: invoice.transportEndpoints,
+          txid: send.txid,
+          assetId: send.assetId,
+          payload: '',
+          opIds: [],
+        })
+      } catch {
+        // An unavailable proxy must not interrupt unrelated RGB sync work.
+        continue
+      }
+      if (ack === undefined) continue
+      send.recipientAck = ack
+      await this.persist()
+    }
+  }
+
   async markSendHistoryConfirmed(transferId: string) {
     const state = this.requireState()
     const history = state.pendingSendHistory || []
@@ -3017,6 +3059,10 @@ export class RgbService {
       ...(pending.request.precision === undefined ? {} : { precision: pending.request.precision }),
       txid: broadcast.completed.txid,
       invoice: pending.request.invoice,
+      ...(pending.request.donation ? { donation: true } : {}),
+      ...(pending.request.donation && !decodeRgbInvoice(pending.request.invoice).proxyInvoiceId
+        ? { recipientAckExpected: true }
+        : {}),
       ...(broadcast.completed.fundingUpdate?.spentOutpoints
         ? { spentOutpoints: broadcast.completed.fundingUpdate.spentOutpoints }
         : {}),

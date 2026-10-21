@@ -111,6 +111,10 @@ export interface RgbTransferItem {
   acknowledgedAt?: number
   status: RgbTransferStatus
   local?: boolean
+  /** Bitcoin broadcast happened even if the receiver later rejected the RGB transfer. */
+  broadcasted?: boolean
+  /** Keep checking for a late legacy proxy ACK/NACK after Bitcoin confirmation. */
+  awaitingRecipientAck?: boolean
 }
 
 export type RgbTransferNotificationKind = 'broadcasted' | 'receive_confirmed'

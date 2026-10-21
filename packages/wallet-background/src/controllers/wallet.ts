@@ -5684,7 +5684,12 @@ export class WalletController extends BaseController {
       'RGB recovery: advancing restored pending transfers',
       rgbRecoveryServiceSummary(service)
     )
-    await this.rgbCoordinator.syncPendingTransfers(service)
+    try {
+      await this.rgbCoordinator.syncPendingTransfers(service)
+    } finally {
+      // A late recipient NACK is independent of other pending sends.
+      await service.syncBroadcastedSendAcknowledgements?.()
+    }
     log.debug(
       'RGB recovery: pending transfer advancement completed',
       rgbRecoveryServiceSummary(service)

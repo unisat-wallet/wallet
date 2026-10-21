@@ -333,6 +333,12 @@ export interface RgbPendingSendHistory {
   precision?: number
   txid?: string
   invoice?: string
+  /** Broadcast-first send; its receiver may acknowledge after the Bitcoin broadcast. */
+  donation?: boolean
+  /** Legacy proxy supports an ACK/NACK after a broadcast-first send. */
+  recipientAckExpected?: boolean
+  /** Receiver decision is separate from the irreversible Bitcoin broadcast status. */
+  recipientAck?: boolean
   /** Funding allocations removed locally when this broadcast was accepted. */
   spentOutpoints?: RgbOutpoint[]
   createdAt: number

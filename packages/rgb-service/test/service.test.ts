@@ -3765,6 +3765,32 @@ describe('RgbService', () => {
     expect(service.getPendingTransfers()).toEqual([])
   })
 
+  it('records a late legacy NACK without releasing a broadcasted donation', async () => {
+    const dependencies = createDependencies()
+    dependencies.transport.getAcknowledgement = vi.fn().mockResolvedValue(false)
+    const service = new RgbService(dependencies)
+    await service.open(wallet)
+    await service.sync()
+    await service.prepareSend({
+      assetId: 'rgb:AQEBAQEB-AQEBAQE-BAQEBAQ-EBAQEBA-QEBAQEB-AQEBAQE',
+      amount: '60', invoice: rgbInvoice(), feeRate: 2, donation: true,
+    })
+    await service.completeSend('transfer-1', 'signed-psbt')
+    expect(dependencies.transport.getAcknowledgement).not.toHaveBeenCalled()
+
+    await service.syncBroadcastedSendAcknowledgements()
+    expect(dependencies.transport.getAcknowledgement).toHaveBeenCalledWith(expect.objectContaining({
+      recipientId: decodeRgbInvoice(rgbInvoice()).proxyRecipientId,
+      endpoints: [proxyEndpoint],
+    }))
+    expect(service.getPendingSendHistory()[0]).toMatchObject({
+      status: 'broadcasted', donation: true, recipientAckExpected: true,
+      recipientAck: false, txid: 'c'.repeat(64),
+    })
+    await service.syncBroadcastedSendAcknowledgements()
+    expect(dependencies.transport.getAcknowledgement).toHaveBeenCalledTimes(1)
+  })
+
   it('keeps a published donation locked and retryable after broadcast failure', async () => {
     const dependencies = createDependencies()
     dependencies.broadcaster.broadcast = vi.fn()

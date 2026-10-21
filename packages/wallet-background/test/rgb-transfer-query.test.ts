@@ -4,6 +4,46 @@ import { toRgbDisplayAmount } from '@unisat/wallet-shared'
 import { RgbTransferQuery } from '../src/rgb/RgbTransferQuery'
 
 describe('RgbTransferQuery', () => {
+  it('shows a late receiver rejection while retaining the broadcast transaction', async () => {
+    const send = {
+      transferId: 'send-1', assetId: 'rgb:asset', amount: '50',
+      txid: 'a'.repeat(64), createdAt: 10, status: 'broadcasted',
+      donation: true, recipientAckExpected: true, recipientAck: false,
+    }
+    const service = {
+      getPendingTransfers: vi.fn().mockReturnValue([]),
+      getPendingSendHistory: vi.fn().mockReturnValue([send]),
+      getIssueHistory: vi.fn().mockReturnValue([]),
+      getPendingReceiveHistory: vi.fn().mockReturnValue([]),
+      getPendingReceives: vi.fn().mockReturnValue([]),
+      getLocalAssetDetail: vi.fn().mockReturnValue({ name: 'Token', ticker: 'TKN' }),
+      markSendHistoryConfirmed: vi.fn(),
+    }
+    const context = { service, wallet: { walletId: 'wallet', fundingAddress: 'funding', network: 'mainnet' } }
+    const query = new RgbTransferQuery({
+      getContext: vi.fn().mockResolvedValue(context as never),
+      syncReceiveHistory: vi.fn(), syncPendingTransfers: vi.fn(),
+      syncReceivedAllocations: vi.fn().mockResolvedValue(context as never),
+      getRemoteActivity: vi.fn().mockResolvedValue({ total: 1, list: [{
+        id: 'remote', type: 'send', txid: send.txid, assetId: send.assetId,
+        amount: '50', timestamp: 10, status: 'confirmed',
+      }] }),
+      warn: vi.fn(),
+    })
+    const result = await query.getTransfers(1, 20)
+    expect(result.list).toEqual([expect.objectContaining({
+      transferId: 'send-1', status: 'rejected', broadcasted: true, txid: send.txid,
+    })])
+    expect(service.markSendHistoryConfirmed).not.toHaveBeenCalled()
+
+    delete (send as { recipientAck?: boolean }).recipientAck
+    const awaiting = await query.getTransfers(1, 20, { skipSync: true })
+    expect(awaiting.list).toEqual([expect.objectContaining({
+      transferId: 'send-1', status: 'confirmed', awaitingRecipientAck: true,
+    })])
+    expect(service.markSendHistoryConfirmed).not.toHaveBeenCalled()
+  })
+
   it('includes local asset metadata on a broadcasted send', async () => {
     const service = {
       getPendingTransfers: vi.fn().mockReturnValue([]),

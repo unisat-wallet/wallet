@@ -5,6 +5,7 @@ import type { RgbTransferItem, RgbTransferNotification } from '../types'
 import { mergeRgbTransferAssetMetadata } from '../utils/rgb-transfer-metadata'
 
 function isInProgress(transfer?: RgbTransferItem) {
+  if (transfer?.awaitingRecipientAck) return true
   if (!transfer) return false
   if (
     ['canceled', 'cancelled', 'rejected', 'settled', 'confirmed', 'failed'].includes(
