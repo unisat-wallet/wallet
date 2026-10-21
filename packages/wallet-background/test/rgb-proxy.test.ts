@@ -187,6 +187,7 @@ describe('RGB proxy transport', () => {
     const received = await transport.getConsignment?.({ recipientId: invoiceId, endpoints: [endpoint], proxyPrivateKey: prepared!.privateKey })
     expect(received?.proxyTransferId).toBe(transferId)
     expect(received?.payload).toBe(payload)
+    expect(received).not.toHaveProperty('txid')
     await transport.acknowledgeConsignment?.({
       recipientId: invoiceId,
       endpoints: [endpoint],

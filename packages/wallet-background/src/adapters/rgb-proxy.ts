@@ -345,7 +345,6 @@ async function getProxyV1Consignment(input: {
       return {
         recipientId: input.recipientId,
         payload: Buffer.from(plaintext).toString('base64'),
-        txid: '',
         endpoint,
         proxyTransferId: transferId,
         proxySenderPublicKey: result.sender_pk,

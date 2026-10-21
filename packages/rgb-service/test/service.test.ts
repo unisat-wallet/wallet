@@ -1161,9 +1161,13 @@ describe('RgbService', () => {
     })).resolves.toBeUndefined()
   })
 
-  it.each(['blind', 'witness'] as const)(
-    'stages a claimed %s NIA consignment without a backend txid',
-    async recipientType => {
+  it.each([
+    { recipientType: 'blind', source: 'claimed' },
+    { recipientType: 'witness', source: 'claimed' },
+    { recipientType: 'blind', source: 'v1 proxy' },
+  ] as const)(
+    'stages a $source $recipientType NIA consignment without a backend txid',
+    async ({ recipientType, source }) => {
       const parentTxid = '8d54c98d4c29a1ec4fd90635f543f0f7a871a78eb6a6e706342f831d92e3ba19'
       const genesis = encodeNiaGenesis({
         ticker: 'PARSE', name: 'Parse NIA', precision: 0,
@@ -1174,7 +1178,12 @@ describe('RgbService', () => {
       const contractId = `rgb:${Buffer.from(genesis.assetId).toString('hex')}`
       const seal = { txid: 'aa'.repeat(32), vout: 1, blinding: 7n }
       const invoice = decodeRgbInvoice(recipientType === 'blind'
-        ? encodeBlindRgbInvoice({ network: 'mainnet', seal, assetId: contractId, amount: '60' })
+        ? encodeBlindRgbInvoice({
+            network: 'mainnet', seal,
+            ...(source === 'v1 proxy' ? {
+              transportEndpoints: [proxyEndpoint], proxyPublicKey: '33'.repeat(32),
+            } : { assetId: contractId, amount: '60' }),
+          })
         : `rgb:${contractId.slice(4)}/schema/~/bc:wvout:A8cJ7Ww3-NIzADo3-Tzp_5aD-7CTBWmA-AAAAAAA-AAAAAAA-ALSQkcw?amount=60`)
       const prepared = prepareNiaOpretTransfer({
         network: 'mainnet', assetId: contractId, amount: '60', recipientSeal: invoice.seal,
@@ -1214,16 +1223,24 @@ describe('RgbService', () => {
       const decoded = decodeNiaConsignment(Uint8Array.from(Buffer.from(payload, 'base64')))
       const witnessTxid = decoded.witnessBundles[0]!.txid
       const dependencies = createDependencies()
-      dependencies.stateSource.getClaimedConsignments = vi.fn().mockResolvedValue([
-        { recipientId: invoice.proxyRecipientId, payload },
-      ])
+      if (source === 'v1 proxy') {
+        dependencies.transport.getConsignment = vi.fn().mockResolvedValue({
+          recipientId: invoice.proxyRecipientId, payload, txid: '',
+          endpoint: proxyEndpoint, proxyTransferId: 'dd'.repeat(32),
+        })
+      } else {
+        dependencies.stateSource.getClaimedConsignments = vi.fn().mockResolvedValue([
+          { recipientId: invoice.proxyRecipientId, payload },
+        ])
+      }
       dependencies.transport.acknowledgeConsignment = vi.fn()
       const service = new RgbService(dependencies)
       await service.open(wallet)
       ;(service as any).state.pendingReceives = [{
         invoice: invoice.raw, recipientId: invoice.recipientId,
-        proxyRecipientId: invoice.proxyRecipientId, recipientType, assetId,
-        amount: '60', createdAt: 1,
+        proxyRecipientId: invoice.proxyRecipientId, recipientType,
+        ...(source === 'v1 proxy' ? { proxyPrivateKey: '44'.repeat(32) } : { assetId, amount: '60' }),
+        createdAt: 1,
         ...(recipientType === 'blind' ? { seal } : {
           witnessScriptPubKey: decoded.witnessBundles[0]!.outputs[1]!.scriptPubKey,
         }),
@@ -1233,7 +1250,7 @@ describe('RgbService', () => {
 
       expect(service.getPendingReceives()).toEqual([
         expect.objectContaining({
-          pendingAccept: expect.objectContaining({ txid: witnessTxid, payload }),
+          pendingAccept: expect.objectContaining({ txid: witnessTxid, payload, assetId, amount: '60' }),
         }),
       ])
       expect(service.getPendingReceiveHistory()).toEqual([])
@@ -1506,6 +1523,29 @@ describe('RgbService', () => {
     expect(service.getPendingReceiveHistory()).toEqual([
       expect.objectContaining({ status: 'rejected', txid: 'c'.repeat(64) }),
     ])
+  })
+
+  it('keeps a broadcast-first receive pending when the proxy has no ACK operation', async () => {
+    const dependencies = createDependencies()
+    dependencies.transport.getConsignment = vi.fn().mockResolvedValue({
+      recipientId: 'recipient', payload: 'invalid-consignment', endpoint: proxyEndpoint,
+      proxyTransferId: 'dd'.repeat(32),
+    })
+    dependencies.transport.acknowledgeConsignment = vi
+      .fn()
+      .mockRejectedValue(new RgbProxyOperationNotFoundError())
+    const service = new RgbService(dependencies)
+    await service.open(wallet)
+    ;(service as any).state.pendingReceives = [{
+      invoice: rgbInvoice(), recipientId: 'recipient', createdAt: 1,
+      seal: { txid: 'a'.repeat(64), vout: 0, blinding: 1n },
+    }]
+    ;(service as any).validateIncomingConsignment = vi.fn().mockReturnValue(undefined)
+
+    await service.processClaimedReceives({ includeClaimed: false })
+
+    expect(service.getPendingReceives()).toHaveLength(1)
+    expect(service.getPendingReceiveHistory()).toEqual([])
   })
 
   it('keeps an acknowledged receive pending when local settlement fails', async () => {

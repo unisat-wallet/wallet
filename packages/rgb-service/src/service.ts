@@ -1345,7 +1345,7 @@ export class RgbService {
       try {
         const match = await this.validateIncomingConsignment(receive, item)
         if (!match) {
-          await this.rejectInvalidProxyConsignment(receive, item)
+          if (!(await this.rejectInvalidProxyConsignment(receive, item))) continue
           pending.splice(receiveIndex, 1)
           changed = true
           continue
@@ -1488,7 +1488,7 @@ export class RgbService {
         // failing polling loop. NACK it when possible; if the proxy already
         // made its ACK immutable, archive the unusable local receive anyway.
         try {
-          await this.rejectInvalidProxyConsignment(receive, item)
+          if (!(await this.rejectInvalidProxyConsignment(receive, item))) continue
         } catch {
           throw error
         }
@@ -1717,13 +1717,16 @@ export class RgbService {
     receive: import('./types').RgbPendingReceive,
     item: { recipientId: string; payload: string; txid?: string; endpoint?: string }
   ) {
+    // Proxy v1 consignments have no Bitcoin txid field. Older adapters stored
+    // that absence as '', which must not constrain the witness in a NIA payload.
+    const expectedTxid = item.txid || undefined
     const payload = Uint8Array.from(Buffer.from(item.payload, 'base64'))
     if (isSupportedV1TransferConsignment(payload)) {
       const validate = this.dependencies.validateBfaConsignment
       if (!validate) throw new RgbServiceError('RGB v1 receive validation is unavailable')
       const bfa = await validate({
         wallet: this.requireState().wallet, payload,
-        ...(item.txid ? { pendingWitnessTxid: item.txid } : { allowPendingLastWitness: true }),
+        ...(expectedTxid ? { pendingWitnessTxid: expectedTxid } : { allowPendingLastWitness: true }),
         knownBlindSeals: this.getKnownBlindSeals(),
         confirmedBitcoinWitnesses: this.requireState().confirmedBitcoinWitnesses ||= {},
       })
@@ -1734,7 +1737,7 @@ export class RgbService {
       // bundle can satisfy this invoice's witness output.
       const latestBundleId = bfa.bundles.at(-1)?.id
       const candidate = bfa.terminalAssignments.find(assignment => {
-        if (item.txid && assignment.txid !== item.txid) return false
+        if (expectedTxid && assignment.txid !== expectedTxid) return false
         if (receive.recipientType === 'witness') {
           if (!latestBundleId || assignment.bundleId !== latestBundleId) return false
           return assignment.output?.scriptPubKey.toLowerCase() === receive.witnessScriptPubKey?.toLowerCase()
@@ -1776,13 +1779,13 @@ export class RgbService {
           return (
             txid === witness.txid &&
             output?.scriptPubKey.toLowerCase() === expectedScript &&
-            (item.txid === undefined || witness.txid === item.txid)
+            (expectedTxid === undefined || witness.txid === expectedTxid)
           )
         })
       if (
         !match ||
         'secretSeal' in match.assignment.seal ||
-        (item.txid !== undefined && match.witness.txid !== item.txid)
+        (expectedTxid !== undefined && match.witness.txid !== expectedTxid)
       )
         return undefined
       if (
@@ -1830,7 +1833,7 @@ export class RgbService {
           bundle.transitions.some(transition => transition.opId === match.transition.opId)
         )
       : undefined
-    if (!match || !witness || (item.txid !== undefined && witness.txid !== item.txid)) {
+    if (!match || !witness || (expectedTxid !== undefined && witness.txid !== expectedTxid)) {
       return undefined
     }
     if (
@@ -3734,18 +3737,22 @@ export class RgbService {
     try {
       await this.acknowledgeProxyConsignment(item, false)
     } catch (error) {
+      // Broadcast-first v1 transfers do not create an ACK operation. A proxy
+      // 404 therefore cannot prove that the recipient rejected the transfer.
+      // Keep the invoice so a later valid consignment can still be accepted.
+      if (error instanceof RgbProxyOperationNotFoundError) return false
       // RGB proxy ACKs are immutable. A recovered local state can legitimately
       // retry a NACK after the proxy has already settled that recipient ID.
       // This is terminal for the stale/mismatched local receive, not a reason
       // to surface the same error on every polling interval.
-      if (!(error instanceof RgbProxyOperationNotFoundError) &&
-        !String(error).includes('Cannot change ACK')) throw error
+      if (!String(error).includes('Cannot change ACK')) throw error
     }
     this.recordReceiveOutcome(
       receive,
       'rejected',
       item.txid || receive.pendingAccept?.txid || receive.receivedConsignment?.txid || ''
     )
+    return true
   }
 
   private runPendingTransferOperation<T>(transferId: string, operation: () => Promise<T>) {
