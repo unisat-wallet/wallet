@@ -35,7 +35,7 @@ export function includeConfiguredRgbUsdt(items: RgbBalance[], assetId: string, b
   }
   const existing = items.find(item => isSameRgbAssetId(item.assetId, assetId)) || balance
   const usdt: RgbBalance = existing
-    ? { ...existing, name: existing.name || 'USDT', ticker: existing.ticker || 'USDT', configuredUsdt: true }
+    ? { ...existing, name: 'USDT', ticker: 'USDT', configuredUsdt: true }
     : { assetId, name: 'USDT', ticker: 'USDT', balance: '0', spendable: '0', configuredUsdt: true, configuredPlaceholder: true }
   return [usdt, ...items.filter(item => !isSameRgbAssetId(item.assetId, assetId))]
 }

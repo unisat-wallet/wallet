@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 
 import type { RgbActivityItem, RgbActivityType, RgbAssetDetail, RgbBalance } from '..'
-import { useI18n, useNavigation, useWallet } from '..'
+import { useI18n, useNavigation, useWallet, useWalletConfig } from '..'
 import { getRgbIconShortName } from '../utils/rgb-amount-utils'
 import { useInfiniteList } from './useInfiniteList'
 import { UNCONFIGURED_RGB_USDT_ASSET_ID } from './useRGBListLogic'
@@ -27,6 +27,9 @@ export function useRGBTokenScreenLogic() {
   const nav = useNavigation()
   const { assetId, tokenBalance } = nav.getRouteState<'RGBTokenScreen'>()
   const isUnconfiguredUsdt = assetId === UNCONFIGURED_RGB_USDT_ASSET_ID
+  const configuredUsdtAssetId = useWalletConfig().rgbUsdtAssetId?.trim()
+  const isConfiguredUsdt = !!configuredUsdtAssetId && !isUnconfiguredUsdt &&
+    isSameRgbAssetId(assetId, configuredUsdtAssetId)
   const wallet = useWallet()
   const { t } = useI18n()
 
@@ -186,22 +189,28 @@ export function useRGBTokenScreenLogic() {
     latestTokenBalance && resolvedPrecision !== undefined
       ? { ...latestTokenBalance, precision: resolvedPrecision }
       : latestTokenBalance
+  const displayTokenBalance = resolvedTokenBalance && isConfiguredUsdt
+    ? { ...resolvedTokenBalance, name: 'USDT', ticker: 'USDT' }
+    : resolvedTokenBalance
+  const displayDetail = detail && isConfiguredUsdt
+    ? { ...detail, name: 'USDT', ticker: 'USDT' }
+    : detail
 
-  const tokenSummary = detail
+  const tokenSummary = displayDetail
     ? {
-        tokenInfo: detail,
-        assetInfo: detail,
-        tokenBalance: resolvedTokenBalance,
+        tokenInfo: displayDetail,
+        assetInfo: displayDetail,
+        tokenBalance: displayTokenBalance,
       }
     : undefined
 
   const ticker =
-    detail?.ticker ||
-    detail?.name ||
-    resolvedTokenBalance?.ticker ||
-    resolvedTokenBalance?.name ||
+    displayDetail?.ticker ||
+    displayDetail?.name ||
+    displayTokenBalance?.ticker ||
+    displayTokenBalance?.name ||
     'RGB'
-  const name = detail?.name || resolvedTokenBalance?.name || ticker
+  const name = displayDetail?.name || displayTokenBalance?.name || ticker
   const iconInfo = {
     assetId,
     iconUrl: detail?.['iconUrl'] || resolvedTokenBalance?.['iconUrl'] || '',
@@ -234,32 +243,32 @@ export function useRGBTokenScreenLogic() {
     if (isUnconfiguredUsdt) return
     nav.navigate('RGBReceiveScreen', {
       assetId,
-      tokenBalance: resolvedTokenBalance,
+      tokenBalance: displayTokenBalance,
     })
   }
   const onClickViewInvoices = () => {
     if (isUnconfiguredUsdt) return
     nav.navigate('RGBInvoiceListScreen', {
       assetId,
-      tokenBalance: resolvedTokenBalance,
+      tokenBalance: displayTokenBalance,
     })
   }
   const onClickSend = () => {
     if (isUnconfiguredUsdt) return
     nav.navigate('SendRGBScreen', {
       assetId,
-      tokenBalance: resolvedTokenBalance,
+      tokenBalance: displayTokenBalance,
     })
   }
   const onClickBurn = () => {
     if (isUnconfiguredUsdt || String(detail?.schema || resolvedTokenBalance?.schema || '').toUpperCase() !== 'BFA') return
-    nav.navigate('SendRGBScreen', { assetId, tokenBalance: resolvedTokenBalance, burn: true })
+    nav.navigate('SendRGBScreen', { assetId, tokenBalance: displayTokenBalance, burn: true })
   }
 
   return {
     assetId,
-    tokenBalance: resolvedTokenBalance,
-    detail,
+    tokenBalance: displayTokenBalance,
+    detail: displayDetail,
     activity,
     total,
     loading: detailLoading || balanceLoading,

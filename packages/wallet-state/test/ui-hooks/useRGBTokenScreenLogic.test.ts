@@ -29,7 +29,10 @@ describe('useRGBTokenScreenLogic', () => {
     wallet.getRGBAssetActivity.mockResolvedValue({ list: [], total: 0 })
 
     const { result } = renderHook(() => useRGBTokenScreenLogic(), { wrapper })
-    await waitFor(() => expect(result.current.iconInfo.assetId).toBe(assetId))
+    await waitFor(() => expect(result.current.tokenSummary?.tokenInfo.name).toBe('USDT'))
+    expect(result.current.iconInfo.assetId).toBe(assetId)
+    expect(result.current.tokenSummary?.tokenInfo.ticker).toBe('USDT')
+    expect(result.current.tokenBalance?.name).toBe('USDT')
   })
 
   it('shows the unconfigured USDT item without loading an invalid asset or allowing transfers', async () => {

@@ -60,7 +60,7 @@ describe('useRGBListLogic', () => {
     const { result } = renderHook(() => useRGBListLogic(), { wrapper })
 
     await waitFor(() => expect(result.current.items).toEqual([
-      expect.objectContaining({ assetId: 'rgb:usdt-asset', spendable: '42', configuredUsdt: true }),
+      expect.objectContaining({ assetId: 'rgb:usdt-asset', name: 'USDT', ticker: 'USDT', spendable: '42', configuredUsdt: true }),
     ]))
     expect(result.current.total).toBe(1)
   })
