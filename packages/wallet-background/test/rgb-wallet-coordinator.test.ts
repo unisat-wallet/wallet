@@ -36,6 +36,33 @@ describe('RgbWalletCoordinator', () => {
     expect(service.sync).toHaveBeenCalledOnce()
   })
 
+  it('publishes a recovered allocation after the receive invoice has settled', async () => {
+    const pending = { txid: 'a'.repeat(64), outpoints: [] }
+    const service = {
+      isRecoveryBackupEnabled: vi.fn().mockReturnValue(true),
+      getSnapshot: vi.fn().mockReturnValue({ syncedAt: 1, utxos: [] }),
+      hasKnownAssetHistory: vi.fn().mockReturnValue(true),
+      getPendingUtxoSync: vi.fn().mockReturnValue(pending),
+      sync: vi.fn().mockResolvedValue({ syncedAt: 1, utxos: [] }),
+    }
+    const context = {
+      service,
+      wallet: { walletId: 'wallet', fundingAddress: 'bc1p-funding', network: 'mainnet' },
+    }
+    const syncIndexerOutbox = vi.fn().mockResolvedValue(true)
+    const coordinator = new RgbWalletCoordinator({
+      getContext: vi.fn().mockResolvedValue(context as any),
+      syncIndexerOutbox,
+      syncReceiveHistory: vi.fn(),
+      tryEnsureWriteLease: vi.fn().mockResolvedValue(true),
+    })
+
+    await coordinator.syncListState()
+
+    expect(service.sync).toHaveBeenCalledOnce()
+    expect(syncIndexerOutbox).toHaveBeenCalledWith(service, context.wallet)
+  })
+
   it('checks pending RGB allocations sooner than settled balances', async () => {
     const snapshot = {
       syncedAt: 1,

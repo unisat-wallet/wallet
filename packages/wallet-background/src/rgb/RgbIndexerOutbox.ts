@@ -19,9 +19,27 @@ type RgbIndexerOutboxDependencies = {
 
 /** Retries local RGB state that has been durably committed but not indexed remotely. */
 export class RgbIndexerOutbox {
+  private readonly activeSyncs = new WeakMap<RgbService, Promise<boolean>>()
+
   constructor(private readonly dependencies: RgbIndexerOutboxDependencies) {}
 
-  async sync(service: RgbService, wallet: LocalRgbWallet): Promise<boolean> {
+  sync(service: RgbService, wallet: LocalRgbWallet): Promise<boolean> {
+    // The first registration of a witness output can contain no allocation.
+    // Keep a later settled replacement from reaching the indexer before that
+    // older registration, or the old response could erase the new color.
+    const previous = this.activeSyncs.get(service)
+    const current = (previous || Promise.resolve(true))
+      .catch(() => false)
+      .then(() => this.syncOnce(service, wallet))
+    this.activeSyncs.set(service, current)
+    const clear = () => {
+      if (this.activeSyncs.get(service) === current) this.activeSyncs.delete(service)
+    }
+    void current.then(clear, clear)
+    return current
+  }
+
+  private async syncOnce(service: RgbService, wallet: LocalRgbWallet): Promise<boolean> {
     let synced = true
     for (const item of service.getPendingAssetMetadata?.() || []) {
       try {
@@ -47,7 +65,7 @@ export class RgbIndexerOutbox {
     if (utxoSync) {
       try {
         await this.dependencies.replaceUtxos(utxoSync, wallet)
-        await service.markUtxoSyncCompleted(utxoSync.txid)
+        await service.markUtxoSyncCompleted(utxoSync.txid, utxoSync)
       } catch (error) {
         synced = false
         this.dependencies.warn('Failed to sync pending RGB UTXOs', error)

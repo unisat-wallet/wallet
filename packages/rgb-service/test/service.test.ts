@@ -1,4 +1,4 @@
-import { Psbt } from 'bitcoinjs-lib'
+import { Psbt, Transaction } from 'bitcoinjs-lib'
 import { describe, expect, it, vi } from 'vitest'
 import type {
   RgbCompletedTransfer,
@@ -26,6 +26,8 @@ import {
   RgbServiceError,
 } from '../src'
 import { encodeBfaTransferConsignment, NIA_V1_SCHEMA_ID } from '../src/protocol/bfa-consignment'
+import { serializeBfaOpretWitnessBundle } from '../src/protocol/consignment'
+import { validateBfaTransferConsignment } from '../src/protocol/bfa-validator'
 
 const wallet: RgbWalletRef = {
   walletId: 'rgb-wallet-1',
@@ -1433,6 +1435,160 @@ describe('RgbService', () => {
     releaseSnapshot!()
     await expect(Promise.all(synchronizations)).resolves.toEqual([snapshot, snapshot, snapshot])
   })
+
+  it('keeps an allocation queued while an older snapshot request is in flight', async () => {
+    const dependencies = createDependencies()
+    const service = new RgbService(dependencies)
+    await service.open(wallet)
+    await service.sync()
+    let releaseSnapshot: (() => void) | undefined
+    vi.mocked(dependencies.stateSource.getSnapshot).mockImplementationOnce(() =>
+      new Promise<RgbWalletSnapshot>(resolve => {
+        releaseSnapshot = () => resolve({ syncedAt: 2, utxos: [] })
+      })
+    )
+    const refreshing = service.sync()
+    const local = service.getSnapshot().utxos[0]!
+    await service.queueUtxoSync({ txid: local.outpoint.txid, outpoints: [local] })
+    await service.markUtxoSyncCompleted(local.outpoint.txid, service.getPendingUtxoSync())
+    releaseSnapshot!()
+    await refreshing
+    expect(service.getSnapshot().utxos).toContainEqual(expect.objectContaining({
+      outpoint: local.outpoint,
+      allocations: local.allocations,
+    }))
+    expect(service.getSnapshot().syncedAt).toBe(1)
+  })
+
+  it('does not clear a newer allocation sync with an older completion for the same txid', async () => {
+    const dependencies = createDependencies()
+    const service = new RgbService(dependencies)
+    await service.open(wallet)
+    const local = (await vi.mocked(dependencies.stateSource.getSnapshot)(wallet)).utxos[0]!
+    await service.queueUtxoSync({ txid: local.outpoint.txid, outpoints: [local] })
+    const previous = service.getPendingUtxoSync()!
+    const updated = {
+      ...local,
+      allocations: [...local.allocations, { ...local.allocations[0]!, assignmentIndex: 1 }],
+    }
+    await service.queueUtxoSync({ txid: local.outpoint.txid, outpoints: [updated] })
+    await service.markUtxoSyncCompleted(local.outpoint.txid, previous)
+    expect(service.getPendingUtxoSync()?.outpoints.find(utxo =>
+      utxo.outpoint.txid === local.outpoint.txid
+    )?.allocations).toHaveLength(2)
+    const current = service.getPendingUtxoSync()!
+    await service.markUtxoSyncCompleted(local.outpoint.txid, current)
+    expect(service.getPendingUtxoSync()).toBeUndefined()
+  })
+
+  it('replays locally settled allocations when the indexer omits them on a live outpoint', async () => {
+    const dependencies = createDependencies()
+    const service = new RgbService(dependencies)
+    await service.open(wallet)
+    await service.sync()
+    const local = service.getSnapshot().utxos[0]!
+    vi.mocked(dependencies.stateSource.getSnapshot).mockResolvedValueOnce({
+      syncedAt: 2,
+      utxos: [{ ...local, allocations: [] }, service.getSnapshot().utxos[1]!],
+    })
+    await service.sync()
+    expect(service.getSnapshot().utxos[0]?.allocations).toEqual(local.allocations)
+    expect(service.getPendingUtxoSync()?.txid).toBe(local.outpoint.txid)
+  })
+
+  it.each(['change', 'blind'] as const)(
+    'recovers a lost v1 %s allocation from accepted history and a confirmed wallet output',
+    async recipient => {
+    const genesis = encodeNiaGenesis({
+      ticker: 'NIA', name: 'Recovered', precision: 0, timestamp: 1,
+      network: 'mainnet', allocations: [{ txid: 'a'.repeat(64), vout: 0, blinding: 1n, amount: 100n }],
+    })
+    const rawAssetId = `rgb:${Buffer.from(genesis.assetId).toString('hex')}`
+    const assetId = encodeRgbContractId(genesis.assetId)
+    const receivedSeal = { txid: 'd'.repeat(64), vout: 0, blinding: 5n }
+    const invoice = decodeRgbInvoice(recipient === 'blind'
+      ? encodeBlindRgbInvoice({ network: 'mainnet', seal: receivedSeal, assetId, amount: '60' })
+      : `${rawAssetId}/schema/~/` + blindRecipient + '?amount=60')
+    const prepared = prepareNiaOpretTransfer({
+      network: 'mainnet', assetId: rawAssetId, amount: '60',
+      selectedUtxos: [{
+        outpoint: { txid: 'a'.repeat(64), vout: 0 }, satoshis: 10_000,
+        scriptPubKey: `5120${'11'.repeat(32)}`, publicKey: `02${'22'.repeat(32)}`,
+        allocations: [{ assetId: rawAssetId, amount: '100', settled: true, spendable: true,
+          opId: rawAssetId.slice(4), assignmentIndex: 0, assignmentType: 4000 }],
+      }],
+      recipientSeal: invoice.seal, feeRate: 2,
+      feeFunding: { utxos: [{
+        outpoint: { txid: 'b'.repeat(64), vout: 1 }, satoshis: 10_000,
+        scriptPubKey: `5120${'11'.repeat(32)}`, publicKey: `02${'22'.repeat(32)}`,
+      }], changeScriptPubKey: `5120${'11'.repeat(32)}`, changeDustLimit: 330 },
+      nonce: 1n, entropy: 2n, recipientBlinding: 3n, changeBlinding: 4n,
+    })
+    const psbt = Psbt.fromHex(prepared.psbtHex)
+    const transaction = Transaction.fromBuffer(
+      ((psbt.data.globalMap.unsignedTx as any).tx || psbt.data.globalMap.unsignedTx).toBuffer()
+    )
+    const bundle = serializeBfaOpretWitnessBundle({
+      witnessTx: transaction.toBuffer(), contractId: rawAssetId,
+      transitionId: prepared.transitionId, transition: prepared.transition,
+      inputs: [{ opId: rawAssetId.slice(4), assignmentType: 4000, assignmentIndex: 0 }],
+      entropy: 2n,
+    })
+    const consignment = encodeBfaTransferConsignment({
+      genesis: genesis.strict, validatedWitnessBundles: [], witnessBundle: bundle.strict,
+      terminals: [{ bundleId: bundle.bundleId, secretSeals: [
+        invoice.seal.type === 'confidential' ? invoice.seal.secretSeal : new Uint8Array(32),
+      ] }],
+    })
+    const output = transaction.outs[prepared.changeVout!]!
+    const target = recipient === 'blind'
+      ? { outpoint: { txid: receivedSeal.txid, vout: receivedSeal.vout },
+          satoshis: 1_000, scriptPubKey: `5120${'11'.repeat(32)}` }
+      : { outpoint: { txid: transaction.getId(), vout: prepared.changeVout! },
+          satoshis: output.value, scriptPubKey: output.script.toString('hex') }
+    const dependencies = createDependencies()
+    let now = 1_000_000
+    dependencies.now = () => now
+    vi.mocked(dependencies.stateSource.getSnapshot).mockResolvedValue({
+      syncedAt: 1, utxos: [{
+        ...target,
+        publicKey: `02${'22'.repeat(32)}`, chainStatus: 'confirmed', confirmations: 1,
+        allocations: [],
+      }],
+    })
+    let outputStatus: 'spent' | 'confirmed' = 'spent'
+    dependencies.stateSource.verifyUtxos = vi.fn(async (_wallet, outpoints) =>
+      outpoints.map(utxo => ({
+        outpoint: utxo.outpoint, status: outputStatus, confirmations: outputStatus === 'confirmed' ? 1 : 0,
+      }))
+    )
+    dependencies.validateBfaConsignment = vi.fn(({ payload, knownBlindSeals }) =>
+      validateBfaTransferConsignment(payload, {
+        network: 0, knownBlindSeals, isBitcoinTxConfirmed: async () => true,
+      })
+    )
+    const service = new RgbService(dependencies)
+    await service.open(wallet)
+    ;(service as any).state.contracts = {
+      [assetId]: { consignment: Buffer.from(consignment).toString('base64'), createdAt: 1 },
+    }
+    if (recipient === 'blind') (service as any).state.receivedBlindSeals = [receivedSeal]
+    await service.sync()
+    expect(service.getLocalAssetBalance(assetId)?.settled || '0').toBe('0')
+    expect(service.getPendingUtxoSync()).toBeUndefined()
+    outputStatus = 'confirmed'
+    now += 5 * 60_000 + 1
+    await service.sync()
+    expect(service.getLocalAssetBalance(assetId)).toMatchObject({
+      settled: recipient === 'blind' ? '60' : '40',
+      spendable: recipient === 'blind' ? '60' : '40',
+    })
+    expect(service.getPendingUtxoSync()?.outpoints[0]?.allocations).toContainEqual(
+      expect.objectContaining({ assetId, amount: recipient === 'blind' ? '60' : '40' })
+    )
+    expect(dependencies.stateSource.verifyUtxos).toHaveBeenCalledTimes(2)
+    }
+  )
 
   it('does not checkpoint when a snapshot refresh only advances syncedAt or returns an unverified empty replica', async () => {
     const dependencies = createDependencies()

@@ -28,7 +28,11 @@ import {
   isSupportedV1TransferConsignment,
   unwrapRgbContractConsignment,
 } from './protocol/bfa-consignment'
-import { mergeBfaValidatedHistories, pruneConfirmedBfaWitnesses } from './protocol/bfa-validator'
+import {
+  bfaConsignmentWitnessTxids,
+  mergeBfaValidatedHistories,
+  pruneConfirmedBfaWitnesses,
+} from './protocol/bfa-validator'
 import { convertNiaV0ConsignmentToV1, unwrapNiaV0Contract } from './protocol/nia-v0-migration'
 import { encodeNiaContract, encodeNiaTransferConsignment } from './protocol/nia-contract'
 import {
@@ -124,12 +128,14 @@ export class RgbService {
   private pendingReceiveOperation: Promise<void> = Promise.resolve()
   private openedFromStorage = false
   private recoveryBackupEnabled = false
+  private readonly v1AllocationRepairAttempts = new Map<string, number>()
 
   constructor(private readonly dependencies: RgbServiceDependencies) {
     this.now = dependencies.now || (() => Date.now())
   }
 
   async open(wallet: RgbWalletRef) {
+    this.v1AllocationRepairAttempts.clear()
     const storageKey = this.storageKey(wallet)
     const stored = await this.dependencies.storage.get<RgbServiceState>(storageKey)
     this.openedFromStorage = Boolean(
@@ -442,14 +448,46 @@ export class RgbService {
     // A remote snapshot may still expose consumed outpoints. Finish durable
     // post-broadcast delivery first, or leave the locally updated snapshot intact.
     if (Object.keys(state.pending).length) await this.advancePendingTransfers()
+    const localSnapshotBeforeRequest = JSON.stringify(state.snapshot.utxos)
     const snapshot = normalizeSnapshot(
       await this.dependencies.stateSource.getSnapshot(state.wallet)
     )
+    // A receive or broadcast may have queued a newer local allocation while
+    // the indexer request was in flight. Never apply that older response.
+    if (this.hasPendingSnapshotProtection() ||
+      JSON.stringify(state.snapshot.utxos) !== localSnapshotBeforeRequest) return state.snapshot
     // Keep the local funding update while the indexer still returns the RGB
     // allocations that this installation already spent in a broadcast tx.
     // Once those outpoints disappear from the remote snapshot, it is safe to
     // accept the remote state again, even before the transfer is confirmed.
     if (this.hasStaleBroadcastedFundingOutpoints(snapshot)) return state.snapshot
+    // A replica can briefly return the same live outpoint without the
+    // allocation we have already validated and settled. Re-publish the local
+    // observation rather than treating that omission as a zero balance.
+    const remoteOutpoints = new Map(snapshot.utxos.map(utxo => [outpointKey(utxo), utxo]))
+    const missingAllocation = state.snapshot.utxos.find(local => {
+      const remote = remoteOutpoints.get(outpointKey(local))
+      return remote &&
+        local.chainStatus !== 'spent' && local.chainStatus !== 'replaced' &&
+        local.scriptPubKey === remote.scriptPubKey && local.satoshis === remote.satoshis &&
+        local.allocations.some(allocation =>
+        !remote.allocations.some(candidate =>
+          candidate.opId === allocation.opId &&
+          candidate.assignmentIndex === allocation.assignmentIndex &&
+          candidate.assetId === allocation.assetId
+        )
+      )
+    })
+    if (missingAllocation) {
+      state.pendingUtxoSync = {
+        txid: missingAllocation.outpoint.txid,
+        outpoints: state.snapshot.utxos,
+      }
+      await this.persist()
+      return state.snapshot
+    }
+    if (await this.repairMissingV1Allocations(snapshot, localSnapshotBeforeRequest))
+      return state.snapshot
     // The indexer is an eventually-consistent replica of wallet-owned state.
     // Before accepting an empty response, confirm that every locally retained
     // UTXO is terminal. This preserves state while an indexer is rebuilding,
@@ -469,6 +507,95 @@ export class RgbService {
     state.snapshot = snapshot
     await this.persist({ skipRecovery: !checkpointSnapshotChanged })
     return state.snapshot
+  }
+
+  /** Rebuild an already accepted v1 receive if an older snapshot erased its color. */
+  private async repairMissingV1Allocations(
+    snapshot: RgbWalletSnapshot,
+    localSnapshotBeforeRequest: string
+  ): Promise<boolean> {
+    const state = this.requireState()
+    const validate = this.dependencies.validateBfaConsignment
+    const verifyUtxos = this.dependencies.stateSource.verifyUtxos
+    if (!validate || !verifyUtxos) return false
+    const network = state.wallet.network === 'mainnet' ||
+      state.wallet.network === 'fractal-mainnet' || state.wallet.network === 'fractal-test'
+      ? 0 : state.wallet.network === 'testnet' ? 1 : state.wallet.network === 'testnet4' ? 2 : 3
+    const live = snapshot.utxos.filter(utxo => utxo.chainStatus === 'confirmed')
+    if (!live.length) return false
+    const receivedBlindOutpoints = new Set((state.receivedBlindSeals || [])
+      .map(seal => `${seal.txid}:${seal.vout}`))
+    for (const [assetId, contract] of Object.entries(state.contracts || {})) {
+      const payload = Uint8Array.from(Buffer.from(contract.history?.payload || contract.consignment, 'base64'))
+      let witnessTxids: Set<string>
+      try {
+        if (!isSupportedV1TransferConsignment(payload)) continue
+        witnessTxids = new Set(bfaConsignmentWitnessTxids(payload, network))
+      } catch {
+        continue
+      }
+      const candidates = live.filter(utxo =>
+        (witnessTxids.has(utxo.outpoint.txid) || receivedBlindOutpoints.has(outpointKey(utxo))) &&
+        !utxo.allocations.some(allocation => allocation.assetId === assetId)
+      )
+      if (!candidates.length) continue
+      const key = `${assetId}:${candidates.map(utxo => outpointKey(utxo)).join(',')}`
+      const now = this.now()
+      if ((this.v1AllocationRepairAttempts.get(key) || 0) + 5 * 60_000 > now) continue
+      this.v1AllocationRepairAttempts.set(key, now)
+      let validated: Awaited<ReturnType<NonNullable<RgbServiceDependencies['validateBfaConsignment']>>>
+      try {
+        validated = await validate({
+          wallet: state.wallet, payload,
+          knownBlindSeals: this.getKnownBlindSeals(),
+          confirmedBitcoinWitnesses: state.confirmedBitcoinWitnesses ||= {},
+        })
+      } catch (error) {
+        console.warn('Unable to repair a locally validated RGB v1 allocation', error)
+        continue
+      }
+      if (validated.assetId !== assetId) continue
+      const possible = candidates.filter(utxo => validated.allocations.some(allocation =>
+        allocation.txid === utxo.outpoint.txid && allocation.vout === utxo.outpoint.vout &&
+        (!allocation.scriptPubKey || allocation.scriptPubKey === utxo.scriptPubKey)
+      ))
+      if (!possible.length) continue
+      let verified: Awaited<ReturnType<NonNullable<RgbServiceDependencies['stateSource']['verifyUtxos']>>>
+      try {
+        verified = await verifyUtxos(state.wallet, possible)
+      } catch (error) {
+        console.warn('Unable to verify a missing RGB v1 allocation output', error)
+        continue
+      }
+      if (this.hasPendingSnapshotProtection() ||
+        JSON.stringify(state.snapshot.utxos) !== localSnapshotBeforeRequest) return true
+      const confirmed = new Set(verified.filter(item => item.status === 'confirmed')
+        .map(item => `${item.outpoint.txid}:${item.outpoint.vout}`))
+      let repairedTxid: string | undefined
+      for (const utxo of possible) {
+        if (!confirmed.has(outpointKey(utxo))) continue
+        for (const allocation of validated.allocations) {
+          if (allocation.txid !== utxo.outpoint.txid || allocation.vout !== utxo.outpoint.vout ||
+            (allocation.scriptPubKey && allocation.scriptPubKey !== utxo.scriptPubKey)) continue
+          if (utxo.allocations.some(item =>
+            item.opId === allocation.opId && item.assignmentIndex === allocation.assignmentIndex
+          )) continue
+          utxo.allocations.push({
+            assetId, amount: allocation.amount, settled: true, spendable: true,
+            opId: allocation.opId, assignmentIndex: allocation.assignmentIndex,
+            assignmentType: 4000,
+          })
+          repairedTxid = utxo.outpoint.txid
+        }
+      }
+      if (!repairedTxid) continue
+      const rollback = snapshotState(state)
+      state.snapshot = snapshot
+      state.pendingUtxoSync = { txid: repairedTxid, outpoints: snapshot.utxos }
+      await this.persistWithRecoveryRollback(rollback)
+      return true
+    }
+    return false
   }
 
   private hasStaleBroadcastedFundingOutpoints(snapshot: RgbWalletSnapshot) {
@@ -820,9 +947,10 @@ export class RgbService {
     })
   }
 
-  async markUtxoSyncCompleted(txid: string) {
+  async markUtxoSyncCompleted(txid: string, completed?: RgbPendingUtxoSync) {
     const state = this.requireState()
-    if (!state.pendingUtxoSync || state.pendingUtxoSync.txid !== txid) return
+    if (!state.pendingUtxoSync || state.pendingUtxoSync.txid !== txid ||
+      (completed && state.pendingUtxoSync !== completed)) return
     delete state.pendingUtxoSync
     await this.persist()
   }

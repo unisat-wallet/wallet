@@ -624,6 +624,14 @@ function parseConsignment(value: Uint8Array, network: number, known = new Map<st
   }
   return { genesis, bundles, terminals, body, patches }
 }
+
+/** Cheap local hint for repairing a previously validated wallet allocation. */
+export function bfaConsignmentWitnessTxids(
+  value: Uint8Array,
+  network: BfaValidationOptions['network']
+): string[] {
+  return parseConsignment(value, network).bundles.map(bundle => bundle.txid)
+}
 function applyPatches(body: Uint8Array, patches: SealPatch[]): Uint8Array {
   if (!patches.length) return body
   const parts: Uint8Array[] = []
