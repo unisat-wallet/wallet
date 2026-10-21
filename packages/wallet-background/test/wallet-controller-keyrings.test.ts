@@ -798,7 +798,7 @@ describe('RGB fee-pool inspection', () => {
 
     const inspection = await wallet.getRgbFeePoolInspection()
 
-    expect(inspection.ready).toBe(true)
+    expect(inspection.ready).toBe(false)
     expect(inspection.availableCount).toBe(2)
     expect(inspection.withdrawals).toEqual([])
     expect(inspection.utxos).toEqual(
@@ -808,6 +808,11 @@ describe('RGB fee-pool inspection', () => {
         expect.objectContaining({ txid: 'c'.repeat(64), vout: 2, available: true, pending: true }),
       ])
     )
+    vi.mocked(walletApiService.bitcoin.getAllBTCUtxos).mockResolvedValue([
+      { txid: 'a'.repeat(64), vout: 0, satoshis: 2_500 },
+      { txid: 'b'.repeat(64), vout: 1, satoshis: 5_000 },
+    ] as any)
+    expect((await wallet.getRgbFeePoolInspection()).ready).toBe(true)
   })
 })
 

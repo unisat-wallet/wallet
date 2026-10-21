@@ -419,6 +419,14 @@ export function useSendRGBScreenLogic() {
     setStep(SendRGBScreenStep.SIGN_TX)
   }
 
+  const prepareFeePoolTopUp = async () => {
+    const topUp = await wallet.createRgbFeePoolTopUpBegin({ feeRate })
+    if (!topUp?.toSignData) throw new Error(t('rgb_send_transaction_unavailable'))
+    transferData.current = { toSignData: topUp.toSignData, feePoolTopUp: true }
+    setSignRequestVersion(version => version + 1)
+    setStep(SendRGBScreenStep.SIGN_TX)
+  }
+
   const onClickNext = async () => {
     if (!Number.isFinite(feeRate) || feeRate <= 0) return
     const inputVersion = invoiceInputVersion.current
@@ -444,18 +452,17 @@ export function useSendRGBScreenLogic() {
       // recipient ID can be occupied after the debounce check completed.
       if (!burn) await checkInvoiceAvailability()
       if (inputVersion !== invoiceInputVersion.current) return
+      const feePool = await wallet.getRgbFeePoolStatus({ feeRate })
+      if (inputVersion !== invoiceInputVersion.current) return
+      if (!feePool.ready) {
+        await prepareFeePoolTopUp()
+        return
+      }
       try {
         await prepareRgbSend()
       } catch (error) {
         if (!isMissingRgbFeeFunding(error)) throw error
-        const topUp = await wallet.createRgbFeePoolTopUpBegin({ feeRate })
-        if (!topUp?.toSignData) throw new Error(t('rgb_send_transaction_unavailable'))
-        transferData.current = {
-          toSignData: topUp.toSignData,
-          feePoolTopUp: true,
-        }
-        setSignRequestVersion(version => version + 1)
-        setStep(SendRGBScreenStep.SIGN_TX)
+        await prepareFeePoolTopUp()
       }
     } catch (e) {
       if (inputVersion !== invoiceInputVersion.current) return

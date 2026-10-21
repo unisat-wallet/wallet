@@ -5029,6 +5029,9 @@ export class WalletController extends BaseController {
       }))
       .sort((a, b) => a.txid.localeCompare(b.txid) || a.vout - b.vout)
     const availableCount = utxos.filter(utxo => utxo.available).length
+    const availableSatoshis = utxos.reduce(
+      (total, utxo) => total + (utxo.available ? utxo.satoshis : 0), 0
+    )
     const withdrawals = await this.getRgbFeePoolWithdrawalHistory(wallet)
     return {
       address: feeAccount.address,
@@ -5036,7 +5039,7 @@ export class WalletController extends BaseController {
       minimumSatoshis,
       availableCount,
       targetCount: RGB_FEE_POOL_TARGET_UTXOS,
-      ready: availableCount > 0,
+      ready: availableSatoshis >= RGB_FEE_POOL_UTXO_SATS,
       utxos,
       withdrawals,
     }
