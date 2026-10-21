@@ -3525,6 +3525,15 @@
   "rgb_reject_transfer": {
     "message": "拒絕"
   },
+  "rgb_reject_receive_confirm_title": {
+    "message": "確定拒絕這筆轉帳？"
+  },
+  "rgb_reject_receive_confirm_description": {
+    "message": "此操作無法復原。拒絕後，你將無法再接受這筆轉帳。"
+  },
+  "rgb_confirm_reject_transfer": {
+    "message": "確認拒絕"
+  },
   "rgb_accept_transfer_success": {
     "message": "已接受轉帳"
   },

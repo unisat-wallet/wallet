@@ -3536,6 +3536,15 @@
   "rgb_reject_transfer": {
     "message": "Reject"
   },
+  "rgb_reject_receive_confirm_title": {
+    "message": "Reject this transfer?"
+  },
+  "rgb_reject_receive_confirm_description": {
+    "message": "This action cannot be undone. After rejecting, you will no longer be able to accept this transfer."
+  },
+  "rgb_confirm_reject_transfer": {
+    "message": "Confirm reject"
+  },
   "rgb_accept_transfer_success": {
     "message": "Transfer accepted"
   },

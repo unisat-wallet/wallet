@@ -18,6 +18,7 @@ import {
 } from '@unisat/wallet-state';
 
 import { useRgbWriteLeaseGuard } from './components/useRgbWriteLeaseGuard';
+import { RGBRejectReceiveConfirmModal } from './components/RGBRejectReceiveConfirmModal';
 
 function getStatusLabel(status: string, t: (key: string) => string, type?: RgbTransferItem['type']) {
   switch (status.toLowerCase()) {
@@ -205,6 +206,7 @@ export function RGBTransferDetailSheet({
   const tools = useTools();
   const { requestWrite, writeLeaseModal } = useRgbWriteLeaseGuard();
   const [cancelConfirmVisible, setCancelConfirmVisible] = useState(false);
+  const [rejectConfirmVisible, setRejectConfirmVisible] = useState(false);
   const [cancelAcknowledged, setCancelAcknowledged] = useState(false);
   const [cancelLoading, setCancelLoading] = useState(false);
   const [actionLoading, setActionLoading] = useState(false);
@@ -522,7 +524,7 @@ export function RGBTransferDetailSheet({
                   text={t('rgb_reject_transfer')}
                   preset="default"
                   disabled={actionLoading}
-                  onClick={() => void requestWrite(() => void onRejectReceive())}
+                  onClick={() => setRejectConfirmVisible(true)}
                   full
                   style={{
                     height: 48,
@@ -591,6 +593,15 @@ export function RGBTransferDetailSheet({
         </Column>
         {renderCancelConfirmModal()}
       </BottomModal>
+      <RGBRejectReceiveConfirmModal
+        visible={rejectConfirmVisible}
+        loading={actionLoading}
+        onClose={() => setRejectConfirmVisible(false)}
+        onConfirm={() => {
+          setRejectConfirmVisible(false);
+          void requestWrite(() => void onRejectReceive());
+        }}
+      />
       {writeLeaseModal}
     </>
   );

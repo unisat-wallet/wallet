@@ -14,6 +14,7 @@ import {
 } from '@unisat/wallet-state';
 
 import { RGBTransferNotificationPanel } from './components/RGBTransferNotificationPanel';
+import { RGBRejectReceiveConfirmModal } from './components/RGBRejectReceiveConfirmModal';
 
 function getStatusLabel(status: string, t: (key: string) => string, type?: RgbTransferItem['type']) {
   switch (status.toLowerCase()) {
@@ -81,6 +82,7 @@ function isFailedStatus(status: string) {
 export default function RGBTransferDetailScreen() {
   const chain = useChain();
   const [dismissedBroadcastId, setDismissedBroadcastId] = useState<string>();
+  const [rejectConfirmVisible, setRejectConfirmVisible] = useState(false);
   const {
     transfer,
     transferId,
@@ -208,7 +210,7 @@ export default function RGBTransferDetailScreen() {
               text={t('rgb_reject_transfer')}
               preset="default"
               disabled={receiveActionLoading}
-              onClick={() => void onRejectReceive()}
+              onClick={() => setRejectConfirmVisible(true)}
               style={{ background: 'transparent', border: '1px solid rgba(255,255,255,0.42)' }}
               textStyle={{ color: colors.white, fontWeight: 'normal' }}
             />
@@ -235,6 +237,16 @@ export default function RGBTransferDetailScreen() {
         actionText={t('done')}
         onAction={dismissNotification}
         onClose={dismissNotification}
+      />
+      <RGBRejectReceiveConfirmModal
+        visible={rejectConfirmVisible}
+        loading={receiveActionLoading}
+        onClose={() => setRejectConfirmVisible(false)}
+        onConfirm={() => {
+          void onRejectReceive().then(rejected => {
+            if (rejected) setRejectConfirmVisible(false);
+          });
+        }}
       />
       {canBroadcast && dismissedBroadcastId !== transferId ? (
         <BottomModal onClose={() => setDismissedBroadcastId(transferId)}>
