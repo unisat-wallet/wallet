@@ -2,6 +2,16 @@ import { describe, expect, it, vi } from 'vitest'
 import { concealBlindSeal, decodeRgbInvoice, encodeBlindRgbInvoice } from '../src'
 
 describe('blind RGB receive', () => {
+  it('uses the RGB Signet beneficiary prefix', () => {
+    const invoice = encodeBlindRgbInvoice({
+      network: 'signet',
+      seal: { txid: '11'.repeat(32), vout: 2, blinding: 3n },
+    })
+    expect(invoice).toContain('/sb:utxob:')
+    expect(decodeRgbInvoice(invoice).network).toBe('signet')
+    expect(decodeRgbInvoice(invoice.replace('/sb:utxob:', '/tbs:utxob:')).network).toBe('signet')
+  })
+
   it.each([
     { name: 'any asset', assetId: undefined, amount: undefined },
     { name: 'fixed asset, any amount', assetId: 'rgb:CgoKCgoK-CgoKCgo-KCgoKCg-oKCgoKC-goKCgoK-CgoKCgo', amount: undefined },

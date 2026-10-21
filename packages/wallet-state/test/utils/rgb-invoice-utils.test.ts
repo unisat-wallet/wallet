@@ -8,6 +8,11 @@ import {
 } from '../../src/utils/rgb-invoice-utils'
 
 describe('rgb invoice utils', () => {
+  it('identifies standard and older Signet invoice prefixes', () => {
+    expect(decodeRgbInvoice('rgb:~/~/~/sb:utxob:test').network).toBe('signet')
+    expect(decodeRgbInvoice('rgb:~/~/~/tbs:utxob:test').network).toBe('signet')
+  })
+
   it('decodes fungible amount state from RGB invoice encoding', () => {
     expect(decodeRgbInvoiceAmountState('ae')).toBe('1')
     expect(decodeRgbInvoiceAmountState('BF')).toBe('100')

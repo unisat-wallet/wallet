@@ -8,6 +8,17 @@ import {
 } from '../src'
 
 describe('decodeRgbInvoice', () => {
+  it('uses the RGB Signet beneficiary prefix for witness invoices', () => {
+    const invoice = encodeWitnessRgbInvoice({
+      network: 'signet',
+      scriptPubKey: '512079be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798',
+      transportEndpoints: ['rpcs://proxy.example/rgb/json-rpc'],
+    })
+    expect(invoice).toContain('/sb:wvout:')
+    expect(decodeRgbInvoice(invoice).network).toBe('signet')
+    expect(decodeRgbInvoice(invoice.replace('/sb:wvout:', '/tbs:wvout:')).network).toBe('signet')
+  })
+
   it('decodes invoice identity, amount and transport without a network request', () => {
     const invoice = decodeRgbInvoice(
       'rgb:BQUFBQUF-BQUFBQU-FBQUFBQ-UFBQUFB-QUFBQUF-BQUFBQU/schema-id/~/bc:wvout:A8cJ7Ww3-NIzADo3-Tzp_5aD-7CTBWmA-AAAAAAA-AAAAAAA-ALSQkcw?amount=42&endpoints=rpcs%3A%2F%2Fproxy.example'

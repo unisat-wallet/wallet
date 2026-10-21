@@ -113,7 +113,8 @@ function invoiceNetwork(recipientId: string): RgbNetwork | undefined {
       return 'mainnet'
     case 'tb':
       return 'testnet'
-    case 'tbs':
+    case 'sb':
+    case 'tbs': // Read invoices created by older wallet versions.
       return 'signet'
     default:
       return undefined
@@ -169,7 +170,7 @@ function networkPrefix(network: RgbNetwork) {
     case 'fractal-test':
       return 'bc'
     case 'signet':
-      return 'tbs'
+      return 'sb'
     case 'testnet':
     case 'testnet4':
       return 'tb'

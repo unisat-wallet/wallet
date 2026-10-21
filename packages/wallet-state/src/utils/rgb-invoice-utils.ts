@@ -187,6 +187,7 @@ function getNetwork(recipientId?: string) {
   const map: Record<string, string> = {
     bc: 'mainnet',
     tb: 'testnet',
+    sb: 'signet',
     tbs: 'signet',
     bcrt: 'regtest',
   }

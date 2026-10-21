@@ -86,7 +86,7 @@ function networkPrefix(network: RgbNetwork) {
     case 'fractal-test':
       return 'bc'
     case 'signet':
-      return 'tbs'
+      return 'sb'
     case 'testnet':
     case 'testnet4':
       return 'tb'
