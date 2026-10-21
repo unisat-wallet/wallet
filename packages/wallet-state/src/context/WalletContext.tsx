@@ -625,6 +625,8 @@ export interface WalletController {
 
   /** Base64 of a standard RGB\0CON contract file (NIA only). */
   exportRgbAssetContract(assetId: string): Promise<string>
+  /** Base64 of a terminal-free RGB\0TFR BFA burn proof. */
+  exportRgbBurnConsignment(txid: string): Promise<string>
 
   getRGBAssetActivity(
     address: string,
@@ -860,6 +862,8 @@ export interface WalletController {
     feeRate?: number
     minConfirmations?: number
     donation?: boolean
+    burn?: boolean
+    burnReason?: string
     witnessData?: {
       amountSat: number | string
       blinding?: number | string | null

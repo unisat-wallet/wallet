@@ -10,6 +10,8 @@ import {
   toRgbDisplayAmount,
   useChain,
   useRGBTransferDetailLogic,
+  useTools,
+  useWallet,
   type RgbTransferItem
 } from '@unisat/wallet-state';
 
@@ -80,6 +82,8 @@ function isFailedStatus(status: string) {
 }
 
 export default function RGBTransferDetailScreen() {
+  const wallet = useWallet();
+  const tools = useTools();
   const chain = useChain();
   const [dismissedBroadcastId, setDismissedBroadcastId] = useState<string>();
   const [rejectConfirmVisible, setRejectConfirmVisible] = useState(false);
@@ -118,6 +122,22 @@ export default function RGBTransferDetailScreen() {
   const isFailed = isFailedStatus(status);
   const isIssue = transfer?.type === 'issue';
   const recordId = isIssue ? transfer?.txid : transfer?.transferId || transferId;
+
+  const downloadBurnProof = async () => {
+    if (!transfer?.txid) return;
+    try {
+      const payload = await wallet.exportRgbBurnConsignment(transfer.txid);
+      const bytes = Uint8Array.from(atob(payload), (char) => char.charCodeAt(0));
+      const url = URL.createObjectURL(new Blob([bytes], { type: 'application/octet-stream' }));
+      const anchor = document.createElement('a');
+      anchor.href = url;
+      anchor.download = `bfa-burn-${transfer.txid}.rgb`;
+      anchor.click();
+      setTimeout(() => URL.revokeObjectURL(url), 0);
+    } catch (error) {
+      tools.toastError(error instanceof Error ? error.message : String(error));
+    }
+  };
 
   return (
     <Layout>
@@ -203,34 +223,46 @@ export default function RGBTransferDetailScreen() {
         {loading ? <Text text={t('loading')} color="textDim" textCenter /> : null}
       </Content>
       <Footer>
-        {canAcceptReceive ? (
-          <Row fullX gap="md">
+        <Column gap="sm">
+          {transfer?.burn && transfer.txid ? (
             <Button
               full
-              text={t('rgb_reject_transfer')}
-              preset="default"
-              disabled={receiveActionLoading}
-              onClick={() => setRejectConfirmVisible(true)}
-              style={{ background: 'transparent', border: '1px solid rgba(255,255,255,0.42)' }}
-              textStyle={{ color: colors.white, fontWeight: 'normal' }}
+              text={t('rgb_download_burn_proof')}
+              preset="primary"
+              style={{ height: 50, minHeight: 50, borderRadius: 12 }}
+              onClick={() => void downloadBurnProof()}
+              data-testid="rgb-download-burn-proof"
             />
+          ) : null}
+          {canAcceptReceive ? (
+            <Row fullX gap="md">
+              <Button
+                full
+                text={t('rgb_reject_transfer')}
+                preset="default"
+                disabled={receiveActionLoading}
+                onClick={() => setRejectConfirmVisible(true)}
+                style={{ background: 'transparent', border: '1px solid rgba(255,255,255,0.42)' }}
+                textStyle={{ color: colors.white, fontWeight: 'normal' }}
+              />
+              <Button
+                full
+                text={t('rgb_accept_transfer')}
+                disabled={receiveActionLoading}
+                onClick={() => void onAcceptReceive()}
+              />
+            </Row>
+          ) : canBroadcast || canRetryBroadcast ? (
             <Button
               full
-              text={t('rgb_accept_transfer')}
-              disabled={receiveActionLoading}
-              onClick={() => void onAcceptReceive()}
+              text={t(canBroadcast ? 'Broadcast' : 'rgb_retry_broadcast')}
+              disabled={broadcastRetryLoading}
+              onClick={() => void onRetryBroadcast()}
             />
-          </Row>
-        ) : canBroadcast || canRetryBroadcast ? (
-          <Button
-            full
-            text={t(canBroadcast ? 'Broadcast' : 'rgb_retry_broadcast')}
-            disabled={broadcastRetryLoading}
-            onClick={() => void onRetryBroadcast()}
-          />
-        ) : (
-          <Button full text={t('done')} onClick={onClickDone} />
-        )}
+          ) : (
+            <Button full text={t('done')} onClick={onClickDone} />
+          )}
+        </Column>
       </Footer>
       <RGBTransferNotificationPanel
         notification={notification}

@@ -34,6 +34,8 @@ type RgbTransferQueryDependencies = {
 
 /** Merges durable local RGB records into the first page of indexer activity. */
 export class RgbTransferQuery {
+  private readonly confirmedBurnTxids = new Set<string>()
+
   constructor(private readonly dependencies: RgbTransferQueryDependencies) {}
 
   // eslint-disable-next-line @typescript-eslint/explicit-function-return-type -- preserve the precise merged activity response.
@@ -113,12 +115,25 @@ export class RgbTransferQuery {
         .map(item => item.txid)
         .filter((txid): txid is string => !!txid)
     )
+    const burnTxids = [...new Set((service.getPendingSendHistory?.() || [])
+      .filter(send => send.burn && send.txid)
+      .map(send => send.txid!))]
+    await Promise.all(burnTxids.map(async txid => {
+      if (confirmedActivityTxids.has(txid) || this.confirmedBurnTxids.has(txid)) return
+      try {
+        if (await service.getBurnTransactionStatus(txid) === 'confirmed')
+          this.confirmedBurnTxids.add(txid)
+      } catch (error) {
+        this.dependencies.warn('Failed to check BFA burn confirmation', error)
+      }
+    }))
     const localSends = pendingTransfers.map(transfer => ({
       id: `local-send:${transfer.id}`,
       transferId: transfer.id,
       assetId: transfer.request.assetId,
       ...localAssetMetadata(transfer.request.assetId),
       type: 'send' as const,
+      ...(transfer.request.burn ? { burn: true } : {}),
       amount: transfer.request.amount,
       precision: transfer.request.precision,
       txid: transfer.delivery?.completed.txid ?? transfer.broadcast?.completed.txid,
@@ -145,11 +160,15 @@ export class RgbTransferQuery {
       assetId: send.assetId,
       ...localAssetMetadata(send.assetId),
       type: 'send' as const,
+      ...(send.burn ? { burn: true } : {}),
       amount: send.amount,
       precision: send.precision,
       txid: send.txid,
       timestamp: send.createdAt,
-      status: send.recipientAck === false
+      status: send.burn && send.txid &&
+        (confirmedActivityTxids.has(send.txid) || this.confirmedBurnTxids.has(send.txid))
+        ? 'confirmed'
+        : send.recipientAck === false
         ? 'rejected'
         : send.recipientAckExpected && send.txid && confirmedActivityTxids.has(send.txid)
           ? 'confirmed'
@@ -276,6 +295,7 @@ export class RgbTransferQuery {
     }))
     const visibleLocalSendHistory = localSendHistory.filter(
       send =>
+        send.burn ||
         !send.broadcasted ||
         send.awaitingRecipientAck ||
         send.recipientRejected ||
@@ -284,6 +304,7 @@ export class RgbTransferQuery {
     )
     for (const send of localSendHistory) {
       if (
+        send.burn ||
         !send.broadcasted ||
         send.awaitingRecipientAck ||
         send.recipientRejected ||

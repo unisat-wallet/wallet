@@ -180,10 +180,11 @@ export function useSendRGBScreenLogic() {
   const wallet = useWallet()
   const tools = useTools()
   const { t } = useI18n()
-  const { assetId, tokenBalance } = nav.getRouteState<'SendRGBScreen'>()
+  const { assetId, tokenBalance, burn = false } = nav.getRouteState<'SendRGBScreen'>()
   const { feeRate } = useFeeRateBar()
   const [invoice, setInvoice] = useState('')
   const [amount, setAmount] = useState('')
+  const [burnReason, setBurnReason] = useState('')
   const [donation, setDonation] = useState(false)
   const [error, setError] = useState('')
   const [feePoolRequirement, setFeePoolRequirement] = useState<RgbFeePoolRequirement>()
@@ -216,15 +217,15 @@ export function useSendRGBScreenLogic() {
     invoice.trim().length > 0 &&
     !(typeof invoiceProxyPublicKey === 'string' && /^[0-9a-f]{64}$/.test(invoiceProxyPublicKey))
   const hasTransportEndpoint = decodedInvoice.transportEndpoints.length > 0
-  const invoiceInvalid =
+  const invoiceInvalid = !burn &&
     invoice.trim().length > 0 && (!decodedInvoice.valid || !hasTransportEndpoint)
-  const invoiceReadyForAmount =
+  const invoiceReadyForAmount = burn || (
     invoice.trim().length > 0 &&
     decodedInvoice.valid &&
     hasTransportEndpoint &&
     !invoiceAssetMismatch &&
-    !bfaInvoiceUnsupported
-  const invoiceValidationMessage = invoiceInvalid
+    !bfaInvoiceUnsupported)
+  const invoiceValidationMessage = burn ? '' : invoiceInvalid
     ? t('invalid_rgb_invoice')
     : invoiceAssetMismatch
       ? t('invoice_asset_mismatch')
@@ -235,7 +236,7 @@ export function useSendRGBScreenLogic() {
           : invoiceAvailability === 'error'
             ? invoiceAvailabilityError || t('rgb_invoice_transport_unreachable')
             : ''
-  const requiresAmount = invoice.trim().length > 0 && decodedInvoice.needsAmount
+  const requiresAmount = burn || (invoice.trim().length > 0 && decodedInvoice.needsAmount)
   const amountInput = amount.trim()
   const assetPrecision = getRgbTokenPrecision(tokenBalance)
   const spendable = blockingSendStatus ? '0' : toRgbDisplayAmount(rawSpendable, assetPrecision)
@@ -351,15 +352,16 @@ export function useSendRGBScreenLogic() {
   const disabled = useMemo(() => {
     return (
       !invoiceReadyForAmount ||
-      invoiceAvailability === 'checking' ||
-      invoiceAvailability === 'unavailable' ||
-      invoiceAvailability === 'error' ||
+      (!burn && (invoiceAvailability === 'checking' ||
+        invoiceAvailability === 'unavailable' || invoiceAvailability === 'error')) ||
       feeRate <= 0 ||
       !isAmountValid ||
       insufficientBalance ||
+      (burn && (!/^(?:0x)?[0-9a-f]{40}$/i.test(burnReason.trim()) ||
+        /^0+$/.test(burnReason.trim().replace(/^0x/i, '')))) ||
       !!blockingSendStatus
     )
-  }, [invoiceReadyForAmount, feeRate, isAmountValid, insufficientBalance, blockingSendStatus, invoiceAvailability])
+  }, [invoiceReadyForAmount, feeRate, isAmountValid, insufficientBalance, blockingSendStatus, invoiceAvailability, burn, burnReason])
 
   const onClickBack = () => {
     nav.goBack()
@@ -385,7 +387,7 @@ export function useSendRGBScreenLogic() {
 
   const prepareRgbSend = async () => {
     const beginResult = await wallet.createRgbSendBegin({
-      invoice: decodedInvoice.submissionInvoice,
+      invoice: burn ? '' : decodedInvoice.submissionInvoice,
       assetId: invoiceAssetId || assetId,
       amount: requiresAmount ? normalizedAmount : undefined,
       ticker,
@@ -393,6 +395,8 @@ export function useSendRGBScreenLogic() {
       precision: assetPrecision,
       feeRate,
       donation,
+      burn,
+      ...(burnReason.trim() ? { burnReason: burnReason.trim() } : {}),
     })
     const toSignData = beginResult?.toSignData
     if (!toSignData) {
@@ -428,17 +432,12 @@ export function useSendRGBScreenLogic() {
             : t('rgb_transfer_broadcasting_description')
         )
       }
-      if (
-        !decodedInvoice.valid ||
-        !hasTransportEndpoint ||
-        invoiceAssetMismatch ||
-        bfaInvoiceUnsupported
-      ) {
+      if (!burn && (!decodedInvoice.valid || !hasTransportEndpoint || invoiceAssetMismatch || bfaInvoiceUnsupported)) {
         throw new Error(invoiceValidationMessage || t('invalid_rgb_invoice'))
       }
       // Always run one final, read-only probe before creating a PSBT: a
       // recipient ID can be occupied after the debounce check completed.
-      await checkInvoiceAvailability()
+      if (!burn) await checkInvoiceAvailability()
       if (inputVersion !== invoiceInputVersion.current) return
       try {
         await prepareRgbSend()
@@ -529,6 +528,7 @@ export function useSendRGBScreenLogic() {
                     ? 'canceled'
                     : 'broadcasted',
           local: true,
+          ...(burn ? { burn: true } : {}),
         },
       })
       transferData.current = {}
@@ -591,6 +591,9 @@ export function useSendRGBScreenLogic() {
     step,
     t,
     assetId,
+    burn,
+    burnReason,
+    setBurnReason,
     tokenBalance,
     ticker,
     name,

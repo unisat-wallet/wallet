@@ -138,6 +138,84 @@ function createDependencies(): RgbServiceDependencies {
 }
 
 describe('RgbService', () => {
+  it('broadcasts a BFA burn without proxy delivery and retains its exact consignment after reopening', async () => {
+    const dependencies = createDependencies()
+    const service = new RgbService(dependencies)
+    const assetId = 'rgb:AQEBAQEB-AQEBAQE-BAQEBAQ-EBAQEBA-QEBAQEB-AQEBAQE'
+    const txid = 'c'.repeat(64)
+    const proof = Buffer.from('RGB\0TFRburn-proof')
+    dependencies.encoder.prepareBurn = vi.fn().mockResolvedValue({
+      id: 'burn-1', psbt: 'cHNidP8=', toSignInputs: [],
+      lockedOutpoints: [{ txid: 'b'.repeat(64), vout: 1 }],
+      metadata: { schema: 'BFA_BURN', transitionId: 'd'.repeat(64) },
+    })
+    dependencies.encoder.completeTransfer = vi.fn().mockResolvedValue({
+      txid, rawTx: '02000000000000000000',
+      consignments: [{ recipientId: '', payload: proof.toString('base64'), assetId, opIds: ['d'.repeat(64)] }],
+    })
+    dependencies.validateBfaConsignment = vi.fn().mockResolvedValue({
+      assetId, metadata: { schema: 'BFA' }, terminals: [], bundles: [{ operationIds: ['d'.repeat(64)] }],
+    })
+    await service.open(wallet)
+    ;(service as any).state.contracts = {
+      [assetId]: { consignment: proof.toString('base64'), createdAt: 1,
+        metadata: { ticker: 'BFA', name: 'Burnable', precision: 0, schema: 'BFA', issuedSupply: '100' } },
+    }
+    await service.sync()
+    await expect(service.prepareBurn({ assetId, amount: '60', feeRate: 1 })).rejects.toThrow('requires an EVM address')
+    await service.prepareBurn({ assetId, amount: '60', feeRate: 1,
+      burnReason: '0xf39FD6e51aad88f6f4ce6ab8827279cfffb92266' })
+    expect(service.getPendingTransfers()[0]?.request.burnReason).toBe(
+      '000000000000000000000000f39fd6e51aad88f6f4ce6ab8827279cfffb92266'
+    )
+    await service.completeSend('burn-1', 'signed-psbt')
+
+    expect(dependencies.transport.publishConsignment).not.toHaveBeenCalled()
+    expect(dependencies.stateSource.syncBroadcast).not.toHaveBeenCalled()
+    expect(dependencies.broadcaster.broadcast).toHaveBeenCalledTimes(1)
+    expect(Buffer.from(service.exportBurnConsignment(txid))).toEqual(proof)
+    const reopened = new RgbService(dependencies)
+    await reopened.open(wallet)
+    expect(Buffer.from(reopened.exportBurnConsignment(txid))).toEqual(proof)
+    expect(reopened.getPendingSendHistory()).toEqual([
+      expect.objectContaining({ burn: true, txid, amount: '60', status: 'broadcasted' }),
+    ])
+  })
+
+  it('does not rebroadcast a failed BFA burn during sync and allows explicit retry', async () => {
+    const dependencies = createDependencies()
+    const service = new RgbService(dependencies)
+    const assetId = 'rgb:AQEBAQEB-AQEBAQE-BAQEBAQ-EBAQEBA-QEBAQEB-AQEBAQE'
+    const txid = 'c'.repeat(64)
+    dependencies.encoder.prepareBurn = vi.fn().mockResolvedValue({
+      id: 'burn-1', psbt: 'cHNidP8=', toSignInputs: [],
+      lockedOutpoints: [{ txid: 'b'.repeat(64), vout: 1 }], metadata: { schema: 'BFA_BURN', transitionId: 'd'.repeat(64) },
+    })
+    dependencies.encoder.completeTransfer = vi.fn().mockResolvedValue({
+      txid, rawTx: '02000000000000000000',
+      consignments: [{ recipientId: '', payload: Buffer.from('RGB\0TFRburn').toString('base64'), assetId, opIds: ['d'.repeat(64)] }],
+    })
+    dependencies.validateBfaConsignment = vi.fn().mockResolvedValue({
+      assetId, metadata: { schema: 'BFA' }, terminals: [], bundles: [{ operationIds: ['d'.repeat(64)] }],
+    })
+    ;(dependencies.broadcaster.broadcast as ReturnType<typeof vi.fn>)
+      .mockRejectedValueOnce(new Error('node unavailable')).mockResolvedValue(txid)
+    await service.open(wallet)
+    ;(service as any).state.contracts = {
+      [assetId]: { consignment: 'AA==', createdAt: 1,
+        metadata: { ticker: 'BFA', name: 'Burnable', precision: 0, schema: 'BFA', issuedSupply: '100' } },
+    }
+    await service.sync()
+    await service.prepareBurn({ assetId, amount: '60', feeRate: 1,
+      burnReason: '0xf39fd6e51aad88f6f4ce6ab8827279cfffb92266' })
+    await expect(service.completeSend('burn-1', 'signed-psbt')).rejects.toThrow('node unavailable')
+    await service.syncPendingTransfers()
+    expect(dependencies.broadcaster.broadcast).toHaveBeenCalledTimes(1)
+    await service.broadcastPendingSend('burn-1')
+    expect(dependencies.broadcaster.broadcast).toHaveBeenCalledTimes(2)
+    expect(Buffer.from(service.exportBurnConsignment(txid))).toEqual(Buffer.from('RGB\0TFRburn'))
+  })
+
   it('reopens an Any Asset receive canceled before its asset was known', async () => {
     const dependencies = createDependencies()
     const service = new RgbService(dependencies)

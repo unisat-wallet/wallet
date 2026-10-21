@@ -212,6 +212,7 @@ export type RouteParamList = {
   SendRGBScreen: {
     assetId: string
     tokenBalance?: RgbBalance
+    burn?: boolean
   }
   RGBSendCompleteScreen: {
     assetId: string

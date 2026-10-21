@@ -12,6 +12,9 @@ import type {
   RgbWalletRef,
 } from '../types'
 import { encodeBfaTransferConsignment, BFA_SCHEMA_ID, NIA_V1_SCHEMA_ID } from './bfa-consignment'
+import { createRgbOpretPsbt } from './bitcoin'
+import { normalizeBfaBurnDestination } from './bfa-burn-destination'
+import { transitionBundleId } from './bundle'
 import { isSupportedV1ContractConsignment, isSupportedV1TransferConsignment } from './bfa-consignment'
 import {
   cacheValidatedBfaHistory,
@@ -23,6 +26,8 @@ import { completeRgbOpretPsbt } from './complete'
 import { normalizeRgbAssetId } from './contract-id'
 import { serializeBfaOpretWitnessBundle } from './consignment'
 import { prepareNiaOpretTransfer } from './opret-transfer'
+import { encodeBfaBurnTransition, niaInputFromAllocation } from './nia'
+import { commitOpretRgbPsbt } from './psbt-commit'
 import { localNiaProtocolEncoder } from './local-nia-encoder'
 import { convertNiaV0ConsignmentToV1 } from './nia-v0-migration'
 import { witnessSealDustLimit } from './witness'
@@ -194,6 +199,100 @@ export function prepareBfaTransfer(input: {
   }
 }
 
+/** Prepare a BFA burn without an invoice or proxy recipient. */
+export function prepareBfaBurn(input: {
+  wallet: RgbWalletRef
+  assetId: string
+  amount: string
+  burnReason?: string
+  selectedUtxos: RgbUtxo[]
+  history: ValidatedBfaTransferHistory
+  feeRate: number
+  feeFunding?: RgbFeeFunding
+}): RgbPreparedTransfer {
+  if (hex(input.history.genesis.slice(2, 34)) !== BFA_SCHEMA_ID)
+    throw new RgbServiceError('Only BFA assets support this burn operation')
+  if (normalizeRgbAssetId(input.history.assetId) !== normalizeRgbAssetId(input.assetId))
+    throw new RgbServiceError('BFA burn history belongs to another asset')
+  const amount = parseU64(input.amount, 'BFA burn amount')
+  if (!amount) throw new RgbServiceError('BFA burn amount must be positive')
+  const proved = new Map(input.history.allocations.map(item => [
+    `${item.txid}:${item.vout}:${item.opId.toLowerCase()}:${item.assignmentIndex}`, item,
+  ]))
+  const allocations = input.selectedUtxos.flatMap(utxo => utxo.allocations.map(allocation => ({ utxo, allocation })))
+  if (!allocations.length) throw new RgbServiceError('BFA burn requires validated allocations')
+  for (const { utxo, allocation } of allocations) {
+    if (normalizeRgbAssetId(allocation.assetId) !== normalizeRgbAssetId(input.assetId) ||
+      allocation.assignmentType !== 4000 || !allocation.opId || allocation.assignmentIndex === undefined ||
+      !allocation.settled || !allocation.spendable) throw new RgbServiceError('BFA burn includes an unsupported allocation')
+    const proof = proved.get(`${utxo.outpoint.txid}:${utxo.outpoint.vout}:${allocation.opId.toLowerCase()}:${allocation.assignmentIndex}`)
+    if (!proof || proof.amount !== allocation.amount ||
+      (proof.scriptPubKey && proof.scriptPubKey.toLowerCase() !== utxo.scriptPubKey.toLowerCase()))
+      throw new RgbServiceError('BFA burn allocation is absent from validated history')
+  }
+  const selectedAmount = allocations.reduce((total, item) => total + BigInt(item.allocation.amount), 0n)
+  if (amount > selectedAmount) throw new RgbServiceError('BFA burn exceeds selected balance')
+  const changeAmount = selectedAmount - amount
+  const nonce = randomU64()
+  const entropy = randomU64()
+  const bitcoin = createRgbOpretPsbt({
+    network: input.wallet.network, selectedUtxos: input.selectedUtxos,
+    feeRate: input.feeRate, preserveFundingOutput: changeAmount > 0n,
+    ...(input.feeFunding ? { feeFunding: input.feeFunding } : {}),
+  })
+  if (changeAmount && bitcoin.changeVout === undefined)
+    throw new RgbServiceError('BFA burn change output is missing')
+  const transition = encodeBfaBurnTransition({
+    contractId: input.assetId, nonce,
+    inputs: allocations.map(item => niaInputFromAllocation(item.allocation)),
+    burnedAmount: amount,
+    ...(changeAmount ? { change: {
+      amount: changeAmount,
+      seal: { txid: null, vout: bitcoin.changeVout!, blinding: randomU64() },
+    } } : {}),
+    burnReason: normalizeBfaBurnDestination(input.burnReason),
+  })
+  const parents = allocations.map(({ allocation }) => ({
+    opId: allocation.opId!, assignmentType: 4000, assignmentIndex: allocation.assignmentIndex!,
+  }))
+  const bundleId = transitionBundleId(parents.map(parent => ({ ...parent, transitionId: transition.opId })))
+  const committed = commitOpretRgbPsbt({
+    psbtHex: bitcoin.psbtHex, hostVout: bitcoin.hostVout, entropy,
+    messages: [{ protocolId: transition.strict.slice(2, 34), message: bundleId }],
+    transitionId: transition.opId, transition: transition.strict,
+  })
+  const feeUtxos = new Map(input.feeFunding?.utxos.map(utxo => [`${utxo.outpoint.txid}:${utxo.outpoint.vout}`, utxo]) || [])
+  return {
+    id: hex(transition.opId), psbt: committed.psbtHex,
+    toSignInputs: [
+      ...input.selectedUtxos.map(utxo => ({
+        index: findInputIndex(committed.psbtHex, utxo.outpoint.txid, utxo.outpoint.vout),
+        publicKey: utxo.publicKey, useTweakedSigner: true,
+      })),
+      ...bitcoin.feeOutpoints.map(outpoint => {
+        const fee = feeUtxos.get(`${outpoint.txid}:${outpoint.vout}`)
+        if (!fee) throw new RgbServiceError('BFA burn fee input is missing')
+        return { index: findInputIndex(committed.psbtHex, outpoint.txid, outpoint.vout), publicKey: fee.publicKey }
+      }),
+    ],
+    lockedOutpoints: input.selectedUtxos.map(utxo => utxo.outpoint),
+    feeOutpoints: bitcoin.feeOutpoints,
+    metadata: {
+      schema: 'BFA_BURN', preparedPsbt: committed.psbtHex,
+      hostVout: String(bitcoin.hostVout), commitment: hex(committed.commitment),
+      transitionId: hex(transition.opId), transition: hex(transition.strict),
+      bundleId: hex(bundleId), entropy: entropy.toString(),
+      genesis: Buffer.from(input.history.genesis).toString('base64'),
+      historyWitnessBundles: JSON.stringify(input.history.witnessBundles.map(bundle => Buffer.from(bundle).toString('base64'))),
+      fundingScript: input.selectedUtxos[0]!.scriptPubKey,
+      fundingPublicKey: input.selectedUtxos[0]!.publicKey,
+      changeVout: bitcoin.changeVout === undefined ? '' : String(bitcoin.changeVout),
+      changeAmount: changeAmount.toString(), inputs: JSON.stringify(parents),
+      burnReason: normalizeBfaBurnDestination(input.burnReason),
+    },
+  }
+}
+
 /** Finish the signed PSBT and encode the v1 BFA consignment on this device. */
 export function completeBfaTransfer(input: {
   pending: RgbPendingTransfer
@@ -286,11 +385,106 @@ export function completeBfaTransfer(input: {
   }
 }
 
+/** Complete the signed Bitcoin witness and retain a portable, terminal-free burn proof. */
+export function completeBfaBurn(input: { pending: RgbPendingTransfer; signedPsbt: string }): RgbCompletedTransfer {
+  const data = input.pending.prepared.metadata
+  if (data?.['schema'] !== 'BFA_BURN') throw new RgbServiceError('Pending transfer is not a BFA burn')
+  const hostVout = Number(data['hostVout'])
+  if (!Number.isInteger(hostVout) || hostVout < 0) throw new RgbServiceError('BFA burn host output is invalid')
+  const completed = completeRgbOpretPsbt({
+    preparedPsbt: data['preparedPsbt'] || '', signedPsbt: input.signedPsbt,
+    hostVout, commitment: parseHex32(data['commitment'], 'BFA burn commitment'),
+  })
+  let parents: Array<{ opId: string; assignmentType: number; assignmentIndex: number }>
+  let historyBundles: Uint8Array[]
+  try {
+    parents = JSON.parse(data['inputs'] || '')
+    historyBundles = JSON.parse(data['historyWitnessBundles'] || '').map((value: string) =>
+      Uint8Array.from(Buffer.from(value, 'base64')))
+  } catch { throw new RgbServiceError('BFA burn has invalid local history') }
+  if (!Array.isArray(parents) || !parents.length || !Array.isArray(historyBundles))
+    throw new RgbServiceError('BFA burn has incomplete local history')
+  const witnessBundle = serializeBfaOpretWitnessBundle({
+    witnessTx: Uint8Array.from(Buffer.from(completed.rawTx, 'hex')),
+    contractId: input.pending.request.assetId,
+    transitionId: parseHex32(data['transitionId'], 'BFA burn transition ID'),
+    transition: Uint8Array.from(Buffer.from(data['transition'] || '', 'hex')),
+    inputs: parents, entropy: parseU64(data['entropy'], 'BFA burn MPC entropy'),
+  })
+  if (hex(witnessBundle.bundleId) !== data['bundleId'])
+    throw new RgbServiceError('BFA burn WitnessBundle does not match the transition')
+  const consignment = encodeBfaTransferConsignment({
+    genesis: Uint8Array.from(Buffer.from(data['genesis'] || '', 'base64')),
+    validatedWitnessBundles: historyBundles,
+    witnessBundle: witnessBundle.strict,
+    terminals: [],
+  })
+  const changeVout = data['changeVout'] === '' ? undefined : Number(data['changeVout'])
+  if (changeVout !== undefined && (!Number.isInteger(changeVout) || changeVout < 0))
+    throw new RgbServiceError('BFA burn change output is invalid')
+  const tx = Transaction.fromHex(completed.rawTx)
+  const change = changeVout === undefined ? undefined : tx.outs[changeVout]
+  if (changeVout !== undefined && !change) throw new RgbServiceError('BFA burn change output is missing')
+  if (change && change.script.toString('hex') !== data['fundingScript'])
+    throw new RgbServiceError('BFA burn change script does not match the funding address')
+  return {
+    txid: completed.txid, rawTx: completed.rawTx,
+    consignments: [{
+      recipientId: '', payload: Buffer.from(consignment).toString('base64'),
+      assetId: input.pending.request.assetId, opIds: [data['transitionId'] || ''],
+    }],
+    fundingUpdate: {
+      spentOutpoints: input.pending.prepared.lockedOutpoints,
+      ...(change && changeVout !== undefined ? { createdUtxo: {
+        outpoint: { txid: completed.txid, vout: changeVout }, satoshis: change.value,
+        scriptPubKey: data['fundingScript'] || '', publicKey: data['fundingPublicKey'] || '',
+        allocations: [{ assetId: input.pending.request.assetId,
+          amount: data['changeAmount'] || '', settled: true, spendable: true,
+          opId: data['transitionId'], assignmentIndex: 0, assignmentType: 4000,
+        }],
+      } } : {}),
+    },
+  }
+}
+
 /** Route ordinary RGB transfers by the version and schema of locally verified history. */
 export function createLocalRgbProtocolEncoder(
   validateBfa: NonNullable<RgbServiceDependencies['validateBfaConsignment']>
 ): RgbProtocolEncoder {
   return {
+    async prepareBurn(input) {
+      const payloads = input.validationHistory.consignments.map(item =>
+        Uint8Array.from(Buffer.from(item.payload, 'base64'))
+      )
+      const transfers = payloads.filter(isSupportedV1TransferConsignment)
+      if (!transfers.length) {
+        throw new RgbServiceError('BFA burn requires a validated v1 transfer history')
+      }
+      const knownBlindSeals = input.validationHistory.knownBlindSeals || []
+      const evmRpcCache = new Map<string, Promise<unknown>>()
+      const bitcoinStatusCache = new Map<string, Promise<boolean>>()
+      const histories = await Promise.all(transfers.map(payload => validateBfa({
+        wallet: input.wallet, payload, knownBlindSeals, evmRpcCache, bitcoinStatusCache,
+        confirmedBitcoinWitnesses: input.validationHistory.confirmedBitcoinWitnesses,
+      })))
+      const merged = mergeBfaValidatedHistories(histories)
+      const history = await validateBfa({
+        wallet: input.wallet, payload: merged, knownBlindSeals, evmRpcCache, bitcoinStatusCache,
+        confirmedBitcoinWitnesses: input.validationHistory.confirmedBitcoinWitnesses,
+      })
+      if (hex(history.genesis.slice(2, 34)) !== BFA_SCHEMA_ID)
+        throw new RgbServiceError('Only BFA assets can be burned')
+      const spendHistory = selectBfaSpendHistory(history, input.selectedUtxos.flatMap(utxo =>
+        utxo.allocations.map(allocation => allocation.opId || '')
+      ))
+      return prepareBfaBurn({
+        wallet: input.wallet, assetId: input.request.assetId, amount: input.request.amount,
+        ...(input.request.burnReason ? { burnReason: input.request.burnReason } : {}),
+        selectedUtxos: input.selectedUtxos, history: spendHistory,
+        feeRate: input.request.feeRate,
+        ...(input.feeFunding ? { feeFunding: input.feeFunding } : {}),
+      })
+    },
     async prepareTransfer(input) {
       const payloads = input.validationHistory.consignments.map(item =>
         Uint8Array.from(Buffer.from(item.payload, 'base64'))
@@ -349,9 +543,11 @@ export function createLocalRgbProtocolEncoder(
       })
     },
     async completeTransfer(input) {
-      return ['BFA', 'NIA_V1'].includes(input.pending.prepared.metadata?.['schema'] || '')
-        ? completeBfaTransfer(input)
-        : localNiaProtocolEncoder.completeTransfer(input)
+      return input.pending.prepared.metadata?.['schema'] === 'BFA_BURN'
+        ? completeBfaBurn(input)
+        : ['BFA', 'NIA_V1'].includes(input.pending.prepared.metadata?.['schema'] || '')
+          ? completeBfaTransfer(input)
+          : localNiaProtocolEncoder.completeTransfer(input)
     },
   }
 }

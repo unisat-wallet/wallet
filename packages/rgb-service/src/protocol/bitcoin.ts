@@ -8,7 +8,8 @@ import { invoiceSealToScriptPubKey, witnessSealDustLimit } from './witness'
 export interface RgbOpretPsbtRequest {
   network: RgbNetwork
   selectedUtxos: RgbUtxo[]
-  recipientSeal: RgbInvoiceSeal
+  /** Burn operations have no RGB beneficiary. */
+  recipientSeal?: RgbInvoiceSeal
   feeRate: number
   /** Required for witness beneficiaries and must be a standard dust-safe amount. */
   witnessAmountSat?: number
@@ -138,9 +139,9 @@ export function createRgbOpretPsbt(input: RgbOpretPsbtRequest): RgbOpretPsbt {
     return total + utxo.satoshis
   }, 0)
 
-  const recipientScript = invoiceSealToScriptPubKey(input.recipientSeal)
+  const recipientScript = input.recipientSeal ? invoiceSealToScriptPubKey(input.recipientSeal) : undefined
   const witnessDustLimit =
-    input.recipientSeal.type === 'witness' ? witnessSealDustLimit(input.recipientSeal) : 0
+    input.recipientSeal?.type === 'witness' ? witnessSealDustLimit(input.recipientSeal) : 0
   if (
     recipientScript &&
     (!Number.isSafeInteger(input.witnessAmountSat) || input.witnessAmountSat! < witnessDustLimit)

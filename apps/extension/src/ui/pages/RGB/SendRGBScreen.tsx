@@ -60,6 +60,9 @@ export default function SendRGBScreen() {
     step,
     t,
     assetId,
+    burn,
+    burnReason,
+    setBurnReason,
     ticker,
     name,
     assetPrecision,
@@ -96,6 +99,7 @@ export default function SendRGBScreen() {
   const invoiceRef = useRef<HTMLTextAreaElement>(null);
   const [showDonationPopover, setShowDonationPopover] = useState(false);
   const [understandDonation, setUnderstandDonation] = useState(false);
+  const [understandBurn, setUnderstandBurn] = useState(false);
   const closeDonationPopover = () => {
     setShowDonationPopover(false);
     setUnderstandDonation(false);
@@ -138,14 +142,14 @@ export default function SendRGBScreen() {
 
   return (
     <Layout>
-      <Header onBack={onClickBack} title={`${t('send')} ${name}`} />
+      <Header onBack={onClickBack} title={`${burn ? t('rgb_burn') : t('send')} ${name}`} />
       <Content>
         <Column style={{ paddingTop: 12, gap: spacing.extraLarge }}>
           <Row justifyCenter>
             <RGBAssetIcon assetId={assetId} iconInfo={iconInfo} ticker={ticker} name={name} size={68} />
           </Row>
 
-          <Column gap="md">
+          {!burn ? <Column gap="md">
             <Row>
               <Text text={t('rgb_invoice')} />
             </Row>
@@ -168,7 +172,7 @@ export default function SendRGBScreen() {
               />
             </div>
             {invoiceValidationMessage ? <Text text={invoiceValidationMessage} size="xs" color="danger" wrap /> : null}
-          </Column>
+          </Column> : null}
 
           {invoiceReadyForAmount ? (
             <TransferAmountSection>
@@ -190,11 +194,34 @@ export default function SendRGBScreen() {
             </TransferAmountSection>
           ) : null}
 
+          {burn ? (
+            <Column gap="md">
+              <Text text={t('rgb_burn_reason')} size="sm" />
+              <input
+                value={burnReason}
+                onChange={(event) => setBurnReason(event.target.value.trim())}
+                placeholder={t('rgb_burn_reason_placeholder')}
+                maxLength={42}
+                spellCheck={false}
+                style={{ ...invoiceBoxStyle, width: '100%', color: '#fff', outline: 'none' }}
+                data-testid="rgb-burn-reason-input"
+              />
+              {burnReason && (!/^(?:0x)?[0-9a-f]{40}$/i.test(burnReason) ||
+                /^0+$/.test(burnReason.replace(/^0x/i, ''))) ? (
+                <Text text={t('rgb_burn_reason_invalid')} size="xs" color="danger" wrap />
+              ) : null}
+              <Text text={t('rgb_burn_description')} size="xs" color="textDim" wrap />
+              <Checkbox checked={understandBurn} onChange={(event) => setUnderstandBurn(event.target.checked)}>
+                <Text text={t('rgb_burn_confirm')} size="sm" wrap />
+              </Checkbox>
+            </Column>
+          ) : null}
+
           <Column gap="sm">
             <FeeRateBar />
           </Column>
 
-          {invoiceReadyForAmount ? (
+          {!burn && invoiceReadyForAmount ? (
             <Checkbox
               checked={donation}
               onChange={(event) => {
@@ -208,7 +235,7 @@ export default function SendRGBScreen() {
           {error ? <Text text={error} color="error" wrap /> : null}
 
           <Button
-            disabled={disabled}
+            disabled={disabled || (burn && !understandBurn)}
             preset="primary"
             text={t('next')}
             onClick={() => void requestWrite(onClickNext)}

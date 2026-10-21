@@ -122,6 +122,7 @@ export function useRGBTokenScreenLogic() {
           id: transfer.id,
           transferId: transfer.transferId,
           local: transfer.local,
+          burn: transfer.burn,
           assetId: transfer.assetId ?? assetId,
           ticker: transfer.ticker,
           name: transfer.name,
@@ -250,6 +251,10 @@ export function useRGBTokenScreenLogic() {
       tokenBalance: resolvedTokenBalance,
     })
   }
+  const onClickBurn = () => {
+    if (isUnconfiguredUsdt || String(detail?.schema || resolvedTokenBalance?.schema || '').toUpperCase() !== 'BFA') return
+    nav.navigate('SendRGBScreen', { assetId, tokenBalance: resolvedTokenBalance, burn: true })
+  }
 
   return {
     assetId,
@@ -281,6 +286,7 @@ export function useRGBTokenScreenLogic() {
     enableTransfer,
     enableReceive,
     onClickSend,
+    onClickBurn,
     onClickReceive,
     onClickViewInvoices,
   }

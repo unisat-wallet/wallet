@@ -30,6 +30,7 @@ function toTransferItem(
     id: item.id || item.txid,
     transferId: item.transferId,
     local: item.local,
+    burn: item.burn,
     assetId: item.assetId,
     ticker: item.ticker || fallbackTicker,
     name: item.name || fallbackName,
@@ -112,7 +113,14 @@ export function RGBTokenHistory(props: {
                 assetLabel={ticker}
                 showDate={Boolean(date && date !== previousDate)}
                 showDirectionIcon={showDirectionIcon}
-                onClick={() => setSelectedTransfer(transfer)}
+                onClick={() => {
+                  if (transfer.burn) {
+                    nav.navigate('RGBTransferDetailScreen', {
+                      transferId: transfer.transferId || transfer.id,
+                      initialTransfer: transfer
+                    });
+                  } else setSelectedTransfer(transfer);
+                }}
               />
             );
           }}

@@ -3441,6 +3441,13 @@
   "rgb_amount_locking": {
     "message": "Verrouillé"
   },
+  "rgb_burn": { "message": "Brûler" },
+  "rgb_burn_reason": { "message": "Adresse EVM destinataire (obligatoire)" },
+  "rgb_burn_reason_placeholder": { "message": "0x suivi de 40 caractères hexadécimaux" },
+  "rgb_burn_reason_invalid": { "message": "Saisissez une adresse EVM valide de 20 octets." },
+  "rgb_burn_description": { "message": "Cette opération détruit définitivement les jetons BFA. Le portefeuille permet de télécharger une preuve .rgb après diffusion. Un rachat via un pont suit les règles de ce pont." },
+  "rgb_burn_confirm": { "message": "Je comprends que cette destruction est irréversible." },
+  "rgb_download_burn_proof": { "message": "Télécharger la preuve de destruction (.rgb)" },
   "rgb_locked_balance_hint": {
     "message": "Vous avez un transfert en attente. Voir les transferts"
   },

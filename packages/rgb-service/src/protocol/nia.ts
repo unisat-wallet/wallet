@@ -6,6 +6,9 @@ import { StrictWriter } from './strict'
 
 const RGB_NIA_ASSET_OWNER = 4000
 const RGB_NIA_TRANSFER = 10000
+const RGB_BFA_BURN = 8010
+const RGB_BFA_BURNED_ASSET = 2015
+const RGB_BFA_BURN_REASON = 3009
 const TAG_MERKLE_NODE = 'urn:ubideco:merkle:node#2024-01-31'
 const TAG_STRICT_HASH = 'urn:ubideco:strict-types:value-hash#2024-02-10'
 const TAG_SECRET_SEAL = 'urn:lnp-bp:seals:secret#2024-02-03'
@@ -255,5 +258,64 @@ export function encodeNiaTransition(input: NiaTransition): EncodedNiaTransition 
   const inputRoot = merklize(inputs.map(item => taggedHash(TAG_MERKLE_NODE, serializeOpout(item))))
   const assignmentsRoot = merklize(assignments.map(assignmentCommitment))
   const opCommitment = serializeOpCommitment(input, inputRoot, assignmentsRoot)
+  return { strict: writer.toBytes(), opCommitment, opId: taggedHash(TAG_OPERATION, opCommitment) }
+}
+
+/** Strict RGB v1 BFA burn transition; the amount and optional reason are global state. */
+export function encodeBfaBurnTransition(input: {
+  contractId: string
+  nonce: bigint
+  inputs: NiaOutpoint[]
+  burnedAmount: bigint
+  change?: NiaFungibleAssignment
+  burnReason?: string
+}): EncodedNiaTransition {
+  if (!input.inputs.length || input.burnedAmount <= 0n || input.burnedAmount > 0xffff_ffff_ffff_ffffn)
+    throw new RgbServiceError('BFA burn amount or inputs are invalid')
+  const reason = input.burnReason === undefined ? undefined : hexBytes(input.burnReason, 'BFA burn reason')
+  const inputs = [...input.inputs].sort((left, right) =>
+    compareBytes(serializeOpout(left), serializeOpout(right))
+  )
+  const globals = [
+    { type: RGB_BFA_BURNED_ASSET, value: new StrictWriter().writeU64(input.burnedAmount).toBytes() },
+    ...(reason ? [{ type: RGB_BFA_BURN_REASON, value: reason }] : []),
+  ]
+  const globalWriter = new StrictWriter().writeU8(globals.length)
+  for (const global of globals) {
+    globalWriter.writeU16(global.type).writeU16(1).writeConfinedBytes(global.value, 65535)
+  }
+  const globalBytes = globalWriter.toBytes()
+  const assignments = input.change ? [input.change] : []
+  const writer = new StrictWriter()
+    .writeU16(0)
+    .writeFixedBytes(rgbContractIdBytes(input.contractId), 32)
+    .writeU64(input.nonce)
+    .writeU16(RGB_BFA_BURN)
+    .writeU8(0)
+    .writeFixedBytes(globalBytes, globalBytes.length)
+    .writeU16(inputs.length)
+  inputs.forEach(item => writer.writeFixedBytes(serializeOpout(item), 36))
+  writer.writeU16(assignments.length ? 1 : 0)
+  if (assignments.length) {
+    writer.writeU16(RGB_NIA_ASSET_OWNER).writeU8(1).writeU16(1)
+    const encoded = serializeAssignment(assignments[0]!)
+    writer.writeFixedBytes(encoded, encoded.length)
+  }
+  writer.writeU8(0)
+  const metadataHash = taggedHash(TAG_STRICT_HASH, Uint8Array.from([0]))
+  const globalsRoot = merklize(globals.map(global => taggedHash(TAG_MERKLE_NODE,
+    new StrictWriter().writeU16(global.type).writeConfinedBytes(global.value, 65535).toBytes()
+  )))
+  const inputsRoot = merklize(inputs.map(item => taggedHash(TAG_MERKLE_NODE, serializeOpout(item))))
+  const assignmentRoot = merklize(assignments.map(assignmentCommitment))
+  const opCommitment = new StrictWriter()
+    .writeU16(0).writeU64(input.nonce).writeU8(1)
+    .writeFixedBytes(rgbContractIdBytes(input.contractId), 32)
+    .writeU16(RGB_BFA_BURN)
+    .writeFixedBytes(metadataHash, 32)
+    .writeFixedBytes(globalsRoot, 32)
+    .writeFixedBytes(inputsRoot, 32)
+    .writeFixedBytes(assignmentRoot, 32)
+    .toBytes()
   return { strict: writer.toBytes(), opCommitment, opId: taggedHash(TAG_OPERATION, opCommitment) }
 }

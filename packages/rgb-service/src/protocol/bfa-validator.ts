@@ -21,6 +21,7 @@ const VIRTUAL_LEAF = new Uint8Array(32).fill(0xff)
 const OS_ASSET = 4000
 const OS_MINT = 4013
 const TS_MINT = 8013
+const TS_BURN = 8010
 const TS_TRANSFER = 10000
 
 type Seal = { txid: string | null; vout: number; secret: string }
@@ -481,7 +482,7 @@ function readTransition(reader: StrictReader, contractId: string, known: Map<str
   if (reader.readU16() !== 0 || hex(reader.readFixedBytes(32)) !== contractId) fail('transition contract mismatch')
   const nonce = reader.readU64()
   const type = reader.readU16()
-  if (type !== TS_TRANSFER && (nia || type !== TS_MINT)) fail('unsupported transition type')
+  if (type !== TS_TRANSFER && (nia || (type !== TS_MINT && type !== TS_BURN))) fail('unsupported transition type')
   const metadata = readMetadata(reader)
   const globals = readGlobals(reader)
   const afterRaw = metadata.values.get(1003)
@@ -494,6 +495,14 @@ function readTransition(reader: StrictReader, contractId: string, known: Map<str
     afterBlock = new StrictReader(afterRaw).readU64()
     amount = new StrictReader(supply[0]!).readU64()
     if (!amount) fail('zero-value mint')
+  } else if (type === TS_BURN) {
+    const burned = globals.states.get(2015)
+    const reason = globals.states.get(3009)
+    if (metadata.values.size || !burned || burned.length !== 1 || burned[0]!.length !== 8 ||
+      (reason && (reason.length !== 1 || reason[0]!.length !== 32)) ||
+      globals.states.size !== (reason ? 2 : 1)) fail('invalid BFA burn global state')
+    amount = new StrictReader(burned[0]!).readU64()
+    if (!amount) fail('zero-value BFA burn')
   } else if (metadata.values.size || globals.states.size) fail('transfer has unsupported metadata or global state')
   const inputCount = reader.readU16()
   if (!inputCount) fail('transition has no inputs')
@@ -777,6 +786,9 @@ export async function validateBfaTransferConsignment(
     if (operation.type === TS_MINT) {
       if (mintInputs !== 1 || assetInputs || outputAmount !== operation.amount || outputMintRights > 1) fail('invalid mint conservation')
       await verifyMintEvent(operation, genesis.chainId, genesis.address, options)
+    } else if (operation.type === TS_BURN) {
+      if (mintInputs || !assetInputs || outputMintRights || outputAmount + operation.amount !== inputAmount)
+        fail('invalid burn conservation')
     } else if ((nia && (mintInputs !== 0 || outputMintRights !== 0)) ||
       (mintInputs === 0 && outputMintRights !== 0) ||
       (mintInputs > 0 && outputMintRights < mintInputs) ||

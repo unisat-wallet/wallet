@@ -81,6 +81,20 @@ histories are merged into the encrypted local checkpoint. If Bitcoin or EVM
 chain data is temporarily unavailable, a BFA receive remains pending instead
 of being rejected.
 
+The BFA burn path consumes validated asset allocations and commits a `TS_BURN`
+transition to a locally signed Bitcoin transaction. It has no invoice,
+recipient, proxy post, or acknowledgement. The signed v1 transfer consignment
+has no terminals and is retained in the encrypted wallet state for export as
+an `RGB\0TFR` `.rgb` file from transfer details. Broadcast failures require an
+explicit retry; ordinary synchronization never rebroadcasts a burn. Burning
+does not submit a redemption request to an EVM bridge.
+
+For bridge redemption, a burn destination is mandatory. A 20-byte EVM address
+is left-padded with 12 zero bytes to the 32-byte `burnReason` field. A
+precomputed 32-byte V1 destination hash can be supplied directly. The wallet
+does not derive the V1 hash or choose the release route, and the destination
+cannot be changed after broadcast.
+
 ## Enablement requirement
 
 The address-scoped UTXO snapshot supplies only the parent operation pointer

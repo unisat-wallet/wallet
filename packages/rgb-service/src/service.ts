@@ -15,6 +15,7 @@ import {
   witnessRgbInvoiceRecipientId,
 } from './protocol/invoice'
 import { normalizeRgbAssetId, rgbContractIdHex } from './protocol/contract-id'
+import { normalizeBfaBurnDestination } from './protocol/bfa-burn-destination'
 import {
   decodeNiaConsignment,
   niaConsignmentSpendableOutputScripts,
@@ -661,9 +662,12 @@ export class RgbService {
           if (pending.broadcast) await this.syncBroadcastedTransfer(transferId, pending)
           else if (pending.delivery?.externalBroadcast)
             await this.syncExternallyBroadcastTransfer(transferId, pending)
-          else if (pending.request.donation && pending.delivery?.broadcastError)
+          else if ((pending.request.donation || pending.request.burn) && pending.delivery?.broadcastError)
             // A failed donation needs an explicit sender retry. Do not let an
             // unavailable broadcaster interrupt synchronization of other sends.
+            return
+          else if (pending.request.burn && pending.delivery)
+            // Burn has no recipient. Only an explicit user action may retry its broadcast.
             return
           else if (pending.delivery && !pending.delivery.requiresCounterpartySignature)
             await this.advancePendingDelivery(transferId, pending)
@@ -1126,7 +1130,7 @@ export class RgbService {
   async markSendHistoryConfirmed(transferId: string) {
     const state = this.requireState()
     const history = state.pendingSendHistory || []
-    const next = history.filter(item => item.transferId !== transferId)
+    const next = history.filter(item => item.transferId !== transferId || item.burn)
     if (next.length === history.length) return
     state.pendingSendHistory = next
     await this.persist()
@@ -2557,6 +2561,30 @@ export class RgbService {
     return Object.entries(this.requireState().pending).map(([id, pending]) => ({ id, ...pending }))
   }
 
+  /** Exact RGB\0TFR file bytes, retained after a BFA burn has been broadcast. */
+  exportBurnConsignment(txid: string): Uint8Array {
+    const state = this.requireState()
+    const proof = state.burnProofs?.[txid]
+    const pending = Object.values(state.pending).find(item =>
+      item.request.burn && (item.delivery?.completed.txid === txid || item.broadcast?.completed.txid === txid)
+    )
+    const payload = proof?.payload || pending?.delivery?.completed.consignments[0]?.payload ||
+      pending?.broadcast?.completed.consignments[0]?.payload
+    if (!payload) throw new RgbServiceError('BFA burn consignment is unavailable')
+    return Uint8Array.from(Buffer.from(payload, 'base64'))
+  }
+
+  /** Observe a recorded burn on Bitcoin so its local history can show confirmation. */
+  async getBurnTransactionStatus(txid: string): Promise<'confirmed' | 'mempool' | 'unknown'> {
+    const state = this.requireState()
+    if (!state.burnProofs?.[txid] && !state.pendingSendHistory?.some(item => item.burn && item.txid === txid))
+      throw new RgbServiceError('BFA burn transaction is unavailable')
+    const getStatus = this.dependencies.stateSource.getTransactionStatus
+    if (!getStatus) return 'unknown'
+    const status = (await getStatus(state.wallet, txid)).status
+    return status === 'confirmed' || status === 'mempool' ? status : 'unknown'
+  }
+
   /**
    * Local provider ownership for a pending payment or its locally retained
    * status history. It is intentionally never included in recovery state.
@@ -2619,43 +2647,62 @@ export class RgbService {
     }
   }
 
+  /** Prepare a BFA burn using the same local allocation reservation as a send. */
+  async prepareBurn(request: Omit<RgbTransferRequest, 'invoice' | 'burn'> & { amount: string }) {
+    return this.prepareSend({ ...request, invoice: '', burn: true })
+  }
+
+  private requireBurnEncoder(): NonNullable<RgbServiceDependencies['encoder']['prepareBurn']> {
+    const encode = this.dependencies.encoder.prepareBurn
+    if (!encode) throw new RgbServiceError('BFA burn encoder is unavailable')
+    return encode.bind(this.dependencies.encoder)
+  }
+
   /** Reserve RGB allocations and persist the pending transfer as one serialized operation. */
   private async prepareSendOnce(request: RgbTransferRequest, options: { providerOrigin?: string }) {
     const state = this.requireState()
+    const burn = request.burn === true
+    if (burn && (request.donation || request.swapPsbt))
+      throw new RgbServiceError('BFA burn cannot use donation or swap delivery')
     if (request.donation && request.swapPsbt) {
       throw new RgbServiceError('RGB donation cannot use a counterparty-signed swap')
     }
-    const invoice = decodeRgbInvoice(request.invoice)
+    const invoice = burn ? undefined : decodeRgbInvoice(request.invoice)
     const requestedAssetId = normalizeAssetId(request.assetId)
-    if (invoice.assetId && invoice.assetId !== requestedAssetId) {
+    if (burn && this.getLocalAssetDetail(requestedAssetId).schema?.toUpperCase() !== 'BFA')
+      throw new RgbServiceError('Only BFA assets can be burned')
+    if (invoice?.assetId && invoice.assetId !== requestedAssetId) {
       throw new RgbServiceError('RGB invoice asset does not match the requested asset')
     }
     if (
       this.getLocalAssetDetail(requestedAssetId).schema?.toUpperCase() === 'BFA' &&
-      !invoice.proxyPublicKey
+      !burn && !invoice?.proxyPublicKey
     ) {
       throw new RgbServiceError('This invoice does not support the selected asset')
     }
-    if (invoice.network && !isCompatibleInvoiceNetwork(invoice.network, state.wallet.network)) {
+    if (invoice?.network && !isCompatibleInvoiceNetwork(invoice.network, state.wallet.network)) {
       throw new RgbServiceError('RGB invoice network does not match the current wallet')
     }
     if (
-      invoice.expirationTimestamp !== undefined &&
+      invoice?.expirationTimestamp !== undefined &&
       invoice.expirationTimestamp <= Math.floor(this.now() / 1000)
     ) {
       throw new RgbServiceError('RGB invoice has expired')
     }
-    if (!invoice.transportEndpoints.length) {
+    if (!burn && !invoice?.transportEndpoints.length) {
       throw new RgbServiceError('RGB invoice has no proxy transport endpoint')
     }
-    const amount = request.amount === undefined ? invoice.amount : request.amount
+    const amount = request.amount === undefined ? invoice?.amount : request.amount
     if (!amount) {
       throw new RgbServiceError('RGB transfer amount must be provided by the request or invoice')
     }
-    if (invoice.amount && invoice.amount !== amount) {
+    if (invoice?.amount && invoice.amount !== amount) {
       throw new RgbServiceError('RGB invoice amount does not match the requested amount')
     }
-    const resolvedRequest = { ...request, assetId: requestedAssetId, amount }
+    const resolvedRequest = {
+      ...request, assetId: requestedAssetId, amount,
+      ...(burn ? { burnReason: normalizeBfaBurnDestination(request.burnReason) } : {}),
+    }
     // A market relay can fail after the wallet has already durably prepared a
     // seller swap. Reuse that exact template on retry so its RGB reservation
     // is not mistaken for an insufficient balance.
@@ -2748,7 +2795,7 @@ export class RgbService {
           ),
         }
       : undefined
-    const intent = {
+    const intent = invoice ? {
       assetId: requestedAssetId,
       amount,
       invoice,
@@ -2758,19 +2805,21 @@ export class RgbService {
         recipientId: invoice.recipientId,
         selectedUtxos,
       }),
-    }
+    } : undefined
     const encoderInput = () => ({
       wallet: state.wallet,
       snapshot: state.snapshot,
       request: resolvedRequest,
-      intent,
+      intent: intent!,
       selectedUtxos,
       ...(availableFeeFunding === undefined ? {} : { feeFunding: availableFeeFunding }),
       validationHistory,
     })
     let prepared: RgbPreparedTransfer
     try {
-      prepared = await this.dependencies.encoder.prepareTransfer(encoderInput())
+      prepared = burn
+        ? await this.requireBurnEncoder()(encoderInput())
+        : await this.dependencies.encoder.prepareTransfer(encoderInput())
     } catch (error) {
       // `history.opIds` is metadata from the encrypted checkpoint. Older
       // checkpoints can claim an allocation Transition while their compact
@@ -2779,7 +2828,9 @@ export class RgbService {
       // failing the send.
       if (!usingLocalHistory || !isIncompleteLocalHistoryError(error)) throw error
       validationHistory = enrichValidationHistory(await getRemoteHistory())
-      prepared = await this.dependencies.encoder.prepareTransfer(encoderInput())
+      prepared = burn
+        ? await this.requireBurnEncoder()(encoderInput())
+        : await this.dependencies.encoder.prepareTransfer(encoderInput())
     }
 
     const selectedOutpoints = new Set(selectedUtxos.map(outpointKey))
@@ -2801,7 +2852,7 @@ export class RgbService {
       prepared,
       request: resolvedRequest,
       createdAt: this.now(),
-      ...(invoice.proxyPublicKey ? { proxySenderPrivateKey: Buffer.from(randomBytes(32)).toString('hex') } : {}),
+      ...(invoice?.proxyPublicKey ? { proxySenderPrivateKey: Buffer.from(randomBytes(32)).toString('hex') } : {}),
       ...(options.providerOrigin ? { providerOrigin: options.providerOrigin } : {}),
     }
     // The unsigned reservation is locally durable and can be rebuilt after a
@@ -2917,13 +2968,32 @@ export class RgbService {
         pending,
         signedPsbt,
       })
-      const endpoints = decodeRgbInvoice(pending.request.invoice).transportEndpoints
-      if (!endpoints.length)
+      if (pending.request.burn) {
+        const validate = this.dependencies.validateBfaConsignment
+        const proof = completed.consignments[0]
+        if (!validate || !proof) throw new RgbServiceError('BFA burn validation is unavailable')
+        const checked = await validate({
+          wallet: state.wallet,
+          payload: Uint8Array.from(Buffer.from(proof.payload, 'base64')),
+          pendingWitnessTxid: completed.txid,
+          knownBlindSeals: this.getKnownBlindSeals(),
+          evmRpcCache: new Map(),
+          bitcoinStatusCache: new Map(),
+          confirmedBitcoinWitnesses: state.confirmedBitcoinWitnesses ||= {},
+        })
+        if (checked.assetId !== pending.request.assetId || checked.metadata.schema !== 'BFA' ||
+          checked.terminals.length !== 0 ||
+          !checked.bundles.at(-1)?.operationIds.includes(pending.prepared.metadata?.['transitionId'] || ''))
+          throw new RgbServiceError('BFA burn proof does not match the prepared operation')
+      }
+      const endpoints = pending.request.burn ? [] : decodeRgbInvoice(pending.request.invoice).transportEndpoints
+      if (!pending.request.burn && !endpoints.length)
         throw new RgbServiceError('RGB invoice has no proxy transport endpoint')
       const rollback = snapshotState(state)
       pending.delivery = { completed, endpoints }
       await this.persistWithRecoveryRollback(rollback)
     }
+    if (pending.request.burn) return this.advanceBurnDelivery(transferId, pending)
     return this.advancePendingDelivery(transferId, pending)
   }
 
@@ -2932,12 +3002,13 @@ export class RgbService {
     return this.runPendingTransferOperation(transferId, async () => {
       const pending = this.requireState().pending[transferId]
       if (
-        !(pending?.delivery?.acknowledgedAt || pending?.delivery?.donationReadyAt) ||
+        !(pending?.delivery?.acknowledgedAt || pending?.delivery?.donationReadyAt || pending?.request.burn) ||
         pending.delivery.externalBroadcast ||
         pending.delivery.requiresCounterpartySignature
       ) {
         throw new RgbServiceError('RGB transfer is not ready for sender broadcast')
       }
+      if (pending.request.burn) return this.advanceBurnDelivery(transferId, pending)
       let canceled = false
       try {
         canceled = (await this.dependencies.stateSource.getBroadcastCancellation?.(
@@ -2961,7 +3032,7 @@ export class RgbService {
     const state = this.requireState()
     let canceled = 0
     for (const [transferId, pending] of Object.entries(state.pending)) {
-      if (!pending.delivery?.broadcastError || pending.broadcast) continue
+      if (!pending.delivery?.broadcastError || pending.broadcast || pending.request.burn) continue
       if (!pending.delivery.failureReportedAt) {
         try { await this.reportPendingBroadcastFailure(transferId, pending) } catch { /* Retry on next poll. */ }
       }
@@ -2982,7 +3053,7 @@ export class RgbService {
   private async reportPendingBroadcastFailure(transferId: string, pending: RgbPendingTransfer) {
     const delivery = pending.delivery
     const report = this.dependencies.stateSource.reportBroadcastFailure
-    if (!delivery?.broadcastError || !report) return
+    if (!delivery?.broadcastError || !report || pending.request.burn) return
     await report(this.requireState().wallet, {
       transferId,
       recipientId: decodeRgbInvoice(pending.request.invoice).proxyRecipientId,
@@ -3035,7 +3106,7 @@ export class RgbService {
 
     // V1 must clear the unreleased signed transaction before its local inputs
     // can be reused. Legacy transport retains its best-effort cancel signal.
-    if (!pending.delivery?.acknowledgedAt && pending.delivery) {
+    if (!pending.request.burn && !pending.delivery?.acknowledgedAt && pending.delivery) {
       const invoice = decodeRgbInvoice(pending.request.invoice)
       if (invoice.proxyInvoiceId) {
         if (!pending.proxySenderPrivateKey || !this.dependencies.transport.cancelConsignment) {
@@ -3182,7 +3253,7 @@ export class RgbService {
     if (!broadcast) throw new RgbServiceError(`RGB transfer ${transferId} has not been broadcast`)
     // Consignments were durably posted before this transaction was broadcast.
     // Regular sends also waited for the recipient ACK.
-    await this.dependencies.stateSource.syncBroadcast?.(
+    if (!pending.request.burn) await this.dependencies.stateSource.syncBroadcast?.(
       state.wallet,
       transferId,
       broadcast.completed,
@@ -3202,8 +3273,9 @@ export class RgbService {
       ...(pending.request.precision === undefined ? {} : { precision: pending.request.precision }),
       txid: broadcast.completed.txid,
       invoice: pending.request.invoice,
+      ...(pending.request.burn ? { burn: true } : {}),
       ...(pending.request.donation ? { donation: true } : {}),
-      ...(pending.request.donation && !decodeRgbInvoice(pending.request.invoice).proxyInvoiceId
+      ...(pending.request.donation && !pending.request.burn && !decodeRgbInvoice(pending.request.invoice).proxyInvoiceId
         ? { recipientAckExpected: true }
         : {}),
       ...(broadcast.completed.fundingUpdate?.spentOutpoints
@@ -3284,6 +3356,49 @@ export class RgbService {
       await this.persist({ skipRecovery: true })
     }
     return consignments
+  }
+
+  /** Burn is a unilateral Bitcoin operation. Persist its signed proof before broadcasting. */
+  private async advanceBurnDelivery(transferId: string, pending: RgbPendingTransfer) {
+    const state = this.requireState()
+    const delivery = pending.delivery
+    if (!pending.request.burn || !delivery) throw new RgbServiceError('BFA burn is not signed')
+    if (!delivery.donationReadyAt) {
+      const rollback = snapshotState(state)
+      delivery.donationReadyAt = this.now()
+      await this.persistWithRecoveryRollback(rollback)
+    }
+    let broadcastTxid: string
+    try {
+      broadcastTxid = await this.dependencies.broadcaster.broadcast(delivery.completed.rawTx)
+    } catch (error) {
+      delivery.broadcastError = error instanceof Error ? error.message : String(error)
+      await this.persist({ waitForRecovery: true })
+      const recovery = await this.reconcileFailedBroadcast(transferId, pending)
+      if (recovery === 'broadcasted') return this.syncBroadcastedTransfer(transferId, pending)
+      throw error
+    }
+    if (broadcastTxid !== delivery.completed.txid)
+      throw new RgbServiceError('Broadcast transaction ID does not match the BFA burn')
+    this.applyFundingUpdate(delivery.completed)
+    await this.retainCompletedLocalHistory(delivery.completed)
+    this.recordBurnProof(pending, delivery.completed)
+    pending.broadcast = { completed: delivery.completed, broadcastAt: this.now() }
+    delete pending.delivery
+    await this.persist({ waitForRecovery: true })
+    return this.syncBroadcastedTransfer(transferId, pending)
+  }
+
+  private recordBurnProof(pending: RgbPendingTransfer, completed: RgbCompletedTransfer) {
+    if (!pending.request.burn) return
+    const proof = completed.consignments[0]
+    if (!proof) throw new RgbServiceError('BFA burn consignment is missing')
+    const state = this.requireState()
+    ;(state.burnProofs ||= {})[completed.txid] = {
+      assetId: pending.request.assetId, amount: pending.request.amount,
+      payload: proof.payload, createdAt: this.now(),
+      ...(pending.request.burnReason ? { burnReason: pending.request.burnReason } : {}),
+    }
   }
 
   private async advancePendingDelivery(
@@ -3435,6 +3550,7 @@ export class RgbService {
         if (chain.status === 'mempool' || chain.status === 'confirmed') {
           this.applyFundingUpdate(delivery.completed)
           await this.retainCompletedLocalHistory(delivery.completed)
+          this.recordBurnProof(pending, delivery.completed)
           pending.broadcast = { completed: delivery.completed, broadcastAt: this.now() }
           delete pending.delivery
           await this.persist({ waitForRecovery: true })

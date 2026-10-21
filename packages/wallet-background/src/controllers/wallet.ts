@@ -621,6 +621,8 @@ type RgbSendBeginRequest = {
   feeRate?: number
   minConfirmations?: number
   donation?: boolean
+  burn?: boolean
+  burnReason?: string
   /** Maker-built, unsigned swap template. */
   swapPsbt?: string
   /** Trusted provider origin for a dApp-created RGB payment. */
@@ -3757,6 +3759,13 @@ export class WalletController extends BaseController {
     const { service } = await this.getLocalRgbReadService()
     const contract = service.exportContractConsignment(assetId)
     return Buffer.concat([Buffer.from('RGB\0CON'), Buffer.from(contract)]).toString('base64')
+  }
+
+  /** Export the exact terminal-free RGB Transfer file proving a BFA burn. */
+  exportRgbBurnConsignment = async (txid: string): Promise<string> => {
+    await this.assertRgbEnabled()
+    const { service } = await this.getLocalRgbReadService()
+    return Buffer.from(service.exportBurnConsignment(txid)).toString('base64')
   }
 
   getRGBAssetDetail = async (_address: string, assetId: string) => {

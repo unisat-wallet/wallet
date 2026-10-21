@@ -41,6 +41,8 @@ export type RgbSendBeginParams = {
   feeRate?: number
   minConfirmations?: number
   donation?: boolean
+  burn?: boolean
+  burnReason?: string
   /** Maker-built, unsigned swap template. It is validated and colored locally. */
   swapPsbt?: string
   /** Trusted provider origin persisted with a dApp-created payment. */
@@ -62,7 +64,7 @@ export class RgbSendOperations {
 
     await service.sync()
     await this.dependencies.assertContext?.({ service, wallet })
-    const prepared = await service.prepareSend(
+    const sendRequest =
       {
         assetId: params.assetId,
         invoice: params.invoice,
@@ -70,20 +72,34 @@ export class RgbSendOperations {
         ...(params.precision === undefined ? {} : { precision: params.precision }),
         ...(params.amount === undefined ? {} : { amount: String(params.amount) }),
         ...(params.donation === undefined ? {} : { donation: params.donation }),
+        ...(params.burn === undefined ? {} : { burn: params.burn }),
+        ...(params.burnReason === undefined ? {} : { burnReason: params.burnReason }),
         ...(params.minConfirmations === undefined
           ? {}
           : { minConfirmations: params.minConfirmations }),
         ...(params.swapPsbt === undefined ? {} : { swapPsbt: params.swapPsbt }),
-      },
-      params.providerOrigin === undefined ? {} : { providerOrigin: params.providerOrigin }
-    )
+      }
+    const prepared = params.burn
+      ? await service.prepareBurn({
+          assetId: params.assetId,
+          amount: String(params.amount || ''),
+          feeRate: validatedFeeRate,
+          ...(params.precision === undefined ? {} : { precision: params.precision }),
+          ...(params.burnReason === undefined ? {} : { burnReason: params.burnReason }),
+        })
+      : await service.prepareSend(
+          sendRequest,
+          params.providerOrigin === undefined ? {} : { providerOrigin: params.providerOrigin }
+        )
     await this.dependencies.assertContext?.({ service, wallet })
     const toSignData = await this.dependencies.getToSignData({
       wallet,
       psbt: prepared.psbt,
       toSignInputs: prepared.toSignInputs,
       amountDisplay: getAmountDisplay(params),
-      actionName: params.donation
+      actionName: params.burn
+        ? `Burn ${getAssetLabel(params)}`
+        : params.donation
         ? `Send ${getAssetLabel(params)} without recipient acceptance`
         : `Send ${getAssetLabel(params)}`,
     })
@@ -190,8 +206,8 @@ export class RgbSendOperations {
     // the same authoritative lease check as signed completion.
     await this.dependencies.ensureWriteLease?.({ service, wallet }, { forceRenew: true })
     const transfer = service.getPendingTransfers().find(item => item.id === transferId)
-    if (!(transfer?.delivery?.acknowledgedAt || transfer?.delivery?.donationReadyAt) ||
-      transfer.delivery.externalBroadcast) {
+    if (!(transfer?.delivery?.acknowledgedAt || transfer?.delivery?.donationReadyAt || transfer?.request.burn) ||
+      transfer?.delivery?.externalBroadcast) {
       return { broadcast: false, status: 'not_retryable' as const }
     }
     try {

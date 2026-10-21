@@ -142,7 +142,7 @@ export function RGBTransferListItem({
           )}
           <Column gap="xs" style={{ minWidth: 0, overflow: 'hidden' }}>
             <Row style={{ minWidth: 0, flexDirection: 'column', alignItems: 'flex-start', gap: 4 }}>
-              <Text text={getTransferTitle(item.type, t)} style={{ flexShrink: 0, lineHeight: '20px' }} />
+              <Text text={item.burn ? t('rgb_burn') : getTransferTitle(item.type, t)} style={{ flexShrink: 0, lineHeight: '20px' }} />
               {showStatus ? (
                 <Row
                   style={{

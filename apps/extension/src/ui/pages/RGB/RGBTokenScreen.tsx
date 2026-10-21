@@ -46,6 +46,7 @@ export default function RGBTokenScreen() {
     onClickReceive,
     onClickViewInvoices,
     onClickSend,
+    onClickBurn,
     enableReceive,
     enableTransfer,
     activeTab,
@@ -65,6 +66,7 @@ export default function RGBTokenScreen() {
   const lockedAmount = toRgbDisplayAmount(tokenBalance?.lockedAmount, precision);
   const pendingAmount = toRgbDisplayAmount(tokenBalance?.pending, precision);
   const balanceSize = spendable.length > 24 ? 'lg' : spendable.length > 16 ? 'xl' : 'xxl';
+  const isBfa = String(tokenInfo?.schema || tokenBalance?.schema || '').toUpperCase() === 'BFA';
 
   const renderTabChildren = useMemo(() => {
     if (activeTab === RGBTokenScreenTabKey.DETAILS) {
@@ -234,6 +236,16 @@ export default function RGBTokenScreen() {
               data-testid="rgb-send-button"
             />
           </Row>
+          {isBfa ? (
+            <Button
+              text={t('rgb_burn')}
+              preset="default"
+              onClick={() => void requestWrite(onClickBurn)}
+              disabled={!enableTransfer}
+              full
+              data-testid="rgb-burn-button"
+            />
+          ) : null}
         </Column>
       </Footer>
       {receiveSelectorOpen && (

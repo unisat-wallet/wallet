@@ -4,6 +4,36 @@ import { toRgbDisplayAmount } from '@unisat/wallet-shared'
 import { RgbTransferQuery } from '../src/rgb/RgbTransferQuery'
 
 describe('RgbTransferQuery', () => {
+  it('keeps a burn proof visible and confirms it from Bitcoin status', async () => {
+    const txid = 'b'.repeat(64)
+    const service = {
+      getPendingTransfers: vi.fn().mockReturnValue([]),
+      getPendingSendHistory: vi.fn().mockReturnValue([{
+        transferId: 'burn-1', assetId: 'rgb:bfa', amount: '25', txid,
+        createdAt: 10, status: 'broadcasted', burn: true,
+      }]),
+      getIssueHistory: vi.fn().mockReturnValue([]),
+      getPendingReceiveHistory: vi.fn().mockReturnValue([]),
+      getPendingReceives: vi.fn().mockReturnValue([]),
+      getLocalAssetDetail: vi.fn().mockReturnValue({ name: 'BFA', ticker: 'BFA' }),
+      getBurnTransactionStatus: vi.fn().mockResolvedValue('confirmed'),
+      markSendHistoryConfirmed: vi.fn(),
+    }
+    const context = { service, wallet: { walletId: 'wallet', fundingAddress: 'funding', network: 'mainnet' } }
+    const query = new RgbTransferQuery({
+      getContext: vi.fn().mockResolvedValue(context as never),
+      syncReceiveHistory: vi.fn(), syncPendingTransfers: vi.fn(),
+      syncReceivedAllocations: vi.fn().mockResolvedValue(context as never),
+      getRemoteActivity: vi.fn().mockResolvedValue({ total: 0, list: [] }),
+      warn: vi.fn(),
+    })
+    const result = await query.getTransfers(1, 20, { skipSync: true })
+    expect(result.list).toEqual([expect.objectContaining({
+      transferId: 'burn-1', burn: true, txid, status: 'confirmed',
+    })])
+    expect(service.markSendHistoryConfirmed).not.toHaveBeenCalled()
+  })
+
   it('shows a late receiver rejection while retaining the broadcast transaction', async () => {
     const send = {
       transferId: 'send-1', assetId: 'rgb:asset', amount: '50',
