@@ -209,6 +209,72 @@ describe('RGB proxy transport', () => {
     expect(methods).toEqual(['invoice.check', 'consignment.post'])
   })
 
+  it.each(['transfer.list', 'consignment.get'])(
+    'tries the next v1 endpoint when %s fails', async failedMethod => {
+      const firstEndpoint = 'rpcs://first.example/json-rpc'
+      const nextEndpoint = 'rpcs://next.example/json-rpc'
+      const invoiceId = '22'.repeat(32)
+      const senderPk = proxyV1PublicKey('11'.repeat(32))
+      const transferId = proxyV1TransferId(invoiceId, senderPk)
+      const plaintext = Buffer.from('v1 fallback consignment')
+      fetchMock.mockImplementation(async (url: string, init: RequestInit) => {
+        const { method } = JSON.parse(init.body as string)
+        if (url === 'https://first.example/json-rpc') {
+          if (method === failedMethod) {
+            if (method === 'transfer.list') throw new Error('first proxy offline')
+            return rpcError(-32000, 'first proxy unavailable')
+          }
+          return rpcResponse({ [transferId]: 'pending' })
+        }
+        expect(url).toBe('https://next.example/json-rpc')
+        if (method === 'transfer.list') return rpcResponse({ [transferId]: 'pending' })
+        expect(method).toBe('consignment.get')
+        return rpcResponse({
+          consignment: plaintext.toString('base64'),
+          sender_transport_endpoint: nextEndpoint,
+          sender_pk: senderPk,
+          consignment_hash: proxyV1Hash(plaintext),
+          batch: false,
+        })
+      })
+
+      await expect(createRgbProxyTransport([endpoint]).getConsignment?.({
+        recipientId: invoiceId, endpoints: [firstEndpoint, nextEndpoint],
+        proxyPrivateKey: '33'.repeat(32),
+      })).resolves.toMatchObject({
+        recipientId: invoiceId,
+        payload: plaintext.toString('base64'),
+        endpoint: nextEndpoint,
+        proxyTransferId: transferId,
+      })
+    }
+  )
+
+  it('reports the final v1 endpoint error when every endpoint fails', async () => {
+    fetchMock
+      .mockRejectedValueOnce(new Error('first proxy offline'))
+      .mockResolvedValueOnce(rpcError(-32000, 'second proxy unavailable'))
+
+    await expect(createRgbProxyTransport([endpoint]).getConsignment?.({
+      recipientId: '22'.repeat(32),
+      endpoints: ['rpcs://first.example/json-rpc', 'rpcs://next.example/json-rpc'],
+      proxyPrivateKey: '33'.repeat(32),
+    })).rejects.toThrow('RGB proxy transfer.list failed: second proxy unavailable')
+    expect(fetchMock).toHaveBeenCalledTimes(2)
+  })
+
+  it('returns no v1 consignment when a healthy fallback has no pending transfer', async () => {
+    fetchMock
+      .mockRejectedValueOnce(new Error('first proxy offline'))
+      .mockResolvedValueOnce(rpcResponse({}))
+
+    await expect(createRgbProxyTransport([endpoint]).getConsignment?.({
+      recipientId: '22'.repeat(32),
+      endpoints: ['rpcs://first.example/json-rpc', 'rpcs://next.example/json-rpc'],
+      proxyPrivateKey: '33'.repeat(32),
+    })).resolves.toBeUndefined()
+  })
+
   it('decrypts proxy v1 consignments across the 64 KiB chunk boundary and rejects altered ciphertext', () => {
     const senderKey = '11'.repeat(32)
     const recipientKey = '22'.repeat(32)

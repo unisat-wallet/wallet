@@ -294,47 +294,57 @@ async function getProxyV1Consignment(input: {
   const privateKey = input.proxyPrivateKey
   if (!privateKey) throw new Error('RGB proxy v1 invoice signing key is missing')
   const timestamp = String(Math.floor(Date.now() / 1000))
+  let lastError: unknown
+  let sawHealthyEndpoint = false
+  let sawPendingTransfer = false
   for (const endpoint of input.endpoints) {
-    const listed = await postJson<Record<string, string>>(endpoint, 'transfer.list', {
-      invoice_id: input.recipientId,
-      timestamp,
-      signature: proxyV1Sign(privateKey, input.recipientId + timestamp),
-    })
-    if (listed.error) throw new Error(`RGB proxy transfer.list failed: ${listed.error.message || listed.error.code}`)
-    const transferId = Object.entries(listed.result || {}).find(([, status]) => status === 'pending')?.[0]
-    if (!transferId) continue
-    const received = await postJson<ProxyV1Consignment>(endpoint, 'consignment.get', { transfer_id: transferId })
-    if (received.error) throw new Error(`RGB proxy consignment.get failed: ${received.error.message || received.error.code}`)
-    const result = received.result
-    if (!result?.consignment || !result.sender_pk || !result.consignment_hash || !result.sender_transport_endpoint) {
-      throw new Error('RGB proxy returned an incomplete v1 consignment')
-    }
-    if (proxyV1TransferId(input.recipientId, result.sender_pk) !== transferId) {
-      throw new Error('RGB proxy returned a transfer with an invalid ID')
-    }
-    const blob = base64ToBytes(result.consignment)
-    let plaintext: Uint8Array
     try {
-      plaintext = proxyV1Hash(blob) === result.consignment_hash
-        ? blob
-        : proxyV1DecryptBlob(blob, privateKey, result.sender_pk, result.consignment_hash)
-    } catch {
-      throw new Error('RGB proxy returned a consignment with an invalid hash')
-    }
-    if (proxyV1Hash(plaintext) !== result.consignment_hash) {
-      throw new Error('RGB proxy returned a consignment with an invalid hash')
-    }
-    return {
-      recipientId: input.recipientId,
-      payload: Buffer.from(plaintext).toString('base64'),
-      txid: '',
-      endpoint,
-      proxyTransferId: transferId,
-      proxySenderPublicKey: result.sender_pk,
-      proxySenderEndpoint: result.sender_transport_endpoint,
-      proxyConsignmentHash: result.consignment_hash,
+      const listed = await postJson<Record<string, string>>(endpoint, 'transfer.list', {
+        invoice_id: input.recipientId,
+        timestamp,
+        signature: proxyV1Sign(privateKey, input.recipientId + timestamp),
+      })
+      if (listed.error) throw new Error(`RGB proxy transfer.list failed: ${listed.error.message || listed.error.code}`)
+      sawHealthyEndpoint = true
+      const transferId = Object.entries(listed.result || {}).find(([, status]) => status === 'pending')?.[0]
+      if (!transferId) continue
+      sawPendingTransfer = true
+      const received = await postJson<ProxyV1Consignment>(endpoint, 'consignment.get', { transfer_id: transferId })
+      if (received.error) throw new Error(`RGB proxy consignment.get failed: ${received.error.message || received.error.code}`)
+      const result = received.result
+      if (!result?.consignment || !result.sender_pk || !result.consignment_hash || !result.sender_transport_endpoint) {
+        throw new Error('RGB proxy returned an incomplete v1 consignment')
+      }
+      if (proxyV1TransferId(input.recipientId, result.sender_pk) !== transferId) {
+        throw new Error('RGB proxy returned a transfer with an invalid ID')
+      }
+      const blob = base64ToBytes(result.consignment)
+      let plaintext: Uint8Array
+      try {
+        plaintext = proxyV1Hash(blob) === result.consignment_hash
+          ? blob
+          : proxyV1DecryptBlob(blob, privateKey, result.sender_pk, result.consignment_hash)
+      } catch {
+        throw new Error('RGB proxy returned a consignment with an invalid hash')
+      }
+      if (proxyV1Hash(plaintext) !== result.consignment_hash) {
+        throw new Error('RGB proxy returned a consignment with an invalid hash')
+      }
+      return {
+        recipientId: input.recipientId,
+        payload: Buffer.from(plaintext).toString('base64'),
+        txid: '',
+        endpoint,
+        proxyTransferId: transferId,
+        proxySenderPublicKey: result.sender_pk,
+        proxySenderEndpoint: result.sender_transport_endpoint,
+        proxyConsignmentHash: result.consignment_hash,
+      }
+    } catch (error) {
+      lastError = error
     }
   }
+  if (lastError && (sawPendingTransfer || !sawHealthyEndpoint)) throw lastError
   return undefined
 }
 
