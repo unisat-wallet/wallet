@@ -3434,6 +3434,7 @@
   },
   "rgb_burn": { "message": "Quemar" },
   "rgb_burn_amount": { "message": "Cantidad a quemar" },
+  "rgb_burn_minimum_amount": { "message": "La cantidad mínima para quemar es 1 {ticker}." },
   "rgb_burn_reason": { "message": "Dirección destinataria en Arbitrum One" },
   "rgb_burn_reason_placeholder": { "message": "Introduce la dirección EVM" },
   "rgb_burn_reason_invalid": { "message": "Introduce una dirección EVM válida de 20 bytes." },

@@ -3443,6 +3443,7 @@
   },
   "rgb_burn": { "message": "バーン" },
   "rgb_burn_amount": { "message": "バーン数量" },
+  "rgb_burn_minimum_amount": { "message": "バーンの最小数量は 1 {ticker} です。" },
   "rgb_burn_reason": { "message": "Arbitrum One受取アドレス" },
   "rgb_burn_reason_placeholder": { "message": "EVM受取アドレスを入力" },
   "rgb_burn_reason_invalid": { "message": "有効な20バイトのEVMアドレスを入力してください。" },

@@ -3443,6 +3443,7 @@
   },
   "rgb_burn": { "message": "Brûler" },
   "rgb_burn_amount": { "message": "Montant à brûler" },
+  "rgb_burn_minimum_amount": { "message": "Le montant minimum à brûler est de 1 {ticker}." },
   "rgb_burn_reason": { "message": "Adresse destinataire sur Arbitrum One" },
   "rgb_burn_reason_placeholder": { "message": "Saisissez l’adresse EVM" },
   "rgb_burn_reason_invalid": { "message": "Saisissez une adresse EVM valide de 20 octets." },

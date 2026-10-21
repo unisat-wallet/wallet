@@ -264,6 +264,22 @@ describe('RgbService', () => {
     ])
   })
 
+  it('rejects BFA burns below one whole token using the asset precision', async () => {
+    const dependencies = createDependencies()
+    const service = new RgbService(dependencies)
+    const assetId = 'rgb:AQEBAQEB-AQEBAQE-BAQEBAQ-EBAQEBA-QEBAQEB-AQEBAQE'
+    await service.open(wallet)
+    ;(service as any).state.contracts = {
+      [assetId]: { consignment: 'AA==', createdAt: 1,
+        metadata: { ticker: 'USDT', name: 'USDT', precision: 6, schema: 'BFA', issuedSupply: '2000000' } },
+    }
+    await service.sync()
+    await expect(service.prepareBurn({ assetId, amount: '999999', feeRate: 1,
+      burnReason: '0xf39fd6e51aad88f6f4ce6ab8827279cfffb92266' }))
+      .rejects.toThrow('at least one token')
+    expect(service.getPendingTransfers()).toEqual([])
+  })
+
   it('does not rebroadcast a failed BFA burn during sync and allows explicit retry', async () => {
     const dependencies = createDependencies()
     const service = new RgbService(dependencies)

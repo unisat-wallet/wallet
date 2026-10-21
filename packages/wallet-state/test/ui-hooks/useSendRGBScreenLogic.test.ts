@@ -29,6 +29,31 @@ describe('useSendRGBScreenLogic', () => {
     }))
   })
 
+  it('requires at least one whole token before preparing a BFA burn', async () => {
+    const assetId = 'rgb:bfa'
+    const { wrapper, wallet } = createHookTestHarness({
+      routeState: { assetId, burn: true,
+        tokenBalance: { assetId, ticker: 'USDT', precision: 6, spendable: '2000000' } },
+    })
+    wallet.createRgbSendBegin = vi.fn().mockResolvedValue({
+      txid: 'burn-1', toSignData: { psbtHex: 'unsigned-psbt' },
+    })
+    const { result } = renderHook(() => useSendRGBScreenLogic(), { wrapper })
+    act(() => {
+      result.current.setBurnReason('0xf39fd6e51aad88f6f4ce6ab8827279cfffb92266')
+      result.current.onAmountChange('0.999999')
+    })
+    expect(result.current.disabled).toBe(true)
+    expect(result.current.amountValidationMessage).toBe('rgb_burn_minimum_amount')
+
+    act(() => result.current.onAmountChange('1'))
+    expect(result.current.disabled).toBe(false)
+    await act(async () => result.current.onClickNext())
+    expect(wallet.createRgbSendBegin).toHaveBeenCalledWith(expect.objectContaining({
+      burn: true, amount: '1000000',
+    }))
+  })
+
   it('passes the selected donation mode to RGB send preparation', async () => {
     const assetId = 'rgb:test-asset'
     const invoice = 'rgb:test-asset/~/~/bc:utxob:test?amount=1&endpoints=rpc://proxy'

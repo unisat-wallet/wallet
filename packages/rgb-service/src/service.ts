@@ -2773,6 +2773,13 @@ export class RgbService {
     if (!amount) {
       throw new RgbServiceError('RGB transfer amount must be provided by the request or invoice')
     }
+    if (burn) {
+      const precision = this.getLocalAssetDetail(requestedAssetId).precision
+      if (precision === undefined || !Number.isInteger(precision) || precision < 0 || precision > 18)
+        throw new RgbServiceError('BFA burn asset precision is unavailable')
+      if (!/^\d+$/.test(amount) || BigInt(amount) < 10n ** BigInt(precision))
+        throw new RgbServiceError('BFA burn amount must be at least one token')
+    }
     if (invoice?.amount && invoice.amount !== amount) {
       throw new RgbServiceError('RGB invoice amount does not match the requested amount')
     }

@@ -3446,6 +3446,7 @@
   },
   "rgb_burn": { "message": "銷毀" },
   "rgb_burn_amount": { "message": "銷毀數量" },
+  "rgb_burn_minimum_amount": { "message": "最低銷毀數量為 1 {ticker}。" },
   "rgb_burn_reason": { "message": "Arbitrum One 收款地址" },
   "rgb_burn_reason_placeholder": { "message": "輸入 EVM 收款地址" },
   "rgb_burn_reason_invalid": { "message": "請輸入有效的 20 位元組 EVM 地址。" },

@@ -3443,6 +3443,7 @@
   },
   "rgb_burn": { "message": "Сжечь" },
   "rgb_burn_amount": { "message": "Сумма сжигания" },
+  "rgb_burn_minimum_amount": { "message": "Минимальная сумма сжигания — 1 {ticker}." },
   "rgb_burn_reason": { "message": "Адрес получателя в Arbitrum One" },
   "rgb_burn_reason_placeholder": { "message": "Введите EVM-адрес" },
   "rgb_burn_reason_invalid": { "message": "Введите действительный 20-байтовый EVM-адрес." },

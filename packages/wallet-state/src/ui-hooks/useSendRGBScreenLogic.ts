@@ -242,7 +242,10 @@ export function useSendRGBScreenLogic() {
   const spendable = blockingSendStatus ? '0' : toRgbDisplayAmount(rawSpendable, assetPrecision)
   const normalizedAmount = toRgbAtomicAmount(amountInput, assetPrecision)
   const isAmountFormatValid = isValidRgbDecimalAmount(amountInput, assetPrecision)
-  const isAmountValid = !requiresAmount || (isAmountFormatValid && /[1-9]/.test(normalizedAmount))
+  const burnBelowMinimum = burn && isAmountFormatValid &&
+    BigInt(normalizedAmount) < 10n ** BigInt(assetPrecision)
+  const isAmountValid = !requiresAmount ||
+    (isAmountFormatValid && /[1-9]/.test(normalizedAmount) && !burnBelowMinimum)
   const requestedAmount = requiresAmount ? normalizedAmount : invoiceAmount
   const insufficientBalance =
     invoiceReadyForAmount &&
@@ -258,6 +261,8 @@ export function useSendRGBScreenLogic() {
     ? ''
     : !isAmountFormatValid
       ? t('rgb_amount_precision_invalid', { precision: String(assetPrecision) })
+      : burnBelowMinimum
+        ? t('rgb_burn_minimum_amount', { ticker })
       : t('enter_amount_greater_than_0')
   const blockingSendMessage =
     blockingSendStatus === 'waiting_ack'
