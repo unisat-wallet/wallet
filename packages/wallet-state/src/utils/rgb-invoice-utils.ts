@@ -286,11 +286,15 @@ export function decodeRgbInvoice(invoice: string): DecodedRgbInvoice {
   const assetId = normalizeRgbAssetId(queryAssetId || contractId)
   const assignmentName = getQueryValue(query, 'assignment_name')
   const expiry = query['expiry']
-  const expirationText = typeof expiry === 'string' ? expiry : undefined
-  const expiryInvalid = query['expirationTimestamp'] !== undefined ||
+  const legacyExpiry = query['expirationTimestamp']
+  const expirationText = typeof expiry === 'string'
+    ? expiry
+    : typeof legacyExpiry === 'string' ? legacyExpiry : undefined
+  const expiryInvalid = (expiry !== undefined && legacyExpiry !== undefined) ||
     Array.isArray(expiry) ||
-    (expiry !== undefined && (
-      !/^(0|[1-9][0-9]*)$/.test(expirationText ?? '') ||
+    Array.isArray(legacyExpiry) ||
+    (expirationText !== undefined && (
+      !/^(0|[1-9][0-9]*)$/.test(expirationText) ||
       !Number.isSafeInteger(Number(expirationText))
     ))
   const expirationTimestamp = expiryInvalid || expirationText === undefined
@@ -301,7 +305,7 @@ export function decodeRgbInvoice(invoice: string): DecodedRgbInvoice {
     invoice: value,
     submissionInvoice: value,
     valid: scheme.toLowerCase() === 'rgb' && pathSegments.length >= 4 && !expiryInvalid,
-    ...(expiryInvalid ? { error: 'RGB invoice expiry is invalid or unsupported' } : {}),
+    ...(expiryInvalid ? { error: 'RGB invoice expiry is invalid or ambiguous' } : {}),
     scheme,
     invoiceType: getInvoiceType(recipientId),
     contractId,

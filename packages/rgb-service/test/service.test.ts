@@ -264,6 +264,17 @@ describe('RgbService', () => {
     })
   })
 
+  it('enforces the expiration time on legacy invoices', async () => {
+    const service = new RgbService(createDependencies())
+    await service.open(wallet)
+    const now = Math.floor(Date.now() / 1000)
+
+    await expect(service.checkInvoiceAvailability(`${rgbInvoice()}&expirationTimestamp=${now + 3600}`))
+      .resolves.toEqual({ available: true })
+    await expect(service.checkInvoiceAvailability(`${rgbInvoice()}&expirationTimestamp=${now - 1}`))
+      .rejects.toThrow('RGB invoice has expired')
+  })
+
   it('includes local pending invoice reservations in the UTXO inspection view', async () => {
     const dependencies = createDependencies()
     const service = new RgbService(dependencies)

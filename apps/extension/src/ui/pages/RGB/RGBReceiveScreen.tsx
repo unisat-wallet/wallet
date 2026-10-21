@@ -24,6 +24,7 @@ import { PlusCircleOutlined } from '@ant-design/icons';
 import {
   ANY_RGB_ASSET,
   ANY_RGB_ASSET_ID,
+  decodeRgbInvoice,
   getRgbAssetId,
   getRgbTokenIconInfo,
   getRgbTokenPrecision,
@@ -732,10 +733,10 @@ export default function RGBReceiveScreen({ initialStep = 'create_invoice' }: { i
   }
 
   if (invoice) {
-    const expirationMatch = invoice.match(/[?&]expiry=(-?\d+)/);
+    const decodedInvoice = decodeRgbInvoice(invoice);
     const invoiceExpirationTimestamp =
       selectedPendingInvoice?.expirationTimestamp ??
-      (expirationMatch ? Number(expirationMatch[1]) : undefined);
+      (decodedInvoice.valid ? decodedInvoice.expirationTimestamp : undefined);
 
     return (
       <Layout>

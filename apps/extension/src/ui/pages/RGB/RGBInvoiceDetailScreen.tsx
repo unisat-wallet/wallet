@@ -20,6 +20,7 @@ import { EllipsisOutlined } from '@ant-design/icons';
 import {
   ANY_RGB_ASSET,
   ANY_RGB_ASSET_ID,
+  decodeRgbInvoice,
   formatRgbPendingAmountTag,
   getRgbAssetId,
   getRgbTokenIconInfo,
@@ -208,9 +209,9 @@ export default function RGBInvoiceDetailScreen() {
   const invoiceDescription = isAnyRgbAsset
     ? t('use_this_invoice_to_receive_any_rgb_asset')
     : t('use_this_invoice_to_receive', { ticker: invoiceName });
-  const expirationMatch = invoiceText.match(/[?&]expiry=(-?\d+)/);
+  const decodedInvoice = decodeRgbInvoice(invoiceText);
   const invoiceExpirationTimestamp =
-    invoice?.expirationTimestamp ?? (expirationMatch ? Number(expirationMatch[1]) : undefined);
+    invoice?.expirationTimestamp ?? (decodedInvoice.valid ? decodedInvoice.expirationTimestamp : undefined);
 
   return (
     <Layout>

@@ -52,13 +52,21 @@ describe('rgb invoice utils', () => {
     expect(decodeRgbInvoice(invoice).expirationTimestamp).toBe(1_800_000_000)
   })
 
+  it('reads legacy expirationTimestamp from invoices', () => {
+    const invoice = 'rgb:~/~/~/bc:utxob:test?expirationTimestamp=1800000000'
+    expect(decodeRgbInvoice(invoice)).toMatchObject({ valid: true, expirationTimestamp: 1_800_000_000 })
+  })
+
   it.each([
-    'expirationTimestamp=1800000000',
+    'expirationTimestamp=',
+    'expirationTimestamp=-1',
     'expiry=',
     'expiry=-1',
     'expiry=9007199254740992',
     'expiry=1800000000&expiry=1800000001',
-  ])('marks unsupported or invalid expiry as invalid: %s', query => {
+    'expirationTimestamp=1800000000&expirationTimestamp=1800000001',
+    'expiry=1800000000&expirationTimestamp=1800000000',
+  ])('marks ambiguous or invalid expiry as invalid: %s', query => {
     expect(decodeRgbInvoice(`rgb:~/~/~/bc:utxob:test?${query}`).valid).toBe(false)
   })
 
