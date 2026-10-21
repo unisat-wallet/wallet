@@ -169,19 +169,40 @@ describe('RgbService', () => {
         allocations: [],
       }],
     })
-    dependencies.stateSource.getTransactionStatus = vi.fn().mockResolvedValue({
-      status: 'mempool', confirmations: 0,
-    })
+    let outputConfirmed = false
+    dependencies.stateSource.verifyUtxos = vi.fn(async (_wallet, outpoints) =>
+      outpoints.map(utxo => ({
+        outpoint: utxo.outpoint,
+        status: outputConfirmed ? 'confirmed' as const : 'mempool' as const,
+        confirmations: outputConfirmed ? 1 : 0,
+      }))
+    )
     await service.sync()
     expect(service.getLocalAssetBalance(assetId)?.lockedAmount).toBe('40')
 
-    state.snapshot.utxos[0].chainStatus = 'confirmed'
-    state.snapshot.utxos[0].allocations[0].settled = true
-    state.snapshot.utxos[0].allocations[0].spendable = true
+    outputConfirmed = true
+    await service.sync()
     expect(service.getLocalAssetBalance(assetId)).toMatchObject({
       spendable: '40', pending: '0',
     })
     expect(service.getLocalAssetBalance(assetId)?.lockedAmount).toBeUndefined()
+    expect(service.getPendingUtxoSync()?.outpoints[0]?.allocations[0]).toMatchObject({
+      settled: true, spendable: true,
+    })
+    await service.markUtxoSyncCompleted(txid)
+    await service.sync()
+    expect(service.getLocalAssetBalance(assetId)?.spendable).toBe('40')
+
+    // A replica can return the output while still carrying the old pending allocation.
+    ;(dependencies.stateSource.getSnapshot as ReturnType<typeof vi.fn>).mockResolvedValue({
+      syncedAt: 3,
+      utxos: [{
+        ...state.snapshot.utxos[0], chainStatus: 'confirmed', confirmations: 1,
+        allocations: [{ ...state.snapshot.utxos[0].allocations[0], settled: false, spendable: false }],
+      }],
+    })
+    await service.sync()
+    expect(service.getLocalAssetBalance(assetId)?.spendable).toBe('40')
   })
 
   it('broadcasts a BFA burn without proxy delivery and retains its exact consignment after reopening', async () => {
@@ -198,6 +219,15 @@ describe('RgbService', () => {
     dependencies.encoder.completeTransfer = vi.fn().mockResolvedValue({
       txid, rawTx: '02000000000000000000',
       consignments: [{ recipientId: '', payload: proof.toString('base64'), assetId, opIds: ['d'.repeat(64)] }],
+      fundingUpdate: {
+        spentOutpoints: [{ txid: 'b'.repeat(64), vout: 1 }],
+        createdUtxo: {
+          outpoint: { txid, vout: 0 }, satoshis: 700,
+          scriptPubKey: `5120${'11'.repeat(32)}`, publicKey: `02${'22'.repeat(32)}`,
+          allocations: [{ assetId, amount: '40', settled: true, spendable: true,
+            opId: 'd'.repeat(64), assignmentIndex: 1, assignmentType: 4000 }],
+        },
+      },
     })
     dependencies.validateBfaConsignment = vi.fn().mockResolvedValue({
       assetId, metadata: { schema: 'BFA' }, terminals: [], bundles: [{ operationIds: ['d'.repeat(64)] }],
@@ -208,6 +238,7 @@ describe('RgbService', () => {
         metadata: { ticker: 'BFA', name: 'Burnable', precision: 0, schema: 'BFA', issuedSupply: '100' } },
     }
     await service.sync()
+    ;(service as any).state.snapshot.utxos[0].allocations[0].amount = '100'
     await expect(service.prepareBurn({ assetId, amount: '60', feeRate: 1 })).rejects.toThrow('requires an EVM address')
     await service.prepareBurn({ assetId, amount: '60', feeRate: 1,
       burnReason: '0xf39FD6e51aad88f6f4ce6ab8827279cfffb92266' })
@@ -219,9 +250,14 @@ describe('RgbService', () => {
     expect(dependencies.transport.publishConsignment).not.toHaveBeenCalled()
     expect(dependencies.stateSource.syncBroadcast).not.toHaveBeenCalled()
     expect(dependencies.broadcaster.broadcast).toHaveBeenCalledTimes(1)
+    expect(service.getPendingUtxoSync()?.outpoints).toContainEqual(expect.objectContaining({
+      outpoint: { txid, vout: 0 },
+      allocations: [expect.objectContaining({ assetId, amount: '40', settled: false })],
+    }))
     expect(Buffer.from(service.exportBurnConsignment(txid))).toEqual(proof)
     const reopened = new RgbService(dependencies)
     await reopened.open(wallet)
+    expect(reopened.getPendingUtxoSync()?.txid).toBe(txid)
     expect(Buffer.from(reopened.exportBurnConsignment(txid))).toEqual(proof)
     expect(reopened.getPendingSendHistory()).toEqual([
       expect.objectContaining({ burn: true, txid, amount: '60', status: 'broadcasted' }),

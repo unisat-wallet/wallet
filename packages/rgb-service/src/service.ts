@@ -462,7 +462,7 @@ export class RgbService {
     // Once those outpoints disappear from the remote snapshot, it is safe to
     // accept the remote state again, once it includes any local burn change.
     if (this.hasStaleBroadcastedFundingOutpoints(snapshot)) return state.snapshot
-    if (await this.hasMissingLocalBurnChange(snapshot)) return state.snapshot
+    if (await this.reconcileLocalBurnChange(snapshot)) return state.snapshot
     // A replica can briefly return the same live outpoint without the
     // allocation we have already validated and settled. Re-publish the local
     // observation rather than treating that omission as a zero balance.
@@ -613,31 +613,67 @@ export class RgbService {
     )
   }
 
-  /** Keep a broadcast burn's unconfirmed change when the indexer lags its anchor transaction. */
-  private async hasMissingLocalBurnChange(snapshot: RgbWalletSnapshot) {
+  /** Settle verified burn change locally while the indexer catches up with its RGB allocation. */
+  private async reconcileLocalBurnChange(snapshot: RgbWalletSnapshot) {
     const state = this.requireState()
     const burnTxids = new Set((state.pendingSendHistory || [])
       .filter(item => item.burn && item.status === 'broadcasted' && item.txid)
       .map(item => item.txid!))
     if (!burnTxids.size) return false
-    const remoteOutpoints = new Set(snapshot.utxos.map(outpointKey))
-    const missingTxids = new Set(state.snapshot.utxos
-      .filter(utxo => burnTxids.has(utxo.outpoint.txid) &&
-        utxo.allocations.some(allocation => !allocation.settled) &&
-        !remoteOutpoints.has(outpointKey(utxo)))
-      .map(utxo => utxo.outpoint.txid))
-    if (!missingTxids.size) return false
-    const getStatus = this.dependencies.stateSource.getTransactionStatus
-    if (!getStatus) return true
-    for (const txid of missingTxids) {
-      try {
-        const { status } = await getStatus(state.wallet, txid)
-        if (status !== 'spent' && status !== 'replaced') return true
-      } catch {
-        return true
+    const remoteOutpoints = new Map(snapshot.utxos.map(utxo => [outpointKey(utxo), utxo]))
+    const localChange = state.snapshot.utxos.filter(utxo =>
+      burnTxids.has(utxo.outpoint.txid) && utxo.allocations.length > 0 &&
+      utxo.chainStatus !== 'spent' && utxo.chainStatus !== 'replaced'
+    )
+    let changed = false
+    let missing = false
+    for (const utxo of localChange) {
+      const remote = remoteOutpoints.get(outpointKey(utxo))
+      const hasRemoteAllocation = remote && utxo.allocations.every(allocation =>
+        remote.allocations.some(candidate => candidate.assetId === allocation.assetId &&
+          candidate.amount === allocation.amount && candidate.opId === allocation.opId &&
+          candidate.assignmentIndex === allocation.assignmentIndex &&
+          (remote.chainStatus !== 'confirmed' || (candidate.settled && candidate.spendable)))
+      )
+      if (hasRemoteAllocation && (remote.chainStatus === 'confirmed' ||
+        utxo.allocations.every(allocation => !allocation.settled))) continue
+      let status = remote?.chainStatus
+      let confirmations = remote?.confirmations || 0
+      if (status !== 'confirmed') {
+        const verify = this.dependencies.stateSource.verifyUtxos
+        if (verify) {
+          try {
+            const result = await verify(state.wallet, [utxo])
+            const verified = result.find(item =>
+              item.outpoint.txid === utxo.outpoint.txid && item.outpoint.vout === utxo.outpoint.vout
+            )
+            status = verified?.status
+            confirmations = verified?.confirmations || 0
+          } catch {
+            // Keep the local allocation until its outpoint can be verified.
+          }
+        }
       }
+      if (status === 'spent' || status === 'replaced') continue
+      if (!hasRemoteAllocation || (remote?.chainStatus !== 'confirmed' &&
+        utxo.allocations.some(allocation => allocation.settled))) missing = true
+      if (status !== 'confirmed' || confirmations < 1 ||
+        !utxo.allocations.some(allocation => !allocation.settled || !allocation.spendable)) continue
+      utxo.chainStatus = 'confirmed'
+      utxo.confirmations = confirmations
+      utxo.allocations = utxo.allocations.map(allocation => ({
+        ...allocation, settled: true, spendable: true,
+      }))
+      state.pendingUtxoSync = { txid: utxo.outpoint.txid, outpoints: state.snapshot.utxos }
+      changed = true
     }
-    return false
+    if (changed) {
+      await this.persist()
+      return true
+    }
+    // A missing output can only be discarded once its exact outpoint is known
+    // to be spent or replaced. Transaction confirmation alone is insufficient.
+    return missing
   }
 
   private async areLocalSnapshotUtxosTerminal() {
@@ -3237,6 +3273,12 @@ export class RgbService {
     const pending = Object.values(state.pending).find(
       item => item.delivery?.completed === completed
     )
+    // Burn skips syncBroadcast because there is no recipient consignment to
+    // publish. Its colored change still needs to reach the indexer, including
+    // when a broadcast timeout is later reconciled as successful.
+    if (pending?.request.burn && update.createdUtxo?.allocations.length) {
+      state.pendingUtxoSync = { txid: completed.txid, outpoints: state.snapshot.utxos }
+    }
     if (pending?.prepared.feeOutpoints?.length) {
       const spent = new Set(
         pending.prepared.feeOutpoints.map(outpoint => `${outpoint.txid}:${outpoint.vout}`)

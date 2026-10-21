@@ -6172,6 +6172,17 @@ export class WalletController extends BaseController {
           totalLength: payload.length,
         }
       })
+      .catch(error => {
+        // A checkpoint appeared after our last read (or a replica returned
+        // stale metadata). Re-read its revision before any further write;
+        // restoreRgbRecoveryIfNeeded will run the normal conflict checks.
+        if (String(error instanceof Error ? error.message : error)
+          .includes('RGB recovery checkpoint requires a current wallet version')) {
+          this.rgbRecoveryVersions.delete(key)
+          this.rgbRecoveryVerifiedFingerprints.delete(key)
+        }
+        throw error
+      })
     this.rgbRecoveryBackups.set(key, backup)
     void backup.catch(error => {
       if (isRgbWalletContextCancellation(error)) return

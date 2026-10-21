@@ -1304,6 +1304,29 @@ describe('RGB wallet references', () => {
     )
   })
 
+  it('re-reads recovery metadata after the server rejects a stale writer version', async () => {
+    const wallet = new WalletController()
+    vi.spyOn(wallet as any, 'assertActiveRgbWallet').mockResolvedValue(undefined)
+    vi.spyOn(wallet as any, 'rgbRecoveryKey').mockResolvedValue('11'.repeat(32))
+    const walletRef = {
+      walletId: 'rgb-wallet', network: 'mainnet', fundingAddress: 'bc1p-rgb-funding',
+    }
+    const key = `${walletRef.network}:${walletRef.fundingAddress}`
+    ;(wallet as any).rgbRecoveryVersions.set(key, { kind: 'normal', generation: 1 })
+    ;(walletApiService as any).rgb = {
+      saveRgbRecoveryCheckpoint: vi.fn().mockRejectedValue(
+        new Error('RGB recovery checkpoint requires a current wallet version')
+      ),
+    }
+
+    await expect((wallet as any).queueRgbRecoveryCheckpoint(
+      walletRef,
+      { version: 1, wallet: walletRef, snapshot: { syncedAt: 1, utxos: [] } },
+      { reason: 'state_change', kind: 'normal' }
+    )).rejects.toThrow('requires a current wallet version')
+    expect((wallet as any).rgbRecoveryVersions.has(key)).toBe(false)
+  })
+
   it('does not expose local blind-seal bigint values through wallet responses', () => {
     const result = toPublicRgbPendingReceiveInvoice(
       {
