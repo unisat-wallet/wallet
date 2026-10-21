@@ -49,6 +49,15 @@ function errorMessage(error: unknown): string | undefined {
   return undefined;
 }
 
+function createRestoreProgressId(): string {
+  const browserCrypto = globalThis.crypto;
+  if (typeof browserCrypto?.randomUUID === 'function') return browserCrypto.randomUUID();
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, char => {
+    const value = browserCrypto.getRandomValues(new Uint8Array(1))[0] & 15;
+    return (char === 'x' ? value : (value & 3) | 8).toString(16);
+  });
+}
+
 export default function RgbBackupRestoreScreen() {
   const wallet = useWallet();
   const nav = useNavigation();
@@ -123,15 +132,16 @@ export default function RgbBackupRestoreScreen() {
 
   const restoreBackup = async () => {
     if (!payload || !preview || !riskAcknowledged) return;
-    const progressId = globalThis.crypto.randomUUID();
-    const onProgress = (progress?: RestoreProgress) => {
-      if (progress?.progressId === progressId) setRestoreProgress(progress);
-    };
-    uiEventBus.addEventListener(BUS_METHODS.RGB_BACKUP_RESTORE_PROGRESS, onProgress);
-    setRestoreProgress({ progressId, completed: 0, total: preview.accountIndexes.length, phase: 'preparing' });
+    let onProgress: ((progress?: RestoreProgress) => void) | undefined;
     setRestoring(true);
     setErrorText(undefined);
     try {
+      const progressId = createRestoreProgressId();
+      onProgress = (progress?: RestoreProgress) => {
+        if (progress?.progressId === progressId) setRestoreProgress(progress);
+      };
+      uiEventBus.addEventListener(BUS_METHODS.RGB_BACKUP_RESTORE_PROGRESS, onProgress);
+      setRestoreProgress({ progressId, completed: 0, total: preview.accountIndexes.length, phase: 'preparing' });
       await wallet.restoreRgbBackupFile({
         payload,
         replaceRemote: true,
@@ -148,7 +158,7 @@ export default function RgbBackupRestoreScreen() {
       setErrorText(message);
       tools.toastError(message);
     } finally {
-      uiEventBus.removeEventListener(BUS_METHODS.RGB_BACKUP_RESTORE_PROGRESS, onProgress);
+      if (onProgress) uiEventBus.removeEventListener(BUS_METHODS.RGB_BACKUP_RESTORE_PROGRESS, onProgress);
       setRestoring(false);
     }
   };
