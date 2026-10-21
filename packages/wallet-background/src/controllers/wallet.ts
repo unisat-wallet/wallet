@@ -3736,7 +3736,7 @@ export class WalletController extends BaseController {
     const balance = await this.getRgbAssetBalance(address, assetId)
     // A token detail screen may be open without the RGB asset list. Keep its
     // pending allocation moving while a receive or change output confirms.
-    if (Number(balance?.pending || 0) > 0) {
+    if (Number(balance?.pending || 0) > 0 || Number(balance?.lockedAmount || 0) > 0) {
       void this.syncRgbListState().catch(error => {
         if (isRgbWalletLockCancellation(error)) return
         log.warn('Failed to refresh RGB indexer snapshot while loading asset balance', error)
@@ -5711,7 +5711,7 @@ export class WalletController extends BaseController {
   /** Exclude locally locked RGB UTXOs from the UI's spendable balance until a send completes. */
   private getRgbPendingLockedAmounts = () => this.rgbCoordinator.getPendingLockedAmounts()
 
-  private applyRgbPendingLock<T extends { assetId?: string; spendable?: string | number }>(
+  private applyRgbPendingLock<T extends { assetId?: string; spendable?: string | number; lockedAmount?: string }>(
     balance: T,
     lockedAmounts: Map<string, bigint>
   ) {
@@ -5723,7 +5723,7 @@ export class WalletController extends BaseController {
       return {
         ...balance,
         spendable: (spendable > lockedAmount ? spendable - lockedAmount : 0n).toString(),
-        lockedAmount: lockedAmount.toString(),
+        lockedAmount: (BigInt(balance.lockedAmount || '0') + lockedAmount).toString(),
       }
     } catch {
       return balance

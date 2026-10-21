@@ -73,6 +73,8 @@ export interface RgbLocalAssetBalance {
   pending: string
   /** Accepted incoming consignments awaiting settlement, included in pending. */
   incomingPending: string
+  /** Unconfirmed change from a locally broadcast burn; unavailable until settled. */
+  lockedAmount?: string
   ticker?: string
   name?: string
   precision?: number

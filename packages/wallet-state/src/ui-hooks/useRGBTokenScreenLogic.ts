@@ -169,15 +169,18 @@ export function useRGBTokenScreenLogic() {
   const hasPendingBalance = hasPositiveAmount(
     fetchedTokenBalance?.pending ?? tokenBalance?.pending
   )
+  const hasLockedBalance = hasPositiveAmount(
+    fetchedTokenBalance?.lockedAmount ?? tokenBalance?.lockedAmount
+  )
 
   useEffect(() => {
-    if (!hasActiveActivity && !hasPendingBalance) return undefined
+    if (!hasActiveActivity && !hasPendingBalance && !hasLockedBalance) return undefined
     const intervalId = setInterval(() => {
       void loadBalance(false)
       onRefreshActivity()
     }, 10_000)
     return () => clearInterval(intervalId)
-  }, [hasActiveActivity, hasPendingBalance, loadBalance, onRefreshActivity])
+  }, [hasActiveActivity, hasPendingBalance, hasLockedBalance, loadBalance, onRefreshActivity])
 
   const latestTokenBalance = fetchedTokenBalance || tokenBalance || detail?.balance
   const resolvedPrecision =

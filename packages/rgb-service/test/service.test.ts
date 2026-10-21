@@ -138,6 +138,52 @@ function createDependencies(): RgbServiceDependencies {
 }
 
 describe('RgbService', () => {
+  it('shows unconfirmed BFA burn change as locked until it settles', async () => {
+    const dependencies = createDependencies()
+    const service = new RgbService(dependencies)
+    const assetId = 'rgb:AQEBAQEB-AQEBAQE-BAQEBAQ-EBAQEBA-QEBAQEB-AQEBAQE'
+    const txid = 'e'.repeat(64)
+    await service.open(wallet)
+    const state = (service as any).state
+    state.pendingSendHistory = [{
+      transferId: 'burn-1', assetId, amount: '20', txid, burn: true,
+      createdAt: 1, status: 'broadcasted',
+    }]
+    state.snapshot.utxos = [{
+      outpoint: { txid, vout: 0 }, satoshis: 1000,
+      scriptPubKey: `5120${'00'.repeat(32)}`, publicKey: `02${'11'.repeat(32)}`,
+      chainStatus: 'mempool', confirmations: 0,
+      allocations: [{ assetId, amount: '40', settled: false, spendable: false }],
+    }]
+
+    expect(service.getLocalAssetBalance(assetId)).toMatchObject({
+      spendable: '0', pending: '0', lockedAmount: '40',
+    })
+
+    // The indexer can report other UTXOs before it reports the burn change.
+    // That stale response must not erase the locally known locked balance.
+    ;(dependencies.stateSource.getSnapshot as ReturnType<typeof vi.fn>).mockResolvedValue({
+      syncedAt: 2, utxos: [{
+        outpoint: { txid: 'f'.repeat(64), vout: 0 }, satoshis: 1000,
+        scriptPubKey: `5120${'22'.repeat(32)}`, publicKey: `02${'33'.repeat(32)}`,
+        allocations: [],
+      }],
+    })
+    dependencies.stateSource.getTransactionStatus = vi.fn().mockResolvedValue({
+      status: 'mempool', confirmations: 0,
+    })
+    await service.sync()
+    expect(service.getLocalAssetBalance(assetId)?.lockedAmount).toBe('40')
+
+    state.snapshot.utxos[0].chainStatus = 'confirmed'
+    state.snapshot.utxos[0].allocations[0].settled = true
+    state.snapshot.utxos[0].allocations[0].spendable = true
+    expect(service.getLocalAssetBalance(assetId)).toMatchObject({
+      spendable: '40', pending: '0',
+    })
+    expect(service.getLocalAssetBalance(assetId)?.lockedAmount).toBeUndefined()
+  })
+
   it('broadcasts a BFA burn without proxy delivery and retains its exact consignment after reopening', async () => {
     const dependencies = createDependencies()
     const service = new RgbService(dependencies)

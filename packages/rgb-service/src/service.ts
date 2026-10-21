@@ -460,8 +460,9 @@ export class RgbService {
     // Keep the local funding update while the indexer still returns the RGB
     // allocations that this installation already spent in a broadcast tx.
     // Once those outpoints disappear from the remote snapshot, it is safe to
-    // accept the remote state again, even before the transfer is confirmed.
+    // accept the remote state again, once it includes any local burn change.
     if (this.hasStaleBroadcastedFundingOutpoints(snapshot)) return state.snapshot
+    if (await this.hasMissingLocalBurnChange(snapshot)) return state.snapshot
     // A replica can briefly return the same live outpoint without the
     // allocation we have already validated and settled. Re-publish the local
     // observation rather than treating that omission as a zero balance.
@@ -610,6 +611,33 @@ export class RgbService {
     return (
       spentOutpoints.size > 0 && snapshot.utxos.some(utxo => spentOutpoints.has(outpointKey(utxo)))
     )
+  }
+
+  /** Keep a broadcast burn's unconfirmed change when the indexer lags its anchor transaction. */
+  private async hasMissingLocalBurnChange(snapshot: RgbWalletSnapshot) {
+    const state = this.requireState()
+    const burnTxids = new Set((state.pendingSendHistory || [])
+      .filter(item => item.burn && item.status === 'broadcasted' && item.txid)
+      .map(item => item.txid!))
+    if (!burnTxids.size) return false
+    const remoteOutpoints = new Set(snapshot.utxos.map(outpointKey))
+    const missingTxids = new Set(state.snapshot.utxos
+      .filter(utxo => burnTxids.has(utxo.outpoint.txid) &&
+        utxo.allocations.some(allocation => !allocation.settled) &&
+        !remoteOutpoints.has(outpointKey(utxo)))
+      .map(utxo => utxo.outpoint.txid))
+    if (!missingTxids.size) return false
+    const getStatus = this.dependencies.stateSource.getTransactionStatus
+    if (!getStatus) return true
+    for (const txid of missingTxids) {
+      try {
+        const { status } = await getStatus(state.wallet, txid)
+        if (status !== 'spent' && status !== 'replaced') return true
+      } catch {
+        return true
+      }
+    }
+    return false
   }
 
   private async areLocalSnapshotUtxosTerminal() {
@@ -2373,7 +2401,15 @@ export class RgbService {
         pending.prepared.lockedOutpoints.map(outpoint => `${outpoint.txid}:${outpoint.vout}`)
       )
     )
-    const amounts = new Map<string, { settled: bigint; spendable: bigint; pending: bigint; incomingPending: bigint }>()
+    const burnChangeTxids = new Set([
+      ...(state.pendingSendHistory || [])
+        .filter(item => item.burn && item.status === 'broadcasted' && item.txid)
+        .map(item => item.txid!),
+      ...Object.values(state.pending)
+        .filter(item => item.request.burn && item.broadcast)
+        .map(item => item.broadcast!.completed.txid),
+    ])
+    const amounts = new Map<string, { settled: bigint; spendable: bigint; pending: bigint; incomingPending: bigint; locked: bigint }>()
     for (const utxo of state.snapshot.utxos) {
       if (
         utxo.chainStatus === 'spent' ||
@@ -2388,9 +2424,11 @@ export class RgbService {
           spendable: 0n,
           pending: 0n,
           incomingPending: 0n,
+          locked: 0n,
         }
         const amount = BigInt(allocation.amount)
         if (allocation.settled) current.settled += amount
+        else if (burnChangeTxids.has(utxo.outpoint.txid)) current.locked += amount
         else current.pending += amount
         if (allocation.settled && allocation.spendable && !locked.has(outpointKey(utxo))) {
           current.spendable += amount
@@ -2410,6 +2448,7 @@ export class RgbService {
         spendable: 0n,
         pending: 0n,
         incomingPending: 0n,
+        locked: 0n,
       }
       // A remote snapshot can report the same allocation before the local
       // receive finishes. Count it once, and never present a settled output as
@@ -2434,11 +2473,12 @@ export class RgbService {
 
   private getEmptyLocalAssetBalance(
     assetId: string,
-    amount: { settled: bigint; spendable: bigint; pending: bigint; incomingPending: bigint } = {
+    amount: { settled: bigint; spendable: bigint; pending: bigint; incomingPending: bigint; locked: bigint } = {
       settled: 0n,
       spendable: 0n,
       pending: 0n,
       incomingPending: 0n,
+      locked: 0n,
     }
   ): RgbLocalAssetDetail {
     const state = this.requireState()
@@ -2470,6 +2510,7 @@ export class RgbService {
       spendable: amount.spendable.toString(),
       pending: amount.pending.toString(),
       incomingPending: amount.incomingPending.toString(),
+      ...(amount.locked > 0n ? { lockedAmount: amount.locked.toString() } : {}),
       ...(metadata
         ? {
             ticker: metadata.ticker,

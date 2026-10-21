@@ -123,6 +123,32 @@ describe('useRGBTokenScreenLogic', () => {
     }
   })
 
+  it('refreshes locked burn change until the balance becomes spendable', async () => {
+    vi.useFakeTimers()
+    const { wrapper, wallet } = createHookTestHarness({ routeState: { assetId } })
+    wallet.getRGBAssetDetail.mockResolvedValue(detail)
+    wallet.getRGBAssetBalance
+      .mockResolvedValueOnce({ ...fetchedBalance, spendable: '0', pending: '0', lockedAmount: '40' })
+      .mockResolvedValue({ ...fetchedBalance, spendable: '40', pending: '0' })
+    wallet.getRGBAssetActivity.mockResolvedValue({ list: [], total: 0 })
+
+    try {
+      const { result } = renderHook(() => useRGBTokenScreenLogic(), { wrapper })
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(0)
+      })
+      expect(result.current.tokenBalance?.lockedAmount).toBe('40')
+
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(10_000)
+      })
+      expect(result.current.tokenBalance).toMatchObject({ spendable: '40', pending: '0' })
+      expect(wallet.getRGBAssetBalance).toHaveBeenCalledTimes(2)
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
   it('refreshes a route tokenBalance and prefers the latest value', async () => {
     const routeBalance = {
       assetId,
