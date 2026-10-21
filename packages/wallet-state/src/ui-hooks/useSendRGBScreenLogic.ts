@@ -187,6 +187,7 @@ export function useSendRGBScreenLogic() {
   const [invoiceAvailability, setInvoiceAvailability] = useState<InvoiceAvailability>('idle')
   const [invoiceAvailabilityError, setInvoiceAvailabilityError] = useState('')
   const feePoolTransitionStarted = useRef(false)
+  const invoiceInputVersion = useRef(0)
   const prepareRgbSendRef = useRef<() => Promise<void>>(async () => undefined)
   const transferData = useRef<{
     toSignData?: any
@@ -267,12 +268,14 @@ export function useSendRGBScreenLogic() {
 
   const checkInvoiceAvailability = useCallback(async () => {
     if (typeof wallet.checkRgbInvoiceAvailability !== 'function') return
+    const inputVersion = invoiceInputVersion.current
     setInvoiceAvailability('checking')
     setInvoiceAvailabilityError('')
     try {
       await wallet.checkRgbInvoiceAvailability({ invoice: decodedInvoice.submissionInvoice })
-      setInvoiceAvailability('available')
+      if (inputVersion === invoiceInputVersion.current) setInvoiceAvailability('available')
     } catch (error) {
+      if (inputVersion !== invoiceInputVersion.current) throw error
       if (isRgbInvoiceUnavailable(error)) {
         setInvoiceAvailability('unavailable')
         throw error
@@ -336,8 +339,11 @@ export function useSendRGBScreenLogic() {
   }
 
   const onInvoiceChange = (value: string) => {
+    invoiceInputVersion.current++
     setInvoice(value)
     setAmount('')
+    setError('')
+    setFeePoolRequirement(undefined)
     setInvoiceAvailability('idle')
     setInvoiceAvailabilityError('')
   }
@@ -379,6 +385,7 @@ export function useSendRGBScreenLogic() {
 
   const onClickNext = async () => {
     if (!Number.isFinite(feeRate) || feeRate <= 0) return
+    const inputVersion = invoiceInputVersion.current
 
     setError('')
     setFeePoolRequirement(undefined)
@@ -400,6 +407,7 @@ export function useSendRGBScreenLogic() {
       // Always run one final, read-only probe before creating a PSBT: a
       // recipient ID can be occupied after the debounce check completed.
       await checkInvoiceAvailability()
+      if (inputVersion !== invoiceInputVersion.current) return
       // Keep compatibility with lightweight wallet implementations while the
       // background service rolls out the dedicated fee-pool RPCs.
       const feePool = wallet.getRgbFeePoolStatus
@@ -418,6 +426,7 @@ export function useSendRGBScreenLogic() {
       }
       await prepareRgbSend()
     } catch (e) {
+      if (inputVersion !== invoiceInputVersion.current) return
       const requirement = getRgbFeePoolRequirement(e)
       if (requirement) {
         setFeePoolRequirement(requirement)

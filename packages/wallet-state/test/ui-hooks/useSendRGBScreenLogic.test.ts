@@ -103,6 +103,60 @@ describe('useSendRGBScreenLogic', () => {
     expect(result.current.invoiceValidationMessage).toBe('rgb_invoice_unavailable')
   })
 
+  it('clears the send error when an unavailable invoice is replaced', async () => {
+    const assetId = 'rgb:test-asset'
+    const usedInvoice = 'rgb:test-asset/~/~/bc:utxob:used?amount=1&endpoints=rpc://proxy'
+    const freshInvoice = 'rgb:test-asset/~/~/bc:utxob:fresh?amount=1&endpoints=rpc://proxy'
+    const { wrapper, wallet } = createHookTestHarness({
+      routeState: {
+        assetId,
+        tokenBalance: { assetId, ticker: 'RGB', precision: 8, spendable: '150000000' },
+      },
+    })
+    wallet.checkRgbInvoiceAvailability = vi.fn()
+      .mockRejectedValueOnce({ code: 'RGB_INVOICE_UNAVAILABLE' })
+      .mockResolvedValue(undefined)
+    const { result } = renderHook(() => useSendRGBScreenLogic(), { wrapper })
+
+    act(() => result.current.onInvoiceChange(usedInvoice))
+    await act(async () => result.current.onClickNext())
+    expect(result.current.error).toBe('rgb_invoice_unavailable')
+
+    act(() => result.current.onInvoiceChange(freshInvoice))
+    expect(result.current.error).toBe('')
+    expect(result.current.invoiceValidationMessage).toBe('')
+  })
+
+  it('ignores an old invoice check that fails after the invoice changes', async () => {
+    const assetId = 'rgb:test-asset'
+    const usedInvoice = 'rgb:test-asset/~/~/bc:utxob:used?amount=1&endpoints=rpc://proxy'
+    const freshInvoice = 'rgb:test-asset/~/~/bc:utxob:fresh?amount=1&endpoints=rpc://proxy'
+    const { wrapper, wallet } = createHookTestHarness({
+      routeState: {
+        assetId,
+        tokenBalance: { assetId, ticker: 'RGB', precision: 8, spendable: '150000000' },
+      },
+    })
+    let rejectOldCheck!: (reason: unknown) => void
+    wallet.checkRgbInvoiceAvailability = vi.fn().mockImplementationOnce(() =>
+      new Promise<void>((_resolve, reject) => { rejectOldCheck = reject })
+    )
+    const { result } = renderHook(() => useSendRGBScreenLogic(), { wrapper })
+
+    act(() => result.current.onInvoiceChange(usedInvoice))
+    let pendingNext!: Promise<void>
+    act(() => { pendingNext = result.current.onClickNext() })
+    await waitFor(() => expect(rejectOldCheck).toBeDefined())
+    act(() => result.current.onInvoiceChange(freshInvoice))
+    await act(async () => {
+      rejectOldCheck({ code: 'RGB_INVOICE_UNAVAILABLE' })
+      await pendingNext
+    })
+
+    expect(result.current.error).toBe('')
+    expect(result.current.invoiceValidationMessage).toBe('')
+  })
+
   it('shows the required, available, and missing BTC for an RGB fee-pool top-up', () => {
     const t = vi.fn((key: string, substitutions?: Record<string, string>) =>
       `${key}:${substitutions?.required}:${substitutions?.available}:${substitutions?.missing}`
