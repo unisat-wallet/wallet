@@ -396,6 +396,34 @@ describe('useRGBReceiveScreenLogic', () => {
     )
   })
 
+  it('shows a retryable proxy timeout without starting another UTXO check', async () => {
+    const { wrapper, wallet } = createHookTestHarness()
+    wallet.createRgbBlindReceive.mockRejectedValue(
+      new Error('RGB proxy server.info timed out after 10 seconds')
+    )
+    const { result } = renderHook(() => useRGBReceiveScreenLogic(), { wrapper })
+
+    await act(async () => {
+      await result.current.onCreateInvoice()
+    })
+
+    expect(result.current.error).toBe('rgb_invoice_proxy_timeout')
+    expect(wallet.getRgbAllocationSummary).toHaveBeenCalledTimes(1)
+    expect(wallet.createRgbUtxosBegin).not.toHaveBeenCalled()
+  })
+
+  it('replaces an uninformative abort message with a retry hint', async () => {
+    const { wrapper, wallet } = createHookTestHarness()
+    wallet.createRgbBlindReceive.mockRejectedValue(new Error('signal is aborted without reason'))
+    const { result } = renderHook(() => useRGBReceiveScreenLogic(), { wrapper })
+
+    await act(async () => {
+      await result.current.onCreateInvoice()
+    })
+
+    expect(result.current.error).toBe('rgb_invoice_request_timeout')
+  })
+
   it('does not abort unrelated pending RGB UTXO vanilla transactions before creating a new one', async () => {
     const assetId = 'rgb:test-asset'
     const tokenBalance = {

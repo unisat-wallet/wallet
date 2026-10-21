@@ -142,15 +142,23 @@ async function postJson<T>(endpoint: string, method: string, params: Record<stri
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ jsonrpc: '2.0', id: rpcId(), method, params }),
-  })
+  }, method)
   return readRpcResponse<T>(response)
 }
 
-async function fetchWithTimeout(input: RequestInfo | URL, init: RequestInit) {
+async function fetchWithTimeout(input: RequestInfo | URL, init: RequestInit, operation = 'request') {
   const controller = new AbortController()
   const timeout = setTimeout(() => controller.abort(), RGB_PROXY_REQUEST_TIMEOUT_MS)
   try {
     return await fetch(input, { ...init, signal: controller.signal })
+  } catch (error) {
+    if (controller.signal.aborted) {
+      throw new Error(`RGB proxy ${operation} timed out after ${RGB_PROXY_REQUEST_TIMEOUT_MS / 1000} seconds`)
+    }
+    if (error instanceof TypeError) {
+      throw new Error(`RGB proxy ${operation} could not connect to the endpoint: ${String(error.message || error)}`)
+    }
+    throw error
   } finally {
     clearTimeout(timeout)
   }

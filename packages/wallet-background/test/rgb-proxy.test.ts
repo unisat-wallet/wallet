@@ -28,7 +28,30 @@ describe('RGB proxy transport', () => {
   })
 
   afterEach(() => {
+    vi.useRealTimers()
     vi.unstubAllGlobals()
+  })
+
+  it('reports which RGB proxy call timed out while preparing an invoice', async () => {
+    vi.useFakeTimers()
+    fetchMock.mockImplementation((_url, init: RequestInit) => new Promise((_resolve, reject) => {
+      init.signal?.addEventListener('abort', () => reject(new DOMException('signal is aborted without reason', 'AbortError')))
+    }))
+    const result = expect(createRgbProxyTransport([endpoint]).prepareInvoice?.({
+      recipientId,
+      endpoints: [endpoint],
+    })).rejects.toThrow('RGB proxy server.info timed out after 10 seconds')
+
+    await vi.advanceTimersByTimeAsync(10_000)
+    await result
+  })
+
+  it('reports an unreachable invoice proxy separately from an RPC rejection', async () => {
+    fetchMock.mockRejectedValue(new TypeError('Failed to fetch'))
+    await expect(createRgbProxyTransport([endpoint]).prepareInvoice?.({
+      recipientId,
+      endpoints: [endpoint],
+    })).rejects.toThrow('RGB proxy server.info could not connect to the endpoint: Failed to fetch')
   })
 
   it('posts a binary consignment to a rpcs endpoint before requesting its acknowledgement', async () => {

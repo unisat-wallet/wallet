@@ -118,8 +118,31 @@ const getInvoiceText = (value: unknown): string => {
 
 const getErrorMessage = (error: any) => {
   if (typeof error?.msg === 'string') return error.msg
-  if (error.message) return error.message
+  if (typeof error?.message === 'string') return error.message
   return 'An unknown error occurred'
+}
+
+const isRgbProxyInvoiceError = (error: unknown) =>
+  /RGB proxy (?:server\.info|invoice\.prepare)/i.test(getErrorMessage(error))
+
+const isRequestAbortError = (error: unknown) =>
+  /signal is aborted without reason|signal timed out|the operation was aborted/i.test(getErrorMessage(error)) ||
+  (error as { name?: string } | null)?.name === 'AbortError'
+
+const getInvoiceCreationErrorMessage = (
+  error: unknown,
+  t: (key: string, substitutions?: Record<string, string | number>) => string
+) => {
+  const message = getErrorMessage(error)
+  const timeout = message.match(/RGB proxy [\w.]+ timed out after (\d+) seconds/i)
+  if (timeout) return t('rgb_invoice_proxy_timeout', { seconds: timeout[1] })
+  if (/RGB proxy [\w.]+ could not connect/i.test(message)) {
+    return t('rgb_invoice_proxy_unreachable')
+  }
+  if (isRequestAbortError(error)) {
+    return t('rgb_invoice_request_timeout')
+  }
+  return message
 }
 
 const isInsufficientBtcError = (error: unknown) => {
@@ -450,7 +473,7 @@ export function useRGBReceiveScreenLogic(
       const syncedValue = await rgbWallet.getRgbPendingReceiveInvoices()
       applyPendingInvoices(syncedValue)
     } catch (e: unknown) {
-      setError(getErrorMessage(e))
+      setError(getInvoiceCreationErrorMessage(e, t))
     } finally {
       setPendingLoading(false)
     }
@@ -574,10 +597,14 @@ export function useRGBReceiveScreenLogic(
           setError('')
           return
         }
+        if (isRgbProxyInvoiceError(invoiceError) || isRequestAbortError(invoiceError)) {
+          setError(getInvoiceCreationErrorMessage(invoiceError, t))
+          return
+        }
         setLoadingText(t('rgb_checking_utxo'))
         const summary = await rgbWallet.getRgbAllocationSummary({ skipSync: false })
         if (hasReusableRgbAllocation(summary)) {
-          setError(getErrorMessage(invoiceError))
+          setError(getInvoiceCreationErrorMessage(invoiceError, t))
           return
         }
 
@@ -590,7 +617,7 @@ export function useRGBReceiveScreenLogic(
         setError('')
         return
       }
-      setError(getErrorMessage(e))
+      setError(getInvoiceCreationErrorMessage(e, t))
     } finally {
       setLoading(false)
       setLoadingText('')
@@ -632,7 +659,7 @@ export function useRGBReceiveScreenLogic(
         setInsufficientBtcForInvoice(true)
         setError('')
       } else {
-        setError(getErrorMessage(e))
+        setError(getInvoiceCreationErrorMessage(e, t))
       }
       setStep('create_invoice')
       setUtxoToSignData(undefined)
