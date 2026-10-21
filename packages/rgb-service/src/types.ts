@@ -590,7 +590,7 @@ export interface RgbServiceDependencies {
     getFeeFunding(wallet: RgbWalletRef): Promise<RgbFeeFunding>
   }
   encoder: RgbProtocolEncoder
-  /** Local BFA validation with Bitcoin status and EVM finality supplied by the host. */
+  /** Local BFA/NIA v1 validation with Bitcoin status and optional EVM finality supplied by the host. */
   validateBfaConsignment?: (input: {
     wallet: RgbWalletRef
     payload: Uint8Array

@@ -3,7 +3,7 @@ import type {
   RgbTransport,
   RgbTransportConsignment,
 } from '@unisat/rgb-service'
-import { rgbProxyInvoiceId } from '@unisat/rgb-service'
+import { rgbProxyInvoiceId, RgbProxyOperationNotFoundError } from '@unisat/rgb-service'
 import { ed25519 } from '@noble/curves/ed25519'
 import log from 'loglevel'
 
@@ -113,6 +113,13 @@ function toHttpEndpoint(endpoint: string) {
     url.searchParams.delete(key)
   }
   return `${url.origin}${url.pathname === '/' ? '' : url.pathname}`
+}
+
+/** Older senders advertise rpc:// even when their proxy is reachable over TLS. */
+function secureSenderEndpoint(endpoint: string) {
+  return endpoint.startsWith('rpc://')
+    ? `rpcs://${endpoint.slice('rpc://'.length)}`
+    : endpoint
 }
 
 function rpcId() {
@@ -624,12 +631,13 @@ export function createRgbProxyTransport(proxyEndpoints: string[] = []): RgbTrans
         }
         const body = await postJson<{
           sender_pk?: string; signed_tx?: string; signed_tx_hash?: string
-        }>(proxySenderEndpoint, 'ack.post', {
+        }>(secureSenderEndpoint(proxySenderEndpoint), 'ack.post', {
           transfer_id: proxyTransferId,
           ack: acknowledged,
           signature: proxyV1Sign(proxyPrivateKey,
             proxyTransferId + String(acknowledged) + proxyConsignmentHash),
         })
+        if (body.error?.code === -104) throw new RgbProxyOperationNotFoundError()
         if (body.error) throw new Error(`RGB proxy ack.post failed: ${body.error.message || body.error.code}`)
         if (acknowledged) {
           if (!body.result?.signed_tx || !body.result.sender_pk || !body.result.signed_tx_hash) {

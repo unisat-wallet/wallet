@@ -1,8 +1,9 @@
 import { sha256 } from '@noble/hashes/sha256'
 import { Transaction } from 'bitcoinjs-lib'
 import { RgbBfaValidationUnavailableError, RgbServiceError } from '../errors'
+import { verifyBfaRejectList } from './bfa-reject-list'
 import { transitionBundleId } from './bundle'
-import { BFA_SCHEMA_ID, encodeBfaTransferConsignment } from './bfa-consignment'
+import { BFA_SCHEMA_ID, NIA_V1_SCHEMA_ID, encodeBfaTransferConsignment } from './bfa-consignment'
 import { unwrapRgbTransferConsignment, wrapRgbTransferConsignment } from './consignment'
 import { encodeRgbContractId, rgbContractIdHex } from './contract-id'
 import { verifyMpcMerkleProof } from './mpc'
@@ -93,7 +94,7 @@ export function createBfaEvmRpc(url: string, transport: BfaHttpTransport): NonNu
   }
 }
 
-function fail(message: string): never { throw new RgbServiceError(`BFA: ${message}`) }
+function fail(message: string): never { throw new RgbServiceError(`RGB v1: ${message}`) }
 function hex(bytes: Uint8Array): string { return Buffer.from(bytes).toString('hex') }
 function bytes(value: string): Uint8Array { return Uint8Array.from(Buffer.from(value, 'hex')) }
 function concat(...parts: Uint8Array[]): Uint8Array {
@@ -148,14 +149,15 @@ function sealed(reader: StrictReader, genesis: boolean, known: Map<string, RgbBl
   reader.readU64()
   return { txid, vout, secret: hex(hash(TAG_SEAL, reader.slice(revealedStart))) }
 }
-function readAssignments(reader: StrictReader, genesis: boolean, known: Map<string, RgbBlindSeal>, patches: SealPatch[]): Assignment[] {
+function readAssignments(reader: StrictReader, genesis: boolean, known: Map<string, RgbBlindSeal>, patches: SealPatch[], schema = BFA_SCHEMA_ID): Assignment[] {
   const count = reader.readU16()
   const result: Assignment[] = []
   let previous = -1
   for (let group = 0; group < count; group++) {
     const type = reader.readU16()
     if (type <= previous || (type !== OS_ASSET && type !== OS_MINT)) fail('unsupported or unordered assignment type')
-    if (genesis && type !== OS_MINT) fail('Genesis contains an asset allocation')
+    if (genesis && type !== (schema === NIA_V1_SCHEMA_ID ? OS_ASSET : OS_MINT))
+      fail('Genesis contains an unsupported assignment')
     previous = type
     const stateType = reader.readU8()
     if (stateType !== (type === OS_ASSET ? 1 : 0)) fail('invalid assignment state type')
@@ -223,8 +225,11 @@ function operationId(input: { nonce: bigint; kind: Uint8Array; metadata: Uint8Ar
 }
 function readGenesis(reader: StrictReader, network: number, known: Map<string, RgbBlindSeal>, patches: SealPatch[]) {
   const start = reader.position
-  if (reader.readU16() !== 0 || hex(reader.readFixedBytes(32)) !== BFA_SCHEMA_ID) fail('unsupported Genesis')
-  const schema = bytes(BFA_SCHEMA_ID)
+  if (reader.readU16() !== 0) fail('unsupported Genesis version')
+  const schemaId = hex(reader.readFixedBytes(32))
+  if (schemaId !== BFA_SCHEMA_ID && schemaId !== NIA_V1_SCHEMA_ID) fail('unsupported Genesis schema')
+  const schema = bytes(schemaId)
+  const nia = schemaId === NIA_V1_SCHEMA_ID
   const timestamp = reader.readU64()
   const issuerStart = reader.position
   const issuer = new TextDecoder().decode(reader.readConfinedBytes(4096))
@@ -236,37 +241,61 @@ function readGenesis(reader: StrictReader, network: number, known: Map<string, R
   const metadata = readMetadata(reader)
   if (metadata.values.size) fail('unsupported Genesis metadata')
   const globals = readGlobals(reader)
-  if ([...globals.states.keys()].some(type => type !== 2000 && type !== 2001 && type !== 3008) ||
+  if ([...globals.states.keys()].some(type => type !== 2000 && type !== 2001 && type !== (nia ? 2010 : 3008) && (nia || type !== 3010)) ||
     globals.states.get(2000)?.length !== 1 || globals.states.get(2001)?.length !== 1)
-    fail('unsupported Genesis global state or external reject/link rule')
-  const location = globals.states.get(3008)
-  if (!location || location.length !== 1 || location[0]!.length !== 29 || location[0]![0] !== 0)
-    fail('invalid EVM bridge location')
-  const bridge = new StrictReader(location[0]!)
-  bridge.readU8()
-  const chainId = bridge.readU64()
-  const address = `0x${hex(bridge.readFixedBytes(20))}`
+    fail(`unsupported Genesis global state or external link rule (${[...globals.states.keys()].join(', ')})`)
+  let chainId = 0n
+  let address = ''
+  let rejectListAddress: string | undefined
+  let issuedSupply = 0n
+  if (nia) {
+    const supply = globals.states.get(2010)
+    if (!supply || supply.length !== 1 || supply[0]!.length !== 8) fail('invalid NIA issued supply')
+    issuedSupply = new StrictReader(supply[0]!).readU64()
+    if (!issuedSupply) fail('NIA issued supply is zero')
+  } else {
+    const location = globals.states.get(3008)
+    if (!location || location.length !== 1 || location[0]!.length !== 29 || location[0]![0] !== 0)
+      fail('invalid EVM bridge location')
+    const bridge = new StrictReader(location[0]!)
+    bridge.readU8()
+    chainId = bridge.readU64()
+    address = `0x${hex(bridge.readFixedBytes(20))}`
+    const rejectList = globals.states.get(3010)
+    if (rejectList) {
+      if (rejectList.length !== 1 || rejectList[0]!.length !== 29 || rejectList[0]![0] !== 1)
+        fail('unsupported BFA reject list location')
+      const location = new StrictReader(rejectList[0]!)
+      location.readU8()
+      if (location.readU64() !== chainId) fail('BFA reject list is on another EVM chain')
+      rejectListAddress = `0x${hex(location.readFixedBytes(20))}`
+    }
+  }
   const spec = new StrictReader(globals.states.get(2000)![0]!)
   const ticker = new TextDecoder('utf-8', { fatal: true }).decode(spec.readConfinedBytes(8))
   const name = new TextDecoder('utf-8', { fatal: true }).decode(spec.readConfinedBytes(40))
   if (spec.readU8() !== 0) fail('asset details profile is unsupported')
   const precision = spec.readU8()
   if (!ticker || !name || precision > 18 || spec.remaining) fail('invalid asset specification')
-  const assignments = readAssignments(reader, true, known, patches)
-  if (!assignments.length) fail('Genesis has no mint right')
+  const assignments = readAssignments(reader, true, known, patches, schemaId)
+  if (!assignments.length) fail('Genesis has no assignments')
+  if (nia && assignments.reduce((sum, item) => sum + item.amount, 0n) !== issuedSupply)
+    fail('NIA Genesis allocations do not match issued supply')
   const kind = concat(Uint8Array.from([0]), schema, new StrictWriter().writeU64(timestamp).toBytes(), issuerHash, Uint8Array.from([chainNet, 0]))
   const id = operationId({
     nonce: 0xffff_ffff_ffff_ffffn, kind, metadata: metadata.hash,
     globals: globals.root, inputs: merkle([]), assignments: assignmentsRoot(assignments),
   })
-  const contractMetadata: RgbContractMetadata = { ticker, name, precision, schema: 'BFA', issuedSupply: '0', timestamp: Number(timestamp) }
-  return { id, strict: reader.slice(start), assignments, chainId, address, metadata: contractMetadata }
+  const contractMetadata: RgbContractMetadata = {
+    ticker, name, precision, schema: nia ? 'NIA' : 'BFA', issuedSupply: issuedSupply.toString(), timestamp: Number(timestamp),
+  }
+  return { id, strict: reader.slice(start), assignments, chainId, address, rejectListAddress, metadata: contractMetadata }
 }
-function readTransition(reader: StrictReader, contractId: string, known: Map<string, RgbBlindSeal>, patches: SealPatch[]): Operation {
+function readTransition(reader: StrictReader, contractId: string, known: Map<string, RgbBlindSeal>, patches: SealPatch[], nia: boolean): Operation {
   if (reader.readU16() !== 0 || hex(reader.readFixedBytes(32)) !== contractId) fail('transition contract mismatch')
   const nonce = reader.readU64()
   const type = reader.readU16()
-  if (type !== TS_MINT && type !== TS_TRANSFER) fail('unsupported transition type')
+  if (type !== TS_TRANSFER && (nia || type !== TS_MINT)) fail('unsupported transition type')
   const metadata = readMetadata(reader)
   const globals = readGlobals(reader)
   const afterRaw = metadata.values.get(1003)
@@ -329,10 +358,19 @@ function readBitcoinTx(reader: StrictReader): Transaction {
   tx.locktime = reader.readU32()
   return tx
 }
-function readBundle(reader: StrictReader, contractId: string, known: Map<string, RgbBlindSeal>, patches: SealPatch[]): Bundle {
+function readBundle(reader: StrictReader, contractId: string, known: Map<string, RgbBlindSeal>, patches: SealPatch[], nia: boolean): Bundle {
   const start = reader.position
   const tx = readBitcoinTx(reader)
-  if (reader.readU8() !== 0) fail('SPV proof profile is unsupported')
+  const spvProof = reader.readU8()
+  if (spvProof === 1) {
+    // The chain status provider verifies the witness against the active chain;
+    // the optional sender proof is parsed for framing, never trusted alone.
+    reader.readU32() // block height
+    reader.readU32() // transaction position
+    const siblings = reader.readU8()
+    if (siblings > 32) fail('SPV proof has too many siblings')
+    reader.readFixedBytes(siblings * 32)
+  } else if (spvProof !== 0) fail('SPV proof option is invalid')
   const proofStart = reader.position
   reader.readU32()
   reader.readU16()
@@ -350,7 +388,7 @@ function readBundle(reader: StrictReader, contractId: string, known: Map<string,
   const operations: Operation[] = []
   for (let index = 0; index < transitionCount; index++) {
     const claimedId = hex(reader.readFixedBytes(32))
-    const operation = readTransition(reader, contractId, known, patches)
+    const operation = readTransition(reader, contractId, known, patches, nia)
     if (operation.id !== claimedId) fail('transition operation ID mismatch')
     operations.push(operation)
   }
@@ -380,8 +418,9 @@ function parseConsignment(value: Uint8Array, network: number, known = new Map<st
     if (!count) fail('empty terminal')
     const secrets = []
     for (let seal = 0; seal < count; seal++) {
-      if (reader.readU8() !== 1) fail('revealed terminal seal is unsupported')
-      secrets.push(hex(reader.readFixedBytes(32)))
+      const terminalSeal = sealed(reader, false, new Map(), [])
+      if (!terminalSeal) fail('invalid terminal seal')
+      secrets.push(terminalSeal.secret)
     }
     terminals.push({ bundleId, secrets })
   }
@@ -389,7 +428,7 @@ function parseConsignment(value: Uint8Array, network: number, known = new Map<st
   const count = reader.readU32()
   if (!count || count > 100000) fail('invalid witness bundle count')
   const bundles: Bundle[] = []
-  for (let index = 0; index < count; index++) bundles.push(readBundle(reader, genesis.id, known, patches))
+  for (let index = 0; index < count; index++) bundles.push(readBundle(reader, genesis.id, known, patches, genesis.metadata.schema === 'NIA'))
   if (reader.remaining) fail('consignment has trailing bytes')
   for (const terminal of terminals) {
     const bundle = bundles.find(candidate => candidate.id === terminal.bundleId)
@@ -469,25 +508,55 @@ async function verifyMintEvent(
 }
 
 /**
- * Validate the supported BFA T0 profile locally. Reject unsupported schema
- * features and incomplete ancestry instead of granting an unproved balance.
+ * Validate supported BFA and NIA v1 transfers locally. Reject unsupported
+ * schema features and incomplete ancestry before granting a balance.
  */
 export async function validateBfaTransferConsignment(
   value: Uint8Array, options: BfaValidationOptions
 ): Promise<ValidatedBfaConsignment> {
   const disclosed = revealBfaConsignmentBlindSeals(value, options.network, options.knownBlindSeals || [])
   const { genesis, bundles, terminals } = parseConsignment(disclosed, options.network)
+  const nia = genesis.metadata.schema === 'NIA'
   const pendingTxid = options.pendingWitnessTxid ??
     (options.allowPendingLastWitness ? bundles.at(-1)?.txid : undefined)
   const operations = new Map<string, { operation: Operation; bundle: Bundle }>()
   for (const bundle of bundles) {
     if (bundle.txid !== pendingTxid && !await options.isBitcoinTxConfirmed(bundle.txid))
-      throw new RgbBfaValidationUnavailableError(`BFA Bitcoin witness is not confirmed: ${bundle.txid}`)
+      throw new RgbBfaValidationUnavailableError(`${nia ? 'NIA' : 'BFA'} Bitcoin witness is not confirmed: ${bundle.txid}`)
     for (const operation of bundle.operations) {
       if (operations.has(operation.id)) fail('duplicate transition')
       operations.set(operation.id, { operation, bundle })
     }
   }
+  // Every disclosed transition must trace back to the authenticated Genesis.
+  // Conservation alone would also accept a closed cycle of fabricated NIA
+  // assignments with no issued asset behind it.
+  const indegrees = new Map<string, number>()
+  const children = new Map<string, string[]>()
+  for (const [id, { operation }] of operations) {
+    let degree = 0
+    for (const input of operation.inputs) {
+      if (input.opId === genesis.id) continue
+      if (!operations.has(input.opId)) fail('missing parent transition')
+      degree++
+      const dependents = children.get(input.opId) || []
+      dependents.push(id)
+      children.set(input.opId, dependents)
+    }
+    indegrees.set(id, degree)
+  }
+  const ready = [...indegrees].filter(([, degree]) => degree === 0).map(([id]) => id)
+  let reachable = 0
+  while (ready.length) {
+    const id = ready.pop()!
+    reachable++
+    for (const child of children.get(id) || []) {
+      const degree = indegrees.get(child)! - 1
+      indegrees.set(child, degree)
+      if (degree === 0) ready.push(child)
+    }
+  }
+  if (reachable !== operations.size) fail('transition history is cyclic')
   const consumed = new Set<string>()
   for (const { operation, bundle } of operations.values()) {
     let inputAmount = 0n
@@ -514,12 +583,41 @@ export async function validateBfaTransferConsignment(
     if (operation.type === TS_MINT) {
       if (mintInputs !== 1 || assetInputs || outputAmount !== operation.amount || outputMintRights > 1) fail('invalid mint conservation')
       await verifyMintEvent(operation, genesis.chainId, genesis.address, options)
-    } else if ((mintInputs === 0 && outputMintRights !== 0) ||
+    } else if ((nia && (mintInputs !== 0 || outputMintRights !== 0)) ||
+      (mintInputs === 0 && outputMintRights !== 0) ||
       (mintInputs > 0 && outputMintRights < mintInputs) ||
       outputAmount !== inputAmount) fail('invalid transfer conservation')
   }
+  if (genesis.rejectListAddress) {
+    const rpc = options.getEvmRpc?.(genesis.chainId) ?? options.evmRpc
+    if (!rpc) throw new RgbBfaValidationUnavailableError('BFA reject list EVM RPC is not configured')
+    const terminalSecrets = new Map<string, Set<string>>()
+    for (const terminal of terminals) {
+      const bundle = bundles.find(item => item.id === terminal.bundleId)!
+      for (const operation of bundle.operations) {
+        const secrets = new Set(terminal.secrets.filter(secret => operation.assignments.some(item => item.seal?.secret === secret)))
+        if (secrets.size) terminalSecrets.set(operation.id, secrets)
+      }
+    }
+    await verifyBfaRejectList({
+      chainId: genesis.chainId, address: genesis.rejectListAddress, rpc,
+      operations: [...operations.values()].map(({ operation }) => ({
+        id: operation.id, inputs: operation.inputs,
+        assignments: operation.assignments.map(item => ({ type: item.type, index: item.index, secret: item.seal!.secret })),
+      })),
+      terminalSecrets,
+    })
+  }
   const allocations: ValidatedBfaTransferHistory['allocations'] = []
   const terminalAssignments: ValidatedBfaConsignment['terminalAssignments'] = []
+  if (nia) for (const item of genesis.assignments) {
+    if (item.type !== OS_ASSET || consumed.has(`${genesis.id}:${item.type}:${item.index}`) ||
+      !item.seal || !item.seal.txid || item.seal.vout < 0) continue
+    allocations.push({
+      txid: item.seal.txid, vout: item.seal.vout, opId: genesis.id,
+      assignmentIndex: item.index, amount: item.amount.toString(),
+    })
+  }
   for (const { operation, bundle } of operations.values()) {
     for (const item of operation.assignments) {
       if (item.type !== OS_ASSET || consumed.has(`${operation.id}:${item.type}:${item.index}`)) continue
@@ -540,8 +638,9 @@ export async function validateBfaTransferConsignment(
       })
     }
   }
-  const issuedSupply = [...operations.values()].filter(item => item.operation.type === TS_MINT)
-    .reduce((sum, item) => sum + item.operation.amount, 0n)
+  const issuedSupply = nia ? BigInt(genesis.metadata.issuedSupply) :
+    [...operations.values()].filter(item => item.operation.type === TS_MINT)
+      .reduce((sum, item) => sum + item.operation.amount, 0n)
   return {
     assetId: encodeRgbContractId(bytes(genesis.id)), genesis: genesis.strict,
     witnessBundles: bundles.map(bundle => bundle.strict), allocations,

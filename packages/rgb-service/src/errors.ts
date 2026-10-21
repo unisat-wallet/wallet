@@ -13,6 +13,14 @@ export class RgbBfaValidationUnavailableError extends RgbServiceError {
   }
 }
 
+/** The proxy v1 sender has no ACK operation, as with a donation transfer. */
+export class RgbProxyOperationNotFoundError extends RgbServiceError {
+  constructor() {
+    super('RGB proxy ack.post failed: Operation not found')
+    this.name = 'RgbProxyOperationNotFoundError'
+  }
+}
+
 export class RgbInsufficientBalanceError extends RgbServiceError {
   constructor(assetId: string, amount: string) {
     super(`Insufficient spendable RGB balance for ${assetId}: ${amount}`)

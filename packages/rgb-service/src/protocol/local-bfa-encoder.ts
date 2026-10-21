@@ -11,8 +11,8 @@ import type {
   RgbUtxo,
   RgbWalletRef,
 } from '../types'
-import { encodeBfaTransferConsignment, BFA_SCHEMA_ID } from './bfa-consignment'
-import { isBfaContractConsignment, isBfaTransferConsignment } from './bfa-consignment'
+import { encodeBfaTransferConsignment, BFA_SCHEMA_ID, NIA_V1_SCHEMA_ID } from './bfa-consignment'
+import { isSupportedV1ContractConsignment, isSupportedV1TransferConsignment } from './bfa-consignment'
 import { mergeBfaValidatedHistories } from './bfa-validator'
 import { completeRgbOpretPsbt } from './complete'
 import { normalizeRgbAssetId } from './contract-id'
@@ -82,8 +82,10 @@ export function prepareBfaTransfer(input: {
   feeFunding?: RgbFeeFunding
   swapPsbt?: string
 }): RgbPreparedTransfer {
-  if (hex(input.history.genesis.slice(2, 34)) !== BFA_SCHEMA_ID)
-    throw new RgbServiceError('BFA transfer history has another schema')
+  const schemaId = hex(input.history.genesis.slice(2, 34))
+  if (schemaId !== BFA_SCHEMA_ID && schemaId !== NIA_V1_SCHEMA_ID)
+    throw new RgbServiceError('RGB v1 transfer history has another schema')
+  const schema = schemaId === NIA_V1_SCHEMA_ID ? 'NIA_V1' : 'BFA'
   const expectedAssetId = normalizeRgbAssetId(input.intent.assetId)
   if (normalizeRgbAssetId(input.history.assetId) !== expectedAssetId)
     throw new RgbServiceError('BFA validated history belongs to another asset')
@@ -156,11 +158,13 @@ export function prepareBfaTransfer(input: {
     lockedOutpoints: input.selectedUtxos.map(utxo => utxo.outpoint),
     feeOutpoints: prepared.feeOutpoints,
     metadata: {
-      schema: 'BFA',
+      schema,
       preparedPsbt: prepared.psbtHex,
       hostVout: String(prepared.hostVout),
       commitment: hex(prepared.commitment),
       transitionId: hex(prepared.transitionId),
+      // The shared builder's final zero is a v0 empty valencies field. In
+      // RGB v1 it encodes the replacement Option<Signature>::None field.
       transition: hex(prepared.transition),
       bundleId: hex(prepared.bundleId),
       entropy: entropy.toString(),
@@ -191,7 +195,8 @@ export function completeBfaTransfer(input: {
   allowIncomplete?: boolean
 }): RgbCompletedTransfer {
   const data = input.pending.prepared.metadata
-  if (data?.['schema'] !== 'BFA') throw new RgbServiceError('Pending transfer is not BFA')
+  if (data?.['schema'] !== 'BFA' && data?.['schema'] !== 'NIA_V1')
+    throw new RgbServiceError('Pending transfer is not a supported RGB v1 asset')
   const hostVout = Number(data['hostVout'])
   if (!Number.isInteger(hostVout) || hostVout < 0)
     throw new RgbServiceError('BFA Opret host output is invalid')
@@ -218,9 +223,9 @@ export function completeBfaTransfer(input: {
     witnessTx: Uint8Array.from(Buffer.from(completed.rawTx, 'hex')),
     contractId: input.pending.request.assetId,
     transitionId: parseHex32(data['transitionId'], 'BFA transition ID'),
-    // RGB 0.11.2 Transition carries an optional signature after Assignments.
-    // The operation ID excludes this field; a local unsigned transfer uses None.
-    transition: Uint8Array.from([...Buffer.from(data['transition'] || '', 'hex'), 0]),
+    // The builder's final zero already encodes RGB v1's unsigned signature
+    // option. Appending another zero would corrupt the following bundle data.
+    transition: Uint8Array.from(Buffer.from(data['transition'] || '', 'hex')),
     inputs: parents,
     entropy: parseU64(data['entropy'], 'BFA MPC entropy'),
   })
@@ -275,7 +280,7 @@ export function completeBfaTransfer(input: {
   }
 }
 
-/** Route ordinary RGB transfers by the schema of their locally verified history. */
+/** Route ordinary RGB transfers by the version and schema of locally verified history. */
 export function createLocalRgbProtocolEncoder(
   validateBfa: NonNullable<RgbServiceDependencies['validateBfaConsignment']>
 ): RgbProtocolEncoder {
@@ -284,10 +289,10 @@ export function createLocalRgbProtocolEncoder(
       const payloads = input.validationHistory.consignments.map(item =>
         Uint8Array.from(Buffer.from(item.payload, 'base64'))
       )
-      const transferPayloads = payloads.filter(payload => isBfaTransferConsignment(payload))
+      const transferPayloads = payloads.filter(payload => isSupportedV1TransferConsignment(payload))
       if (!transferPayloads.length) return localNiaProtocolEncoder.prepareTransfer(input)
-      if (payloads.some(payload => !isBfaTransferConsignment(payload) && !isBfaContractConsignment(payload)))
-        throw new RgbServiceError('BFA history contains a non-BFA consignment')
+      if (payloads.some(payload => !isSupportedV1TransferConsignment(payload) && !isSupportedV1ContractConsignment(payload)))
+        throw new RgbServiceError('RGB v1 history contains an unsupported consignment')
       const knownBlindSeals = input.validationHistory.knownBlindSeals || []
       const checked = await Promise.all(transferPayloads.map(payload => validateBfa({
         wallet: input.wallet, payload, knownBlindSeals,
@@ -304,7 +309,7 @@ export function createLocalRgbProtocolEncoder(
       })
     },
     async completeTransfer(input) {
-      return input.pending.prepared.metadata?.['schema'] === 'BFA'
+      return ['BFA', 'NIA_V1'].includes(input.pending.prepared.metadata?.['schema'] || '')
         ? completeBfaTransfer(input)
         : localNiaProtocolEncoder.completeTransfer(input)
     },

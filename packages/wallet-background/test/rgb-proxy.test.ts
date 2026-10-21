@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { RgbProxyOperationNotFoundError } from '@unisat/rgb-service'
 
 import { createRgbProxyTransport } from '../src/adapters/rgb-proxy'
 import { proxyV1DecryptBlob, proxyV1EncryptBlob, proxyV1Hash, proxyV1PublicKey, proxyV1TransferId, proxyV1Verify } from '../src/adapters/rgb-proxy-v1'
@@ -129,7 +130,7 @@ describe('RGB proxy transport', () => {
           expect(proxyV1Verify(recipientPk, params.signature, invoiceId + params.timestamp)).toBe(true)
           return rpcResponse({ [transferId]: 'pending' })
         case 'consignment.get':
-          return rpcResponse({ consignment: postedPayload, sender_transport_endpoint: endpoint, sender_pk: senderPk, consignment_hash: consignmentHash, batch: false })
+          return rpcResponse({ consignment: postedPayload, sender_transport_endpoint: 'rpc://proxy.example/json-rpc', sender_pk: senderPk, consignment_hash: consignmentHash, batch: false })
         case 'ack.post':
           ack = params.ack
           ackSignature = params.signature
@@ -173,6 +174,9 @@ describe('RGB proxy transport', () => {
       proxySenderEndpoint: received!.proxySenderEndpoint,
       proxyConsignmentHash: received!.proxyConsignmentHash,
     })
+    expect(fetchMock.mock.calls.find(([, options]) =>
+      typeof options?.body === 'string' && JSON.parse(options.body).method === 'ack.post'
+    )?.[0]).toBe('https://proxy.example/json-rpc')
     await expect(transport.getAcknowledgement?.(consignment)).resolves.toBe(true)
   })
 
@@ -391,6 +395,36 @@ describe('RGB proxy transport', () => {
       `Unsupported RGB proxy endpoint: ${insecureEndpoint}`
     )
     expect(fetchMock).not.toHaveBeenCalled()
+  })
+
+  it('does not send a v1 ACK to a local sender endpoint', async () => {
+    const transport = createRgbProxyTransport([endpoint])
+    await expect(transport.acknowledgeConsignment?.({
+      recipientId,
+      endpoints: [endpoint],
+      acknowledged: true,
+      proxyPrivateKey: '11'.repeat(32),
+      proxyTransferId: '22'.repeat(32),
+      proxySenderPublicKey: '33'.repeat(32),
+      proxySenderEndpoint: 'rpc://localhost:13000/json-rpc',
+      proxyConsignmentHash: '44'.repeat(32),
+    })).rejects.toThrow('Unsupported RGB proxy endpoint: rpcs://localhost:13000/json-rpc')
+    expect(fetchMock).not.toHaveBeenCalled()
+  })
+
+  it('preserves proxy v1 operation-not-found so donation receives can use chain status', async () => {
+    fetchMock.mockResolvedValueOnce(rpcError(-104, 'Operation not found'))
+    const transport = createRgbProxyTransport([endpoint])
+    await expect(transport.acknowledgeConsignment?.({
+      recipientId,
+      endpoints: [endpoint],
+      acknowledged: true,
+      proxyPrivateKey: '11'.repeat(32),
+      proxyTransferId: '22'.repeat(32),
+      proxySenderPublicKey: '33'.repeat(32),
+      proxySenderEndpoint: endpoint,
+      proxyConsignmentHash: '44'.repeat(32),
+    })).rejects.toBeInstanceOf(RgbProxyOperationNotFoundError)
   })
 
   it.each(['rpcs://127.0.0.1:3000', 'https://[::1]', 'https://localhost'])
