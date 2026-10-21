@@ -485,6 +485,8 @@ describe('RgbService', () => {
     const receive = await service.createBlindReceive({ assetId: 'rgb:AQEBAQEB-AQEBAQE-BAQEBAQ-EBAQEBA-QEBAQEB-AQEBAQE', amount: '1' })
     const issueFunding = service.getAvailableIssueUtxos()
 
+    expect(decodeRgbInvoice(receive.invoice).expirationTimestamp).toBe(receive.expirationTimestamp)
+    expect(receive.expirationTimestamp).toBe(Math.floor(receive.createdAt / 1000) + 24 * 60 * 60)
     expect(receive.seal).toMatchObject(fundingUtxos[0]!.outpoint)
     expect(issueFunding).toHaveLength(4)
     expect(issueFunding.map(utxo => utxo.outpoint)).not.toContainEqual(receive.seal)
@@ -503,6 +505,8 @@ describe('RgbService', () => {
     expect(witness.recipientType).toBe('witness')
     expect(witness).not.toHaveProperty('seal')
     expect(witness.proxyRecipientId).toMatch(/^[0-9a-f]{64}$/)
+    expect(decodeRgbInvoice(witness.invoice).expirationTimestamp).toBe(witness.expirationTimestamp)
+    expect(witness.expirationTimestamp).toBe(Math.floor(witness.createdAt / 1000) + 24 * 60 * 60)
 
     const reopened = new RgbService(dependencies)
     await reopened.open(wallet)

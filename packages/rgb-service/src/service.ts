@@ -579,10 +579,7 @@ export class RgbService {
       throw new RgbServiceError('RGB receive amount exceeds the maximum u64 value')
     }
     const now = this.now()
-    const expirationTimestamp =
-      input.durationSeconds === undefined
-        ? undefined
-        : Math.floor(now / 1000) + input.durationSeconds
+    const expirationTimestamp = Math.floor(now / 1000) + (input.durationSeconds ?? 24 * 60 * 60)
     if (
       input.durationSeconds !== undefined &&
       (!Number.isInteger(input.durationSeconds) || input.durationSeconds <= 0)
@@ -691,10 +688,7 @@ export class RgbService {
       appendRgbInvoiceRecipientNonce(endpoint, nonce)
     )
     const now = this.now()
-    const expirationTimestamp =
-      input.durationSeconds === undefined
-        ? undefined
-        : Math.floor(now / 1000) + input.durationSeconds
+    const expirationTimestamp = Math.floor(now / 1000) + (input.durationSeconds ?? 24 * 60 * 60)
     const recipientId = witnessRgbInvoiceRecipientId(state.wallet.network, input.scriptPubKey)
     const proxyRegistration = this.dependencies.transport.prepareInvoice
       ? await this.dependencies.transport.prepareInvoice({
@@ -2377,7 +2371,7 @@ export class RgbService {
       throw new RgbServiceError('RGB invoice network does not match the current wallet')
     }
     if (
-      invoice.expirationTimestamp &&
+      invoice.expirationTimestamp !== undefined &&
       invoice.expirationTimestamp <= Math.floor(this.now() / 1000)
     ) {
       throw new RgbServiceError('RGB invoice has expired')
@@ -2425,7 +2419,7 @@ export class RgbService {
       throw new RgbServiceError('RGB invoice network does not match the current wallet')
     }
     if (
-      invoice.expirationTimestamp &&
+      invoice.expirationTimestamp !== undefined &&
       invoice.expirationTimestamp <= Math.floor(this.now() / 1000)
     ) {
       throw new RgbServiceError('RGB invoice has expired')

@@ -285,15 +285,23 @@ export function decodeRgbInvoice(invoice: string): DecodedRgbInvoice {
   const queryAssetId = getQueryValue(query, 'assetId')
   const assetId = normalizeRgbAssetId(queryAssetId || contractId)
   const assignmentName = getQueryValue(query, 'assignment_name')
-  const expirationText = getQueryValue(query, 'expiry')
-  const expirationTimestamp = expirationText && /^-?[0-9]+$/.test(expirationText)
-    ? Number(expirationText)
-    : undefined
+  const expiry = query['expiry']
+  const expirationText = typeof expiry === 'string' ? expiry : undefined
+  const expiryInvalid = query['expirationTimestamp'] !== undefined ||
+    Array.isArray(expiry) ||
+    (expiry !== undefined && (
+      !/^(0|[1-9][0-9]*)$/.test(expirationText ?? '') ||
+      !Number.isSafeInteger(Number(expirationText))
+    ))
+  const expirationTimestamp = expiryInvalid || expirationText === undefined
+    ? undefined
+    : Number(expirationText)
 
   return {
     invoice: value,
     submissionInvoice: value,
-    valid: scheme.toLowerCase() === 'rgb' && pathSegments.length >= 4,
+    valid: scheme.toLowerCase() === 'rgb' && pathSegments.length >= 4 && !expiryInvalid,
+    ...(expiryInvalid ? { error: 'RGB invoice expiry is invalid or unsupported' } : {}),
     scheme,
     invoiceType: getInvoiceType(recipientId),
     contractId,

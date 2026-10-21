@@ -67,13 +67,16 @@ function decodePart(value: string) {
   }
 }
 
-function getQueryValues(query: string, key: string) {
+function getAllQueryValues(query: string, key: string) {
   return query
     .split('&')
     .map(part => part.split('='))
     .filter(([queryKey]) => decodePart(queryKey || '') === key)
     .map(([, ...value]) => decodePart(value.join('=')))
-    .filter(Boolean)
+}
+
+function getQueryValues(query: string, key: string) {
+  return getAllQueryValues(query, key).filter(Boolean)
 }
 
 function decodeFast32Amount(value?: string) {
@@ -346,7 +349,15 @@ export function decodeRgbInvoice(invoice: string): RgbInvoice {
   const seal = decodeInvoiceSeal(recipientId)
   const [queryAmount] = getQueryValues(query, 'amount')
   const [queryAssetId] = getQueryValues(query, 'assetId')
-  const [expiration] = getQueryValues(query, 'expiry')
+  if (getAllQueryValues(query, 'expirationTimestamp').length) {
+    throw new RgbServiceError('RGB invoice uses the unsupported expirationTimestamp field')
+  }
+  const expirations = getAllQueryValues(query, 'expiry')
+  if (expirations.length > 1 || (expirations.length === 1 &&
+    (!/^(0|[1-9][0-9]*)$/.test(expirations[0]!) || !Number.isSafeInteger(Number(expirations[0]))))) {
+    throw new RgbServiceError('RGB invoice expiry is invalid')
+  }
+  const [expiration] = expirations
   const [proxyPublicKey] = getQueryValues(query, 'pk')
   if (proxyPublicKey && !/^[0-9a-f]{64}$/.test(proxyPublicKey)) {
     throw new RgbServiceError('RGB proxy invoice public key is invalid')
@@ -374,8 +385,7 @@ export function decodeRgbInvoice(invoice: string): RgbInvoice {
     recipientType: seal.type === 'confidential' ? 'blind' : 'witness',
     seal,
     network: invoiceNetwork(recipientId),
-    expirationTimestamp:
-      expiration && /^(0|[1-9][0-9]*)$/.test(expiration) ? Number(expiration) : undefined,
+    expirationTimestamp: expiration === undefined ? undefined : Number(expiration),
     transportEndpoints,
   }
 }

@@ -52,6 +52,16 @@ describe('rgb invoice utils', () => {
     expect(decodeRgbInvoice(invoice).expirationTimestamp).toBe(1_800_000_000)
   })
 
+  it.each([
+    'expirationTimestamp=1800000000',
+    'expiry=',
+    'expiry=-1',
+    'expiry=9007199254740992',
+    'expiry=1800000000&expiry=1800000001',
+  ])('marks unsupported or invalid expiry as invalid: %s', query => {
+    expect(decodeRgbInvoice(`rgb:~/~/~/bc:utxob:test?${query}`).valid).toBe(false)
+  })
+
   it('decodes compatible JSON invoice payloads', () => {
     const invoice = 'rgb:test-asset/~/~/bc:utxob:test?amount=42'
     const decoded = decodeRgbInvoice(
