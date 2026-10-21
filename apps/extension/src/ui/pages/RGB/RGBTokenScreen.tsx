@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 
 import {
   Button,
+  BottomSheetHeader,
   Column,
   Content,
   Footer,
@@ -13,9 +14,11 @@ import {
   Row,
   Text
 } from '@/ui/components';
+import { BottomModal } from '@/ui/components/BottomModal';
 import { TabBar } from '@/ui/components/TabBar';
 import { colors } from '@/ui/theme/colors';
 import { fontSizes } from '@/ui/theme/font';
+import { EllipsisOutlined } from '@ant-design/icons';
 import { RgbReceiveSelectorModal } from '../Main/WalletTabScreen/RgbReceiveSelectorModal';
 import {
   getRgbTokenPrecision,
@@ -31,6 +34,7 @@ import { useRgbWriteLeaseGuard } from './components/useRgbWriteLeaseGuard';
 export default function RGBTokenScreen() {
   const { requestWrite, writeLeaseModal } = useRgbWriteLeaseGuard();
   const [receiveSelectorOpen, setReceiveSelectorOpen] = useState(false);
+  const [actionMenuVisible, setActionMenuVisible] = useState(false);
   const {
     assetId: routeAssetId,
     tokenSummary,
@@ -129,6 +133,17 @@ export default function RGBTokenScreen() {
         onBack={() => {
           window.history.go(-1);
         }}
+        RightComponent={
+          isBfa ? (
+            <Icon
+              style={{ fontSize: 24, color: 'rgba(255, 255, 255, 0.65)' }}
+              onClick={() => setActionMenuVisible(true)}
+              data-testid="rgb-token-more-button"
+            >
+              <EllipsisOutlined />
+            </Icon>
+          ) : null
+        }
       />
       {tokenSummary ? (
         <Content>
@@ -236,18 +251,29 @@ export default function RGBTokenScreen() {
               data-testid="rgb-send-button"
             />
           </Row>
-          {isBfa ? (
-            <Button
-              text={t('rgb_burn')}
-              preset="default"
-              onClick={() => void requestWrite(onClickBurn)}
-              disabled={!enableTransfer}
-              full
-              data-testid="rgb-burn-button"
-            />
-          ) : null}
         </Column>
       </Footer>
+      {actionMenuVisible ? (
+        <BottomModal onClose={() => setActionMenuVisible(false)} bodyStyle={{ padding: 0 }}>
+          <Column fullX gap="zero">
+            <BottomSheetHeader title={t('more')} onClose={() => setActionMenuVisible(false)} />
+            <Row
+              fullX
+              itemsCenter
+              gap="md"
+              onClick={() => {
+                if (!enableTransfer) return;
+                setActionMenuVisible(false);
+                void requestWrite(onClickBurn);
+              }}
+              style={{ padding: '0 20px 24px', boxSizing: 'border-box', opacity: enableTransfer ? 1 : 0.45 }}
+              data-testid="rgb-burn-menu-item"
+            >
+              <Text text={t('rgb_burn')} size="sm" />
+            </Row>
+          </Column>
+        </BottomModal>
+      ) : null}
       {receiveSelectorOpen && (
         <RgbReceiveSelectorModal
           assetId={assetId}
