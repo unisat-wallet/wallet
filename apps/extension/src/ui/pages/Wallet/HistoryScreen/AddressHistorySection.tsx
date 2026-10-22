@@ -29,8 +29,8 @@ function HistoryAssetIcon({ asset }: { asset: AddressHistoryAssetItem }) {
   const chain = useChain();
   if (asset.kind === 'coin') {
     return (
-      <span className={styles.assetIconFrame} aria-hidden="true">
-        <img src={IMAGE_SOURCE_MAP[chain.icon]} alt="" className={styles.assetIcon} />
+      <span className={`${styles.assetIconFrame} ${styles.coinIconFrame}`} aria-hidden="true">
+        <img src={IMAGE_SOURCE_MAP[chain.icon]} alt="" className={`${styles.assetIcon} ${styles.coinIcon}`} />
       </span>
     );
   }
