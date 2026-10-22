@@ -21,6 +21,7 @@ type RgbIssueOperationsDependencies = {
 
 export type RgbIssueNiaParams = {
   orderId?: string
+  issuanceTxid?: string
   ticker: string
   name: string
   precision: number
@@ -121,6 +122,7 @@ export class RgbIssueOperations {
     await service.queueIssue({
       assetId,
       ...(params.orderId ? { orderId: params.orderId } : {}),
+      ...(params.issuanceTxid ? { issuanceTxid: params.issuanceTxid } : {}),
       contract: contract.strict,
       genesis: genesis.strict,
       asset: {

@@ -4,6 +4,42 @@ import { toRgbDisplayAmount } from '@unisat/wallet-shared'
 import { RgbTransferQuery } from '../src/rgb/RgbTransferQuery'
 
 describe('RgbTransferQuery', () => {
+  it('uses the issuance order transaction for an issue activity link', async () => {
+    const anchorTxid = 'a'.repeat(64)
+    const issuanceTxid = 'b'.repeat(64)
+    const service = {
+      getPendingTransfers: vi.fn().mockReturnValue([]),
+      getPendingSendHistory: vi.fn().mockReturnValue([]),
+      getIssueHistory: vi.fn().mockReturnValue([{
+        assetId: 'rgb:issued', amount: '100', txid: anchorTxid, issuanceTxid,
+        createdAt: 1, chainStatus: 'confirmed',
+        asset: { ticker: 'ISS', name: 'Issued', precision: 0 },
+      }]),
+      getPendingReceiveHistory: vi.fn().mockReturnValue([]),
+      getPendingReceives: vi.fn().mockReturnValue([]),
+    }
+    const context = {
+      service,
+      wallet: { walletId: 'wallet', fundingAddress: 'funding', network: 'mainnet' },
+    }
+    const query = new RgbTransferQuery({
+      getContext: vi.fn().mockResolvedValue(context as never),
+      syncReceiveHistory: vi.fn(), syncPendingTransfers: vi.fn(),
+      syncReceivedAllocations: vi.fn().mockResolvedValue(context as never),
+      getRemoteActivity: vi.fn().mockResolvedValue({ total: 1, list: [{
+        id: 'remote-issue', assetId: 'rgb:issued', type: 'issue', txid: anchorTxid,
+        amount: '100', timestamp: 1, status: 'confirmed',
+      }] }),
+      warn: vi.fn(),
+    })
+
+    const result = await query.getTransfers(1, 20, { skipSync: true })
+
+    expect(result.list).toEqual([
+      expect.objectContaining({ type: 'issue', txid: issuanceTxid }),
+    ])
+  })
+
   it('shows an unverified receive for review with its reason and reject capability', async () => {
     const service = {
       getPendingTransfers: vi.fn().mockReturnValue([]),

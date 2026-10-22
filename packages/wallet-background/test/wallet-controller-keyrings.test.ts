@@ -2792,6 +2792,7 @@ describe('RGB wallet references', () => {
         {
           assetId: 'rgb:issued',
           amount: '42',
+          issuanceTxid: 'e'.repeat(64),
           txid: 'd'.repeat(64),
           createdAt: 100,
           asset: { ticker: 'ISS', name: 'Issued', precision: 0, schema: 'NIA', issuedSupply: '42' },
@@ -2819,11 +2820,11 @@ describe('RGB wallet references', () => {
     await expect(wallet.getRgbAssetActivity('rgb:issued', 1, 20, walletRef.fundingAddress)).resolves
       .toMatchObject({
         total: 1,
-        list: [{ id: 'local-issue:rgb:issued', type: 'issue', amount: '42', status: 'confirmed' }],
+        list: [{ id: 'local-issue:rgb:issued', type: 'issue', amount: '42', txid: 'e'.repeat(64), status: 'confirmed' }],
       })
     await expect(wallet.getAddressRgbActivity(walletRef.fundingAddress, 1, 20)).resolves.toMatchObject({
       total: 1,
-      list: [{ id: 'local-issue:rgb:issued', type: 'issue', amount: '42', status: 'confirmed' }],
+      list: [{ id: 'local-issue:rgb:issued', type: 'issue', amount: '42', txid: 'e'.repeat(64), status: 'confirmed' }],
     })
   })
 

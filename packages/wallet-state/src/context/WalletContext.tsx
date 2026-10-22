@@ -791,6 +791,8 @@ export interface WalletController {
   getRgbFundingAddress(): Promise<{ address: string }>
 
   createRgbIssueNia(params: {
+    orderId?: string
+    issuanceTxid?: string
     ticker: string
     name: string
     precision: number

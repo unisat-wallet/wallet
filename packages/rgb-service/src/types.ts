@@ -397,6 +397,9 @@ export interface RgbIssueHistoryItem {
   /** Paid web issuance order used to make retries idempotent. */
   orderId?: string
   amount: string
+  /** Bitcoin transaction created for the issuance order and shown in activity. */
+  issuanceTxid?: string
+  /** Genesis allocation anchor transaction used to track confirmation state. */
   txid: string
   createdAt: number
   asset: RgbContractMetadata

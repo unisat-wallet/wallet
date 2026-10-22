@@ -1131,6 +1131,7 @@ export class RgbService {
   async queueIssue(input: {
     assetId: string
     orderId?: string
+    issuanceTxid?: string
     contract: Uint8Array
     genesis: Uint8Array
     asset: RgbPendingIssue['asset']
@@ -1167,6 +1168,7 @@ export class RgbService {
       assetId,
       ...(input.orderId ? { orderId: input.orderId } : {}),
       amount: input.asset.issuedSupply,
+      ...(input.issuanceTxid ? { issuanceTxid: input.issuanceTxid } : {}),
       txid: input.utxoSync.txid,
       createdAt: this.now(),
       asset: input.asset,
@@ -4396,6 +4398,7 @@ function validateRecoveredState(state: RgbServiceState, currentWallet: RgbWallet
       !/^(0|[1-9][0-9]*)$/.test(issue.amount) ||
       (issue.orderId !== undefined &&
         !/^(?:[0-9a-f-]{36}|\d{6}-RGB20-[A-Z0-9]{8})$/i.test(issue.orderId)) ||
+      (issue.issuanceTxid !== undefined && !/^[0-9a-f]{64}$/i.test(issue.issuanceTxid)) ||
       !/^[0-9a-f]{64}$/i.test(issue.txid) ||
       !Number.isSafeInteger(issue.createdAt) ||
       issue.createdAt < 0 ||

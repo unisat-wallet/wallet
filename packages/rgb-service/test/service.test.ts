@@ -992,6 +992,7 @@ describe('RgbService', () => {
       assetId,
       orderId: '202610-RGB20-ABC12345',
       amount: '1',
+      issuanceTxid: 'b'.repeat(64),
       txid: 'a'.repeat(64),
       createdAt: 1,
       asset: { ticker: 'ISS', name: 'Issued', precision: 0, schema: 'NIA', issuedSupply: '1' },
@@ -1016,6 +1017,12 @@ describe('RgbService', () => {
       service.restoreRecoveryState({
         ...recovery,
         issueHistory: [{ ...issue, orderId: 'invalid-order-id' }],
+      })
+    ).rejects.toThrow('RGB recovery checkpoint contains an invalid issue history item')
+    await expect(
+      service.restoreRecoveryState({
+        ...recovery,
+        issueHistory: [{ ...issue, issuanceTxid: 'invalid-txid' }],
       })
     ).rejects.toThrow('RGB recovery checkpoint contains an invalid issue history item')
   })
@@ -2392,8 +2399,10 @@ describe('RgbService', () => {
       },
     ]
 
+    const issuanceTxid = 'a'.repeat(64)
     await service.queueIssue({
       assetId: 'rgb:BgYGBgYG-BgYGBgY-GBgYGBg-YGBgYGB-gYGBgYG-BgYGBgY',
+      issuanceTxid,
       contract: Uint8Array.from([1]),
       genesis: Uint8Array.from([2]),
       asset: {
@@ -2422,6 +2431,7 @@ describe('RgbService', () => {
       expect.objectContaining({
         assetId: 'rgb:BgYGBgYG-BgYGBgY-GBgYGBg-YGBgYGB-gYGBgYG-BgYGBgY',
         amount: '1',
+        issuanceTxid,
         txid: outpoints[0]!.outpoint.txid,
         chainStatus: 'confirmed',
         asset: expect.objectContaining({ ticker: 'ISS', name: 'Issued' }),

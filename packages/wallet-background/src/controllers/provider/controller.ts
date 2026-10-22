@@ -959,6 +959,7 @@ class ProviderController extends BaseController {
     try {
       const issued = await wallet.createRgbIssueNia({
         orderId: params.orderId,
+        issuanceTxid: paymentTxid,
         ticker: params.ticker,
         name: params.name,
         precision: params.precision,

@@ -186,12 +186,18 @@ export class RgbTransferQuery {
       recipientRejected: send.recipientAck === false,
       local: true,
     }))
-    const localIssues = (service.getIssueHistory?.() || []).map(issue => ({
+    const issueHistory = service.getIssueHistory?.() || []
+    const issuanceTxidByAssetId = new Map(
+      issueHistory.flatMap(issue =>
+        issue.issuanceTxid ? [[issue.assetId, issue.issuanceTxid] as const] : []
+      )
+    )
+    const localIssues = issueHistory.map(issue => ({
       id: `local-issue:${issue.assetId}`,
       assetId: issue.assetId,
       type: 'issue' as const,
       amount: issue.amount,
-      txid: issue.txid,
+      txid: issue.issuanceTxid ?? issue.txid,
       timestamp: issue.createdAt,
       status: rgbIssueActivityStatus(issue.chainStatus),
       local: true,
@@ -361,6 +367,12 @@ export class RgbTransferQuery {
         .map(item => item.txid)
         .filter(Boolean)
     )
+    if (includeLocalTransfers) {
+      for (const issue of issueHistory) {
+        localNonReceiveTxids.add(issue.txid)
+        if (issue.issuanceTxid) localNonReceiveTxids.add(issue.issuanceTxid)
+      }
+    }
     const localReceiveIds = new Set(
       [...visibleLocalReceives, ...visibleLocalReceiveHistory]
         .map(item => item.transferId?.replace(/^local-receive:|^receive:/, ''))
@@ -397,7 +409,10 @@ export class RgbTransferQuery {
         assetId: item.assetId,
         type: item.type === 'send' || item.type === 'receive' ? item.type : 'issue',
         amount: item.amount === null || item.amount === undefined ? undefined : String(item.amount),
-        txid: item.txid,
+        txid:
+          item.type !== 'send' && item.type !== 'receive' && item.assetId
+            ? (issuanceTxidByAssetId.get(item.assetId) ?? item.txid)
+            : item.txid,
         ticker: item.ticker,
         name: item.name,
         precision: item.precision,

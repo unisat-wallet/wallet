@@ -170,7 +170,8 @@ describe('provider RGB issue payment gate', () => {
       pendingConfirmation: false, syncPending: false,
     })
     expect(wallet.createRgbIssueNia).toHaveBeenCalledWith({
-      orderId, ticker: 'TOK', name: 'Token', precision: 0, amounts: ['100'],
+      orderId, issuanceTxid: 'a'.repeat(64),
+      ticker: 'TOK', name: 'Token', precision: 0, amounts: ['100'],
     })
   })
 })

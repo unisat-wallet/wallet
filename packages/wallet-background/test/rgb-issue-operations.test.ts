@@ -91,6 +91,7 @@ describe('RgbIssueOperations', () => {
     })
 
     await operation.issueNia({
+      issuanceTxid: 'c'.repeat(64),
       ticker: 'TOK',
       name: 'Token',
       precision: 0,
@@ -100,6 +101,7 @@ describe('RgbIssueOperations', () => {
     expect(service.getAvailableIssueUtxos).toHaveBeenCalledOnce()
     expect(service.queueIssue).toHaveBeenCalledWith(
       expect.objectContaining({
+        issuanceTxid: 'c'.repeat(64),
         utxoSync: expect.objectContaining({
           outpoints: expect.arrayContaining([
             expect.objectContaining({

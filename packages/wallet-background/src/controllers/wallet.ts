@@ -550,6 +550,7 @@ type RgbCancelReceiveInvoiceResult = {
 type RgbIssueNiaRequest = {
   wallet: RgbWalletRef
   orderId?: string
+  issuanceTxid?: string
   ticker: string
   name: string
   precision: number
@@ -3916,6 +3917,13 @@ export class WalletController extends BaseController {
     const latestSnapshot = await getRgbApiService()
       .getRgbWalletUtxoSnapshot({ wallet, forceSync: true })
       .catch(() => undefined)
+    const issueByAssetId = new Map(issueHistory.map(issue => [issue.assetId, issue]))
+    const pageList = page.list.map(item => {
+      const remote = item as { assetId?: string; type?: string; txid?: string }
+      const localIssue = remote.assetId ? issueByAssetId.get(remote.assetId) : undefined
+      if (remote.type !== 'issue' || !localIssue?.issuanceTxid) return item
+      return { ...(item as Record<string, unknown>), txid: localIssue.issuanceTxid }
+    })
     const localIssues = issueHistory
       .filter(issue => !params.assetId || issue.assetId === params.assetId)
       .map(issue => {
@@ -3929,7 +3937,7 @@ export class WalletController extends BaseController {
           assetId: issue.assetId,
           type: 'issue',
           amount: issue.amount,
-          txid: issue.txid,
+          txid: issue.issuanceTxid ?? issue.txid,
           timestamp: issue.createdAt,
           status: rgbIssueActivityStatus(latestChainStatus ?? issue.chainStatus),
           ticker: issue.asset.ticker,
@@ -3939,13 +3947,13 @@ export class WalletController extends BaseController {
         }
       })
     const remoteTxids = new Set(
-      page.list
+      pageList
         .map(item => (item as { txid?: string }).txid)
         .filter((txid): txid is string => Boolean(txid))
     )
     const additions = localIssues.filter(issue => !remoteTxids.has(issue.txid))
-    if (!additions.length) return page
-    const list = [...additions, ...page.list].sort(
+    if (!additions.length) return { ...page, list: pageList }
+    const list = [...additions, ...pageList].sort(
       (left, right) =>
         Number(
           (right as { timestamp?: number; createdAt?: number }).timestamp ??
