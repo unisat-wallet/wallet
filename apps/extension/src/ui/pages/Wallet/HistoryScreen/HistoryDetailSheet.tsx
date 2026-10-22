@@ -86,6 +86,7 @@ export function HistoryDetailSheet({ summary, onClose }: { summary: AddressHisto
   const display = resolvedSummary.display
     ? { ...summary.display, ...resolvedSummary.display }
     : summary.display;
+  const hideNetworkFee = display?.hideNetworkFee || resolvedSummary.direction === 'receive';
   const titleSummary = { direction: resolvedSummary.direction, display };
   const hideAmount = display?.hideAmount;
   const isCoin = primary?.asset.kind === 'coin';
@@ -165,7 +166,7 @@ export function HistoryDetailSheet({ summary, onClose }: { summary: AddressHisto
                 ) : '—'}
               </SummaryRow>
             )}
-            {!display?.hideNetworkFee && (
+            {!hideNetworkFee && (
               <SummaryRow label={t('network_fee')}>
                 {fee} <span className={styles.detailUnit}>{chain.unit}</span>
               </SummaryRow>
