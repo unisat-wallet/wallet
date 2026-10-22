@@ -14,6 +14,7 @@ export type RgbRemoteActivity = {
   timestamp?: number
   createdAt?: number
   status?: string
+  rejectionReason?: string
   ticker?: string
   name?: string
   precision?: number
@@ -42,11 +43,14 @@ export class RgbTransferQuery {
   async getTransfers(currentPage: number, pageSize: number, options?: { skipSync?: boolean }) {
     let context = await this.dependencies.getContext()
     let { service, wallet } = context
-    const activityPromise = this.dependencies.getRemoteActivity(
-      wallet.fundingAddress,
-      currentPage,
-      pageSize
-    )
+    // A pending receive can settle or be rejected during the sync below.
+    // Fetch its remote history afterwards so this request does not render an
+    // old confirmed row immediately after publishing the newer outcome.
+    const receiveMayChange = !options?.skipSync &&
+      ((service.getPendingReceiveHistory?.().length || 0) > 0 || service.getPendingReceives().length > 0)
+    const activityPromise = receiveMayChange
+      ? undefined
+      : this.dependencies.getRemoteActivity(wallet.fundingAddress, currentPage, pageSize)
     if (!options?.skipSync) {
       try {
         await this.dependencies.syncReceiveHistory(service, context)
@@ -98,7 +102,7 @@ export class RgbTransferQuery {
     }
 
     const [activity, pendingTransfers] = await Promise.all([
-      activityPromise,
+      activityPromise || this.dependencies.getRemoteActivity(wallet.fundingAddress, currentPage, pageSize),
       Promise.resolve(service.getPendingTransfers()),
     ])
     const localAssetMetadata = (assetId: string) => {
@@ -343,28 +347,23 @@ export class RgbTransferQuery {
     const includeLocalTransfers = currentPage === 1
     const visibleLocalSends = includeLocalTransfers ? localSends : []
     const visibleLocalIssues = includeLocalTransfers ? localIssues : []
-    // A previously persisted local NACK must not hide a transaction the
-    // indexer has since confirmed. This heals historical records produced by
-    // older recovery flows while the service keeps a one-way settled state for
-    // all new records.
     const visibleLocalReceiveHistory = includeLocalTransfers
-      ? localReceiveHistory.map(receive =>
-          receive.status === 'rejected' && receive.txid && confirmedActivityTxids.has(receive.txid)
-            ? { ...receive, status: 'settled', local: false }
-            : receive
-        )
+      ? localReceiveHistory
       : []
     const visibleLocalReceives = includeLocalTransfers ? localReceives : []
     const visibleLocalHistory = includeLocalTransfers ? visibleLocalSendHistory : []
-    const localTxids = new Set(
+    const localNonReceiveTxids = new Set(
       [
         ...visibleLocalSends,
         ...visibleLocalIssues,
         ...visibleLocalHistory,
-        ...visibleLocalReceives,
-        ...visibleLocalReceiveHistory,
       ]
         .map(item => item.txid)
+        .filter(Boolean)
+    )
+    const localReceiveIds = new Set(
+      [...visibleLocalReceives, ...visibleLocalReceiveHistory]
+        .map(item => item.transferId?.replace(/^local-receive:|^receive:/, ''))
         .filter(Boolean)
     )
     const pendingAcceptCount = visibleLocalReceives.filter(
@@ -383,7 +382,9 @@ export class RgbTransferQuery {
     }
     const remoteItems = activity.list
       .filter(item => {
-        if (item.txid && localTxids.has(item.txid)) return false
+        if (item.type === 'receive' && item.id &&
+          localReceiveIds.has(item.id.replace(/^local-receive:|^receive:/, ''))) return false
+        if (item.type !== 'receive' && item.txid && localNonReceiveTxids.has(item.txid)) return false
         const status = String(item.status ?? '').toLowerCase()
         const inProgressReceive =
           item.type === 'receive' &&
@@ -408,6 +409,7 @@ export class RgbTransferQuery {
           )
             ? 'confirming'
             : (item.status ?? 'settled'),
+        rejectionReason: item.rejectionReason,
       }))
     const list = [
       ...visibleLocalSends,

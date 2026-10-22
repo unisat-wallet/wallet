@@ -480,7 +480,7 @@ export function RGBTransferDetailSheet({
                 size={32}
               />
               <Column gap="xs" style={{ minWidth: 0, maxWidth: 'calc(100% - 40px)' }}>
-                {!isCanceledReceive && !hasValidationFailure && transfer?.amount ? (
+                {!isCanceledReceive && !isRejectedReceive && !hasValidationFailure && transfer?.amount ? (
                   <Text
                     text={amountText}
                     style={{
@@ -536,6 +536,9 @@ export function RGBTransferDetailSheet({
                     wrap
                   />
                 </Column>
+              ) : null}
+              {isRejectedReceive && transfer?.amount ? (
+                <DetailRow label={t('amount')} value={displayAmount} />
               ) : null}
               {assetId || (!isRejectedReceive && !hasValidationFailure) ? <Row fullX justifyBetween itemsCenter style={{ minHeight: 32 }}>
                 <Text

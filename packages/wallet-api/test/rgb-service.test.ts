@@ -204,6 +204,31 @@ describe('RgbService', () => {
     })
   })
 
+  it('reports a rejected receive without requiring an asset or transaction ID', async () => {
+    const httpClient = { post: vi.fn().mockResolvedValue(undefined), get: vi.fn() }
+    const service = new RgbService(httpClient as any)
+    service.setRequestAuthenticator(vi.fn().mockResolvedValue({
+      fundingAddress: 'bc1p-funding', nonce: 'a'.repeat(32), expiresAt: 1, signature: 'signature',
+    }))
+
+    await service.syncRgbReceiveTransfer({
+      wallet: { fundingAddress: 'bc1p-funding' },
+      transferId: 'receive:rejected-invoice',
+      status: 'rejected',
+      createdAt: 1_786_688_361_585,
+      rejectionReason: 'Rejected by you',
+    })
+
+    expect(httpClient.post).toHaveBeenCalledWith('/v5/rgb/transfers/receive/outcome', {
+      wallet: { fundingAddress: 'bc1p-funding' },
+      transferId: 'receive:rejected-invoice',
+      status: 'rejected',
+      createdAt: 1_786_688_361_585,
+      rejectionReason: 'Rejected by you',
+      auth: expect.objectContaining({ fundingAddress: 'bc1p-funding' }),
+    })
+  })
+
   it('normalizes legacy RGB hex IDs on reads and in activity responses', async () => {
     const httpClient = {
       post: vi.fn(),

@@ -472,10 +472,12 @@ type RgbControllerApiService = {
     wallet: RgbWalletRef
     lease?: RgbControllerWriteLeaseCredential
     transferId: string
-    assetId: string
-    amount: string
-    txid: string
+    status?: 'settled' | 'rejected' | 'canceled'
+    assetId?: string
+    amount?: string
+    txid?: string
     createdAt: number
+    rejectionReason?: string
   }) => Promise<void>
 } & Pick<RgbBackendApi, 'reportRgbBroadcastFailure' | 'getRgbBroadcastFailureStatus'>
 
@@ -5662,10 +5664,12 @@ export class WalletController extends BaseController {
       wallet,
       ...(lease ? { lease } : {}),
       transferId: receive.transferId,
-      assetId: receive.assetId,
-      amount: receive.amount,
-      txid: receive.txid,
+      ...(receive.status && receive.status !== 'settled' ? { status: receive.status } : {}),
+      ...(receive.assetId ? { assetId: receive.assetId } : {}),
+      ...(receive.amount ? { amount: receive.amount } : {}),
+      ...(receive.txid ? { txid: receive.txid } : {}),
       createdAt: receive.createdAt,
+      ...(receive.rejectionReason ? { rejectionReason: receive.rejectionReason } : {}),
     })
   }
 

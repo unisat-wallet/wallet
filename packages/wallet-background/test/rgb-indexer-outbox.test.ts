@@ -3,6 +3,26 @@ import type { RgbPendingUtxoSync, RgbService } from '@unisat/rgb-service'
 import { RgbIndexerOutbox } from '../src/rgb/RgbIndexerOutbox'
 
 describe('RgbIndexerOutbox', () => {
+  it('retains a rejected receive until the backend accepts its outcome', async () => {
+    const receive = {
+      transferId: 'receive:invoice', status: 'rejected', createdAt: 1,
+    }
+    const service = {
+      getPendingReceiveHistory: vi.fn().mockReturnValue([receive]),
+      markReceiveHistorySynced: vi.fn(),
+    } as unknown as RgbService
+    const syncReceiveHistory = vi.fn().mockRejectedValue(new Error('outcome endpoint unavailable'))
+    const outbox = new RgbIndexerOutbox({
+      syncIssue: vi.fn(), syncAssetMetadata: vi.fn(), replaceUtxos: vi.fn(),
+      syncReceiveHistory, warn: vi.fn(),
+    })
+
+    await outbox.syncReceiveHistory(service, { fundingAddress: 'address' } as any)
+
+    expect(syncReceiveHistory).toHaveBeenCalledWith(receive, expect.anything())
+    expect(service.markReceiveHistorySynced).not.toHaveBeenCalled()
+  })
+
   it('publishes a settled allocation after an earlier empty witness registration', async () => {
     const empty = { txid: 'a'.repeat(64), outpoints: [{ allocations: [] }] } as RgbPendingUtxoSync
     const settled = { txid: empty.txid, outpoints: [{ allocations: [{ amount: '100' }] }] } as RgbPendingUtxoSync

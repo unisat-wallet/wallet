@@ -104,7 +104,7 @@ export function RGBTransferListItem({
   const showStatus = item.type !== 'issue' && (pending || ['canceled', 'cancelled', 'rejected'].includes(status));
   const isReceive = item.type === 'receive';
   const isCanceledReceive = isReceive && ['canceled', 'cancelled'].includes(status);
-  const hideReceiveAmount = isReceive && (status === 'validation_failed' || (status === 'rejected' && !item.amount));
+  const hideReceiveAmount = isReceive && ['validation_failed', 'rejected'].includes(status);
   const secondaryAssetLabel = assetName || (isCanceledReceive ? assetSymbol : '');
   const amountColor = isReceive || item.type === 'issue'
     ? 'rgba(124, 219, 152, 0.85)'

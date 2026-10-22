@@ -57,6 +57,7 @@ export interface RgbActivityItem {
   name?: string
   type: RgbActivityType
   status: string
+  rejectionReason?: string
   amount: string
   txid: string
   timestamp: number
@@ -282,15 +283,18 @@ export interface RgbTransferSyncRequest {
   }>
 }
 
-/** Index a confirmed RGB transfer received by the local funding address. */
+/** Index a local RGB receive outcome for this invoice. */
 export interface RgbReceiveTransferSyncRequest {
   wallet: RgbWalletRef
   lease?: RgbWriteLeaseCredential
   transferId: string
-  assetId: string
-  amount: string
-  txid: string
+  status?: 'settled' | 'rejected' | 'canceled'
+  assetId?: string
+  amount?: string
+  txid?: string
   createdAt: number
+  from?: string
+  rejectionReason?: string
 }
 
 /** Transport endpoint for a locally-created consignment. */

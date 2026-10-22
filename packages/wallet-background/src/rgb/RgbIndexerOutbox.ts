@@ -76,7 +76,6 @@ export class RgbIndexerOutbox {
 
   async syncReceiveHistory(service: RgbService, wallet: LocalRgbWallet): Promise<void> {
     for (const receive of service.getPendingReceiveHistory?.() || []) {
-      if (receive.status && receive.status !== 'settled') continue
       try {
         await this.dependencies.syncReceiveHistory(receive, wallet)
         await service.markReceiveHistorySynced(receive.transferId)

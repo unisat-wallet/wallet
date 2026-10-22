@@ -2170,6 +2170,34 @@ describe('RGB wallet references', () => {
     expect(service.markReceiveHistorySynced).toHaveBeenCalledWith('receive:invoice-1')
   })
 
+  it('syncs a rejected receive outcome so a stale confirmed indexer entry is corrected', async () => {
+    const wallet = new WalletController()
+    const syncRgbReceiveTransfer = vi.fn().mockResolvedValue(undefined)
+    ;(walletApiService as any).rgb = { syncRgbReceiveTransfer }
+    const service = {
+      getPendingReceiveHistory: vi.fn(() => [{
+        transferId: 'receive:invoice-2',
+        assetId: '', amount: '', txid: '',
+        createdAt: 1_786_688_361_585,
+        status: 'rejected',
+        rejectionReason: 'Rejected by you',
+      }]),
+      markReceiveHistorySynced: vi.fn().mockResolvedValue(undefined),
+    }
+    const walletRef = { fundingAddress: 'bc1p-rgb-funding' }
+
+    await (wallet as any).syncRgbReceiveHistory(service, walletRef)
+
+    expect(syncRgbReceiveTransfer).toHaveBeenCalledWith({
+      wallet: walletRef,
+      transferId: 'receive:invoice-2',
+      status: 'rejected',
+      createdAt: 1_786_688_361_585,
+      rejectionReason: 'Rejected by you',
+    })
+    expect(service.markReceiveHistorySynced).toHaveBeenCalledWith('receive:invoice-2')
+  })
+
   it('reports a remote RGB writer as read-only without exposing its identity', async () => {
     const wallet = new WalletController()
     const getRgbWriteLeaseStatus = vi.fn().mockResolvedValue({

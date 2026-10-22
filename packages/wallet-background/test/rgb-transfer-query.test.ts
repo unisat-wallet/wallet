@@ -163,8 +163,8 @@ describe('RgbTransferQuery', () => {
       service,
       wallet: { walletId: 'wallet', fundingAddress: 'funding', network: 'mainnet' },
     }
-    const remoteHistory = localHistory.slice(0, 13).map((item, index) => ({
-      id: `remote-${index}`,
+    const remoteHistory = localHistory.slice(0, 13).map(item => ({
+      id: item.transferId,
       assetId: item.assetId,
       type: 'receive',
       amount: item.amount,
@@ -185,6 +185,70 @@ describe('RgbTransferQuery', () => {
 
     expect(firstPage.list).toHaveLength(18)
     expect(firstPage.total).toBe(18)
+  })
+
+  it('keeps a rejected invoice separate from a confirmed receive sharing its Bitcoin txid', async () => {
+    const txid = 'a'.repeat(64)
+    const service = {
+      getPendingTransfers: vi.fn().mockReturnValue([]),
+      getPendingSendHistory: vi.fn().mockReturnValue([]),
+      getIssueHistory: vi.fn().mockReturnValue([]),
+      getPendingReceiveHistory: vi.fn().mockReturnValue([{
+        transferId: 'receive:rejected-invoice', assetId: 'rgb:asset', amount: '10',
+        txid, createdAt: 1, status: 'rejected', rejectionReason: 'Rejected by you',
+      }]),
+      getPendingReceives: vi.fn().mockReturnValue([]),
+    }
+    const context = { service, wallet: { walletId: 'wallet', fundingAddress: 'funding', network: 'mainnet' } }
+    const query = new RgbTransferQuery({
+      getContext: vi.fn().mockResolvedValue(context as never),
+      syncReceiveHistory: vi.fn(), syncPendingTransfers: vi.fn(),
+      syncReceivedAllocations: vi.fn().mockResolvedValue(context as never),
+      getRemoteActivity: vi.fn().mockResolvedValue({ total: 2, list: [
+        { id: 'receive:rejected-invoice', type: 'receive', status: 'confirmed', txid, amount: '10' },
+        { id: 'receive:accepted-invoice', type: 'receive', status: 'confirmed', txid, amount: '10' },
+      ] }),
+      warn: vi.fn(),
+    })
+
+    const result = await query.getTransfers(1, 20, { skipSync: true })
+
+    expect(result.list).toHaveLength(2)
+    expect(result.list).toEqual(expect.arrayContaining([
+      expect.objectContaining({ id: 'receive:accepted-invoice', status: 'confirmed' }),
+      expect.objectContaining({ id: 'receive:rejected-invoice', status: 'rejected', rejectionReason: 'Rejected by you' }),
+    ]))
+  })
+
+  it('reads remote receive history after publishing a pending local outcome', async () => {
+    let published = false
+    const service = {
+      getPendingTransfers: vi.fn().mockReturnValue([]),
+      getPendingSendHistory: vi.fn().mockReturnValue([]),
+      getIssueHistory: vi.fn().mockReturnValue([]),
+      getPendingReceiveHistory: vi.fn().mockReturnValue([{ transferId: 'receive:invoice' }]),
+      getPendingReceives: vi.fn().mockReturnValue([]),
+    }
+    const context = { service, wallet: { walletId: 'wallet', fundingAddress: 'funding', network: 'mainnet' } }
+    const getRemoteActivity = vi.fn(async () => ({
+      total: 1,
+      list: [{ id: 'receive:invoice', type: 'receive', status: published ? 'rejected' : 'confirmed',
+        txid: 'a'.repeat(64), rejectionReason: published ? 'Rejected by you' : undefined }],
+    }))
+    const query = new RgbTransferQuery({
+      getContext: vi.fn().mockResolvedValue(context as never),
+      syncReceiveHistory: vi.fn(async () => { published = true; service.getPendingReceiveHistory.mockReturnValue([]) }),
+      syncPendingTransfers: vi.fn(),
+      syncReceivedAllocations: vi.fn().mockResolvedValue(context as never),
+      getRemoteActivity,
+      warn: vi.fn(),
+    })
+
+    const result = await query.getTransfers(1, 20)
+
+    expect(result.list).toEqual([expect.objectContaining({
+      id: 'receive:invoice', status: 'rejected', rejectionReason: 'Rejected by you',
+    })])
   })
 
   it('keeps the total stable across pages when a local transfer appears only on page one', async () => {
