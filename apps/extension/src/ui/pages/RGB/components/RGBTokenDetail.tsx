@@ -15,9 +15,13 @@ export function RGBTokenDetail(props: {
   ticker: string;
   tokenInfo?: Record<string, unknown>;
   tokenBalance?: Record<string, unknown>;
+  reservedSendAmount?: string;
+  sendingAmount?: string;
+  estimatedBalance?: string;
+  otherLockedAmount?: string;
 }) {
   const { t } = useI18n();
-  const { assetId, name, ticker, tokenInfo, tokenBalance } = props;
+  const { assetId, name, ticker, tokenInfo, tokenBalance, reservedSendAmount, sendingAmount, estimatedBalance, otherLockedAmount } = props;
   const precision = getRgbTokenPrecision(tokenBalance) || getRgbTokenPrecision(tokenInfo);
   const formatValue = (value: unknown) => {
     return value === undefined || value === null || value === '' ? '--' : value.toString();
@@ -31,7 +35,10 @@ export function RGBTokenDetail(props: {
   const total = formatNumber(getRgbTotalAtomicAmount(tokenBalance));
   const available = formatNumber(tokenBalance?.spendable);
   const pending = formatNumber(tokenBalance?.pending ?? '0');
-  const locking = formatNumber(tokenBalance?.lockedAmount ?? '0');
+  const locking = formatNumber(otherLockedAmount ?? tokenBalance?.lockedAmount ?? '0');
+  const expectedChange = reservedSendAmount !== undefined && sendingAmount !== undefined
+    ? (BigInt(reservedSendAmount) - BigInt(sendingAmount)).toString()
+    : undefined;
 
   return (
     <Column
@@ -62,13 +69,31 @@ export function RGBTokenDetail(props: {
       <Line />
       <Section title={t('schema_rgb')} value={formatValue(tokenInfo?.schema)} />
       <Line />
-      <Section title={t('total_balance')} value={total} maxLength={Number.POSITIVE_INFINITY} wrapValue />
+      <Section title={t(reservedSendAmount !== undefined && Number(tokenBalance?.pending || 0) === 0 ? 'rgb_current_balance' : 'total_balance')} value={total} maxLength={Number.POSITIVE_INFINITY} wrapValue />
       <Line />
       <Section title={t('available_balance')} value={available} maxLength={Number.POSITIVE_INFINITY} wrapValue />
       <Line />
       <Section title={t('pending')} value={pending} maxLength={Number.POSITIVE_INFINITY} wrapValue />
       <Line />
-      <Section title={t('rgb_amount_locking')} value={locking} maxLength={Number.POSITIVE_INFINITY} wrapValue />
+      {reservedSendAmount !== undefined && sendingAmount !== undefined ? (
+        <>
+          <Section title={t('rgb_reserved_for_pending_send')} value={formatNumber(reservedSendAmount)} maxLength={Number.POSITIVE_INFINITY} wrapValue />
+          <Line />
+          <Section title={t('rgb_sending_amount')} value={formatNumber(sendingAmount)} maxLength={Number.POSITIVE_INFINITY} wrapValue />
+          <Line />
+          <Section title={t('rgb_expected_change')} value={formatNumber(expectedChange)} maxLength={Number.POSITIVE_INFINITY} wrapValue />
+          {estimatedBalance !== undefined ? (
+            <>
+              <Line />
+              <Section title={t('rgb_estimated_balance_after_send')} value={formatNumber(estimatedBalance)} maxLength={Number.POSITIVE_INFINITY} wrapValue />
+            </>
+          ) : null}
+          {otherLockedAmount !== '0' ? <Line /> : null}
+        </>
+      ) : null}
+      {reservedSendAmount === undefined || otherLockedAmount !== '0' ? (
+        <Section title={t('rgb_amount_locking')} value={locking} maxLength={Number.POSITIVE_INFINITY} wrapValue />
+      ) : null}
     </Column>
   );
 }

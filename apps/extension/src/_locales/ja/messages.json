@@ -3441,6 +3441,12 @@
   "rgb_amount_locking": {
     "message": "ロック中"
   },
+  "rgb_current_balance": { "message": "現在の残高" },
+  "rgb_reserved_for_pending_send": { "message": "送金用に確保" },
+  "rgb_sending_amount": { "message": "送金額" },
+  "rgb_expected_change": { "message": "予想されるおつり" },
+  "rgb_estimated_balance_after_send": { "message": "送金後の予想残高" },
+  "rgb_send_not_deducted_yet": { "message": "現在の残高からはまだ差し引かれていません" },
   "rgb_balance_processing": {
     "message": "処理中"
   },

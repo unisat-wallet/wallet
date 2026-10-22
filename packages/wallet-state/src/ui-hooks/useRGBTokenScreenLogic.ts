@@ -136,6 +136,7 @@ export function useRGBTokenScreenLogic() {
           canReject: transfer.canReject,
           rejectLocally: transfer.rejectLocally,
           amount: transfer.amount ?? '',
+          lockedAmount: transfer.lockedAmount,
           txid: transfer.txid ?? '',
           timestamp: transfer.timestamp,
         }))

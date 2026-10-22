@@ -2596,8 +2596,9 @@ export class RgbService {
         if (allocation.settled) current.settled += amount
         else if (burnChangeTxids.has(utxo.outpoint.txid)) current.locked += amount
         else current.pending += amount
-        if (allocation.settled && allocation.spendable && !locked.has(outpointKey(utxo))) {
-          current.spendable += amount
+        if (allocation.settled && allocation.spendable) {
+          if (locked.has(outpointKey(utxo))) current.locked += amount
+          else current.spendable += amount
         }
         amounts.set(allocation.assetId, current)
       }

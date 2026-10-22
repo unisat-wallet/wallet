@@ -87,6 +87,8 @@ export interface RgbActivityItem {
   canReject?: boolean
   rejectLocally?: boolean
   amount: string
+  /** RGB amount in UTXOs reserved by this local send, before change returns. */
+  lockedAmount?: string
   txid: string
   timestamp: number
 }
@@ -113,6 +115,8 @@ export interface RgbTransferItem {
   precision?: number
   type: 'send' | 'receive' | 'issue'
   amount?: string
+  /** RGB amount in UTXOs reserved by this local send, before change returns. */
+  lockedAmount?: string
   txid?: string
   timestamp: number
   /** Time the receiver accepted this send, used to order pending broadcasts. */

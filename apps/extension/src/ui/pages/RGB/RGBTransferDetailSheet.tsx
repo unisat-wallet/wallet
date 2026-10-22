@@ -300,6 +300,18 @@ export function RGBTransferDetailSheet({
     transfer?.type === 'send' && String(transfer?.status || '').toLowerCase() === 'broadcast_failed';
   const canBroadcast =
     transfer?.type === 'send' && String(transfer?.status || '').toLowerCase() === 'ready_to_broadcast';
+  const isUnbroadcastSend = transfer?.type === 'send' && !transfer.burn &&
+    ['signed', 'waiting_ack', 'ready_to_broadcast'].includes(status.toLowerCase());
+  const reservedAmount = transfer?.lockedAmount && /^\d+$/.test(transfer.lockedAmount)
+    ? BigInt(transfer.lockedAmount)
+    : undefined;
+  const sendingAmount = transfer?.amount && /^\d+$/.test(transfer.amount)
+    ? BigInt(transfer.amount)
+    : undefined;
+  const expectedChange = isUnbroadcastSend && reservedAmount !== undefined && sendingAmount !== undefined &&
+    reservedAmount >= sendingAmount
+    ? reservedAmount - sendingAmount
+    : undefined;
   const assetId = transfer?.assetId?.trim();
   const isIssue = transfer?.type === 'issue';
   const recordId = isIssue ? transfer?.txid : transfer?.transferId || transferId || '';
@@ -510,6 +522,7 @@ export function RGBTransferDetailSheet({
             </Row>
 
             {description ? <Text text={description} color="textDim" textCenter size="xs" /> : null}
+            {isUnbroadcastSend ? <Text text={t('rgb_send_not_deducted_yet')} color="textDim" textCenter size="xs" /> : null}
             {canBroadcast && remainingBroadcastCount > 0 ? (
               <Text
                 text={`${t('rgb_more_transfers_to_broadcast')}: ${remainingBroadcastCount}`}
@@ -526,6 +539,13 @@ export function RGBTransferDetailSheet({
                 value={getStatusLabel(status, t, transfer?.type)}
                 valueColor={getStatusColor(status)}
               />
+              {expectedChange !== undefined ? (
+                <>
+                  <DetailRow label={t('rgb_reserved_for_pending_send')} value={toRgbDisplayAmount(reservedAmount!.toString(), getRgbTokenPrecision(transfer))} />
+                  <DetailRow label={t('rgb_sending_amount')} value={displayAmount} />
+                  <DetailRow label={t('rgb_expected_change')} value={toRgbDisplayAmount(expectedChange.toString(), getRgbTokenPrecision(transfer))} />
+                </>
+              ) : null}
               {isRejectedReceive || hasValidationFailure ? (
                 <Column fullX gap="xs" style={{ paddingTop: 4, paddingBottom: 4 }}>
                   <Text text={t(hasValidationFailure ? 'rgb_validation_reason' : 'rgb_rejection_reason')} color="textDim" size="sm" />

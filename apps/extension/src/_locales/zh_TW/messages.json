@@ -3444,6 +3444,12 @@
   "rgb_amount_locking": {
     "message": "鎖定中"
   },
+  "rgb_current_balance": { "message": "目前餘額" },
+  "rgb_reserved_for_pending_send": { "message": "待發送占用" },
+  "rgb_sending_amount": { "message": "發送" },
+  "rgb_expected_change": { "message": "預計找零" },
+  "rgb_estimated_balance_after_send": { "message": "發送後預計餘額" },
+  "rgb_send_not_deducted_yet": { "message": "尚未從目前餘額扣除" },
   "rgb_balance_processing": {
     "message": "處理中"
   },

@@ -105,6 +105,28 @@ export class RgbTransferQuery {
       activityPromise || this.dependencies.getRemoteActivity(wallet.fundingAddress, currentPage, pageSize),
       Promise.resolve(service.getPendingTransfers()),
     ])
+    const snapshotUtxos = new Map(
+      (service.getSnapshot?.()?.utxos || []).map(utxo => [
+        `${utxo.outpoint.txid}:${utxo.outpoint.vout}`,
+        utxo,
+      ])
+    )
+    const lockedAssetAmount = (transfer: typeof pendingTransfers[number]) => {
+      let amount = 0n
+      const visited = new Set<string>()
+      for (const outpoint of transfer.prepared?.lockedOutpoints || []) {
+        const key = `${outpoint.txid}:${outpoint.vout}`
+        if (visited.has(key)) continue
+        visited.add(key)
+        const utxo = snapshotUtxos.get(key)
+        if (!utxo || ['spent', 'replaced', 'pending_spend'].includes(utxo.chainStatus)) continue
+        for (const allocation of utxo.allocations) {
+          if (allocation.assetId === transfer.request.assetId && allocation.settled && allocation.spendable)
+            amount += BigInt(allocation.amount)
+        }
+      }
+      return amount.toString()
+    }
     const localAssetMetadata = (assetId: string) => {
       try {
         const { name, ticker } = service.getLocalAssetDetail(assetId)
@@ -142,6 +164,7 @@ export class RgbTransferQuery {
         ? { burnDestinationChainId: transfer.request.burnDestination.destinationChainId }
         : {}),
       amount: transfer.request.amount,
+      lockedAmount: lockedAssetAmount(transfer),
       precision: transfer.request.precision,
       txid: transfer.delivery?.completed.txid ?? transfer.broadcast?.completed.txid,
       timestamp: transfer.createdAt,

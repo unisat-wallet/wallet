@@ -2919,7 +2919,7 @@ describe('RGB wallet references', () => {
     expect(result.list).toEqual([expect.objectContaining({ id: 'remote-page-two' })])
   })
 
-  it('excludes locally locked RGB UTXOs from the asset list spendable balance', async () => {
+  it('does not subtract active RGB send locks twice in the asset list', async () => {
     const wallet = new WalletController()
     const service = {
       getPendingTransfers: vi.fn(() => [
@@ -2934,7 +2934,13 @@ describe('RGB wallet references', () => {
           {
             outpoint: { txid: 'a'.repeat(64), vout: 0 },
             allocations: [
-              { assetId: 'rgb:asset', amount: '10', settled: true, spendable: true },
+              { assetId: 'rgb:asset', amount: '2', settled: true, spendable: true },
+            ],
+          },
+          {
+            outpoint: { txid: 'b'.repeat(64), vout: 0 },
+            allocations: [
+              { assetId: 'rgb:asset', amount: '8', settled: true, spendable: true },
             ],
           },
         ],
@@ -2947,15 +2953,15 @@ describe('RGB wallet references', () => {
       currentPage: 1,
       pageSize: 20,
       total: 1,
-      list: [{ assetId: 'rgb:asset', spendable: '10' }],
+      list: [{ assetId: 'rgb:asset', spendable: '8', lockedAmount: '2' }],
     })
 
     const result = await wallet.getRGBList('', 1, 20, { skipSync: true })
 
-    expect(result.list).toEqual([{ assetId: 'rgb:asset', spendable: '0', lockedAmount: '10' }])
+    expect(result.list).toEqual([{ assetId: 'rgb:asset', spendable: '8', lockedAmount: '2' }])
   })
 
-  it('keeps a broadcast RGB transfer locked until the snapshot reflects its change allocation', async () => {
+  it('does not subtract a still-active broadcast RGB send lock twice', async () => {
     const wallet = new WalletController()
     const service = {
       getPendingTransfers: vi.fn(() => [
@@ -2965,12 +2971,24 @@ describe('RGB wallet references', () => {
           prepared: { lockedOutpoints: [{ txid: 'a'.repeat(64), vout: 0 }] },
         },
       ]),
+      getPendingSendHistory: vi.fn(() => [
+        {
+          assetId: 'rgb:asset', status: 'broadcasted',
+          spentOutpoints: [{ txid: 'a'.repeat(64), vout: 0 }],
+        },
+      ]),
       getSnapshot: vi.fn(() => ({
         utxos: [
           {
             outpoint: { txid: 'a'.repeat(64), vout: 0 },
             allocations: [
-              { assetId: 'rgb:asset', amount: '10', settled: true, spendable: true },
+              { assetId: 'rgb:asset', amount: '2', settled: true, spendable: true },
+            ],
+          },
+          {
+            outpoint: { txid: 'b'.repeat(64), vout: 0 },
+            allocations: [
+              { assetId: 'rgb:asset', amount: '8', settled: true, spendable: true },
             ],
           },
         ],
@@ -2979,12 +2997,14 @@ describe('RGB wallet references', () => {
     vi.spyOn(wallet as any, 'getLocalRgbService').mockResolvedValue({ service })
     vi.spyOn(wallet as any, 'getLocalRgbReadService').mockResolvedValue({ service })
     vi.spyOn(wallet, 'getRgbFundingAddress').mockResolvedValue({ address: 'bc1p-rgb-funding' })
-    vi.spyOn(wallet, 'getRgbAssetBalance').mockResolvedValue({ assetId: 'rgb:asset', spendable: '10' })
+    vi.spyOn(wallet, 'getRgbAssetBalance').mockResolvedValue({
+      assetId: 'rgb:asset', spendable: '8', lockedAmount: '2',
+    })
 
     await expect(wallet.getRGBAssetBalance('', 'rgb:asset')).resolves.toEqual({
       assetId: 'rgb:asset',
-      spendable: '0',
-      lockedAmount: '10',
+      spendable: '8',
+      lockedAmount: '2',
     })
   })
 

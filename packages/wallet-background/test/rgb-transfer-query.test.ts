@@ -4,6 +4,40 @@ import { toRgbDisplayAmount } from '@unisat/wallet-shared'
 import { RgbTransferQuery } from '../src/rgb/RgbTransferQuery'
 
 describe('RgbTransferQuery', () => {
+  it('reports the full reserved allocation for a smaller pending send', async () => {
+    const txid = 'a'.repeat(64)
+    const service = {
+      getPendingTransfers: vi.fn().mockReturnValue([{
+        id: 'send-1', request: { assetId: 'rgb:asset', amount: '1', precision: 0 },
+        prepared: { lockedOutpoints: [{ txid, vout: 2 }] },
+        delivery: { acknowledgedAt: 2, completed: { txid: 'b'.repeat(64) } },
+        createdAt: 1,
+      }]),
+      getSnapshot: vi.fn().mockReturnValue({ utxos: [{
+        outpoint: { txid, vout: 2 }, chainStatus: 'confirmed',
+        allocations: [{ assetId: 'rgb:asset', amount: '2', settled: true, spendable: true }],
+      }] }),
+      getPendingSendHistory: vi.fn().mockReturnValue([]),
+      getIssueHistory: vi.fn().mockReturnValue([]),
+      getPendingReceiveHistory: vi.fn().mockReturnValue([]),
+      getPendingReceives: vi.fn().mockReturnValue([]),
+      getLocalAssetDetail: vi.fn().mockReturnValue({ name: 'Token', ticker: 'TKN' }),
+    }
+    const context = { service, wallet: { walletId: 'wallet', fundingAddress: 'funding', network: 'mainnet' } }
+    const query = new RgbTransferQuery({
+      getContext: vi.fn().mockResolvedValue(context as never),
+      syncReceiveHistory: vi.fn(), syncPendingTransfers: vi.fn(),
+      syncReceivedAllocations: vi.fn().mockResolvedValue(context as never),
+      getRemoteActivity: vi.fn().mockResolvedValue({ total: 0, list: [] }),
+      warn: vi.fn(),
+    })
+
+    const result = await query.getTransfers(1, 20, { skipSync: true })
+    expect(result.list).toEqual([expect.objectContaining({
+      id: 'local-send:send-1', status: 'ready_to_broadcast', amount: '1', lockedAmount: '2',
+    })])
+  })
+
   it('uses the issuance order transaction for an issue activity link', async () => {
     const anchorTxid = 'a'.repeat(64)
     const issuanceTxid = 'b'.repeat(64)

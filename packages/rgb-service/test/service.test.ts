@@ -138,6 +138,24 @@ function createDependencies(): RgbServiceDependencies {
 }
 
 describe('RgbService', () => {
+  it('reports an active send lock separately from settled and available amounts', async () => {
+    const service = new RgbService(createDependencies())
+    await service.open(wallet)
+    await service.sync()
+    const state = (service as any).state
+    const assetId = state.snapshot.utxos[0].allocations[0].assetId
+    const lockedOutpoint = state.snapshot.utxos[0].outpoint
+    state.pending['waiting-for-ack'] = {
+      request: { assetId, amount: '20' },
+      prepared: { lockedOutpoints: [lockedOutpoint] },
+      createdAt: 1,
+    }
+
+    expect(service.getLocalAssetBalance(assetId)).toMatchObject({
+      settled: '100', spendable: '60', pending: '0', lockedAmount: '40',
+    })
+  })
+
   it('shows unconfirmed BFA burn change as locked until it settles', async () => {
     const dependencies = createDependencies()
     const service = new RgbService(dependencies)

@@ -155,35 +155,32 @@ export class RgbWalletCoordinator {
     const snapshot = service.getSnapshot?.()
     if (!snapshot) return new Map<string, bigint>()
     const lockedAmounts = new Map<string, bigint>()
-    const lockedTransfers = [
-      ...(service.getPendingTransfers?.() || []).map(pending => ({
-        assetId: pending.request.assetId,
-        lockedOutpoints: pending.prepared.lockedOutpoints,
-      })),
-      ...(service.getPendingSendHistory?.() || [])
-        .filter(item => item.status === 'broadcasted')
-        .map(item => ({
-          assetId: item.assetId,
-          lockedOutpoints: item.spentOutpoints || [],
-        })),
-    ]
-    for (const transfer of lockedTransfers) {
-      const lockedOutpoints = new Set(
-        transfer.lockedOutpoints.map(outpoint => `${outpoint.txid}:${outpoint.vout}`)
-      )
-      for (const utxo of snapshot.utxos) {
-        if (!lockedOutpoints.has(`${utxo.outpoint.txid}:${utxo.outpoint.vout}`)) continue
-        for (const allocation of utxo.allocations) {
-          if (
-            allocation.assetId !== transfer.assetId ||
-            !allocation.settled ||
-            !allocation.spendable
-          ) {
-            continue
-          }
-          const current = lockedAmounts.get(allocation.assetId) ?? 0n
-          lockedAmounts.set(allocation.assetId, current + BigInt(allocation.amount))
-        }
+    // Active pending sends are already excluded from the service's spendable
+    // balance and included in its lockedAmount. Only compacted broadcast
+    // history needs an additional lock in the wallet-facing balance.
+    const activeOutpoints = new Set(
+      (service.getPendingTransfers?.() || [])
+        .flatMap(pending => pending.prepared.lockedOutpoints)
+        .map(outpoint => `${outpoint.txid}:${outpoint.vout}`)
+    )
+    const historyOutpoints = new Map<string, Set<string>>()
+    for (const send of service.getPendingSendHistory?.() || []) {
+      if (send.status !== 'broadcasted') continue
+      const outpoints = historyOutpoints.get(send.assetId) || new Set<string>()
+      for (const outpoint of send.spentOutpoints || []) {
+        const key = `${outpoint.txid}:${outpoint.vout}`
+        if (!activeOutpoints.has(key)) outpoints.add(key)
+      }
+      historyOutpoints.set(send.assetId, outpoints)
+    }
+    if (![...historyOutpoints.values()].some(outpoints => outpoints.size > 0)) return lockedAmounts
+    for (const utxo of snapshot.utxos) {
+      const key = `${utxo.outpoint.txid}:${utxo.outpoint.vout}`
+      for (const allocation of utxo.allocations) {
+        if (!historyOutpoints.get(allocation.assetId)?.has(key) ||
+          !allocation.settled || !allocation.spendable) continue
+        const current = lockedAmounts.get(allocation.assetId) ?? 0n
+        lockedAmounts.set(allocation.assetId, current + BigInt(allocation.amount))
       }
     }
     return lockedAmounts

@@ -40,6 +40,7 @@ function toTransferItem(
     rejectionReason: item.rejectionReason,
     canReject: item.canReject,
     amount: item.amount,
+    lockedAmount: item.lockedAmount,
     txid: item.txid,
     timestamp: getActivityTimestamp(item)
   };
