@@ -2120,21 +2120,25 @@ export class RgbService {
   private async removePendingReceiveOnce(recipientId: string) {
     const state = this.requireState()
     const receives = state.pendingReceives || []
-    const index = receives.findIndex(item => item.recipientId === recipientId)
+    const index = receives.findIndex(
+      item => item.proxyRecipientId === recipientId || item.recipientId === recipientId
+    )
     if (index < 0) return { cancelled: false }
+    const removed = receives[index]
+    if (!removed) return { cancelled: false }
     // Acceptance ACKs the consignment and allows the sender to broadcast. The
     // local record is then the durable receipt needed to settle the allocation,
     // so it cannot be released as an unused invoice.
     if (
-      receives[index]!.receivedConsignment?.accepted ||
-      receives[index]!.receivedConsignment?.acknowledgementPending ||
-      receives[index]!.pendingAccept
+      removed.receivedConsignment?.accepted ||
+      removed.receivedConsignment?.acknowledgementPending ||
+      removed.pendingAccept
     ) {
       return { cancelled: false }
     }
     const rollback = snapshotState(state)
     receives.splice(index, 1)
-    this.recordReleasedReceiveRecipient(recipientId)
+    this.recordReleasedReceiveRecipient(removed.proxyRecipientId ?? removed.recipientId)
     // Releasing a blind seal or deleting a witness invoice changes durable
     // wallet state. Do not report it as removed until its checkpoint is safely
     // published; otherwise another device can restore the stale invoice.

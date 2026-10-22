@@ -668,6 +668,38 @@ describe('RgbService', () => {
     })
   })
 
+  it('deletes the selected witness invoice when multiple invoices share a beneficiary', async () => {
+    const dependencies = createDependencies()
+    const service = new RgbService(dependencies)
+    await service.open(wallet)
+    ;(service as any).state.pendingReceives = [
+      {
+        invoice: 'rgb:witness:first',
+        recipientId: 'shared-witness-recipient',
+        proxyRecipientId: 'proxy-witness-first',
+        recipientType: 'witness',
+        createdAt: 1,
+      },
+      {
+        invoice: 'rgb:witness:second',
+        recipientId: 'shared-witness-recipient',
+        proxyRecipientId: 'proxy-witness-second',
+        recipientType: 'witness',
+        createdAt: 2,
+      },
+    ]
+
+    await expect(service.removePendingReceive('proxy-witness-second')).resolves.toEqual({
+      cancelled: true,
+    })
+    expect(service.getPendingReceives()).toEqual([
+      expect.objectContaining({ proxyRecipientId: 'proxy-witness-first' }),
+    ])
+    expect(service.exportRecoveryState()).toMatchObject({
+      releasedReceiveRecipientIds: ['proxy-witness-second'],
+    })
+  })
+
   it('records a terminal receive tombstone after settlement is abandoned', async () => {
     const dependencies = createDependencies()
     const service = new RgbService(dependencies)

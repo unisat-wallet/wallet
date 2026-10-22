@@ -104,7 +104,9 @@ export class RgbReceiveOperations {
     if (!pending) return { changed: false }
     await this.dependencies.ensureWriteLease?.(context)
     await this.dependencies.assertContext?.(context)
-    const result = await service.removePendingReceive(pending.recipientId)
+    const result = await service.removePendingReceive(
+      pending.proxyRecipientId ?? pending.recipientId
+    )
     return { changed: result.cancelled }
   }
 
