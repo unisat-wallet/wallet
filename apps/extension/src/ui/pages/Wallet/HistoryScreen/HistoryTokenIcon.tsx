@@ -37,9 +37,10 @@ export function HistoryTokenIcon({ asset, className, fallback }: {
   const brc20 = useBRC20IconInfo(asset.symbol);
   const runes = useRunesIconInfo(runeName);
   const alkanes = useAlkanesIconInfo(name, asset.assetId || '');
-  const url = asset.kind === 'brc20' ? brc20.iconUrl
+  const derivedUrl = asset.kind === 'brc20' ? brc20.iconUrl
     : asset.kind === 'runes' && runeName && chain.iconBaseUrl ? runes.iconUrl
     : asset.kind === 'alkanes' && asset.assetId ? alkanes.iconUrl : '';
+  const url = asset.logo || derivedUrl;
   const [failedUrl, setFailedUrl] = useState<string>();
 
   if (!url || failedUrl === url) return <>{fallback}</>;

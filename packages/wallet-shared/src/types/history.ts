@@ -39,6 +39,7 @@ export interface AddressHistoryAssetItem {
   amount: string
   assetId?: string
   displayName?: string
+  logo?: string
 }
 
 export interface AddressHistorySummaryItem {
