@@ -8,6 +8,7 @@ import {
   Content,
   Header,
   Icon,
+  Image,
   Layout,
   RGBAssetIcon,
   Row,
@@ -32,11 +33,11 @@ import { useRgbWriteLeaseGuard } from './components/useRgbWriteLeaseGuard';
 const INVOICE_LINE_HEIGHT = 22;
 const INVOICE_MIN_HEIGHT = INVOICE_LINE_HEIGHT * 3;
 const BURN_NETWORKS = [
-  { id: 42161, name: 'Arbitrum One' },
-  { id: 1, name: 'Ethereum' },
-  { id: 137, name: 'Polygon PoS' },
-  { id: 9745, name: 'Plasma' },
-  { id: 728126428, name: 'Tron' }
+  { id: 42161, name: 'Arbitrum One', icon: './images/icons/artifacts/arbitrum-one.svg' },
+  { id: 1, name: 'Ethereum', icon: './images/icons/artifacts/ethereum.svg' },
+  { id: 137, name: 'Polygon PoS', icon: './images/icons/artifacts/polygon.svg' },
+  { id: 9745, name: 'Plasma', icon: './images/icons/artifacts/plasma.svg' },
+  { id: 728126428, name: 'Tron', icon: './images/icons/artifacts/tron.svg' }
 ] as const;
 const RGB_ACCENT_GOLD = '#F4B62C';
 
@@ -126,6 +127,7 @@ export default function SendRGBScreen() {
   const [showBurnPopover, setShowBurnPopover] = useState(false);
   const [burnNetworkSelectorOpen, setBurnNetworkSelectorOpen] = useState(false);
   const [understandBurn, setUnderstandBurn] = useState(false);
+  const selectedBurnNetwork = BURN_NETWORKS.find(network => network.id === burnDestinationChainId);
   const closeDonationPopover = () => {
     setShowDonationPopover(false);
     setUnderstandDonation(false);
@@ -226,6 +228,7 @@ export default function SendRGBScreen() {
 
           {burn ? (
             <Column gap="md">
+              <Text text={t('rgb_burn_network')} size="sm" />
               <Row
                 fullX
                 itemsCenter
@@ -233,11 +236,16 @@ export default function SendRGBScreen() {
                 onClick={() => setBurnNetworkSelectorOpen(true)}
                 style={burnNetworkSelectorStyle}
                 data-testid="rgb-burn-network-select">
-                <Column style={{ gap: 6 }}>
-                  <Text text={t('rgb_burn_network')} size="xs" color="textDim" />
-                  <Text text={BURN_NETWORKS.find(network => network.id === burnDestinationChainId)?.name || ''}
-                    size="sm" color="white" />
-                </Column>
+                <Row itemsCenter gap="md">
+                  {selectedBurnNetwork ? (
+                    <Image
+                      src={selectedBurnNetwork.icon}
+                      size={32}
+                      style={{ flexShrink: 0, objectFit: 'contain' }}
+                    />
+                  ) : null}
+                  <Text text={selectedBurnNetwork?.name || ''} size="sm" color="white" />
+                </Row>
                 <Icon icon="right" size={20} style={{ backgroundColor: 'rgba(255, 255, 255, 0.65)' }} />
               </Row>
               <Text text={t(burnDestinationChainId === 42161 ? 'rgb_burn_reason' : 'rgb_burn_recipient_address')} size="sm" />
@@ -247,7 +255,15 @@ export default function SendRGBScreen() {
                 placeholder={t(burnDestinationChainId === 728126428 ? 'rgb_burn_tron_placeholder' : 'rgb_burn_reason_placeholder')}
                 maxLength={44}
                 spellCheck={false}
-                style={{ ...invoiceBoxStyle, width: '100%', color: '#fff', outline: 'none' }}
+                style={{
+                  ...invoiceBoxStyle,
+                  width: '100%',
+                  color: '#fff',
+                  outline: 'none',
+                  fontFamily: 'inherit',
+                  fontSize: 14,
+                  lineHeight: `${INVOICE_LINE_HEIGHT}px`
+                }}
                 data-testid="rgb-burn-reason-input"
               />
               {burnReason && (burnDestinationChainId === 728126428
@@ -384,8 +400,10 @@ export default function SendRGBScreen() {
               <Text text={burnDestinationChainId === 42161
                 ? t('rgb_burn_description')
                 : t('rgb_burn_destination_v1_description')} mt="md" wrap />
-              <Text text={BURN_NETWORKS.find(network => network.id === burnDestinationChainId)?.name || ''}
-                size="sm" color="gold" />
+              <Row itemsCenter gap="sm">
+                {selectedBurnNetwork ? <Image src={selectedBurnNetwork.icon} size={24} /> : null}
+                <Text text={selectedBurnNetwork?.name || ''} size="sm" color="gold" />
+              </Row>
               <Text text={burnReason} size="xs" color="gold" wrap style={{ overflowWrap: 'anywhere' }} />
               <Row justifyCenter mt="md">
                 <Checkbox checked={understandBurn} onChange={(event) => setUnderstandBurn(event.target.checked)}>
@@ -432,7 +450,10 @@ export default function SendRGBScreen() {
                       border: selected ? `1px solid ${RGB_ACCENT_GOLD}` : burnNetworkSelectorStyle.border,
                       background: selected ? 'rgba(244,182,44,0.08)' : burnNetworkSelectorStyle.background
                     }}>
-                    <Text text={network.name} size="sm" color={selected ? 'gold' : 'white'} />
+                    <Row itemsCenter gap="md">
+                      <Image src={network.icon} size={32} style={{ flexShrink: 0, objectFit: 'contain' }} />
+                      <Text text={network.name} size="sm" color={selected ? 'gold' : 'white'} />
+                    </Row>
                     {selected ? <Icon icon="checked" color="gold" size={20} /> : null}
                   </Row>
                 );
