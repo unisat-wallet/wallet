@@ -108,6 +108,8 @@ function HistoryRow({ item, onClick }: { item: AddressHistorySummaryItem; onClic
   if (!primary) return null;
   const directionLabel = getHistoryTitle(item, primary.sign === '+', t);
   const { label: assetCategory, tone } = getHistoryAssetCategory(primary.asset.kind, chain.unit, t);
+  const counterpartyAddress = item.direction === 'receive' ? item.fromAddress : item.toAddress;
+  const counterpartyLabel = item.direction === 'receive' ? t('from') : t('to');
 
   return (
     <button type="button" className={styles.historyRow} onClick={onClick} data-testid={`history-${item.txid}`}>
@@ -119,9 +121,9 @@ function HistoryRow({ item, onClick }: { item: AddressHistorySummaryItem; onClic
             <span className={`${styles.assetCategoryTag} ${assetCategoryToneClass[tone]}`}>{assetCategory}</span>
             {item.status === 'pending' ? <span className={styles.rowPending}> · {t('history_pending')}</span> : null}
           </span>
-          {item.toAddress && !item.display?.hideCounterparty && (
-            <span className={styles.rowSubtitle} title={item.toAddress}>
-              {t('to')}: {shortAddress(item.toAddress, 5)}
+          {counterpartyAddress && !item.display?.hideCounterparty && (
+            <span className={styles.rowSubtitle} title={counterpartyAddress}>
+              {counterpartyLabel}: {shortAddress(counterpartyAddress, 5)}
             </span>
           )}
         </span>

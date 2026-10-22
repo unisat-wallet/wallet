@@ -92,8 +92,8 @@ export function HistoryDetailSheet({ summary, onClose }: { summary: AddressHisto
   const counterparty = isSelfTransfer
     ? address
     : isReceive
-    ? detail?.inputs.find((input) => !input.isMine)?.address || detail?.inputs[0]?.address
-    : (externalOutputAddresses.length === 1 ? externalOutputAddresses[0] : undefined) || summary.toAddress;
+    ? resolvedSummary.fromAddress || detail?.inputs.find((input) => !input.isMine)?.address || detail?.inputs[0]?.address
+    : (externalOutputAddresses.length === 1 ? externalOutputAddresses[0] : undefined) || resolvedSummary.toAddress;
   const fee = detail?.fee ?? (resolvedSummary.feeSatoshis / 100_000_000).toFixed(8);
   const coinUnit = chain.unit;
   const assetLabel = isCoin

@@ -61,6 +61,8 @@ export interface AddressHistorySummaryItem {
   }
   /** Unique destination from the history API, when available. */
   toAddress?: string
+  /** Source for a receive only when every transaction input resolves to the same address. */
+  fromAddress?: string
   feeSatoshis: number
   received: AddressHistoryAssetItem[]
   sent: AddressHistoryAssetItem[]
