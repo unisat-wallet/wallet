@@ -15,7 +15,12 @@ import { useChain, useChainType, useCurrentAddress, useI18n, useNavigation, useW
 import { HistoryDetailSheet } from './HistoryDetailSheet';
 import { HistoryTokenIcon } from './HistoryTokenIcon';
 import styles from './history.module.less';
-import { getHistoryAssetChanges, getHistoryDate, type HistoryAssetChange } from './historyAssetView';
+import {
+  getHistoryAssetChanges,
+  getHistoryDate,
+  getHistoryTitleKey,
+  type HistoryAssetChange
+} from './historyAssetView';
 
 const PREVIEW_LIMIT = 10;
 const PAGE_SIZE = 20;
@@ -95,13 +100,7 @@ function HistoryRow({ item, onClick }: { item: AddressHistorySummaryItem; onClic
   const { changes, total } = getHistoryAssetChanges(item);
   const primary = changes[0];
   if (!primary) return null;
-  const directionLabel = isSelfTransfer
-    ? t('self_transfer')
-    : item.direction === 'mixed'
-    ? t('mixed')
-    : primary.sign === '+'
-    ? t('receive')
-    : t('send');
+  const directionLabel = t(getHistoryTitleKey(item, primary.sign === '+'));
   const { label: assetCategory, tone } = getHistoryAssetCategory(primary.asset.kind, chain.unit, t);
 
   return (

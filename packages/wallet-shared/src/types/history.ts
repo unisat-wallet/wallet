@@ -41,6 +41,8 @@ export interface AddressHistoryAssetItem {
   displayName?: string
 }
 
+export type AddressHistoryOperation = 'inscribe-transfer'
+
 export interface AddressHistorySummaryItem {
   txid: string
   timestamp: number
@@ -48,6 +50,8 @@ export interface AddressHistorySummaryItem {
   confirmations: number
   status: 'pending' | 'confirmed'
   direction: 'receive' | 'send' | 'mixed' | 'self'
+  /** Protocol operation to prefer over the generic asset direction as a display label. */
+  operation?: AddressHistoryOperation
   /** Unique destination from the history API, when available. */
   toAddress?: string
   feeSatoshis: number

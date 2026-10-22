@@ -9,7 +9,7 @@ import type { AddressHistorySummaryItem, AddressHistoryTxDetail, Inscription } f
 import { useChain, useCurrentAddress, useI18n, useNavigation, useWallet } from '@unisat/wallet-state';
 
 import styles from './history.module.less';
-import { getHistoryAssetChanges } from './historyAssetView';
+import { getHistoryAssetChanges, getHistoryTitleKey } from './historyAssetView';
 import { HistoryTokenIcon } from './HistoryTokenIcon';
 
 function formatHistoryDateTime(timestamp: number) {
@@ -82,6 +82,10 @@ export function HistoryDetailSheet({ summary, onClose }: { summary: AddressHisto
 
   const isReceive = primary?.sign === '+';
   const isSelfTransfer = resolvedSummary.direction === 'self';
+  const titleSummary = {
+    direction: resolvedSummary.direction,
+    operation: resolvedSummary.operation || summary.operation
+  };
   const isCoin = primary?.asset.kind === 'coin';
   const externalOutputAddresses = [...new Set(detail?.outputs.map((output) => output.address).filter((value) => value && value !== address) || [])];
   const counterparty = isSelfTransfer
@@ -100,7 +104,7 @@ export function HistoryDetailSheet({ summary, onClose }: { summary: AddressHisto
     <BottomModal onClose={onClose} bodyStyle={{ padding: 0 }} borderRadius="20px 20px 0 0">
       <div className={styles.detailSheet}>
         <BottomSheetHeader
-          title={t(isSelfTransfer ? 'self_transfer' : isReceive ? 'receive' : 'send')}
+          title={t(getHistoryTitleKey(titleSummary, isReceive))}
           onClose={onClose}
           height={60}
           inset={16}
