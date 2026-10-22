@@ -127,9 +127,11 @@ function HistoryRow({ item, onClick }: { item: AddressHistorySummaryItem; onClic
           </span>
         ) : (
           <>
-            <HistoryChange change={primary} />
-            {changes[1] && <HistoryChange change={changes[1]} />}
-            {total > 2 && <span className={styles.moreCount}>{t('history_more_count', String(total - 2))}</span>}
+            {!item.display?.hideAmount && <HistoryChange change={primary} />}
+            {!item.display?.hideAmount && changes[1] && <HistoryChange change={changes[1]} />}
+            {!item.display?.hideAmount && total > 2 && (
+              <span className={styles.moreCount}>{t('history_more_count', String(total - 2))}</span>
+            )}
           </>
         )}
       </span>

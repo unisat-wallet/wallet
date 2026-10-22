@@ -82,10 +82,11 @@ export function HistoryDetailSheet({ summary, onClose }: { summary: AddressHisto
 
   const isReceive = resolvedSummary.direction === 'receive' || primary?.sign === '+';
   const isSelfTransfer = resolvedSummary.direction === 'self';
-  const titleSummary = {
-    direction: resolvedSummary.direction,
-    display: resolvedSummary.display || summary.display
-  };
+  const display = resolvedSummary.display
+    ? { ...summary.display, ...resolvedSummary.display }
+    : summary.display;
+  const titleSummary = { direction: resolvedSummary.direction, display };
+  const hideAmount = display?.hideAmount;
   const isCoin = primary?.asset.kind === 'coin';
   const externalOutputAddresses = [...new Set(detail?.outputs.map((output) => output.address).filter((value) => value && value !== address) || [])];
   const counterparty = isSelfTransfer
@@ -138,7 +139,11 @@ export function HistoryDetailSheet({ summary, onClose }: { summary: AddressHisto
                 </span>} /> : null
               )}
               <span>
-                {isSelfTransfer ? t('self_transfer') : `${primary?.sign || ''}${primary?.asset.amount || '0'} ${assetLabel}`}
+                {isSelfTransfer
+                  ? t('self_transfer')
+                  : hideAmount
+                  ? assetLabel
+                  : `${primary?.sign || ''}${primary?.asset.amount || '0'} ${assetLabel}`}
               </span>
             </div>
           )}

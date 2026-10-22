@@ -54,6 +54,7 @@ export interface AddressHistorySummaryItem {
   display?: {
     title: string
     balanceEffect?: 'increase' | 'decrease' | 'neutral'
+    hideAmount?: boolean
   }
   /** Unique destination from the history API, when available. */
   toAddress?: string

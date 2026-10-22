@@ -50,7 +50,7 @@ describe('getHistoryAssetChanges', () => {
     const result = getHistoryAssetChanges({
       ...base,
       direction: 'receive',
-      display: { title: 'Inscribe Transfer', balanceEffect: 'neutral' },
+      display: { title: 'Deploy', balanceEffect: 'neutral', hideAmount: true },
       received: [
         { kind: 'coin', symbol: 'BTC', amount: '0.0000033' },
         { kind: 'brc20', symbol: 'ORDI', amount: '10' },
