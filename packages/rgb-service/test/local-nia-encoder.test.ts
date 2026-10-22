@@ -10,6 +10,7 @@ import {
   localNiaProtocolEncoder,
   validateNiaConsignmentParentSpends,
 } from '../src'
+import { verifyRevealedNiaAllocations } from '../src/protocol/nia-allocation'
 
 const txid = '8d54c98d4c29a1ec4fd90635f543f0f7a871a78eb6a6e706342f831d92e3ba19'
 
@@ -268,6 +269,11 @@ describe('localNiaProtocolEncoder', () => {
       amount: 60n,
       seal: receiveSeal,
     })
+    expect(() => verifyRevealedNiaAllocations({
+      assetId: first.request.assetId,
+      consignments: [secondConsignment],
+      utxos: [receivedUtxo],
+    })).not.toThrow()
     expect(() => validateNiaConsignmentParentSpends(secondConsignment)).not.toThrow()
     if (!revealedParent || 'secretSeal' in revealedParent.seal)
       throw new Error('Expected the local blind parent seal to be revealed')

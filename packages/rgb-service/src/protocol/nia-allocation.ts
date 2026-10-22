@@ -35,14 +35,16 @@ export function verifyRevealedNiaAllocations(input: {
             })
             return
           }
-          if (assignment.seal.txid !== null) return
-          const output = bundle.outputs[assignment.seal.vout]
-          if (output)
-            transitions.set(`${transition.opId}:${assignmentIndex}`, {
-              assignment,
-              txid: bundle.txid,
-              output,
-            })
+          const txid = assignment.seal.txid ?? bundle.txid
+          // An explicit seal can point to another UTXO, whose output is not
+          // part of this witness bundle. Verify its outpoint and amount below.
+          const output = txid === bundle.txid ? bundle.outputs[assignment.seal.vout] : undefined
+          if (txid === bundle.txid && !output) return
+          transitions.set(`${transition.opId}:${assignmentIndex}`, {
+            assignment,
+            txid,
+            output,
+          })
         })
       }
     }
@@ -73,8 +75,51 @@ export function verifyRevealedNiaAllocations(input: {
       const revealed = transitions.get(
         `${allocation.opId.replace(/^rgb:/, '')}:${allocation.assignmentIndex}`
       )
-      if (!revealed)
+      if (!revealed) {
+        const parentOpId = allocation.opId.replace(/^rgb:/, '').toLowerCase()
+        const historyTransitions = input.consignments.flatMap(consignment =>
+          consignment.witnessBundles.flatMap(bundle =>
+            bundle.transitions.map(transition => ({ bundle, transition }))
+          )
+        )
+        console.warn('[RGB] Allocation parent Transition missing from local NIA history', {
+          assetId,
+          outpoint: `${utxo.outpoint.txid}:${utxo.outpoint.vout}`,
+          allocation: {
+            amount: allocation.amount,
+            opId: allocation.opId,
+            assignmentIndex: allocation.assignmentIndex,
+            assignmentType: allocation.assignmentType,
+          },
+          consignmentCount: input.consignments.length,
+          witnessBundleCount: input.consignments.reduce(
+            (count, consignment) => count + consignment.witnessBundles.length, 0
+          ),
+          transitionCount: historyTransitions.length,
+          matchingParentTransitions: historyTransitions
+            .filter(({ transition }) => transition.opId.toLowerCase() === parentOpId)
+            .map(({ bundle, transition }) => {
+              const assignment = transition.assignments[allocation.assignmentIndex!]
+              return {
+                bundleTxid: bundle.txid,
+                assignmentCount: transition.assignments.length,
+                assignmentSeal: assignment
+                  ? ('secretSeal' in assignment.seal ? 'blind' : 'revealed')
+                  : 'missing',
+                ...(
+                  assignment && !('secretSeal' in assignment.seal)
+                    ? {
+                        sealTxid: assignment.seal.txid,
+                        sealVout: assignment.seal.vout,
+                        bundleOutputAvailable: !!bundle.outputs[assignment.seal.vout],
+                      }
+                    : {}
+                ),
+              }
+            }),
+        })
         throw new RgbServiceError('RGB allocation parent Transition is missing from local history')
+      }
       if ('secretSeal' in revealed.assignment.seal) {
         const matchingSeal = (input.knownBlindSeals || []).find(
           seal =>
@@ -92,10 +137,11 @@ export function verifyRevealedNiaAllocations(input: {
           )
         }
       } else if (
-        !revealed.output ||
         utxo.outpoint.txid.toLowerCase() !== revealed.txid.toLowerCase() ||
         utxo.outpoint.vout !== revealed.assignment.seal.vout ||
-        utxo.scriptPubKey.toLowerCase() !== revealed.output.scriptPubKey.toLowerCase() ||
+        (revealed.assignment.seal.txid === null && !revealed.output) ||
+        (revealed.output &&
+          utxo.scriptPubKey.toLowerCase() !== revealed.output.scriptPubKey.toLowerCase()) ||
         BigInt(allocation.amount) !== revealed.assignment.amount
       ) {
         throw new RgbServiceError(
