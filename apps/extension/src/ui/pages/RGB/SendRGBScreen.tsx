@@ -38,7 +38,7 @@ const BURN_NETWORKS = [
   { id: 9745, name: 'Plasma' },
   { id: 728126428, name: 'Tron' }
 ] as const;
-const BURN_NETWORK_GOLD = '#F4B62C';
+const RGB_ACCENT_GOLD = '#F4B62C';
 
 const burnNetworkSelectorStyle = {
   width: '100%',
@@ -266,14 +266,58 @@ export default function SendRGBScreen() {
           </Column>
 
           {!burn && invoiceReadyForAmount ? (
-            <Checkbox
-              checked={donation}
-              onChange={(event) => {
-                if (event.target.checked) setShowDonationPopover(true);
-                else setDonation(false);
+            <button
+              type="button"
+              aria-pressed={donation}
+              data-testid="rgb-donation-send-toggle"
+              onClick={() => {
+                if (donation) setDonation(false);
+                else setShowDonationPopover(true);
+              }}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                gap: 16,
+                width: '100%',
+                minHeight: 72,
+                padding: '12px 14px',
+                border: `1px solid ${donation ? 'rgba(244,182,44,0.5)' : 'rgba(255,255,255,0.12)'}`,
+                borderRadius: 12,
+                background: donation ? 'rgba(244,182,44,0.08)' : 'rgba(255,255,255,0.04)',
+                color: 'inherit',
+                textAlign: 'left',
+                cursor: 'pointer'
               }}>
-              <Text text={t('rgb_donation_send')} size="sm" />
-            </Checkbox>
+              <Column gap="xs" style={{ minWidth: 0 }}>
+                <Text text={t('rgb_donation_send')} size="sm" preset="bold" />
+                <Text text={t('rgb_donation_send_hint')} size="xs" color="textDim" wrap />
+              </Column>
+              <span
+                aria-hidden="true"
+                style={{
+                  width: 38,
+                  height: 22,
+                  borderRadius: 11,
+                  flexShrink: 0,
+                  padding: 2,
+                  boxSizing: 'border-box',
+                  background: donation ? RGB_ACCENT_GOLD : 'rgba(255,255,255,0.25)',
+                  transition: 'background 150ms ease'
+                }}>
+                <span
+                  style={{
+                    display: 'block',
+                    width: 18,
+                    height: 18,
+                    borderRadius: '50%',
+                    background: '#fff',
+                    transform: donation ? 'translateX(16px)' : undefined,
+                    transition: 'transform 150ms ease'
+                  }}
+                />
+              </span>
+            </button>
           ) : null}
 
           {error ? <Text text={error} color="error" wrap /> : null}
@@ -299,24 +343,23 @@ export default function SendRGBScreen() {
       ) : null}
       {showDonationPopover ? (
         <Popover onClose={closeDonationPopover}>
-          <Column justifyCenter itemsCenter>
-            <Row itemsCenter>
-              <Icon icon="alert" color="yellow" size={16} />
-              <Text text={t('rgb_donation_send')} preset="title" />
+          <Column gap="md" fullX>
+            <Row itemsCenter gap="sm" style={{ paddingRight: 22 }}>
+              <Icon icon="warning" color="warning" size={20} />
+              <Text text={t('rgb_donation_send')} preset="bold" size="md" wrap />
             </Row>
             <Line />
-            <Column gap="md" fullX mb="md">
-              <Text text={t('rgb_donation_send_description')} mt="md" wrap />
-              <Row justifyCenter mt="md">
-                <Checkbox checked={understandDonation} onChange={(event) => setUnderstandDonation(event.target.checked)}>
-                  <Text text={t('i_understand')} preset="sub" />
-                </Checkbox>
-              </Row>
-            </Column>
+            <Text text={t('rgb_donation_send_description')} size="sm" color="textDim" wrap />
+            <Checkbox
+              checked={understandDonation}
+              onChange={(event) => setUnderstandDonation(event.target.checked)}
+              style={{ alignItems: 'flex-start', margin: '4px 0 12px' }}>
+              <Text text={t('rgb_donation_send_ack')} size="xs" color="textDim" wrap />
+            </Checkbox>
             <Row full>
               <Button text={t('cancel')} preset="default" full onClick={closeDonationPopover} />
               <Button
-                text={t('confirm')}
+                text={t('rgb_donation_send_enable')}
                 preset="primaryV2"
                 disabled={!understandDonation}
                 full
@@ -386,7 +429,7 @@ export default function SendRGBScreen() {
                     }}
                     style={{
                       ...burnNetworkSelectorStyle,
-                      border: selected ? `1px solid ${BURN_NETWORK_GOLD}` : burnNetworkSelectorStyle.border,
+                      border: selected ? `1px solid ${RGB_ACCENT_GOLD}` : burnNetworkSelectorStyle.border,
                       background: selected ? 'rgba(244,182,44,0.08)' : burnNetworkSelectorStyle.background
                     }}>
                     <Text text={network.name} size="sm" color={selected ? 'gold' : 'white'} />

@@ -3588,6 +3588,9 @@
   "deleting_invoice": { "message": "Удаление инвойса…" },
   "delete_witness_invoice_confirm_title": { "message": "Удалить witness-инвойс?" },
   "use_this_invoice_to_receive_any_rgb_asset": { "message": "Используйте этот инвойс для получения любого RGB-актива." },
-  "rgb_donation_send": { "message": "Отправить без ожидания подтверждения" },
-  "rgb_donation_send_description": { "message": "Транзакция публикуется после загрузки RGB-перевода. Получатель не может её остановить; Bitcoin-транзакция может подтвердиться, даже если актив не удастся принять." }
+  "rgb_donation_send": { "message": "Трансляция до принятия" },
+  "rgb_donation_send_hint": { "message": "Отправка без ожидания подтверждения RGB-перевода получателем." },
+  "rgb_donation_send_description": { "message": "Сначала доставляется RGB-перевод, затем Bitcoin-транзакция транслируется без ожидания принятия получателем. Получатель может отклонить RGB-перевод, но подтверждённую Bitcoin-транзакцию отменить нельзя." },
+  "rgb_donation_send_ack": { "message": "Я понимаю, что отказ получателя не остановит Bitcoin-транзакцию." },
+  "rgb_donation_send_enable": { "message": "Включить" }
 }

@@ -3594,6 +3594,9 @@
   "deleting_invoice": { "message": "Invoiceを削除中…" },
   "delete_witness_invoice_confirm_title": { "message": "Witness Invoiceを削除しますか？" },
   "use_this_invoice_to_receive_any_rgb_asset": { "message": "このInvoiceを使用して任意のRGB資産を受け取ります。" },
-  "rgb_donation_send": { "message": "受取人の承認を待たずに送信" },
-  "rgb_donation_send_description": { "message": "RGB転送をアップロード後にブロードキャストします。受取人は停止できず、資産を受け取れなくてもBitcoin取引が承認される場合があります。" }
+  "rgb_donation_send": { "message": "受取人の承認前にブロードキャスト" },
+  "rgb_donation_send_hint": { "message": "受取人によるRGB転送の承認を待たずに送信します。" },
+  "rgb_donation_send_description": { "message": "先にRGB転送を届け、その後、受取人の承認を待たずにBitcoin取引をブロードキャストします。受取人はRGB転送を拒否できますが、承認済みのBitcoin取引は取り消せません。" },
+  "rgb_donation_send_ack": { "message": "受取人が拒否してもBitcoin取引は停止されないことを理解しました。" },
+  "rgb_donation_send_enable": { "message": "有効にする" }
 }
