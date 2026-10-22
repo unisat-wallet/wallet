@@ -17,10 +17,10 @@ import {
   TransferAmountSection
 } from '@/ui/components';
 import { BottomModal } from '@/ui/components/BottomModal';
-import { Spin } from '@/ui/components/Spin';
+import { FeeRateBar } from '@/ui/components/FeeRateBar';
 import { Line } from '@/ui/components/Line';
 import { Popover } from '@/ui/components/Popover';
-import { FeeRateBar } from '@/ui/components/FeeRateBar';
+import { Spin } from '@/ui/components/Spin';
 import { sendInputContainerStyle } from '@/ui/components/TransferAmountCard';
 import { spacing } from '@/ui/theme/spacing';
 import { showLongNumber } from '@/ui/utils';
@@ -127,7 +127,7 @@ export default function SendRGBScreen() {
   const [showBurnPopover, setShowBurnPopover] = useState(false);
   const [burnNetworkSelectorOpen, setBurnNetworkSelectorOpen] = useState(false);
   const [understandBurn, setUnderstandBurn] = useState(false);
-  const selectedBurnNetwork = BURN_NETWORKS.find(network => network.id === burnDestinationChainId);
+  const selectedBurnNetwork = BURN_NETWORKS.find((network) => network.id === burnDestinationChainId);
   const closeDonationPopover = () => {
     setShowDonationPopover(false);
     setUnderstandDonation(false);
@@ -181,30 +181,32 @@ export default function SendRGBScreen() {
             <RGBAssetIcon assetId={assetId} iconInfo={iconInfo} ticker={ticker} name={name} size={68} />
           </Row>
 
-          {!burn ? <Column gap="md">
-            <Row>
-              <Text text={t('rgb_invoice')} />
-            </Row>
-            <div style={invoiceBoxStyle}>
-              <textarea
-                ref={invoiceRef}
-                value={invoice}
-                onChange={(e) => {
-                  onInvoiceChange(e.target.value);
-                  requestAnimationFrame(syncInvoiceHeight);
-                }}
-                placeholder={t('paste_rgb_invoice')}
-                autoFocus
-                rows={3}
-                spellCheck={false}
-                autoCorrect="off"
-                autoComplete="off"
-                style={invoiceFieldStyle}
-                data-testid="send-rgb-invoice-input"
-              />
-            </div>
-            {invoiceValidationMessage ? <Text text={invoiceValidationMessage} size="xs" color="danger" wrap /> : null}
-          </Column> : null}
+          {!burn ? (
+            <Column gap="md">
+              <Row>
+                <Text text={t('rgb_invoice')} />
+              </Row>
+              <div style={invoiceBoxStyle}>
+                <textarea
+                  ref={invoiceRef}
+                  value={invoice}
+                  onChange={(e) => {
+                    onInvoiceChange(e.target.value);
+                    requestAnimationFrame(syncInvoiceHeight);
+                  }}
+                  placeholder={t('paste_rgb_invoice')}
+                  autoFocus
+                  rows={3}
+                  spellCheck={false}
+                  autoCorrect="off"
+                  autoComplete="off"
+                  style={invoiceFieldStyle}
+                  data-testid="send-rgb-invoice-input"
+                />
+              </div>
+              {invoiceValidationMessage ? <Text text={invoiceValidationMessage} size="xs" color="danger" wrap /> : null}
+            </Column>
+          ) : null}
 
           {invoiceReadyForAmount ? (
             <TransferAmountSection title={burn ? t('rgb_burn_amount') : undefined}>
@@ -238,21 +240,23 @@ export default function SendRGBScreen() {
                 data-testid="rgb-burn-network-select">
                 <Row itemsCenter gap="md">
                   {selectedBurnNetwork ? (
-                    <Image
-                      src={selectedBurnNetwork.icon}
-                      size={32}
-                      style={{ flexShrink: 0, objectFit: 'contain' }}
-                    />
+                    <Image src={selectedBurnNetwork.icon} size={32} style={{ flexShrink: 0, objectFit: 'contain' }} />
                   ) : null}
                   <Text text={selectedBurnNetwork?.name || ''} size="sm" color="white" />
                 </Row>
                 <Icon icon="right" size={20} style={{ backgroundColor: 'rgba(255, 255, 255, 0.65)' }} />
               </Row>
-              <Text text={t(burnDestinationChainId === 42161 ? 'rgb_burn_reason' : 'rgb_burn_recipient_address')} size="sm" />
+              <Text
+                text={t(burnDestinationChainId === 42161 ? 'rgb_burn_reason' : 'rgb_burn_recipient_address')}
+                size="sm"
+                mt="md"
+              />
               <input
                 value={burnReason}
                 onChange={(event) => setBurnReason(event.target.value.trim())}
-                placeholder={t(burnDestinationChainId === 728126428 ? 'rgb_burn_tron_placeholder' : 'rgb_burn_reason_placeholder')}
+                placeholder={t(
+                  burnDestinationChainId === 728126428 ? 'rgb_burn_tron_placeholder' : 'rgb_burn_reason_placeholder'
+                )}
                 maxLength={44}
                 spellCheck={false}
                 style={{
@@ -266,13 +270,16 @@ export default function SendRGBScreen() {
                 }}
                 data-testid="rgb-burn-reason-input"
               />
-              {burnReason && (burnDestinationChainId === 728126428
-                ? !(/^T[1-9A-HJ-NP-Za-km-z]{33}$/.test(burnReason) ||
-                  /^(?:0x)?41[0-9a-f]{40}$/i.test(burnReason))
-                : !/^(?:0x)?[0-9a-f]{40}$/i.test(burnReason) ||
-                  /^0+$/.test(burnReason.replace(/^0x/i, ''))) ? (
-                <Text text={t(burnDestinationChainId === 728126428 ? 'rgb_burn_tron_invalid' : 'rgb_burn_reason_invalid')}
-                  size="xs" color="danger" wrap />
+              {burnReason &&
+              (burnDestinationChainId === 728126428
+                ? !(/^T[1-9A-HJ-NP-Za-km-z]{33}$/.test(burnReason) || /^(?:0x)?41[0-9a-f]{40}$/i.test(burnReason))
+                : !/^(?:0x)?[0-9a-f]{40}$/i.test(burnReason) || /^0+$/.test(burnReason.replace(/^0x/i, ''))) ? (
+                <Text
+                  text={t(burnDestinationChainId === 728126428 ? 'rgb_burn_tron_invalid' : 'rgb_burn_reason_invalid')}
+                  size="xs"
+                  color="danger"
+                  wrap
+                />
               ) : null}
             </Column>
           ) : null}
@@ -351,11 +358,7 @@ export default function SendRGBScreen() {
         </Column>
       </Content>
       {feePoolRequirement ? (
-        <RGBFeePoolInfoModal
-          requirement={feePoolRequirement}
-          onClose={dismissFeePoolRequirement}
-          t={t}
-        />
+        <RGBFeePoolInfoModal requirement={feePoolRequirement} onClose={dismissFeePoolRequirement} t={t} />
       ) : null}
       {showDonationPopover ? (
         <Popover onClose={closeDonationPopover}>
@@ -397,9 +400,15 @@ export default function SendRGBScreen() {
             </Row>
             <Line />
             <Column gap="md" fullX mb="md">
-              <Text text={burnDestinationChainId === 42161
-                ? t('rgb_burn_description')
-                : t('rgb_burn_destination_v1_description')} mt="md" wrap />
+              <Text
+                text={
+                  burnDestinationChainId === 42161
+                    ? t('rgb_burn_description')
+                    : t('rgb_burn_destination_v1_description')
+                }
+                mt="md"
+                wrap
+              />
               <Row itemsCenter gap="sm">
                 {selectedBurnNetwork ? <Image src={selectedBurnNetwork.icon} size={24} /> : null}
                 <Text text={selectedBurnNetwork?.name || ''} size="sm" color="gold" />
@@ -407,8 +416,11 @@ export default function SendRGBScreen() {
               <Text text={burnReason} size="xs" color="gold" wrap style={{ overflowWrap: 'anywhere' }} />
               <Row justifyCenter mt="md">
                 <Checkbox checked={understandBurn} onChange={(event) => setUnderstandBurn(event.target.checked)}>
-                  <Text text={t(burnDestinationChainId === 42161 ? 'rgb_burn_confirm' : 'rgb_burn_destination_v1_confirm')}
-                    preset="sub" wrap />
+                  <Text
+                    text={t(burnDestinationChainId === 42161 ? 'rgb_burn_confirm' : 'rgb_burn_destination_v1_confirm')}
+                    preset="sub"
+                    wrap
+                  />
                 </Checkbox>
               </Row>
             </Column>
@@ -433,7 +445,7 @@ export default function SendRGBScreen() {
           <Column fullX gap="zero">
             <BottomSheetHeader title={t('rgb_burn_network')} onClose={() => setBurnNetworkSelectorOpen(false)} />
             <Column gap="lg" fullX style={{ padding: '0 20px 24px', boxSizing: 'border-box' }}>
-              {BURN_NETWORKS.map(network => {
+              {BURN_NETWORKS.map((network) => {
                 const selected = network.id === burnDestinationChainId;
                 return (
                   <Row
