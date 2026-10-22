@@ -219,7 +219,7 @@ describe('RgbService', () => {
       rejectionReason: 'Rejected by you',
     })
 
-    expect(httpClient.post).toHaveBeenCalledWith('/v5/rgb/transfers/receive/outcome', {
+    expect(httpClient.post).toHaveBeenCalledWith('/v5/rgb/transfers/receive', {
       wallet: { fundingAddress: 'bc1p-funding' },
       transferId: 'receive:rejected-invoice',
       status: 'rejected',

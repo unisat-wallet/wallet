@@ -349,12 +349,7 @@ export class RgbService {
   }
 
   async syncRgbReceiveTransfer(params: RgbReceiveTransferSyncRequest): Promise<void> {
-    // Keep terminal outcomes on a new route. An older server must return 404
-    // and leave the local outbox intact rather than index a rejection as confirmed.
-    const path = params.status === 'rejected' || params.status === 'canceled'
-      ? '/v5/rgb/transfers/receive/outcome'
-      : '/v5/rgb/transfers/receive'
-    await this.privatePost(path, {
+    await this.privatePost('/v5/rgb/transfers/receive', {
       ...params,
       ...(params.assetId ? { assetId: normalizeRgbAssetId(params.assetId) } : {}),
     })
