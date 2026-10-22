@@ -92,6 +92,40 @@ describe('getHistoryAssetChanges', () => {
     })
   })
 
+  it('uses backend-resolved purchase changes instead of wallet net amounts', () => {
+    const inscription = {
+      kind: 'inscription' as const,
+      symbol: 'INSCRIPTION',
+      amount: '1',
+      assetId: 'purchase-i0',
+      displayName: '#4235841070',
+    }
+    const price = { kind: 'coin' as const, symbol: 'FB', amount: '0.1' }
+    const result = getHistoryAssetChanges({
+      ...base,
+      direction: 'mixed',
+      display: {
+        title: 'Buy',
+        assetChanges: [
+          { asset: inscription, sign: '+' },
+          { asset: price, sign: '-' },
+        ],
+      },
+      received: [inscription],
+      sent: [{ kind: 'coin', symbol: 'FB', amount: '0.10049454' }],
+      receivedCount: 1,
+      sentCount: 1,
+    })
+
+    expect(result).toEqual({
+      changes: [
+        { asset: inscription, sign: '+' },
+        { asset: price, sign: '-' },
+      ],
+      total: 2,
+    })
+  })
+
   it('keeps the full asset count when the API truncates its preview', () => {
     const result = getHistoryAssetChanges({
       ...base,

@@ -15,6 +15,13 @@ function isCarrierCoin(asset: AddressHistoryAssetItem, hasOtherAsset: boolean) {
 }
 
 export function getHistoryAssetChanges(item: AddressHistorySummaryItem) {
+  if (item.display?.assetChanges) {
+    return {
+      changes: item.display.assetChanges,
+      total: item.display.assetChanges.length,
+    }
+  }
+
   const visibleKinds = item.display?.visibleAssetKinds
   const isVisible = (asset: AddressHistoryAssetItem) => !visibleKinds || visibleKinds.includes(asset.kind)
   const receivedAssets = item.received.filter(isVisible)

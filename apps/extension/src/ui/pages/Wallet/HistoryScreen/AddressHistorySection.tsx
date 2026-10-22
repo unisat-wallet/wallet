@@ -109,8 +109,9 @@ function HistoryRow({ item, onClick }: { item: AddressHistorySummaryItem; onClic
   const directionLabel = getHistoryTitle(item, primary.sign === '+', t);
   const { label: assetCategory, tone } = getHistoryAssetCategory(primary.asset.kind, chain.unit, t);
   const fromAddress = (item as AddressHistorySummaryItem & { fromAddress?: string }).fromAddress;
-  const counterpartyAddress = item.direction === 'receive' ? fromAddress : item.toAddress;
-  const counterpartyLabel = item.direction === 'receive' ? t('from') : t('to');
+  const showsSource = item.direction === 'receive' || item.operation === 'buy';
+  const counterpartyAddress = showsSource ? fromAddress : item.toAddress;
+  const counterpartyLabel = showsSource ? t('from') : t('to');
 
   return (
     <button type="button" className={styles.historyRow} onClick={onClick} data-testid={`history-${item.txid}`}>
