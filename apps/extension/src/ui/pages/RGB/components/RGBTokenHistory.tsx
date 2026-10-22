@@ -37,6 +37,8 @@ function toTransferItem(
     precision: item.precision ?? fallbackPrecision,
     type,
     status: item.status,
+    rejectionReason: item.rejectionReason,
+    canReject: item.canReject,
     amount: item.amount,
     txid: item.txid,
     timestamp: getActivityTimestamp(item)

@@ -1537,7 +1537,7 @@ describe('RgbService', () => {
       .toThrow('is not known locally')
   })
 
-  it('archives an invalid receive when the proxy ACK is already immutable', async () => {
+  it('keeps an invalid receive for review without attempting an automatic NACK', async () => {
     const dependencies = createDependencies()
     dependencies.transport.getConsignment = vi.fn().mockResolvedValue({
       recipientId: 'recipient',
@@ -1564,10 +1564,15 @@ describe('RgbService', () => {
       received: 0,
     })
 
-    expect(service.getPendingReceives()).toEqual([])
-    expect(service.getPendingReceiveHistory()).toEqual([
-      expect.objectContaining({ status: 'rejected', txid: 'c'.repeat(64) }),
+    expect(dependencies.transport.acknowledgeConsignment).not.toHaveBeenCalled()
+    expect(service.getPendingReceives()).toEqual([
+      expect.objectContaining({ pendingValidationFailure: expect.objectContaining({
+        reason: 'Consignment does not match this invoice',
+        txid: 'c'.repeat(64),
+        endpoint: proxyEndpoint,
+      }) }),
     ])
+    expect(service.getPendingReceiveHistory()).toEqual([])
   })
 
   it('keeps a broadcast-first receive pending when the proxy has no ACK operation', async () => {
@@ -1589,8 +1594,120 @@ describe('RgbService', () => {
 
     await service.processClaimedReceives({ includeClaimed: false })
 
+    expect(dependencies.transport.acknowledgeConsignment).not.toHaveBeenCalled()
     expect(service.getPendingReceives()).toHaveLength(1)
+    expect(service.getPendingReceives()[0]?.pendingValidationFailure?.endpoint).toBe(proxyEndpoint)
     expect(service.getPendingReceiveHistory()).toEqual([])
+  })
+
+  it('does not record a backend-claimed consignment as rejected without a proxy ACK endpoint', async () => {
+    const dependencies = createDependencies()
+    dependencies.stateSource.getClaimedConsignments = vi.fn().mockResolvedValue([{
+      recipientId: 'recipient', payload: 'invalid-consignment',
+    }])
+    dependencies.transport.acknowledgeConsignment = vi.fn()
+    const service = new RgbService(dependencies)
+    await service.open(wallet)
+    ;(service as any).state.pendingReceives = [{
+      invoice: rgbInvoice(), recipientId: 'recipient', createdAt: 1,
+      seal: { txid: 'a'.repeat(64), vout: 0, blinding: 1n },
+    }]
+    ;(service as any).validateIncomingConsignment = vi.fn().mockReturnValue(undefined)
+
+    await service.processClaimedReceives({ includeClaimed: true })
+
+    expect(dependencies.transport.acknowledgeConsignment).not.toHaveBeenCalled()
+    expect(service.getPendingReceives()).toHaveLength(1)
+    expect(service.getPendingReceives()[0]?.pendingValidationFailure?.endpoint).toBeUndefined()
+    expect(service.getPendingReceiveHistory()).toEqual([])
+  })
+
+  it('records the validation reason only after an explicit reject decision', async () => {
+    const dependencies = createDependencies()
+    dependencies.transport.acknowledgeConsignment = vi.fn()
+    const service = new RgbService(dependencies)
+    await service.open(wallet)
+    ;(service as any).state.pendingReceives = [{
+      invoice: rgbInvoice(), recipientId: 'recipient', createdAt: 1,
+      seal: { txid: 'a'.repeat(64), vout: 0, blinding: 1n },
+      pendingValidationFailure: {
+        reason: 'No matching blind assignment was found',
+        discoveredAt: 1,
+        txid: 'c'.repeat(64),
+        endpoint: proxyEndpoint,
+      },
+    }]
+
+    await service.rejectReceive('recipient')
+
+    expect(dependencies.transport.acknowledgeConsignment).toHaveBeenCalledWith(
+      expect.objectContaining({ acknowledged: false, endpoints: [proxyEndpoint] })
+    )
+    expect(service.getPendingReceives()).toEqual([])
+    expect(service.getPendingReceiveHistory()).toEqual([
+      expect.objectContaining({
+        status: 'rejected', txid: 'c'.repeat(64),
+        rejectionReason: 'Rejected by you after validation failed: No matching blind assignment was found',
+      }),
+    ])
+  })
+
+  it('allows an explicit local rejection when a claimed consignment has no ACK endpoint', async () => {
+    const dependencies = createDependencies()
+    dependencies.transport.acknowledgeConsignment = vi.fn()
+    const service = new RgbService(dependencies)
+    await service.open(wallet)
+    ;(service as any).state.pendingReceives = [{
+      invoice: rgbInvoice(), recipientId: 'recipient', createdAt: 1,
+      seal: { txid: 'a'.repeat(64), vout: 0, blinding: 1n },
+      pendingValidationFailure: {
+        reason: 'No matching blind assignment was found',
+        discoveredAt: 1,
+      },
+    }]
+
+    await expect(service.rejectReceive('recipient')).resolves.toEqual({ rejected: true })
+
+    expect(dependencies.transport.acknowledgeConsignment).not.toHaveBeenCalled()
+    expect(service.getPendingReceives()).toEqual([])
+    expect(service.getPendingReceiveHistory()).toEqual([
+      expect.objectContaining({
+        status: 'rejected',
+        rejectionReason: 'Discarded locally by you without notifying the sender after validation failed: No matching blind assignment was found',
+      }),
+    ])
+  })
+
+  it('clears a validation failure when a later poll verifies the consignment', async () => {
+    const dependencies = createDependencies()
+    dependencies.transport.getConsignment = vi.fn().mockResolvedValue({
+      recipientId: 'recipient', payload: 'consignment', endpoint: proxyEndpoint,
+    })
+    dependencies.transport.acknowledgeConsignment = vi.fn()
+    const service = new RgbService(dependencies)
+    await service.open(wallet)
+    ;(service as any).state.pendingReceives = [{
+      invoice: rgbInvoice(), recipientId: 'recipient', createdAt: 1,
+      seal: { txid: 'a'.repeat(64), vout: 0, blinding: 1n },
+    }]
+    ;(service as any).validateIncomingConsignment = vi.fn()
+      .mockReturnValueOnce(undefined)
+      .mockReturnValue({
+        assetId: 'rgb:AQEBAQEB-AQEBAQE-BAQEBAQ-EBAQEBA-QEBAQEB-AQEBAQE',
+        amount: '60', txid: 'c'.repeat(64),
+        decoded: { metadata: { ticker: 'TOK', name: 'Token', precision: 0, schema: 'NIA', issuedSupply: '60' } },
+      })
+
+    await service.processClaimedReceives({ includeClaimed: false })
+    expect(service.getPendingReceives()[0]?.pendingValidationFailure).toBeDefined()
+
+    await service.processClaimedReceives({ includeClaimed: false })
+
+    expect(service.getPendingReceives()[0]?.pendingValidationFailure).toBeUndefined()
+    expect(service.getPendingReceives()[0]?.pendingAccept).toMatchObject({
+      txid: 'c'.repeat(64), amount: '60',
+    })
+    expect(dependencies.transport.acknowledgeConsignment).not.toHaveBeenCalled()
   })
 
   it('keeps an acknowledged receive pending when local settlement fails', async () => {

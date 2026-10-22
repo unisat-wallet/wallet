@@ -3472,6 +3472,12 @@
   "rgb_transfer_details": {
     "message": "Details du transfert"
   },
+  "rgb_recipient_id": {"message": "ID du destinataire" },
+  "rgb_rejection_reason": {"message": "Motif du refus" },
+  "rgb_rejection_reason_unavailable": {"message": "Cette version du portefeuille n’a pas enregistré le motif de ce refus." },
+  "rgb_validation_reason": {"message": "Problème de vérification" },
+  "rgb_status_validation_failed": {"message": "À vérifier" },
+  "rgb_transfer_validation_failed_description": {"message": "Ce transfert n’a pas pu être vérifié. La facture est conservée et la vérification sera réessayée. Examinez le motif avant de refuser." },
   "rgb_transfer_id": {
     "message": "ID du transfert"
   },
@@ -3514,6 +3520,7 @@
   "rgb_reject_receive_confirm_title": { "message": "Refuser ce transfert ?" },
   "rgb_reject_receive_confirm_description": { "message": "Cette action est irréversible. Après le refus, vous ne pourrez plus accepter ce transfert." },
   "rgb_confirm_reject_transfer": { "message": "Confirmer le refus" },
+  "rgb_reject_receive_local_only_description": {"message": "Ce transfert n'a pas pu être vérifié. Aucune adresse de proxy n'est disponible : le rejet ne le supprimera que de ce portefeuille. L'expéditeur ne sera pas informé et vous ne pourrez plus l'accepter."},
   "rgb_accept_transfer_success": { "message": "Transfert accepté" },
   "rgb_reject_transfer_success": { "message": "Transfert refusé" },
   "rgb_accept_transfer_failed": { "message": "Échec de l'acceptation du transfert" },

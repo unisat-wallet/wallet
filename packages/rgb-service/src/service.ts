@@ -74,6 +74,35 @@ const PROVIDER_ORIGIN_HISTORY_TTL_MS = 24 * 60 * 60 * 1000
 const MAX_RECOVERY_HISTORY_PAYLOAD_LENGTH = 48_000_000
 const MAX_RECOVERY_HISTORY_OPERATION_IDS = 65_535
 
+function describeReceiveMismatch(
+  reason: string,
+  details: Record<string, unknown>,
+  receive: import('./types').RgbPendingReceive
+) {
+  switch (reason) {
+    case 'asset_id':
+      return `Invoice asset ID does not match the consignment (offered: ${details['actualAssetId'] || 'unknown'})`
+    case 'amount':
+      return `Invoice amount does not match the consignment (offered: ${details['actualAmount'] || 'unknown'})`
+    case 'asset_or_amount':
+      return receive.assetId && receive.assetId !== details['actualAssetId']
+        ? `Invoice asset ID does not match the consignment (offered: ${details['actualAssetId'] || 'unknown'})`
+        : `Invoice amount does not match the consignment (offered: ${details['actualAmount'] || 'unknown'})`
+    case 'v1_recipient_assignment':
+      return 'No recipient assignment was found in the latest RGB v1 witness bundle'
+    case 'nia_witness_assignment':
+      return 'No matching witness assignment was found in the latest NIA witness bundle'
+    case 'nia_blind_assignment':
+      return 'No matching blind assignment was found in the NIA consignment'
+    case 'missing_witness_script':
+      return 'The receive invoice is missing its witness script'
+    case 'missing_blind_seal':
+      return 'The receive invoice is missing its blind seal'
+    default:
+      return `Consignment does not match this invoice (${reason})`
+  }
+}
+
 function outpointKey(utxo: RgbUtxo) {
   return `${utxo.outpoint.txid}:${utxo.outpoint.vout}`
 }
@@ -949,6 +978,7 @@ export class RgbService {
         !item.expirationTimestamp ||
         item.expirationTimestamp > now ||
         !!item.pendingAccept ||
+        !!item.pendingValidationFailure ||
         item.receivedConsignment?.accepted === true ||
         item.receivedConsignment?.acknowledgementPending === true
     )
@@ -1342,13 +1372,35 @@ export class RgbService {
       )
       if (receiveIndex < 0) continue
       const receive = pending[receiveIndex]!
-      try {
-        const match = await this.validateIncomingConsignment(receive, item)
-        if (!match) {
-          if (!(await this.rejectInvalidProxyConsignment(receive, item))) continue
-          pending.splice(receiveIndex, 1)
+      let mismatchReason: string | undefined
+      const stageValidationFailure = (reason: string) => {
+        const previous = receive.pendingValidationFailure
+        const failure = {
+          reason,
+          discoveredAt: previous?.discoveredAt || this.now(),
+          ...(item.txid ? { txid: item.txid } : {}),
+          ...(item.endpoint ? { endpoint: item.endpoint } : {}),
+          ...(item.proxyTransferId ? { proxyTransferId: item.proxyTransferId } : {}),
+          ...(item.proxySenderPublicKey ? { proxySenderPublicKey: item.proxySenderPublicKey } : {}),
+          ...(item.proxySenderEndpoint ? { proxySenderEndpoint: item.proxySenderEndpoint } : {}),
+          ...(item.proxyConsignmentHash ? { proxyConsignmentHash: item.proxyConsignmentHash } : {}),
+        }
+        if (JSON.stringify(previous) !== JSON.stringify(failure)) {
+          receive.pendingValidationFailure = failure
           changed = true
+        }
+      }
+      try {
+        const match = await this.validateIncomingConsignment(receive, item, (reason, details) => {
+          mismatchReason = describeReceiveMismatch(reason, details, receive)
+        })
+        if (!match) {
+          stageValidationFailure(mismatchReason || 'Consignment does not match this invoice')
           continue
+        }
+        if (receive.pendingValidationFailure) {
+          delete receive.pendingValidationFailure
+          changed = true
         }
         if (receive.rejectedConsignmentTxids?.includes(match.txid)) continue
 
@@ -1476,7 +1528,6 @@ export class RgbService {
           changed = true
         }
       } catch (error) {
-        if (error instanceof RgbBfaValidationUnavailableError) continue
         if (receive.receivedConsignment?.accepted) {
           // ACK is immutable once accepted. A local settlement failure (for
           // example, while merging recovered history) is retriable and must
@@ -1484,16 +1535,15 @@ export class RgbService {
           // user-visible rejected receive.
           continue
         }
-        // A malformed or mismatched consignment must not keep an invoice in a
-        // failing polling loop. NACK it when possible; if the proxy already
-        // made its ACK immutable, archive the unusable local receive anyway.
-        try {
-          if (!(await this.rejectInvalidProxyConsignment(receive, item))) continue
-        } catch {
-          throw error
-        }
-        pending.splice(receiveIndex, 1)
-        changed = true
+        const message = error instanceof Error ? error.message : String(error)
+        stageValidationFailure(`Consignment validation failed: ${message.slice(0, 300)}`)
+        console.warn('[RGB receive] Validation failed; waiting for user review', {
+          recipientId: item.recipientId,
+          proxyTransferId: item.proxyTransferId,
+          txid: item.txid,
+          reason: message,
+          retryable: error instanceof RgbBfaValidationUnavailableError,
+        })
       }
     }
     // Expiration alone does not prove that an offline receiver has not been
@@ -1506,7 +1556,7 @@ export class RgbService {
         const receive = pending[index]!
         if (
           !receive.expirationTimestamp || receive.expirationTimestamp > now ||
-          receive.pendingAccept || receive.receivedConsignment ||
+          receive.pendingAccept || receive.pendingValidationFailure || receive.receivedConsignment ||
           receivedByRecipient.has(receive.proxyRecipientId || receive.recipientId)
         ) continue
         let endpoints: string[]
@@ -1649,7 +1699,8 @@ export class RgbService {
     )
     if (!receive) throw new RgbServiceError(`RGB receive ${recipientId} was not found`)
     const pendingAccept = receive.pendingAccept
-    if (!pendingAccept && !receive.receivedConsignment) {
+    const validationFailure = receive.pendingValidationFailure
+    if (!pendingAccept && !validationFailure && !receive.receivedConsignment) {
       throw new RgbServiceError(`RGB receive ${recipientId} is not awaiting acceptance`)
     }
     // Once ACK intent is durable, the proxy may already have accepted it and
@@ -1662,24 +1713,38 @@ export class RgbService {
       throw new RgbServiceError(`RGB receive ${recipientId} was already accepted`)
     }
 
-    try {
-      await this.acknowledgeProxyConsignment(
-        {
-          recipientId: receive.proxyRecipientId || receive.recipientId,
-          endpoint: pendingAccept!.endpoint,
-          proxyTransferId: pendingAccept!.proxyTransferId,
-          proxySenderPublicKey: pendingAccept!.proxySenderPublicKey,
-          proxySenderEndpoint: pendingAccept!.proxySenderEndpoint,
-          proxyConsignmentHash: pendingAccept!.proxyConsignmentHash,
-        },
-        false
-      )
-    } catch (error) {
-      // Donations have no sender ACK operation. Rejection is still a local
-      // decision even though the Bitcoin transaction may already be public.
-      if (!(error instanceof RgbProxyOperationNotFoundError)) throw error
+    const proposal = pendingAccept || validationFailure
+    if (!proposal) {
+      throw new RgbServiceError('RGB receive has no transfer to reject')
     }
-    this.recordReceiveOutcome(receive, 'rejected', pendingAccept!.txid)
+    if (!proposal.endpoint && !validationFailure) {
+      throw new RgbServiceError('RGB receive cannot be rejected without a proxy endpoint')
+    }
+    if (proposal.endpoint) {
+      try {
+        await this.acknowledgeProxyConsignment(
+          {
+            recipientId: receive.proxyRecipientId || receive.recipientId,
+            endpoint: proposal.endpoint,
+            proxyTransferId: proposal.proxyTransferId,
+            proxySenderPublicKey: proposal.proxySenderPublicKey,
+            proxySenderEndpoint: proposal.proxySenderEndpoint,
+            proxyConsignmentHash: proposal.proxyConsignmentHash,
+          },
+          false
+        )
+      } catch (error) {
+        // Donations have no sender ACK operation. Rejection is still a local
+        // decision even though the Bitcoin transaction may already be public.
+        if (!(error instanceof RgbProxyOperationNotFoundError)) throw error
+      }
+    }
+    this.recordReceiveOutcome(
+      receive, 'rejected', proposal.txid || '',
+      validationFailure
+        ? `${proposal.endpoint ? 'Rejected by you' : 'Discarded locally by you without notifying the sender'} after validation failed: ${validationFailure.reason}`
+        : 'Rejected by you'
+    )
     // Proxy recipient IDs are single-use upload keys. Once a consignment has
     // been posted, a later transfer cannot replace its file even after NACK.
     // Discard the invoice so the user creates a fresh blinded recipient ID.
@@ -1715,8 +1780,23 @@ export class RgbService {
 
   private async validateIncomingConsignment(
     receive: import('./types').RgbPendingReceive,
-    item: { recipientId: string; payload: string; txid?: string; endpoint?: string }
+    item: { recipientId: string; payload: string; txid?: string; endpoint?: string; proxyTransferId?: string },
+    onMismatch?: (reason: string, details: Record<string, unknown>) => void
   ) {
+    const mismatch = (reason: string, details: Record<string, unknown> = {}): undefined => {
+      onMismatch?.(reason, details)
+      console.warn('[RGB receive] Consignment does not match invoice', {
+        recipientId: item.recipientId,
+        proxyTransferId: item.proxyTransferId,
+        txid: item.txid,
+        recipientType: receive.recipientType,
+        expectedAssetId: receive.assetId,
+        expectedAmount: receive.amount,
+        reason,
+        ...details,
+      })
+      return undefined
+    }
     // Proxy v1 consignments have no Bitcoin txid field. Older adapters stored
     // that absence as '', which must not constrain the witness in a NIA payload.
     const expectedTxid = item.txid || undefined
@@ -1731,7 +1811,8 @@ export class RgbService {
         confirmedBitcoinWitnesses: this.requireState().confirmedBitcoinWitnesses ||= {},
       })
       const assetId = bfa.assetId
-      if (receive.assetId && receive.assetId !== assetId) return undefined
+      if (receive.assetId && receive.assetId !== assetId)
+        return mismatch('asset_id', { actualAssetId: assetId })
       const secret = receive.seal ? Buffer.from(concealBlindSeal(receive.seal)).toString('hex') : undefined
       // V1 consignments include unspent ancestors; only the appended witness
       // bundle can satisfy this invoice's witness output.
@@ -1745,7 +1826,12 @@ export class RgbService {
         return assignment.secretSeal === secret && bfa.terminals.some(terminal =>
           terminal.bundleId === assignment.bundleId && terminal.secretSeals.includes(secret!))
       })
-      if (!candidate || (receive.amount && receive.amount !== candidate.amount)) return undefined
+      if (!candidate) return mismatch('v1_recipient_assignment', {
+        assetId, terminalAssignmentCount: bfa.terminalAssignments.length,
+        latestBundleId,
+      })
+      if (receive.amount && receive.amount !== candidate.amount)
+        return mismatch('amount', { actualAmount: candidate.amount })
       const output = candidate.output
       return {
         decoded: { metadata: bfa.metadata, genesis: { strict: bfa.genesis } },
@@ -1761,7 +1847,7 @@ export class RgbService {
     validateNiaConsignmentParentSpends(decoded)
     if (receive.recipientType === 'witness') {
       const expectedScript = receive.witnessScriptPubKey?.toLowerCase()
-      if (!expectedScript) return undefined
+      if (!expectedScript) return mismatch('missing_witness_script')
       const witness = decoded.witnessBundles.at(-1)
       const match = witness?.transitions
         .flatMap(transition =>
@@ -1787,12 +1873,18 @@ export class RgbService {
         'secretSeal' in match.assignment.seal ||
         (expectedTxid !== undefined && match.witness.txid !== expectedTxid)
       )
-        return undefined
+        return mismatch('nia_witness_assignment', {
+          witnessTxid: witness?.txid,
+          transitionCount: witness?.transitions.length || 0,
+        })
       if (
         (receive.assetId && receive.assetId !== decoded.assetId) ||
         (receive.amount && receive.amount !== match.assignment.amount.toString())
       ) {
-        return undefined
+        return mismatch('asset_or_amount', {
+          actualAssetId: decoded.assetId,
+          actualAmount: match.assignment.amount.toString(),
+        })
       }
       return {
         decoded,
@@ -1807,7 +1899,7 @@ export class RgbService {
         counterpartyScriptPubKeys: niaConsignmentSpendableOutputScripts(item.payload),
       }
     }
-    if (!receive.seal) return undefined
+    if (!receive.seal) return mismatch('missing_blind_seal')
     const secretSeal = Buffer.from(concealBlindSeal(receive.seal)).toString('hex')
     const terminalBundleIds = new Set(
       decoded.terminals
@@ -1834,13 +1926,20 @@ export class RgbService {
         )
       : undefined
     if (!match || !witness || (expectedTxid !== undefined && witness.txid !== expectedTxid)) {
-      return undefined
+      return mismatch('nia_blind_assignment', {
+        terminalBundleCount: terminalBundleIds.size,
+        matchedTransition: !!match,
+        witnessTxid: witness?.txid,
+      })
     }
     if (
       (receive.assetId && receive.assetId !== decoded.assetId) ||
       (receive.amount && receive.amount !== match.assignment.amount.toString())
     ) {
-      return undefined
+      return mismatch('asset_or_amount', {
+        actualAssetId: decoded.assetId,
+        actualAmount: match.assignment.amount.toString(),
+      })
     }
     return {
       decoded,
@@ -1956,7 +2055,8 @@ export class RgbService {
   private recordReceiveOutcome(
     receive: import('./types').RgbPendingReceive,
     status: 'settled' | 'canceled' | 'rejected',
-    txid: string
+    txid: string,
+    rejectionReason?: string
   ) {
     const state = this.requireState()
     this.recordReleasedReceiveRecipient(receive.recipientId)
@@ -1976,6 +2076,8 @@ export class RgbService {
       // recovery) must never relabel an already confirmed receive as rejected
       // or canceled.
       if (existing.status !== 'settled' || status === 'settled') existing.status = status
+      if (existing.status === 'rejected' && rejectionReason) existing.rejectionReason = rejectionReason
+      else if (existing.status !== 'rejected') delete existing.rejectionReason
       existing.txid = txid || existing.txid
       if (assetId) existing.assetId = assetId
       if (amount) existing.amount = amount
@@ -1997,6 +2099,7 @@ export class RgbService {
         receive.pendingAccept?.discoveredAt ||
         this.now(),
       status,
+      ...(status === 'rejected' && rejectionReason ? { rejectionReason } : {}),
       counterpartyScriptPubKeys:
         receive.pendingAccept?.counterpartyScriptPubKeys ||
         receive.receivedConsignment?.counterpartyScriptPubKeys,
@@ -2132,7 +2235,8 @@ export class RgbService {
     if (
       removed.receivedConsignment?.accepted ||
       removed.receivedConsignment?.acknowledgementPending ||
-      removed.pendingAccept
+      removed.pendingAccept ||
+      removed.pendingValidationFailure
     ) {
       return { cancelled: false }
     }
@@ -3756,31 +3860,6 @@ export class RgbService {
       proxySenderEndpoint: item.proxySenderEndpoint,
       proxyConsignmentHash: item.proxyConsignmentHash,
     })
-  }
-
-  private async rejectInvalidProxyConsignment(
-    receive: import('./types').RgbPendingReceive,
-    item: { recipientId: string; txid?: string; endpoint?: string }
-  ) {
-    try {
-      await this.acknowledgeProxyConsignment(item, false)
-    } catch (error) {
-      // Broadcast-first v1 transfers do not create an ACK operation. A proxy
-      // 404 therefore cannot prove that the recipient rejected the transfer.
-      // Keep the invoice so a later valid consignment can still be accepted.
-      if (error instanceof RgbProxyOperationNotFoundError) return false
-      // RGB proxy ACKs are immutable. A recovered local state can legitimately
-      // retry a NACK after the proxy has already settled that recipient ID.
-      // This is terminal for the stale/mismatched local receive, not a reason
-      // to surface the same error on every polling interval.
-      if (!String(error).includes('Cannot change ACK')) throw error
-    }
-    this.recordReceiveOutcome(
-      receive,
-      'rejected',
-      item.txid || receive.pendingAccept?.txid || receive.receivedConsignment?.txid || ''
-    )
-    return true
   }
 
   private runPendingTransferOperation<T>(transferId: string, operation: () => Promise<T>) {

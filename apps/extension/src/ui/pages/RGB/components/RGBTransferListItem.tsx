@@ -47,6 +47,8 @@ function getStatusLabel(status: string, t: (key: string) => string, type: RgbTra
       return t('rgb_status_broadcast_failed');
     case 'pending_accept':
       return t('rgb_status_pending_accept');
+    case 'validation_failed':
+      return t('rgb_status_validation_failed');
     case 'confirming':
     case 'pending':
     case 'unconfirmed':
@@ -102,6 +104,7 @@ export function RGBTransferListItem({
   const showStatus = item.type !== 'issue' && (pending || ['canceled', 'cancelled', 'rejected'].includes(status));
   const isReceive = item.type === 'receive';
   const isCanceledReceive = isReceive && ['canceled', 'cancelled'].includes(status);
+  const hideReceiveAmount = isReceive && (status === 'validation_failed' || (status === 'rejected' && !item.amount));
   const secondaryAssetLabel = assetName || (isCanceledReceive ? assetSymbol : '');
   const amountColor = isReceive || item.type === 'issue'
     ? 'rgba(124, 219, 152, 0.85)'
@@ -183,7 +186,7 @@ export function RGBTransferListItem({
             ) : null}
           </Column>
         </Row>
-        {!isCanceledReceive ? (
+        {!isCanceledReceive && !hideReceiveAmount ? (
           <Row gap="xs" style={{ alignItems: 'center', flexShrink: 0, maxWidth: showAssetLabel ? '58%' : undefined, marginLeft: 12, ...(showStatus ? { alignSelf: 'flex-start', marginTop: 24, minHeight: 24 } : {}) }}>
             {showAssetLabel ? (
               <div title={signedDisplayAmount} style={{ display: 'flex', alignItems: 'center', height: 20, minWidth: 0, flexShrink: 1, overflow: 'hidden' }}>

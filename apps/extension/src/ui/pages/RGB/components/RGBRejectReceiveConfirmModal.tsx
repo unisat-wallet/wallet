@@ -32,11 +32,13 @@ const modalStyle = {
 export function RGBRejectReceiveConfirmModal({
   visible,
   loading,
+  description,
   onClose,
   onConfirm
 }: {
   visible: boolean;
   loading: boolean;
+  description?: string;
   onClose: () => void;
   onConfirm: () => void;
 }) {
@@ -62,7 +64,7 @@ export function RGBRejectReceiveConfirmModal({
         />
         <Text text={t('rgb_reject_receive_confirm_title')} color="white" size="md" textCenter />
         <Text
-          text={t('rgb_reject_receive_confirm_description')}
+          text={description || t('rgb_reject_receive_confirm_description')}
           color="white_muted2"
           size="sm"
           wrap

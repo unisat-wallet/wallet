@@ -86,7 +86,7 @@ function getPendingRgbAcceptances(items: ReturnType<typeof useRGBTransfersLogic>
       (item) =>
         item.type === 'receive' &&
         item.local === true &&
-        item.status.toLowerCase() === 'pending_accept' &&
+        ['pending_accept', 'validation_failed'].includes(item.status.toLowerCase()) &&
         !dismissedIds.has(item.transferId || item.id)
     )
     .sort((left, right) => right.timestamp - left.timestamp);

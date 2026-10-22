@@ -294,6 +294,17 @@ export interface RgbPendingReceive {
     /** Spendable witness output scripts used to recover the sender address. */
     counterpartyScriptPubKeys?: string[]
   }
+  /** A received consignment failed validation; keep the invoice and let the user review it. */
+  pendingValidationFailure?: {
+    reason: string
+    discoveredAt: number
+    txid?: string
+    endpoint?: string
+    proxyTransferId?: string
+    proxySenderPublicKey?: string
+    proxySenderEndpoint?: string
+    proxyConsignmentHash?: string
+  }
   /** Recently rejected consignments, retained so delayed proxy responses are ignored. */
   rejectedConsignmentTxids?: string[]
   /** Local receipt retained while acknowledgement and settlement are finalized. */
@@ -334,6 +345,8 @@ export interface RgbPendingReceiveHistory {
   txid: string
   createdAt: number
   status?: 'settled' | 'canceled' | 'rejected'
+  /** Local explanation retained when a receive is rejected before settlement. */
+  rejectionReason?: string
   counterpartyScriptPubKeys?: string[]
 }
 

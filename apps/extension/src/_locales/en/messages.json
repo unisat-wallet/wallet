@@ -3561,6 +3561,7 @@
   "rgb_reject_receive_confirm_description": {
     "message": "This action cannot be undone. After rejecting, you will no longer be able to accept this transfer."
   },
+  "rgb_reject_receive_local_only_description": {"message": "This transfer could not be verified. No proxy address is available, so rejecting will only remove it from this wallet. The sender will not be notified, and you will not be able to accept it later."},
   "rgb_confirm_reject_transfer": {
     "message": "Confirm reject"
   },
@@ -3585,6 +3586,12 @@
   "rgb_transfer_details": {
     "message": "Transfer Details"
   },
+  "rgb_recipient_id": {"message": "Recipient ID" },
+  "rgb_rejection_reason": {"message": "Rejection reason" },
+  "rgb_rejection_reason_unavailable": {"message": "This wallet version did not record a reason for this rejection." },
+  "rgb_validation_reason": {"message": "Verification issue" },
+  "rgb_status_validation_failed": {"message": "Needs review" },
+  "rgb_transfer_validation_failed_description": {"message": "This transfer could not be verified. The invoice is kept and verification will retry. Review the reason before rejecting." },
   "rgb_transfer_id": {
     "message": "Transfer ID"
   },

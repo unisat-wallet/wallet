@@ -228,6 +228,23 @@ export class RgbTransferQuery {
         ]
       }
       const awaitingAccept = !!receive.pendingAccept && !receivedConsignment?.accepted
+      if (receive.pendingValidationFailure && !receivedConsignment?.accepted) {
+        return [{
+          id: `local-receive:${receiveId}`,
+          transferId: receiveId,
+          assetId: receivedAssetId,
+          type: 'receive' as const,
+          amount: receivedAmount,
+          precision: receivedPrecision,
+          txid: receive.pendingValidationFailure.txid || '',
+          timestamp: receive.pendingValidationFailure.discoveredAt,
+          status: 'validation_failed',
+          rejectionReason: receive.pendingValidationFailure.reason,
+          canReject: true,
+          rejectLocally: !receive.pendingValidationFailure.endpoint,
+          local: true,
+        }]
+      }
       if (awaitingAccept && receive.pendingAccept) {
         return [
           {
@@ -295,6 +312,7 @@ export class RgbTransferQuery {
       txid: receive.txid,
       timestamp: receive.createdAt,
       status: receive.status ?? 'settled',
+      rejectionReason: receive.rejectionReason,
       local: receive.status === 'canceled' || receive.status === 'rejected',
     }))
     const visibleLocalSendHistory = localSendHistory.filter(

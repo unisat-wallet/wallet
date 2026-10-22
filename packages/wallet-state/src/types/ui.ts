@@ -83,6 +83,9 @@ export interface RgbActivityItem {
   precision?: number
   type: RgbActivityType
   status: string
+  rejectionReason?: string
+  canReject?: boolean
+  rejectLocally?: boolean
   amount: string
   txid: string
   timestamp: number
@@ -92,6 +95,7 @@ export type RgbTransferStatus =
   | 'signed'
   | 'waiting_ack'
   | 'pending_accept'
+  | 'validation_failed'
   | 'confirming'
   | 'waiting_receive'
   | 'settled'
@@ -114,6 +118,12 @@ export interface RgbTransferItem {
   /** Time the receiver accepted this send, used to order pending broadcasts. */
   acknowledgedAt?: number
   status: RgbTransferStatus
+  /** Local explanation for a rejected RGB receive, when recorded by the wallet. */
+  rejectionReason?: string
+  /** Whether this receive can be dismissed by an explicit user rejection. */
+  canReject?: boolean
+  /** The proxy cannot be notified because the consignment has no ACK endpoint. */
+  rejectLocally?: boolean
   local?: boolean
   /** Unilateral BFA burn with a downloadable consignment proof. */
   burn?: boolean

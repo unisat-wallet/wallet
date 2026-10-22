@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 
 import { Button, Checkbox, Column, Row, Text, Icon, CopyableAddress, RGBAssetIcon } from '@/ui/components';
@@ -36,6 +36,8 @@ function getStatusLabel(status: string, t: (key: string) => string, type?: RgbTr
       return t('rgb_status_broadcast_failed');
     case 'pending_accept':
       return t('rgb_status_pending_accept');
+    case 'validation_failed':
+      return t('rgb_status_validation_failed');
     case 'confirming':
     case 'pending':
     case 'unconfirmed':
@@ -70,6 +72,7 @@ function getDescription(transfer: RgbTransferItem | undefined, t: (key: string) 
   if (transfer?.status === 'broadcasted') return t('rgb_transfer_broadcasted_description');
   if (transfer?.status === 'broadcast_failed') return t('rgb_transfer_broadcast_failed_description');
   if (transfer?.status === 'pending_accept') return t('rgb_transfer_pending_accept_description');
+  if (transfer?.status === 'validation_failed') return t('rgb_transfer_validation_failed_description');
   if (transfer?.status === 'confirming') {
     return t('rgb_transfer_confirming_description');
   }
@@ -213,9 +216,66 @@ export function RGBTransferDetailSheet({
   const [broadcastRetryLoading, setBroadcastRetryLoading] = useState(false);
 
   const status = transfer?.status || 'pending';
+  useEffect(() => {
+    if (transfer?.type !== 'receive' || status.toLowerCase() !== 'rejected') return;
+    const historyId = transfer.transferId || transferId || transfer.id;
+    const recipientId = historyId.replace(/^local-receive:/, '').replace(/^receive:/, '');
+    let canceled = false;
+    void wallet.getRgbPendingReceiveInvoices({ skipSync: true }).then(
+      ({ list }) => {
+        if (canceled) return;
+        const pending = list.find((invoice) => invoice.recipientId === recipientId);
+        console.warn('[RGB receive recovery] Rejected history detail', {
+          historyId,
+          recipientId,
+          txid: transfer.txid || null,
+          assetId: transfer.assetId || null,
+          amount: transfer.amount || null,
+          status: transfer.status,
+          source: transfer.local ? 'local' : 'indexer',
+          timestamp: transfer.timestamp,
+          pendingInvoice: pending
+            ? {
+                status: pending.status,
+                kind: pending.kind,
+                assetId: pending.assetId,
+                amount: pending.amount,
+                createdAt: pending.createdAt,
+                expirationTimestamp: pending.expirationTimestamp
+              }
+            : null
+        });
+      },
+      (error: unknown) => {
+        if (!canceled) {
+          console.warn('[RGB receive recovery] Pending invoice lookup failed', {
+            historyId,
+            error: getTransferActionErrorMessage(error, 'Unknown error')
+          });
+        }
+      }
+    );
+    return () => {
+      canceled = true;
+    };
+  }, [
+    transfer?.id,
+    transfer?.transferId,
+    transfer?.type,
+    transfer?.status,
+    transfer?.txid,
+    transfer?.assetId,
+    transfer?.amount,
+    transfer?.local,
+    transfer?.timestamp,
+    transferId,
+    wallet
+  ]);
   const ticker = transfer?.ticker || transfer?.name || 'RGB';
   const assetName = transfer?.name || transfer?.ticker || 'RGB';
   const isCanceledReceive = transfer?.type === 'receive' && ['canceled', 'cancelled'].includes(status.toLowerCase());
+  const isRejectedReceive = transfer?.type === 'receive' && status.toLowerCase() === 'rejected';
+  const hasValidationFailure = transfer?.type === 'receive' && status.toLowerCase() === 'validation_failed';
   const amountPrefix = isCanceledReceive
     ? ''
     : transfer?.type === 'receive'
@@ -228,7 +288,7 @@ export function RGBTransferDetailSheet({
   const description = getDescription(transfer, t);
   const canExplore =
     !!transfer?.txid &&
-    !['waiting_ack', 'ready_to_broadcast', 'broadcasting', 'broadcast_failed', 'pending_accept', 'rejected', 'canceled', 'cancelled'].includes(status.toLowerCase()) &&
+    !['waiting_ack', 'ready_to_broadcast', 'broadcasting', 'broadcast_failed', 'pending_accept', 'validation_failed', 'rejected', 'canceled', 'cancelled'].includes(status.toLowerCase()) &&
     !!onClickExploreTx;
   const canCancelSend =
     transfer?.type === 'send' && ['signed', 'waiting_ack'].includes(String(transfer?.status || '').toLowerCase());
@@ -243,6 +303,9 @@ export function RGBTransferDetailSheet({
   const assetId = transfer?.assetId?.trim();
   const isIssue = transfer?.type === 'issue';
   const recordId = isIssue ? transfer?.txid : transfer?.transferId || transferId || '';
+  const detailRecordId = isRejectedReceive || hasValidationFailure
+    ? resolveReceiveRecipientId(transfer, transferId)
+    : recordId || '';
 
   const onCancelSend = async () => {
     const abortId = resolveAbortTransferId(transfer, transferId);
@@ -417,7 +480,7 @@ export function RGBTransferDetailSheet({
                 size={32}
               />
               <Column gap="xs" style={{ minWidth: 0, maxWidth: 'calc(100% - 40px)' }}>
-                {!isCanceledReceive ? (
+                {!isCanceledReceive && !hasValidationFailure && transfer?.amount ? (
                   <Text
                     text={amountText}
                     style={{
@@ -463,7 +526,18 @@ export function RGBTransferDetailSheet({
                 value={getStatusLabel(status, t, transfer?.type)}
                 valueColor={getStatusColor(status)}
               />
-              <Row fullX justifyBetween itemsCenter style={{ minHeight: 32 }}>
+              {isRejectedReceive || hasValidationFailure ? (
+                <Column fullX gap="xs" style={{ paddingTop: 4, paddingBottom: 4 }}>
+                  <Text text={t(hasValidationFailure ? 'rgb_validation_reason' : 'rgb_rejection_reason')} color="textDim" size="sm" />
+                  <Text
+                    text={transfer?.rejectionReason || t('rgb_rejection_reason_unavailable')}
+                    color="white"
+                    size="sm"
+                    wrap
+                  />
+                </Column>
+              ) : null}
+              {assetId || (!isRejectedReceive && !hasValidationFailure) ? <Row fullX justifyBetween itemsCenter style={{ minHeight: 32 }}>
                 <Text
                   text={t('asset_id')}
                   style={{
@@ -485,19 +559,24 @@ export function RGBTransferDetailSheet({
                     }}
                   />
                 )}
-              </Row>
-              {status !== 'rejected' ? (
+              </Row> : null}
+              {status !== 'rejected' || isRejectedReceive ? (
                 <Row fullX justifyBetween itemsCenter style={{ minHeight: 32 }}>
                   <Text
-                    text={t(isIssue ? 'rgb_genesis_txid' : 'rgb_transfer_id')}
+                    text={t(isRejectedReceive || hasValidationFailure ? 'rgb_recipient_id' : isIssue ? 'rgb_genesis_txid' : 'rgb_transfer_id')}
                     style={{
                       fontSize: 14,
                       fontWeight: 500,
                       color: 'rgba(255,255,255,0.45)'
                     }}
                   />
-                  {recordId ? (
-                    <CopyableAddress address={recordId} copyPosition="after" len={10} color="ticker_color2" />
+                  {detailRecordId ? (
+                    <CopyableAddress
+                      address={detailRecordId}
+                      copyPosition="after"
+                      len={10}
+                      color="ticker_color2"
+                    />
                   ) : (
                     <Text text="--" color="ticker_color2" />
                   )}
@@ -545,6 +624,15 @@ export function RGBTransferDetailSheet({
                   textStyle={{ color: colors.black, fontWeight: 'normal' }}
                 />
               </Row>
+            ) : hasValidationFailure && transfer?.canReject ? (
+              <Button
+                text={t('rgb_reject_transfer')}
+                preset="default"
+                disabled={actionLoading}
+                onClick={() => setRejectConfirmVisible(true)}
+                full
+                style={{ height: 48, minHeight: 48 }}
+              />
             ) : canBroadcast || canRetryBroadcast ? (
               <Button
                 text={t(canBroadcast ? 'Broadcast' : 'rgb_retry_broadcast')}
@@ -596,6 +684,7 @@ export function RGBTransferDetailSheet({
       <RGBRejectReceiveConfirmModal
         visible={rejectConfirmVisible}
         loading={actionLoading}
+        description={hasValidationFailure && transfer?.rejectLocally ? t('rgb_reject_receive_local_only_description') : undefined}
         onClose={() => setRejectConfirmVisible(false)}
         onConfirm={() => {
           setRejectConfirmVisible(false);

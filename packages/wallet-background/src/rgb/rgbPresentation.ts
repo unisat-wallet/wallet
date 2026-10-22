@@ -34,6 +34,7 @@ export function toPublicRgbPendingReceiveInvoice(
   witnessScriptPubKey?: string
     proxyRecipientId?: string
     pendingAccept?: unknown
+    pendingValidationFailure?: unknown
     receivedConsignment?: {
       accepted?: boolean
       acknowledgementPending?: boolean
@@ -60,7 +61,9 @@ export function toPublicRgbPendingReceiveInvoice(
     ...(item.recipientType === 'witness' && item.witnessScriptPubKey
       ? { witnessScriptPubKey: item.witnessScriptPubKey }
       : {}),
-    status: awaitingAcceptance
+    status: item.pendingValidationFailure
+      ? 'ValidationFailed'
+      : awaitingAcceptance
       ? 'PendingAccept'
       : awaitingSenderConfirmation
         ? 'WaitingSenderConfirmation'
@@ -69,6 +72,7 @@ export function toPublicRgbPendingReceiveInvoice(
         : status,
     canCancel:
       !awaitingAcceptance &&
+      !item.pendingValidationFailure &&
       item.receivedConsignment?.accepted !== true &&
       item.receivedConsignment?.acknowledgementPending !== true,
     ...(batchTransferIdx === undefined ? {} : { batchTransferIdx }),

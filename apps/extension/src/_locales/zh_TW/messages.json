@@ -3550,6 +3550,7 @@
   "rgb_reject_receive_confirm_description": {
     "message": "此操作無法復原。拒絕後，你將無法再接受這筆轉帳。"
   },
+  "rgb_reject_receive_local_only_description": {"message": "此轉帳無法通過驗證。由於沒有代理端點，拒絕只會從本機錢包移除記錄；發送方不會收到通知，之後也無法再接受。"},
   "rgb_confirm_reject_transfer": {
     "message": "確認拒絕"
   },
@@ -3574,6 +3575,12 @@
   "rgb_transfer_details": {
     "message": "轉帳詳情"
   },
+  "rgb_recipient_id": {"message": "接收者 ID" },
+  "rgb_rejection_reason": {"message": "拒絕原因" },
+  "rgb_rejection_reason_unavailable": {"message": "此版本的錢包未記錄這次拒絕的原因。" },
+  "rgb_validation_reason": {"message": "驗證問題" },
+  "rgb_status_validation_failed": {"message": "需要檢查" },
+  "rgb_transfer_validation_failed_description": {"message": "這筆轉帳尚未通過驗證。發票會保留並重試驗證；拒絕前請先查看原因。" },
   "rgb_transfer_id": {
     "message": "轉帳 ID"
   },
