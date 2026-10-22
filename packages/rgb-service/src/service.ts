@@ -3545,31 +3545,33 @@ export class RgbService {
         proxyExpirationTimestamp: invoice.expirationTimestamp,
       } : {}),
     }))
-    for (const consignment of consignments) {
-      try {
-        await this.dependencies.transport.publishConsignment(consignment)
-      } catch (error) {
-        // RGB proxy storage binds a recipient ID to its first uploaded file.
-        // A different consignment for that invoice cannot overwrite it, which
-        // means the recipient must issue a new blinded invoice.
-        if (isInvoiceUnavailableUploadError(error)) {
-          // This consignment was never accepted by the proxy and its Bitcoin
-          // transaction was never broadcast. Drop the local prepared state so
-          // its colored and fee-pool inputs are immediately reusable. Do not
-          // send ACK=false: this recipient ID belongs to another sender's
-          // transfer, which must not be canceled by this failed attempt.
-          delete state.pending[transferId]
-          await this.persist()
-          throw new RgbInvoiceUnavailableError()
+    if (!delivery.publishedAt || !invoice.proxyInvoiceId) {
+      for (const consignment of consignments) {
+        try {
+          await this.dependencies.transport.publishConsignment(consignment)
+        } catch (error) {
+          // RGB proxy storage binds a recipient ID to its first uploaded file.
+          // A different consignment for that invoice cannot overwrite it, which
+          // means the recipient must issue a new blinded invoice.
+          if (isInvoiceUnavailableUploadError(error)) {
+            // This consignment was never accepted by the proxy and its Bitcoin
+            // transaction was never broadcast. Drop the local prepared state so
+            // its colored and fee-pool inputs are immediately reusable. Do not
+            // send ACK=false: this recipient ID belongs to another sender's
+            // transfer, which must not be canceled by this failed attempt.
+            delete state.pending[transferId]
+            await this.persist()
+            throw new RgbInvoiceUnavailableError()
+          }
+          throw error
         }
-        throw error
       }
-    }
-    if (!delivery.publishedAt) {
-      delivery.publishedAt = this.now()
-      // Publication is replayable from the signed checkpoint. Donations get
-      // a durable pre-broadcast checkpoint below; regular sends await ACK.
-      await this.persist({ skipRecovery: true })
+      if (!delivery.publishedAt) {
+        delivery.publishedAt = this.now()
+        // The v1 proxy operation is immutable after publication. Poll ACKs
+        // without re-preparing it after the recipient responds.
+        await this.persist({ skipRecovery: true })
+      }
     }
     if (pending.request.donation) {
       if (!delivery.donationReadyAt) {

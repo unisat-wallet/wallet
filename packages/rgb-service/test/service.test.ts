@@ -4155,6 +4155,46 @@ describe('RgbService', () => {
     expect(service.getPendingTransfers()).toEqual([])
   })
 
+  it('observes a rejection without re-publishing the immutable proxy operation', async () => {
+    const dependencies = createDependencies()
+    vi.mocked(dependencies.transport.getAcknowledgement!)
+      .mockResolvedValueOnce(undefined)
+      .mockResolvedValueOnce(false)
+    vi.mocked(dependencies.transport.publishConsignment)
+      .mockResolvedValueOnce(undefined)
+      .mockRejectedValue(new Error('RGB proxy ack.prepare failed: Cannot change'))
+    const service = new RgbService(dependencies)
+    const assetId = 'rgb:AQEBAQEB-AQEBAQE-BAQEBAQ-EBAQEBA-QEBAQEB-AQEBAQE'
+    const invoice = encodeWitnessRgbInvoice({
+      network: 'mainnet',
+      scriptPubKey: '512079be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798',
+      assetId,
+      amount: '60',
+      transportEndpoints: [proxyEndpoint],
+      proxyPublicKey: 'ab'.repeat(32),
+    })
+    await service.open(wallet)
+    await service.sync()
+    await service.prepareSend({ assetId, amount: '60', invoice, feeRate: 2 })
+
+    await expect(service.completeSend('transfer-1', 'signed-psbt')).rejects.toThrow(
+      'awaiting recipient acknowledgement'
+    )
+    expect(service.getLocalAssetBalance(assetId)?.spendable).toBe('40')
+
+    await expect(service.syncPendingTransfers()).resolves.toBeUndefined()
+
+    expect(dependencies.transport.publishConsignment).toHaveBeenCalledTimes(1)
+    expect(dependencies.transport.getAcknowledgement).toHaveBeenCalledTimes(2)
+    expect(dependencies.broadcaster.broadcast).not.toHaveBeenCalled()
+    expect(service.getPendingTransfers()).toEqual([])
+    expect(service.getPendingSendHistory()).toEqual([
+      expect.objectContaining({ transferId: 'transfer-1', status: 'rejected' }),
+    ])
+    expect(service.getLocalAssetBalance(assetId)).toMatchObject({ spendable: '100' })
+    expect(service.getLocalAssetBalance(assetId)?.lockedAmount).toBeUndefined()
+  })
+
   it('publishes a donation before broadcasting without requesting an ACK', async () => {
     const dependencies = createDependencies()
     const steps: string[] = []
