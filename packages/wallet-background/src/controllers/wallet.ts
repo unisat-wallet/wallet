@@ -1287,7 +1287,7 @@ export class WalletController extends BaseController {
     return preferenceService.getAddressBalance(address) || defaultBalance
   }
 
-  getAddressHistory = async (params: { address: string; start: number; limit: number }) => {
+  getAddressHistory = async (params: { address: string; start: number; limit: number; locale?: string }) => {
     const data = await walletApiService.bitcoin.getAddressRecentHistory(params)
     // preferenceService.updateAddressHistory(address, data);
     // return data;
@@ -1295,7 +1295,7 @@ export class WalletController extends BaseController {
     return data
   }
 
-  getAddressHistoryDetail = async (params: { address: string; txid: string }) => {
+  getAddressHistoryDetail = async (params: { address: string; txid: string; locale?: string }) => {
     return walletApiService.bitcoin.getAddressHistoryDetail(params)
   }
 

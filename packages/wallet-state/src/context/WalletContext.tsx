@@ -132,8 +132,9 @@ export interface WalletController {
     address: string
     start: number
     limit: number
+    locale?: string
   }) => Promise<AddressHistorySummaryPage>
-  getAddressHistoryDetail: (params: { address: string; txid: string }) => Promise<AddressHistoryTxDetail>
+  getAddressHistoryDetail: (params: { address: string; txid: string; locale?: string }) => Promise<AddressHistoryTxDetail>
   getAddressCacheHistory: (address: string) => Promise<TxHistoryItem[]>
 
   getLocale(): Promise<string>

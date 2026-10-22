@@ -9,7 +9,7 @@ import type { AddressHistorySummaryItem, AddressHistoryTxDetail, Inscription } f
 import { useChain, useCurrentAddress, useI18n, useNavigation, useWallet } from '@unisat/wallet-state';
 
 import styles from './history.module.less';
-import { getHistoryAssetChanges, getHistoryTitleKey } from './historyAssetView';
+import { getHistoryAssetChanges, getHistoryTitle } from './historyAssetView';
 import { HistoryTokenIcon } from './HistoryTokenIcon';
 
 function formatHistoryDateTime(timestamp: number) {
@@ -33,7 +33,7 @@ export function HistoryDetailSheet({ summary, onClose }: { summary: AddressHisto
   const chain = useChain();
   const address = useCurrentAddress();
   const wallet = useWallet();
-  const { t } = useI18n();
+  const { t, locale } = useI18n();
   const [detail, setDetail] = useState<AddressHistoryTxDetail>();
   const [inscription, setInscription] = useState<Inscription>();
   const txid = summary.txid;
@@ -42,7 +42,7 @@ export function HistoryDetailSheet({ summary, onClose }: { summary: AddressHisto
     let active = true;
     if (!address) return;
     wallet
-      .getAddressHistoryDetail({ address, txid })
+      .getAddressHistoryDetail({ address, txid, locale })
       .then((result) => {
         if (active && result?.summary && Array.isArray(result.inputs) && Array.isArray(result.outputs)) {
           setDetail(result);
@@ -54,7 +54,7 @@ export function HistoryDetailSheet({ summary, onClose }: { summary: AddressHisto
     return () => {
       active = false;
     };
-  }, [address, txid, wallet]);
+  }, [address, txid, wallet, locale]);
 
   const resolvedSummary = detail?.summary || summary;
   const { changes } = getHistoryAssetChanges(resolvedSummary);
@@ -84,7 +84,7 @@ export function HistoryDetailSheet({ summary, onClose }: { summary: AddressHisto
   const isSelfTransfer = resolvedSummary.direction === 'self';
   const titleSummary = {
     direction: resolvedSummary.direction,
-    operation: resolvedSummary.operation || summary.operation
+    display: resolvedSummary.display || summary.display
   };
   const isCoin = primary?.asset.kind === 'coin';
   const externalOutputAddresses = [...new Set(detail?.outputs.map((output) => output.address).filter((value) => value && value !== address) || [])];
@@ -104,7 +104,7 @@ export function HistoryDetailSheet({ summary, onClose }: { summary: AddressHisto
     <BottomModal onClose={onClose} bodyStyle={{ padding: 0 }} borderRadius="20px 20px 0 0">
       <div className={styles.detailSheet}>
         <BottomSheetHeader
-          title={t(getHistoryTitleKey(titleSummary, isReceive))}
+          title={getHistoryTitle(titleSummary, isReceive, t)}
           onClose={onClose}
           height={60}
           inset={16}

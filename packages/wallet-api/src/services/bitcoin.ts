@@ -120,11 +120,11 @@ export class BitcoinService {
   /**
    * Get address recent history
    */
-  async getAddressRecentHistory(params: { address: string; start: number; limit: number }): Promise<AddressHistorySummaryPage> {
+  async getAddressRecentHistory(params: { address: string; start: number; limit: number; locale?: string }): Promise<AddressHistorySummaryPage> {
     return this.httpClient.get('/v5/address/history', { query: params })
   }
 
-  async getAddressHistoryDetail(params: { address: string; txid: string }): Promise<AddressHistoryTxDetail> {
+  async getAddressHistoryDetail(params: { address: string; txid: string; locale?: string }): Promise<AddressHistoryTxDetail> {
     return this.httpClient.get('/v5/tx/detail', { query: params })
   }
 

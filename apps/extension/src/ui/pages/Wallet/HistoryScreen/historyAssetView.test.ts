@@ -1,22 +1,25 @@
-import { getHistoryTitleKey } from './historyAssetView';
+import { getHistoryTitle } from './historyAssetView';
 
-describe('getHistoryTitleKey', () => {
-  it('prefers the BRC-20 inscription operation over a receive direction', () => {
+describe('getHistoryTitle', () => {
+  const t = (key: string) => key;
+
+  it('prefers the backend-localized title over a receive direction', () => {
     expect(
-      getHistoryTitleKey(
+      getHistoryTitle(
         {
           direction: 'receive',
-          operation: 'inscribe-transfer'
+          display: { title: 'Inscribe Transfer' }
         },
-        true
+        true,
+        t
       )
-    ).toBe('brc20_history_type_inscribe_transfer');
+    ).toBe('Inscribe Transfer');
   });
 
-  it('keeps existing direction labels when no operation is present', () => {
-    expect(getHistoryTitleKey({ direction: 'receive' }, true)).toBe('receive');
-    expect(getHistoryTitleKey({ direction: 'send' }, false)).toBe('send');
-    expect(getHistoryTitleKey({ direction: 'mixed' }, true)).toBe('mixed');
-    expect(getHistoryTitleKey({ direction: 'self' }, false)).toBe('self_transfer');
+  it('keeps existing direction labels when no display title is present', () => {
+    expect(getHistoryTitle({ direction: 'receive' }, true, t)).toBe('receive');
+    expect(getHistoryTitle({ direction: 'send' }, false, t)).toBe('send');
+    expect(getHistoryTitle({ direction: 'mixed' }, true, t)).toBe('mixed');
+    expect(getHistoryTitle({ direction: 'self' }, false, t)).toBe('self_transfer');
   });
 });

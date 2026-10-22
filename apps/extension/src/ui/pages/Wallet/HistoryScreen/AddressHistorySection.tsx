@@ -18,7 +18,7 @@ import styles from './history.module.less';
 import {
   getHistoryAssetChanges,
   getHistoryDate,
-  getHistoryTitleKey,
+  getHistoryTitle,
   type HistoryAssetChange
 } from './historyAssetView';
 
@@ -100,7 +100,7 @@ function HistoryRow({ item, onClick }: { item: AddressHistorySummaryItem; onClic
   const { changes, total } = getHistoryAssetChanges(item);
   const primary = changes[0];
   if (!primary) return null;
-  const directionLabel = t(getHistoryTitleKey(item, primary.sign === '+'));
+  const directionLabel = getHistoryTitle(item, primary.sign === '+', t);
   const { label: assetCategory, tone } = getHistoryAssetCategory(primary.asset.kind, chain.unit, t);
 
   return (
@@ -195,7 +195,7 @@ function AddressHistoryContent({
 }) {
   const wallet = useWallet();
   const nav = useNavigation();
-  const { t } = useI18n();
+  const { t, locale } = useI18n();
   const [page, setPage] = useState(1);
   const [refreshKey, setRefreshKey] = useState(0);
   const [history, setHistory] = useState<AddressHistorySummaryPage>({ start: 0, total: 0, detail: [] });
@@ -219,7 +219,7 @@ function AddressHistoryContent({
     setLoading(true);
     setError(false);
     wallet
-      .getAddressHistory({ address, start: preview ? 0 : (page - 1) * PAGE_SIZE, limit: PAGE_SIZE })
+      .getAddressHistory({ address, start: preview ? 0 : (page - 1) * PAGE_SIZE, limit: PAGE_SIZE, locale })
       .then((result) => {
         if (active) setHistory(result);
       })
@@ -232,7 +232,7 @@ function AddressHistoryContent({
     return () => {
       active = false;
     };
-  }, [address, wallet, page, preview, refreshKey]);
+  }, [address, wallet, page, preview, refreshKey, locale]);
 
   const visibleItems = history.detail
     .filter((item) => getHistoryAssetChanges(item).total > 0)
