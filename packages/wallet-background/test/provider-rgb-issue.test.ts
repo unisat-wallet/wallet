@@ -74,7 +74,11 @@ describe('provider RGB issue payment gate', () => {
     }))
     vi.mocked(wallet.createRgbUtxosBegin).mockResolvedValue({ toSignData: { psbtHex: 'psbt' } } as any)
     const approval = Reflect.getMetadata('APPROVAL', providerController, 'issueRgbNia')
-    const request = { data: { params: { ...params, toSignData: { psbtHex: 'untrusted' } } } }
+    const request = { data: { params: {
+      ...params,
+      toSignData: { psbtHex: 'untrusted' },
+      serviceFeeSats: 1,
+    } } }
     await approval[1](request)
     expect(wallet.createRgbUtxosBegin).toHaveBeenCalledWith({
       num: 1,
@@ -82,6 +86,7 @@ describe('provider RGB issue payment gate', () => {
       issue: { ticker: 'TOK', name: 'Token', amount: '100', precision: 0 },
     })
     expect(request.data.params.toSignData).toEqual({ psbtHex: 'psbt' })
+    expect(request.data.params.serviceFeeSats).toBe(1500)
   })
 
   it('does not prepare or trust a site-supplied PSBT when retrying a broadcast payment', async () => {

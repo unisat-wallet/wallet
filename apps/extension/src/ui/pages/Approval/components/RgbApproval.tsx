@@ -1,10 +1,11 @@
-import { type ReactNode, useEffect, useState } from 'react';
+import { type ReactNode, useEffect, useRef, useState } from 'react';
 
 import { Button, Card, Column, Content, Footer, Header, Icon, Layout, RGBAssetIcon, Row, Text } from '@/ui/components';
+import LoadingPage from '@/ui/components/LoadingPage';
 import WebsiteBar from '@/ui/components/WebsiteBar';
 import { shortAddress } from '@/ui/utils';
 import type { SignedData, ToSignData } from '@unisat/wallet-shared';
-import { getRgbTokenIconInfo, useApproval, useI18n, useWallet } from '@unisat/wallet-state';
+import { getRgbTokenIconInfo, toRgbDisplayAmount, useApproval, useI18n, useWallet } from '@unisat/wallet-state';
 
 import { useRgbWriteLeaseGuard } from '../../RGB/components/useRgbWriteLeaseGuard';
 import SignPsbt from './SignPsbt';
@@ -37,6 +38,7 @@ interface Props {
       name?: string;
       precision?: number;
       orderId?: string;
+      serviceFeeSats?: number;
       toSignData?: ToSignData;
       invoice?: string;
       receive?: Receive;
@@ -707,32 +709,177 @@ export function RgbIssue({ params: { data, session } }: Props) {
   const { t } = useI18n();
   const { resolveApproval, rejectApproval } = useApproval();
   const { requestWrite, writeLeaseModal } = useRgbWriteLeaseGuard();
-  if (data.toSignData) {
+  const [signing, setSigning] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const submittingRef = useRef(false);
+  const [error, setError] = useState('');
+  const ticker = data.ticker?.trim() || 'RGB';
+  const name = data.name?.trim() || ticker;
+  const atomicSupply = data.amount?.trim() || '-';
+  const displaySupply = toRgbDisplayAmount(atomicSupply, data.precision ?? 0);
+  const supplyLabel = data.ticker?.trim() ? `${displaySupply} ${ticker}` : displaySupply;
+  const hasServiceFee = data.serviceFeeSats !== undefined;
+
+  const onSignIssue = async (signedDatas: SignedData[]) => {
+    if (submittingRef.current) return;
+    const signedPsbt = signedDatas[0]?.psbtHex;
+    if (!signedPsbt) {
+      setError(t('rgb_approval_create_utxo_no_signed_psbt'));
+      setSigning(false);
+      return;
+    }
+
+    submittingRef.current = true;
+    setSubmitting(true);
+    setError('');
+    try {
+      // The write lease was acquired before entering SignPsbt. The wallet
+      // renews it again before broadcasting the signed funding transaction.
+      await resolveApproval({ signedPsbt });
+    } catch (e) {
+      submittingRef.current = false;
+      setError(e instanceof Error ? e.message : String(e));
+      setSigning(false);
+      setSubmitting(false);
+    }
+  };
+
+  if (signing && data.toSignData) {
     return (
       <>
-        <SignPsbt
-          params={{ data: { toSignDatas: [data.toSignData] }, session }}
-          handleCancel={() => void rejectApproval()}
-          handleConfirm={(signedDatas) => void requestWrite(() => void resolveApproval({ signedPsbt: signedDatas[0]?.psbtHex }))}
-        />
+        {submitting ? (
+          <LoadingPage />
+        ) : (
+          <SignPsbt
+            params={{ data: { toSignDatas: [data.toSignData] }, session }}
+            handleCancel={() => setSigning(false)}
+            handleConfirm={(signedDatas) => void onSignIssue(signedDatas)}
+          />
+        )}
         {writeLeaseModal}
       </>
     );
   }
+
   return (
-    <RgbApprovalLayout
-      session={session}
-      title={t('issue_rgb_asset')}
-      description={t('issue_rgb_asset_desc')}
-      rows={[
-        [t('name_label'), data.name || ''],
-        [t('ticker_label'), data.ticker || ''],
-        [t('total_supply'), data.amount || ''],
-        [t('precision_rgb'), String(data.precision ?? 0)],
-        ['Order ID', data.orderId || '']
-      ]}
-      confirmText={t('issue_asset')}
-    />
+    <Layout>
+      <Header>
+        <WebsiteBar session={session} />
+      </Header>
+      <Content>
+        <Column mt="lg" gap="md">
+          <Column gap="xs" itemsCenter>
+            <Text text={t('review_rgb_asset')} preset="title-bold" textCenter />
+            <Text text={t('issue_rgb_asset_desc')} preset="sub" textCenter />
+          </Column>
+
+          <Card
+            style={{
+              display: 'block',
+              padding: 16,
+              overflow: 'hidden',
+              background:
+                'radial-gradient(circle at 88% 5%, rgba(43, 125, 233, 0.22), transparent 38%), linear-gradient(145deg, rgba(36, 175, 122, 0.14), rgba(235, 185, 76, 0.08))',
+              border: '1px solid rgba(235, 185, 76, 0.22)'
+            }}>
+            <Column gap="lg" fullX>
+              <Row justifyBetween itemsCenter gap="md" fullX>
+                <Row itemsCenter gap="md" style={{ minWidth: 0, flex: 1 }}>
+                  <div
+                    style={{
+                      padding: 3,
+                      borderRadius: '50%',
+                      background: 'rgba(255,255,255,0.10)',
+                      boxShadow: '0 8px 24px rgba(0,0,0,0.20)'
+                    }}>
+                    <RGBAssetIcon ticker={ticker} name={name} size={54} />
+                  </div>
+                  <Column gap="xs" style={{ minWidth: 0, flex: 1 }}>
+                    <Text text={name} size="xl" preset="title-bold" max2Lines style={{ wordBreak: 'break-word' }} />
+                    <Text text={ticker} size="sm" color="textDim" style={{ wordBreak: 'break-word' }} />
+                  </Column>
+                </Row>
+                <Row
+                  itemsCenter
+                  gap="xs"
+                  style={{
+                    flexShrink: 0,
+                    padding: '6px 9px',
+                    borderRadius: 999,
+                    background: 'rgba(235, 185, 76, 0.14)',
+                    border: '1px solid rgba(235, 185, 76, 0.20)'
+                  }}>
+                  <Icon icon="rgb" size={12} />
+                  <Text text="NIA" size="xxs" color="gold" preset="bold" />
+                </Row>
+              </Row>
+
+              <div style={{ height: 1, background: 'rgba(255,255,255,0.10)' }} />
+
+              <Column gap="xs">
+                <Text text={t('total_supply')} size="xs" color="textDim" />
+                <Text
+                  text={supplyLabel}
+                  size="xxl"
+                  preset="title-bold"
+                  style={{ wordBreak: 'break-word', letterSpacing: '-0.3px' }}
+                />
+              </Column>
+            </Column>
+          </Card>
+
+          <Card style={{ display: 'block', padding: 0, overflow: 'hidden' }}>
+            <Column gap="zero" fullX>
+              <Row itemsCenter style={{ padding: '13px 14px 11px' }}>
+                <Text text={t('details')} preset="bold" size="sm" />
+              </Row>
+              <div style={{ height: 1, background: 'rgba(255,255,255,0.08)' }} />
+              <Column gap="md" style={{ padding: '13px 14px' }}>
+                <RgbReceiveDetail label={t('name_label')} value={name} />
+                <RgbReceiveDetail label={t('ticker_label')} value={ticker} />
+                <RgbReceiveDetail label="Schema" value="NIA" />
+                <RgbReceiveDetail label={t('precision_rgb')} value={String(data.precision ?? 0)} />
+                <RgbReceiveDetail label="Order ID" value={data.orderId || '-'} />
+                {hasServiceFee ? (
+                  <RgbReceiveDetail label={t('service_fee')} value={`${data.serviceFeeSats} sats`} />
+                ) : null}
+              </Column>
+            </Column>
+          </Card>
+
+          <Row
+            itemsCenter
+            gap="sm"
+            style={{
+              padding: '10px 12px',
+              borderRadius: 10,
+              background: 'rgba(255,255,255,0.04)'
+            }}>
+            <Icon icon="circle-info" size={16} color="textDim" />
+            <Text text={t('decimal_places_tooltip')} size="xs" color="textDim" style={{ lineHeight: '17px' }} />
+          </Row>
+          {error ? <Text text={error} size="sm" color="red" /> : null}
+        </Column>
+      </Content>
+      <Footer>
+        <Row full>
+          <Button text={t('cancel')} preset="default" onClick={() => rejectApproval()} full />
+          <Button
+            text={t(data.toSignData ? 'continue_to_sign' : 'issue_asset')}
+            preset="primary"
+            onClick={() =>
+              void requestWrite(() => {
+                setError('');
+                if (data.toSignData) setSigning(true);
+                else void resolveApproval();
+              })
+            }
+            full
+          />
+        </Row>
+      </Footer>
+      {writeLeaseModal}
+    </Layout>
   );
 }
 

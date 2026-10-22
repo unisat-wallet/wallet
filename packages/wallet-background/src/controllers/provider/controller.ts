@@ -883,7 +883,8 @@ class ProviderController extends BaseController {
   @Reflect.metadata('APPROVAL', ['RgbIssue', async req => {
     const params = req.data.params as {
       orderId: string; ticker: string; name: string; precision: number; amount: string;
-      paymentTxid?: string; toSignData?: ToSignData
+      paymentTxid?: string; toSignData?: ToSignData;
+      serviceFeeSats?: number
     }
     if (!/^[1-9][0-9]*$/.test(params.amount)) throw new Error('invalid RGB issue amount')
     const order = await getRgbIssueWalletOrder(params.orderId)
@@ -896,6 +897,7 @@ class ProviderController extends BaseController {
       throw new Error('RGB issuance order does not match this wallet')
     }
     delete params.toSignData
+    params.serviceFeeSats = order.feeSats
     if (params.paymentTxid && !/^[0-9a-f]{64}$/i.test(params.paymentTxid)) {
       throw new Error('invalid RGB issue payment transaction ID')
     }

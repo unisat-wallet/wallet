@@ -5324,19 +5324,12 @@ export class WalletController extends BaseController {
       action: {
         name: params.issue ? 'Issue RGB asset' : 'Create RGB UTXO',
         description: '',
-        details: [
-          { label: 'UTXO Count', type: PsbtActionDetailType.TEXT, value: String(num) },
-          { label: 'RGB Address', type: PsbtActionDetailType.ADDRESS, value: funding.address },
-          ...(params.payment ? [
-            { label: 'Service Fee', type: PsbtActionDetailType.TEXT, value: `${params.payment.satoshis} sats` },
-            { label: 'Service Fee Address', type: PsbtActionDetailType.ADDRESS, value: params.payment.address },
-          ] : []),
-          ...(params.issue ? [
-            { label: 'Asset', type: PsbtActionDetailType.TEXT, value: `${params.issue.name} (${params.issue.ticker})` },
-            { label: 'Supply', type: PsbtActionDetailType.TEXT, value: `${params.issue.amount} atomic units` },
-            { label: 'Decimals', type: PsbtActionDetailType.TEXT, value: String(params.issue.precision) },
-          ] : []),
-        ],
+        details: params.issue
+          ? []
+          : [
+              { label: 'UTXO Count', type: PsbtActionDetailType.TEXT, value: String(num) },
+              { label: 'RGB Address', type: PsbtActionDetailType.ADDRESS, value: funding.address },
+            ],
         type: PsbtActionType.CUSTOM,
       },
     })

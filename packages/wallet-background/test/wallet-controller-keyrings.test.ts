@@ -1569,10 +1569,7 @@ describe('RGB wallet references', () => {
     expect(wallet.getToSignData).toHaveBeenLastCalledWith(expect.objectContaining({
       action: expect.objectContaining({
         name: 'Issue RGB asset',
-        details: expect.arrayContaining([
-          expect.objectContaining({ label: 'Asset', value: 'Token (TOK)' }),
-          expect.objectContaining({ label: 'Service Fee', value: '1500 sats' }),
-        ]),
+        details: [],
       }),
     }))
   })
