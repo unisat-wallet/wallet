@@ -64,6 +64,34 @@ describe('getHistoryAssetChanges', () => {
     expect(result.total).toBe(1)
   })
 
+  it('shows an Alkanes deploy premine while excluding its BTC payment', () => {
+    const result = getHistoryAssetChanges({
+      ...base,
+      direction: 'mixed',
+      display: {
+        title: 'Deploy',
+        balanceEffect: 'increase',
+        visibleAssetKinds: ['alkanes'],
+      },
+      received: [
+        { kind: 'alkanes', symbol: '10', displayName: 'ASSDDDD', amount: '10', assetId: '2:114' },
+      ],
+      sent: [{ kind: 'coin', symbol: 'BTC', amount: '0.00002' }],
+      receivedCount: 1,
+      sentCount: 1,
+    })
+
+    expect(result).toEqual({
+      changes: [
+        {
+          asset: { kind: 'alkanes', symbol: '10', displayName: 'ASSDDDD', amount: '10', assetId: '2:114' },
+          sign: '+',
+        },
+      ],
+      total: 1,
+    })
+  })
+
   it('keeps the full asset count when the API truncates its preview', () => {
     const result = getHistoryAssetChanges({
       ...base,

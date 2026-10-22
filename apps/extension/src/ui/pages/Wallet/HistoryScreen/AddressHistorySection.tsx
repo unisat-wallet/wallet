@@ -119,7 +119,7 @@ function HistoryRow({ item, onClick }: { item: AddressHistorySummaryItem; onClic
             <span className={`${styles.assetCategoryTag} ${assetCategoryToneClass[tone]}`}>{assetCategory}</span>
             {item.status === 'pending' ? <span className={styles.rowPending}> · {t('history_pending')}</span> : null}
           </span>
-          {item.toAddress && (
+          {item.toAddress && !item.display?.hideCounterparty && (
             <span className={styles.rowSubtitle} title={item.toAddress}>
               {t('to')}: {shortAddress(item.toAddress, 5)}
             </span>

@@ -15,30 +15,36 @@ function isCarrierCoin(asset: AddressHistoryAssetItem, hasOtherAsset: boolean) {
 }
 
 export function getHistoryAssetChanges(item: AddressHistorySummaryItem) {
-  const hasOtherAsset = [...item.received, ...item.sent].some(asset => asset.kind !== 'coin')
-  const hiddenReceived = item.received.filter(asset => isCarrierCoin(asset, hasOtherAsset)).length
-  const hiddenSent = item.sent.filter(asset => isCarrierCoin(asset, hasOtherAsset)).length
+  const visibleKinds = item.display?.visibleAssetKinds
+  const isVisible = (asset: AddressHistoryAssetItem) => !visibleKinds || visibleKinds.includes(asset.kind)
+  const receivedAssets = item.received.filter(isVisible)
+  const sentAssets = item.sent.filter(isVisible)
+  const receivedCount = visibleKinds ? receivedAssets.length : item.receivedCount
+  const sentCount = visibleKinds ? sentAssets.length : item.sentCount
+  const hasOtherAsset = [...receivedAssets, ...sentAssets].some(asset => asset.kind !== 'coin')
+  const hiddenReceived = receivedAssets.filter(asset => isCarrierCoin(asset, hasOtherAsset)).length
+  const hiddenSent = sentAssets.filter(asset => isCarrierCoin(asset, hasOtherAsset)).length
   if (item.display?.balanceEffect === 'neutral') {
-    const assets = [...item.received, ...item.sent]
+    const assets = [...receivedAssets, ...sentAssets]
     const changes = assets
       .filter(asset => !isCarrierCoin(asset, hasOtherAsset))
       .map((asset): HistoryAssetChange => ({ asset, sign: '' }))
     return {
       changes,
-      total: Math.max(item.receivedCount + item.sentCount - hiddenReceived - hiddenSent, changes.length),
+      total: Math.max(receivedCount + sentCount - hiddenReceived - hiddenSent, changes.length),
     }
   }
   if (item.direction === 'self') {
     // The API places all self-owned outputs, including change, in sent. Keep
     // them neutral; their total is not the user-requested transfer amount.
-    const changes = item.sent
+    const changes = sentAssets
       .filter(asset => !isCarrierCoin(asset, hasOtherAsset))
       .map((asset): HistoryAssetChange => ({ asset, sign: '' }))
-    return { changes, total: Math.max(item.sentCount - hiddenSent, changes.length) }
+    return { changes, total: Math.max(sentCount - hiddenSent, changes.length) }
   }
 
-  const received = item.received.filter(asset => !isCarrierCoin(asset, hasOtherAsset))
-  const sent = item.sent.filter(asset => !isCarrierCoin(asset, hasOtherAsset))
+  const received = receivedAssets.filter(asset => !isCarrierCoin(asset, hasOtherAsset))
+  const sent = sentAssets.filter(asset => !isCarrierCoin(asset, hasOtherAsset))
   const changes: HistoryAssetChange[] = [
     ...received.map((asset): HistoryAssetChange => ({ asset, sign: '+' })),
     ...sent.map((asset): HistoryAssetChange => ({ asset, sign: '-' })),
@@ -46,6 +52,6 @@ export function getHistoryAssetChanges(item: AddressHistorySummaryItem) {
 
   return {
     changes,
-    total: Math.max(item.receivedCount + item.sentCount - hiddenReceived - hiddenSent, changes.length),
+    total: Math.max(receivedCount + sentCount - hiddenReceived - hiddenSent, changes.length),
   }
 }

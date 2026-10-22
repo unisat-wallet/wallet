@@ -54,6 +54,7 @@ export interface AddressHistorySummaryItem {
   display?: {
     title: string
     balanceEffect?: 'increase' | 'decrease' | 'neutral'
+    visibleAssetKinds?: AddressHistoryAssetKind[]
     hideAmount?: boolean
     hideCounterparty?: boolean
     hideNetworkFee?: boolean
