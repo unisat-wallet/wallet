@@ -55,6 +55,8 @@ export interface AddressHistorySummaryItem {
     title: string
     balanceEffect?: 'increase' | 'decrease' | 'neutral'
     hideAmount?: boolean
+    hideCounterparty?: boolean
+    hideNetworkFee?: boolean
   }
   /** Unique destination from the history API, when available. */
   toAddress?: string

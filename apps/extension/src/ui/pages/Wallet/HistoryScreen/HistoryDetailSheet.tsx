@@ -155,16 +155,20 @@ export function HistoryDetailSheet({ summary, onClose }: { summary: AddressHisto
                 {t(resolvedSummary.status === 'confirmed' ? 'history_confirmed' : 'history_pending')}
               </span>
             </SummaryRow>
-            <SummaryRow label={t(isReceive ? 'from' : 'to')}>
-              {counterparty ? (
-                <span className={styles.detailAddress}>
-                  <CopyableAddress address={counterparty} copyPosition="after" len={8} color="text" />
-                </span>
-              ) : '—'}
-            </SummaryRow>
-            <SummaryRow label={t('network_fee')}>
-              {fee} <span className={styles.detailUnit}>{chain.unit}</span>
-            </SummaryRow>
+            {!display?.hideCounterparty && (
+              <SummaryRow label={t(isReceive ? 'from' : 'to')}>
+                {counterparty ? (
+                  <span className={styles.detailAddress}>
+                    <CopyableAddress address={counterparty} copyPosition="after" len={8} color="text" />
+                  </span>
+                ) : '—'}
+              </SummaryRow>
+            )}
+            {!display?.hideNetworkFee && (
+              <SummaryRow label={t('network_fee')}>
+                {fee} <span className={styles.detailUnit}>{chain.unit}</span>
+              </SummaryRow>
+            )}
           </div>
         </div>
         <div className={styles.detailFooter}>

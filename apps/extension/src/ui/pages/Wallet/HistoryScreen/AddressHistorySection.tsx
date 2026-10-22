@@ -60,11 +60,17 @@ function HistoryAssetIcon({ asset }: { asset: AddressHistoryAssetItem }) {
   );
 }
 
-function HistoryChange({ change }: { change: HistoryAssetChange }) {
+function HistoryChange({
+  change,
+  hideAmount = false
+}: {
+  change: HistoryAssetChange;
+  hideAmount?: boolean;
+}) {
   const chain = useChain();
   const label =
     change.asset.kind === 'coin' ? chain.unit : change.asset.displayName || change.asset.symbol || change.asset.kind;
-  const value = `${change.sign}${change.asset.amount} ${label}`;
+  const value = hideAmount ? label : `${change.sign}${change.asset.amount} ${label}`;
   return (
     <span className={change.sign === '+' ? styles.receivedAmount : styles.sentAmount} title={value}>
       {value}
@@ -127,9 +133,9 @@ function HistoryRow({ item, onClick }: { item: AddressHistorySummaryItem; onClic
           </span>
         ) : (
           <>
-            {!item.display?.hideAmount && <HistoryChange change={primary} />}
-            {!item.display?.hideAmount && changes[1] && <HistoryChange change={changes[1]} />}
-            {!item.display?.hideAmount && total > 2 && (
+            <HistoryChange change={primary} hideAmount={item.display?.hideAmount} />
+            {changes[1] && <HistoryChange change={changes[1]} hideAmount={item.display?.hideAmount} />}
+            {total > 2 && (
               <span className={styles.moreCount}>{t('history_more_count', String(total - 2))}</span>
             )}
           </>
