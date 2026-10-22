@@ -43,6 +43,7 @@ export type AddressAssetOverviewItem =
       kind: 'brc20' | 'rune' | 'alkanes' | 'rgb'
       tokenId: string
       name: string
+      displayName?: string
       symbol: string
       logo: string
       divisibility: number

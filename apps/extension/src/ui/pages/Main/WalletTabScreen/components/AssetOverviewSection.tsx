@@ -27,7 +27,7 @@ function formatBalance(value: string) {
 function AssetOverviewCard({ item, onClick, isUsdt }: { item: AddressAssetOverviewItem; onClick: () => void; isUsdt: boolean }) {
   const { t } = useI18n();
   const [imageError, setImageError] = useState(false);
-  const name = isToken(item) ? item.name || item.symbol :
+  const name = isToken(item) ? item.displayName || item.name || item.symbol :
     item.kind === 'domain' ? item.category :
     item.kind === 'inscription-summary' ? t('ordinals') : item.name;
   const imageUrl = isUsdt ? './images/icons/protocol/usdt-logo.svg' : isToken(item) ? item.logo :
