@@ -19,6 +19,7 @@ import {
 
 import { useRgbWriteLeaseGuard } from './components/useRgbWriteLeaseGuard';
 import { RGBRejectReceiveConfirmModal } from './components/RGBRejectReceiveConfirmModal';
+import { RGBTransferReasonTooltip } from './components/RGBTransferReasonTooltip';
 
 function getStatusLabel(status: string, t: (key: string) => string, type?: RgbTransferItem['type']) {
   switch (status.toLowerCase()) {
@@ -534,28 +535,27 @@ export function RGBTransferDetailSheet({
 
             <Column fullX style={{ gap: 12 }}>
               <DetailRow label={t('date')} value={formatDate(transfer?.timestamp || 0)} />
-              <DetailRow
-                label={t('status')}
-                value={getStatusLabel(status, t, transfer?.type)}
-                valueColor={getStatusColor(status)}
-              />
+              <Row fullX justifyBetween itemsCenter style={{ minHeight: 32 }}>
+                <Text text={t('status')} style={{ fontSize: 14, fontWeight: 500, color: 'rgba(255,255,255,0.45)' }} />
+                <Row itemsCenter gap="xs">
+                  <Text
+                    text={getStatusLabel(status, t, transfer?.type)}
+                    style={{ fontSize: 14, fontWeight: 500, color: getStatusColor(status) }}
+                  />
+                  {isRejectedReceive || hasValidationFailure ? (
+                    <RGBTransferReasonTooltip
+                      label={t(hasValidationFailure ? 'rgb_validation_reason' : 'rgb_rejection_reason')}
+                      reason={transfer?.rejectionReason || t('rgb_rejection_reason_unavailable')}
+                    />
+                  ) : null}
+                </Row>
+              </Row>
               {expectedChange !== undefined ? (
                 <>
                   <DetailRow label={t('rgb_reserved_for_pending_send')} value={toRgbDisplayAmount(reservedAmount!.toString(), getRgbTokenPrecision(transfer))} />
                   <DetailRow label={t('rgb_sending_amount')} value={displayAmount} />
                   <DetailRow label={t('rgb_expected_change')} value={toRgbDisplayAmount(expectedChange.toString(), getRgbTokenPrecision(transfer))} />
                 </>
-              ) : null}
-              {isRejectedReceive || hasValidationFailure ? (
-                <Column fullX gap="xs" style={{ paddingTop: 4, paddingBottom: 4 }}>
-                  <Text text={t(hasValidationFailure ? 'rgb_validation_reason' : 'rgb_rejection_reason')} color="textDim" size="sm" />
-                  <Text
-                    text={transfer?.rejectionReason || t('rgb_rejection_reason_unavailable')}
-                    color="white"
-                    size="sm"
-                    wrap
-                  />
-                </Column>
               ) : null}
               {isRejectedReceive && transfer?.amount ? (
                 <DetailRow label={t('amount')} value={displayAmount} />

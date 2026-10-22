@@ -17,6 +17,7 @@ import {
 
 import { RGBTransferNotificationPanel } from './components/RGBTransferNotificationPanel';
 import { RGBRejectReceiveConfirmModal } from './components/RGBRejectReceiveConfirmModal';
+import { RGBTransferReasonTooltip } from './components/RGBTransferReasonTooltip';
 
 function getStatusLabel(status: string, t: (key: string) => string, type?: RgbTransferItem['type']) {
   switch (status.toLowerCase()) {
@@ -34,6 +35,8 @@ function getStatusLabel(status: string, t: (key: string) => string, type?: RgbTr
       return t('rgb_status_broadcast_failed');
     case 'pending_accept':
       return t('rgb_status_pending_accept');
+    case 'validation_failed':
+      return t('rgb_status_validation_failed');
     case 'confirming':
     case 'pending':
     case 'unconfirmed':
@@ -78,7 +81,7 @@ function isConfirmedStatus(status: string) {
 }
 
 function isFailedStatus(status: string) {
-  return ['canceled', 'cancelled', 'rejected', 'broadcast_failed', 'failed'].includes(status.toLowerCase());
+  return ['canceled', 'cancelled', 'rejected', 'validation_failed', 'broadcast_failed', 'failed'].includes(status.toLowerCase());
 }
 
 export default function RGBTransferDetailScreen() {
@@ -120,6 +123,8 @@ export default function RGBTransferDetailScreen() {
 
   const isConfirmed = isConfirmedStatus(status);
   const isFailed = isFailedStatus(status);
+  const isRejectedReceive = transfer?.type === 'receive' && status.toLowerCase() === 'rejected';
+  const hasValidationFailure = transfer?.type === 'receive' && status.toLowerCase() === 'validation_failed';
   const isIssue = transfer?.type === 'issue';
   const recordId = isIssue ? transfer?.txid : transfer?.transferId || transferId;
 
@@ -164,14 +169,22 @@ export default function RGBTransferDetailScreen() {
           ) : (
             <TxResultStatusMark pending={!isConfirmed} />
           )}
-          <Text
-            preset="title"
-            text={statusLabel}
-            textCenter
-            style={{
-              color: isConfirmed ? '#7CDB98' : isFailed ? '#EE344C' : '#F4B62C'
-            }}
-          />
+          <Row itemsCenter gap="xs">
+            <Text
+              preset="title"
+              text={statusLabel}
+              textCenter
+              style={{
+                color: isConfirmed ? '#7CDB98' : isFailed ? '#EE344C' : '#F4B62C'
+              }}
+            />
+            {isRejectedReceive || hasValidationFailure ? (
+              <RGBTransferReasonTooltip
+                label={t(hasValidationFailure ? 'rgb_validation_reason' : 'rgb_rejection_reason')}
+                reason={transfer?.rejectionReason || t('rgb_rejection_reason_unavailable')}
+              />
+            ) : null}
+          </Row>
           {description ? <Text preset="sub" text={description} color="textDim" textCenter /> : null}
         </Column>
 
