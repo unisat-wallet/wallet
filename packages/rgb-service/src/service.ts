@@ -492,26 +492,33 @@ export class RgbService {
     // accept the remote state again, once it includes any local burn change.
     if (this.hasStaleBroadcastedFundingOutpoints(snapshot)) return state.snapshot
     if (await this.reconcileLocalBurnChange(snapshot)) return state.snapshot
-    // A replica can briefly return the same live outpoint without the
-    // allocation we have already validated and settled. Re-publish the local
-    // observation rather than treating that omission as a zero balance.
+    // A replica can briefly omit a validated allocation or return its old
+    // pending state after local confirmation. Keep the settled observation
+    // until the replica catches up.
     const remoteOutpoints = new Map(snapshot.utxos.map(utxo => [outpointKey(utxo), utxo]))
-    const missingAllocation = state.snapshot.utxos.find(local => {
+    const staleAllocation = state.snapshot.utxos.find(local => {
       const remote = remoteOutpoints.get(outpointKey(local))
       return remote &&
         local.chainStatus !== 'spent' && local.chainStatus !== 'replaced' &&
+        remote.chainStatus !== 'spent' && remote.chainStatus !== 'replaced' &&
+        remote.chainStatus !== 'pending_spend' &&
         local.scriptPubKey === remote.scriptPubKey && local.satoshis === remote.satoshis &&
-        local.allocations.some(allocation =>
-        !remote.allocations.some(candidate =>
-          candidate.opId === allocation.opId &&
-          candidate.assignmentIndex === allocation.assignmentIndex &&
-          candidate.assetId === allocation.assetId
-        )
-      )
+        local.allocations.some(allocation => {
+          const candidate = remote.allocations.find(candidate =>
+            candidate.opId === allocation.opId &&
+            candidate.assignmentIndex === allocation.assignmentIndex &&
+            candidate.assetId === allocation.assetId
+          )
+          return !candidate || candidate.amount !== allocation.amount || (
+            local.chainStatus === 'confirmed' && allocation.settled &&
+            (remote.chainStatus === 'mempool' ||
+              !candidate.settled || (allocation.spendable && !candidate.spendable))
+          )
+        })
     })
-    if (missingAllocation) {
+    if (staleAllocation) {
       state.pendingUtxoSync = {
-        txid: missingAllocation.outpoint.txid,
+        txid: staleAllocation.outpoint.txid,
         outpoints: state.snapshot.utxos,
       }
       await this.persist()
@@ -2004,6 +2011,15 @@ export class RgbService {
     if (!utxo) return false
     if (deferConfirmedSettlement) return 'snapshot_required' as const
     const assetId = normalizeAssetId(validated.assetId)
+    const existingAllocation = utxo.allocations.find(allocation =>
+      allocation.opId === validated.opId &&
+      allocation.assignmentIndex === validated.assignmentIndex
+    )
+    if (existingAllocation &&
+      (normalizeAssetId(existingAllocation.assetId) !== assetId ||
+        existingAllocation.amount !== validated.amount)) {
+      throw new RgbServiceError('RGB receive allocation conflicts with the validated consignment')
+    }
     // Do this before mutating the allocation/receive state. A conflicting or
     // malformed branch must reject atomically rather than leave a spendable
     // UTXO whose required DAG was not durably retained.
@@ -2018,13 +2034,10 @@ export class RgbService {
         metadata: validated.decoded.metadata,
       })
     }
-    if (
-      !utxo.allocations.some(
-        allocation =>
-          allocation.opId === validated.opId &&
-          allocation.assignmentIndex === validated.assignmentIndex
-      )
-    ) {
+    if (existingAllocation) {
+      existingAllocation.settled = true
+      existingAllocation.spendable = true
+    } else {
       utxo.allocations.push({
         assetId: validated.assetId,
         amount: validated.amount,
@@ -2034,6 +2047,10 @@ export class RgbService {
         assignmentIndex: validated.assignmentIndex,
         assignmentType: 4000,
       })
+    }
+    if (!utxo.chainStatus || utxo.chainStatus === 'mempool' || utxo.chainStatus === 'confirmed') {
+      utxo.chainStatus = 'confirmed'
+      utxo.confirmations = chain.confirmations
     }
     state.pendingUtxoSync = {
       txid: utxo.outpoint.txid,

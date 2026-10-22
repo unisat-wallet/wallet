@@ -1874,6 +1874,42 @@ describe('RgbService', () => {
     expect(service.getPendingUtxoSync()?.txid).toBe(local.outpoint.txid)
   })
 
+  it.each(['mempool', 'confirmed'] as const)(
+    'keeps a locally confirmed allocation settled while the indexer reports %s with pending color',
+    async remoteStatus => {
+      const dependencies = createDependencies()
+      const service = new RgbService(dependencies)
+      await service.open(wallet)
+      await service.sync()
+      const local = service.getSnapshot().utxos[0]!
+      local.chainStatus = 'confirmed'
+      local.confirmations = 1
+      const assetId = local.allocations[0]!.assetId
+      vi.mocked(dependencies.stateSource.getSnapshot).mockResolvedValueOnce({
+        syncedAt: 2,
+        utxos: [{
+          ...local,
+          chainStatus: remoteStatus,
+          confirmations: remoteStatus === 'confirmed' ? 1 : 0,
+          allocations: local.allocations.map(allocation => ({
+            ...allocation, settled: false, spendable: false,
+          })),
+        }, service.getSnapshot().utxos[1]!],
+      })
+
+      await service.sync()
+
+      expect(service.getLocalAssetBalance(assetId)).toMatchObject({
+        settled: '100', spendable: '100', pending: '0',
+      })
+      expect(service.getSnapshot().utxos[0]).toMatchObject({
+        chainStatus: 'confirmed',
+        allocations: [expect.objectContaining({ settled: true, spendable: true })],
+      })
+      expect(service.getPendingUtxoSync()?.txid).toBe(local.outpoint.txid)
+    }
+  )
+
   it.each(['change', 'blind'] as const)(
     'recovers a lost v1 %s allocation from accepted history and a confirmed wallet output',
     async recipient => {
@@ -3549,6 +3585,53 @@ describe('RgbService', () => {
     )
     expect(result).toBe(false)
     expect(dependencies.stateSource.getTransactionStatus).toHaveBeenCalledWith(wallet, 'c'.repeat(64))
+  })
+
+  it('settles an existing pending witness allocation after chain confirmation', async () => {
+    const dependencies = createDependencies()
+    dependencies.stateSource.getTransactionStatus = vi.fn().mockResolvedValue({
+      status: 'confirmed', confirmations: 1,
+    })
+    const service = new RgbService(dependencies)
+    await service.open(wallet)
+    const txid = 'e'.repeat(64)
+    const assetId = 'rgb:AQEBAQEB-AQEBAQE-BAQEBAQ-EBAQEBA-QEBAQEB-AQEBAQE'
+    const allocation = {
+      assetId, amount: '60', settled: false, spendable: false,
+      opId: 'f'.repeat(64), assignmentIndex: 0, assignmentType: 4000,
+    }
+    ;(service as any).state.snapshot.utxos = [{
+      outpoint: { txid, vout: 0 }, satoshis: 1000,
+      scriptPubKey: `5120${'11'.repeat(32)}`, publicKey: `02${'22'.repeat(32)}`,
+      chainStatus: 'mempool', confirmations: 0,
+      allocations: [allocation],
+    }]
+    vi.spyOn(service as any, 'storeAcceptedHistory').mockImplementation(() => undefined)
+    const receive = {
+      invoice: rgbInvoice(), recipientId: 'recipient', recipientType: 'witness', createdAt: 1,
+      receivedConsignment: { txid, receivedAt: 1, accepted: true, assetId, amount: '60', precision: 0 },
+    }
+
+    const result = await (service as any).advanceAcceptedReceive(
+      receive, { recipientId: 'recipient', payload: 'consignment' },
+      {
+        txid, vout: 0, assetId, amount: '60', opId: allocation.opId,
+        assignmentIndex: 0,
+        decoded: {
+          genesis: { strict: new Uint8Array() },
+          metadata: { ticker: 'TOK', name: 'Token', precision: 0, schema: 'NIA', issuedSupply: '60' },
+        },
+      }, false
+    )
+
+    expect(result).toBe(true)
+    expect(service.getSnapshot().utxos[0]).toMatchObject({
+      chainStatus: 'confirmed', confirmations: 1,
+      allocations: [{ settled: true, spendable: true }],
+    })
+    expect(service.getLocalAssetBalance(assetId)).toMatchObject({
+      settled: '60', spendable: '60', pending: '0',
+    })
   })
 
   it('reconciles a persisted ACK intent after restart without requiring the proxy payload', async () => {
