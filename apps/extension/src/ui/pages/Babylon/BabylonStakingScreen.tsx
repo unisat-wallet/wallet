@@ -18,6 +18,15 @@ const formatter = Intl.NumberFormat('en', {
   maximumFractionDigits: 2
 });
 
+const BABYLON_REQUEST_TIMEOUT_MS = 15_000;
+
+function withTimeout<T>(request: Promise<T>): Promise<T> {
+  return new Promise((resolve, reject) => {
+    const timeoutId = setTimeout(() => reject(new Error('Request timed out')), BABYLON_REQUEST_TIMEOUT_MS);
+    request.then(resolve, reject).finally(() => clearTimeout(timeoutId));
+  });
+}
+
 export function NotSupportedLayout() {
   const { t } = useI18n();
   return (
@@ -380,7 +389,8 @@ export default function BabylonStakingScreen() {
 
   const [addressLoading, setAddressLoading] = useState(true);
   const [summaryLoading, setSummaryLoading] = useState(true);
-  const [statusLoading, setStatusLoading] = useState(true);
+  const [loadError, setLoadError] = useState('');
+  const [loadAttempt, setLoadAttempt] = useState(0);
 
   const [babylonConfigV2, setBabylonConfigV2] = useState<BabylonConfigV2>();
 
@@ -408,31 +418,52 @@ export default function BabylonStakingScreen() {
   }, [babylonAddressSummary.rewardBalance, babylonChain.stakeCurrency.coinDecimals]);
 
   useEffect(() => {
+    let active = true;
+
     const loadSummary = async () => {
+      setAddressLoading(true);
+      setSummaryLoading(true);
+      setLoadError('');
+
       try {
-        const address = await wallet.getBabylonAddress(babylonConfig.chainId);
+        const address = await withTimeout(wallet.getBabylonAddress(babylonConfig.chainId));
+        if (!active) return;
+        if (!address) throw new Error('Babylon address is unavailable');
         setBabylonAddressSummary((prev) => ({ ...prev, address }));
         setAddressLoading(false);
 
-        const babylonConfigV2 = await wallet.getBabylonConfig();
+        const babylonConfigV2 = await withTimeout(wallet.getBabylonConfig());
+        if (!active) return;
         setBabylonConfigV2(babylonConfigV2);
         setSummaryLoading(false);
 
         if (babylonConfigV2 && babylonConfigV2.phase2.state === BabylonPhaseState.ACTIVE) {
-          const summary = await wallet.getBabylonAddressSummary(babylonConfig.chainId, babylonConfigV2);
+          const summary = await withTimeout(
+            wallet.getBabylonAddressSummary(babylonConfig.chainId, babylonConfigV2)
+          );
+          if (!active) return;
+          if (!summary) throw new Error('Babylon account summary is unavailable');
           setBabylonAddressSummary(summary);
-          setStatusLoading(false);
         }
       } catch (e) {
-        tools.toastError((e as any).message);
+        if (!active) return;
+        const message = e instanceof Error ? e.message : t('load_failed');
+        console.error('Failed to load Babylon staking data', e);
+        setLoadError(message);
+        tools.toastError(message);
       } finally {
-        setSummaryLoading(false);
-        setStatusLoading(false);
+        if (active) {
+          setAddressLoading(false);
+          setSummaryLoading(false);
+        }
       }
     };
 
-    loadSummary();
-  }, []);
+    void loadSummary();
+    return () => {
+      active = false;
+    };
+  }, [babylonConfig.chainId, loadAttempt, t, tools, wallet]);
 
   let networkPrefix = '';
   if (chainType !== ChainType.BITCOIN_MAINNET) {
@@ -444,12 +475,32 @@ export default function BabylonStakingScreen() {
       <Layout>
         <Header
           onBack={() => {
-            window.history.go(-1);
+            navigate('DiscoverTabScreen');
           }}
           title={t('babylon_bitcoin_staking')}
         />
         <Content>
           <Loading />
+        </Content>
+      </Layout>
+    );
+  }
+
+  if (loadError) {
+    return (
+      <Layout>
+        <Header
+          onBack={() => {
+            navigate('DiscoverTabScreen');
+          }}
+          title={t('babylon_bitcoin_staking')}
+        />
+        <Content justifyCenter itemsCenter>
+          <Column itemsCenter gap="lg" style={{ width: '100%' }}>
+            <Text text={t('load_failed')} preset="title-bold" />
+            <Text text={loadError} color="white_muted" textCenter />
+            <Button text={t('try_again')} onClick={() => setLoadAttempt((value) => value + 1)} />
+          </Column>
         </Content>
       </Layout>
     );

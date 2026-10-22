@@ -50,7 +50,7 @@ export const BABYLON_CONFIG_MAP: { [key: string]: BabylonConfig } = {
     chainId: 'bbn-1',
   },
   [BabylonChainType.BITCOIN_SIGNET]: {
-    chainId: 'bbn-test-5',
+    chainId: 'bbn-test-6',
   },
 }
 

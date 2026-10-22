@@ -1,10 +1,10 @@
-export const bbnTestnet5 = {
-  chainId: 'bbn-test-5',
+export const bbnTestnet6 = {
+  chainId: 'bbn-test-6',
   chainName: 'Babylon Phase-2 Testnet',
   chainSymbolImageUrl:
     'https://raw.githubusercontent.com/chainapsis/keplr-chain-registry/main/images/bbn-test/chain.png',
-  rpc: 'https://babylon-testnet-rpc.nodes.guru',
-  rest: 'https://babylon-testnet-api.nodes.guru',
+  rpc: 'https://babylon-testnet-rpc.polkachu.com',
+  rest: 'https://babylon-testnet-api.polkachu.com',
   nodeProvider: {
     name: 'Babylonlabs',
     email: 'contact@babylonlabs.io',
@@ -170,14 +170,14 @@ export const bbnMainnet = {
   explorer: 'https://babylon.explorers.guru',
 }
 
-export const COSMOS_CHAINS = ['bbn-test-5', 'devnet-9', 'bbn-1']
+export const COSMOS_CHAINS = ['bbn-test-6', 'devnet-9', 'bbn-1']
 
-export type CosmosChainInfo = typeof bbnTestnet5
+export type CosmosChainInfo = typeof bbnTestnet6
 
 export const COSMOS_CHAINS_MAP: {
   [key: string]: CosmosChainInfo
 } = {
-  'bbn-test-5': bbnTestnet5,
+  'bbn-test-6': bbnTestnet6,
   'devnet-9': bbnDevnet,
   'bbn-1': bbnMainnet,
 }

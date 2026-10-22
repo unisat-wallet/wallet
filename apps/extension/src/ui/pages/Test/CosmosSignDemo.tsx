@@ -22,7 +22,7 @@ export default function CosmosSignDemo() {
     signData: '',
     dataType: CosmosSignDataType.COSMOS_AMINO,
     path: "m/84'/0'/0'/0/0",
-    chainId: 'bbn-test-5',
+    chainId: 'bbn-test-6',
     accountNumber: '0',
     address: signerAddress
   };
