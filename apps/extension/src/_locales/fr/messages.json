@@ -3446,7 +3446,6 @@
   "rgb_sending_amount": { "message": "Envoi" },
   "rgb_expected_change": { "message": "Monnaie estimée" },
   "rgb_estimated_balance_after_send": { "message": "Après l’envoi (estimation)" },
-  "rgb_send_not_deducted_yet": { "message": "Pas encore déduit du solde actuel" },
   "rgb_balance_processing": {
     "message": "En cours"
   },

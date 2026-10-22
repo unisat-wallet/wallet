@@ -3460,7 +3460,6 @@
   "rgb_sending_amount": { "message": "Sending" },
   "rgb_expected_change": { "message": "Expected change" },
   "rgb_estimated_balance_after_send": { "message": "After send (estimated)" },
-  "rgb_send_not_deducted_yet": { "message": "Not yet deducted from the current balance" },
   "rgb_balance_processing": {
     "message": "Processing"
   },

@@ -523,7 +523,6 @@ export function RGBTransferDetailSheet({
             </Row>
 
             {description ? <Text text={description} color="textDim" textCenter size="xs" /> : null}
-            {isUnbroadcastSend ? <Text text={t('rgb_send_not_deducted_yet')} color="textDim" textCenter size="xs" /> : null}
             {canBroadcast && remainingBroadcastCount > 0 ? (
               <Text
                 text={`${t('rgb_more_transfers_to_broadcast')}: ${remainingBroadcastCount}`}

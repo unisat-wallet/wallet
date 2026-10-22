@@ -101,8 +101,6 @@ export function RGBTransferListItem({
   const assetName = item.name?.trim() || '';
   const status = item.status.toLowerCase();
   const pending = isPending(item.status);
-  const isUnbroadcastSend = item.type === 'send' && !item.burn &&
-    ['signed', 'waiting_ack', 'ready_to_broadcast'].includes(status);
   const showStatus = item.type !== 'issue' && (pending || ['canceled', 'cancelled', 'rejected'].includes(status));
   const isReceive = item.type === 'receive';
   const isCanceledReceive = isReceive && ['canceled', 'cancelled'].includes(status);
@@ -185,9 +183,6 @@ export function RGBTransferListItem({
               </Row>
             ) : transferTime ? (
               <Text text={transferTime} preset="sub" />
-            ) : null}
-            {isUnbroadcastSend ? (
-              <Text text={t('rgb_send_not_deducted_yet')} size="xs" color="textDim" wrap />
             ) : null}
           </Column>
         </Row>

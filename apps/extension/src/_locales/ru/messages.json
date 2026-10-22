@@ -3446,7 +3446,6 @@
   "rgb_sending_amount": { "message": "Отправляется" },
   "rgb_expected_change": { "message": "Ожидаемая сдача" },
   "rgb_estimated_balance_after_send": { "message": "После отправки (оценка)" },
-  "rgb_send_not_deducted_yet": { "message": "Пока не вычтено из текущего баланса" },
   "rgb_balance_processing": {
     "message": "Обработка"
   },
