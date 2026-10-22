@@ -72,8 +72,7 @@ export default function RGBTokenScreen() {
   const assetId = routeAssetId || tokenInfo?.assetId || '';
   const precision = getRgbTokenPrecision(tokenBalance) || getRgbTokenPrecision(tokenInfo);
   const totalAtomicAmount = getRgbTotalAtomicAmount(tokenBalance);
-  const totalBalance =
-    totalAtomicAmount === undefined ? '--' : toRgbDisplayAmount(totalAtomicAmount, precision);
+  const totalBalance = totalAtomicAmount === undefined ? '--' : toRgbDisplayAmount(totalAtomicAmount, precision);
   const spendable =
     tokenBalance?.spendable === undefined ? '--' : toRgbDisplayAmount(tokenBalance.spendable, precision);
   const pendingAmount = toRgbDisplayAmount(tokenBalance?.pending, precision);
@@ -94,14 +93,17 @@ export default function RGBTokenScreen() {
     : BigInt(0);
   const showSendBreakdown = reservedSendAtomic > BigInt(0) && balanceLockedAtomic >= reservedSendAtomic;
   const remainingLockedAtomic = balanceLockedAtomic - (showSendBreakdown ? reservedSendAtomic : BigInt(0));
-  const estimatedBalanceAtomic = showSendBreakdown && totalAtomicAmount && /^\d+$/.test(totalAtomicAmount) &&
-    !Number(tokenBalance?.pending || 0) && BigInt(totalAtomicAmount) >= outgoingAtomic
-    ? BigInt(totalAtomicAmount) - outgoingAtomic
-    : undefined;
+  const estimatedBalanceAtomic =
+    showSendBreakdown &&
+    totalAtomicAmount &&
+    /^\d+$/.test(totalAtomicAmount) &&
+    !Number(tokenBalance?.pending || 0) &&
+    BigInt(totalAtomicAmount) >= outgoingAtomic
+      ? BigInt(totalAtomicAmount) - outgoingAtomic
+      : undefined;
   const balanceSize = totalBalance.length > 24 ? 'lg' : totalBalance.length > 16 ? 'xl' : 'xxl';
   const isBfa = String(tokenInfo?.schema || tokenBalance?.schema || '').toUpperCase() === 'BFA';
-  const showUsdtPrice =
-    chain.showPrice && isConfiguredRgbUsdt(assetId, configuredUsdtAssetId) && totalBalance !== '--';
+  const showUsdtPrice = chain.showPrice && isConfiguredRgbUsdt(assetId, configuredUsdtAssetId) && totalBalance !== '--';
 
   const renderTabChildren = useMemo(() => {
     if (activeTab === RGBTokenScreenTabKey.DETAILS) {
@@ -205,7 +207,14 @@ export default function RGBTokenScreen() {
               />
             </Column>
             <Column itemsCenter fullX justifyCenter>
-              <Text text={t(showSendBreakdown && !Number(tokenBalance?.pending || 0) ? 'rgb_current_balance' : 'total_balance')} size="xxs" color="textDim" textCenter />
+              <Text
+                text={t(
+                  showSendBreakdown && !Number(tokenBalance?.pending || 0) ? 'rgb_current_balance' : 'total_balance'
+                )}
+                size="xxs"
+                color="textDim"
+                textCenter
+              />
               <Text
                 text={totalBalance}
                 preset="bold"
@@ -221,27 +230,40 @@ export default function RGBTokenScreen() {
                   <Text text={formatRgbUsdtValue(totalBalance)} size="md" color="textDim" textCenter disableTranslate />
                 </Column>
               ) : null}
-              <Text
-                text={`${t('available_balance')}: ${spendable}`}
-                size="xs"
-                color="textDim"
-                textCenter
-                wrap
-              />
+              <Text text={`${t('available_balance')}: ${spendable}`} size="xs" color="textDim" textCenter wrap />
               {Number(tokenBalance?.pending || 0) > 0 ? (
                 <Text text={`${t('pending')}: ${pendingAmount}`} size="xs" color="gold" textCenter wrap />
               ) : null}
               {showSendBreakdown ? (
-                <Column fullX gap="xs" itemsCenter style={{ marginTop: 10, padding: 12, borderRadius: 8, background: 'rgba(244, 182, 44, 0.08)', boxSizing: 'border-box' }}>
+                <Column
+                  fullX
+                  gap="xs"
+                  itemsCenter
+                  style={{
+                    marginTop: 10,
+                    padding: 12,
+                    borderRadius: 8,
+                    background: 'rgba(244, 182, 44, 0.08)',
+                    boxSizing: 'border-box'
+                  }}>
                   <Text
-                    text={`${t('rgb_reserved_for_pending_send')}: ${toRgbDisplayAmount(reservedSendAtomic.toString(), precision)}`}
+                    text={`${t('rgb_reserved_for_pending_send')}: ${toRgbDisplayAmount(
+                      reservedSendAtomic.toString(),
+                      precision
+                    )}`}
                     size="xs"
                     color="gold"
                     textCenter
                     wrap
                   />
                   <Text
-                    text={`${t('rgb_sending_amount')}: ${toRgbDisplayAmount(outgoingAtomic.toString(), precision)} · ${t('rgb_expected_change')}: ${toRgbDisplayAmount((reservedSendAtomic - outgoingAtomic).toString(), precision)}`}
+                    text={`${t('rgb_sending_amount')}: ${toRgbDisplayAmount(
+                      outgoingAtomic.toString(),
+                      precision
+                    )} · ${t('rgb_expected_change')}: ${toRgbDisplayAmount(
+                      (reservedSendAtomic - outgoingAtomic).toString(),
+                      precision
+                    )}`}
                     size="xs"
                     color="textDim"
                     textCenter
@@ -249,7 +271,10 @@ export default function RGBTokenScreen() {
                   />
                   {estimatedBalanceAtomic !== undefined ? (
                     <Text
-                      text={`${t('rgb_estimated_balance_after_send')}: ${toRgbDisplayAmount(estimatedBalanceAtomic.toString(), precision)}`}
+                      text={`${t('rgb_estimated_balance_after_send')}: ${toRgbDisplayAmount(
+                        estimatedBalanceAtomic.toString(),
+                        precision
+                      )}`}
                       size="xs"
                       color="textDim"
                       textCenter
@@ -259,7 +284,16 @@ export default function RGBTokenScreen() {
                 </Column>
               ) : null}
               {remainingLockedAtomic > BigInt(0) ? (
-                <Text text={`${t('rgb_amount_locking')}: ${toRgbDisplayAmount(remainingLockedAtomic.toString(), precision)}`} size="xs" color="gold" textCenter wrap />
+                <Text
+                  text={`${t('rgb_amount_locking')}: ${toRgbDisplayAmount(
+                    remainingLockedAtomic.toString(),
+                    precision
+                  )}`}
+                  size="xs"
+                  color="gold"
+                  textCenter
+                  wrap
+                />
               ) : null}
             </Column>
           </Column>
@@ -304,7 +338,7 @@ export default function RGBTokenScreen() {
               text={t('send')}
               preset="brc20-action"
               icon="send"
-              onClick={() => void requestWrite(onClickSend)}
+              onClick={() => onClickSend()}
               disabled={!enableTransfer}
               full
               textStyle={{ fontSize: 14 }}
