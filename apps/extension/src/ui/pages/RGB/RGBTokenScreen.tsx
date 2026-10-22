@@ -343,7 +343,7 @@ export default function RGBTokenScreen() {
           }}
           onCreateInvoice={() => {
             setReceiveSelectorOpen(false);
-            void requestWrite(onClickReceive);
+            onClickReceive();
           }}
         />
       )}
