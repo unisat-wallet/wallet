@@ -18,6 +18,16 @@ export function getHistoryAssetChanges(item: AddressHistorySummaryItem) {
   const hasOtherAsset = [...item.received, ...item.sent].some(asset => asset.kind !== 'coin')
   const hiddenReceived = item.received.filter(asset => isCarrierCoin(asset, hasOtherAsset)).length
   const hiddenSent = item.sent.filter(asset => isCarrierCoin(asset, hasOtherAsset)).length
+  if (item.display?.balanceEffect === 'neutral') {
+    const assets = [...item.received, ...item.sent]
+    const changes = assets
+      .filter(asset => !isCarrierCoin(asset, hasOtherAsset))
+      .map((asset): HistoryAssetChange => ({ asset, sign: '' }))
+    return {
+      changes,
+      total: Math.max(item.receivedCount + item.sentCount - hiddenReceived - hiddenSent, changes.length),
+    }
+  }
   if (item.direction === 'self') {
     // The API places all self-owned outputs, including change, in sent. Keep
     // them neutral; their total is not the user-requested transfer amount.

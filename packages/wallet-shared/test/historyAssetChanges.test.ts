@@ -46,6 +46,24 @@ describe('getHistoryAssetChanges', () => {
     expect(result.changes.map(change => `${change.sign}${change.asset.symbol}`)).toEqual(['+PEPE', '-BTC'])
   })
 
+  it('keeps operation assets neutral when the backend says the balance is unchanged', () => {
+    const result = getHistoryAssetChanges({
+      ...base,
+      direction: 'receive',
+      display: { title: 'Inscribe Transfer', balanceEffect: 'neutral' },
+      received: [
+        { kind: 'coin', symbol: 'BTC', amount: '0.0000033' },
+        { kind: 'brc20', symbol: 'ORDI', amount: '10' },
+      ],
+      receivedCount: 2,
+    })
+
+    expect(result.changes).toEqual([
+      { asset: { kind: 'brc20', symbol: 'ORDI', amount: '10' }, sign: '' },
+    ])
+    expect(result.total).toBe(1)
+  })
+
   it('keeps the full asset count when the API truncates its preview', () => {
     const result = getHistoryAssetChanges({
       ...base,

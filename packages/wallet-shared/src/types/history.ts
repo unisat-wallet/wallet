@@ -53,6 +53,7 @@ export interface AddressHistorySummaryItem {
   /** Localized, backend-controlled presentation metadata. */
   display?: {
     title: string
+    balanceEffect?: 'increase' | 'decrease' | 'neutral'
   }
   /** Unique destination from the history API, when available. */
   toAddress?: string

@@ -80,7 +80,7 @@ export function HistoryDetailSheet({ summary, onClose }: { summary: AddressHisto
     };
   }, [inscriptionId, wallet]);
 
-  const isReceive = primary?.sign === '+';
+  const isReceive = resolvedSummary.direction === 'receive' || primary?.sign === '+';
   const isSelfTransfer = resolvedSummary.direction === 'self';
   const titleSummary = {
     direction: resolvedSummary.direction,
