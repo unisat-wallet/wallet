@@ -52,6 +52,7 @@ import type {
   RgbReceivedConsignment,
   RgbPendingIssue,
   RgbPendingAssetMetadata,
+  RgbPendingReceive,
   RgbIssueHistoryItem,
   RgbPendingTransfer,
   RgbPendingUtxoSync,
@@ -2562,6 +2563,11 @@ export class RgbService {
 
   private getLocalAssetBalances(): RgbLocalAssetBalance[] {
     const state = this.requireState()
+    const activeUtxos = state.snapshot.utxos.filter(utxo =>
+      utxo.chainStatus !== 'spent' &&
+      utxo.chainStatus !== 'replaced' &&
+      utxo.chainStatus !== 'pending_spend'
+    )
     const locked = new Set(
       Object.values(state.pending).flatMap(pending =>
         pending.prepared.lockedOutpoints.map(outpoint => `${outpoint.txid}:${outpoint.vout}`)
@@ -2575,16 +2581,59 @@ export class RgbService {
         .filter(item => item.request.burn && item.broadcast)
         .map(item => item.broadcast!.completed.txid),
     ])
-    const amounts = new Map<string, { settled: bigint; spendable: bigint; pending: bigint; incomingPending: bigint; locked: bigint }>()
-    for (const utxo of state.snapshot.utxos) {
-      if (
-        utxo.chainStatus === 'spent' ||
-        utxo.chainStatus === 'replaced' ||
-        utxo.chainStatus === 'pending_spend'
-      ) {
-        continue
+    const localSends = [
+      ...Object.values(state.pending)
+        .filter(pending => !pending.request.burn)
+        .map(pending => ({
+          invoice: pending.request.invoice,
+          assetId: normalizeAssetId(pending.request.assetId),
+          txid: pending.broadcast?.completed.txid || pending.delivery?.completed.txid,
+          spentOutpoints: pending.prepared.lockedOutpoints,
+        })),
+      ...(state.pendingSendHistory || [])
+        .filter(send => send.status === 'broadcasted' && !send.burn)
+        .map(send => ({
+          invoice: send.invoice,
+          assetId: normalizeAssetId(send.assetId),
+          txid: send.txid,
+          spentOutpoints: send.spentOutpoints || [],
+        })),
+    ]
+    const selfReceivesStillInSource = new Set<RgbPendingReceive>()
+    const selfTransferOutputsStillInSource = new Set<string>()
+    const hasCountedSelfSendSource = (assetId: string, txid: string, invoice?: string) =>
+      localSends.some(candidate =>
+        (invoice === undefined || candidate.invoice === invoice) &&
+        candidate.assetId === assetId &&
+        candidate.txid === txid &&
+        candidate.spentOutpoints.some(outpoint => activeUtxos.some(utxo =>
+          outpointKey(utxo) === `${outpoint.txid}:${outpoint.vout}` &&
+          utxo.allocations.some(allocation => normalizeAssetId(allocation.assetId) === assetId)
+        ))
+      )
+    for (const receive of state.pendingReceives || []) {
+      const receipt = receive.receivedConsignment?.accepted
+        ? receive.receivedConsignment
+        : receive.pendingAccept
+      if (!receipt?.txid || !receipt.assetId) continue
+      const assetId = normalizeAssetId(receipt.assetId)
+      if (!hasCountedSelfSendSource(assetId, receipt.txid, receive.invoice)) continue
+      selfReceivesStillInSource.add(receive)
+      selfTransferOutputsStillInSource.add(`${assetId}:${receipt.txid}`)
+    }
+    for (const receive of state.pendingReceiveHistory || []) {
+      if (receive.status !== 'settled') continue
+      const assetId = normalizeAssetId(receive.assetId)
+      if (hasCountedSelfSendSource(assetId, receive.txid)) {
+        selfTransferOutputsStillInSource.add(`${assetId}:${receive.txid}`)
       }
+    }
+    const amounts = new Map<string, { settled: bigint; spendable: bigint; pending: bigint; incomingPending: bigint; locked: bigint }>()
+    for (const utxo of activeUtxos) {
       for (const allocation of utxo.allocations) {
+        // The sender's old allocation and the self-transfer outputs may both
+        // appear in an asynchronously refreshed snapshot. Count only one side.
+        if (selfTransferOutputsStillInSource.has(`${normalizeAssetId(allocation.assetId)}:${utxo.outpoint.txid}`)) continue
         const current = amounts.get(allocation.assetId) || {
           settled: 0n,
           spendable: 0n,
@@ -2629,7 +2678,7 @@ export class RgbService {
         .flatMap(utxo => utxo.allocations)
         .find(item => normalizeAssetId(item.assetId) === assetId && item.amount === receipt.amount)
       if (allocation?.settled) continue
-      if (!allocation) current.pending += amount
+      if (!allocation && !selfReceivesStillInSource.has(receive)) current.pending += amount
       current.incomingPending += amount
       amounts.set(assetId, current)
     }

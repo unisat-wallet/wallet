@@ -156,6 +156,70 @@ describe('RgbService', () => {
     })
   })
 
+  it('does not count both sides of a self-transfer while its source UTXO is still active', async () => {
+    const service = new RgbService(createDependencies())
+    await service.open(wallet)
+    await service.sync()
+    const state = (service as any).state
+    const assetId = state.snapshot.utxos[0].allocations[0].assetId
+    const source = state.snapshot.utxos[1]
+    const invoice = rgbInvoice(10)
+    const txid = 'e'.repeat(64)
+    state.pending['self-send'] = {
+      request: { assetId, amount: '10', invoice },
+      prepared: { lockedOutpoints: [source.outpoint] },
+      delivery: { completed: { txid } },
+      createdAt: 1,
+    }
+    state.pendingReceives = [{
+      invoice, recipientId: 'self', createdAt: 1,
+      receivedConsignment: { accepted: true, assetId, amount: '10', txid, receivedAt: 1 },
+    }]
+
+    const total = () => {
+      const balance = service.getLocalAssetBalance(assetId)!
+      return BigInt(balance.settled) + BigInt(balance.pending)
+    }
+    expect(total()).toBe(100n)
+    expect(service.getLocalAssetBalance(assetId)?.incomingPending).toBe('10')
+
+    state.snapshot.utxos.push(
+      { ...source, outpoint: { txid, vout: 0 }, allocations: [{ ...source.allocations[0], amount: '10', settled: false, spendable: false }] },
+      { ...source, outpoint: { txid, vout: 1 }, allocations: [{ ...source.allocations[0], amount: '50', settled: false, spendable: false }] },
+    )
+    expect(total()).toBe(100n)
+
+    state.pendingSendHistory = [{
+      transferId: 'self-send', invoice, assetId, amount: '10', txid,
+      spentOutpoints: [source.outpoint], createdAt: 1, status: 'broadcasted',
+    }]
+    delete state.pending['self-send']
+    expect(total()).toBe(100n)
+
+    const [pendingReceive] = state.pendingReceives
+    state.pendingReceiveHistory = [{
+      transferId: 'receive:self', assetId, amount: '10', txid,
+      createdAt: 1, status: 'settled',
+    }]
+    state.pendingReceives = []
+    expect(total()).toBe(100n)
+    state.pendingReceives = [pendingReceive]
+
+    source.chainStatus = 'spent'
+    expect(service.getLocalAssetBalance(assetId)).toMatchObject({
+      settled: '40', pending: '60', incomingPending: '10',
+    })
+    expect(total()).toBe(100n)
+
+    for (const utxo of state.snapshot.utxos.slice(-2)) {
+      utxo.allocations[0].settled = true
+      utxo.allocations[0].spendable = true
+    }
+    expect(service.getLocalAssetBalance(assetId)).toMatchObject({
+      settled: '100', pending: '0', incomingPending: '0',
+    })
+  })
+
   it('shows unconfirmed BFA burn change as locked until it settles', async () => {
     const dependencies = createDependencies()
     const service = new RgbService(dependencies)
