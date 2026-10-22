@@ -5594,16 +5594,11 @@ export class WalletController extends BaseController {
     const funding = await this.getCurrentRgbFundingAccount()
     await this.assertActiveRgbWallet(context.wallet)
     if (funding.address !== context.wallet.fundingAddress) throw new RgbWalletContextChangedError()
-    // This only migrates a missing key on invoices created by the first
-    // witness-invoice build; acquire the normal writer fence before persisting.
-    // A different device may still hold the lease immediately after handoff.
-    // Reads must remain available in that window; the next receive poll will
-    // retry the claim/index writes after the lease expires or is released.
-    if (!(await this.tryEnsureRgbWriteLease(context, { forceRenew: true }))) {
-      return context
-    }
-    await context.service.backfillWitnessReceivePublicKey(funding.publicKey)
-    return this.rgbCoordinator.syncReceivedAllocations(context)
+    // Migrate keys missing from early witness invoices during the receive
+    // poll, after its writer-lease check and before any claim/index writes.
+    return this.rgbCoordinator.syncReceivedAllocations(context, async () => {
+      await context.service.backfillWitnessReceivePublicKey(funding.publicKey)
+    })
   }
 
   /** Deliver confirmed receive history through a durable, idempotent local outbox. */

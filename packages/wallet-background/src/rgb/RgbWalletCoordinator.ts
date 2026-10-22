@@ -74,7 +74,8 @@ export class RgbWalletCoordinator {
   }
 
   async syncReceivedAllocations(
-    boundContext?: LocalRgbServiceContext
+    boundContext?: LocalRgbServiceContext,
+    beforeSync?: () => Promise<void>
   ): Promise<LocalRgbServiceContext> {
     const context = boundContext ?? (await this.dependencies.getContext())
     const key = walletKey(context.wallet)
@@ -84,7 +85,7 @@ export class RgbWalletCoordinator {
       return context
     }
 
-    const polling = this.syncReceivedAllocationsOnce(context)
+    const polling = this.syncReceivedAllocationsOnce(context, beforeSync)
       .then(result => {
         this.receivePollingAt.set(key, Date.now())
         return result
@@ -187,7 +188,8 @@ export class RgbWalletCoordinator {
   }
 
   private async syncReceivedAllocationsOnce(
-    context: LocalRgbServiceContext
+    context: LocalRgbServiceContext,
+    beforeSync?: () => Promise<void>
   ): Promise<LocalRgbServiceContext> {
     const { service, wallet } = context
     // Receipt processing persists state and may acknowledge a consignment;
@@ -196,6 +198,8 @@ export class RgbWalletCoordinator {
     const canWrite =
       (await this.dependencies.tryEnsureWriteLease?.(context, { forceRenew: true })) ?? true
     if (!canWrite) return context
+    await this.dependencies.assertContext?.(context)
+    await beforeSync?.()
     await this.dependencies.assertContext?.(context)
     // Claims are durable recipient-to-address bindings. Retrying them here
     // covers invoices created while the recovery endpoint was unavailable.

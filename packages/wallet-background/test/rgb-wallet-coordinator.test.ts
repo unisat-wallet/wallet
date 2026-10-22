@@ -154,6 +154,33 @@ describe('RgbWalletCoordinator', () => {
     expect(service.processClaimedReceives).toHaveBeenCalled()
   })
 
+  it('runs witness key backfill after one lease check and before receive writes', async () => {
+    const calls: string[] = []
+    const service = {
+      claimPendingReceives: vi.fn(async () => { calls.push('claim') }),
+      getPendingReceives: vi.fn(() => []),
+      getSnapshot: vi.fn(() => ({ utxos: [] })),
+      processClaimedReceives: vi.fn(async () => ({ received: 0, snapshotRequired: false })),
+    }
+    const context = {
+      service,
+      wallet: { walletId: 'wallet', fundingAddress: 'bc1p-funding', network: 'mainnet' as const },
+    }
+    const tryEnsureWriteLease = vi.fn(async () => { calls.push('lease'); return true })
+    const beforeSync = vi.fn(async () => { calls.push('backfill') })
+    const coordinator = new RgbWalletCoordinator({
+      getContext: vi.fn().mockResolvedValue(context as any),
+      syncIndexerOutbox: vi.fn().mockResolvedValue(true),
+      syncReceiveHistory: vi.fn().mockResolvedValue(undefined),
+      tryEnsureWriteLease,
+    })
+
+    await coordinator.syncReceivedAllocations(context as any, beforeSync)
+
+    expect(tryEnsureWriteLease).toHaveBeenCalledOnce()
+    expect(calls.slice(0, 3)).toEqual(['lease', 'backfill', 'claim'])
+  })
+
   it('cancels receive processing when the active wallet changes after lease acquisition', async () => {
     const service = {
       claimPendingReceives: vi.fn().mockResolvedValue({ claimed: 0 }),

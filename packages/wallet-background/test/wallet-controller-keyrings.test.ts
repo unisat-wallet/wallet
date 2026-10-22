@@ -2008,6 +2008,7 @@ describe('RGB wallet references', () => {
     const service = {
       claimPendingReceives: vi.fn(),
       processClaimedReceives: vi.fn(),
+      backfillWitnessReceivePublicKey: vi.fn(),
       getPendingReceives: vi.fn(() => [{ recipientId: 'pending-receive' }]),
     }
     vi.spyOn(wallet as any, 'getLocalRgbService').mockResolvedValue({
@@ -2024,6 +2025,8 @@ describe('RGB wallet references', () => {
     await (wallet as any).syncRgbReceivedAllocations()
 
     expect(ensureLease).toHaveBeenCalledWith(expect.anything(), { forceRenew: true })
+    expect(ensureLease).toHaveBeenCalledTimes(1)
+    expect(service.backfillWitnessReceivePublicKey).not.toHaveBeenCalled()
     expect(service.claimPendingReceives).not.toHaveBeenCalled()
     expect(service.processClaimedReceives).not.toHaveBeenCalled()
   })
@@ -2645,7 +2648,7 @@ describe('RGB wallet references', () => {
     vi.spyOn(wallet, 'getCurrentRgbWalletRef').mockResolvedValue(walletRef)
     vi.spyOn(wallet, 'getRgbFundingAddress').mockResolvedValue({ address: walletRef.fundingAddress })
     vi.spyOn(wallet, 'getRgbAssetList').mockResolvedValue({ currentPage: 1, pageSize: 20, total: 0, list: [] })
-    vi.spyOn(wallet as any, 'tryEnsureRgbWriteLease').mockResolvedValue(true)
+    const ensureLease = vi.spyOn(wallet as any, 'tryEnsureRgbWriteLease').mockResolvedValue(true)
     vi.spyOn(wallet as any, 'syncRgbIndexerOutbox').mockResolvedValue(false)
     vi.spyOn(wallet as any, 'syncRgbReceiveHistory').mockResolvedValue(undefined)
 
@@ -2653,7 +2656,9 @@ describe('RGB wallet references', () => {
     await (wallet as any).syncRgbReceivedAllocations()
     await (wallet as any).syncRgbReceivedAllocations()
 
+    expect(ensureLease).toHaveBeenCalledTimes(2)
     expect(service.sync).toHaveBeenCalledTimes(1)
+    expect(service.backfillWitnessReceivePublicKey).toHaveBeenCalledTimes(1)
     expect(service.processClaimedReceives).toHaveBeenCalledWith({
       includeClaimed: false,
       deferConfirmedSettlement: true,
