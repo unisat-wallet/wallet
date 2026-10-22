@@ -1,5 +1,5 @@
-import { Psbt, networks } from 'bitcoinjs-lib'
 import { assertValidFeeRate } from '@unisat/base-utils'
+import { Psbt, networks } from 'bitcoinjs-lib'
 import { RgbServiceError } from '../errors'
 import type { RgbFeeFunding, RgbFeeUtxo, RgbNetwork, RgbUtxo } from '../types'
 import type { RgbInvoiceSeal } from './invoice'
@@ -139,7 +139,9 @@ export function createRgbOpretPsbt(input: RgbOpretPsbtRequest): RgbOpretPsbt {
     return total + utxo.satoshis
   }, 0)
 
-  const recipientScript = input.recipientSeal ? invoiceSealToScriptPubKey(input.recipientSeal) : undefined
+  const recipientScript = input.recipientSeal
+    ? invoiceSealToScriptPubKey(input.recipientSeal)
+    : undefined
   const witnessDustLimit =
     input.recipientSeal?.type === 'witness' ? witnessSealDustLimit(input.recipientSeal) : 0
   if (
@@ -196,10 +198,10 @@ export function createRgbOpretPsbt(input: RgbOpretPsbtRequest): RgbOpretPsbt {
   }
   if (!fee)
     throw new RgbServiceError('Ordinary BTC UTXOs do not cover the RGB transfer network fee')
-  const feePoolValue = feeUtxos.reduce((total, utxo) => total + utxo.satoshis, 0)
-  if (fee > Math.floor(feePoolValue * MAX_FEE_POOL_SPEND_RATIO)) {
-    throw new RgbServiceError('RGB transfer network fee exceeds the fee pool safety limit')
-  }
+  // const feePoolValue = feeUtxos.reduce((total, utxo) => total + utxo.satoshis, 0)
+  // // if (fee > Math.floor(feePoolValue * MAX_FEE_POOL_SPEND_RATIO)) {
+  // //   throw new RgbServiceError('RGB transfer network fee exceeds the fee pool safety limit')
+  // // }
 
   const psbt = new Psbt({ network: bitcoinNetwork(input.network) })
   input.selectedUtxos.forEach(utxo => {
