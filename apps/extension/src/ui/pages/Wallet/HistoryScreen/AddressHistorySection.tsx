@@ -108,7 +108,8 @@ function HistoryRow({ item, onClick }: { item: AddressHistorySummaryItem; onClic
   if (!primary) return null;
   const directionLabel = getHistoryTitle(item, primary.sign === '+', t);
   const { label: assetCategory, tone } = getHistoryAssetCategory(primary.asset.kind, chain.unit, t);
-  const counterpartyAddress = item.direction === 'receive' ? item.fromAddress : item.toAddress;
+  const fromAddress = (item as AddressHistorySummaryItem & { fromAddress?: string }).fromAddress;
+  const counterpartyAddress = item.direction === 'receive' ? fromAddress : item.toAddress;
   const counterpartyLabel = item.direction === 'receive' ? t('from') : t('to');
 
   return (
