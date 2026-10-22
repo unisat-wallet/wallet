@@ -95,16 +95,18 @@ Polygon PoS, Plasma, and Tron, it constructs the V1 destination record and
 commits its EIP-712-style hash as `burnReason`. The record contains
 `version`, `destinationChainId`, `dstEid`, and chain-native `recipient` bytes.
 The UI downloads the original record as JSON alongside the `.rgb` consignment;
-both are needed by the redemption operator. The wallet retains the record in
-its encrypted state and verifies its hash on export. The destination cannot
-be changed after signing. A V1 hash alone is insufficient to redeem a burn.
+both are needed by the redemption operator. The exported JSON uses the
+gateway's `BfaBurnDestination` fields, including a `0x`-prefixed hex
+`recipient`, and belongs in the `burnDestination` field of `/unlock/verify`
+and `/unlock` requests. The wallet retains the record in its encrypted state
+and verifies its hash on export. The destination cannot be changed after
+signing. A V1 hash alone is insufficient to redeem a burn.
 
-The public UTEXO `/unlock` integration guide currently shows only the legacy
-request body and does not document how to submit the V1 record. Before using
-a V1 burn with real funds, confirm that the target operator accepts and
-forwards `EvmDestination.burn_destination` to the enclave, and that the chosen
-route and token are enabled in that deployment. This wallet does not submit
-the unlock request.
+The staging gateway OpenAPI documents `burnDestination` for both
+`/unlock/verify` and `/unlock`. The older public integration guide still shows
+only the legacy request body. Before using a V1 burn with real funds, confirm
+that the chosen route and token are enabled in the target deployment. This
+wallet does not submit the unlock request.
 
 ## Enablement requirement
 

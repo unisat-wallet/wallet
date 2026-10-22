@@ -265,7 +265,9 @@ describe('RgbService', () => {
     expect(reopened.getPendingUtxoSync()?.txid).toBe(txid)
     expect(Buffer.from(reopened.exportBurnConsignment(txid))).toEqual(proof)
     if (burnDestination) {
-      expect(reopened.exportBurnDestination(txid)).toEqual({ ...burnDestination, burnReason: expectedReason })
+      expect(reopened.exportBurnDestination(txid)).toEqual({
+        ...burnDestination, recipient: `0x${burnDestination.recipient}`,
+      })
     } else {
       expect(() => reopened.exportBurnDestination(txid)).toThrow('unavailable')
     }

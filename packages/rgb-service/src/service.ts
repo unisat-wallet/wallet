@@ -2654,7 +2654,7 @@ export class RgbService {
     return Uint8Array.from(Buffer.from(payload, 'base64'))
   }
 
-  /** The V1 record needed alongside a burn consignment for LayerZero release. */
+  /** The V1 payout record in the gateway's BfaBurnDestination JSON format. */
   exportBurnDestination(txid: string) {
     const state = this.requireState()
     const proof = state.burnProofs?.[txid]
@@ -2665,7 +2665,7 @@ export class RgbService {
     const burnReason = hashBfaBurnDestinationV1(destination)
     if (burnReason !== (proof?.burnReason || pending?.request.burnReason))
       throw new RgbServiceError('BFA burn destination does not match the proof')
-    return { ...destination, burnReason }
+    return { ...destination, recipient: `0x${destination.recipient}` }
   }
 
   /** Observe a recorded burn on Bitcoin so its local history can show confirmation. */

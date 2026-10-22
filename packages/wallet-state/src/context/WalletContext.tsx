@@ -627,7 +627,7 @@ export interface WalletController {
   exportRgbAssetContract(assetId: string): Promise<string>
   /** Base64 of a terminal-free RGB\0TFR BFA burn proof. */
   exportRgbBurnConsignment(txid: string): Promise<string>
-  exportRgbBurnDestination(txid: string): Promise<{ version: 1; destinationChainId: number; dstEid: number; recipient: string; burnReason: string }>
+  exportRgbBurnDestination(txid: string): Promise<{ version: 1; destinationChainId: number; dstEid: number; recipient: string }>
 
   getRGBAssetActivity(
     address: string,
