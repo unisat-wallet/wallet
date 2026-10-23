@@ -72,6 +72,7 @@ export class HttpClient implements BaseHttpClient {
       timeout = this.defaultConfig.timeout,
       retries = this.defaultConfig.retries,
       headers = {},
+      signal,
     } = options
 
     const url = this.buildUrl(path, query)
@@ -84,7 +85,7 @@ export class HttpClient implements BaseHttpClient {
         const requestInit: RequestInit = {
           method,
           headers: requestHeaders,
-          signal: AbortSignal.timeout(timeout),
+          signal: signal || AbortSignal.timeout(timeout),
         }
 
         if (body) {

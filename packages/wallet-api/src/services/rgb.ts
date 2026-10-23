@@ -357,25 +357,43 @@ export class RgbService {
     })
   }
 
-  async relayRgbProxyRequest(params: RgbProxyRelayRequest): Promise<RgbProxyRelayResponse> {
-    return this.privatePost('/v5/rgb/proxy-relay', params)
+  async relayRgbProxyRequest(
+    params: RgbProxyRelayRequest,
+    signal?: AbortSignal
+  ): Promise<RgbProxyRelayResponse> {
+    return this.privatePost('/v5/rgb/proxy-relay', params, {
+      ...(signal ? { signal } : {}),
+      retries: 0,
+    })
   }
 
-  private async privatePost<T>(path: string, body: unknown): Promise<T> {
+  private async privatePost<T>(
+    path: string,
+    body: unknown,
+    options?: { signal?: AbortSignal; retries?: number }
+  ): Promise<T> {
     if (!this.authenticator) {
       throw new Error('RGB request authentication is not configured')
     }
     const request = { method: 'POST' as const, path, body }
     const auth = await this.authenticator(request)
     try {
-      return await this.httpClient.post<T>(path, { ...(body as Record<string, unknown>), auth })
+      return await this.httpClient.post<T>(
+        path,
+        { ...(body as Record<string, unknown>), auth },
+        options
+      )
     } catch (error) {
       const serverTime = error instanceof ApiClientError && error.code === RGB_CLOCK_SKEW_ERROR_CODE
         ? Number(error.details?.serverTime)
         : NaN
       if (!Number.isSafeInteger(serverTime) || serverTime <= 0) throw error
       const retryAuth = await this.authenticator({ ...request, serverTime })
-      return this.httpClient.post<T>(path, { ...(body as Record<string, unknown>), auth: retryAuth })
+      return this.httpClient.post<T>(
+        path,
+        { ...(body as Record<string, unknown>), auth: retryAuth },
+        options
+      )
     }
   }
 

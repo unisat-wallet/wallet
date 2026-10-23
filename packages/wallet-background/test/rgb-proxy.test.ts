@@ -110,6 +110,29 @@ describe('RGB proxy transport', () => {
     expect(fetchMock).not.toHaveBeenCalled()
   })
 
+  it('aborts a relay request after the RGB proxy timeout', async () => {
+    vi.useFakeTimers()
+    let relaySignal: AbortSignal | undefined
+    const relayRequest = vi.fn((_request, signal: AbortSignal) => {
+      relaySignal = signal
+      return new Promise<never>(() => undefined)
+    })
+    const result = expect(
+      createRgbProxyTransport([endpoint], {
+        authorizeRequest: async () => ({ mode: 'relay' }),
+        relayRequest,
+      }).prepareInvoice?.({
+        recipientId,
+        endpoints: ['rpcs://third-party.example/json-rpc'],
+      })
+    ).rejects.toThrow('RGB proxy server.info timed out after 10 seconds')
+
+    await vi.advanceTimersByTimeAsync(10_000)
+    await result
+    expect(relaySignal?.aborted).toBe(true)
+    expect(fetchMock).not.toHaveBeenCalled()
+  })
+
   it('posts a binary consignment to a rpcs endpoint before requesting its acknowledgement', async () => {
     fetchMock.mockResolvedValueOnce(rpcResponse(true)).mockResolvedValueOnce(rpcResponse(null))
     const transport = createRgbProxyTransport([endpoint])

@@ -61,12 +61,15 @@ export type RgbProxyTransportOptions = {
     endpoint: string
     operation: string
   }) => Promise<{ mode: 'direct' | 'relay' }>
-  relayRequest?: (request: {
-    endpoint: string
-    operation: string
-    contentType: string
-    bodyBase64: string
-  }) => Promise<{ status: number; contentType?: string; bodyBase64: string }>
+  relayRequest?: (
+    request: {
+      endpoint: string
+      operation: string
+      contentType: string
+      bodyBase64: string
+    },
+    signal: AbortSignal
+  ) => Promise<{ status: number; contentType?: string; bodyBase64: string }>
 }
 
 function normalizeEndpoints(endpoints: string[]) {
@@ -169,6 +172,20 @@ function relayBodyBase64(
   throw new Error('RGB proxy request body cannot be relayed')
 }
 
+async function waitForRelay<T>(request: Promise<T>, signal: AbortSignal): Promise<T> {
+  if (signal.aborted) throw signal.reason
+  let onAbort: (() => void) | undefined
+  const aborted = new Promise<never>((_resolve, reject) => {
+    onAbort = () => reject(signal.reason)
+    signal.addEventListener('abort', onAbort, { once: true })
+  })
+  try {
+    return await Promise.race([request, aborted])
+  } finally {
+    if (onAbort) signal.removeEventListener('abort', onAbort)
+  }
+}
+
 async function fetchWithTimeout(
   input: Parameters<typeof fetch>[0],
   init: NonNullable<Parameters<typeof fetch>[1]>,
@@ -176,19 +193,25 @@ async function fetchWithTimeout(
   options?: RgbProxyTransportOptions
 ) {
   const endpoint = String(input)
+  const access = await options?.authorizeRequest?.({ endpoint, operation })
   const controller = new AbortController()
   const timeout = setTimeout(() => controller.abort(), RGB_PROXY_REQUEST_TIMEOUT_MS)
   try {
-    const access = await options?.authorizeRequest?.({ endpoint, operation })
     if (access?.mode === 'relay') {
       if (!options?.relayRequest) throw new Error('RGB proxy relay is not configured')
       const contentType = new Headers(init.headers).get('Content-Type') || ''
-      const relayed = await options.relayRequest({
-        endpoint,
-        operation,
-        contentType,
-        bodyBase64: relayBodyBase64(init.body),
-      })
+      const relayed = await waitForRelay(
+        options.relayRequest(
+          {
+            endpoint,
+            operation,
+            contentType,
+            bodyBase64: relayBodyBase64(init.body),
+          },
+          controller.signal
+        ),
+        controller.signal
+      )
       return new Response(base64ToBytes(relayed.bodyBase64), {
         status: relayed.status,
         headers: relayed.contentType ? { 'Content-Type': relayed.contentType } : undefined,

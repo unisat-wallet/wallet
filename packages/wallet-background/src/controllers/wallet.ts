@@ -1239,12 +1239,15 @@ export class WalletController extends BaseController {
     }
   }
 
-  private relayRgbProxyRequest = (request: {
-    endpoint: string
-    operation: string
-    contentType: string
-    bodyBase64: string
-  }) => walletApiService.rgb.relayRgbProxyRequest(request)
+  private relayRgbProxyRequest = (
+    request: {
+      endpoint: string
+      operation: string
+      contentType: string
+      bodyBase64: string
+    },
+    signal: AbortSignal
+  ) => walletApiService.rgb.relayRgbProxyRequest(request, signal)
 
   /** Recovery-version caches are valid only while their encrypted wallet state remains open. */
   private clearRgbRecoveryCaches = () => {

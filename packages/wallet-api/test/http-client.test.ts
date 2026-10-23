@@ -118,4 +118,25 @@ describe('HttpClient', () => {
     await vi.advanceTimersByTimeAsync(1000)
     await rejection
   })
+
+  it('passes a caller abort signal to fetch', async () => {
+    const fetchMock = vi.mocked(globalThis.fetch as any)
+    fetchMock.mockImplementationOnce((_url, init) => new Promise((_resolve, reject) => {
+      init.signal.addEventListener('abort', () => {
+        const error = new Error('aborted')
+        error.name = 'AbortError'
+        reject(error)
+      })
+    }))
+    const controller = new AbortController()
+    const client = new HttpClient({ endpoint: 'https://api.example.com' })
+    const rejection = expect(
+      client.post('/v1/relay', {}, { signal: controller.signal, retries: 0 })
+    ).rejects.toBeInstanceOf(TimeoutError)
+
+    controller.abort()
+    await rejection
+    expect(fetchMock.mock.calls[0][1].signal).toBe(controller.signal)
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+  })
 })
