@@ -1225,6 +1225,25 @@ export class WalletController extends BaseController {
     return { mode: 'relay' }
   }
 
+  getRgbProxyApprovalRequirement = async ({ endpoints }: { endpoints: string[] }) => {
+    const chainType = this.getChainType()
+    const trusted = await this.getTrustedRgbProxyEndpoints()
+    const approvalEndpoints = [...new Set(endpoints.map(toHttpEndpoint))].filter(endpoint =>
+      !trusted.has(endpoint) && !this.rgbApprovedRelayEndpoints.has(`${chainType}:${endpoint}`)
+    )
+    return { endpoints: approvalEndpoints }
+  }
+
+  approveRgbProxyEndpoints = async ({ endpoints }: { endpoints: string[] }) => {
+    const chainType = this.getChainType()
+    const trusted = await this.getTrustedRgbProxyEndpoints()
+    for (const endpoint of [...new Set(endpoints.map(toHttpEndpoint))]) {
+      if (!trusted.has(endpoint)) {
+        this.rgbApprovedRelayEndpoints.add(`${chainType}:${endpoint}`)
+      }
+    }
+  }
+
   private relayRgbProxyRequest = (
     request: {
       endpoint: string

@@ -24,6 +24,8 @@ vi.mock('../src/controllers/wallet', () => ({
     getRgbBuySwapReceive: vi.fn(),
     getRgbPendingReceiveInvoices: vi.fn(),
     abandonRgbAcceptedReceive: vi.fn(),
+    getRgbProxyApprovalRequirement: vi.fn(),
+    approveRgbProxyEndpoints: vi.fn(),
   },
 }))
 
@@ -79,6 +81,71 @@ describe('provider RGB payment ownership', () => {
       assetId: 'rgb:asset',
       providerOrigin: 'https://dapp.example',
     })
+  })
+
+  it.each(['prepareRgbPayment', 'prepareRgbSwap'])(
+    'adds untrusted invoice proxies to the existing %s approval',
+    async method => {
+      const invoice =
+        'rgb:BQUFBQUF-BQUFBQU-FBQUFBQ-UFBQUFB-QUFBQUF-BQUFBQU/schema-id/~/bc:wvout:A8cJ7Ww3-NIzADo3-Tzp_5aD-7CTBWmA-AAAAAAA-AAAAAAA-ALSQkcw?amount=42&endpoints=rpcs%3A%2F%2Fproxy.example'
+      vi.mocked(wallet.getRgbProxyApprovalRequirement).mockResolvedValue({
+        endpoints: ['https://proxy.example'],
+      })
+      const approval = Reflect.getMetadata('APPROVAL', providerController, method)
+      const request = {
+        data: { params: { invoice, assetId: 'rgb:asset' } as Record<string, any> },
+        session: { origin: 'https://dapp.example' },
+      }
+
+      await approval[1](request)
+
+      expect(wallet.getRgbProxyApprovalRequirement).toHaveBeenCalledWith({
+        endpoints: ['rpcs://proxy.example'],
+      })
+      expect(request.data.params.rgbProxyApproval).toEqual({
+        endpoints: ['https://proxy.example'],
+      })
+    }
+  )
+
+  it('binds the proxy approval result before preparing the payment', async () => {
+    vi.mocked(wallet.createRgbSendBegin).mockResolvedValue({ id: 'transfer-1' } as any)
+    await providerController.prepareRgbPayment({
+      data: {
+        params: {
+          invoice: 'rgb:invoice',
+          assetId: 'rgb:asset',
+          rgbProxyApproval: { endpoints: ['https://proxy.example'] },
+        },
+      },
+      session: { origin: 'https://dapp.example' },
+      approvalRes: { approvedRgbProxyEndpoints: ['https://proxy.example'] },
+    })
+
+    expect(wallet.approveRgbProxyEndpoints).toHaveBeenCalledWith({
+      endpoints: ['https://proxy.example'],
+    })
+    expect(vi.mocked(wallet.approveRgbProxyEndpoints).mock.invocationCallOrder[0]).toBeLessThan(
+      vi.mocked(wallet.createRgbSendBegin).mock.invocationCallOrder[0]!
+    )
+  })
+
+  it('rejects a payment when the approved proxy does not exactly match the invoice', async () => {
+    await expect(
+      providerController.prepareRgbPayment({
+        data: {
+          params: {
+            invoice: 'rgb:invoice',
+            assetId: 'rgb:asset',
+            rgbProxyApproval: { endpoints: ['https://proxy.example'] },
+          },
+        },
+        session: { origin: 'https://dapp.example' },
+        approvalRes: { approvedRgbProxyEndpoints: ['https://other.example'] },
+      })
+    ).rejects.toThrow('Third-party RGB proxy was not approved')
+    expect(wallet.approveRgbProxyEndpoints).not.toHaveBeenCalled()
+    expect(wallet.createRgbSendBegin).not.toHaveBeenCalled()
   })
 
   it('persists the trusted request origin while creating a receive invoice', async () => {

@@ -49,6 +49,40 @@ function validateRgbProviderFeeRate(req: { data: { params: { feeRate?: number } 
   if (feeRate !== undefined) assertValidFeeRate(feeRate, { supportLowFeeMode: true })
 }
 
+type RgbProxyApprovalRequirement = { endpoints: string[] }
+
+function prepareRgbPaymentApproval(req: {
+  data: { params: { invoice?: string; feeRate?: number; rgbProxyApproval?: unknown } }
+}) {
+  validateRgbProviderFeeRate(req)
+  const params = req.data.params
+  delete params.rgbProxyApproval
+  if (!params.invoice) throw new Error('invoice is required')
+  const invoice = decodeLocalRgbInvoice(params.invoice)
+  return wallet
+    .getRgbProxyApprovalRequirement({ endpoints: invoice.transportEndpoints })
+    .then((requirement: RgbProxyApprovalRequirement) => {
+      params.rgbProxyApproval = requirement
+    })
+}
+
+async function approveRgbPaymentProxy(
+  requirement: RgbProxyApprovalRequirement | undefined,
+  approvalRes?: { approvedRgbProxyEndpoints?: unknown }
+) {
+  const endpoints = requirement?.endpoints || []
+  if (!endpoints.length) return
+  const approved = approvalRes?.approvedRgbProxyEndpoints
+  if (
+    !Array.isArray(approved) ||
+    approved.length !== endpoints.length ||
+    approved.some((endpoint, index) => endpoint !== endpoints[index])
+  ) {
+    throw new WalletError(ErrorCodes.UserCancel, 'Third-party RGB proxy was not approved')
+  }
+  await wallet.approveRgbProxyEndpoints({ endpoints })
+}
+
 function webRgbInvalid(message: string): never {
   throw new WalletError(ErrorCodes.INVALID_PARAMS, message)
 }
@@ -1027,17 +1061,20 @@ class ProviderController extends BaseController {
     return wallet.rejectRgbReceive({ recipientId: params.recipientId })
   }
 
-  @Reflect.metadata('APPROVAL', ['RgbPayment', validateRgbProviderFeeRate])
+  @Reflect.metadata('APPROVAL', ['RgbPayment', prepareRgbPaymentApproval])
   prepareRgbPayment = async ({
     data: { params },
     session: { origin },
+    approvalRes,
   }: {
-    data: { params: { invoice: string; assetId: string; amount?: string; feeRate?: number } }
+    data: { params: { invoice: string; assetId: string; amount?: string; feeRate?: number; rgbProxyApproval?: RgbProxyApprovalRequirement } }
     session: { origin: string }
+    approvalRes?: { approvedRgbProxyEndpoints?: unknown }
   }) => {
     validateRgbProviderFeeRate({ data: { params } })
     if (!params.invoice) throw new Error('invoice is required')
     if (!params.assetId) throw new Error('assetId is required')
+    await approveRgbPaymentProxy(params.rgbProxyApproval, approvalRes)
     const prepared = await wallet.createRgbSendBegin({
       invoice: params.invoice,
       assetId: params.assetId,
@@ -1109,13 +1146,15 @@ class ProviderController extends BaseController {
    * Prepare a seller-side RGB/BTC swap. The local RGB encoder validates the
    * maker template and replaces only its empty Opret host with the commitment.
    */
-  @Reflect.metadata('APPROVAL', ['RgbPayment', validateRgbProviderFeeRate])
+  @Reflect.metadata('APPROVAL', ['RgbPayment', prepareRgbPaymentApproval])
   prepareRgbSwap = async ({
     data: { params },
     session: { origin },
+    approvalRes,
   }: {
-    data: { params: { invoice: string; assetId: string; amount: string; btcReceiveAmount: string; feeRate?: number; psbt: string } }
+    data: { params: { invoice: string; assetId: string; amount: string; btcReceiveAmount: string; feeRate?: number; psbt: string; rgbProxyApproval?: RgbProxyApprovalRequirement } }
     session: { origin: string }
+    approvalRes?: { approvedRgbProxyEndpoints?: unknown }
   }) => {
     validateRgbProviderFeeRate({ data: { params } })
     if (!params.invoice || !params.assetId || !params.amount || !params.btcReceiveAmount || !params.psbt) {
@@ -1137,6 +1176,7 @@ class ProviderController extends BaseController {
     if (!makerPsbt.txOutputs.some(output => output.value >= btcReceiveAmount && output.script.equals(receiveScript))) {
       throw new Error('RGB swap PSBT does not pay the current wallet BTC address')
     }
+    await approveRgbPaymentProxy(params.rgbProxyApproval, approvalRes)
     const prepared = await wallet.createRgbSendBegin({
       invoice: params.invoice,
       assetId: params.assetId,

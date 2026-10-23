@@ -48,6 +48,9 @@ interface Props {
         assetId?: string;
         amount?: string | number;
       };
+      rgbProxyApproval?: {
+        endpoints: string[];
+      };
     };
     session: {
       origin: string;
@@ -452,6 +455,7 @@ function RgbPaymentApproval({ data, session }: { data: Props['params']['data']; 
   const [assetMetadata, setAssetMetadata] = useState<RgbAssetMetadata>();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const proxyEndpoints = data.rgbProxyApproval?.endpoints || [];
 
   const amount = data.amount?.trim() || t('rgb_approval_use_invoice_amount');
   const ticker = assetMetadata?.ticker?.trim();
@@ -498,13 +502,18 @@ function RgbPaymentApproval({ data, session }: { data: Props['params']['data']; 
     return String(value || t('rgb_approval_fund_fee_pool_failed'));
   };
 
+  const resolvePaymentApproval = () =>
+    resolveApproval(
+      proxyEndpoints.length ? { approvedRgbProxyEndpoints: proxyEndpoints } : undefined
+    );
+
   const onPreparePayment = async () => {
     setLoading(true);
     setError('');
     try {
       const feePool = await wallet.getRgbFeePoolStatus();
       if (feePool.ready) {
-        await resolveApproval();
+        await resolvePaymentApproval();
         return;
       }
 
@@ -531,7 +540,7 @@ function RgbPaymentApproval({ data, session }: { data: Props['params']['data']; 
     setError('');
     try {
       await wallet.createRgbFeePoolTopUpEnd({ signedPsbt });
-      await resolveApproval();
+      await resolvePaymentApproval();
     } catch (e) {
       setError(getErrorMessage(e));
       setFeePoolToSignData(undefined);
@@ -656,6 +665,30 @@ function RgbPaymentApproval({ data, session }: { data: Props['params']['data']; 
               </Column>
             </RgbApprovalAccordion>
           </Card>
+
+          {proxyEndpoints.length > 0 ? (
+            <Card style={{ display: 'block', padding: 12, background: 'rgba(235, 185, 76, 0.12)' }}>
+              <Column gap="sm">
+                <Row itemsCenter gap="sm">
+                  <Icon icon="warning" color="gold" size={18} />
+                  <Text text="Third-party RGB proxy" preset="sub" color="gold" />
+                </Row>
+                <Text
+                  text="This payment uses a proxy supplied by the invoice that is not on UniSat's trusted list. Continuing also allows these exact endpoints through UniSat's protected relay until the wallet is locked."
+                  size="xs"
+                  color="textDim"
+                />
+                {proxyEndpoints.map((endpoint) => (
+                  <Text
+                    key={endpoint}
+                    text={endpoint}
+                    size="xs"
+                    style={{ wordBreak: 'break-all' }}
+                  />
+                ))}
+              </Column>
+            </Card>
+          ) : null}
 
           {error && (
             <Card style={{ display: 'block', padding: 12, background: 'rgba(237, 51, 75, 0.12)' }}>
