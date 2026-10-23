@@ -2,9 +2,15 @@ import { useEffect, useRef, useState } from 'react';
 
 import { Icon } from '@/ui/components';
 import type { AddressAssetOverviewItem } from '@unisat/wallet-shared';
-import { AssetTabKey, MoreAssetTabKey, useChainType, useCurrentAddress, useI18n, useNavigation, useWallTabFocusRefresh, useWallet } from '@unisat/wallet-state';
+import { AssetTabKey, MoreAssetTabKey, useChainType, useCurrentAccount, useCurrentAddress, useCurrentKeyring, useI18n, useNavigation, useWallTabFocusRefresh, useWallet } from '@unisat/wallet-state';
 
 import styles from './asset-overview.module.less';
+
+const OVERVIEW_CACHE_MS = 10_000;
+const recentOverviews = new Map<string, {
+  promise: Promise<{ list: AddressAssetOverviewItem[] }>;
+  expiresAt: number;
+}>();
 
 function isToken(item: AddressAssetOverviewItem): item is Extract<AddressAssetOverviewItem, { tokenId: string }> {
   return 'tokenId' in item;
@@ -119,6 +125,9 @@ function AssetOverviewContent({ address, isRgbActive, rgbUsdtAssetId }: { addres
   const wallet = useWallet();
   const nav = useNavigation();
   const { t } = useI18n();
+  const chainType = useChainType();
+  const currentAccount = useCurrentAccount();
+  const currentKeyring = useCurrentKeyring();
   const focusRefresh = useWallTabFocusRefresh();
   const [result, setResult] = useState<{ address: string; items: AddressAssetOverviewItem[] } | null>(null);
   const [errorAddress, setErrorAddress] = useState<string | null>(null);
@@ -161,7 +170,29 @@ function AssetOverviewContent({ address, isRgbActive, rgbUsdtAssetId }: { addres
     if (!address) return;
     let active = true;
     setErrorAddress(null);
-    wallet.getAddressAssetOverview(address)
+    const cacheKey = JSON.stringify([
+      chainType, currentKeyring?.key, currentAccount?.key, address,
+      isRgbActive, focusRefresh, refreshKey
+    ]);
+    let cached = recentOverviews.get(cacheKey);
+    if (!cached || cached.expiresAt <= Date.now()) {
+      cached = {
+        promise: wallet.getAddressAssetOverview(address),
+        expiresAt: Number.POSITIVE_INFINITY
+      };
+      recentOverviews.delete(cacheKey);
+      recentOverviews.set(cacheKey, cached);
+      if (recentOverviews.size > 20) {
+        const oldestKey = recentOverviews.keys().next().value;
+        if (oldestKey !== undefined) recentOverviews.delete(oldestKey);
+      }
+      const entry = cached;
+      void entry.promise.then(
+        () => { entry.expiresAt = Date.now() + OVERVIEW_CACHE_MS; },
+        () => { if (recentOverviews.get(cacheKey) === entry) recentOverviews.delete(cacheKey); }
+      );
+    }
+    cached.promise
       .then(({ list }) => {
         if (active) {
           setResult({ address, items: list });
@@ -172,7 +203,7 @@ function AssetOverviewContent({ address, isRgbActive, rgbUsdtAssetId }: { addres
         if (active) setErrorAddress(address);
       });
     return () => { active = false; };
-  }, [address, wallet, focusRefresh, refreshKey, isRgbActive]);
+  }, [address, wallet, chainType, currentKeyring?.key, currentAccount?.key, focusRefresh, refreshKey, isRgbActive]);
 
   const overviewItems = result?.address === address ? result.items : null;
   const configuredUsdtId = isRgbActive ? rgbUsdtAssetId : '';

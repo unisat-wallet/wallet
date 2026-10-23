@@ -63,6 +63,13 @@ import { WalletActions } from './components/WalletActions';
 const STORAGE_VERSION_KEY = 'version_detail';
 const ASSET_TAB_STORAGE_PREFIX = 'asset_tab_selection_v1:';
 const ALKANES_COLLECTION_TAB_KEY = 'alkanes_collection';
+const NOTIFICATION_REFRESH_INTERVAL = 10_000;
+let lastNotificationRefreshAt = 0;
+const ASSET_COUNT_CACHE_MS = 10_000;
+const recentAssetTabCounts = new Map<string, {
+  promise: Promise<{ summary: AddressAssetSummary; brc20Count: number }>;
+  expiresAt: number;
+}>();
 const assetTabLabel = (name: string, count: number, showCount: boolean) =>
   showCount && count > 0 ? `${name} (${count > 1000 ? '>1k' : count})` : name;
 const dismissedRgbBroadcastIdsByContext = new Map<string, Set<string>>();
@@ -142,7 +149,15 @@ export default function WalletTabScreen({
 
   useEffect(() => {
     const run = async () => {
-      wallet.getNotifications();
+      // Home and Assets mount this screen separately. A tab switch should not
+      // fetch the same server notification list again within the polling window.
+      const now = Date.now();
+      if (now - lastNotificationRefreshAt >= NOTIFICATION_REFRESH_INTERVAL) {
+        lastNotificationRefreshAt = now;
+        void wallet.getNotifications().catch((error) => {
+          console.warn('Failed to refresh notifications', error);
+        });
+      }
 
       const show = await wallet.getShowSafeNotice();
       setShowSafeNotice(show);
@@ -276,26 +291,50 @@ export default function WalletTabScreen({
   useEffect(() => {
     if (screen !== 'assets' || !currentAccount.address) return;
     let active = true;
-    Promise.all([
-      wallet.getAddressAssetSummary(currentAccount.address),
-      supportedAssets.assets.brc20
-        ? wallet
-            .getBRC20List({
-              address: currentAccount.address,
-              currentPage: 1,
-              pageSize: 1,
-              tickFilter: Brc20TickFilter.TICK_BYTES_4_5_6
-            })
-            .then((result) => result.total)
-            .catch(() => null)
-        : Promise.resolve(null)
-    ])
-      .then(([summary, brc20Count]) => {
+    const cacheKey = JSON.stringify([
+      assetContextKey, currentKeyring?.key, supportedAssets.assets.brc20, walletTabFocusRefresh
+    ]);
+    let cached = recentAssetTabCounts.get(cacheKey);
+    if (!cached || cached.expiresAt <= Date.now()) {
+      cached = {
+        promise: Promise.all([
+          wallet.getAddressAssetSummary(currentAccount.address),
+          supportedAssets.assets.brc20
+            ? wallet
+                .getBRC20List({
+                  address: currentAccount.address,
+                  currentPage: 1,
+                  pageSize: 1,
+                  tickFilter: Brc20TickFilter.TICK_BYTES_4_5_6
+                })
+                .then((result) => result.total)
+                .catch(() => null)
+            : Promise.resolve(null)
+        ]).then(([summary, brc20Count]) => ({
+          summary,
+          brc20Count: Math.max(summary.brc20Count, brc20Count ?? 0)
+        })),
+        expiresAt: Number.POSITIVE_INFINITY
+      };
+      recentAssetTabCounts.delete(cacheKey);
+      recentAssetTabCounts.set(cacheKey, cached);
+      if (recentAssetTabCounts.size > 20) {
+        const oldestKey = recentAssetTabCounts.keys().next().value;
+        if (oldestKey !== undefined) recentAssetTabCounts.delete(oldestKey);
+      }
+      const entry = cached;
+      void entry.promise.then(
+        () => { entry.expiresAt = Date.now() + ASSET_COUNT_CACHE_MS; },
+        () => { if (recentAssetTabCounts.get(cacheKey) === entry) recentAssetTabCounts.delete(cacheKey); }
+      );
+    }
+    void cached.promise
+      .then(({ summary, brc20Count }) => {
         if (active) {
           setAssetCounts({
             key: assetContextKey,
             summary,
-            brc20Count: Math.max(summary.brc20Count, brc20Count ?? 0)
+            brc20Count
           });
           setAssetCountErrorKey(null);
         }
@@ -307,7 +346,7 @@ export default function WalletTabScreen({
     return () => {
       active = false;
     };
-  }, [screen, assetContextKey, walletTabFocusRefresh, supportedAssets.assets.brc20, wallet]);
+  }, [screen, assetContextKey, currentKeyring?.key, walletTabFocusRefresh, supportedAssets.assets.brc20, wallet]);
 
   useEffect(() => {
     if (screen !== 'assets' || !currentAccount.address || !isRgbActive) return;

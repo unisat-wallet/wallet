@@ -4,6 +4,52 @@ import { toRgbDisplayAmount } from '@unisat/wallet-shared'
 import { RgbTransferQuery } from '../src/rgb/RgbTransferQuery'
 
 describe('RgbTransferQuery', () => {
+  it('reuses a recent first-page activity read across repeated page mounts', async () => {
+    const service = {
+      getPendingTransfers: vi.fn().mockReturnValue([]),
+      getPendingSendHistory: vi.fn().mockReturnValue([]),
+      getIssueHistory: vi.fn().mockReturnValue([]),
+      getPendingReceiveHistory: vi.fn().mockReturnValue([]),
+      getPendingReceives: vi.fn().mockReturnValue([{ recipientId: 'invoice-1' }]),
+    }
+    const context = { service, wallet: { walletId: 'wallet', fundingAddress: 'funding', network: 'mainnet' } }
+    const getRemoteActivity = vi.fn().mockResolvedValue({ total: 0, list: [] })
+    let receiveChangedOnSync = false
+    const query = new RgbTransferQuery({
+      getContext: vi.fn().mockResolvedValue(context as never),
+      syncReceiveHistory: vi.fn().mockImplementation(async () => {
+        if (receiveChangedOnSync) {
+          service.getPendingReceiveHistory.mockReturnValue([{
+            transferId: 'received-1', assetId: 'rgb:asset', amount: '1',
+            createdAt: 1, status: 'settled',
+          }])
+          receiveChangedOnSync = false
+        }
+      }),
+      syncPendingTransfers: vi.fn(),
+      syncReceivedAllocations: vi.fn().mockResolvedValue(context as never),
+      getRemoteActivity, warn: vi.fn(),
+    })
+    const now = vi.spyOn(Date, 'now').mockReturnValue(1_000)
+    try {
+      await query.getTransfers(1, 20, { skipSync: true })
+      await query.getTransfers(1, 20)
+      expect(getRemoteActivity).toHaveBeenCalledTimes(1)
+
+      receiveChangedOnSync = true
+      await query.getTransfers(1, 20)
+      expect(getRemoteActivity).toHaveBeenCalledTimes(2)
+      await query.getTransfers(1, 20, { skipSync: true })
+      expect(getRemoteActivity).toHaveBeenCalledTimes(2)
+
+      now.mockReturnValue(3_001)
+      await query.getTransfers(1, 20, { skipSync: true })
+      expect(getRemoteActivity).toHaveBeenCalledTimes(3)
+    } finally {
+      now.mockRestore()
+    }
+  })
+
   it('reports the full reserved allocation for a smaller pending send', async () => {
     const txid = 'a'.repeat(64)
     const service = {

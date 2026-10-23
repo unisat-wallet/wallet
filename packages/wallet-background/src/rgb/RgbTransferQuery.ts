@@ -36,8 +36,51 @@ type RgbTransferQueryDependencies = {
 /** Merges durable local RGB records into the first page of indexer activity. */
 export class RgbTransferQuery {
   private readonly confirmedBurnTxids = new Set<string>()
+  private readonly recentActivity = new Map<string, {
+    promise: ReturnType<RgbTransferQueryDependencies['getRemoteActivity']>
+    expiresAt: number
+  }>()
 
   constructor(private readonly dependencies: RgbTransferQueryDependencies) {}
+
+  private getRemoteActivity(wallet: LocalRgbServiceContext['wallet'], currentPage: number, pageSize: number, refresh: boolean) {
+    const key = JSON.stringify([wallet.network, wallet.walletId, wallet.fundingAddress, currentPage, pageSize])
+    if (currentPage !== 1) return this.dependencies.getRemoteActivity(wallet.fundingAddress, currentPage, pageSize)
+    if (refresh) this.recentActivity.delete(key)
+    const cached = this.recentActivity.get(key)
+    if (cached && cached.expiresAt > Date.now()) return cached.promise
+
+    const entry = {
+      promise: this.dependencies.getRemoteActivity(wallet.fundingAddress, currentPage, pageSize),
+      expiresAt: Number.POSITIVE_INFINITY,
+    }
+    this.recentActivity.delete(key)
+    this.recentActivity.set(key, entry)
+    if (this.recentActivity.size > 20) {
+      this.recentActivity.delete(this.recentActivity.keys().next().value!)
+    }
+    void entry.promise.then(
+      () => { entry.expiresAt = Date.now() + 2_000 },
+      () => { if (this.recentActivity.get(key) === entry) this.recentActivity.delete(key) }
+    )
+    return entry.promise
+  }
+
+  private receiveStateKey(service: RgbService): string {
+    return JSON.stringify({
+      pending: service.getPendingReceives().map(receive => [
+        receive.recipientId,
+        receive.pendingAccept?.txid,
+        receive.pendingValidationFailure?.reason,
+        receive.receivedConsignment?.txid,
+        receive.receivedConsignment?.accepted,
+        receive.receivedConsignment?.broadcastDetectedAt,
+      ]),
+      history: (service.getPendingReceiveHistory?.() || []).map(receive => [
+        receive.transferId, receive.txid, receive.status,
+      ]),
+    })
+  }
 
   // eslint-disable-next-line @typescript-eslint/explicit-function-return-type -- preserve the precise merged activity response.
   async getTransfers(currentPage: number, pageSize: number, options?: { skipSync?: boolean }) {
@@ -48,9 +91,10 @@ export class RgbTransferQuery {
     // old confirmed row immediately after publishing the newer outcome.
     const receiveMayChange = !options?.skipSync &&
       ((service.getPendingReceiveHistory?.().length || 0) > 0 || service.getPendingReceives().length > 0)
+    const receiveStateBeforeSync = receiveMayChange ? this.receiveStateKey(service) : undefined
     const activityPromise = receiveMayChange
       ? undefined
-      : this.dependencies.getRemoteActivity(wallet.fundingAddress, currentPage, pageSize)
+      : this.getRemoteActivity(wallet, currentPage, pageSize, false)
     if (!options?.skipSync) {
       try {
         await this.dependencies.syncReceiveHistory(service, context)
@@ -102,7 +146,10 @@ export class RgbTransferQuery {
     }
 
     const [activity, pendingTransfers] = await Promise.all([
-      activityPromise || this.dependencies.getRemoteActivity(wallet.fundingAddress, currentPage, pageSize),
+      activityPromise || this.getRemoteActivity(
+        wallet, currentPage, pageSize,
+        receiveStateBeforeSync !== undefined && receiveStateBeforeSync !== this.receiveStateKey(service)
+      ),
       Promise.resolve(service.getPendingTransfers()),
     ])
     const snapshotUtxos = new Map(
