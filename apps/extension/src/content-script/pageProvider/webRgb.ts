@@ -38,6 +38,16 @@ function transferKey(item: RgbTransfer): string {
   return String(item.transferId || item.recipientId || item.txid || item.id);
 }
 
+function transferAmount(value: unknown): number {
+  if ((typeof value === 'string' && !/^\d+$/.test(value)) ||
+      (typeof value !== 'string' && typeof value !== 'number'))
+    throw providerError('INTERNAL_ERROR', 'RGB transfer amount is not a safe integer');
+  const amount = Number(value);
+  if (!Number.isSafeInteger(amount) || amount < 0)
+    throw providerError('INTERNAL_ERROR', 'RGB transfer amount is not a safe integer');
+  return amount;
+}
+
 export class WebRgbProvider {
   #connected = false;
   #capabilities?: Set<string>;
@@ -213,7 +223,7 @@ export class WebRgbProvider {
       throw providerError('INVALID_PARAMS', 'assetId must be a nonempty string');
     const transfers: RgbTransfer[] = await this.#call('webRgbListTransfers', assetId ? { assetId } : {});
     return transfers.map(item => ({ ...item, status: transferStatus(item.status),
-      ...(item.amount === undefined || item.amount === null ? {} : { amount: Number(item.amount) }) }));
+      ...(item.amount === undefined || item.amount === null ? {} : { amount: transferAmount(item.amount) }) }));
   };
 
   getTransferStatus = async (transferId: string | number, assetId?: string) => {

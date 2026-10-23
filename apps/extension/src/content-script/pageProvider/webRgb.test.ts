@@ -57,6 +57,29 @@ describe('WebRGB provider', () => {
     expect(rpc).not.toHaveBeenCalledWith('prepareRgbPayment', expect.anything());
   });
 
+  it('rejects a transfer amount that cannot be represented safely', async () => {
+    const { provider } = createProvider({
+      webRgbListTransfers: [{ id: 'transfer-1', amount: '9007199254740992', status: 'settled' }]
+    });
+    await provider.enable();
+
+    await expect(provider.listTransfers()).rejects.toMatchObject({
+      code: 'INTERNAL_ERROR',
+      message: 'RGB transfer amount is not a safe integer'
+    });
+  });
+
+  it('returns the largest safe transfer amount without losing precision', async () => {
+    const { provider } = createProvider({
+      webRgbListTransfers: [{ id: 'transfer-1', amount: String(Number.MAX_SAFE_INTEGER), status: 'settled' }]
+    });
+    await provider.enable();
+
+    await expect(provider.listTransfers()).resolves.toMatchObject([
+      { id: 'transfer-1', amount: Number.MAX_SAFE_INTEGER, status: 'Settled' }
+    ]);
+  });
+
   it('returns METHOD_NOT_SUPPORTED for capabilities absent from getInfo', async () => {
     const { provider, rpc } = createProvider({
       webRgbGetInfo: { ready: false, network: 'T0', protocol: null, methods: ['enable', 'getInfo'] }
