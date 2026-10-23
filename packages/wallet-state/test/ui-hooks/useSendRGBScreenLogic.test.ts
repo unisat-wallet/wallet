@@ -192,6 +192,28 @@ describe('useSendRGBScreenLogic', () => {
     expect(wallet.createRgbSendBegin).toHaveBeenCalled()
   })
 
+  it('renders a serialized proxy error message instead of object text', async () => {
+    const assetId = 'rgb:test-asset'
+    const invoice = 'rgb:test-asset/~/~/bc:utxob:test?amount=1&endpoints=rpcs://evil.example'
+    const { wrapper, wallet } = createHookTestHarness({
+      routeState: {
+        assetId,
+        tokenBalance: { assetId, ticker: 'RGB', precision: 8, spendable: '150000000' },
+      },
+    })
+    wallet.getRgbProxyApprovalRequirement = vi.fn().mockRejectedValue({
+      error: { msg: 'Unable to load RGB proxy policy' },
+    })
+    const { result } = renderHook(() => useSendRGBScreenLogic(), { wrapper })
+
+    act(() => result.current.onInvoiceChange(invoice))
+
+    await waitFor(() => {
+      expect(result.current.invoiceValidationMessage).toBe('Unable to load RGB proxy policy')
+    })
+    expect(result.current.invoiceValidationMessage).not.toBe('[object Object]')
+  })
+
   it('blocks signing when the pasted RGB invoice recipient ID is unavailable', async () => {
     const assetId = 'rgb:test-asset'
     const invoice = 'rgb:test-asset/~/~/bc:utxob:test?amount=1&endpoints=rpc://proxy'

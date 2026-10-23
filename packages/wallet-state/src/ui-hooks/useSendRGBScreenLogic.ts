@@ -73,16 +73,24 @@ function getRgbFeePoolRequirement(error: unknown): RgbFeePoolRequirement | undef
 }
 
 function getRgbErrorMessage(error: unknown): string | undefined {
-  if (error instanceof Error && error.message) return error.message
-  if (!error || typeof error !== 'object') return undefined
-  const record = error as Record<string, unknown>
-  return typeof record['message'] === 'string'
-    ? record['message']
-    : typeof record['msg'] === 'string'
-      ? record['msg']
-      : typeof record['reason'] === 'string'
-        ? record['reason']
-        : undefined
+  const seen = new Set<unknown>()
+  const read = (value: unknown): string | undefined => {
+    if (typeof value === 'string') {
+      const message = value.trim()
+      return message && message !== 'Object' && message !== '[object Object]' ? message : undefined
+    }
+    if (!value || typeof value !== 'object' || seen.has(value)) return undefined
+    seen.add(value)
+    const record = value as Record<string, unknown>
+    return (
+      read(record['message']) ||
+      read(record['msg']) ||
+      read(record['reason']) ||
+      read(record['error']) ||
+      read(record['cause'])
+    )
+  }
+  return read(error)
 }
 
 function isMissingRgbFeeFunding(error: unknown): boolean {
@@ -330,7 +338,7 @@ export function useSendRGBScreenLogic() {
       .catch(error => {
         if (canceled) return
         setProxyApprovalStatus('error')
-        setProxyApprovalError(error instanceof Error ? error.message : String(error))
+        setProxyApprovalError(getRgbErrorMessage(error) || t('rgb_invoice_transport_unreachable'))
       })
 
     return () => {
@@ -343,6 +351,7 @@ export function useSendRGBScreenLogic() {
     decodedInvoice.valid,
     hasTransportEndpoint,
     invoiceAssetMismatch,
+    t,
     wallet,
   ])
 
@@ -361,10 +370,10 @@ export function useSendRGBScreenLogic() {
         throw error
       }
       setInvoiceAvailability('error')
-      setInvoiceAvailabilityError(error instanceof Error ? error.message : String(error))
+      setInvoiceAvailabilityError(getRgbErrorMessage(error) || t('rgb_invoice_transport_unreachable'))
       throw error
     }
-  }, [decodedInvoice.submissionInvoice, wallet])
+  }, [decodedInvoice.submissionInvoice, t, wallet])
 
   useEffect(() => {
     if (
@@ -394,11 +403,9 @@ export function useSendRGBScreenLogic() {
             return
           }
           setInvoiceAvailability('error')
-          if (error.message) {
-            setInvoiceAvailabilityError(error.message)
-            return
-          }
-          setInvoiceAvailabilityError(error instanceof Error ? error.message : String(error))
+          setInvoiceAvailabilityError(
+            getRgbErrorMessage(error) || t('rgb_invoice_transport_unreachable')
+          )
         })
     }, 400)
     return () => {
@@ -412,6 +419,7 @@ export function useSendRGBScreenLogic() {
     invoiceAssetMismatch,
     bfaInvoiceUnsupported,
     proxyApprovalReady,
+    t,
     wallet,
   ])
 
