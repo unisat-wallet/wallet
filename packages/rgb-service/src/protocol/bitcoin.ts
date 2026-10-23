@@ -114,8 +114,6 @@ function validateRequest(input: RgbOpretPsbtRequest) {
   }
 }
 
-const MAX_FEE_POOL_SPEND_RATIO = 0.5
-
 /**
  * Build the Bitcoin half of an OpretFirst RGB transfer. RGB transition and MPC
  * commitment data are deliberately added in a later step before this PSBT is
@@ -198,11 +196,6 @@ export function createRgbOpretPsbt(input: RgbOpretPsbtRequest): RgbOpretPsbt {
   }
   if (!fee)
     throw new RgbServiceError('Ordinary BTC UTXOs do not cover the RGB transfer network fee')
-  // const feePoolValue = feeUtxos.reduce((total, utxo) => total + utxo.satoshis, 0)
-  // // if (fee > Math.floor(feePoolValue * MAX_FEE_POOL_SPEND_RATIO)) {
-  // //   throw new RgbServiceError('RGB transfer network fee exceeds the fee pool safety limit')
-  // // }
-
   const psbt = new Psbt({ network: bitcoinNetwork(input.network) })
   input.selectedUtxos.forEach(utxo => {
     const publicKey = publicKeyBytes(utxo.publicKey)

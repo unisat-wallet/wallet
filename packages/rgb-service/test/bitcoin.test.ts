@@ -63,14 +63,30 @@ describe('createRgbOpretPsbt', () => {
     expect(built.fee).toBe(255)
   })
 
-  it('rejects a dust-path fee that consumes too much of the RGB fee pool', () => {
+  it('uses the fee UTXO without a change output when the remaining BTC is dust', () => {
+    const invoice = decodeRgbInvoice(
+      'rgb:AQEBAQEB-AQEBAQE-BAQEBAQ-EBAQEBA-QEBAQEB-AQEBAQE/schema/~/bc:utxob:xDfmDF9g-yNOjriV-6Anbe6H-MLJ__g6-lo7Dd4f-dhWBW8S-XYGBm'
+    )
+    const built = createRgbOpretPsbt({
+      network: 'mainnet', selectedUtxos: [utxo], recipientSeal: invoice.seal,
+      feeRate: 40, preserveFundingOutput: true, feeFunding,
+    })
+    const psbt = Psbt.fromHex(built.psbtHex)
+
+    expect(built.fee).toBe(feeFunding.utxos[0]!.satoshis)
+    expect(built.feeOutpoints).toEqual([feeFunding.utxos[0]!.outpoint])
+    expect(psbt.txOutputs).toHaveLength(2)
+    expect(psbt.txOutputs[1]!.value).toBe(utxo.satoshis)
+  })
+
+  it('rejects a transfer when ordinary BTC UTXOs cannot cover the network fee', () => {
     const invoice = decodeRgbInvoice(
       'rgb:AQEBAQEB-AQEBAQE-BAQEBAQ-EBAQEBA-QEBAQEB-AQEBAQE/schema/~/bc:utxob:xDfmDF9g-yNOjriV-6Anbe6H-MLJ__g6-lo7Dd4f-dhWBW8S-XYGBm'
     )
     expect(() => createRgbOpretPsbt({
       network: 'mainnet', selectedUtxos: [utxo], recipientSeal: invoice.seal,
-      feeRate: 40, preserveFundingOutput: true, feeFunding,
-    })).toThrow('fee pool safety limit')
+      feeRate: 50, preserveFundingOutput: true, feeFunding,
+    })).toThrow('Ordinary BTC UTXOs do not cover the RGB transfer network fee')
   })
 
   it('uses the witness beneficiary script and reserves its output index', () => {

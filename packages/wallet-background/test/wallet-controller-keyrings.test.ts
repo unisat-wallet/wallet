@@ -2031,7 +2031,13 @@ describe('RGB wallet references', () => {
   it('does not poll RGB receive infrastructure when there are no pending invoices', async () => {
     const wallet = new WalletController()
     const calls: string[] = []
-    const service = { sync: vi.fn(async () => void calls.push('sync')), claimPendingReceives: vi.fn(async () => void calls.push('claim')), processClaimedReceives: vi.fn(async () => ({ received: 0 })), getPendingReceives: vi.fn(() => []) }
+    const service = {
+      sync: vi.fn(async () => void calls.push('sync')),
+      claimPendingReceives: vi.fn(async () => void calls.push('claim')),
+      processClaimedReceives: vi.fn(async () => ({ received: 0 })),
+      hasStoredPendingReceives: vi.fn(() => false),
+      getPendingReceives: vi.fn(() => []),
+    }
     vi.spyOn(wallet as any, 'getLocalRgbService').mockResolvedValue({ service, wallet: { fundingAddress: 'bc1p-rgb-funding' } })
 
     await wallet.getRgbPendingReceiveInvoices()
@@ -2050,6 +2056,7 @@ describe('RGB wallet references', () => {
       sync: vi.fn(async () => {
         confirmed = true
       }),
+      hasStoredPendingReceives: vi.fn(() => true),
       getPendingReceives: vi.fn(() => [pendingReceive]),
       getSnapshot: vi.fn(() => ({
         utxos: [
@@ -2416,7 +2423,10 @@ describe('RGB wallet references', () => {
     await expect((wallet as any).syncRgbIndexerOutbox(service, walletRef)).resolves.toBe(true)
 
     expect(replaceRgbUtxos).toHaveBeenCalledTimes(2)
-    expect(service.markUtxoSyncCompleted).toHaveBeenCalledWith('d'.repeat(64))
+    expect(service.markUtxoSyncCompleted).toHaveBeenCalledWith(
+      'd'.repeat(64),
+      expect.objectContaining({ txid: 'd'.repeat(64) })
+    )
     expect(pendingUtxoSync).toBeUndefined()
   })
 
