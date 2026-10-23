@@ -10,7 +10,7 @@ const WebsiteBar = ({ session }: { session: { origin: string; icon: string; name
   return (
     <Card preset="style2" selfItemsCenter>
       <Row itemsCenter>
-        <Image src={formatSessionIcon(session)} fallbackSrc={DEFAULT_SESSION_ICON} size={fontSizes.logo} />
+        <Image src={formatSessionIcon(session)} fallbackSrc={DEFAULT_SESSION_ICON} size={fontSizes.logo} referrerPolicy="no-referrer" />
         <Text text={session.origin} />
       </Row>
     </Card>

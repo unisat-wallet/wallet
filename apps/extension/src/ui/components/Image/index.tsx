@@ -12,15 +12,17 @@ interface ImageProps {
   containerStyle?: CSSProperties;
   onClick?: React.MouseEventHandler<HTMLDivElement>;
   onError?: React.ReactEventHandler<HTMLImageElement>;
+  referrerPolicy?: React.HTMLAttributeReferrerPolicy;
 }
 
 export function Image(props: ImageProps) {
-  const { src, fallbackSrc, size, width, height, style: $imageStyleOverride, onClick, onError } = props;
+  const { src, fallbackSrc, size, width, height, style: $imageStyleOverride, onClick, onError, referrerPolicy } = props;
 
   return (
     <img
       src={src}
       alt=""
+      referrerPolicy={referrerPolicy}
       style={Object.assign({}, $imageStyleOverride, {
         width: width || size || fontSizes.icon,
         height: height || size || fontSizes.icon

@@ -42,7 +42,7 @@ export default function ConnectedSitesScreen() {
                 <Card key={item.origin}>
                   <Row full justifyBetween itemsCenter>
                     <Row itemsCenter>
-                      <Image src={formatSessionIcon(item)} fallbackSrc={DEFAULT_SESSION_ICON} size={fontSizes.logo} />
+                      <Image src={formatSessionIcon(item)} fallbackSrc={DEFAULT_SESSION_ICON} size={fontSizes.logo} referrerPolicy="no-referrer" />
                       <Text text={item.origin} preset="sub" />
                     </Row>
                     <Column justifyCenter>

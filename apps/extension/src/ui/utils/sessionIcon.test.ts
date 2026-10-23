@@ -9,13 +9,18 @@ describe('formatSessionIcon', () => {
     expect(formatSessionIcon(session('https://dapp.example/icon.png'))).toBe('https://dapp.example/icon.png');
   });
 
+  it('accepts HTTPS icons hosted on a separate CDN', () => {
+    const icon = 'https://next-cdn.unisat.space/_/web-v3576/img/favicon.ico';
+    expect(formatSessionIcon(session(icon, 'https://unisat.io'))).toBe(icon);
+    expect(formatSessionIcon(session(icon, 'https://other.example'))).toBe(icon);
+    expect(formatSessionIcon(session('//cdn.example/icon.png'))).toBe('https://cdn.example/icon.png');
+  });
+
   it.each([
     '',
-    'https://other.example/icon.png',
-    'https://dapp.example.evil/icon.png',
     'https://dapp.example@other.example/icon.png',
-    '//other.example/icon.png',
     'http://dapp.example/icon.png',
+    'http://other.example/icon.png',
     'data:image/svg+xml,<svg/>',
     'javascript:alert(1)',
     'https://user:pass@dapp.example/icon.png',

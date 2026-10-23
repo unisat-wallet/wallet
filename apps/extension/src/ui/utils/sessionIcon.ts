@@ -10,7 +10,6 @@ export function formatSessionIcon(session: { origin: string; icon: string; name:
     if (
       origin.protocol !== 'https:' ||
       icon.protocol !== 'https:' ||
-      icon.origin !== origin.origin ||
       icon.username ||
       icon.password
     ) {
