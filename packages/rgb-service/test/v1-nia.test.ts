@@ -250,6 +250,79 @@ describe('NIA v1 transfer', () => {
     expect(next.terminalAssignments).toContainEqual(expect.objectContaining({ amount: '10' }))
   })
 
+  it('allows the exact selected mempool witness when preparing a chained send', async () => {
+    const { consignment, assetId, prepared: first, transaction } = fixture()
+    const witnessTxid = transaction.getId()
+    const validateForSend = vi.fn(async (
+      input: Parameters<NonNullable<import('../src/types').RgbServiceDependencies['validateBfaConsignment']>>[0]
+    ) => validateBfaTransferConsignment(input.payload, {
+      network: 0,
+      isBitcoinTxConfirmed: async () => false,
+      ...(input.pendingWitnessTxid ? { pendingWitnessTxid: input.pendingWitnessTxid } : {}),
+      knownBlindSeals: input.knownBlindSeals,
+    }))
+    const encoder = createLocalRgbProtocolEncoder(validateForSend)
+    const changeVout = first.changeVout!
+    const change = transaction.outs[changeVout]!
+    const utxo = {
+      outpoint: { txid: witnessTxid, vout: changeVout },
+      satoshis: change.value,
+      scriptPubKey: change.script.toString('hex'),
+      publicKey: `02${'22'.repeat(32)}`,
+      chainStatus: 'mempool' as const,
+      allocations: [{
+        assetId,
+        amount: '40',
+        settled: true,
+        spendable: true,
+        opId: Buffer.from(first.transitionId).toString('hex'),
+        assignmentIndex: 1,
+        assignmentType: 4000,
+      }],
+    }
+    const invoice = decodeRgbInvoice(
+      `rgb:${assetId.slice(4)}/schema/~/bc:utxob:xDfmDF9g-yNOjriV-6Anbe6H-MLJ__g6-lo7Dd4f-dhWBW8S-XYGBm?amount=10`
+    )
+
+    await expect(encoder.prepareTransfer({
+      wallet: { walletId: 'test', fundingAddress: 'bc1p-test', network: 'mainnet' },
+      snapshot: { utxos: [utxo], syncedAt: 1 },
+      request: { assetId, amount: '10', invoice: invoice.raw, feeRate: 2 },
+      intent: { assetId, amount: '10', invoice, transition: {
+        assetId,
+        inputAmount: '40',
+        recipientAmount: '10',
+        changeAmount: '30',
+        recipientId: invoice.recipientId,
+        inputs: [{ outpoint: utxo.outpoint, assetId, amount: '40' }],
+        preservedAllocations: [],
+      } },
+      selectedUtxos: [utxo],
+      feeFunding: {
+        utxos: [{
+          outpoint: { txid: 'cc'.repeat(32), vout: 1 },
+          satoshis: 10_000,
+          scriptPubKey: utxo.scriptPubKey,
+          publicKey: utxo.publicKey,
+        }],
+        changeScriptPubKey: utxo.scriptPubKey,
+        changeDustLimit: 330,
+      },
+      validationHistory: {
+        assetId,
+        consignments: [{
+          opId: assetId.slice(4),
+          payload: Buffer.from(consignment).toString('base64'),
+        }],
+      },
+    })).resolves.toMatchObject({ metadata: { schema: 'NIA_V1' } })
+
+    expect(validateForSend).toHaveBeenCalled()
+    expect(validateForSend.mock.calls.every(([input]) =>
+      input.pendingWitnessTxid === witnessTxid
+    )).toBe(true)
+  })
+
   it('keeps only the selected branch in a consignment for the next recipient', async () => {
     const genesis = encodeNiaGenesis({
       ticker: 'NIA', name: 'Two branches', precision: 0, timestamp: 1_713_261_744,

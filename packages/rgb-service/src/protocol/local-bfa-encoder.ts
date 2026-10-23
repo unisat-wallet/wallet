@@ -45,6 +45,21 @@ function hex(bytes: Uint8Array) {
   return Buffer.from(bytes).toString('hex')
 }
 
+/** Allow only the exact mempool witness whose allocation is being spent. */
+function selectedPendingWitnessTxid(selectedUtxos: RgbUtxo[]): string | undefined {
+  const txids = new Set(
+    selectedUtxos
+      .filter(utxo => utxo.chainStatus === 'mempool')
+      .map(utxo => utxo.outpoint.txid.toLowerCase())
+  )
+  if (txids.size > 1) {
+    throw new RgbServiceError(
+      'RGB transfer cannot spend allocations from multiple unconfirmed witnesses'
+    )
+  }
+  return txids.values().next().value
+}
+
 function randomU64() {
   const value = new Uint8Array(8)
   if (!globalThis.crypto?.getRandomValues)
@@ -461,16 +476,19 @@ export function createLocalRgbProtocolEncoder(
         throw new RgbServiceError('BFA burn requires a validated v1 transfer history')
       }
       const knownBlindSeals = input.validationHistory.knownBlindSeals || []
+      const pendingWitnessTxid = selectedPendingWitnessTxid(input.selectedUtxos)
       const evmRpcCache = new Map<string, Promise<unknown>>()
       const bitcoinStatusCache = new Map<string, Promise<boolean>>()
       const histories = await Promise.all(transfers.map(payload => validateBfa({
         wallet: input.wallet, payload, knownBlindSeals, evmRpcCache, bitcoinStatusCache,
         confirmedBitcoinWitnesses: input.validationHistory.confirmedBitcoinWitnesses,
+        ...(pendingWitnessTxid ? { pendingWitnessTxid } : {}),
       })))
       const merged = mergeBfaValidatedHistories(histories)
       const history = await validateBfa({
         wallet: input.wallet, payload: merged, knownBlindSeals, evmRpcCache, bitcoinStatusCache,
         confirmedBitcoinWitnesses: input.validationHistory.confirmedBitcoinWitnesses,
+        ...(pendingWitnessTxid ? { pendingWitnessTxid } : {}),
       })
       if (hex(history.genesis.slice(2, 34)) !== BFA_SCHEMA_ID)
         throw new RgbServiceError('Only BFA assets can be burned')
@@ -503,6 +521,7 @@ export function createLocalRgbProtocolEncoder(
       if (!transferPayloads.length) throw new RgbServiceError('RGB v1 history has no transfer')
       const singlePayload = transferPayloads.length === 1 ? transferPayloads[0] : undefined
       const confirmedBitcoinWitnesses = input.validationHistory.confirmedBitcoinWitnesses
+      const pendingWitnessTxid = selectedPendingWitnessTxid(input.selectedUtxos)
       const cachedHistories = input.validationHistory.validatedV1SendHistories
       const network = input.wallet.network === 'mainnet' || input.wallet.network === 'fractal-mainnet' ||
         input.wallet.network === 'fractal-test' ? 0 : input.wallet.network === 'testnet' ? 1 :
@@ -515,10 +534,12 @@ export function createLocalRgbProtocolEncoder(
         const bitcoinStatusCache = new Map<string, Promise<boolean>>()
         const checked = await Promise.all(transferPayloads.map(payload => validateBfa({
           wallet: input.wallet, payload, knownBlindSeals, evmRpcCache, bitcoinStatusCache, confirmedBitcoinWitnesses,
+          ...(pendingWitnessTxid ? { pendingWitnessTxid } : {}),
         })))
         const merged = mergeBfaValidatedHistories(checked)
         const validated = await validateBfa({
           wallet: input.wallet, payload: merged, knownBlindSeals, evmRpcCache, bitcoinStatusCache, confirmedBitcoinWitnesses,
+          ...(pendingWitnessTxid ? { pendingWitnessTxid } : {}),
         })
         history = validated
         // Only a fully verified, deeply confirmed local history can bypass
