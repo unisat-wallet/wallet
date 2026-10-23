@@ -481,6 +481,15 @@ type RgbControllerApiService = {
     createdAt: number
     rejectionReason?: string
   }) => Promise<void>
+  reportRgbBurn: (params: {
+    wallet: RgbWalletRef & { network: string }
+    txid: string
+    assetId: string
+    amount: string
+    destinationChainId: number
+    recipient: string
+    createdAt: number
+  }) => Promise<{ recorded: true; txid: string }>
 } & Pick<RgbBackendApi, 'reportRgbBroadcastFailure' | 'getRgbBroadcastFailureStatus'>
 
 const getRgbApiService = () => (walletApiService as unknown as { rgb: RgbControllerApiService }).rgb
@@ -6619,6 +6628,20 @@ export class WalletController extends BaseController {
           await this.assertActiveRgbWallet(localWallet)
           return txid
         },
+      },
+      onBurnBroadcasted: async record => {
+        try {
+          if (!record.wallet.network) throw new Error('RGB burn wallet network is unavailable')
+          await getRgbApiService().reportRgbBurn({
+            ...record,
+            wallet: record.wallet as RgbWalletRef & { network: string },
+          })
+        } catch (error) {
+          log.warn('Failed to report RGB burn', {
+            txid: record.txid,
+            assetId: record.assetId,
+          }, error)
+        }
       },
       now: () => this.getRgbNow(),
       onStatePersisted: (state, context) =>

@@ -3519,6 +3519,23 @@ export class RgbService {
     const state = this.requireState()
     const broadcast = pending.broadcast
     if (!broadcast) throw new RgbServiceError(`RGB transfer ${transferId} has not been broadcast`)
+    if (pending.request.burn) {
+      try {
+        await this.dependencies.onBurnBroadcasted?.({
+          wallet: state.wallet,
+          txid: broadcast.completed.txid,
+          assetId: pending.request.assetId,
+          amount: pending.request.amount,
+          destinationChainId: pending.request.burnDestination?.destinationChainId ?? 42161,
+          recipient: pending.request.burnDestination?.recipient
+            ?? pending.request.burnReason?.slice(-40).toLowerCase()
+            ?? '',
+          createdAt: pending.createdAt,
+        })
+      } catch {
+        // Audit reporting must not turn an already-broadcast irreversible burn into a UI failure.
+      }
+    }
     // Consignments were durably posted before this transaction was broadcast.
     // Regular sends also waited for the recipient ACK.
     if (!pending.request.burn) await this.dependencies.stateSource.syncBroadcast?.(

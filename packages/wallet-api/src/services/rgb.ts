@@ -11,6 +11,8 @@ import type {
   RgbAssetActivityQuery,
   RgbAssetDetail,
   RgbAssetMetadataSyncRequest,
+  RgbBurnReportRequest,
+  RgbBurnReportResult,
   RgbBalance,
   RgbPageResponse,
   RgbConsignmentPublishRequest,
@@ -347,6 +349,13 @@ export class RgbService {
         ...consignment,
         assetId: normalizeRgbAssetId(consignment.assetId),
       })),
+    })
+  }
+
+  async reportRgbBurn(params: RgbBurnReportRequest): Promise<RgbBurnReportResult> {
+    return this.privatePost('/v5/rgb/burns/report', {
+      ...params,
+      assetId: normalizeRgbAssetId(params.assetId),
     })
   }
 

@@ -302,6 +302,23 @@ export interface RgbTransferSyncRequest {
   }>
 }
 
+/** Record a successfully broadcast BFA burn without uploading its proof payload. */
+export interface RgbBurnReportRequest {
+  wallet: RgbWalletRef & { network: string }
+  txid: string
+  assetId: string
+  amount: string
+  destinationChainId: number
+  /** Lowercase hex-encoded chain-native recipient bytes. */
+  recipient: string
+  createdAt: number
+}
+
+export interface RgbBurnReportResult {
+  recorded: true
+  txid: string
+}
+
 /** Index a local RGB receive outcome for this invoice. */
 export interface RgbReceiveTransferSyncRequest {
   wallet: RgbWalletRef

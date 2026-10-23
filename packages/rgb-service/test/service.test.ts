@@ -297,6 +297,7 @@ describe('RgbService', () => {
       expectedReason: '9274beba7130d3f8a4ef95c5c4c555616718050c688f8478e23f8131762a9537' },
   ])('broadcasts a $label BFA burn and retains its proof after reopening', async ({ burnReason, burnDestination, expectedReason }) => {
     const dependencies = createDependencies()
+    dependencies.onBurnBroadcasted = vi.fn()
     const service = new RgbService(dependencies)
     const assetId = 'rgb:AQEBAQEB-AQEBAQE-BAQEBAQ-EBAQEBA-QEBAQEB-AQEBAQE'
     const txid = 'c'.repeat(64)
@@ -337,6 +338,14 @@ describe('RgbService', () => {
     expect(dependencies.transport.publishConsignment).not.toHaveBeenCalled()
     expect(dependencies.stateSource.syncBroadcast).not.toHaveBeenCalled()
     expect(dependencies.broadcaster.broadcast).toHaveBeenCalledTimes(1)
+    expect(dependencies.onBurnBroadcasted).toHaveBeenCalledWith(expect.objectContaining({
+      wallet,
+      txid,
+      assetId,
+      amount: '60',
+      destinationChainId: burnDestination?.destinationChainId ?? 42161,
+      recipient: burnDestination?.recipient ?? burnReason?.replace(/^0x/i, '').toLowerCase(),
+    }))
     expect(service.getPendingUtxoSync()?.outpoints).toContainEqual(expect.objectContaining({
       outpoint: { txid, vout: 0 },
       allocations: [expect.objectContaining({ assetId, amount: '40', settled: false })],

@@ -665,6 +665,16 @@ export interface RgbServiceDependencies {
   }) => Promise<import('./protocol/bfa-validator').ValidatedBfaConsignment>
   transport: RgbTransport
   broadcaster: BitcoinBroadcaster
+  /** Best-effort structured audit record after a BFA burn is durably persisted and broadcast. */
+  onBurnBroadcasted?: (record: {
+    wallet: RgbWalletRef
+    txid: string
+    assetId: string
+    amount: string
+    destinationChainId: number
+    recipient: string
+    createdAt: number
+  }) => void | Promise<void>
   /**
    * Queues a recovery checkpoint after local state is durably encrypted at
    * rest. Critical state transitions may await its completion.

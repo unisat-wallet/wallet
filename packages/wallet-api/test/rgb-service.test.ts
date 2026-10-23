@@ -30,6 +30,30 @@ describe('RgbService', () => {
     )
   })
 
+  it('reports a broadcast RGB burn through the authenticated API', async () => {
+    const httpClient = { post: vi.fn().mockResolvedValue({ recorded: true, txid: 'b'.repeat(64) }), get: vi.fn() }
+    const service = new RgbService(httpClient as any)
+    service.setRequestAuthenticator(vi.fn().mockResolvedValue({
+      fundingAddress: 'bc1p-funding', nonce: 'a'.repeat(32), expiresAt: 1, signature: 'signature',
+    }))
+    const params = {
+      wallet: { fundingAddress: 'bc1p-funding', network: 'mainnet' as const },
+      txid: 'b'.repeat(64),
+      assetId: 'rgb:AQEBAQEB-AQEBAQE-BAQEBAQ-EBAQEBA-QEBAQEB-AQEBAQE',
+      amount: '60',
+      destinationChainId: 42161,
+      recipient: 'f39fd6e51aad88f6f4ce6ab8827279cfffb92266',
+      createdAt: 1_786_688_361_585,
+    }
+
+    await service.reportRgbBurn(params)
+
+    expect(httpClient.post).toHaveBeenCalledWith('/v5/rgb/burns/report', {
+      ...params,
+      auth: expect.objectContaining({ fundingAddress: 'bc1p-funding' }),
+    })
+  })
+
   it('re-signs once with server time when RGB authorization detects clock skew', async () => {
     const httpClient = {
       post: vi.fn()
