@@ -4,6 +4,7 @@ import { Column, Icon, Row, Text } from '@/ui/components';
 import { AddressText } from '@/ui/components/AddressText';
 import { RgbAddressBadge } from '@/ui/components/RgbAddressBadge';
 import { colors } from '@/ui/theme/colors';
+import { typography } from '@/ui/theme/typography';
 import { numUtils } from '@unisat/base-utils';
 import {
   DecodedPsbt,
@@ -17,6 +18,7 @@ import {
 import { useBTCUnit, useCurrentAddress, useI18n, useWallet } from '@unisat/wallet-state';
 import { AssetList } from './AssetList';
 import ContractSection from './ContractSection';
+import { SighashSingleDetailsPopover } from './SighashSingleDetailsPopover';
 
 export function InputItem(props: {
   index: number;
@@ -35,6 +37,7 @@ export function InputItem(props: {
   const btcUnit = useBTCUnit();
   const { t } = useI18n();
   const [rgbFundingAddress, setRgbFundingAddress] = useState('');
+  const [showSighashSingleDetails, setShowSighashSingleDetails] = useState(false);
   const itemInfo = (inputInfo || outputInfo)!;
 
   const isToSign = inputInfo && toSignData!.toSignInputs.find((input) => input.index === index);
@@ -134,13 +137,25 @@ export function InputItem(props: {
                 </Row>
               )}
               {inputInfo && props.isSighashSingle && (
-                <Row style={{ padding: '2px 4px', backgroundColor: 'rgba(244, 182, 44, 0.15)', borderRadius: 4 }}>
-                  <Text
-                    text={`SIGHASH_SINGLE${(inputInfo.sighashType & 0x80) !== 0 ? '|ANYONECANPAY' : ''}`}
-                    color="warning"
-                    size="xxs"
-                  />
-                </Row>
+                <button
+                  type="button"
+                  onClick={() => setShowSighashSingleDetails(true)}
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    padding: '2px 4px',
+                    backgroundColor: 'rgba(244, 182, 44, 0.15)',
+                    border: 0,
+                    borderRadius: 4,
+                    cursor: 'pointer',
+                    fontFamily: typography.primary.regular,
+                    fontSize: 10,
+                    lineHeight: 'normal'
+                  }}>
+                  <span style={{ color: colors.warning }}>
+                    {`SIGHASH_SINGLE${(inputInfo.sighashType & 0x80) !== 0 ? '|ANYONECANPAY' : ''}`}
+                  </span>
+                </button>
               )}
             </Row>
           </Column>
@@ -160,6 +175,12 @@ export function InputItem(props: {
           brc20PriceMap={props.brc20PriceMap}
         />
       </Column>
+      {showSighashSingleDetails && inputInfo && (
+        <SighashSingleDetailsPopover
+          hasAnyoneCanPay={(inputInfo.sighashType & 0x80) !== 0}
+          onClose={() => setShowSighashSingleDetails(false)}
+        />
+      )}
     </Row>
   );
 }
