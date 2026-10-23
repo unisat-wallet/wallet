@@ -11,6 +11,25 @@ describe('RgbService', () => {
     expect(normalizeRgbAssetRecord({ assetId: '' })).toEqual({ assetId: '' })
   })
 
+  it('reports user-approved proxy endpoints without relaying proxy traffic', async () => {
+    const httpClient = { post: vi.fn().mockResolvedValue({ recorded: true }), get: vi.fn() }
+    const service = new RgbService(httpClient as any)
+    service.setRequestAuthenticator(vi.fn().mockResolvedValue({
+      fundingAddress: 'bc1p-funding', nonce: 'a'.repeat(32), expiresAt: 1, signature: 'signature',
+    }))
+
+    await service.recordRgbProxyApprovals({ endpoints: ['https://proxy.example/json-rpc'] })
+
+    expect(httpClient.post).toHaveBeenCalledWith(
+      '/v5/rgb/proxy-approvals',
+      {
+        endpoints: ['https://proxy.example/json-rpc'],
+        auth: expect.objectContaining({ fundingAddress: 'bc1p-funding' }),
+      },
+      { retries: 0 }
+    )
+  })
+
   it('re-signs once with server time when RGB authorization detects clock skew', async () => {
     const httpClient = {
       post: vi.fn()

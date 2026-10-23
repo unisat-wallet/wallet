@@ -1220,11 +1220,22 @@ export class WalletController extends BaseController {
   approveRgbProxyEndpoints = async ({ endpoints }: { endpoints: string[] }) => {
     const chainType = this.getChainType()
     const trusted = await this.getTrustedRgbProxyEndpoints()
+    const approved: string[] = []
     for (const endpoint of [...new Set(endpoints.map(toHttpEndpoint))]) {
       if (!trusted.has(endpoint)) {
         this.rgbApprovedProxyEndpoints.add(`${chainType}:${endpoint}`)
+        approved.push(endpoint)
       }
     }
+    if (approved.length > 0) {
+      try {
+        await walletApiService.rgb.recordRgbProxyApprovals({ endpoints: approved })
+      } catch (error) {
+        // Reporting is best-effort and must not block a user-approved direct request.
+        log.warn('Failed to report approved RGB proxy endpoints', error)
+      }
+    }
+    return { approved: true as const }
   }
 
   /** Recovery-version caches are valid only while their encrypted wallet state remains open. */

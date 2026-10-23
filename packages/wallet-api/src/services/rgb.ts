@@ -367,6 +367,12 @@ export class RgbService {
     })
   }
 
+  async recordRgbProxyApprovals(
+    params: { endpoints: string[] }
+  ): Promise<{ recorded: true; endpoints: string[] }> {
+    return this.privatePost('/v5/rgb/proxy-approvals', params, { retries: 0 })
+  }
+
   private async privatePost<T>(
     path: string,
     body: unknown,
@@ -377,23 +383,21 @@ export class RgbService {
     }
     const request = { method: 'POST' as const, path, body }
     const auth = await this.authenticator(request)
+    const post = (requestAuth: Awaited<ReturnType<RgbRequestAuthenticator>>) => {
+      const payload = { ...(body as Record<string, unknown>), auth: requestAuth }
+      return options
+        ? this.httpClient.post<T>(path, payload, options)
+        : this.httpClient.post<T>(path, payload)
+    }
     try {
-      return await this.httpClient.post<T>(
-        path,
-        { ...(body as Record<string, unknown>), auth },
-        options
-      )
+      return await post(auth)
     } catch (error) {
       const serverTime = error instanceof ApiClientError && error.code === RGB_CLOCK_SKEW_ERROR_CODE
         ? Number(error.details?.serverTime)
         : NaN
       if (!Number.isSafeInteger(serverTime) || serverTime <= 0) throw error
       const retryAuth = await this.authenticator({ ...request, serverTime })
-      return this.httpClient.post<T>(
-        path,
-        { ...(body as Record<string, unknown>), auth: retryAuth },
-        options
-      )
+      return post(retryAuth)
     }
   }
 
