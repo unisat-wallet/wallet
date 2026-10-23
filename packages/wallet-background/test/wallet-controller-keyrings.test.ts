@@ -4,7 +4,7 @@ import { KeyringType } from '@unisat/keyring-service/types'
 import { RgbTransferAwaitingAckError, RgbTransferRejectedError } from '@unisat/rgb-service'
 import * as txHelpers from '@unisat/tx-helpers'
 import { bitcoin } from '@unisat/wallet-bitcoin'
-import { BUS_EVENTS, BUS_METHODS, CHAINS_MAP, toRgbDisplayAmount } from '@unisat/wallet-shared'
+import { BUS_EVENTS, BUS_METHODS, CHAINS_MAP, ErrorCodes, toRgbDisplayAmount } from '@unisat/wallet-shared'
 import { AddressType, ChainType, NetworkType } from '@unisat/wallet-types'
 import log from 'loglevel'
 import {
@@ -927,9 +927,10 @@ describe('RGB wallet references', () => {
     ;(keyringService as any).setEncryptedStorageItem = setEncryptedStorageItem
     vi.spyOn(wallet, 'getCurrentRgbWalletRef').mockResolvedValue(walletRef)
 
-    await expect((wallet as any).getLocalRgbReadService()).rejects.toThrow(
-      'RGB is not enabled for this wallet'
-    )
+    const disabledError = await (wallet as any).getLocalRgbReadService()
+      .then(() => undefined, reason => reason)
+    expect(disabledError).toMatchObject({ code: ErrorCodes.RGB_NOT_ENABLED })
+    expect(disabledError).not.toHaveProperty('data')
     await expect(wallet.getRgbFeatureStatus()).resolves.toEqual({
       enabled: false,
       supported: true,

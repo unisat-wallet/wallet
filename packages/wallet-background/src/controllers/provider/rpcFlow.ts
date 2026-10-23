@@ -62,9 +62,10 @@ const flowContext = flow
     const { mapMethod } = ctx
     if (mapMethod.startsWith('webRgb') && mapMethod !== 'webRgbEnable' &&
         !permissionService.hasPermission(ctx.request.session.origin)) {
-      const error = new Error('WebRGB provider is not enabled for this site') as Error & { code: string }
-      error.code = 'NOT_ENABLED'
-      throw error
+      throw new WalletError(
+        ErrorCodes.UNAUTHORIZED,
+        'WebRGB provider is not enabled for this site'
+      )
     }
     if (!Reflect.getMetadata('SAFE', providerController, mapMethod)) {
       // check lock

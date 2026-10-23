@@ -4,6 +4,9 @@ export default defineConfig({
   root: __dirname,
   test: {
     environment: 'node',
-    include: ['src/content-script/pageProvider/webRgb.test.ts']
+    include: [
+      'src/content-script/pageProvider/webRgb.test.ts',
+      'src/shared/utils/message/errorSerialization.test.ts'
+    ]
   }
 });

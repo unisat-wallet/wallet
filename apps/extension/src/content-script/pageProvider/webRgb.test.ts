@@ -1,3 +1,4 @@
+import { ErrorCodes } from '@unisat/wallet-shared';
 import { announceWebRgbProvider, WebRgbProvider } from './webRgb';
 import { describe, expect, it, vi } from 'vitest';
 
@@ -34,6 +35,21 @@ describe('WebRGB provider', () => {
     await provider.enable();
     expect(provider.enabled).toBe(true);
     expect((await provider.getInfo()).methods).toContain('sendAsset');
+  });
+
+  it('maps numeric wallet RPC codes to stable WebRGB codes', async () => {
+    const { provider } = createProvider({
+      webRgbListAssets: () => Promise.reject({
+        code: ErrorCodes.RGB_NOT_ENABLED,
+        message: 'RGB is not enabled for this wallet'
+      })
+    });
+    await provider.enable();
+
+    await expect(provider.listAssets()).rejects.toMatchObject({
+      code: 'NOT_ENABLED',
+      message: 'RGB is not enabled for this wallet'
+    });
   });
 
   it('creates a receive invoice with the effective three-confirmation floor', async () => {

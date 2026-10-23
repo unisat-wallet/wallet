@@ -53,10 +53,12 @@ describe('provider connection approval', () => {
   })
 
   it('rejects WebRGB reads before enable without raising a connection prompt', async () => {
-    await expect(rpcFlow({
+    const error = await rpcFlow({
       ...request(),
       data: { method: 'webRgbGetInfo', params: {} },
-    })).rejects.toMatchObject({ code: 'NOT_ENABLED' })
+    }).then(() => undefined, reason => reason)
+    expect(error).toMatchObject({ code: 4100 })
+    expect(error).not.toHaveProperty('data')
     expect(approvalService.requestApproval).not.toHaveBeenCalled()
   })
 })

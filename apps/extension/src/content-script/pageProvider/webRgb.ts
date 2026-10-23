@@ -1,4 +1,6 @@
 /** WebRGB v1 adapter over the wallet's existing, origin-bound RGB RPCs. */
+import { ErrorCodes } from '@unisat/wallet-shared';
+
 type WebRgbCode = 'USER_REJECTED' | 'NOT_ENABLED' | 'METHOD_NOT_SUPPORTED' | 'INVALID_PARAMS' | 'ASSET_NOT_FOUND' | 'INTERNAL_ERROR';
 type RgbEvent = 'transferReceived' | 'transferSettled';
 type RgbTransfer = Record<string, any>;
@@ -8,11 +10,18 @@ function providerError(code: WebRgbCode, message: string): Error & { code: WebRg
 }
 
 function normalizeError(error: unknown): Error & { code: WebRgbCode } {
-  const value = error as { code?: string | number; message?: string } | null;
+  const value = error as {
+    code?: string | number;
+    message?: string;
+  } | null;
   const code = value?.code;
   const message = value?.message || String(error);
   if (code === 'NOT_ENABLED' || code === 'METHOD_NOT_SUPPORTED' || code === 'INVALID_PARAMS' ||
       code === 'ASSET_NOT_FOUND' || code === 'USER_REJECTED') return providerError(code, message);
+  if (code === ErrorCodes.UNAUTHORIZED || code === ErrorCodes.RGB_NOT_ENABLED)
+    return providerError('NOT_ENABLED', message);
+  if (code === ErrorCodes.INVALID_PARAMS) return providerError('INVALID_PARAMS', message);
+  if (code === ErrorCodes.RGB_ASSET_NOT_FOUND) return providerError('ASSET_NOT_FOUND', message);
   if (code === 4001 || code === '4001' ||
       /user (?:rejected|cancelled|canceled)|connection was not approved|approval.*(?:rejected|cancelled|canceled)/i.test(message))
     return providerError('USER_REJECTED', message);

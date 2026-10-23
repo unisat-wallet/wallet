@@ -1,9 +1,10 @@
 /**
  * Provider initialization and lifecycle management
  */
-import { ethErrors, serializeError } from 'eth-rpc-errors';
+import { ethErrors } from 'eth-rpc-errors';
 
 import { MESSAGE_TYPE } from '@unisat/wallet-shared';
+import { serializeProviderRpcError } from '@/shared/utils/message/errorSerialization';
 import { _unisatProviderPrivate, getCacheOrigin, requestMethodKey, setCacheOrigin } from './providerState';
 import { $, domReadyCall } from './utils';
 
@@ -114,8 +115,9 @@ export async function requestMethod(data: any): Promise<any> {
         return res;
       })
       .catch((err) => {
-        log('[request: error]', data.method, serializeError(err));
-        throw serializeError(err);
+        const error = serializeProviderRpcError(err);
+        log('[request: error]', data.method, error);
+        throw error;
       });
   });
 }

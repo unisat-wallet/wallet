@@ -5,6 +5,8 @@ import { MESSAGE_TYPE } from '@unisat/wallet-shared';
 import { ethErrors } from 'eth-rpc-errors';
 import { EventEmitter } from 'events';
 
+import { serializeTransportError } from './errorSerialization';
+
 abstract class Message extends EventEmitter {
   // available id list
   // max concurrent request limit
@@ -59,13 +61,8 @@ abstract class Message extends EventEmitter {
 
       try {
         res = await this.listenCallback(data);
-      } catch (e: any) {
-        err = {
-          message: e.message,
-          stack: e.stack
-        };
-        e.code && (err.code = e.code);
-        e.data && (err.data = e.data);
+      } catch (error) {
+        err = serializeTransportError(error);
       }
 
       this.send(MESSAGE_TYPE.RESPONSE, { ident, res, err });

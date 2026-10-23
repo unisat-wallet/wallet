@@ -30,11 +30,13 @@ import {
   PlatformEnv,
   SESSION_EVENTS,
   AccountSignMethod,
+  ErrorCodes,
   SignMessageResult,
   SignMessageType,
   SignPsbtResult,
   ToSignData,
   ToSignMessage,
+  WalletError,
   getAccountCapabilities,
   hasOwn,
   isSupportedChainType,
@@ -48,9 +50,7 @@ function validateRgbProviderFeeRate(req: { data: { params: { feeRate?: number } 
 }
 
 function webRgbInvalid(message: string): never {
-  const error = new Error(message) as Error & { code: string }
-  error.code = 'INVALID_PARAMS'
-  throw error
+  throw new WalletError(ErrorCodes.INVALID_PARAMS, message)
 }
 
 function webRgbSafeNumber(value: string | number | undefined, name: string): number {
@@ -784,9 +784,10 @@ class ProviderController extends BaseController {
     if (typeof params?.assetId !== 'string' || !params.assetId) webRgbInvalid('assetId is required')
     const balance = await wallet.getRGBAssetBalance('', params.assetId)
     if (!balance) {
-      const error = new Error('RGB asset was not found') as Error & { code: string }
-      error.code = 'ASSET_NOT_FOUND'
-      throw error
+      throw new WalletError(
+        ErrorCodes.RGB_ASSET_NOT_FOUND,
+        'RGB asset was not found'
+      )
     }
     return { assetId: params.assetId, balance: webRgbSafeNumber(balance.balance, 'balance'), raw: balance }
   }

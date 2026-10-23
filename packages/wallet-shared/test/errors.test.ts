@@ -3,6 +3,22 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { ErrorCodes, ErrorMessages, WalletError } from '../src/errors'
 
 describe('WalletError', () => {
+  it('uses JSON-RPC-compatible numeric codes for wallet errors', () => {
+    const implementationCodes = [
+      ErrorCodes.INSUFFICIENT_BTC_UTXO,
+      ErrorCodes.INSUFFICIENT_ASSET_UTXO,
+      ErrorCodes.NOT_SAFE_UTXOS,
+      ErrorCodes.ASSET_MAYBE_LOST,
+      ErrorCodes.INSUFFICIENT_FEE_UTXO,
+      ErrorCodes.NO_ACCOUNT,
+      ErrorCodes.RGB_NOT_ENABLED,
+      ErrorCodes.RGB_ASSET_NOT_FOUND,
+    ]
+
+    expect(implementationCodes.every(code => code >= -32099 && code <= -32000)).toBe(true)
+    expect(ErrorCodes.UNKNOWN).toBe(ErrorCodes.INTERNAL_ERROR)
+  })
+
   beforeEach(() => {
     vi.spyOn(console, 'log').mockImplementation(() => {})
   })
@@ -15,9 +31,9 @@ describe('WalletError', () => {
   })
 
   it('uses explicit message when provided', () => {
-    const err = new WalletError(ErrorCodes.UNKNOWN, 'manual message')
+    const err = new WalletError(ErrorCodes.RGB_NOT_ENABLED, 'manual message')
 
-    expect(err.code).toBe(ErrorCodes.UNKNOWN)
+    expect(err.code).toBe(ErrorCodes.RGB_NOT_ENABLED)
     expect(err.message).toBe('manual message')
   })
 

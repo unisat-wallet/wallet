@@ -1,3 +1,4 @@
+import { ErrorCodes } from '@unisat/wallet-shared'
 import type { SignPsbtParams, SignedData, ToSignData } from '@unisat/wallet-shared'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useI18n, useNavigation, useTools, useWallet } from 'src/context'
@@ -147,7 +148,13 @@ const getInvoiceCreationErrorMessage = (
 
 const isInsufficientBtcError = (error: unknown) => {
   const value = error as { code?: number; message?: string; msg?: string }
-  if (value?.code === -2 || value?.code === -7) return true
+  if (
+    value?.code === ErrorCodes.INSUFFICIENT_BTC_UTXO ||
+    value?.code === ErrorCodes.INSUFFICIENT_FEE_UTXO ||
+    // Accept errors produced by extension versions before the JSON-RPC code migration.
+    value?.code === -2 ||
+    value?.code === -7
+  ) return true
 
   const message = getErrorMessage(error).toLowerCase()
   return (

@@ -54,6 +54,7 @@ import {
   CosmosBalance,
   CosmosSignDataType,
   DummyTxType,
+  ErrorCodes,
   LocalPsbtSummary,
   PlatformEnv,
   PsbtActionDetailType,
@@ -70,6 +71,7 @@ import {
   ToSignData,
   ToSignMessage,
   UTXO,
+  WalletError,
   WalletKeyring,
   bgI18n,
   getAccountCapabilities,
@@ -4086,7 +4088,10 @@ export class WalletController extends BaseController {
   private async assertRgbFeatureEnabled() {
     const wallet = await this.getCurrentRgbWalletRef()
     if (!(await this.isRgbFeatureEnabled(wallet))) {
-      throw new Error('RGB is not enabled for this wallet. Enable RGB before continuing.')
+      throw new WalletError(
+        ErrorCodes.RGB_NOT_ENABLED,
+        'RGB is not enabled for this wallet. Enable RGB before continuing.'
+      )
     }
   }
 
@@ -4219,7 +4224,10 @@ export class WalletController extends BaseController {
     // activation. All payload/state endpoints remain consent-gated.
     if (request.path !== '/v5/rgb/recovery/checkpoint/metadata') {
       if (!(await this.isRgbFeatureEnabled(wallet))) {
-        throw new Error('RGB is not enabled for this wallet. Enable RGB before continuing.')
+        throw new WalletError(
+          ErrorCodes.RGB_NOT_ENABLED,
+          'RGB is not enabled for this wallet. Enable RGB before continuing.'
+        )
       }
     }
     assertCanCreateSigningRequest(account)
@@ -6190,7 +6198,10 @@ export class WalletController extends BaseController {
     wallet: LocalRgbWallet
   ): Promise<LocalRgbServiceContext> => {
     if (!(await this.isRgbFeatureEnabled(wallet))) {
-      throw new Error('RGB is not enabled for this wallet. Enable RGB before continuing.')
+      throw new WalletError(
+        ErrorCodes.RGB_NOT_ENABLED,
+        'RGB is not enabled for this wallet. Enable RGB before continuing.'
+      )
     }
     const context = await this.rgbServiceRegistry.get(wallet)
     await this.restoreRgbRecoveryIfNeeded(context)
