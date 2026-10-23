@@ -246,18 +246,6 @@ export function RGBTransferDetailSheet({
     transfer?.type === 'send' && String(transfer?.status || '').toLowerCase() === 'broadcast_failed';
   const canBroadcast =
     transfer?.type === 'send' && String(transfer?.status || '').toLowerCase() === 'ready_to_broadcast';
-  const isUnbroadcastSend = transfer?.type === 'send' && !transfer.burn &&
-    ['signed', 'waiting_ack', 'ready_to_broadcast'].includes(status.toLowerCase());
-  const reservedAmount = transfer?.lockedAmount && /^\d+$/.test(transfer.lockedAmount)
-    ? BigInt(transfer.lockedAmount)
-    : undefined;
-  const sendingAmount = transfer?.amount && /^\d+$/.test(transfer.amount)
-    ? BigInt(transfer.amount)
-    : undefined;
-  const expectedChange = isUnbroadcastSend && reservedAmount !== undefined && sendingAmount !== undefined &&
-    reservedAmount >= sendingAmount
-    ? reservedAmount - sendingAmount
-    : undefined;
   const assetId = transfer?.assetId?.trim();
   const isIssue = transfer?.type === 'issue';
   const recordId = isIssue ? transfer?.txid : transfer?.transferId || transferId || '';
@@ -494,13 +482,6 @@ export function RGBTransferDetailSheet({
                   ) : null}
                 </Row>
               </Row>
-              {expectedChange !== undefined ? (
-                <>
-                  <DetailRow label={t('rgb_reserved_for_pending_send')} value={toRgbDisplayAmount(reservedAmount!.toString(), getRgbTokenPrecision(transfer))} />
-                  <DetailRow label={t('rgb_sending_amount')} value={displayAmount} />
-                  <DetailRow label={t('rgb_expected_change')} value={toRgbDisplayAmount(expectedChange.toString(), getRgbTokenPrecision(transfer))} />
-                </>
-              ) : null}
               {isRejectedReceive && transfer?.amount ? (
                 <DetailRow label={t('amount')} value={displayAmount} />
               ) : null}

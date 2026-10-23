@@ -3442,9 +3442,6 @@
     "message": "Verrouillé"
   },
   "rgb_current_balance": { "message": "Solde actuel" },
-  "rgb_reserved_for_pending_send": { "message": "Réservé pour l’envoi" },
-  "rgb_sending_amount": { "message": "Envoi" },
-  "rgb_expected_change": { "message": "Monnaie estimée" },
   "rgb_estimated_balance_after_send": { "message": "Après l’envoi (estimation)" },
   "rgb_balance_processing": {
     "message": "En cours"

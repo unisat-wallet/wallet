@@ -115,7 +115,6 @@ export default function RGBTokenScreen() {
           tokenInfo={tokenInfo}
           tokenBalance={tokenBalance}
           reservedSendAmount={showSendBreakdown ? reservedSendAtomic.toString() : undefined}
-          sendingAmount={showSendBreakdown ? outgoingAtomic.toString() : undefined}
           estimatedBalance={estimatedBalanceAtomic?.toString()}
           otherLockedAmount={remainingLockedAtomic.toString()}
         />
@@ -234,7 +233,7 @@ export default function RGBTokenScreen() {
               {Number(tokenBalance?.pending || 0) > 0 ? (
                 <Text text={`${t('pending')}: ${pendingAmount}`} size="xs" color="gold" textCenter wrap />
               ) : null}
-              {showSendBreakdown ? (
+              {estimatedBalanceAtomic !== undefined ? (
                 <Column
                   fullX
                   gap="xs"
@@ -247,21 +246,8 @@ export default function RGBTokenScreen() {
                     boxSizing: 'border-box'
                   }}>
                   <Text
-                    text={`${t('rgb_reserved_for_pending_send')}: ${toRgbDisplayAmount(
-                      reservedSendAtomic.toString(),
-                      precision
-                    )}`}
-                    size="xs"
-                    color="gold"
-                    textCenter
-                    wrap
-                  />
-                  <Text
-                    text={`${t('rgb_sending_amount')}: ${toRgbDisplayAmount(
-                      outgoingAtomic.toString(),
-                      precision
-                    )} · ${t('rgb_expected_change')}: ${toRgbDisplayAmount(
-                      (reservedSendAtomic - outgoingAtomic).toString(),
+                    text={`${t('rgb_estimated_balance_after_send')}: ${toRgbDisplayAmount(
+                      estimatedBalanceAtomic.toString(),
                       precision
                     )}`}
                     size="xs"
@@ -269,18 +255,6 @@ export default function RGBTokenScreen() {
                     textCenter
                     wrap
                   />
-                  {estimatedBalanceAtomic !== undefined ? (
-                    <Text
-                      text={`${t('rgb_estimated_balance_after_send')}: ${toRgbDisplayAmount(
-                        estimatedBalanceAtomic.toString(),
-                        precision
-                      )}`}
-                      size="xs"
-                      color="textDim"
-                      textCenter
-                      wrap
-                    />
-                  ) : null}
                 </Column>
               ) : null}
               {remainingLockedAtomic > BigInt(0) ? (

@@ -3456,9 +3456,6 @@
     "message": "Locking"
   },
   "rgb_current_balance": { "message": "Current balance" },
-  "rgb_reserved_for_pending_send": { "message": "Reserved for send" },
-  "rgb_sending_amount": { "message": "Sending" },
-  "rgb_expected_change": { "message": "Expected change" },
   "rgb_estimated_balance_after_send": { "message": "After send (estimated)" },
   "rgb_balance_processing": {
     "message": "Processing"

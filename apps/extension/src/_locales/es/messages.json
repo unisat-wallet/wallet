@@ -3433,9 +3433,6 @@
     "message": "Bloqueado"
   },
   "rgb_current_balance": { "message": "Saldo actual" },
-  "rgb_reserved_for_pending_send": { "message": "Reservado para envío" },
-  "rgb_sending_amount": { "message": "Enviando" },
-  "rgb_expected_change": { "message": "Cambio estimado" },
   "rgb_estimated_balance_after_send": { "message": "Tras el envío (estimado)" },
   "rgb_balance_processing": {
     "message": "Procesando"
