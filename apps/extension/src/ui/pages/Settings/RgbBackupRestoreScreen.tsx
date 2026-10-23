@@ -148,7 +148,7 @@ export default function RgbBackupRestoreScreen() {
         createMissingAccounts: (preview.missingAccountIndexes?.length || 0) > 0,
         progressId
       });
-      await reloadAccounts().catch(error => console.error('Failed to refresh accounts after RGB restore', error));
+      await reloadAccounts().catch(() => undefined);
       setConfirmRestore(false);
       setStep(3);
       tools.toastSuccess(t('rgb_backup_restored'));

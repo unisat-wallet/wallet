@@ -532,8 +532,8 @@ export function useRGBReceiveScreenLogic(
     if (!txid) return
     try {
       await wallet.abortRgbVanillaTx({ txid })
-    } catch (e) {
-      console.warn('Failed to abort RGB vanilla tx', e)
+    } catch {
+      // Cancellation is best-effort while leaving the signing flow.
     }
   }
 
@@ -591,7 +591,6 @@ export function useRGBReceiveScreenLogic(
       try {
         await finishCreateInvoice(true)
       } catch (invoiceError: unknown) {
-        console.log('Invoice creation error:', invoiceError)
         if (isInsufficientBtcError(invoiceError)) {
           setInsufficientBtcForInvoice(true)
           setError('')
@@ -611,7 +610,6 @@ export function useRGBReceiveScreenLogic(
         await startCreateRgbUtxoSign()
       }
     } catch (e: unknown) {
-      console.log('Error during invoice creation or RGB UTXO preparation:', e)
       if (isInsufficientBtcError(e)) {
         setInsufficientBtcForInvoice(true)
         setError('')

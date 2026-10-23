@@ -65,9 +65,8 @@ export function useSettingsTabScreenLogic() {
       .then(status => {
         if (active) setRgbFeatureStatus({ contextKey: rgbContextKey, enabled: status.enabled && status.supported })
       })
-      .catch(error => {
+      .catch(() => {
         if (active) {
-          console.error('Failed to read RGB feature status in settings', error)
           setRgbFeatureStatus({ contextKey: '', enabled: false })
         }
       })

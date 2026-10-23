@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { createPortal } from 'react-dom';
 
 import { Button, Checkbox, Column, Row, Text, Icon, CopyableAddress, RGBAssetIcon } from '@/ui/components';
@@ -217,61 +217,6 @@ export function RGBTransferDetailSheet({
   const [broadcastRetryLoading, setBroadcastRetryLoading] = useState(false);
 
   const status = transfer?.status || 'pending';
-  useEffect(() => {
-    if (transfer?.type !== 'receive' || status.toLowerCase() !== 'rejected') return;
-    const historyId = transfer.transferId || transferId || transfer.id;
-    const recipientId = historyId.replace(/^local-receive:/, '').replace(/^receive:/, '');
-    let canceled = false;
-    void wallet.getRgbPendingReceiveInvoices({ skipSync: true }).then(
-      ({ list }) => {
-        if (canceled) return;
-        const pending = list.find((invoice) => invoice.recipientId === recipientId);
-        console.warn('[RGB receive recovery] Rejected history detail', {
-          historyId,
-          recipientId,
-          txid: transfer.txid || null,
-          assetId: transfer.assetId || null,
-          amount: transfer.amount || null,
-          status: transfer.status,
-          source: transfer.local ? 'local' : 'indexer',
-          timestamp: transfer.timestamp,
-          pendingInvoice: pending
-            ? {
-                status: pending.status,
-                kind: pending.kind,
-                assetId: pending.assetId,
-                amount: pending.amount,
-                createdAt: pending.createdAt,
-                expirationTimestamp: pending.expirationTimestamp
-              }
-            : null
-        });
-      },
-      (error: unknown) => {
-        if (!canceled) {
-          console.warn('[RGB receive recovery] Pending invoice lookup failed', {
-            historyId,
-            error: getTransferActionErrorMessage(error, 'Unknown error')
-          });
-        }
-      }
-    );
-    return () => {
-      canceled = true;
-    };
-  }, [
-    transfer?.id,
-    transfer?.transferId,
-    transfer?.type,
-    transfer?.status,
-    transfer?.txid,
-    transfer?.assetId,
-    transfer?.amount,
-    transfer?.local,
-    transfer?.timestamp,
-    transferId,
-    wallet
-  ]);
   const ticker = transfer?.ticker || transfer?.name || 'RGB';
   const assetName = transfer?.name || transfer?.ticker || 'RGB';
   const isCanceledReceive = transfer?.type === 'receive' && ['canceled', 'cancelled'].includes(status.toLowerCase());

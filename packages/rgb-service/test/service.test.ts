@@ -493,11 +493,7 @@ describe('RgbService', () => {
 
       await expect(service.open(wallet)).rejects.toThrow('RGB receive history contains an invalid asset ID')
       expect(await dependencies.storage.get(storageKey)).toEqual(stored)
-      expect(warning).toHaveBeenCalledWith('RGB receive history contains an invalid asset ID', {
-        index: 0,
-        status,
-        assetId: 'rgb:invalid',
-      })
+      expect(warning).not.toHaveBeenCalled()
       warning.mockRestore()
     }
   )

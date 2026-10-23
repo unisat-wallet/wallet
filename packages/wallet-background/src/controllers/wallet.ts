@@ -1078,7 +1078,7 @@ export class WalletController extends BaseController {
       const result = await this.getAddressRgbActivity(address, currentPage, pageSize)
       return { total: result.total, list: result.list as RgbRemoteActivity[] }
     },
-    warn: (message, error) => console.warn(message, error),
+    warn: (message, error) => log.warn(message, error),
   })
   private readonly rgbReceiveOperations = new RgbReceiveOperations({
     getContext: () => this.getLocalRgbService(),
@@ -5170,8 +5170,8 @@ export class WalletController extends BaseController {
           destination: account.address,
           createdAt: this.getRgbNow(),
         })
-      } catch (error) {
-        console.warn('Failed to save local RGB fee-pool withdrawal history', error)
+      } catch {
+        // Withdrawal broadcast success must not depend on local history persistence.
       }
     }
     return { txid }
@@ -5413,50 +5413,9 @@ export class WalletController extends BaseController {
   }
 
   acceptRgbReceive = async (params: { recipientId: string }) => {
-    log.info('[RGB accept] Starting receive acceptance')
-    try {
-      const context = await this.getLocalRgbService()
-      log.info('[RGB accept] Recovery state is ready')
-      await this.ensureRgbWriteLease(context, { forceRenew: true })
-      log.info('[RGB accept] Write permission acquired')
-      const receive = context.service
-        .getPendingReceives?.()
-        ?.find(
-          item =>
-            item.recipientId === params.recipientId || item.proxyRecipientId === params.recipientId
-        )
-      log.warn('[RGB accept] Local receive state', {
-        found: Boolean(receive),
-        matchedByProxyRecipient: receive?.proxyRecipientId === params.recipientId,
-        hasPendingAccept: Boolean(receive?.pendingAccept),
-        hasReceivedConsignment: Boolean(receive?.receivedConsignment),
-        accepted: receive?.receivedConsignment?.accepted,
-        acknowledgementPending: receive?.receivedConsignment?.acknowledgementPending,
-        recipientType: receive?.recipientType,
-      })
-      const result = await this.rgbReceiveOperations.acceptReceive(params.recipientId, context)
-      if (!result?.accepted) {
-        log.error('[RGB accept] Receive acceptance returned an unexpected result', {
-          accepted: result?.accepted,
-          status: result?.status,
-        })
-      } else {
-        log.info('[RGB accept] Receive acceptance completed', { status: result.status })
-      }
-      return result
-    } catch (error) {
-      const record = error && typeof error === 'object' ? (error as Record<string, unknown>) : {}
-      log.error('[RGB accept] Receive acceptance failed', {
-        name: typeof record['name'] === 'string' ? record['name'] : undefined,
-        message: typeof record['message'] === 'string' ? record['message'] : String(error),
-        code:
-          typeof record['code'] === 'string' || typeof record['code'] === 'number'
-            ? record['code']
-            : undefined,
-        stack: typeof record['stack'] === 'string' ? record['stack'] : undefined,
-      })
-      throw error
-    }
+    const context = await this.getLocalRgbService()
+    await this.ensureRgbWriteLease(context, { forceRenew: true })
+    return this.rgbReceiveOperations.acceptReceive(params.recipientId, context)
   }
 
   rejectRgbReceive = async (params: { recipientId: string }) => {

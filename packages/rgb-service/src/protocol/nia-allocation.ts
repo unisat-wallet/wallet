@@ -76,48 +76,6 @@ export function verifyRevealedNiaAllocations(input: {
         `${allocation.opId.replace(/^rgb:/, '')}:${allocation.assignmentIndex}`
       )
       if (!revealed) {
-        const parentOpId = allocation.opId.replace(/^rgb:/, '').toLowerCase()
-        const historyTransitions = input.consignments.flatMap(consignment =>
-          consignment.witnessBundles.flatMap(bundle =>
-            bundle.transitions.map(transition => ({ bundle, transition }))
-          )
-        )
-        console.warn('[RGB] Allocation parent Transition missing from local NIA history', {
-          assetId,
-          outpoint: `${utxo.outpoint.txid}:${utxo.outpoint.vout}`,
-          allocation: {
-            amount: allocation.amount,
-            opId: allocation.opId,
-            assignmentIndex: allocation.assignmentIndex,
-            assignmentType: allocation.assignmentType,
-          },
-          consignmentCount: input.consignments.length,
-          witnessBundleCount: input.consignments.reduce(
-            (count, consignment) => count + consignment.witnessBundles.length, 0
-          ),
-          transitionCount: historyTransitions.length,
-          matchingParentTransitions: historyTransitions
-            .filter(({ transition }) => transition.opId.toLowerCase() === parentOpId)
-            .map(({ bundle, transition }) => {
-              const assignment = transition.assignments[allocation.assignmentIndex!]
-              return {
-                bundleTxid: bundle.txid,
-                assignmentCount: transition.assignments.length,
-                assignmentSeal: assignment
-                  ? ('secretSeal' in assignment.seal ? 'blind' : 'revealed')
-                  : 'missing',
-                ...(
-                  assignment && !('secretSeal' in assignment.seal)
-                    ? {
-                        sealTxid: assignment.seal.txid,
-                        sealVout: assignment.seal.vout,
-                        bundleOutputAvailable: !!bundle.outputs[assignment.seal.vout],
-                      }
-                    : {}
-                ),
-              }
-            }),
-        })
         throw new RgbServiceError('RGB allocation parent Transition is missing from local history')
       }
       if ('secretSeal' in revealed.assignment.seal) {

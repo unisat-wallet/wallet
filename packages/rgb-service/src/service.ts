@@ -1,5 +1,4 @@
 import {
-  RgbBfaValidationUnavailableError,
   RgbInvoiceUnavailableError,
   RgbInsufficientBalanceError,
   RgbProxyOperationNotFoundError,
@@ -589,8 +588,7 @@ export class RgbService {
           knownBlindSeals: this.getKnownBlindSeals(),
           confirmedBitcoinWitnesses: state.confirmedBitcoinWitnesses ||= {},
         })
-      } catch (error) {
-        console.warn('Unable to repair a locally validated RGB v1 allocation', error)
+      } catch {
         continue
       }
       if (validated.assetId !== assetId) continue
@@ -602,8 +600,7 @@ export class RgbService {
       let verified: Awaited<ReturnType<NonNullable<RgbServiceDependencies['stateSource']['verifyUtxos']>>>
       try {
         verified = await verifyUtxos(state.wallet, possible)
-      } catch (error) {
-        console.warn('Unable to verify a missing RGB v1 allocation output', error)
+      } catch {
         continue
       }
       if (this.hasPendingSnapshotProtection() ||
@@ -1547,13 +1544,6 @@ export class RgbService {
         }
         const message = error instanceof Error ? error.message : String(error)
         stageValidationFailure(`Consignment validation failed: ${message.slice(0, 300)}`)
-        console.warn('[RGB receive] Validation failed; waiting for user review', {
-          recipientId: item.recipientId,
-          proxyTransferId: item.proxyTransferId,
-          txid: item.txid,
-          reason: message,
-          retryable: error instanceof RgbBfaValidationUnavailableError,
-        })
       }
     }
     // Expiration alone does not prove that an offline receiver has not been
@@ -1795,16 +1785,6 @@ export class RgbService {
   ) {
     const mismatch = (reason: string, details: Record<string, unknown> = {}): undefined => {
       onMismatch?.(reason, details)
-      console.warn('[RGB receive] Consignment does not match invoice', {
-        recipientId: item.recipientId,
-        proxyTransferId: item.proxyTransferId,
-        txid: item.txid,
-        recipientType: receive.recipientType,
-        expectedAssetId: receive.assetId,
-        expectedAmount: receive.amount,
-        reason,
-        ...details,
-      })
       return undefined
     }
     // Proxy v1 consignments have no Bitcoin txid field. Older adapters stored
@@ -4555,7 +4535,7 @@ function normalizeStateAssetIds(state: RgbServiceState): RgbServiceState {
   })
   // Older Any Asset cancellations may store a missing ID as either '' or
   // 'rgb:'. Normalize the latter to the former without discarding the record.
-  state.pendingReceiveHistory?.forEach((item, index) => {
+  state.pendingReceiveHistory?.forEach(item => {
     if (!item.assetId) return
     if ((item.status === 'canceled' || item.status === 'rejected') && item.assetId.trim().toLowerCase() === 'rgb:') {
       item.assetId = ''
@@ -4564,11 +4544,6 @@ function normalizeStateAssetIds(state: RgbServiceState): RgbServiceState {
     try {
       item.assetId = normalizeAssetId(item.assetId)
     } catch {
-      console.warn('RGB receive history contains an invalid asset ID', {
-        index,
-        status: item.status ?? 'unknown',
-        assetId: item.assetId,
-      })
       throw new RgbServiceError('RGB receive history contains an invalid asset ID')
     }
   })

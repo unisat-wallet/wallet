@@ -258,9 +258,8 @@ export default function WalletTabScreen({
         setRgbStatusErrorKey('');
         setRgbStatusContextKey(rgbContextKey);
       })
-      .catch((error) => {
+      .catch(() => {
         if (active) {
-          console.error('Failed to read RGB feature status', error);
           if (rgbStatusRetry.contextKey !== rgbContextKey || rgbStatusRetry.count === 0) {
             retryTimer = setTimeout(() => setRgbStatusRetry({ contextKey: rgbContextKey, count: 1 }), 500);
           } else {
@@ -365,8 +364,7 @@ export default function WalletTabScreen({
           });
         }
       })
-      .catch((error) => {
-        console.error('Failed to load RGB asset tab count', error);
+      .catch(() => {
         if (active && rgbUsdtAssetId) setRgbAssetCount({ key: rgbContextKey, count: 1 });
       });
     return () => {
@@ -501,7 +499,6 @@ export default function WalletTabScreen({
       setRgbActivationOpen(false);
       onRgbFeatureEnabled();
     } catch (error) {
-      console.error('Failed to enable RGB', error);
       const rawMessage = error && typeof error === 'object' && 'message' in error ? error.message : error;
       const nestedMessage =
         rawMessage && typeof rawMessage === 'object' && 'message' in rawMessage ? rawMessage.message : undefined;
