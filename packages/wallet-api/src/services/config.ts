@@ -11,6 +11,7 @@ import type {
   CoinPrice,
   TickPriceItem,
   PaginationParams,
+  RgbProxyPolicy,
 } from '../types'
 
 export class ConfigService {
@@ -21,6 +22,10 @@ export class ConfigService {
    */
   async getWalletConfig(): Promise<WalletConfig> {
     return this.httpClient.get('/v5/default/config')
+  }
+
+  async getRgbProxyPolicy(): Promise<RgbProxyPolicy> {
+    return this.httpClient.get('/v5/rgb/proxy-policy', { retries: 0 })
   }
 
   /**

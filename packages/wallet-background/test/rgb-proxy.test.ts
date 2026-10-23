@@ -54,6 +54,62 @@ describe('RGB proxy transport', () => {
     })).rejects.toThrow('RGB proxy server.info could not connect to the endpoint: Failed to fetch')
   })
 
+  it('disables redirects and omits credentials for every direct proxy request', async () => {
+    const response = rpcError(-32601, 'Method not found')
+    Object.defineProperty(response, 'url', { value: 'https://proxy.example/' })
+    fetchMock.mockResolvedValueOnce(response)
+    await createRgbProxyTransport([endpoint]).prepareInvoice?.({
+      recipientId,
+      endpoints: [endpoint],
+    })
+    expect(fetchMock).toHaveBeenCalledWith(
+      'https://proxy.example',
+      expect.objectContaining({
+        redirect: 'error',
+        credentials: 'omit',
+        referrerPolicy: 'no-referrer',
+        cache: 'no-store',
+      })
+    )
+  })
+
+  it('routes an approved untrusted endpoint through the relay without direct fetch', async () => {
+    const authorizeRequest = vi.fn().mockResolvedValue({ mode: 'relay' })
+    const relayRequest = vi.fn().mockImplementation(async request => {
+      expect(request.endpoint).toBe('https://third-party.example/json-rpc')
+      expect(request.operation).toBe('server.info')
+      expect(JSON.parse(Buffer.from(request.bodyBase64, 'base64').toString()).method).toBe(
+        'server.info'
+      )
+      return {
+        status: 200,
+        contentType: 'application/json',
+        bodyBase64: Buffer.from(
+          JSON.stringify({
+            jsonrpc: '2.0',
+            id: '1',
+            error: { code: -32601, message: 'Method not found' },
+          })
+        ).toString('base64'),
+      }
+    })
+    await expect(
+      createRgbProxyTransport([endpoint], {
+        authorizeRequest,
+        relayRequest,
+      }).prepareInvoice?.({
+        recipientId,
+        endpoints: ['rpcs://third-party.example/json-rpc'],
+      })
+    ).resolves.toBeUndefined()
+    expect(authorizeRequest).toHaveBeenCalledWith({
+      endpoint: 'https://third-party.example/json-rpc',
+      operation: 'server.info',
+    })
+    expect(relayRequest).toHaveBeenCalledTimes(1)
+    expect(fetchMock).not.toHaveBeenCalled()
+  })
+
   it('posts a binary consignment to a rpcs endpoint before requesting its acknowledgement', async () => {
     fetchMock.mockResolvedValueOnce(rpcResponse(true)).mockResolvedValueOnce(rpcResponse(null))
     const transport = createRgbProxyTransport([endpoint])

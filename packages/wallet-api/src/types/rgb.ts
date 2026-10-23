@@ -110,6 +110,25 @@ export type RgbRequestAuthenticator = (request: {
   serverTime?: number
 }) => Promise<RgbRequestAuthorization>
 
+export interface RgbProxyPolicy {
+  version: number
+  expiresAt: number
+  endpoints: string[]
+}
+
+export interface RgbProxyRelayRequest {
+  endpoint: string
+  operation: string
+  contentType: string
+  bodyBase64: string
+}
+
+export interface RgbProxyRelayResponse {
+  status: number
+  contentType?: string
+  bodyBase64: string
+}
+
 export interface RgbUtxoSyncRequest {
   address: string
   /** Present on current clients so index writes are fenced by the wallet lease. */

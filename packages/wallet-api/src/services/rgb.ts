@@ -47,6 +47,8 @@ import type {
   RgbWriteLeaseRenewRequest,
   RgbWriteLeaseStatus,
   RgbWriteLeaseStatusRequest,
+  RgbProxyRelayRequest,
+  RgbProxyRelayResponse,
 } from '../types'
 
 export const RGB_CLOCK_SKEW_ERROR_CODE = -605
@@ -353,6 +355,10 @@ export class RgbService {
       ...params,
       ...(params.assetId ? { assetId: normalizeRgbAssetId(params.assetId) } : {}),
     })
+  }
+
+  async relayRgbProxyRequest(params: RgbProxyRelayRequest): Promise<RgbProxyRelayResponse> {
+    return this.privatePost('/v5/rgb/proxy-relay', params)
   }
 
   private async privatePost<T>(path: string, body: unknown): Promise<T> {
