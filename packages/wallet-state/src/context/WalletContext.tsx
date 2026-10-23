@@ -667,6 +667,8 @@ export interface WalletController {
   }): Promise<any>
 
   checkRgbInvoiceAvailability(params: { invoice: string }): Promise<{ available: true }>
+  getRgbProxyApprovalRequirement(params: { endpoints: string[] }): Promise<{ endpoints: string[] }>
+  approveRgbProxyEndpoints(params: { endpoints: string[] }): Promise<{ approved: true }>
 
   getRgbPendingReceiveInvoices(params?: { skipSync?: boolean }): Promise<{
     list: Array<{

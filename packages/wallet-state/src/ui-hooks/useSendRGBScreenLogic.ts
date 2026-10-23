@@ -27,6 +27,7 @@ const RGB_INVOICE_UNAVAILABLE_ERROR_CODE = 'RGB_INVOICE_UNAVAILABLE'
 const RGB_FEE_POOL_INSUFFICIENT_BTC_ERROR_CODE = 'RGB_FEE_POOL_INSUFFICIENT_BTC'
 
 type InvoiceAvailability = 'idle' | 'checking' | 'available' | 'unavailable' | 'error'
+type ProxyApprovalStatus = 'idle' | 'checking' | 'ready' | 'error'
 
 export type RgbFeePoolRequirement = {
   requiredSatoshis: number
@@ -194,6 +195,10 @@ export function useSendRGBScreenLogic() {
   const [blockingSendStatus, setBlockingSendStatus] = useState<string>()
   const [invoiceAvailability, setInvoiceAvailability] = useState<InvoiceAvailability>('idle')
   const [invoiceAvailabilityError, setInvoiceAvailabilityError] = useState('')
+  const [proxyApprovalStatus, setProxyApprovalStatus] = useState<ProxyApprovalStatus>('idle')
+  const [proxyApprovalEndpoints, setProxyApprovalEndpoints] = useState<string[]>([])
+  const [proxyApprovalAccepted, setProxyApprovalAccepted] = useState(false)
+  const [proxyApprovalError, setProxyApprovalError] = useState('')
   const feePoolTransitionStarted = useRef(false)
   const invoiceInputVersion = useRef(0)
   const prepareRgbSendRef = useRef<() => Promise<void>>(async () => undefined)
@@ -232,6 +237,8 @@ export function useSendRGBScreenLogic() {
       ? t('invoice_asset_mismatch')
       : bfaInvoiceUnsupported
         ? t('rgb_bfa_invoice_not_supported')
+        : proxyApprovalStatus === 'error'
+          ? proxyApprovalError || t('rgb_invoice_transport_unreachable')
         : invoiceAvailability === 'unavailable'
           ? t('rgb_invoice_unavailable')
           : invoiceAvailability === 'error'
@@ -272,6 +279,11 @@ export function useSendRGBScreenLogic() {
         ? t('rgb_transfer_broadcasting_description')
         : ''
 
+  const proxyApprovalReady =
+    burn ||
+    (proxyApprovalStatus === 'ready' &&
+      (proxyApprovalEndpoints.length === 0 || proxyApprovalAccepted))
+
   useEffect(() => {
     let canceled = false
     void wallet
@@ -287,6 +299,52 @@ export function useSendRGBScreenLogic() {
       canceled = true
     }
   }, [assetId, wallet])
+
+  useEffect(() => {
+    if (
+      burn ||
+      !decodedInvoice.valid ||
+      !hasTransportEndpoint ||
+      invoiceAssetMismatch ||
+      bfaInvoiceUnsupported
+    ) {
+      setProxyApprovalStatus('idle')
+      setProxyApprovalEndpoints([])
+      setProxyApprovalAccepted(false)
+      setProxyApprovalError('')
+      return undefined
+    }
+
+    let canceled = false
+    setProxyApprovalStatus('checking')
+    setProxyApprovalEndpoints([])
+    setProxyApprovalAccepted(false)
+    setProxyApprovalError('')
+    void wallet
+      .getRgbProxyApprovalRequirement({ endpoints: decodedInvoice.transportEndpoints })
+      .then(requirement => {
+        if (canceled) return
+        setProxyApprovalEndpoints(requirement.endpoints)
+        setProxyApprovalStatus('ready')
+      })
+      .catch(error => {
+        if (canceled) return
+        setProxyApprovalStatus('error')
+        setProxyApprovalError(error instanceof Error ? error.message : String(error))
+      })
+
+    return () => {
+      canceled = true
+    }
+  }, [
+    bfaInvoiceUnsupported,
+    burn,
+    decodedInvoice.submissionInvoice,
+    decodedInvoice.valid,
+    hasTransportEndpoint,
+    invoiceAssetMismatch,
+    wallet,
+  ])
 
   const checkInvoiceAvailability = useCallback(async () => {
     if (typeof wallet.checkRgbInvoiceAvailability !== 'function') return
@@ -313,7 +371,8 @@ export function useSendRGBScreenLogic() {
       !decodedInvoice.valid ||
       !hasTransportEndpoint ||
       invoiceAssetMismatch ||
-      bfaInvoiceUnsupported
+      bfaInvoiceUnsupported ||
+      !proxyApprovalReady
     ) {
       setInvoiceAvailability('idle')
       setInvoiceAvailabilityError('')
@@ -352,12 +411,14 @@ export function useSendRGBScreenLogic() {
     hasTransportEndpoint,
     invoiceAssetMismatch,
     bfaInvoiceUnsupported,
+    proxyApprovalReady,
     wallet,
   ])
 
   const disabled = useMemo(() => {
     return (
       !invoiceReadyForAmount ||
+      (!burn && !proxyApprovalReady) ||
       (!burn && (invoiceAvailability === 'checking' ||
         invoiceAvailability === 'unavailable' || invoiceAvailability === 'error')) ||
       feeRate <= 0 ||
@@ -370,7 +431,7 @@ export function useSendRGBScreenLogic() {
           /^0+$/.test(burnReason.trim().replace(/^0x/i, '')))) ||
       !!blockingSendStatus
     )
-  }, [invoiceReadyForAmount, feeRate, isAmountValid, insufficientBalance, blockingSendStatus, invoiceAvailability, burn, burnReason, burnDestinationChainId])
+  }, [invoiceReadyForAmount, proxyApprovalReady, feeRate, isAmountValid, insufficientBalance, blockingSendStatus, invoiceAvailability, burn, burnReason, burnDestinationChainId])
 
   const onClickBack = () => {
     nav.goBack()
@@ -384,6 +445,10 @@ export function useSendRGBScreenLogic() {
     setFeePoolRequirement(undefined)
     setInvoiceAvailability('idle')
     setInvoiceAvailabilityError('')
+    setProxyApprovalStatus('idle')
+    setProxyApprovalEndpoints([])
+    setProxyApprovalAccepted(false)
+    setProxyApprovalError('')
   }
 
   const onAmountChange = (value: string) => {
@@ -452,6 +517,25 @@ export function useSendRGBScreenLogic() {
       }
       if (!burn && (!decodedInvoice.valid || !hasTransportEndpoint || invoiceAssetMismatch || bfaInvoiceUnsupported)) {
         throw new Error(invoiceValidationMessage || t('invalid_rgb_invoice'))
+      }
+      if (!burn) {
+        const requirement = await wallet.getRgbProxyApprovalRequirement({
+          endpoints: decodedInvoice.transportEndpoints,
+        })
+        if (inputVersion !== invoiceInputVersion.current) return
+        const displayedEndpointsMatch =
+          requirement.endpoints.length === proxyApprovalEndpoints.length &&
+          requirement.endpoints.every(endpoint => proxyApprovalEndpoints.includes(endpoint))
+        setProxyApprovalEndpoints(requirement.endpoints)
+        setProxyApprovalStatus('ready')
+        if (requirement.endpoints.length > 0 && (!proxyApprovalAccepted || !displayedEndpointsMatch)) {
+          setProxyApprovalAccepted(false)
+          return
+        }
+        if (requirement.endpoints.length > 0) {
+          await wallet.approveRgbProxyEndpoints({ endpoints: requirement.endpoints })
+          if (inputVersion !== invoiceInputVersion.current) return
+        }
       }
       // Always run one final, read-only probe before creating a PSBT: a
       // recipient ID can be occupied after the debounce check completed.
@@ -643,6 +727,10 @@ export function useSendRGBScreenLogic() {
     invoiceReadyForAmount,
     invoiceValidationMessage,
     invoiceAvailability,
+    proxyApprovalStatus,
+    proxyApprovalEndpoints,
+    proxyApprovalAccepted,
+    setProxyApprovalAccepted,
     displayAmount,
     amountPlaceholder,
     amountMuted,

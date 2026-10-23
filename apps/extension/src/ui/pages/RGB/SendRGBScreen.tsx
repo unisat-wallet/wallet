@@ -3,6 +3,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   BottomSheetHeader,
   Button,
+  Card,
   Checkbox,
   Column,
   Content,
@@ -102,6 +103,9 @@ export default function SendRGBScreen() {
     requiresAmount,
     invoiceReadyForAmount,
     invoiceValidationMessage,
+    proxyApprovalEndpoints,
+    proxyApprovalAccepted,
+    setProxyApprovalAccepted,
     displayAmount,
     amountPlaceholder,
     amountMuted,
@@ -205,6 +209,36 @@ export default function SendRGBScreen() {
                 />
               </div>
               {invoiceValidationMessage ? <Text text={invoiceValidationMessage} size="xs" color="danger" wrap /> : null}
+              {proxyApprovalEndpoints.length > 0 ? (
+                <Card style={{ display: 'block', padding: 12, background: 'rgba(235, 185, 76, 0.12)' }}>
+                  <Column gap="sm">
+                    <Row itemsCenter gap="sm">
+                      <Icon icon="warning" color="gold" size={18} />
+                      <Text text="Third-party RGB proxy" preset="sub" color="gold" />
+                    </Row>
+                    <Text
+                      text="This invoice uses a proxy that is not on UniSat's trusted list. Requests will be sent through UniSat's protected relay."
+                      size="xs"
+                      color="textDim"
+                      wrap
+                    />
+                    {proxyApprovalEndpoints.map((endpoint) => (
+                      <Text key={endpoint} text={endpoint} size="xs" style={{ wordBreak: 'break-all' }} />
+                    ))}
+                    <Checkbox
+                      checked={proxyApprovalAccepted}
+                      onChange={(event) => setProxyApprovalAccepted(event.target.checked)}
+                      style={{ alignItems: 'flex-start', marginTop: 4 }}>
+                      <Text
+                        text="I authorize this wallet to use the proxy endpoint shown above for this RGB payment."
+                        size="xs"
+                        color="textDim"
+                        wrap
+                      />
+                    </Checkbox>
+                  </Column>
+                </Card>
+              ) : null}
             </Column>
           ) : null}
 

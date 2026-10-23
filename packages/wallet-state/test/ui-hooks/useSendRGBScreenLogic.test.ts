@@ -140,6 +140,10 @@ describe('useSendRGBScreenLogic', () => {
 
     act(() => result.current.onInvoiceChange(invoice))
     await act(async () => {
+      await Promise.resolve()
+      await Promise.resolve()
+    })
+    await act(async () => {
       await vi.advanceTimersByTimeAsync(400)
     })
 
@@ -150,6 +154,42 @@ describe('useSendRGBScreenLogic', () => {
 
     unmount()
     vi.useRealTimers()
+  })
+
+  it('requires inline consent before using an untrusted invoice proxy', async () => {
+    const assetId = 'rgb:test-asset'
+    const invoice = 'rgb:test-asset/~/~/bc:utxob:test?amount=1&endpoints=rpcs://evil.example'
+    const endpoint = 'https://evil.example'
+    const { wrapper, wallet } = createHookTestHarness({
+      routeState: {
+        assetId,
+        tokenBalance: { assetId, ticker: 'RGB', precision: 8, spendable: '150000000' },
+      },
+    })
+    wallet.getRgbProxyApprovalRequirement = vi.fn().mockResolvedValue({ endpoints: [endpoint] })
+    wallet.createRgbSendBegin = vi.fn().mockResolvedValue({
+      txid: 'proxy-transfer',
+      toSignData: { psbtHex: 'unsigned-psbt' },
+    })
+    const { result } = renderHook(() => useSendRGBScreenLogic(), { wrapper })
+
+    act(() => result.current.onInvoiceChange(invoice))
+
+    await waitFor(() => {
+      expect(result.current.proxyApprovalEndpoints).toEqual([endpoint])
+      expect(result.current.disabled).toBe(true)
+    })
+    expect(wallet.checkRgbInvoiceAvailability).not.toHaveBeenCalled()
+    expect(wallet.approveRgbProxyEndpoints).not.toHaveBeenCalled()
+    expect(wallet.createRgbSendBegin).not.toHaveBeenCalled()
+
+    act(() => result.current.setProxyApprovalAccepted(true))
+    await waitFor(() => expect(result.current.disabled).toBe(false))
+    await act(async () => result.current.onClickNext())
+
+    expect(wallet.approveRgbProxyEndpoints).toHaveBeenCalledWith({ endpoints: [endpoint] })
+    expect(wallet.checkRgbInvoiceAvailability).toHaveBeenCalledWith({ invoice })
+    expect(wallet.createRgbSendBegin).toHaveBeenCalled()
   })
 
   it('blocks signing when the pasted RGB invoice recipient ID is unavailable', async () => {
@@ -326,7 +366,7 @@ describe('useSendRGBScreenLogic', () => {
     })
 
     expect(result.current.isAmountValid).toBe(true)
-    expect(result.current.disabled).toBe(false)
+    await waitFor(() => expect(result.current.disabled).toBe(false))
 
     act(() => {
       result.current.onClickMaxAmount()
@@ -373,7 +413,7 @@ describe('useSendRGBScreenLogic', () => {
     expect(result.current.assetPrecision).toBe(18)
     expect(result.current.requiresAmount).toBe(true)
     expect(result.current.isAmountValid).toBe(true)
-    expect(result.current.disabled).toBe(false)
+    await waitFor(() => expect(result.current.disabled).toBe(false))
 
     await act(async () => {
       await result.current.onClickNext()
@@ -482,7 +522,7 @@ describe('useSendRGBScreenLogic', () => {
       )
     })
 
-    expect(result.current.disabled).toBe(false)
+    await waitFor(() => expect(result.current.disabled).toBe(false))
     await act(async () => {
       await result.current.onClickNext()
     })
