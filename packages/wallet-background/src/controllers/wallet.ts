@@ -1063,7 +1063,6 @@ export class WalletController extends BaseController {
   private readonly rgbPendingBitcoinOperations = new Map<string, LocalRgbWallet>()
   /** User-approved third-party proxies are relayed and remain approved only until wallet lock. */
   private readonly rgbApprovedRelayEndpoints = new Set<string>()
-  private readonly rgbDeniedRelayEndpoints = new Map<string, number>()
   private rgbProxyPolicyCache:
     | { chainType: ChainType; expiresAt: number; endpoints: Set<string> }
     | undefined
@@ -1159,7 +1158,6 @@ export class WalletController extends BaseController {
       this.clearRgbRecoveryCaches()
       this.rgbWriteLeases.clear()
       this.rgbApprovedRelayEndpoints.clear()
-      this.rgbDeniedRelayEndpoints.clear()
       this.rgbProxyPolicyCache = undefined
     })
   }
@@ -1213,30 +1211,18 @@ export class WalletController extends BaseController {
     }
     const approvalKey = `${this.getChainType()}:${canonicalEndpoint}`
     if (this.rgbApprovedRelayEndpoints.has(approvalKey)) return { mode: 'relay' }
-    const deniedUntil = this.rgbDeniedRelayEndpoints.get(approvalKey) || 0
-    if (deniedUntil > Date.now()) {
-      throw new Error('Third-party RGB proxy access was rejected')
+    const result = await approvalService.requestApproval(
+      {
+        approvalComponent: 'RgbProxy',
+        params: { endpoint: canonicalEndpoint, operation },
+      },
+      { height: 560 }
+    )
+    if (result?.approved !== true || result.endpoint !== canonicalEndpoint) {
+      throw new Error('Third-party RGB proxy access was not approved')
     }
-    try {
-      const result = await approvalService.requestApproval(
-        {
-          approvalComponent: 'RgbProxy',
-          params: { endpoint: canonicalEndpoint, operation },
-        },
-        { height: 560 }
-      )
-      if (result?.approved !== true || result.endpoint !== canonicalEndpoint) {
-        this.rgbDeniedRelayEndpoints.set(approvalKey, Date.now() + 60 * 60 * 1000)
-        throw new Error('Third-party RGB proxy access was not approved')
-      }
-      this.rgbApprovedRelayEndpoints.add(approvalKey)
-      return { mode: 'relay' }
-    } catch (error) {
-      if (error instanceof WalletError && error.code === ErrorCodes.UserCancel) {
-        this.rgbDeniedRelayEndpoints.set(approvalKey, Date.now() + 60 * 60 * 1000)
-      }
-      throw error
-    }
+    this.rgbApprovedRelayEndpoints.add(approvalKey)
+    return { mode: 'relay' }
   }
 
   private relayRgbProxyRequest = (
