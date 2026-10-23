@@ -20,6 +20,7 @@ import {
   cacheBfaEvmRpc,
   createBfaEvmRpc,
   createLocalRgbProtocolEncoder,
+  decodeRgbInvoice as decodeLocalRgbInvoice,
   validateBfaTransferConsignment,
   type RgbServiceDependencies,
   type RgbNetwork,
@@ -1185,8 +1186,8 @@ export class WalletController extends BaseController {
           ),
         }
       } catch {
-        // Built-in endpoints remain usable; unknown endpoints still require
-        // explicit approval and are relayed rather than failing open.
+        // Built-in endpoints remain usable; unknown endpoints are still
+        // routed through the relay rather than failing open or being trusted.
         this.rgbProxyPolicyCache = {
           chainType,
           expiresAt: now + 5 * 60,
@@ -1200,7 +1201,6 @@ export class WalletController extends BaseController {
 
   private authorizeRgbProxyRequest = async ({
     endpoint,
-    operation,
   }: {
     endpoint: string
     operation: string
@@ -1209,19 +1209,6 @@ export class WalletController extends BaseController {
     if ((await this.getTrustedRgbProxyEndpoints()).has(canonicalEndpoint)) {
       return { mode: 'direct' }
     }
-    const approvalKey = `${this.getChainType()}:${canonicalEndpoint}`
-    if (this.rgbApprovedRelayEndpoints.has(approvalKey)) return { mode: 'relay' }
-    const result = await approvalService.requestApproval(
-      {
-        approvalComponent: 'RgbProxy',
-        params: { endpoint: canonicalEndpoint, operation },
-      },
-      { height: 560 }
-    )
-    if (result?.approved !== true || result.endpoint !== canonicalEndpoint) {
-      throw new Error('Third-party RGB proxy access was not approved')
-    }
-    this.rgbApprovedRelayEndpoints.add(approvalKey)
     return { mode: 'relay' }
   }
 
@@ -1241,6 +1228,29 @@ export class WalletController extends BaseController {
       if (!trusted.has(endpoint)) {
         this.rgbApprovedRelayEndpoints.add(`${chainType}:${endpoint}`)
       }
+    }
+  }
+
+  private requestRgbProxyApprovals = async ({
+    endpoints,
+    operation,
+  }: {
+    endpoints: string[]
+    operation: string
+  }) => {
+    const requirement = await this.getRgbProxyApprovalRequirement({ endpoints })
+    for (const endpoint of requirement.endpoints) {
+      const result = await approvalService.requestApproval(
+        {
+          approvalComponent: 'RgbProxy',
+          params: { endpoint, operation },
+        },
+        { height: 560 }
+      )
+      if (result?.approved !== true || result.endpoint !== endpoint) {
+        throw new Error('Third-party RGB proxy access was not approved')
+      }
+      await this.approveRgbProxyEndpoints({ endpoints: [endpoint] })
     }
   }
 
@@ -4447,6 +4457,11 @@ export class WalletController extends BaseController {
 
   /** Wallet-only, read-only transport preflight used before presenting an RGB send signature. */
   checkRgbInvoiceAvailability = async (params: { invoice: string }) => {
+    const invoice = decodeLocalRgbInvoice(params.invoice)
+    await this.requestRgbProxyApprovals({
+      endpoints: invoice.transportEndpoints,
+      operation: 'invoice.check',
+    })
     const { service } = await this.getLocalRgbService()
     return service.checkInvoiceAvailability(params.invoice)
   }
