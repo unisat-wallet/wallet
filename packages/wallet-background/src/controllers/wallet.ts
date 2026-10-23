@@ -1061,8 +1061,8 @@ export class WalletController extends BaseController {
   private readonly rgbRecoveryVerifiedFingerprints = new Map<string, string>()
   /** Wallet identity captured while building RGB-related Bitcoin signing requests. */
   private readonly rgbPendingBitcoinOperations = new Map<string, LocalRgbWallet>()
-  /** User-approved third-party proxies are relayed and remain approved only until wallet lock. */
-  private readonly rgbApprovedRelayEndpoints = new Set<string>()
+  /** User-approved third-party proxies remain approved only until wallet lock. */
+  private readonly rgbApprovedProxyEndpoints = new Set<string>()
   private rgbProxyPolicyCache:
     | { chainType: ChainType; expiresAt: number; endpoints: Set<string> }
     | undefined
@@ -1157,7 +1157,7 @@ export class WalletController extends BaseController {
       this.rgbHdBackupWallets.clear()
       this.clearRgbRecoveryCaches()
       this.rgbWriteLeases.clear()
-      this.rgbApprovedRelayEndpoints.clear()
+      this.rgbApprovedProxyEndpoints.clear()
       this.rgbProxyPolicyCache = undefined
     })
   }
@@ -1204,18 +1204,15 @@ export class WalletController extends BaseController {
     endpoint: string
     operation: string
   }): Promise<{ mode: 'direct' | 'relay' }> => {
-    const canonicalEndpoint = toHttpEndpoint(endpoint)
-    if ((await this.getTrustedRgbProxyEndpoints()).has(canonicalEndpoint)) {
-      return { mode: 'direct' }
-    }
-    return { mode: 'relay' }
+    toHttpEndpoint(endpoint)
+    return { mode: 'direct' }
   }
 
   getRgbProxyApprovalRequirement = async ({ endpoints }: { endpoints: string[] }) => {
     const chainType = this.getChainType()
     const trusted = await this.getTrustedRgbProxyEndpoints()
     const approvalEndpoints = [...new Set(endpoints.map(toHttpEndpoint))].filter(endpoint =>
-      !trusted.has(endpoint) && !this.rgbApprovedRelayEndpoints.has(`${chainType}:${endpoint}`)
+      !trusted.has(endpoint) && !this.rgbApprovedProxyEndpoints.has(`${chainType}:${endpoint}`)
     )
     return { endpoints: approvalEndpoints }
   }
@@ -1225,20 +1222,10 @@ export class WalletController extends BaseController {
     const trusted = await this.getTrustedRgbProxyEndpoints()
     for (const endpoint of [...new Set(endpoints.map(toHttpEndpoint))]) {
       if (!trusted.has(endpoint)) {
-        this.rgbApprovedRelayEndpoints.add(`${chainType}:${endpoint}`)
+        this.rgbApprovedProxyEndpoints.add(`${chainType}:${endpoint}`)
       }
     }
   }
-
-  private relayRgbProxyRequest = (
-    request: {
-      endpoint: string
-      operation: string
-      contentType: string
-      bodyBase64: string
-    },
-    signal: AbortSignal
-  ) => walletApiService.rgb.relayRgbProxyRequest(request, signal)
 
   /** Recovery-version caches are valid only while their encrypted wallet state remains open. */
   private clearRgbRecoveryCaches = () => {
@@ -6613,7 +6600,6 @@ export class WalletController extends BaseController {
       validateBfaConsignment,
       transport: createRgbProxyTransport(CHAINS_MAP[chainType]?.rgbProxyEndpoints || [], {
         authorizeRequest: this.authorizeRgbProxyRequest,
-        relayRequest: this.relayRgbProxyRequest,
       }),
       broadcaster: {
         broadcast: async rawTx => {

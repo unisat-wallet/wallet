@@ -217,7 +217,7 @@ export default function SendRGBScreen() {
                       <Text text="Third-party RGB proxy" preset="sub" color="gold" />
                     </Row>
                     <Text
-                      text="This invoice uses a proxy that is not on UniSat's trusted list. Requests will be sent through UniSat's protected relay."
+                      text="This invoice uses a proxy that is not on UniSat's trusted list. The wallet extension will connect to this endpoint directly."
                       size="xs"
                       color="textDim"
                       wrap

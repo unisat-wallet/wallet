@@ -22,7 +22,7 @@ export default function RgbProxy({ params }: Props) {
             <Icon icon="warning" color="gold" size={40} />
             <Text text="Use a third-party RGB proxy?" preset="title-bold" textCenter />
             <Text
-              text="This proxy was supplied by the counterparty and is not on UniSat's trusted list. If you continue, the request will be sent through UniSat's protected relay."
+              text="This proxy was supplied by the counterparty and is not on UniSat's trusted list. If you continue, the wallet extension will connect to it directly."
               color="textDim"
               textCenter
             />
@@ -38,7 +38,7 @@ export default function RgbProxy({ params }: Props) {
           </Card>
 
           <Text
-            text="Approval lasts until the wallet is locked. Redirects and access to private network addresses remain blocked."
+            text="Approval lasts until the wallet is locked. HTTP endpoints and redirects remain blocked."
             size="xs"
             color="textDim"
             textCenter

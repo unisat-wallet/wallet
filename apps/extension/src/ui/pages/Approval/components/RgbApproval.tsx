@@ -674,7 +674,7 @@ function RgbPaymentApproval({ data, session }: { data: Props['params']['data']; 
                   <Text text="Third-party RGB proxy" preset="sub" color="gold" />
                 </Row>
                 <Text
-                  text="This payment uses a proxy supplied by the invoice that is not on UniSat's trusted list. Continuing also allows these exact endpoints through UniSat's protected relay until the wallet is locked."
+                  text="This payment uses a proxy supplied by the invoice that is not on UniSat's trusted list. Continuing allows the wallet extension to connect directly to these exact endpoints until the wallet is locked."
                   size="xs"
                   color="textDim"
                 />
