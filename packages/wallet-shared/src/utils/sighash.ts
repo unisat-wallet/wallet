@@ -14,3 +14,12 @@ export function getSighashSingleInputIndexes(
     return (input.sighashType & SIGHASH_OUTPUT_MASK) === SIGHASH_SINGLE ? [index] : []
   })
 }
+
+export function getSighashSingleAnyoneCanPayInputIndexes(
+  toSignData: ToSignData,
+  inputInfos: Pick<DecodedPsbtInput, 'sighashType'>[]
+): number[] {
+  return getSighashSingleInputIndexes(toSignData, inputInfos).filter(
+    index => ((inputInfos[index]?.sighashType ?? 0) & 0x80) !== 0
+  )
+}

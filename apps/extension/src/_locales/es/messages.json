@@ -2151,6 +2151,9 @@
   "sighash_single_anyonecanpay_description": {
     "message": "ANYONECANPAY también permite cambiar otras entradas después de firmar."
   },
+  "sighash_single_anyonecanpay_signed_amount": {
+    "message": "BTC en la entrada firmada"
+  },
   "sign": {
     "message": "Firmar"
   },

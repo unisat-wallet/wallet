@@ -304,7 +304,11 @@ export default function SignPsbt(props: SignPsbtProps) {
       {header}
       <Content>
         <Column gap="xl">
-          <ActionOverviewSection decodedPsbt={currentDecodedPsbt} action={currentToSignData.action!} />
+          <ActionOverviewSection
+            decodedPsbt={currentDecodedPsbt}
+            action={currentToSignData.action!}
+            toSignData={currentToSignData}
+          />
 
           <AssetOverviewSection
             decodedPsbt={currentDecodedPsbt}

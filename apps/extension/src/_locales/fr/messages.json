@@ -2151,6 +2151,9 @@
   "sighash_single_anyonecanpay_description": {
     "message": "ANYONECANPAY permet aussi de modifier les autres entrées après la signature."
   },
+  "sighash_single_anyonecanpay_signed_amount": {
+    "message": "BTC dans l'entrée signée"
+  },
   "sign": {
     "message": "Signer"
   },

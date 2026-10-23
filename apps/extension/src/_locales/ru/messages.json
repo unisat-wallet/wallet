@@ -2151,6 +2151,9 @@
   "sighash_single_anyonecanpay_description": {
     "message": "ANYONECANPAY также позволяет изменять другие входы после подписания."
   },
+  "sighash_single_anyonecanpay_signed_amount": {
+    "message": "BTC в подписываемом входе"
+  },
   "sign": {
     "message": "Подписать"
   },

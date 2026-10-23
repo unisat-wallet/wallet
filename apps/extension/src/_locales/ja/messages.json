@@ -2151,6 +2151,9 @@
   "sighash_single_anyonecanpay_description": {
     "message": "ANYONECANPAY では、署名後に他の入力も変更できます。"
   },
+  "sighash_single_anyonecanpay_signed_amount": {
+    "message": "署名対象の入力にある BTC"
+  },
   "sign": {
     "message": "署名"
   },

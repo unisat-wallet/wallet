@@ -4,6 +4,8 @@ import {
   PsbtActionDetailType,
   PsbtActionInfo,
   PsbtActionType,
+  ToSignData,
+  getSighashSingleAnyoneCanPayInputIndexes,
 } from '@unisat/wallet-shared'
 import { useMemo } from 'react'
 import { useI18n } from 'src/context'
@@ -12,14 +14,24 @@ import { useChain, useCurrentAddress } from 'src/hooks'
 export interface ActionOverviewSectionProps {
   action: PsbtActionInfo
   decodedPsbt: DecodedPsbt
+  toSignData: ToSignData
 }
 
-export function useActionOverviewSectionLogic({ action, decodedPsbt }: ActionOverviewSectionProps) {
+export function useActionOverviewSectionLogic({ action, decodedPsbt, toSignData }: ActionOverviewSectionProps) {
   const { t } = useI18n()
 
   const chain = useChain()
 
   const currentAddress = useCurrentAddress()
+  const mutableInputIndexes = getSighashSingleAnyoneCanPayInputIndexes(
+    toSignData,
+    decodedPsbt.inputInfos
+  )
+  const hasMutableOutputs = mutableInputIndexes.length > 0
+  const signedInputSatoshis = mutableInputIndexes.reduce(
+    (total, index) => total + (decodedPsbt.inputInfos[index]?.value ?? 0),
+    0
+  )
 
   const spendSatoshis = useMemo(() => {
     const inValue = decodedPsbt.inputInfos
@@ -125,7 +137,15 @@ export function useActionOverviewSectionLogic({ action, decodedPsbt }: ActionOve
   }
 
   const commonDetails: any[] = []
-  if (spendSatoshis > 0) {
+  if (hasMutableOutputs && signedInputSatoshis > 0) {
+    commonDetails.push({
+      type: PsbtActionDetailType.SATOSHIS,
+      label: t('sighash_single_anyonecanpay_signed_amount'),
+      value: `${signedInputSatoshis}`,
+    })
+  }
+
+  if (spendSatoshis > 0 && !hasMutableOutputs) {
     commonDetails.push({
       type: PsbtActionDetailType.SATOSHIS,
       label: t('spending_amount'),
@@ -133,7 +153,7 @@ export function useActionOverviewSectionLogic({ action, decodedPsbt }: ActionOve
     })
   }
 
-  if (spendSatoshis < 0) {
+  if (spendSatoshis < 0 && !hasMutableOutputs) {
     commonDetails.push({
       type: PsbtActionDetailType.SATOSHIS,
       label: t('receive'),

@@ -2157,6 +2157,9 @@
   "sighash_single_anyonecanpay_description": {
     "message": "ANYONECANPAY also allows other inputs to change after signing."
   },
+  "sighash_single_anyonecanpay_signed_amount": {
+    "message": "BTC in signed input"
+  },
   "sign": {
     "message": "Sign"
   },
