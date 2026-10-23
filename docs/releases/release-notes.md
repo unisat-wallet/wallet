@@ -1,5 +1,42 @@
 # UniSat Wallet Release Notes
 
+## v1.8.0
+
+### New Home and Assets Experience
+
+- Redesigned the wallet home screen with a cleaner layout, consolidated wallet actions, asset overviews, and recent transaction history.
+- Added a dedicated Assets tab for easier navigation across BRC-20, Runes, Ordinals, Alkanes, and RGB assets.
+- Added asset counts, improved token and collection categorization, and remembered the selected asset tab for each account.
+- Improved transaction history with token logos, source and recipient addresses, marketplace purchase records, and clearer asset details.
+
+### RGB Upgrades
+
+- Enabled RGB functionality on the Bitcoin Signet network.
+- Upgraded RGB invoice and transfer flows with Proxy V1 support, witness and blind invoices, configurable expiration, and improved transfer status tracking.
+- Added dedicated RGB asset selection, invoice management, issuance review, and transfer history experiences.
+- Added support for donation transfers and BFA burn destinations with proof export.
+- Improved pending, locked, and available balance presentation across RGB asset screens.
+- Added encrypted RGB backups, guided restore, recovery checkpoints, and safer synchronization across devices.
+- Improved handling of rejected, expired, canceled, and interrupted RGB transfers, with clearer status and recovery actions.
+
+### Improvements
+
+- Improved wallet home and asset loading performance while reducing duplicate API requests.
+- Improved RGB balance synchronization, invoice polling, fee-pool handling, and transfer reliability.
+- Refined RGB token, send, receive, issuance, and transfer detail interfaces.
+- Added clearer validation and confirmation prompts throughout RGB operations.
+- Improved localization and display handling for long asset names, small amounts, and asset precision.
+
+### Security and Reliability
+
+- Strengthened dApp session isolation, request validation, and transaction approval checks.
+- Added stricter validation for RGB amounts, invoices, fees, signing requests, and network-specific operations.
+- Improved recovery from temporary API, proxy, indexer, and Babylon RPC failures.
+
+### Availability
+
+- RGB is available on **Bitcoin Testnet4 and Bitcoin Signet**. Bitcoin Mainnet RGB support remains disabled in this release.
+
 ## v1.7.22
 
 ### Bug Fixes
