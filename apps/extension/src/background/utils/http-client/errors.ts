@@ -124,7 +124,9 @@ export class ServiceUnavailableError extends ApiClientError {
 export function isRetryableError(error: Error): boolean {
   if (error instanceof NetworkError) return true;
   if (error instanceof TimeoutError) return true;
-  if (error instanceof ServiceUnavailableError) return true;
+  // The observed 567 response followed the request limit. Retrying it
+  // immediately only adds more requests while the server is rejecting them.
+  if (error instanceof ServiceUnavailableError) return error.details?.status !== 567;
   if (error instanceof HttpError) {
     // Retry on 5xx errors and 429 (rate limit)
     return error.status >= 500 || error.status === 429;

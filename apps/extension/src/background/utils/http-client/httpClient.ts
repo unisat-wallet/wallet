@@ -187,7 +187,9 @@ export class HttpClient implements BaseHttpClient {
     // Handle other HTTP errors
     if (!response.ok) {
       if (response.status >= 500) {
-        throw new ServiceUnavailableError(`Service unavailable: ${response.status} ${response.statusText}`);
+        throw new ServiceUnavailableError(`Service unavailable: ${response.status} ${response.statusText}`, {
+          status: response.status
+        });
       }
       throw new HttpError(response.status, response.statusText);
     }
