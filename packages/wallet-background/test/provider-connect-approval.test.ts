@@ -2,12 +2,13 @@ import 'reflect-metadata'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 vi.mock('../src/services', () => ({
-  keyringService: { memStore: { getState: () => ({ isUnlocked: true }) } },
-  permissionService: { hasPermission: () => false, addConnectedSite: vi.fn() },
+  keyringService: { memStore: { getState: vi.fn(() => ({ isUnlocked: true })) } },
+  permissionService: { hasPermission: vi.fn(() => false), addConnectedSite: vi.fn() },
 }))
 vi.mock('../src/controllers/provider/controller', () => ({
   default: {
     getPublicKey: vi.fn().mockResolvedValue('public-key'),
+    webRgbEnable: vi.fn().mockResolvedValue(undefined),
     webRgbGetInfo: vi.fn().mockResolvedValue({ ready: true }),
   },
 }))
@@ -17,7 +18,7 @@ vi.mock('src/services/approval', () => ({
 vi.mock('src/utils/eventBus', () => ({ bgEventBus: { emit: vi.fn() } }))
 
 import rpcFlow from '../src/controllers/provider/rpcFlow'
-import { permissionService } from '../src/services'
+import { keyringService, permissionService } from '../src/services'
 import approvalService from 'src/services/approval'
 
 const request = () => ({
@@ -26,7 +27,11 @@ const request = () => ({
 })
 
 describe('provider connection approval', () => {
-  beforeEach(() => vi.clearAllMocks())
+  beforeEach(() => {
+    vi.clearAllMocks()
+    vi.mocked(keyringService.memStore.getState).mockReturnValue({ isUnlocked: true } as any)
+    vi.mocked(permissionService.hasPermission).mockReturnValue(false)
+  })
 
   it.each([undefined, { approved: true, origin: 'https://other.example' }, { approved: false, origin: 'https://dapp.example' }])(
     'does not connect without an explicit matching approval: %s',
@@ -60,5 +65,19 @@ describe('provider connection approval', () => {
     expect(error).toMatchObject({ code: 4100 })
     expect(error).not.toHaveProperty('data')
     expect(approvalService.requestApproval).not.toHaveBeenCalled()
+  })
+
+  it('requests wallet unlock before enabling WebRGB', async () => {
+    vi.mocked(keyringService.memStore.getState).mockReturnValue({ isUnlocked: false } as any)
+    vi.mocked(permissionService.hasPermission).mockReturnValue(true)
+    vi.mocked(approvalService.requestApproval).mockResolvedValue(undefined)
+
+    await expect(rpcFlow({
+      ...request(),
+      data: { method: 'webRgbEnable', params: {} },
+    })).resolves.toBeUndefined()
+
+    expect(approvalService.requestApproval).toHaveBeenCalledTimes(1)
+    expect(approvalService.requestApproval).toHaveBeenCalledWith({ lock: true })
   })
 })

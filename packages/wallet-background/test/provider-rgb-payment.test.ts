@@ -36,6 +36,36 @@ describe('provider RGB payment ownership', () => {
     vi.clearAllMocks()
   })
 
+  it('requires wallet unlock for every account-bound RGB method', () => {
+    const accountBoundMethods = [
+      'getRgbAssets',
+      'webRgbEnable',
+      'webRgbGetInfo',
+      'webRgbGetAddress',
+      'webRgbListAssets',
+      'webRgbGetAssetBalance',
+      'webRgbListTransfers',
+      'webRgbGetTransferStatus',
+      'webRgbReleasePreparedPayment',
+      'getRgbFundingUtxos',
+      'getRgbFeeUtxos',
+      'getRgbIssueAvailability',
+      'getRgbPendingReceives',
+      'getRgbPaymentStatus',
+      'confirmRgbSellSwap',
+      'getRgbSwapStatus',
+    ]
+
+    for (const method of accountBoundMethods) {
+      expect(Reflect.getMetadata('SAFE', providerController, method), method).not.toBe(true)
+    }
+  })
+
+  it('keeps account-independent invoice helpers callable while locked', () => {
+    expect(Reflect.getMetadata('SAFE', providerController, 'webRgbDecodeInvoice')).toBe(true)
+    expect(Reflect.getMetadata('SAFE', providerController, 'webRgbBuildInvoice')).toBe(true)
+  })
+
   it('persists the trusted request origin while preparing a payment', async () => {
     vi.mocked(wallet.createRgbSendBegin).mockResolvedValue({ id: 'transfer-1' } as any)
 

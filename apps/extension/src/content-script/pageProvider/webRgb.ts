@@ -78,12 +78,16 @@ export class WebRgbProvider {
 
   async #requireEnabled() {
     if (!this.#connected) throw providerError('NOT_ENABLED', 'Call enable() before using WebRGB');
-    // getAccounts returns [] without prompting when this origin was disconnected.
-    const accounts = await this.#call('getAccounts');
-    if (!Array.isArray(accounts) || !accounts.length) {
-      this.#connected = false;
-      this.#stopPolling();
-      throw providerError('NOT_ENABLED', 'WebRGB is no longer enabled for this site');
+    try {
+      const info = await this.#call('webRgbGetInfo');
+      this.#capabilities = new Set(info.methods || []);
+      return info;
+    } catch (error) {
+      if ((error as { code?: WebRgbCode }).code === 'NOT_ENABLED') {
+        this.#connected = false;
+        this.#stopPolling();
+      }
+      throw error;
     }
   }
 
@@ -95,16 +99,11 @@ export class WebRgbProvider {
   };
 
   getInfo = async () => {
-    await this.#requireEnabled();
-    const info = await this.#call('webRgbGetInfo');
-    this.#capabilities = new Set(info.methods || []);
-    return info;
+    return this.#requireEnabled();
   };
 
   async #requireCapability(method: string) {
-    await this.#requireEnabled();
-    const info = await this.#call('webRgbGetInfo');
-    this.#capabilities = new Set(info.methods || []);
+    const info = await this.#requireEnabled();
     if (!info.methods?.includes(method)) unsupported(method);
   }
 

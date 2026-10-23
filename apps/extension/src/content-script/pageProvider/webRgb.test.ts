@@ -52,6 +52,30 @@ describe('WebRGB provider', () => {
     });
   });
 
+  it('does not treat an empty locked-wallet account list as revoked WebRGB permission', async () => {
+    const { provider, rpc } = createProvider({ getAccounts: [] });
+    await provider.enable();
+
+    await expect(provider.getInfo()).resolves.toMatchObject({ ready: true });
+    expect(provider.enabled).toBe(true);
+    expect(rpc).not.toHaveBeenCalledWith('getAccounts', undefined);
+  });
+
+  it('clears local enable state when the backend reports revoked permission', async () => {
+    let calls = 0;
+    const { provider } = createProvider({
+      webRgbGetInfo: () => {
+        calls += 1;
+        if (calls === 1) return { ready: true, network: 'T0', protocol: 'RGB_L1', methods };
+        return Promise.reject({ code: ErrorCodes.UNAUTHORIZED, message: 'WebRGB provider is not enabled for this site' });
+      }
+    });
+    await provider.enable();
+
+    await expect(provider.getInfo()).rejects.toMatchObject({ code: 'NOT_ENABLED' });
+    expect(provider.enabled).toBe(false);
+  });
+
   it('creates a receive invoice with the effective three-confirmation floor', async () => {
     const { provider, rpc } = createProvider({
       createRgbReceiveInvoice: { invoice: 'rgb:invoice', recipientId: 'recipient' }

@@ -734,7 +734,6 @@ class ProviderController extends BaseController {
     return await wallet.pushTx(rawtx)
   }
 
-  @Reflect.metadata('SAFE', true)
   getRgbAssets = async ({
     data: {
       params: { page = 1, pageSize = 50 },
@@ -744,12 +743,10 @@ class ProviderController extends BaseController {
   }
 
   /** WebRGB uses the existing site connection prompt, but never connects on a read call. */
-  @Reflect.metadata('SAFE', true)
   webRgbEnable = async ({ session: { origin } }: { session: { origin: string } }) => {
     if (!permissionService.hasPermission(origin)) throw new Error('WebRGB connection was not approved')
   }
 
-  @Reflect.metadata('SAFE', true)
   webRgbGetInfo = async () => {
     const feature = await wallet.getRgbFeatureStatus()
     const ready = feature.enabled && feature.supported
@@ -765,10 +762,8 @@ class ProviderController extends BaseController {
     }
   }
 
-  @Reflect.metadata('SAFE', true)
   webRgbGetAddress = async () => wallet.getRgbFundingAddress()
 
-  @Reflect.metadata('SAFE', true)
   webRgbListAssets = async () => {
     const assets: any[] = []
     for (let page = 1; page <= 1000; page++) {
@@ -779,7 +774,6 @@ class ProviderController extends BaseController {
     throw new Error('RGB asset list exceeds the provider pagination limit')
   }
 
-  @Reflect.metadata('SAFE', true)
   webRgbGetAssetBalance = async ({ data: { params } }: { data: { params: { assetId: string } } }) => {
     if (typeof params?.assetId !== 'string' || !params.assetId) webRgbInvalid('assetId is required')
     const balance = await wallet.getRGBAssetBalance('', params.assetId)
@@ -792,7 +786,6 @@ class ProviderController extends BaseController {
     return { assetId: params.assetId, balance: webRgbSafeNumber(balance.balance, 'balance'), raw: balance }
   }
 
-  @Reflect.metadata('SAFE', true)
   webRgbListTransfers = async ({ data: { params } }: { data: { params?: { assetId?: string } } }) => {
     if (params?.assetId !== undefined && (typeof params.assetId !== 'string' || !params.assetId))
       webRgbInvalid('assetId must be a nonempty string')
@@ -809,7 +802,6 @@ class ProviderController extends BaseController {
     throw new Error('RGB transfer list exceeds the provider pagination limit')
   }
 
-  @Reflect.metadata('SAFE', true)
   webRgbGetTransferStatus = async ({ data: { params } }: {
     data: { params: { transferId: string; assetId?: string } }
   }) => {
@@ -859,7 +851,6 @@ class ProviderController extends BaseController {
   }
 
   /** Release only this origin's unsigned reservation after the signing prompt is dismissed. */
-  @Reflect.metadata('SAFE', true)
   webRgbReleasePreparedPayment = async ({ data: { params }, session: { origin } }: {
     data: { params: { transferId: string } }; session: { origin: string }
   }) => {
@@ -869,16 +860,13 @@ class ProviderController extends BaseController {
     return wallet.abortRgbVanillaTx({ txid: params.transferId })
   }
 
-  @Reflect.metadata('SAFE', true)
   getRgbFundingUtxos = async ({ data: { params } }: { data: { params: { assetId: string } } }) => {
     if (!params.assetId) throw new Error('assetId is required')
     return wallet.getRgbFundingUtxos({ assetId: params.assetId })
   }
 
-  @Reflect.metadata('SAFE', true)
   getRgbFeeUtxos = async () => wallet.getRgbFeeUtxos()
 
-  @Reflect.metadata('SAFE', true)
   getRgbIssueAvailability = async () => wallet.getRgbAllocationSummary({ skipSync: false })
 
   @Reflect.metadata('APPROVAL', ['RgbIssue', async req => {
@@ -1000,7 +988,6 @@ class ProviderController extends BaseController {
       : wallet.createRgbBlindReceive(receiveParams)
   }
 
-  @Reflect.metadata('SAFE', true)
   getRgbPendingReceives = async ({ session: { origin } }: { session: { origin: string } }) =>
     wallet.getRgbPendingReceiveInvoices({ providerOrigin: origin })
 
@@ -1106,7 +1093,6 @@ class ProviderController extends BaseController {
     return wallet.abortRgbVanillaTx({ txid: params.transferId })
   }
 
-  @Reflect.metadata('SAFE', true)
   getRgbPaymentStatus = async ({
     data: { params },
     session: { origin },
@@ -1207,7 +1193,6 @@ class ProviderController extends BaseController {
    * validates/records the buyer completion, but deliberately leaves broadcast
    * to the dApp, so no second approval is needed here.
    */
-  @Reflect.metadata('SAFE', true)
   confirmRgbSellSwap = async ({
     data: { params },
     session: { origin },
@@ -1257,7 +1242,6 @@ class ProviderController extends BaseController {
     return wallet.abortRgbVanillaTx({ txid: params.transferId })
   }
 
-  @Reflect.metadata('SAFE', true)
   getRgbSwapStatus = async ({ data: { params }, session: { origin } }: { data: { params: { transferId: string } }; session: { origin: string } }) => {
     if (!params.transferId) throw new Error('transferId is required')
     await assertRgbPaymentOrigin(params.transferId, origin)
