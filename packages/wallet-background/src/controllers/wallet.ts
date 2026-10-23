@@ -5917,6 +5917,7 @@ export class WalletController extends BaseController {
               localRevisionKnown: localRevision !== undefined,
               remoteRevisionKnown: checkpoint.revision !== undefined,
             })
+            await service.clearRecoveryConflict?.()
           } else {
             const localRecoveryState = service.exportRecoveryState?.()
             log.warn('RGB recovery: checkpoint revision conflicts with local state', {

@@ -247,10 +247,13 @@ export class RgbService {
       return false
     }
     try {
-      const candidate = normalizeStateAssetIds(hydrateState(recovery))
+      const local = normalizeStateAssetIds(snapshotState(current))
+      const candidate = normalizeStateAssetIds(snapshotState(recovery))
+      canonicalizeRecoveryComparisonState(local)
+      canonicalizeRecoveryComparisonState(candidate)
       validateRecoveredState(candidate, current.wallet)
       return (
-        stableRecoveryJson(comparableRecoveryState(recoverySnapshot(persistState(current)))) ===
+        stableRecoveryJson(comparableRecoveryState(recoverySnapshot(persistState(local)))) ===
         stableRecoveryJson(comparableRecoveryState(recoverySnapshot(persistState(candidate))))
       )
     } catch {
@@ -358,6 +361,14 @@ export class RgbService {
     await this.dependencies.storage.set(this.storageKey(state.wallet), persistState(state))
   }
 
+  /** Clear a stale local fence only after the controller proves the remote state is identical. */
+  async clearRecoveryConflict() {
+    const state = this.requireState()
+    if (state.recoveryConflict !== true) return
+    state.recoveryConflict = undefined
+    await this.dependencies.storage.set(this.storageKey(state.wallet), persistState(state))
+  }
+
   /**
    * Prepare an explicitly user-approved local state to replace a conflicting
    * cloud checkpoint. The controller must acquire a fenced writer lease and
@@ -408,7 +419,8 @@ export class RgbService {
     // A matching wallet can still contain malformed legacy data or encounter
     // a storage failure. Preserve the actual error instead of reporting those
     // failures as a wallet identity mismatch.
-    const restored = normalizeStateAssetIds(hydrateState(recovery))
+    const restored = normalizeStateAssetIds(snapshotState(recovery))
+    hydrateStoredContractMetadataState(restored)
     // Provider ownership is a local browser authorization boundary. Never
     // accept it from a recovery checkpoint, even if an older/foreign client
     // included the field unexpectedly.
@@ -4184,41 +4196,61 @@ export class RgbService {
   }
 
   private queueAssetMetadata(assetId: string, metadata: RgbPendingAssetMetadata['metadata']) {
-    const state = this.requireState()
-    const normalized = normalizeAssetId(assetId)
-    const pending = state.pendingAssetMetadata || (state.pendingAssetMetadata = [])
-    const existing = pending.find(item => item.assetId === normalized)
-    if (existing) {
-      const changed = Object.keys(metadata).some(
-        key =>
-          existing.metadata[key as keyof typeof metadata] !== metadata[key as keyof typeof metadata]
-      )
-      if (changed) {
-        existing.metadata = metadata
-        existing.synced = false
-      }
-      return changed
-    }
-    pending.push({ assetId: normalized, metadata })
-    return true
+    return queueAssetMetadataForState(this.requireState(), assetId, metadata)
   }
 
   /** Recover metadata from received consignments saved before metadata indexing existed. */
   private hydrateStoredContractMetadata() {
-    const state = this.requireState()
-    for (const [assetId, contract] of Object.entries(state.contracts || {})) {
-      if (contract.metadata) continue
-      try {
-        const decoded = decodeNiaConsignment(
-          Uint8Array.from(Buffer.from(contract.consignment, 'base64'))
-        )
-        contract.metadata = decoded.metadata
-        this.queueAssetMetadata(assetId, decoded.metadata)
-      } catch {
-        // Locally stored contract placeholders may not be complete NIA consignments.
-      }
+    hydrateStoredContractMetadataState(this.requireState())
+  }
+}
+
+function queueAssetMetadataForState(
+  state: RgbServiceState,
+  assetId: string,
+  metadata: RgbPendingAssetMetadata['metadata']
+) {
+  const normalized = normalizeAssetId(assetId)
+  const pending = state.pendingAssetMetadata || (state.pendingAssetMetadata = [])
+  const existing = pending.find(item => item.assetId === normalized)
+  if (existing) {
+    const changed = Object.keys(metadata).some(
+      key => existing.metadata[key as keyof typeof metadata] !== metadata[key as keyof typeof metadata]
+    )
+    if (changed) {
+      existing.metadata = metadata
+      existing.synced = false
+    }
+    return changed
+  }
+  pending.push({ assetId: normalized, metadata })
+  return true
+}
+
+/** Apply deterministic state upgrades to local storage and decrypted legacy checkpoints alike. */
+function hydrateStoredContractMetadataState(state: RgbServiceState) {
+  for (const [assetId, contract] of Object.entries(state.contracts || {})) {
+    if (contract.metadata) continue
+    try {
+      const decoded = decodeNiaConsignment(
+        Uint8Array.from(Buffer.from(contract.consignment, 'base64'))
+      )
+      contract.metadata = decoded.metadata
+      queueAssetMetadataForState(state, assetId, decoded.metadata)
+    } catch {
+      // Locally stored contract placeholders may not be complete NIA consignments.
     }
   }
+}
+
+/** Remove outbox entries whose payload is already recoverable from durable contract data. */
+function canonicalizeRecoveryComparisonState(state: RgbServiceState) {
+  hydrateStoredContractMetadataState(state)
+  if (!state.pendingAssetMetadata) return
+  state.pendingAssetMetadata = state.pendingAssetMetadata.filter(
+    item => !state.contracts?.[normalizeAssetId(item.assetId)]?.metadata
+  )
+  if (state.pendingAssetMetadata.length === 0) state.pendingAssetMetadata = undefined
 }
 
 /** Encrypted feature storage is JSON-based; only the RGB blind-seal u64 crosses this boundary. */

@@ -1150,6 +1150,55 @@ describe('RgbService', () => {
     ).toBe(false)
   })
 
+  it('matches a v1.7 checkpoint after applying deterministic metadata migration', async () => {
+    const dependencies = createDependencies()
+    const service = new RgbService(dependencies)
+    await service.open(wallet)
+    const genesis = encodeNiaGenesis({
+      ticker: 'OLD',
+      name: 'Legacy asset',
+      precision: 0,
+      timestamp: 1_713_261_744,
+      network: 'mainnet',
+      allocations: [{ txid: 'ab'.repeat(32), vout: 0, blinding: 1n, amount: 100n }],
+    })
+    const assetId = encodeRgbContractId(genesis.assetId)
+    const legacyRecovery = {
+      version: 1 as const,
+      wallet,
+      snapshot: { syncedAt: 1, utxos: [] },
+      pending: {},
+      contracts: {
+        [assetId]: {
+          consignment: Buffer.from(encodeNiaContract(genesis).strict).toString('base64'),
+          createdAt: 1,
+        },
+      },
+    }
+
+    await expect(service.restoreRecoveryState(legacyRecovery)).resolves.toBe(true)
+    expect(service.getPendingAssetMetadata()).toEqual([
+      expect.objectContaining({ assetId, metadata: expect.objectContaining({ ticker: 'OLD' }) }),
+    ])
+    expect(service.matchesRecoveryState(legacyRecovery)).toBe(true)
+    expect(legacyRecovery.contracts[assetId]).not.toHaveProperty('metadata')
+
+    await service.markAssetMetadataSynced(assetId)
+    expect(service.getPendingAssetMetadata()).toEqual([])
+    expect(service.matchesRecoveryState(legacyRecovery)).toBe(true)
+  })
+
+  it('clears a stale recovery conflict after an identical checkpoint is proven', async () => {
+    const service = new RgbService(createDependencies())
+    await service.open(wallet)
+    await service.markRecoveryConflict()
+    expect(service.hasRecoveryConflict()).toBe(true)
+
+    await service.clearRecoveryConflict()
+
+    expect(service.hasRecoveryConflict()).toBe(false)
+  })
+
   it('leaves the live state untouched when atomic recovery persistence fails', async () => {
     const dependencies = createDependencies()
     const service = new RgbService(dependencies)

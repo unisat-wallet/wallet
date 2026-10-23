@@ -1121,6 +1121,7 @@ describe('RGB wallet references', () => {
       needsRecoveryRestore: vi.fn(() => false),
       getRecoveryCheckpointRevision: vi.fn(() => 'a'.repeat(24)),
       matchesRecoveryState: vi.fn(() => true),
+      clearRecoveryConflict: vi.fn(),
       markRecoveryConflict: vi.fn(),
       setRecoveryCheckpointVersion: vi.fn(),
       setRecoveryCheckpointRevision: vi.fn(),
@@ -1142,6 +1143,7 @@ describe('RGB wallet references', () => {
     await (wallet as any).restoreRgbRecoveryIfNeeded({ service, wallet: walletRef })
 
     expect(service.matchesRecoveryState).toHaveBeenCalledWith(recoveryState)
+    expect(service.clearRecoveryConflict).toHaveBeenCalledTimes(1)
     expect(service.markRecoveryConflict).not.toHaveBeenCalled()
     expect(service.setRecoveryCheckpointVersion).toHaveBeenCalledWith(2)
     expect(service.setRecoveryCheckpointRevision).toHaveBeenCalledWith('b'.repeat(24))
