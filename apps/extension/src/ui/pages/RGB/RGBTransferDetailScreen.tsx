@@ -133,6 +133,19 @@ export default function RGBTransferDetailScreen() {
   const downloadBurn = async () => {
     if (!transfer?.txid) return;
     try {
+      // Burns created before V1 destination support have no separate
+      // destination record to bundle. Preserve their original .rgb export.
+      if (transfer.burnDestinationChainId === undefined) {
+        const payload = await wallet.exportRgbBurnConsignment(transfer.txid);
+        const bytes = Uint8Array.from(atob(payload), (char) => char.charCodeAt(0));
+        const url = URL.createObjectURL(new Blob([bytes], { type: 'application/octet-stream' }));
+        const anchor = document.createElement('a');
+        anchor.href = url;
+        anchor.download = `bfa-burn-${transfer.txid}.rgb`;
+        anchor.click();
+        setTimeout(() => URL.revokeObjectURL(url), 0);
+        return;
+      }
       const burn = await wallet.exportRgbBurn(transfer.txid);
       const url = URL.createObjectURL(new Blob([JSON.stringify(burn, null, 2)], { type: 'application/json' }));
       const anchor = document.createElement('a');
@@ -244,10 +257,10 @@ export default function RGBTransferDetailScreen() {
       </Content>
       <Footer>
         <Column gap="sm">
-          {transfer?.burn && transfer.txid && transfer.burnDestinationChainId ? (
+          {transfer?.burn && transfer.txid ? (
             <Button
               full
-              text={t('rgb_download_burn')}
+              text={t(transfer.burnDestinationChainId === undefined ? 'rgb_download_burn_proof' : 'rgb_download_burn')}
               preset="primary"
               style={{ height: 50, minHeight: 50, borderRadius: 12 }}
               onClick={() => void downloadBurn()}

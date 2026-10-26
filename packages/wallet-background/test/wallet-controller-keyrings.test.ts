@@ -1918,6 +1918,36 @@ describe('RGB wallet references', () => {
     )
   })
 
+  it('creates an Arbitrum burn with a V1 direct destination', async () => {
+    const wallet = new WalletController()
+    vi.spyOn(wallet as any, 'assertActiveRgbWallet').mockResolvedValue(undefined)
+    const service = {
+      sync: vi.fn(),
+      prepareBurn: vi.fn().mockResolvedValue({
+        id: 'rgb-burn', psbt: 'cHNidP8=', toSignInputs: [],
+      }),
+    }
+    vi.spyOn(wallet, 'getRgbToSignData').mockResolvedValue({ psbtHex: '00', toSignInputs: [] } as any)
+    const localWallet = { fundingAddress: 'bc1p-rgb-funding', network: 'mainnet', walletId: 'rgb-wallet' }
+    vi.spyOn(wallet as any, 'getLocalRgbService').mockResolvedValue({ service, wallet: localWallet })
+    vi.spyOn(wallet as any, 'ensureRgbWriteLease').mockResolvedValue(undefined)
+
+    await wallet.createRgbSendBegin({
+      invoice: '', assetId: 'rgb:asset', amount: '1000000', feeRate: 2,
+      burn: true, burnDestinationChainId: 42161,
+      burnReason: '0xf39fd6e51aad88f6f4ce6ab8827279cfffb92266',
+    })
+
+    expect(service.prepareBurn).toHaveBeenCalledWith(expect.objectContaining({
+      burnDestination: {
+        version: 1,
+        destinationChainId: 42161,
+        dstEid: 0,
+        recipient: 'f39fd6e51aad88f6f4ce6ab8827279cfffb92266',
+      },
+    }))
+  })
+
   it('revalidates the lease before RGB mutations that can follow an approval', async () => {
     const wallet = new WalletController()
     const context = {

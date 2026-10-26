@@ -66,7 +66,7 @@ export class RgbSendOperations {
     await this.dependencies.assertContext?.({ service, wallet })
     const validatedFeeRate = assertValidFeeRate(feeRate, { supportLowFeeMode: true })
     const burnDestination = params.burnDestination ||
-      (params.burn && params.burnDestinationChainId && params.burnDestinationChainId !== 42161
+      (params.burn && params.burnDestinationChainId
         ? createBfaBurnDestinationV1(params.burnDestinationChainId, params.burnReason || '')
         : undefined)
 

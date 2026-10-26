@@ -24,7 +24,7 @@ export type UtexoBurnExportV1 = {
 const TYPEHASH_V1 = 'a1cba9d766975eb04c6a31c3b68dbb2381444a222c9972b6bf3ab26fcb829b00'
 const BASE58_ALPHABET = '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz'
 
-/** The routes documented by the UTEXO bridge; EIDs are LayerZero V2 mainnet IDs. */
+/** The routes documented by the UTEXO bridge; dstEid 0 is direct Arbitrum fundsOut. */
 export const BFA_BURN_ROUTES = [
   { name: 'Arbitrum One', destinationChainId: 42161, dstEid: 0 },
   { name: 'Ethereum', destinationChainId: 1, dstEid: 30101 },
@@ -58,7 +58,7 @@ function decodeTronAddress(value: string): Uint8Array {
 
 export function createBfaBurnDestinationV1(destinationChainId: number, address: string): BfaBurnDestinationV1 {
   const route = BFA_BURN_ROUTES.find(item => item.destinationChainId === destinationChainId)
-  if (!route || route.dstEid === 0) throw new RgbServiceError('BFA burn destination network is unsupported')
+  if (!route) throw new RgbServiceError('BFA burn destination network is unsupported')
   const value = address.trim()
   const recipient = destinationChainId === 728126428
     ? (/^(?:0x)?41[0-9a-f]{40}$/i.test(value)
@@ -74,7 +74,7 @@ export function createBfaBurnDestinationV1(destinationChainId: number, address: 
 
 export function hashBfaBurnDestinationV1(record: BfaBurnDestinationV1): string {
   const route = BFA_BURN_ROUTES.find(item => item.destinationChainId === record.destinationChainId)
-  if (!route || route.dstEid === 0 || record.version !== 1 || record.dstEid !== route.dstEid)
+  if (!route || record.version !== 1 || record.dstEid !== route.dstEid)
     throw new RgbServiceError('BFA burn destination route is invalid')
   if (!/^[0-9a-f]{40}(?:[0-9a-f]{2})?$/i.test(record.recipient))
     throw new RgbServiceError('BFA burn recipient address is invalid')

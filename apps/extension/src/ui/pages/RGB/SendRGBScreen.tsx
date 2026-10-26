@@ -275,7 +275,7 @@ export default function SendRGBScreen() {
                 <Icon icon="right" size={20} style={{ backgroundColor: 'rgba(255, 255, 255, 0.65)' }} />
               </Row>
               <Text
-                text={t(burnDestinationChainId === 42161 ? 'rgb_burn_reason' : 'rgb_burn_recipient_address')}
+                text={t('rgb_burn_recipient_address')}
                 size="sm"
                 mt="md"
               />
@@ -429,11 +429,7 @@ export default function SendRGBScreen() {
             <Line />
             <Column gap="md" fullX mb="md">
               <Text
-                text={
-                  burnDestinationChainId === 42161
-                    ? t('rgb_burn_description')
-                    : t('rgb_burn_destination_v1_description')
-                }
+                text={t('rgb_burn_destination_v1_description')}
                 mt="md"
                 wrap
               />
@@ -445,7 +441,7 @@ export default function SendRGBScreen() {
               <Row justifyCenter mt="md">
                 <Checkbox checked={understandBurn} onChange={(event) => setUnderstandBurn(event.target.checked)}>
                   <Text
-                    text={t(burnDestinationChainId === 42161 ? 'rgb_burn_confirm' : 'rgb_burn_destination_v1_confirm')}
+                    text={t('rgb_burn_destination_v1_confirm')}
                     preset="sub"
                     wrap
                   />

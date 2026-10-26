@@ -9,7 +9,12 @@ import {
 import { StrictReader } from '../src/protocol/strict'
 
 describe('BFA burn encoding', () => {
-  it('matches the official Ethereum and Tron V1 burn destination vectors', () => {
+  it('matches the official V1 burn destination routes and vectors', () => {
+    const arbitrum = createBfaBurnDestinationV1(42161, '0x' + '11'.repeat(20))
+    expect(arbitrum).toEqual({
+      version: 1, destinationChainId: 42161, dstEid: 0, recipient: '11'.repeat(20),
+    })
+    expect(hashBfaBurnDestinationV1(arbitrum)).toMatch(/^[0-9a-f]{64}$/)
     const ethereum = createBfaBurnDestinationV1(1, '0x' + '22'.repeat(20))
     expect(ethereum).toEqual({
       version: 1, destinationChainId: 1, dstEid: 30101, recipient: '22'.repeat(20),
