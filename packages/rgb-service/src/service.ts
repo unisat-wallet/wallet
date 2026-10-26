@@ -1,4 +1,5 @@
 import {
+  RgbBfaValidationUnavailableError,
   RgbInvoiceUnavailableError,
   RgbInsufficientBalanceError,
   RgbProxyOperationNotFoundError,
@@ -1547,6 +1548,15 @@ export class RgbService {
           // example, while merging recovered history) is retriable and must
           // never turn a successfully acknowledged transfer into a NACK or a
           // user-visible rejected receive.
+          continue
+        }
+        if (error instanceof RgbBfaValidationUnavailableError) {
+          // Missing chain finality, RPC data, or another transient validation
+          // dependency must remain retriable and must never invite a NACK.
+          if (receive.pendingValidationFailure) {
+            delete receive.pendingValidationFailure
+            changed = true
+          }
           continue
         }
         const message = error instanceof Error ? error.message : String(error)

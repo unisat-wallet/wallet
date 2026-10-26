@@ -20,6 +20,7 @@ import {
   prepareNiaOpretTransfer,
   serializeNiaOpretWitnessBundle,
   rgbProxyInvoiceId,
+  RgbBfaValidationUnavailableError,
   RgbInsufficientBalanceError,
   RgbProxyOperationNotFoundError,
   RgbService,
@@ -1890,6 +1891,42 @@ describe('RgbService', () => {
     await service.processClaimedReceives({ includeClaimed: false })
 
     expect(service.getPendingReceives()[0]?.pendingValidationFailure).toBeUndefined()
+    expect(service.getPendingReceives()[0]?.pendingAccept).toMatchObject({
+      txid: 'c'.repeat(64), amount: '60',
+    })
+    expect(dependencies.transport.acknowledgeConsignment).not.toHaveBeenCalled()
+  })
+
+  it('keeps a receive pending while EVM mint finality is unavailable and retries it', async () => {
+    const dependencies = createDependencies()
+    dependencies.transport.getConsignment = vi.fn().mockResolvedValue({
+      recipientId: 'recipient', payload: 'consignment', endpoint: proxyEndpoint,
+    })
+    dependencies.transport.acknowledgeConsignment = vi.fn()
+    const service = new RgbService(dependencies)
+    await service.open(wallet)
+    ;(service as any).state.pendingReceives = [{
+      invoice: rgbInvoice(), recipientId: 'recipient', createdAt: 1,
+      seal: { txid: 'a'.repeat(64), vout: 0, blinding: 1n },
+    }]
+    ;(service as any).validateIncomingConsignment = vi.fn()
+      .mockRejectedValueOnce(new RgbBfaValidationUnavailableError(
+        `Finalized BFA FundsIn event is missing for mint ${'d'.repeat(64)}`
+      ))
+      .mockReturnValue({
+        assetId: 'rgb:AQEBAQEB-AQEBAQE-BAQEBAQ-EBAQEBA-QEBAQEB-AQEBAQE',
+        amount: '60', txid: 'c'.repeat(64),
+        decoded: { metadata: { ticker: 'TOK', name: 'Token', precision: 0, schema: 'BFA', issuedSupply: '60' } },
+      })
+
+    await service.processClaimedReceives({ includeClaimed: false })
+
+    expect(service.getPendingReceives()[0]).not.toHaveProperty('pendingValidationFailure')
+    expect(service.getPendingReceives()[0]).not.toHaveProperty('pendingAccept')
+    expect(dependencies.transport.acknowledgeConsignment).not.toHaveBeenCalled()
+
+    await service.processClaimedReceives({ includeClaimed: false })
+
     expect(service.getPendingReceives()[0]?.pendingAccept).toMatchObject({
       txid: 'c'.repeat(64), amount: '60',
     })
