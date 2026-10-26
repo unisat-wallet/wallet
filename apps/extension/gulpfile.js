@@ -7,6 +7,7 @@ var jsoncombine = require('gulp-jsoncombine');
 var minimist = require('minimist');
 var packageConfig = require('./package.json');
 const { exit } = require('process');
+const { execFileSync } = require('child_process');
 
 //parse arguments
 var knownOptions = {
@@ -32,6 +33,13 @@ var options = {
 };
 options = minimist(process.argv.slice(2), knownOptions);
 var artifactVersion = options['artifact-version'] || version;
+var artifactGitHash =
+  options.browser === 'chrome' && options.manifest === 'mv3'
+    ? execFileSync('git', ['rev-parse', '--short=7', 'HEAD'], {
+        cwd: __dirname,
+        encoding: 'utf8'
+      }).trim()
+    : '';
 if (!supported_envs.includes(options.env)) {
   console.error(`not supported env: [${options.env}]. It should be one of ${supported_envs.join(', ')}.`);
   exit(0);
@@ -105,9 +113,10 @@ function task_package(cb) {
         .pipe(zip(`${brandName}-${options.browser}-${options.manifest}-v${artifactVersion}.xpi`))
         .pipe(gulp.dest('./dist'));
     } else {
+      const gitHashSuffix = artifactGitHash ? `-${artifactGitHash}` : '';
       return gulp
         .src(`dist/${options.browser}/**/*`)
-        .pipe(zip(`${brandName}-${options.browser}-${options.manifest}-v${artifactVersion}.zip`))
+        .pipe(zip(`${brandName}-${options.browser}-${options.manifest}-v${artifactVersion}${gitHashSuffix}.zip`))
         .pipe(gulp.dest('./dist'));
     }
   }
