@@ -3444,6 +3444,8 @@
   "rgb_amount_locking": {
     "message": "Verrouillé"
   },
+  "rgb_total_balance": { "message": "Solde total" },
+  "rgb_pending_balance": { "message": "En attente" },
   "rgb_current_balance": { "message": "Solde actuel" },
   "rgb_estimated_balance_after_send": { "message": "Après l’envoi (estimation)" },
   "rgb_balance_processing": {

@@ -51,7 +51,7 @@ export function RGBTokenDetail(props: {
       <Line />
       <Section title={t('name_label')} value={name} maxLength={Number.POSITIVE_INFINITY} wrapValue />
       <Line />
-      <Section title={t('ticker')} value={ticker} maxLength={Number.POSITIVE_INFINITY} wrapValue />
+      <Section title={t('ticker_label')} value={ticker} maxLength={Number.POSITIVE_INFINITY} wrapValue />
       <Line />
       <Section title={t('precision_rgb')} value={formatValue(tokenInfo?.precision)} />
       <Line />
@@ -64,11 +64,11 @@ export function RGBTokenDetail(props: {
       <Line />
       <Section title={t('schema_rgb')} value={formatValue(tokenInfo?.schema)} />
       <Line />
-      <Section title={t(reservedSendAmount !== undefined && Number(tokenBalance?.pending || 0) === 0 ? 'rgb_current_balance' : 'total_balance')} value={total} maxLength={Number.POSITIVE_INFINITY} wrapValue />
+      <Section title={t(reservedSendAmount !== undefined && Number(tokenBalance?.pending || 0) === 0 ? 'rgb_current_balance' : 'rgb_total_balance')} value={total} maxLength={Number.POSITIVE_INFINITY} wrapValue />
       <Line />
       <Section title={t('available_balance')} value={available} maxLength={Number.POSITIVE_INFINITY} wrapValue />
       <Line />
-      <Section title={t('pending')} value={pending} maxLength={Number.POSITIVE_INFINITY} wrapValue />
+      <Section title={t('rgb_pending_balance')} value={pending} maxLength={Number.POSITIVE_INFINITY} wrapValue />
       <Line />
       {reservedSendAmount !== undefined && estimatedBalance !== undefined ? (
         <>

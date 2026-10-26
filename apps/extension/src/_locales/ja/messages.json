@@ -3444,6 +3444,8 @@
   "rgb_amount_locking": {
     "message": "ロック中"
   },
+  "rgb_total_balance": { "message": "総残高" },
+  "rgb_pending_balance": { "message": "保留中" },
   "rgb_current_balance": { "message": "現在の残高" },
   "rgb_estimated_balance_after_send": { "message": "送金後の予想残高" },
   "rgb_balance_processing": {

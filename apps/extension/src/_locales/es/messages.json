@@ -3435,6 +3435,8 @@
   "rgb_amount_locking": {
     "message": "Bloqueado"
   },
+  "rgb_total_balance": { "message": "Saldo total" },
+  "rgb_pending_balance": { "message": "Pendiente" },
   "rgb_current_balance": { "message": "Saldo actual" },
   "rgb_estimated_balance_after_send": { "message": "Tras el envío (estimado)" },
   "rgb_balance_processing": {
