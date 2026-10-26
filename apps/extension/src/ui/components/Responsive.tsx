@@ -11,7 +11,7 @@ export const AppDimensions = (props) => {
     if (extensionIsInTab) {
       return '100vw';
     }
-    return isSidePanel ? '100vw' : '357px';
+    return isSidePanel ? '100vw' : '400px';
   }, [extensionIsInTab, isSidePanel]);
 
   const height = useMemo(() => {
