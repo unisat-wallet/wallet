@@ -1,17 +1,27 @@
-# RGB API (Experimental)
+# Native RGB API (Experimental)
 
-The RGB provider is available only under `window.unisat.rgb`. There are no
-top-level `window.unisat.*Rgb*` methods.
+This document covers UniSat's native, wallet-specific RGB API at
+`window.unisat.rgb`. It does **not** describe the standard WebRGB v1 provider
+at `window.rgb`; see [WebRGB Provider](./webrgb.md) for that interface.
+
+There are no top-level `window.unisat.*Rgb*` methods.
 
 ```ts
 const rgb = window.unisat.rgb
 ```
 
-RGB is available only when the currently selected wallet chain has RGB enabled.
-The dApp must first connect with `window.unisat.requestAccounts()`. Payment
-send, receive, and swap operations are bound to the connected origin; an
-operation created by one origin cannot be listed, accepted, rejected, signed,
-finalized, canceled, or aborted by another origin.
+RGB is available only when the currently selected wallet chain supports RGB
+and the user has enabled RGB for the selected wallet. The dApp must first
+connect with `window.unisat.requestAccounts()`.
+
+If the wallet is locked, an account-bound call opens the normal unlock flow and
+continues after a successful unlock. Read methods marked "No" below do not open
+a second action-confirmation screen, but connection and unlock prompts may
+still be required.
+
+Payment, receive, issuance, and swap operations are bound to the connected
+origin. An operation created by one origin cannot be listed, accepted,
+rejected, signed, finalized, canceled, or aborted by another origin.
 
 ## Conventions
 
@@ -20,6 +30,9 @@ finalized, canceled, or aborted by another origin.
   are unsigned decimal strings in atomic units. Never use JavaScript `number`
   for an asset amount. Returned UTXO `satoshis` fields and `feeRate` parameters
   are JavaScript numbers.
+- Do not copy examples from the WebRGB document without converting the amount
+  types. WebRGB v1 uses positive JavaScript safe integers for fungible amounts;
+  this native API uses decimal strings.
 - An invoice is one-time. A blind invoice reserves an existing RGB funding
   outpoint; a witness invoice requires the sender transaction to create its
   receiver output.
@@ -29,22 +42,24 @@ finalized, canceled, or aborted by another origin.
 
 ## API overview
 
-| Method | Approval | Purpose |
-|---|---:|---|
-| `getAssets` | No | Read local RGB balances. |
-| `getFundingUtxos` / `getFeeUtxos` | No | Read eligible inputs for a maker PSBT template. |
-| `createReceiveInvoice` | Yes | Create and persist a one-time RGB invoice. |
-| `getPendingReceives` | No | List this dApp origin's invoices and pending incoming consignments. |
-| `acceptReceive` / `rejectReceive` | Yes | ACK or reject a validated incoming consignment. |
-| `preparePayment` | Yes | Build and lock a normal RGB payment. |
-| `signPayment` | Yes | Sign, deliver the consignment, wait for ACK, then broadcast. |
-| `cancelPayment` / `getPaymentStatus` | Yes / No | Cancel an unacknowledged payment or inspect its status. |
-| `prepareSwap` | Yes | Prepare a seller-side RGB-for-BTC atomic swap. |
-| `signSellSwapAndPublishConsignment` | Yes | Add seller signatures and publish the consignment, without broadcasting. |
-| `confirmSellSwap` | No | Verify the buyer's returned signed PSBT and ACK; the dApp finalizes and broadcasts it. |
-| `applySellSwapAbort` / `applyBuySwapAbort` | Yes | Apply a mutually signed, terminal swap-abort agreement to local seller/buyer RGB state. |
-| `cancelSwap` / `getOperationStatus` | Yes / No | Cancel or inspect a swap. |
-| `signBuySwapAndAcceptConsignment` | Yes | Sign buyer BTC inputs and accept the RGB consignment. |
+| Method                                     | Approval | Purpose                                                                                      |
+| ------------------------------------------ | -------: | -------------------------------------------------------------------------------------------- |
+| `getAssets`                                |       No | Read local RGB balances.                                                                     |
+| `getFundingUtxos` / `getFeeUtxos`          |       No | Read eligible inputs for a maker PSBT template.                                              |
+| `getIssueAvailability`                     |       No | Inspect whether a confirmed, unallocated RGB funding UTXO is available.                      |
+| `issueNia`                                 |      Yes | Verify a wallet issuance order, pay its service fee if needed, and issue one NIA allocation. |
+| `createReceiveInvoice`                     |      Yes | Create and persist a one-time RGB invoice.                                                   |
+| `getPendingReceives`                       |       No | List this dApp origin's invoices and pending incoming consignments.                          |
+| `acceptReceive` / `rejectReceive`          |      Yes | ACK or reject a validated incoming consignment.                                              |
+| `preparePayment`                           |      Yes | Build and lock a normal RGB payment.                                                         |
+| `signPayment`                              |      Yes | Sign, deliver the consignment, wait for ACK, then broadcast.                                 |
+| `cancelPayment` / `getPaymentStatus`       | Yes / No | Cancel an unacknowledged payment or inspect its status.                                      |
+| `prepareSwap`                              |      Yes | Prepare a seller-side RGB-for-BTC atomic swap.                                               |
+| `signSellSwapAndPublishConsignment`        |      Yes | Add seller signatures and publish the consignment, without broadcasting.                     |
+| `confirmSellSwap`                          |       No | Verify the buyer's returned signed PSBT and ACK; the dApp finalizes and broadcasts it.       |
+| `applySellSwapAbort` / `applyBuySwapAbort` |      Yes | Apply a mutually signed, terminal swap-abort agreement to local seller/buyer RGB state.      |
+| `cancelSwap` / `getOperationStatus`        | Yes / No | Cancel or inspect a swap.                                                                    |
+| `signBuySwapAndAcceptConsignment`          |      Yes | Sign buyer BTC inputs and accept the RGB consignment.                                        |
 
 ## Assets
 
@@ -89,6 +104,80 @@ wallet recognizes it as wallet-owned and includes it in the signing request.
 The dApp must still account for its sats correctly in the user payout/change
 outputs; querying an outpoint never reserves it.
 
+## Issue an NIA asset
+
+Native issuance is intentionally separate from WebRGB's `issueAsset` shape.
+It requires a wallet issuance order created by the UniSat issuance service;
+the wallet does not trust ticker, supply, fee, address, network, or payment
+state supplied by the page.
+
+### `getIssueAvailability()`
+
+Returns the wallet's current allocation availability after synchronizing RGB
+state.
+
+```ts
+const availability = await rgb.getIssueAvailability()
+// {
+//   available: boolean,
+//   availableAllocationCount: number,
+//   freeAllocationCount: number,
+//   colorableUtxoCount: number,
+//   pendingConfirmation: boolean,
+//   pendingAllocationCount: number,
+// }
+```
+
+`available: false` with `pendingConfirmation: true` means a funding output is
+known but is not yet available for issuance. This query does not reserve an
+output.
+
+### `issueNia(params)`
+
+```ts
+const result = await rgb.issueNia({
+  orderId: '202610-RGB20-ABC12345',
+  ticker: 'TOK',
+  name: 'Token',
+  precision: 2,
+  amount: '100000',
+  // paymentTxid: '<64 hex chars>', // only when resuming an existing payment
+})
+```
+
+Before showing approval, the wallet fetches `orderId` from the configured
+wallet API and requires its network, current Bitcoin address, ticker, name,
+precision, amount, fee address, fee amount, and status to match. A page cannot
+provide its own fee transaction or override the service fee.
+
+If the order is still unpaid, the approval includes the wallet-built Bitcoin
+funding transaction and service-fee payment. If the payment already exists,
+`paymentTxid` can resume the verified order without paying again.
+
+Successful issuance returns only public identifiers and state flags; private
+contract and Genesis bytes are not exposed to the page:
+
+```ts
+// {
+//   status: 'issued',
+//   paymentTxid,
+//   assetId,
+//   pendingConfirmation: boolean,
+//   syncPending: boolean,
+// }
+```
+
+A recoverable asynchronous result can instead be:
+
+```ts
+// { status: 'payment_pending', paymentTxid, error }
+// { status: 'issuance_pending', paymentTxid, error }
+```
+
+Persist `orderId` and `paymentTxid` and retry the same verified order. Do not
+create a replacement order merely because indexing or payment verification is
+temporarily pending.
+
 ## Receive RGB
 
 ### `createReceiveInvoice(params)`
@@ -97,14 +186,16 @@ Creates durable receiver state before exposing the invoice to a sender.
 
 ```ts
 const receive = await rgb.createReceiveInvoice({
-  assetId: 'rgb:...',        // omit only for an any-asset invoice
-  amount: '1000',            // omit only for an any-amount invoice
+  assetId: 'rgb:...', // omit only for an any-asset invoice
+  amount: '1000', // omit only for an any-amount invoice
   durationSeconds: 900,
-  recipientType: 'blind',    // 'blind' (default) | 'witness'
+  minConfirmations: 3,
+  recipientType: 'blind', // 'blind' (default) | 'witness'
 })
 
 // {
-//   invoice, recipientId, assetId?, amount?, expirationTimestamp?, createdAt?,
+//   invoice, recipientId, assetId?, amount?, expirationTimestamp?,
+//   minConfirmations?, createdAt?, witnessScriptPubKey?, canCancel?,
 //   kind: 'ReceiveBlind' | 'ReceiveWitness',
 //   status: 'WaitingConfirmations' | 'WaitingCounterparty',
 // }
@@ -120,6 +211,11 @@ beneficiary. A blind invoice needs an available RGB funding UTXO first. A
 witness invoice does not reserve an existing UTXO; its recipient output is
 created by the sender transaction.
 
+`durationSeconds` must be a positive integer. When omitted, the wallet creates
+an invoice with a 24-hour expiry. `minConfirmations`, when supplied to this
+native API, must be a positive integer; settlement waits for that many Bitcoin
+confirmations. WebRGB applies a separate minimum floor of three confirmations.
+
 ### `getPendingReceives()`
 
 ```ts
@@ -129,7 +225,8 @@ const { list } = await rgb.getPendingReceives()
 Each item includes its invoice, recipient ID, optional asset/amount and a
 status. Relevant statuses are `WaitingConfirmations`, `WaitingCounterparty`,
 `PendingAccept`, `WaitingSenderBroadcast`, and
-`WaitingSenderConfirmation`.
+`WaitingSenderConfirmation`, and `ValidationFailed`. `canCancel` reports
+whether the local invoice can still be canceled safely.
 
 ### `acceptReceive(recipientId)` and `rejectReceive(recipientId)`
 
@@ -165,6 +262,12 @@ const prepared = await rgb.preparePayment({
 The wallet validates the invoice, selects confirmed spendable RGB allocations,
 constructs and commits the transition, then durably locks the selected inputs.
 Keep `prepared.id` as the payment `transferId`.
+
+If an invoice advertises a third-party RGB proxy endpoint, its direct-access
+consent is included in the same payment approval. The dApp must not contact the
+endpoint itself or manufacture an approval result. Depending on wallet policy,
+transport may use a trusted endpoint directly or the wallet API relay; the
+payment remains bound to the exact prepared invoice and origin.
 
 ### `signPayment(transferId)`
 
@@ -258,7 +361,7 @@ const prepared = await rgb.prepareSwap({
   amount: '1000',
   btcReceiveAmount: '250000', // minimum sats to current wallet BTC address
   feeRate: 5,
-  psbt: makerUnsignedPsbt,    // hex or base64
+  psbt: makerUnsignedPsbt, // hex or base64
 })
 
 // { transferId, coloredPsbt, status: 'waiting_counterparty_signature' }
@@ -283,7 +386,10 @@ inputs, publishes the RGB consignment, and returns the seller-signed PSBT to
 relay to the buyer. It never broadcasts at this point.
 
 ```ts
-const published = await rgb.signSellSwapAndPublishConsignment(prepared.transferId, prepared.coloredPsbt)
+const published = await rgb.signSellSwapAndPublishConsignment(
+  prepared.transferId,
+  prepared.coloredPsbt
+)
 // { transferId, txid, status: 'awaiting_buyer_signature', makerSignedPsbt }
 ```
 
@@ -350,3 +456,19 @@ states that an operation is awaiting ACK or has a recoverable broadcast
 failure. Persist `transferId` immediately after preparation and poll the
 corresponding status method after a page reload. Do not retry a preparation
 request blindly: it may already have locked local RGB allocations.
+
+Native provider errors use numeric JSON-RPC/EIP-1193-style codes. Important
+stable codes include:
+
+|     Code | Meaning                                     |
+| -------: | ------------------------------------------- |
+|   `4001` | User rejected or canceled an approval.      |
+|   `4100` | The origin is not connected or authorized.  |
+| `-32602` | Invalid parameters.                         |
+| `-32020` | RGB is not enabled for the selected wallet. |
+| `-32021` | The requested RGB asset is not known.       |
+
+Use `error.code` for control flow and `error.message` for display. Provider
+errors intentionally do not expose background stack traces or an
+`originalError` object. These numeric codes are not the same as WebRGB's
+string error codes.
