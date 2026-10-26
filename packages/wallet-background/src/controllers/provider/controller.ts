@@ -227,7 +227,25 @@ async function claimRgbIssueWalletPayment(orderId: string, txid: string): Promis
       throw new Error(payload.msg || 'RGB issue payment is not visible yet')
     } catch (error) {
       lastError = error instanceof Error ? error : new Error(String(error))
-      if (/invalid|insufficient|predates|order wallet|network mismatch/i.test(lastError.message)) break
+      // The proxy may time out while the issuance service continues verifying
+      // and commits the payment. Observe the order before retrying the POST so
+      // an uncertain response becomes an idempotent success immediately.
+      try {
+        const observed = await getRgbIssueWalletOrder(orderId)
+        if (observed.status === 'paid' && observed.paymentTxid === txid) return observed
+        if (observed.status !== 'pending') {
+          lastError = new Error('RGB issue order was paid by another transaction')
+        }
+      } catch {
+        // Keep the claim error; the next attempt can recover a transient read.
+      }
+      if (
+        /invalid|insufficient|predates|order wallet|network mismatch|paid by another|belongs to another/i.test(
+          lastError.message
+        )
+      ) {
+        break
+      }
       if (attempt < 9) await new Promise(resolve => setTimeout(resolve, 1500))
     }
   }

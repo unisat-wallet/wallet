@@ -163,6 +163,31 @@ describe('provider RGB issue payment gate', () => {
     expect(result).toMatchObject({ status: 'issued', paymentTxid: txid, assetId: 'rgb:issued' })
   })
 
+  it('recovers when a timed-out claim was committed before the retry', async () => {
+    const txid = 'b'.repeat(64)
+    const pending = { ...paidOrder.data, status: 'pending', paymentTxid: undefined }
+    let reads = 0
+    const fetchMock = vi.fn().mockImplementation(async (_url: string, options?: { method?: string }) => {
+      if (options?.method === 'POST') {
+        return { ok: true, json: async () => ({ code: -1, msg: 'Payment transaction is being claimed' }) }
+      }
+      reads++
+      return {
+        ok: true,
+        json: async () => ({ code: 0, data: reads === 1 ? pending : { ...paidOrder.data, paymentTxid: txid } }),
+      }
+    })
+    vi.stubGlobal('fetch', fetchMock)
+    vi.mocked(wallet.createRgbIssueNia).mockResolvedValue({ assetId: 'rgb:issued' } as any)
+
+    const result = await providerController.issueRgbNia({
+      data: { params: { ...params, paymentTxid: txid } },
+    })
+
+    expect(fetchMock.mock.calls.filter(([, options]) => options?.method === 'POST')).toHaveLength(1)
+    expect(result).toMatchObject({ status: 'issued', paymentTxid: txid, assetId: 'rgb:issued' })
+  })
+
   it('returns only the asset ID and status after verified local issuance', async () => {
     vi.mocked(wallet.createRgbIssueNia).mockResolvedValue({
       assetId: 'rgb:issued', genesis: 'secret-genesis', contract: 'secret-contract',
