@@ -10,7 +10,7 @@ import {
   isSupportedV1TransferConsignment,
   unwrapRgbContractConsignment,
 } from '../src/protocol/bfa-consignment'
-import { createBfaValidationAttestationPayload, mergeBfaValidatedHistories, restoreAttestedBfaHistory, restoreValidatedBfaHistory, selectBfaSpendHistory, validateBfaTransferConsignment } from '../src/protocol/bfa-validator'
+import { createBfaValidationAttestationPayload, mergeBfaValidatedHistories, refreshPersistedBfaValidation, restoreAttestedBfaHistory, restoreValidatedBfaHistory, selectBfaSpendHistory, validateBfaTransferConsignment } from '../src/protocol/bfa-validator'
 import { decodeRgbInvoice } from '../src/protocol/invoice'
 import { encodeRgbContractId } from '../src/protocol/contract-id'
 import { createLocalRgbProtocolEncoder } from '../src/protocol/local-bfa-encoder'
@@ -129,6 +129,23 @@ describe('NIA v1 transfer', () => {
     changed[changed.length - 1] ^= 1
     expect(restoreAttestedBfaHistory(changed, 0, [], attestation, 1_000)).toBeUndefined()
     expect(restoreAttestedBfaHistory(consignment, 0, [], attestation, 2_001)).toBeUndefined()
+  })
+
+  it('refreshes Bitcoin witnesses from an expired persisted validation snapshot', async () => {
+    const { consignment } = fixture()
+    const checked = await validateBfaTransferConsignment(consignment, {
+      network: 0, isBitcoinTxConfirmed: async () => true, allowPendingLastWitness: true,
+    })
+    const snapshot = createBfaValidationAttestationPayload(consignment, 0, checked, 1)
+    const confirmed = vi.fn(async () => true)
+    await expect(refreshPersistedBfaValidation(consignment, {
+      network: 0, isBitcoinTxConfirmed: confirmed,
+    }, snapshot)).resolves.toMatchObject({ assetId: checked.assetId })
+    expect(confirmed).toHaveBeenCalledTimes(checked.bundles.length)
+
+    await expect(refreshPersistedBfaValidation(consignment, {
+      network: 0, isBitcoinTxConfirmed: async () => false,
+    }, snapshot)).rejects.toThrow('Bitcoin witness is not confirmed')
   })
 
   it('rejects a changed NIA issued supply', async () => {

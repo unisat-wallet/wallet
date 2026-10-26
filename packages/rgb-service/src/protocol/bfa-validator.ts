@@ -758,8 +758,15 @@ export function restoreAttestedBfaHistory(
   value: Uint8Array, network: BfaValidationOptions['network'], knownBlindSeals: RgbBlindSeal[],
   attestation: BfaValidationAttestationPayload, now = Date.now()
 ): ValidatedBfaConsignment | undefined {
+  return restoreBfaValidationSnapshot(value, network, knownBlindSeals, attestation, now, false)
+}
+
+function restoreBfaValidationSnapshot(
+  value: Uint8Array, network: BfaValidationOptions['network'], knownBlindSeals: RgbBlindSeal[],
+  attestation: BfaValidationAttestationPayload, now: number, allowExpired: boolean
+): ValidatedBfaConsignment | undefined {
   if (attestation?.version !== 1 || attestation.validatorVersion !== BFA_VALIDATOR_VERSION ||
-    attestation.network !== network || attestation.expiresAt <= now ||
+    attestation.network !== network || (!allowExpired && attestation.expiresAt <= now) ||
     attestation.payloadHash !== hex(sha256(value)) || attestation.hasDynamicRejectList ||
     !Array.isArray(attestation.bundles)) return undefined
   const disclosed = revealBfaConsignmentBlindSeals(value, network, knownBlindSeals)
@@ -778,6 +785,31 @@ export function restoreAttestedBfaHistory(
   const consumed = new Set(parsed.bundles.flatMap(bundle => bundle.operations)
     .flatMap(operation => operation.inputs.map(input => `${input.opId}:${input.type}:${input.index}`)))
   return buildValidatedConsignment(parsed, consumed)
+}
+
+/**
+ * Reuse a persisted deterministic validation snapshot after refreshing the
+ * mutable Bitcoin witness facts. Finalized EVM mint proofs are immutable;
+ * assets with a dynamic reject list are deliberately ineligible for reuse.
+ */
+export async function refreshPersistedBfaValidation(
+  value: Uint8Array,
+  options: BfaValidationOptions,
+  snapshot: BfaValidationAttestationPayload
+): Promise<ValidatedBfaConsignment | undefined> {
+  const history = restoreBfaValidationSnapshot(
+    value, options.network, options.knownBlindSeals || [], snapshot, Date.now(), true
+  )
+  if (!history) return undefined
+  const pendingTxid = options.pendingWitnessTxid ??
+    (options.allowPendingLastWitness ? history.bundles.at(-1)?.txid : undefined)
+  for (const txid of new Set(history.bundles.map(bundle => bundle.txid))) {
+    if (txid !== pendingTxid && !await options.isBitcoinTxConfirmed(txid))
+      throw new RgbBfaValidationUnavailableError(
+        `${history.metadata.schema === 'NIA' ? 'NIA' : 'BFA'} Bitcoin witness is not confirmed: ${txid}`
+      )
+  }
+  return history
 }
 function hexQuantity(value: unknown, name: string): bigint {
   if (typeof value !== 'string' || !/^0x(?:0|[1-9a-f][0-9a-f]*)$/i.test(value)) fail(`invalid ${name}`)
