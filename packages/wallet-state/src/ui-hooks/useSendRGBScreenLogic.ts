@@ -637,7 +637,7 @@ export function useSendRGBScreenLogic() {
                     ? 'canceled'
                     : 'broadcasted',
           local: true,
-          ...(burn ? { burn: true } : {}),
+          ...(burn ? { burn: true, burnDestinationChainId } : {}),
         },
       })
       transferData.current = {}

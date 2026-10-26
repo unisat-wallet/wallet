@@ -18,6 +18,7 @@ import {
 import { RGBTransferNotificationPanel } from './components/RGBTransferNotificationPanel';
 import { RGBRejectReceiveConfirmModal } from './components/RGBRejectReceiveConfirmModal';
 import { RGBTransferReasonTooltip } from './components/RGBTransferReasonTooltip';
+import { getRgbBurnNetworkName } from './rgbBurnNetworks';
 
 function getStatusLabel(status: string, t: (key: string) => string, type?: RgbTransferItem['type']) {
   switch (status.toLowerCase()) {
@@ -113,6 +114,7 @@ export default function RGBTransferDetailScreen() {
   const displayAmount = transfer?.amount
     ? toRgbDisplayAmount(transfer.amount, getRgbTokenPrecision(transfer))
     : '--';
+  const burnDestinationChainId = transfer?.burn ? transfer.burnDestinationChainId ?? 42161 : undefined;
   const description = getDescription(transfer, t);
   const statusLabel = getStatusLabel(status, t, transfer?.type);
   const canExplore =
@@ -214,6 +216,12 @@ export default function RGBTransferDetailScreen() {
               <Text text={t('amount')} color="textDim" />
               <Text text={displayAmount} color="ticker_color2" />
             </Row>
+            {burnDestinationChainId !== undefined ? (
+              <Row justifyBetween itemsCenter>
+                <Text text={t('rgb_burn_network')} color="textDim" />
+                <Text text={getRgbBurnNetworkName(burnDestinationChainId)} color="ticker_color2" />
+              </Row>
+            ) : null}
             {status !== 'rejected' || transfer?.broadcasted ? (
               <Row justifyBetween itemsCenter>
                 <Text text={t(isIssue ? 'rgb_genesis_txid' : 'rgb_transfer_id')} color="textDim" />

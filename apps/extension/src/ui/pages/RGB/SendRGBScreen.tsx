@@ -30,16 +30,10 @@ import { SendRGBScreenStep, useSendRGBScreenLogic } from '@unisat/wallet-state';
 import { SignPsbt } from '../Approval/components';
 import { RGBFeePoolInfoModal } from './components/RGBFeePoolInfoModal';
 import { useRgbWriteLeaseGuard } from './components/useRgbWriteLeaseGuard';
+import { RGB_BURN_NETWORKS } from './rgbBurnNetworks';
 
 const INVOICE_LINE_HEIGHT = 22;
 const INVOICE_MIN_HEIGHT = INVOICE_LINE_HEIGHT * 3;
-const BURN_NETWORKS = [
-  { id: 42161, name: 'Arbitrum One', icon: './images/icons/artifacts/arbitrum-one.svg' },
-  { id: 1, name: 'Ethereum', icon: './images/icons/artifacts/ethereum.svg' },
-  { id: 137, name: 'Polygon PoS', icon: './images/icons/artifacts/polygon.svg' },
-  { id: 9745, name: 'Plasma', icon: './images/icons/artifacts/plasma.svg' },
-  { id: 728126428, name: 'Tron', icon: './images/icons/artifacts/tron.svg' }
-] as const;
 const RGB_ACCENT_GOLD = '#F4B62C';
 
 const burnNetworkSelectorStyle = {
@@ -131,7 +125,7 @@ export default function SendRGBScreen() {
   const [showBurnPopover, setShowBurnPopover] = useState(false);
   const [burnNetworkSelectorOpen, setBurnNetworkSelectorOpen] = useState(false);
   const [understandBurn, setUnderstandBurn] = useState(false);
-  const selectedBurnNetwork = BURN_NETWORKS.find((network) => network.id === burnDestinationChainId);
+  const selectedBurnNetwork = RGB_BURN_NETWORKS.find((network) => network.id === burnDestinationChainId);
   const closeDonationPopover = () => {
     setShowDonationPopover(false);
     setUnderstandDonation(false);
@@ -479,7 +473,7 @@ export default function SendRGBScreen() {
           <Column fullX gap="zero">
             <BottomSheetHeader title={t('rgb_burn_network')} onClose={() => setBurnNetworkSelectorOpen(false)} />
             <Column gap="lg" fullX style={{ padding: '0 20px 24px', boxSizing: 'border-box' }}>
-              {BURN_NETWORKS.map((network) => {
+              {RGB_BURN_NETWORKS.map((network) => {
                 const selected = network.id === burnDestinationChainId;
                 return (
                   <Row

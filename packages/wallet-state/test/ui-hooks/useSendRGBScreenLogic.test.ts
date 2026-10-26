@@ -51,6 +51,41 @@ describe('useSendRGBScreenLogic', () => {
     }))
   })
 
+  it('includes the burn destination network in the completed transfer details', async () => {
+    const assetId = 'rgb:bfa'
+    const { wrapper, wallet, navigation } = createHookTestHarness({
+      routeState: { assetId, burn: true,
+        tokenBalance: { assetId, ticker: 'BFA', precision: 0, spendable: '100' } },
+    })
+    wallet.createRgbSendBegin = vi.fn().mockResolvedValue({
+      txid: 'burn-ethereum', toSignData: { psbtHex: 'unsigned-psbt' },
+    })
+    wallet.createRgbSendEnd = vi.fn().mockResolvedValue({
+      transferId: 'burn-transfer', txid: 'burn-txid', status: 'broadcasted',
+    })
+    const { result } = renderHook(() => useSendRGBScreenLogic(), { wrapper })
+
+    act(() => {
+      result.current.setBurnDestinationChainId(1)
+      result.current.setBurnReason('0xf39fd6e51aad88f6f4ce6ab8827279cfffb92266')
+      result.current.onAmountChange('1')
+    })
+    await act(async () => result.current.onClickNext())
+    await act(async () => {
+      await result.current.onSignPsbtHandleConfirm([{ psbtHex: 'signed-psbt' }] as any)
+    })
+
+    expect(navigation.navigate).toHaveBeenCalledWith(
+      'RGBTransferDetailScreen',
+      expect.objectContaining({
+        initialTransfer: expect.objectContaining({
+          burn: true,
+          burnDestinationChainId: 1,
+        }),
+      })
+    )
+  })
+
   it('requires at least one whole token before preparing a BFA burn', async () => {
     const assetId = 'rgb:bfa'
     const { wrapper, wallet } = createHookTestHarness({
