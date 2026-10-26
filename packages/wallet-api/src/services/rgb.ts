@@ -22,6 +22,8 @@ import type {
   RgbClaimedConsignmentsResult,
   RgbConsignmentHistoryRequest,
   RgbConsignmentHistoryResult,
+  RgbConsignmentValidationRequest,
+  RgbConsignmentValidationResult,
   RgbTransferSyncRequest,
   RgbUtxoSyncRequest,
   RgbWalletUtxoSnapshotRequest,
@@ -324,6 +326,12 @@ export class RgbService {
       { ...params, assetId: normalizeRgbAssetId(params.assetId) }
     )
     return { ...response, assetId: normalizeRgbAssetId(response.assetId) }
+  }
+
+  async validateRgbConsignment(
+    params: RgbConsignmentValidationRequest
+  ): Promise<RgbConsignmentValidationResult> {
+    return this.privatePost('/v5/rgb/consignments/validate', params)
   }
 
   async publishRgbConsignment(params: RgbConsignmentPublishRequest): Promise<void> {

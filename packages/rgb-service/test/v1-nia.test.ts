@@ -10,7 +10,7 @@ import {
   isSupportedV1TransferConsignment,
   unwrapRgbContractConsignment,
 } from '../src/protocol/bfa-consignment'
-import { mergeBfaValidatedHistories, restoreValidatedBfaHistory, selectBfaSpendHistory, validateBfaTransferConsignment } from '../src/protocol/bfa-validator'
+import { createBfaValidationAttestationPayload, mergeBfaValidatedHistories, restoreAttestedBfaHistory, restoreValidatedBfaHistory, selectBfaSpendHistory, validateBfaTransferConsignment } from '../src/protocol/bfa-validator'
 import { decodeRgbInvoice } from '../src/protocol/invoice'
 import { encodeRgbContractId } from '../src/protocol/contract-id'
 import { createLocalRgbProtocolEncoder } from '../src/protocol/local-bfa-encoder'
@@ -115,6 +115,20 @@ describe('NIA v1 transfer', () => {
     expect(result.terminalAssignments).toContainEqual(expect.objectContaining({
       amount: '60', opId: Buffer.from(prepared.transitionId).toString('hex'),
     }))
+  })
+
+  it('restores an exact, unexpired server-attested history without trusting changed bytes', async () => {
+    const { consignment } = fixture()
+    const checked = await validateBfaTransferConsignment(consignment, {
+      network: 0, isBitcoinTxConfirmed: async () => true, allowPendingLastWitness: true,
+    })
+    const attestation = createBfaValidationAttestationPayload(consignment, 0, checked, 2_000)
+    expect(restoreAttestedBfaHistory(consignment, 0, [], attestation, 1_000))
+      .toMatchObject({ assetId: checked.assetId, allocations: checked.allocations })
+    const changed = Uint8Array.from(consignment)
+    changed[changed.length - 1] ^= 1
+    expect(restoreAttestedBfaHistory(changed, 0, [], attestation, 1_000)).toBeUndefined()
+    expect(restoreAttestedBfaHistory(consignment, 0, [], attestation, 2_001)).toBeUndefined()
   })
 
   it('rejects a changed NIA issued supply', async () => {

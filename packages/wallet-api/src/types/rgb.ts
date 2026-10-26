@@ -281,6 +281,34 @@ export interface RgbConsignmentHistoryResult {
   }>
 }
 
+export interface RgbValidationAttestationPayload {
+  version: 1
+  validatorVersion: string
+  network: 0 | 1 | 2 | 3
+  payloadHash: string
+  assetId: string
+  genesisHash: string
+  hasDynamicRejectList: boolean
+  bundles: Array<{
+    id: string
+    txid: string
+    operationIds: string[]
+    parentOpIds: string[]
+  }>
+  expiresAt: number
+}
+
+export interface RgbConsignmentValidationRequest {
+  wallet: RgbWalletRef
+  payload: string
+}
+
+export interface RgbConsignmentValidationResult {
+  payload: RgbValidationAttestationPayload
+  publicKey: string
+  signature: string
+}
+
 /** Post-broadcast index update. No key material or transaction construction is sent to the API. */
 export interface RgbTransferSyncRequest {
   wallet: RgbWalletRef

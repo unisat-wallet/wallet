@@ -140,3 +140,13 @@ UTXOs. It validates the complete Consignment history each round and prints JSON
 metrics for Consignment bytes, history bundle count, per-step latency, and
 total serialized bytes. It is a local protocol/load test only: it does not
 test two real keyrings, proxy ACKs, Bitcoin confirmation, or backend indexing.
+
+## Validation attestations
+
+A wallet API may run the same v1 validator and sign a short-lived attestation
+bound to the exact payload hash, network, Genesis and bundle DAG. The wallet
+accepts it only from a release-pinned Ed25519 key, reparses the payload with
+its private blind seals, and checks every attested bundle identity and edge.
+Invalid, expired and dynamic-reject-list attestations fall back to complete
+local validation; blind-seal ownership and invoice matching never move to the
+server.

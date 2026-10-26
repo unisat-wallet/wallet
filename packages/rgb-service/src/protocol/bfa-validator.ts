@@ -60,6 +60,48 @@ export interface CachedValidatedBfaHistory {
   bundles: Array<{ id: string; txid: string; operationIds: string[]; parentOpIds: string[] }>
 }
 
+export const BFA_VALIDATOR_VERSION = 'bfa-v1-2026-10-26'
+
+export interface BfaValidationAttestationPayload {
+  version: 1
+  validatorVersion: typeof BFA_VALIDATOR_VERSION
+  network: BfaValidationOptions['network']
+  payloadHash: string
+  assetId: string
+  genesisHash: string
+  hasDynamicRejectList: boolean
+  bundles: Array<{ id: string; txid: string; operationIds: string[]; parentOpIds: string[] }>
+  expiresAt: number
+}
+
+export interface SignedBfaValidationAttestation {
+  payload: BfaValidationAttestationPayload
+  publicKey: string
+  signature: string
+}
+
+/** Stable byte representation used by both the API signer and wallet verifier. */
+export function serializeBfaValidationAttestation(payload: BfaValidationAttestationPayload): Uint8Array {
+  return new TextEncoder().encode(JSON.stringify(payload))
+}
+
+export function createBfaValidationAttestationPayload(
+  value: Uint8Array,
+  network: BfaValidationOptions['network'],
+  history: ValidatedBfaConsignment,
+  expiresAt: number
+): BfaValidationAttestationPayload {
+  if (!Number.isSafeInteger(expiresAt) || expiresAt <= 0) fail('invalid validation attestation expiry')
+  return {
+    version: 1, validatorVersion: BFA_VALIDATOR_VERSION, network,
+    payloadHash: hex(sha256(value)), assetId: history.assetId,
+    genesisHash: hex(sha256(history.genesis)), hasDynamicRejectList: history.hasDynamicRejectList,
+    bundles: history.bundles.map(({ id, txid, operationIds, parentOpIds }) =>
+      ({ id, txid, operationIds, parentOpIds })),
+    expiresAt,
+  }
+}
+
 function validatedHistoryFingerprint(payload: Uint8Array, knownBlindSeals: RgbBlindSeal[]): string {
   const sealKeys = knownBlindSeals.map(seal =>
     `${seal.txid.toLowerCase()}:${seal.vout}:${seal.blinding.toString()}`
@@ -661,6 +703,82 @@ export function revealBfaConsignmentBlindSeals(value: Uint8Array, network: BfaVa
   const parsed = parseConsignment(value, network, known)
   return parsed.patches.length ? wrapRgbTransferConsignment(applyPatches(parsed.body, parsed.patches)) : value
 }
+
+function buildValidatedConsignment(
+  parsed: ReturnType<typeof parseConsignment>, consumed: Set<string>
+): ValidatedBfaConsignment {
+  const { genesis, bundles, terminals } = parsed
+  const nia = genesis.metadata.schema === 'NIA'
+  const allocations: ValidatedBfaTransferHistory['allocations'] = []
+  const terminalAssignments: ValidatedBfaConsignment['terminalAssignments'] = []
+  if (nia) for (const item of genesis.assignments) {
+    if (item.type !== OS_ASSET || consumed.has(`${genesis.id}:${item.type}:${item.index}`) ||
+      !item.seal || !item.seal.txid || item.seal.vout < 0) continue
+    allocations.push({ txid: item.seal.txid, vout: item.seal.vout, opId: genesis.id,
+      assignmentIndex: item.index, amount: item.amount.toString() })
+  }
+  const operations = new Map<string, { operation: Operation; bundle: Bundle }>()
+  for (const bundle of bundles) for (const operation of bundle.operations)
+    operations.set(operation.id, { operation, bundle })
+  for (const { operation, bundle } of operations.values()) for (const item of operation.assignments) {
+    if (item.type !== OS_ASSET || consumed.has(`${operation.id}:${item.type}:${item.index}`) || !item.seal) continue
+    const output = item.seal.vout >= 0 && (item.seal.txid === null || item.seal.txid === bundle.txid)
+      ? bundle.tx.outs[item.seal.vout] : undefined
+    if (item.seal.vout >= 0) allocations.push({
+      txid: item.seal.txid ?? bundle.txid, vout: item.seal.vout,
+      opId: operation.id, assignmentIndex: item.index, amount: item.amount.toString(),
+      ...(output ? { scriptPubKey: output.script.toString('hex') } : {}),
+    })
+    terminalAssignments.push({
+      opId: operation.id, assignmentIndex: item.index, amount: item.amount.toString(),
+      bundleId: bundle.id, txid: bundle.txid, vout: item.seal.vout, secretSeal: item.seal.secret,
+      ...(output ? { output: { scriptPubKey: output.script.toString('hex'), satoshis: output.value } } : {}),
+    })
+  }
+  const issuedSupply = nia ? BigInt(genesis.metadata.issuedSupply) :
+    [...operations.values()].filter(item => item.operation.type === TS_MINT)
+      .reduce((sum, item) => sum + item.operation.amount, 0n)
+  return {
+    assetId: encodeRgbContractId(bytes(genesis.id)), genesis: genesis.strict,
+    witnessBundles: bundles.map(bundle => bundle.strict), allocations,
+    hasDynamicRejectList: Boolean(genesis.rejectListAddress),
+    metadata: { ...genesis.metadata, issuedSupply: issuedSupply.toString() },
+    witnessOutputScripts: bundles.at(-1)!.tx.outs.filter(output => output.script[0] !== 0x6a)
+      .map(output => output.script.toString('hex')),
+    terminals: terminals.map(item => ({ bundleId: item.bundleId, secretSeals: item.secrets })),
+    terminalAssignments,
+    bundles: bundles.map(bundle => ({ id: bundle.id, txid: bundle.txid, strict: bundle.strict,
+      operationIds: bundle.operations.map(operation => operation.id),
+      parentOpIds: bundle.operations.flatMap(operation => operation.inputs.map(input => input.opId)) })),
+  }
+}
+
+/** Reparse an attested payload with wallet-private seals while reusing public-history validation. */
+export function restoreAttestedBfaHistory(
+  value: Uint8Array, network: BfaValidationOptions['network'], knownBlindSeals: RgbBlindSeal[],
+  attestation: BfaValidationAttestationPayload, now = Date.now()
+): ValidatedBfaConsignment | undefined {
+  if (attestation?.version !== 1 || attestation.validatorVersion !== BFA_VALIDATOR_VERSION ||
+    attestation.network !== network || attestation.expiresAt <= now ||
+    attestation.payloadHash !== hex(sha256(value)) || attestation.hasDynamicRejectList ||
+    !Array.isArray(attestation.bundles)) return undefined
+  const disclosed = revealBfaConsignmentBlindSeals(value, network, knownBlindSeals)
+  const parsed = parseConsignment(disclosed, network)
+  const assetId = encodeRgbContractId(bytes(parsed.genesis.id))
+  if (assetId !== attestation.assetId || hex(sha256(parsed.genesis.strict)) !== attestation.genesisHash ||
+    parsed.bundles.length !== attestation.bundles.length || parsed.genesis.rejectListAddress) return undefined
+  for (let index = 0; index < parsed.bundles.length; index++) {
+    const bundle = parsed.bundles[index]!
+    const saved = attestation.bundles[index]
+    if (!saved || saved.id !== bundle.id || saved.txid !== bundle.txid ||
+      saved.operationIds.join(',') !== bundle.operations.map(operation => operation.id).join(',') ||
+      saved.parentOpIds.join(',') !== bundle.operations.flatMap(operation => operation.inputs.map(input => input.opId)).join(','))
+      return undefined
+  }
+  const consumed = new Set(parsed.bundles.flatMap(bundle => bundle.operations)
+    .flatMap(operation => operation.inputs.map(input => `${input.opId}:${input.type}:${input.index}`)))
+  return buildValidatedConsignment(parsed, consumed)
+}
 function hexQuantity(value: unknown, name: string): bigint {
   if (typeof value !== 'string' || !/^0x(?:0|[1-9a-f][0-9a-f]*)$/i.test(value)) fail(`invalid ${name}`)
   return BigInt(value)
@@ -718,7 +836,8 @@ export async function validateBfaTransferConsignment(
   value: Uint8Array, options: BfaValidationOptions
 ): Promise<ValidatedBfaConsignment> {
   const disclosed = revealBfaConsignmentBlindSeals(value, options.network, options.knownBlindSeals || [])
-  const { genesis, bundles, terminals } = parseConsignment(disclosed, options.network)
+  const parsed = parseConsignment(disclosed, options.network)
+  const { genesis, bundles, terminals } = parsed
   const nia = genesis.metadata.schema === 'NIA'
   const pendingTxid = options.pendingWitnessTxid ??
     (options.allowPendingLastWitness ? bundles.at(-1)?.txid : undefined)
@@ -814,54 +933,7 @@ export async function validateBfaTransferConsignment(
       terminalSecrets,
     })
   }
-  const allocations: ValidatedBfaTransferHistory['allocations'] = []
-  const terminalAssignments: ValidatedBfaConsignment['terminalAssignments'] = []
-  if (nia) for (const item of genesis.assignments) {
-    if (item.type !== OS_ASSET || consumed.has(`${genesis.id}:${item.type}:${item.index}`) ||
-      !item.seal || !item.seal.txid || item.seal.vout < 0) continue
-    allocations.push({
-      txid: item.seal.txid, vout: item.seal.vout, opId: genesis.id,
-      assignmentIndex: item.index, amount: item.amount.toString(),
-    })
-  }
-  for (const { operation, bundle } of operations.values()) {
-    for (const item of operation.assignments) {
-      if (item.type !== OS_ASSET || consumed.has(`${operation.id}:${item.type}:${item.index}`)) continue
-      if (!item.seal) continue
-      const ownedOutput = item.seal.vout >= 0 && (item.seal.txid === null || item.seal.txid === bundle.txid)
-        ? bundle.tx.outs[item.seal.vout] : undefined
-      if (item.seal.vout >= 0) allocations.push({
-          txid: item.seal.txid ?? bundle.txid, vout: item.seal.vout,
-          opId: operation.id, assignmentIndex: item.index, amount: item.amount.toString(),
-          ...(ownedOutput ? { scriptPubKey: ownedOutput.script.toString('hex') } : {}),
-        })
-      const output = ownedOutput
-      terminalAssignments.push({
-        opId: operation.id, assignmentIndex: item.index, amount: item.amount.toString(),
-        bundleId: bundle.id, txid: bundle.txid, vout: item.seal.vout,
-        secretSeal: item.seal.secret,
-        ...(output ? { output: { scriptPubKey: output.script.toString('hex'), satoshis: output.value } } : {}),
-      })
-    }
-  }
-  const issuedSupply = nia ? BigInt(genesis.metadata.issuedSupply) :
-    [...operations.values()].filter(item => item.operation.type === TS_MINT)
-      .reduce((sum, item) => sum + item.operation.amount, 0n)
-  return {
-    assetId: encodeRgbContractId(bytes(genesis.id)), genesis: genesis.strict,
-    witnessBundles: bundles.map(bundle => bundle.strict), allocations,
-    hasDynamicRejectList: Boolean(genesis.rejectListAddress),
-    metadata: { ...genesis.metadata, issuedSupply: issuedSupply.toString() },
-    witnessOutputScripts: bundles.at(-1)!.tx.outs
-      .filter(output => output.script[0] !== 0x6a)
-      .map(output => output.script.toString('hex')),
-    terminals: terminals.map(item => ({ bundleId: item.bundleId, secretSeals: item.secrets })),
-    terminalAssignments,
-    bundles: bundles.map(bundle => ({ id: bundle.id, txid: bundle.txid, strict: bundle.strict,
-      operationIds: bundle.operations.map(operation => operation.id),
-      parentOpIds: bundle.operations.flatMap(operation => operation.inputs.map(input => input.opId)),
-    })),
-  }
+  return buildValidatedConsignment(parsed, consumed)
 }
 
 /** Combine independently validated branches into one portable local history. */

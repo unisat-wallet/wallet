@@ -218,6 +218,8 @@ export type TypeChain = {
   rgbProxyEndpoints?: string[]
   /** EVM JSON-RPC endpoints used to validate BFA mint anchors, keyed by EIP-155 chain ID. */
   rgbEvmRpcUrls?: Record<number, string>
+  /** Pinned Ed25519 keys allowed to attest server-side RGB validation. */
+  rgbValidationPublicKeys?: string[]
   mempoolSpaceUrl: string
   unisatUrl: string
   ordinalsUrl: string

@@ -20,7 +20,9 @@ import {
   cacheBfaEvmRpc,
   createBfaEvmRpc,
   createLocalRgbProtocolEncoder,
+  restoreAttestedBfaHistory,
   validateBfaTransferConsignment,
+  type BfaValidationAttestationPayload,
   type RgbServiceDependencies,
   type RgbNetwork,
 } from '@unisat/rgb-service'
@@ -83,6 +85,7 @@ import {
   t,
   toRgbDisplayAmount,
 } from '@unisat/wallet-shared'
+import { verifyRgbValidationAttestation } from '../rgb/RgbValidationAttestation'
 import { AddressType, ChainType, NetworkType } from '@unisat/wallet-types'
 import {
   contactBookService,
@@ -385,6 +388,11 @@ type RgbControllerApiService = {
   ) => Promise<{
     status: 'mempool' | 'confirmed' | 'pending_spend' | 'spent' | 'replaced' | 'unknown'
     confirmations: number
+  }>
+  validateRgbConsignment: (params: { wallet: RgbWalletRef; payload: string }) => Promise<{
+    payload: BfaValidationAttestationPayload
+    publicKey: string
+    signature: string
   }>
   acquireRgbWriteLease: (params: {
     wallet: RgbWalletRef & { network: string }
@@ -6544,12 +6552,42 @@ export class WalletController extends BaseController {
     const networkType = this.getNetworkType()
     const chainType = this.getChainType()
     let service: LocalRgbService | undefined
+    const validationAttestations = new Map<string, BfaValidationAttestationPayload>()
+    const dynamicAttestationPayloads = new Set<string>()
     const validateBfaConsignment: NonNullable<RgbServiceDependencies['validateBfaConsignment']> = async input => {
       await this.assertActiveRgbWallet(localWallet)
       const network = input.wallet.network === 'mainnet' || input.wallet.network === 'fractal-mainnet'
         || input.wallet.network === 'fractal-test' ? 0
         : input.wallet.network === 'testnet' ? 1
           : input.wallet.network === 'testnet4' ? 2 : 3
+      const payloadHash = bitcoin.crypto.sha256(Buffer.from(input.payload)).toString('hex')
+      let attestation = validationAttestations.get(payloadHash)
+      const trustedKeys = CHAINS_MAP[chainType]?.rgbValidationPublicKeys || []
+      if (!attestation && !dynamicAttestationPayloads.has(payloadHash) &&
+        input.allowPendingLastWitness && trustedKeys.length) {
+        try {
+          const signed = await getRgbApiService().validateRgbConsignment({
+            wallet: input.wallet, payload: Buffer.from(input.payload).toString('base64'),
+          })
+          if (!verifyRgbValidationAttestation(signed, trustedKeys))
+            throw new Error('RGB validation attestation signature is invalid')
+          attestation = signed.payload
+          if (attestation.hasDynamicRejectList) dynamicAttestationPayloads.add(payloadHash)
+          validationAttestations.set(payloadHash, attestation)
+        } catch {
+          // Attestation is an optimization; all failures fall back to complete local validation.
+        }
+      }
+      if (attestation) {
+        const restored = restoreAttestedBfaHistory(
+          input.payload, network, input.knownBlindSeals || [], attestation
+        )
+        if (restored) {
+          await this.assertActiveRgbWallet(localWallet)
+          return restored
+        }
+        validationAttestations.delete(payloadHash)
+      }
       const result = await validateBfaTransferConsignment(input.payload, {
         network,
         ...(input.pendingWitnessTxid ? { pendingWitnessTxid: input.pendingWitnessTxid } : {}),
