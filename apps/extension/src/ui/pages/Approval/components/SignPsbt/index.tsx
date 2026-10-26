@@ -13,7 +13,13 @@ import KeystoneSignScreen from '@/ui/pages/Wallet/KeystoneSignScreen';
 import { fontSizes } from '@/ui/theme/font';
 import { numUtils } from '@unisat/base-utils';
 import { KeystoneSignEnum } from '@unisat/keyring-service/types';
-import { AccountSignMethod, getSighashSingleInputIndexes } from '@unisat/wallet-shared';
+import {
+  AccountSignMethod,
+  getInvalidSighashInputIndexes,
+  getSighashAllAnyoneCanPayInputIndexes,
+  getSighashNoneInputIndexes,
+  getSighashSingleInputIndexes
+} from '@unisat/wallet-shared';
 import {
   PsbtLocalInfo,
   SignPsbtProps,
@@ -155,6 +161,18 @@ export default function SignPsbt(props: SignPsbtProps) {
   const sighashSingleInputIndexes =
     currentDecodedPsbt && currentToSignData
       ? getSighashSingleInputIndexes(currentToSignData, currentDecodedPsbt.inputInfos)
+      : [];
+  const sighashNoneInputIndexes =
+    currentDecodedPsbt && currentToSignData
+      ? getSighashNoneInputIndexes(currentToSignData, currentDecodedPsbt.inputInfos)
+      : [];
+  const sighashAllAnyoneCanPayInputIndexes =
+    currentDecodedPsbt && currentToSignData
+      ? getSighashAllAnyoneCanPayInputIndexes(currentToSignData, currentDecodedPsbt.inputInfos)
+      : [];
+  const invalidSighashInputIndexes =
+    currentDecodedPsbt && currentToSignData
+      ? getInvalidSighashInputIndexes(currentToSignData, currentDecodedPsbt.inputInfos)
       : [];
   const listResetKey = getIncrementalListResetKey(currentToSignData?.psbtHex || '');
 
@@ -316,6 +334,9 @@ export default function SignPsbt(props: SignPsbtProps) {
             brc20PriceMap={brc20PriceMap}
             networkFee={networkFee}
             sighashSingleInputIndexes={sighashSingleInputIndexes}
+            sighashNoneInputIndexes={sighashNoneInputIndexes}
+            sighashAllAnyoneCanPayInputIndexes={sighashAllAnyoneCanPayInputIndexes}
+            invalidSighashInputIndexes={invalidSighashInputIndexes}
           />
           <SignPsbtSection title={t('transaction_details')}>
             {isValidData && (
@@ -323,7 +344,6 @@ export default function SignPsbt(props: SignPsbtProps) {
                 <InputsList
                   decodedPsbt={currentDecodedPsbt}
                   toSignData={currentToSignData}
-                  sighashSingleInputIndexes={sighashSingleInputIndexes}
                   runesPriceMap={runesPriceMap}
                   resetKey={listResetKey}
                   setContractPopoverData={setContractPopoverData}

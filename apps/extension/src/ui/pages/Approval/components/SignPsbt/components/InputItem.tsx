@@ -13,11 +13,14 @@ import {
   Inscription,
   PsbtActionDetailType,
   TickPriceItem,
-  ToSignData
+  ToSignData,
+  getSighashTypeLabel,
+  isDefinedSighashType
 } from '@unisat/wallet-shared';
 import { useBTCUnit, useCurrentAddress, useI18n, useWallet } from '@unisat/wallet-state';
 import { AssetList } from './AssetList';
 import ContractSection from './ContractSection';
+import { SighashNoneDetailsPopover } from './SighashNoneDetailsPopover';
 import { SighashSingleDetailsPopover } from './SighashSingleDetailsPopover';
 
 export function InputItem(props: {
@@ -26,7 +29,6 @@ export function InputItem(props: {
   outputInfo?: DecodedPsbtOutput;
   decodedPsbt: DecodedPsbt;
   toSignData?: ToSignData;
-  isSighashSingle?: boolean;
   brc20PriceMap?: Record<string, TickPriceItem>;
   runesPriceMap?: Record<string, TickPriceItem>;
   setContractPopoverData: (data: any) => void;
@@ -37,10 +39,18 @@ export function InputItem(props: {
   const btcUnit = useBTCUnit();
   const { t } = useI18n();
   const [rgbFundingAddress, setRgbFundingAddress] = useState('');
-  const [showSighashSingleDetails, setShowSighashSingleDetails] = useState(false);
+  const [sighashDetailsType, setSighashDetailsType] = useState<'single' | 'none' | null>(null);
   const itemInfo = (inputInfo || outputInfo)!;
 
   const isToSign = inputInfo && toSignData!.toSignInputs.find((input) => input.index === index);
+  const inputSighashType = inputInfo?.sighashType;
+  const sighashOutputType = typeof inputSighashType === 'number' ? inputSighashType & 0x03 : undefined;
+  const hasAnyoneCanPay = typeof inputSighashType === 'number' && (inputSighashType & 0x80) !== 0;
+  const hasDefinedSighash = typeof inputSighashType === 'number' && isDefinedSighashType(inputSighashType);
+  const isSighashSingle = Boolean(isToSign && hasDefinedSighash && sighashOutputType === 0x03);
+  const isSighashNone = Boolean(isToSign && hasDefinedSighash && sighashOutputType === 0x02);
+  const isInvalidSighash = Boolean(isToSign && typeof inputSighashType === 'number' && !hasDefinedSighash);
+  const sighashLabel = isToSign ? getSighashTypeLabel(inputSighashType) : undefined;
   const inscriptions: Inscription[] = [];
   const runes = itemInfo.runes || [];
   const alkanes = itemInfo.alkanes || [];
@@ -136,24 +146,31 @@ export function InputItem(props: {
                   </Row>
                 </Row>
               )}
-              {inputInfo && props.isSighashSingle && (
+              {inputInfo && sighashLabel && (
                 <button
                   type="button"
-                  onClick={() => setShowSighashSingleDetails(true)}
+                  disabled={!isSighashSingle && !isSighashNone}
+                  onClick={() => {
+                    if (isSighashSingle) setSighashDetailsType('single');
+                    if (isSighashNone) setSighashDetailsType('none');
+                  }}
                   style={{
                     display: 'inline-flex',
                     alignItems: 'center',
                     padding: '2px 4px',
-                    backgroundColor: 'rgba(244, 182, 44, 0.15)',
+                    backgroundColor:
+                      isSighashNone || isInvalidSighash
+                        ? 'rgba(237, 51, 75, 0.15)'
+                        : 'rgba(244, 182, 44, 0.15)',
                     border: 0,
                     borderRadius: 4,
-                    cursor: 'pointer',
+                    cursor: isSighashSingle || isSighashNone ? 'pointer' : 'default',
                     fontFamily: typography.primary.regular,
                     fontSize: 10,
                     lineHeight: 'normal'
                   }}>
-                  <span style={{ color: colors.warning }}>
-                    {`SIGHASH_SINGLE${(inputInfo.sighashType & 0x80) !== 0 ? '|ANYONECANPAY' : ''}`}
+                  <span style={{ color: isSighashNone || isInvalidSighash ? colors.red : colors.warning }}>
+                    {sighashLabel}
                   </span>
                 </button>
               )}
@@ -175,10 +192,16 @@ export function InputItem(props: {
           brc20PriceMap={props.brc20PriceMap}
         />
       </Column>
-      {showSighashSingleDetails && inputInfo && (
+      {sighashDetailsType === 'single' && inputInfo && isSighashSingle && (
         <SighashSingleDetailsPopover
-          hasAnyoneCanPay={(inputInfo.sighashType & 0x80) !== 0}
-          onClose={() => setShowSighashSingleDetails(false)}
+          hasAnyoneCanPay={hasAnyoneCanPay}
+          onClose={() => setSighashDetailsType(null)}
+        />
+      )}
+      {sighashDetailsType === 'none' && inputInfo && isSighashNone && (
+        <SighashNoneDetailsPopover
+          hasAnyoneCanPay={hasAnyoneCanPay}
+          onClose={() => setSighashDetailsType(null)}
         />
       )}
     </Row>

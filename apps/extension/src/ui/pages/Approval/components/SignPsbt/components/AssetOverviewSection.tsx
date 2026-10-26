@@ -19,6 +19,7 @@ import { useBTCUnit, useI18n } from '@unisat/wallet-state';
 import AssetCard from './AssetCard';
 import InfoCard from './InfoCard';
 import { SignPsbtSection } from './Section';
+import { SighashNoneDetailsPopover } from './SighashNoneDetailsPopover';
 import { SighashSingleDetailsPopover } from './SighashSingleDetailsPopover';
 
 interface AssetOverviewSectionProps {
@@ -27,6 +28,9 @@ interface AssetOverviewSectionProps {
   brc20PriceMap?: { [key: string]: TickPriceItem };
   networkFee: any;
   sighashSingleInputIndexes: number[];
+  sighashNoneInputIndexes: number[];
+  sighashAllAnyoneCanPayInputIndexes: number[];
+  invalidSighashInputIndexes: number[];
 }
 
 export default function AssetOverviewSection({
@@ -34,7 +38,10 @@ export default function AssetOverviewSection({
   networkFee,
   runesPriceMap,
   brc20PriceMap,
-  sighashSingleInputIndexes
+  sighashSingleInputIndexes,
+  sighashNoneInputIndexes,
+  sighashAllAnyoneCanPayInputIndexes,
+  invalidSighashInputIndexes
 }: AssetOverviewSectionProps) {
   const btcUnit = useBTCUnit();
   const { t } = useI18n();
@@ -50,9 +57,13 @@ export default function AssetOverviewSection({
   const hasSighashSingleAnyoneCanPay = sighashSingleInputIndexes.some(
     (index) => ((decodedPsbt.inputInfos[index]?.sighashType || 0) & 0x80) !== 0
   );
+  const hasSighashNoneAnyoneCanPay = sighashNoneInputIndexes.some(
+    (index) => ((decodedPsbt.inputInfos[index]?.sighashType || 0) & 0x80) !== 0
+  );
 
   const [selectedAssetType, setSelectedAssetType] = useState<string | null>(null);
   const [showSighashSingleDetails, setShowSighashSingleDetails] = useState(false);
+  const [showSighashNoneDetails, setShowSighashNoneDetails] = useState(false);
 
   const inscriptionArray = Object.values(decodedPsbt.inscriptions);
 
@@ -210,7 +221,14 @@ export default function AssetOverviewSection({
     }
   };
 
-  if (showNetworkFee === false && assetCards.length === 0 && sighashSingleInputIndexes.length === 0) {
+  if (
+    showNetworkFee === false &&
+    assetCards.length === 0 &&
+    sighashSingleInputIndexes.length === 0 &&
+    sighashNoneInputIndexes.length === 0 &&
+    sighashAllAnyoneCanPayInputIndexes.length === 0 &&
+    invalidSighashInputIndexes.length === 0
+  ) {
     return null;
   }
 
@@ -257,7 +275,36 @@ export default function AssetOverviewSection({
                 title="SighashType"
                 value="SIGHASH_SINGLE"
                 subtitle={`(${sighashSingleInputIndexes.length})`}
+                status="warning"
                 onClick={() => setShowSighashSingleDetails(true)}
+              />
+            )}
+
+            {sighashNoneInputIndexes.length > 0 && (
+              <InfoCard
+                title="SighashType"
+                value="SIGHASH_NONE"
+                subtitle={`(${sighashNoneInputIndexes.length})`}
+                status="error"
+                onClick={() => setShowSighashNoneDetails(true)}
+              />
+            )}
+
+            {sighashAllAnyoneCanPayInputIndexes.length > 0 && (
+              <InfoCard
+                title="SighashType"
+                value="SIGHASH_ALL|ANYONECANPAY"
+                subtitle={`(${sighashAllAnyoneCanPayInputIndexes.length})`}
+                status="warning"
+              />
+            )}
+
+            {invalidSighashInputIndexes.length > 0 && (
+              <InfoCard
+                title="SighashType"
+                value="INVALID_SIGHASH"
+                subtitle={`(${invalidSighashInputIndexes.length})`}
+                status="error"
               />
             )}
 
@@ -271,6 +318,12 @@ export default function AssetOverviewSection({
         <SighashSingleDetailsPopover
           hasAnyoneCanPay={hasSighashSingleAnyoneCanPay}
           onClose={() => setShowSighashSingleDetails(false)}
+        />
+      )}
+      {showSighashNoneDetails && (
+        <SighashNoneDetailsPopover
+          hasAnyoneCanPay={hasSighashNoneAnyoneCanPay}
+          onClose={() => setShowSighashNoneDetails(false)}
         />
       )}
       {selectedAssetType && (
