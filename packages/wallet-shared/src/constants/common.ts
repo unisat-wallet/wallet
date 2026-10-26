@@ -229,6 +229,8 @@ export type TypeChain = {
   supportsAssetOverview?: boolean
   /** Whether the homepage can load /v5/address/history. */
   supportsAddressHistory?: boolean
+  /** Whether wallet asset views should offer links to the UniSat marketplace. */
+  enableMarket?: boolean
   disable?: boolean
   isFractal?: boolean
   showPrice: boolean
@@ -283,6 +285,7 @@ const PROD_CHAINS_MAP: { [key: string]: TypeChain } = {
     defaultExplorer: 'mempool-space',
     supportsAssetOverview: false,
     supportsAddressHistory: false,
+    enableMarket: false,
     svg: 'bitcoin-testnet',
   },
   [ChainType.BITCOIN_TESTNET4]: {
@@ -307,6 +310,7 @@ const PROD_CHAINS_MAP: { [key: string]: TypeChain } = {
     defaultExplorer: 'mempool-space',
     supportsAssetOverview: false,
     supportsAddressHistory: false,
+    enableMarket: false,
     rgbProxyEndpoints: ['rpcs://wallet-api-testnet4.unisat.space/_/rgb/v1/json-rpc'],
     svg: 'bitcoin-testnet',
   },
@@ -329,6 +333,7 @@ const PROD_CHAINS_MAP: { [key: string]: TypeChain } = {
     defaultExplorer: 'unisat-explorer',
     supportsAssetOverview: false,
     supportsAddressHistory: false,
+    enableMarket: false,
     enableBrc20Prog: true,
     rgbProxyEndpoints: ['rpcs://wallet-api-signet.unisat.space/_/rgb/v1/json-rpc'],
     rgbEvmRpcUrls: {
@@ -384,6 +389,7 @@ const PROD_CHAINS_MAP: { [key: string]: TypeChain } = {
     defaultExplorer: 'unisat-explorer',
     supportsAssetOverview: false,
     supportsAddressHistory: false,
+    enableMarket: false,
     enableBrc20SingleStep: true,
     svg: 'fractalbitcoin-testnet',
   },
