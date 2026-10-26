@@ -216,6 +216,7 @@ describe('NIA v1 transfer', () => {
         network: 0, isBitcoinTxConfirmed: async () => true,
         ...(input.pendingWitnessTxid ? { pendingWitnessTxid: input.pendingWitnessTxid } : {}),
         ...(input.allowPendingLastWitness ? { allowPendingLastWitness: true } : {}),
+        ...(input.requiredOperationIds ? { requiredOperationIds: input.requiredOperationIds } : {}),
         knownBlindSeals: input.knownBlindSeals,
       })
     const history = await validate({
@@ -301,6 +302,7 @@ describe('NIA v1 transfer', () => {
       network: 0,
       isBitcoinTxConfirmed: async () => false,
       ...(input.pendingWitnessTxid ? { pendingWitnessTxid: input.pendingWitnessTxid } : {}),
+      ...(input.requiredOperationIds ? { requiredOperationIds: input.requiredOperationIds } : {}),
       knownBlindSeals: input.knownBlindSeals,
     }))
     const encoder = createLocalRgbProtocolEncoder(validateForSend)
@@ -361,7 +363,8 @@ describe('NIA v1 transfer', () => {
 
     expect(validateForSend).toHaveBeenCalled()
     expect(validateForSend.mock.calls.every(([input]) =>
-      input.pendingWitnessTxid === witnessTxid
+      input.pendingWitnessTxid === witnessTxid &&
+      input.requiredOperationIds?.join(',') === utxo.allocations[0]!.opId
     )).toBe(true)
   })
 
@@ -402,7 +405,7 @@ describe('NIA v1 transfer', () => {
         inputs: [{ opId: assetId.slice(4), assignmentType: 4000, assignmentIndex }],
         entropy: BigInt(vout + 2),
       })
-      return { ...bundle, transitionId: prepared.transitionId }
+      return { ...bundle, transitionId: prepared.transitionId, txid: Transaction.fromBuffer(tx).getId() }
     }
     const left = makeBranch(0)
     const right = makeBranch(1)
@@ -411,11 +414,22 @@ describe('NIA v1 transfer', () => {
         genesis: genesis.strict, validatedWitnessBundles: [], witnessBundle: bundle.strict, terminals: [],
       }), { network: 0, isBitcoinTxConfirmed: async () => true }
     )
-    const merged = mergeBfaValidatedHistories(await Promise.all([validate(left), validate(right)]))
-    const complete = await validateBfaTransferConsignment(merged, {
-      network: 0, isBitcoinTxConfirmed: async () => true,
-    })
     const leftOpId = Buffer.from(left.transitionId).toString('hex')
+    const merged = mergeBfaValidatedHistories(await Promise.all([validate(left), validate(right)]))
+    await expect(validateBfaTransferConsignment(merged, {
+      network: 0,
+      isBitcoinTxConfirmed: async txid => txid !== right.txid,
+    })).rejects.toThrow(`Bitcoin witness is not confirmed: ${right.txid}`)
+    const checkedTxids: string[] = []
+    const complete = await validateBfaTransferConsignment(merged, {
+      network: 0,
+      requiredOperationIds: [leftOpId],
+      isBitcoinTxConfirmed: async txid => {
+        checkedTxids.push(txid)
+        return txid !== right.txid
+      },
+    })
+    expect(checkedTxids).toEqual([left.txid])
     const selected = selectBfaSpendHistory(complete, [leftOpId])
     expect(selected.witnessBundles).toHaveLength(1)
     const portable = encodeBfaTransferConsignment({

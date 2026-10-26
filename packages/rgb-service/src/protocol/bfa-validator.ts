@@ -205,6 +205,8 @@ export interface BfaValidationOptions {
   /** The sender witness is not broadcast until the receiver ACKs it. */
   pendingWitnessTxid?: string
   allowPendingLastWitness?: boolean
+  /** Check Bitcoin confirmation only for witness branches needed by these operations. */
+  requiredOperationIds?: string[]
   /** Locally known blind seals used to disclose spendable ancestors. */
   knownBlindSeals?: RgbBlindSeal[]
 }
@@ -875,12 +877,36 @@ export async function validateBfaTransferConsignment(
     (options.allowPendingLastWitness ? bundles.at(-1)?.txid : undefined)
   const operations = new Map<string, { operation: Operation; bundle: Bundle }>()
   for (const bundle of bundles) {
-    if (bundle.txid !== pendingTxid && !await options.isBitcoinTxConfirmed(bundle.txid))
-      throw new RgbBfaValidationUnavailableError(`${nia ? 'NIA' : 'BFA'} Bitcoin witness is not confirmed: ${bundle.txid}`)
     for (const operation of bundle.operations) {
       if (operations.has(operation.id)) fail('duplicate transition')
       operations.set(operation.id, { operation, bundle })
     }
+  }
+  // A wallet may hold independent allocations of the same asset. A pending
+  // transfer on one branch must not block spending another confirmed branch.
+  // The full DAG is still validated below; only its mutable chain-status
+  // lookup is scoped to the ancestry of the allocations selected for spend.
+  let requiredBundles: Set<Bundle> | undefined
+  if (options.requiredOperationIds) {
+    requiredBundles = new Set()
+    const visited = new Set<string>()
+    const include = (opId: string) => {
+      if (opId === genesis.id || visited.has(opId)) return
+      const current = operations.get(opId)
+      // A merged validation may inspect an independently transported branch
+      // that does not contain the selected operation. The final merged DAG
+      // and selectBfaSpendHistory enforce that it exists.
+      if (!current) return
+      visited.add(opId)
+      requiredBundles!.add(current.bundle)
+      for (const input of current.operation.inputs) include(input.opId)
+    }
+    for (const opId of options.requiredOperationIds) include(opId)
+  }
+  for (const bundle of bundles) {
+    if ((!requiredBundles || requiredBundles.has(bundle)) &&
+      bundle.txid !== pendingTxid && !await options.isBitcoinTxConfirmed(bundle.txid))
+      throw new RgbBfaValidationUnavailableError(`${nia ? 'NIA' : 'BFA'} Bitcoin witness is not confirmed: ${bundle.txid}`)
   }
   // Every disclosed transition must trace back to the authenticated Genesis.
   // Conservation alone would also accept a closed cycle of fabricated NIA

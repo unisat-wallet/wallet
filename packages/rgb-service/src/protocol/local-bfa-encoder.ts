@@ -519,6 +519,9 @@ export function createLocalRgbProtocolEncoder(
       const knownBlindSeals = input.validationHistory.knownBlindSeals || []
       const transferPayloads = compatiblePayloads.filter(isSupportedV1TransferConsignment)
       if (!transferPayloads.length) throw new RgbServiceError('RGB v1 history has no transfer')
+      const requiredOperationIds = input.selectedUtxos.flatMap(utxo =>
+        utxo.allocations.map(allocation => allocation.opId || '')
+      )
       const singlePayload = transferPayloads.length === 1 ? transferPayloads[0] : undefined
       const confirmedBitcoinWitnesses = input.validationHistory.confirmedBitcoinWitnesses
       const pendingWitnessTxid = selectedPendingWitnessTxid(input.selectedUtxos)
@@ -534,11 +537,13 @@ export function createLocalRgbProtocolEncoder(
         const bitcoinStatusCache = new Map<string, Promise<boolean>>()
         const checked = await Promise.all(transferPayloads.map(payload => validateBfa({
           wallet: input.wallet, payload, knownBlindSeals, evmRpcCache, bitcoinStatusCache, confirmedBitcoinWitnesses,
+          requiredOperationIds,
           ...(pendingWitnessTxid ? { pendingWitnessTxid } : {}),
         })))
         const merged = mergeBfaValidatedHistories(checked)
         const validated = await validateBfa({
           wallet: input.wallet, payload: merged, knownBlindSeals, evmRpcCache, bitcoinStatusCache, confirmedBitcoinWitnesses,
+          requiredOperationIds,
           ...(pendingWitnessTxid ? { pendingWitnessTxid } : {}),
         })
         history = validated
@@ -553,9 +558,7 @@ export function createLocalRgbProtocolEncoder(
           )
         }
       }
-      const spendHistory = selectBfaSpendHistory(history, input.selectedUtxos.flatMap(utxo =>
-        utxo.allocations.map(allocation => allocation.opId || '')
-      ))
+      const spendHistory = selectBfaSpendHistory(history, requiredOperationIds)
       return prepareBfaTransfer({
         wallet: input.wallet, intent: input.intent, selectedUtxos: input.selectedUtxos,
         history: spendHistory, feeRate: input.request.feeRate,

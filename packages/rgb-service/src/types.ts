@@ -657,6 +657,8 @@ export interface RgbServiceDependencies {
     payload: Uint8Array
     pendingWitnessTxid?: string
     allowPendingLastWitness?: boolean
+    /** Limit mutable Bitcoin witness checks to the ancestors of these selected allocations. */
+    requiredOperationIds?: string[]
     knownBlindSeals: import('./protocol/receive').RgbBlindSeal[]
     /** Shared only by validations within one operation; never persisted across sends. */
     evmRpcCache?: Map<string, Promise<unknown>>

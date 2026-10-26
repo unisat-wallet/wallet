@@ -6556,6 +6556,8 @@ export class WalletController extends BaseController {
     const dynamicAttestationPayloads = new Set<string>()
     const validateBfaConsignment: NonNullable<RgbServiceDependencies['validateBfaConsignment']> = async input => {
       await this.assertActiveRgbWallet(localWallet)
+      // Keep source builds compatible with an older generated rgb-service declaration.
+      const requiredOperationIds = (input as typeof input & { requiredOperationIds?: string[] }).requiredOperationIds
       const network = input.wallet.network === 'mainnet' || input.wallet.network === 'fractal-mainnet'
         || input.wallet.network === 'fractal-test' ? 0
         : input.wallet.network === 'testnet' ? 1
@@ -6592,6 +6594,7 @@ export class WalletController extends BaseController {
         network,
         ...(input.pendingWitnessTxid ? { pendingWitnessTxid: input.pendingWitnessTxid } : {}),
         ...(input.allowPendingLastWitness ? { allowPendingLastWitness: true } : {}),
+        ...(requiredOperationIds ? { requiredOperationIds } : {}),
         knownBlindSeals: input.knownBlindSeals,
         isBitcoinTxConfirmed: cacheBfaBitcoinStatus(cacheConfirmedBfaWitnesses(
           txid => getRgbApiService().getRgbTransactionStatus(txid, { wallet: input.wallet }),

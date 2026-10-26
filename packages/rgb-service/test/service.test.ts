@@ -108,12 +108,13 @@ function createDependencies(): RgbServiceDependencies {
       }),
       syncBroadcast: vi.fn(),
     },
-    validateBfaConsignment: ({ payload, pendingWitnessTxid, allowPendingLastWitness, knownBlindSeals }) =>
+    validateBfaConsignment: ({ payload, pendingWitnessTxid, allowPendingLastWitness, requiredOperationIds, knownBlindSeals }) =>
       validateBfaTransferConsignment(payload, {
         network: 0,
         isBitcoinTxConfirmed: async () => true,
         ...(pendingWitnessTxid ? { pendingWitnessTxid } : {}),
         ...(allowPendingLastWitness ? { allowPendingLastWitness: true } : {}),
+        ...(requiredOperationIds ? { requiredOperationIds } : {}),
         knownBlindSeals,
       }),
     encoder: {
