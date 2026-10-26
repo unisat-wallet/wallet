@@ -150,3 +150,10 @@ its private blind seals, and checks every attested bundle identity and edge.
 Invalid, expired and dynamic-reject-list attestations fall back to complete
 local validation; blind-seal ownership and invoice matching never move to the
 server.
+
+Legacy NIA v0 transfers are accepted through a constrained compatibility
+boundary: the service parses and converts them to the canonical v1 envelope,
+then uses the same v1 validator and allocation matching path as a native v1
+transfer. Accepted history is stored as v1 while the original v0 payload is
+retained only as recovery compatibility data. The legacy parser is not an
+independent acceptance authority.

@@ -25,7 +25,7 @@ import {
   RgbService,
   RgbServiceError,
 } from '../src'
-import { encodeBfaTransferConsignment, NIA_V1_SCHEMA_ID } from '../src/protocol/bfa-consignment'
+import { encodeBfaTransferConsignment, isSupportedV1TransferConsignment, NIA_V1_SCHEMA_ID } from '../src/protocol/bfa-consignment'
 import { serializeBfaOpretWitnessBundle } from '../src/protocol/consignment'
 import { validateBfaTransferConsignment } from '../src/protocol/bfa-validator'
 
@@ -108,6 +108,14 @@ function createDependencies(): RgbServiceDependencies {
       }),
       syncBroadcast: vi.fn(),
     },
+    validateBfaConsignment: ({ payload, pendingWitnessTxid, allowPendingLastWitness, knownBlindSeals }) =>
+      validateBfaTransferConsignment(payload, {
+        network: 0,
+        isBitcoinTxConfirmed: async () => true,
+        ...(pendingWitnessTxid ? { pendingWitnessTxid } : {}),
+        ...(allowPendingLastWitness ? { allowPendingLastWitness: true } : {}),
+        knownBlindSeals,
+      }),
     encoder: {
       prepareTransfer: vi.fn().mockResolvedValue({
         id: 'transfer-1',
@@ -1337,13 +1345,36 @@ describe('RgbService', () => {
     const decoded = decodeNiaConsignment(Uint8Array.from(Buffer.from(payload, 'base64')))
     const scriptPubKey = decoded.witnessBundles[1]!.outputs[1]!.scriptPubKey
     expect(decoded.witnessBundles[0]!.outputs[1]!.scriptPubKey).toBe(scriptPubKey)
-    const service = new RgbService(createDependencies())
+    const dependencies = createDependencies()
+    dependencies.validateBfaConsignment = vi.fn(dependencies.validateBfaConsignment!)
+    const service = new RgbService(dependencies)
     await service.open(wallet)
     const receive = { recipientType: 'witness', witnessScriptPubKey: scriptPubKey }
     const item = { recipientId: 'recipient', payload }
 
-    await expect((service as any).validateIncomingConsignment(receive, item))
-      .resolves.toMatchObject({ txid: decoded.witnessBundles[1]!.txid, amount: '10' })
+    const match = await (service as any).validateIncomingConsignment(receive, item)
+    expect(match).toMatchObject({
+      txid: decoded.witnessBundles[1]!.txid, amount: '10', legacyPayload: payload,
+    })
+    const validatedPayload = vi.mocked(dependencies.validateBfaConsignment!).mock.calls[0]?.[0].payload
+    expect(validatedPayload && isSupportedV1TransferConsignment(validatedPayload)).toBe(true)
+    dependencies.stateSource.getTransactionStatus = vi.fn().mockResolvedValue({
+      status: 'confirmed', confirmations: 1,
+    })
+    await expect((service as any).advanceAcceptedReceive({
+      ...receive,
+      recipientId: 'recipient', invoice: '', createdAt: 1,
+      witnessPublicKey: `02${'22'.repeat(32)}`,
+      receivedConsignment: {
+        accepted: true, assetId: match.assetId, amount: match.amount,
+        txid: match.txid, receivedAt: 1,
+      },
+    }, item, match, false)).resolves.toBe(true)
+    const stored = (service as any).state.contracts[match.assetId]
+    expect(isSupportedV1TransferConsignment(
+      Uint8Array.from(Buffer.from(stored.history.payload, 'base64'))
+    )).toBe(true)
+    expect(stored.history.legacyPayloads).toContain(payload)
     await expect((service as any).validateIncomingConsignment(receive, {
       ...item, txid: decoded.witnessBundles[0]!.txid,
     })).resolves.toBeUndefined()

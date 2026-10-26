@@ -15,12 +15,7 @@ import {
 } from './protocol/invoice'
 import { normalizeRgbAssetId, rgbContractIdHex } from './protocol/contract-id'
 import { hashBfaBurnDestinationV1, normalizeBfaBurnDestination } from './protocol/bfa-burn-destination'
-import {
-  decodeNiaConsignment,
-  niaConsignmentSpendableOutputScripts,
-  validateNiaConsignmentParentSpends,
-  validateNiaConsignmentParentState,
-} from './protocol/nia-consignment'
+import { decodeNiaConsignment } from './protocol/nia-consignment'
 import { mergeNiaConsignmentHistory } from './protocol/nia-history'
 import {
   encodeBfaContractConsignment,
@@ -1802,157 +1797,56 @@ export class RgbService {
     // Proxy v1 consignments have no Bitcoin txid field. Older adapters stored
     // that absence as '', which must not constrain the witness in a NIA payload.
     const expectedTxid = item.txid || undefined
-    const payload = Uint8Array.from(Buffer.from(item.payload, 'base64'))
-    if (isSupportedV1TransferConsignment(payload)) {
-      const validate = this.dependencies.validateBfaConsignment
-      if (!validate) throw new RgbServiceError('RGB v1 receive validation is unavailable')
-      const bfa = await validate({
-        wallet: this.requireState().wallet, payload,
-        ...(expectedTxid ? { pendingWitnessTxid: expectedTxid } : { allowPendingLastWitness: true }),
-        knownBlindSeals: this.getKnownBlindSeals(),
-        confirmedBitcoinWitnesses: this.requireState().confirmedBitcoinWitnesses ||= {},
-      })
-      const assetId = bfa.assetId
-      if (receive.assetId && receive.assetId !== assetId)
-        return mismatch('asset_id', { actualAssetId: assetId })
-      const secret = receive.seal ? Buffer.from(concealBlindSeal(receive.seal)).toString('hex') : undefined
-      // V1 consignments include unspent ancestors; only the appended witness
-      // bundle can satisfy this invoice's witness output.
-      const latestBundleId = bfa.bundles.at(-1)?.id
-      const candidate = bfa.terminalAssignments.find(assignment => {
-        if (expectedTxid && assignment.txid !== expectedTxid) return false
-        if (receive.recipientType === 'witness') {
-          if (!latestBundleId || assignment.bundleId !== latestBundleId) return false
-          return assignment.output?.scriptPubKey.toLowerCase() === receive.witnessScriptPubKey?.toLowerCase()
-        }
-        return assignment.secretSeal === secret && bfa.terminals.some(terminal =>
-          terminal.bundleId === assignment.bundleId && terminal.secretSeals.includes(secret!))
-      })
-      if (!candidate) return mismatch('v1_recipient_assignment', {
-        assetId, terminalAssignmentCount: bfa.terminalAssignments.length,
-        latestBundleId,
-      })
-      if (receive.amount && receive.amount !== candidate.amount)
-        return mismatch('amount', { actualAmount: candidate.amount })
-      const output = candidate.output
-      return {
-        decoded: { metadata: bfa.metadata, genesis: { strict: bfa.genesis } },
-        witness: { outputs: output && candidate.vout >= 0 ? Array.from({ length: candidate.vout + 1 }, (_, index) =>
-          index === candidate.vout ? output : undefined) : [] },
-        assetId, amount: candidate.amount, txid: candidate.txid,
-        vout: receive.seal?.vout ?? candidate.vout,
-        opId: candidate.opId, assignmentIndex: candidate.assignmentIndex,
-        counterpartyScriptPubKeys: bfa.witnessOutputScripts,
+    const originalPayload = Uint8Array.from(Buffer.from(item.payload, 'base64'))
+    const v1 = isSupportedV1TransferConsignment(originalPayload)
+    // Legacy NIA bytes are only parsed by the constrained migration layer.
+    // Acceptance, allocation matching and persisted history all use the same
+    // v1 validator as native v1 transfers.
+    const payload = v1 ? originalPayload : convertNiaV0ConsignmentToV1(originalPayload)
+    const validate = this.dependencies.validateBfaConsignment
+    if (!validate) throw new RgbServiceError('RGB v1 receive validation is unavailable')
+    const bfa = await validate({
+      wallet: this.requireState().wallet, payload,
+      ...(expectedTxid ? { pendingWitnessTxid: expectedTxid } : { allowPendingLastWitness: true }),
+      knownBlindSeals: this.getKnownBlindSeals(),
+      confirmedBitcoinWitnesses: this.requireState().confirmedBitcoinWitnesses ||= {},
+    })
+    if (receive.recipientType === 'witness' && !receive.witnessScriptPubKey)
+      return mismatch('missing_witness_script')
+    if (receive.recipientType !== 'witness' && !receive.seal)
+      return mismatch('missing_blind_seal')
+    const assetId = bfa.assetId
+    if (receive.assetId && receive.assetId !== assetId)
+      return mismatch(v1 ? 'asset_id' : 'asset_or_amount', { actualAssetId: assetId })
+    const secret = receive.seal ? Buffer.from(concealBlindSeal(receive.seal)).toString('hex') : undefined
+    const latestBundleId = bfa.bundles.at(-1)?.id
+    const candidate = bfa.terminalAssignments.find(assignment => {
+      if (expectedTxid && assignment.txid !== expectedTxid) return false
+      if (receive.recipientType === 'witness') {
+        if (!latestBundleId || assignment.bundleId !== latestBundleId) return false
+        return assignment.output?.scriptPubKey.toLowerCase() === receive.witnessScriptPubKey?.toLowerCase()
       }
-    }
-    const decoded = decodeNiaConsignment(payload)
-    validateNiaConsignmentParentSpends(decoded)
-    if (receive.recipientType === 'witness') {
-      const expectedScript = receive.witnessScriptPubKey?.toLowerCase()
-      if (!expectedScript) return mismatch('missing_witness_script')
-      const witness = decoded.witnessBundles.at(-1)
-      const match = witness?.transitions
-        .flatMap(transition =>
-          transition.assignments.map((assignment, assignmentIndex) => ({
-            witness,
-            transition,
-            assignment,
-            assignmentIndex,
-          }))
-        )
-        .find(({ witness, assignment }) => {
-          if ('secretSeal' in assignment.seal) return false
-          const txid = assignment.seal.txid || witness.txid
-          const output = witness.outputs[assignment.seal.vout]
-          return (
-            txid === witness.txid &&
-            output?.scriptPubKey.toLowerCase() === expectedScript &&
-            (expectedTxid === undefined || witness.txid === expectedTxid)
-          )
-        })
-      if (
-        !match ||
-        'secretSeal' in match.assignment.seal ||
-        (expectedTxid !== undefined && match.witness.txid !== expectedTxid)
-      )
-        return mismatch('nia_witness_assignment', {
-          witnessTxid: witness?.txid,
-          transitionCount: witness?.transitions.length || 0,
-        })
-      if (
-        (receive.assetId && receive.assetId !== decoded.assetId) ||
-        (receive.amount && receive.amount !== match.assignment.amount.toString())
-      ) {
-        return mismatch('asset_or_amount', {
-          actualAssetId: decoded.assetId,
-          actualAmount: match.assignment.amount.toString(),
-        })
-      }
-      return {
-        decoded,
-        match,
-        witness: match.witness,
-        assetId: decoded.assetId,
-        amount: match.assignment.amount.toString(),
-        txid: match.witness.txid,
-        vout: match.assignment.seal.vout,
-        opId: match.transition.opId,
-        assignmentIndex: match.assignmentIndex,
-        counterpartyScriptPubKeys: niaConsignmentSpendableOutputScripts(item.payload),
-      }
-    }
-    if (!receive.seal) return mismatch('missing_blind_seal')
-    const secretSeal = Buffer.from(concealBlindSeal(receive.seal)).toString('hex')
-    const terminalBundleIds = new Set(
-      decoded.terminals
-        .filter(terminal => terminal.secretSeals.includes(secretSeal))
-        .map(terminal => terminal.bundleId)
+      return assignment.secretSeal === secret && bfa.terminals.some(terminal =>
+        terminal.bundleId === assignment.bundleId && terminal.secretSeals.includes(secret!))
+    })
+    if (!candidate) return mismatch(
+      v1 ? 'v1_recipient_assignment' :
+        receive.recipientType === 'witness' ? 'nia_witness_assignment' : 'nia_blind_assignment',
+      { assetId, terminalAssignmentCount: bfa.terminalAssignments.length, latestBundleId }
     )
-    const match = decoded.witnessBundles
-      .filter(bundle => terminalBundleIds.has(bundle.bundleId))
-      .flatMap(bundle => bundle.transitions)
-      .flatMap(transition =>
-        transition.assignments.map((assignment, assignmentIndex) => ({
-          transition,
-          assignment,
-          assignmentIndex,
-        }))
-      )
-      .find(
-        ({ assignment }) =>
-          'secretSeal' in assignment.seal && assignment.seal.secretSeal === secretSeal
-      )
-    const witness = match
-      ? decoded.witnessBundles.find(bundle =>
-          bundle.transitions.some(transition => transition.opId === match.transition.opId)
-        )
-      : undefined
-    if (!match || !witness || (expectedTxid !== undefined && witness.txid !== expectedTxid)) {
-      return mismatch('nia_blind_assignment', {
-        terminalBundleCount: terminalBundleIds.size,
-        matchedTransition: !!match,
-        witnessTxid: witness?.txid,
-      })
-    }
-    if (
-      (receive.assetId && receive.assetId !== decoded.assetId) ||
-      (receive.amount && receive.amount !== match.assignment.amount.toString())
-    ) {
-      return mismatch('asset_or_amount', {
-        actualAssetId: decoded.assetId,
-        actualAmount: match.assignment.amount.toString(),
-      })
-    }
+    if (receive.amount && receive.amount !== candidate.amount)
+      return mismatch(v1 ? 'amount' : 'asset_or_amount', { actualAmount: candidate.amount })
+    const output = candidate.output
     return {
-      decoded,
-      match,
-      witness,
-      assetId: decoded.assetId,
-      amount: match.assignment.amount.toString(),
-      txid: witness.txid,
-      opId: match.transition.opId,
-      assignmentIndex: match.assignmentIndex,
-      counterpartyScriptPubKeys: niaConsignmentSpendableOutputScripts(item.payload),
+      decoded: { metadata: bfa.metadata, genesis: { strict: bfa.genesis } },
+      witness: { outputs: output && candidate.vout >= 0 ? Array.from({ length: candidate.vout + 1 }, (_, index) =>
+        index === candidate.vout ? output : undefined) : [] },
+      assetId, amount: candidate.amount, txid: candidate.txid,
+      vout: receive.seal?.vout ?? candidate.vout,
+      opId: candidate.opId, assignmentIndex: candidate.assignmentIndex,
+      counterpartyScriptPubKeys: bfa.witnessOutputScripts,
+      historyPayload: Buffer.from(payload).toString('base64'),
+      ...(v1 ? {} : { legacyPayload: item.payload }),
     }
   }
 
@@ -2018,8 +1912,11 @@ export class RgbService {
     // Do this before mutating the allocation/receive state. A conflicting or
     // malformed branch must reject atomically rather than leave a spendable
     // UTXO whose required DAG was not durably retained.
-    if (this.needsV1HistoryMerge(assetId, item.payload)) {
-      await this.storeAcceptedBfaHistory(assetId, item.payload)
+    const historyPayload = validated.historyPayload || item.payload
+    if (this.needsV1HistoryMerge(assetId, historyPayload)) {
+      await this.storeAcceptedBfaHistory(
+        assetId, historyPayload, undefined, validated.legacyPayload ? [validated.legacyPayload] : []
+      )
     } else {
       this.storeAcceptedHistory({
         assetId,
@@ -2427,14 +2324,19 @@ export class RgbService {
     })
   }
 
-  private async prepareV1HistoryMerge(assetId: string, payload: string, pendingWitnessTxid?: string) {
+  private async prepareV1HistoryMerge(
+    assetId: string, payload: string, pendingWitnessTxid?: string, additionalLegacyPayloads: string[] = []
+  ) {
     const validate = this.dependencies.validateBfaConsignment
     if (!validate) throw new RgbServiceError('RGB v1 receive validation is unavailable')
     const state = this.requireState()
     const existing = state.contracts?.[assetId]
     const existingPayload = existing?.history?.payload ?? existing?.consignment
     const originals = [...new Set([existingPayload, payload].filter((item): item is string => Boolean(item)))]
-    const legacyPayloads = [...(existing?.history?.legacyPayloads || [])]
+    const legacyPayloads = [...new Set([
+      ...(existing?.history?.legacyPayloads || []),
+      ...additionalLegacyPayloads,
+    ])]
     const transfers: Uint8Array[] = []
     const rootGenesises: string[] = []
     for (const original of originals) {
@@ -2482,11 +2384,13 @@ export class RgbService {
     return { canonicalPayload, complete, opIds, legacyPayloads }
   }
 
-  private async storeAcceptedBfaHistory(assetId: string, payload: string, pendingWitnessTxid?: string) {
+  private async storeAcceptedBfaHistory(
+    assetId: string, payload: string, pendingWitnessTxid?: string, additionalLegacyPayloads: string[] = []
+  ) {
     const state = this.requireState()
     const existing = state.contracts?.[assetId]
     const { canonicalPayload, complete, opIds, legacyPayloads } =
-      await this.prepareV1HistoryMerge(assetId, payload, pendingWitnessTxid)
+      await this.prepareV1HistoryMerge(assetId, payload, pendingWitnessTxid, additionalLegacyPayloads)
     const contracts = state.contracts || (state.contracts = {})
     contracts[assetId] = {
       consignment: canonicalPayload,
