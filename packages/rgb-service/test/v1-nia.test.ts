@@ -117,6 +117,17 @@ describe('NIA v1 transfer', () => {
     }))
   })
 
+  it('validates Node Buffer payloads without mutating their shared storage', async () => {
+    const { consignment, assetId } = fixture()
+    const payload = Buffer.from(consignment)
+    const original = Buffer.from(payload)
+    const result = await validateBfaTransferConsignment(payload, {
+      network: 0, isBitcoinTxConfirmed: async () => true, allowPendingLastWitness: true,
+    })
+    expect(result.assetId).toBe(encodeRgbContractId(Uint8Array.from(Buffer.from(assetId.slice(4), 'hex'))))
+    expect(payload).toEqual(original)
+  })
+
   it('restores an exact, unexpired server-attested history without trusting changed bytes', async () => {
     const { consignment } = fixture()
     const checked = await validateBfaTransferConsignment(consignment, {

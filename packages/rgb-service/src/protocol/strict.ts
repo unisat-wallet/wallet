@@ -156,7 +156,10 @@ export class StrictReader {
     if (!Number.isSafeInteger(length) || length < 0 || this.remaining < length) {
       throw new RgbServiceError('Unexpected end of strict RGB data')
     }
-    const result = this.value.slice(this.offset, this.offset + length)
+    // Buffer.slice() returns a shared-memory view, unlike Uint8Array.slice().
+    // Always copy so callers may safely reverse or otherwise transform fields
+    // without mutating the source consignment between validation passes.
+    const result = Uint8Array.from(this.value.subarray(this.offset, this.offset + length))
     this.offset += length
     return result
   }
