@@ -368,8 +368,19 @@ describe('RgbService', () => {
       expect(reopened.exportBurnDestination(txid)).toEqual({
         ...burnDestination, recipient: `0x${burnDestination.recipient}`,
       })
+      expect(reopened.exportBurn(txid)).toEqual({
+        format: 'utexo-burn',
+        version: 1,
+        consignment: {
+          encoding: 'base64',
+          byteLength: proof.byteLength,
+          data: proof.toString('base64'),
+        },
+        burnDestination: { ...burnDestination, recipient: `0x${burnDestination.recipient}` },
+      })
     } else {
       expect(() => reopened.exportBurnDestination(txid)).toThrow('unavailable')
+      expect(() => reopened.exportBurn(txid)).toThrow('unavailable')
     }
     expect(reopened.getPendingSendHistory()).toEqual([
       expect.objectContaining({ burn: true, txid, amount: '60', status: 'broadcasted',

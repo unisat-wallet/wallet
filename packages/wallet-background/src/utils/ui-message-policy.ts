@@ -60,6 +60,7 @@ const UI_CONTROLLER_METHODS = new Set([
   'deriveNewAccountFromMnemonic',
   'enableRgbFeature',
   'exportRgbAssetContract',
+  'exportRgbBurn',
   'exportRgbBurnConsignment',
   'exportRgbBurnDestination',
   'exportRgbHdBackup',

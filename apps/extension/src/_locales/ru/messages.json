@@ -3456,7 +3456,7 @@
   "rgb_burn_recipient_address": { "message": "Адрес получателя" },
   "rgb_burn_tron_placeholder": { "message": "Введите адрес Tron" },
   "rgb_burn_tron_invalid": { "message": "Введите действительный адрес Tron." },
-  "rgb_burn_destination_v1_description": { "message": "Это необратимое сжигание фиксирует сеть и получателя. Для вывода нужен оператор с поддержкой адресатов V1. Скачайте доказательство и запись назначения из деталей транзакции и передайте оператору оба файла." },
+  "rgb_burn_destination_v1_description": { "message": "Это необратимое сжигание фиксирует сеть и получателя. Для вывода нужен оператор с поддержкой адресатов V1. Скачайте файл сжигания из деталей транзакции и передайте его оператору." },
   "rgb_burn_destination_v1_confirm": { "message": "Я проверил сеть и адрес получателя и понимаю, что сжигание необратимо." },
   "rgb_download_burn_destination": { "message": "Скачать запись назначения (.json)" },
   "rgb_burn_amount": { "message": "Сумма сжигания" },
@@ -3467,6 +3467,7 @@
   "rgb_burn_description": { "message": "Этот burn допускает вывод только в Arbitrum One, не в Ethereum или другие маршруты LayerZero. Проверьте адрес: сжигание необратимо, а адрес нельзя изменить. Доказательство доступно в деталях транзакции." },
   "rgb_burn_confirm": { "message": "Я проверил адрес в Arbitrum One и понимаю, что сжигание нельзя отменить." },
   "rgb_download_burn_proof": { "message": "Скачать доказательство сжигания (.rgb)" },
+  "rgb_download_burn": { "message": "Скачать файл сжигания (.json)" },
   "rgb_locked_balance_hint": {
     "message": "У вас есть ожидающий перевод. Открыть переводы"
   },

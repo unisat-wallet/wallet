@@ -3882,6 +3882,13 @@ export class WalletController extends BaseController {
     return service.exportBurnDestination(txid)
   }
 
+  /** Export a self-contained UTEXO burn JSON artifact. */
+  exportRgbBurn = async (txid: string) => {
+    await this.assertRgbEnabled()
+    const { service } = await this.getLocalRgbReadService()
+    return service.exportBurn(txid)
+  }
+
   getRGBAssetDetail = async (_address: string, assetId: string) => {
     const detail = await this.getRgbAssetDetail(assetId)
     // Local RGB details keep balance fields flat, while the wallet UI's

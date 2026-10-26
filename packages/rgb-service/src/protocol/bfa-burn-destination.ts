@@ -10,6 +10,17 @@ export type BfaBurnDestinationV1 = {
   recipient: string
 }
 
+export type UtexoBurnExportV1 = {
+  format: 'utexo-burn'
+  version: 1
+  consignment: {
+    encoding: 'base64'
+    byteLength: number
+    data: string
+  }
+  burnDestination: BfaBurnDestinationV1
+}
+
 const TYPEHASH_V1 = 'a1cba9d766975eb04c6a31c3b68dbb2381444a222c9972b6bf3ab26fcb829b00'
 const BASE58_ALPHABET = '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz'
 

@@ -2741,6 +2741,21 @@ export class RgbService {
     return { ...destination, recipient: `0x${destination.recipient}` }
   }
 
+  /** A self-contained UTEXO burn artifact containing both the proof and its destination. */
+  exportBurn(txid: string): import('./protocol/bfa-burn-destination').UtexoBurnExportV1 {
+    const consignment = this.exportBurnConsignment(txid)
+    return {
+      format: 'utexo-burn',
+      version: 1,
+      consignment: {
+        encoding: 'base64',
+        byteLength: consignment.byteLength,
+        data: Buffer.from(consignment).toString('base64'),
+      },
+      burnDestination: this.exportBurnDestination(txid),
+    }
+  }
+
   /** Observe a recorded burn on Bitcoin so its local history can show confirmation. */
   async getBurnTransactionStatus(txid: string): Promise<'confirmed' | 'mempool' | 'unknown'> {
     const state = this.requireState()

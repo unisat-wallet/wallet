@@ -3470,7 +3470,7 @@
   "rgb_burn_recipient_address": { "message": "Recipient address" },
   "rgb_burn_tron_placeholder": { "message": "Enter Tron address" },
   "rgb_burn_tron_invalid": { "message": "Enter a valid Tron address." },
-  "rgb_burn_destination_v1_description": { "message": "This irreversible burn commits the selected network and recipient. Redemption requires an operator that supports V1 destinations. Download the burn proof and destination record from transaction details and provide both to the operator." },
+  "rgb_burn_destination_v1_description": { "message": "This irreversible burn commits the selected network and recipient. Redemption requires an operator that supports V1 destinations. Download the burn file from transaction details and provide it to the operator." },
   "rgb_burn_destination_v1_confirm": { "message": "I checked the destination network and recipient and understand this burn cannot be reversed." },
   "rgb_download_burn_destination": { "message": "Download destination record (.json)" },
   "rgb_burn_amount": { "message": "Burn Amount" },
@@ -3481,6 +3481,7 @@
   "rgb_burn_description": { "message": "This burn can only unlock on Arbitrum One. It cannot be used for Ethereum or other LayerZero routes. Check the recipient carefully: burning is irreversible and the address cannot be changed. The proof is available in transaction details." },
   "rgb_burn_confirm": { "message": "I have checked the Arbitrum One recipient and understand this burn cannot be reversed." },
   "rgb_download_burn_proof": { "message": "Download burn proof (.rgb)" },
+  "rgb_download_burn": { "message": "Download burn file (.json)" },
   "rgb_locked_balance_hint": {
     "message": "You have a pending transfer. View transfers"
   },
