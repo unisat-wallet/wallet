@@ -8,6 +8,7 @@ var minimist = require('minimist');
 var packageConfig = require('./package.json');
 const { exit } = require('process');
 const { execFileSync } = require('child_process');
+const path = require('path');
 
 //parse arguments
 var knownOptions = {
@@ -123,11 +124,24 @@ function task_package(cb) {
   cb();
 }
 
+function task_print_output(cb) {
+  if (options.env == 'pro') {
+    const extension = options.browser == 'firefox' ? 'xpi' : 'zip';
+    const gitHashSuffix = artifactGitHash ? `-${artifactGitHash}` : '';
+    const artifactName = `${brandName}-${options.browser}-${options.manifest}-v${artifactVersion}${gitHashSuffix}.${extension}`;
+    console.log(`Build artifact: ${path.resolve(__dirname, 'dist', artifactName)}`);
+  } else {
+    console.log(`Build output: ${path.resolve(__dirname, 'dist', options.browser)}`);
+  }
+  cb();
+}
+
 exports.build = gulp.series(
   task_clean,
   task_prepare,
   task_merge_manifest,
   task_clean_tmps,
   task_webpack,
-  task_package
+  task_package,
+  task_print_output
 );
