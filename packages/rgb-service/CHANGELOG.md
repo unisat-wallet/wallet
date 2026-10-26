@@ -1,5 +1,11 @@
 # @unisat/rgb-service
 
+## 2.1.1
+
+### Patch Changes
+
+- fix buffer
+
 ## 2.1.0
 
 ### Minor Changes
