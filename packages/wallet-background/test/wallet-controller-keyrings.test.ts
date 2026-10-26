@@ -1149,6 +1149,37 @@ describe('RGB wallet references', () => {
     expect(service.setRecoveryCheckpointRevision).toHaveBeenCalledWith('b'.repeat(24))
   })
 
+  it('waits for its own queued checkpoint before checking for another installation', async () => {
+    const wallet = new WalletController()
+    const walletRef = {
+      walletId: 'rgb-wallet',
+      network: 'mainnet',
+      fundingAddress: 'bc1p-rgb-funding',
+    }
+    const context = {
+      service: { isRecoveryBackupEnabled: vi.fn(() => true) },
+      wallet: walletRef,
+    }
+    const key = `${walletRef.network}:${walletRef.fundingAddress}`
+    let releaseBackup: () => void
+    const backup = new Promise<void>(resolve => { releaseBackup = resolve })
+    ;(wallet as any).rgbRecoveryBackups.set(key, backup)
+    vi.spyOn(wallet as any, 'assertRgbRecoveryWallet').mockResolvedValue(undefined)
+    const restore = vi
+      .spyOn(wallet as any, 'restoreRgbRecoveryIfNeeded')
+      .mockResolvedValue(undefined)
+
+    const refresh = (wallet as any).refreshRgbRecoveryForWrite(context)
+    await Promise.resolve()
+    expect(restore).not.toHaveBeenCalled()
+
+    releaseBackup!()
+    await refresh
+
+    expect(restore).toHaveBeenCalledOnce()
+    expect(restore).toHaveBeenCalledWith(context)
+  })
+
   it('requeues verified local RGB state when the recovery backend is explicitly empty', async () => {
     const wallet = new WalletController()
     const walletRef = {

@@ -6045,6 +6045,15 @@ export class WalletController extends BaseController {
    */
   private refreshRgbRecoveryForWrite = async (context: LocalRgbServiceContext) => {
     const key = `${context.wallet.network}:${context.wallet.fundingAddress}`
+    // A completed issue may still be publishing follow-up indexer snapshots
+    // through the per-wallet checkpoint queue. Reading the remote revision
+    // before that queue settles can mistake this installation's intermediate
+    // checkpoint for a write from another installation: local state has
+    // already advanced, while the remote state reflects an earlier queued
+    // snapshot. Drain our own queue before performing the conflict check.
+    const pendingBackup = this.rgbRecoveryBackups.get(key)
+    if (pendingBackup) await pendingBackup.catch(() => undefined)
+    await this.assertRgbRecoveryWallet(context.wallet)
     this.rgbRecoveryVersions.delete(key)
     await this.restoreRgbRecoveryIfNeeded(context)
     if (!context.service.isRecoveryBackupEnabled()) {
