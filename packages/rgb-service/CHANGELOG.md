@@ -1,5 +1,11 @@
 # @unisat/rgb-service
 
+## 2.1.0
+
+### Minor Changes
+
+- validate legacy NIA through v1
+
 ## 2.0.0
 
 ### Major Changes
