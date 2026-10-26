@@ -1,8 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 
 import { useI18n, useNavigation, useTools, useWallet } from '../context'
+import { useWalletConfig } from '../hooks/settings'
 import type { RgbTransferItem, RgbTransferNotification } from '../types'
 import { mergeRgbTransferAssetMetadata } from '../utils/rgb-transfer-metadata'
+import { normalizeConfiguredRgbUsdt } from '../utils/rgb-usdt'
 
 function isInProgress(transfer?: RgbTransferItem) {
   if (transfer?.awaitingRecipientAck) return true
@@ -61,8 +63,11 @@ export function useRGBTransferDetailLogic() {
   const wallet = useWallet()
   const tools = useTools()
   const { t } = useI18n()
+  const configuredUsdtAssetId = useWalletConfig().rgbUsdtAssetId?.trim() || ''
   const { transferId, initialTransfer } = nav.getRouteState<'RGBTransferDetailScreen'>()
-  const [transfer, setTransfer] = useState<RgbTransferItem | undefined>(initialTransfer)
+  const [transfer, setTransfer] = useState<RgbTransferItem | undefined>(() =>
+    initialTransfer ? normalizeConfiguredRgbUsdt(initialTransfer, configuredUsdtAssetId) : undefined
+  )
   const [loading, setLoading] = useState(false)
   const [cancelLoading, setCancelLoading] = useState(false)
   const [receiveActionLoading, setReceiveActionLoading] = useState(false)
@@ -83,20 +88,20 @@ export function useRGBTransferDetailLogic() {
             (!!current?.txid && item.txid === current.txid)
         )
         if (!latest) return current
-        return {
+        return normalizeConfiguredRgbUsdt({
           ...latest,
           assetId: current?.assetId ?? latest.assetId,
           ticker: latest.ticker || current?.ticker,
           name: latest.name || current?.name,
           precision: latest.precision ?? current?.precision,
-        }
+        }, configuredUsdtAssetId)
       })
     } catch {
       // Keep the most recently known state visible while the background refreshes.
     } finally {
       setLoading(false)
     }
-  }, [transferId, wallet])
+  }, [configuredUsdtAssetId, transferId, wallet])
 
   useEffect(() => {
     void refresh()
@@ -111,7 +116,10 @@ export function useRGBTransferDetailLogic() {
         if (canceled || !detail) return
         setTransfer(current =>
           current?.assetId === transfer.assetId
-            ? mergeRgbTransferAssetMetadata(current, detail)
+            ? normalizeConfiguredRgbUsdt(
+                mergeRgbTransferAssetMetadata(current, detail),
+                configuredUsdtAssetId
+              )
             : current
         )
       })
@@ -120,7 +128,7 @@ export function useRGBTransferDetailLogic() {
     return () => {
       canceled = true
     }
-  }, [transfer?.assetId, transfer?.precision, wallet])
+  }, [configuredUsdtAssetId, transfer?.assetId, transfer?.precision, wallet])
 
   useEffect(() => {
     if (!isInProgress(transfer)) return undefined

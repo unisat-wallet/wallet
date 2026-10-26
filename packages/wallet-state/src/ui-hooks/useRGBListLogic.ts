@@ -12,12 +12,9 @@ import type { RgbBalance } from '../types'
 import { WalletView } from '../types/ui'
 import { useInfiniteList } from './useInfiniteList'
 import { uiEventBus } from '../utils/eventBus'
+import { isSameRgbAssetId, normalizeConfiguredRgbUsdt } from '../utils/rgb-usdt'
 
 export const UNCONFIGURED_RGB_USDT_ASSET_ID = '-'
-
-export function isSameRgbAssetId(left: string, right: string) {
-  return left.replace(/^rgb:/i, '') === right.replace(/^rgb:/i, '')
-}
 
 export function includeConfiguredRgbUsdt(items: RgbBalance[], assetId: string, balance?: RgbBalance) {
   if (!assetId) return items
@@ -35,7 +32,7 @@ export function includeConfiguredRgbUsdt(items: RgbBalance[], assetId: string, b
   }
   const existing = items.find(item => isSameRgbAssetId(item.assetId, assetId)) || balance
   const usdt: RgbBalance = existing
-    ? { ...existing, name: 'USDT', ticker: 'USDT', configuredUsdt: true }
+    ? { ...normalizeConfiguredRgbUsdt(existing, assetId), configuredUsdt: true }
     : { assetId, name: 'USDT', ticker: 'USDT', balance: '0', spendable: '0', configuredUsdt: true, configuredPlaceholder: true }
   return [usdt, ...items.filter(item => !isSameRgbAssetId(item.assetId, assetId))]
 }

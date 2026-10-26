@@ -9,7 +9,7 @@ import { useChain } from '../hooks'
 import { useWalletConfig } from '../hooks/settings'
 import type { RgbBalance } from '../types'
 import { getRgbTokenPrecision, toRgbDisplayAmount } from '../utils/rgb-amount-utils'
-import { isSameRgbAssetId } from './useRGBListLogic'
+import { isSameRgbAssetId } from '../utils/rgb-usdt'
 
 const DEBOUNCE_DELAY = 1000
 

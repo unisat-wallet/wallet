@@ -26,13 +26,27 @@ describe('useRGBTokenScreenLogic', () => {
     }))
     wallet.getRGBAssetDetail.mockResolvedValue({ ...detail, ticker: 'OTHER', iconUrl: 'https://example.com/other.png' })
     wallet.getRGBAssetBalance.mockResolvedValue(fetchedBalance)
-    wallet.getRGBAssetActivity.mockResolvedValue({ list: [], total: 0 })
+    wallet.getRGBAssetActivity.mockResolvedValue({
+      list: [{
+        id: 'usdt-history',
+        assetId,
+        ticker: 'USDT0',
+        name: 'Tether USD',
+        type: 'send',
+        status: 'confirmed',
+        amount: '1',
+        txid: 'usdt-txid',
+        timestamp: 1,
+      }],
+      total: 1,
+    })
 
     const { result } = renderHook(() => useRGBTokenScreenLogic(), { wrapper })
     await waitFor(() => expect(result.current.tokenSummary?.tokenInfo.name).toBe('USDT'))
     expect(result.current.iconInfo.assetId).toBe(assetId)
     expect(result.current.tokenSummary?.tokenInfo.ticker).toBe('USDT')
     expect(result.current.tokenBalance?.name).toBe('USDT')
+    expect(result.current.activityItems[0]).toMatchObject({ name: 'USDT', ticker: 'USDT' })
   })
 
   it('shows the unconfigured USDT item without loading an invalid asset or allowing transfers', async () => {

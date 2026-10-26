@@ -2,6 +2,7 @@ import { act, renderHook, waitFor } from '@testing-library/react'
 import { describe, expect, it } from 'vitest'
 
 import { useRGBTransferDetailLogic } from '../../src/ui-hooks/useRGBTransferDetailLogic'
+import { settingsActions } from '../../src/reducers/settings'
 import { createHookTestHarness } from './testHelpers'
 
 const pendingReceive = {
@@ -33,6 +34,26 @@ const confirmingReceive = {
 }
 
 describe('useRGBTransferDetailLogic', () => {
+  it('normalizes configured USDT metadata in transfer details', async () => {
+    const initialTransfer = { ...confirmingReceive, name: 'Tether USD', ticker: 'USDT0' }
+    const { wrapper, wallet, store } = createHookTestHarness({
+      routeState: { transferId: 'recipient-id', initialTransfer },
+    })
+    store.dispatch(settingsActions.updateSettings({
+      walletConfig: {
+        ...store.getState().settings.walletConfig,
+        rgbUsdtAssetId: initialTransfer.assetId,
+      },
+    }))
+    wallet.getRgbTransfers.mockResolvedValue({ list: [initialTransfer], total: 1 })
+
+    const { result } = renderHook(() => useRGBTransferDetailLogic(), { wrapper })
+
+    await waitFor(() => {
+      expect(result.current.transfer).toMatchObject({ name: 'USDT', ticker: 'USDT' })
+    })
+  })
+
   it('returns to Assets from the transfer detail screen', async () => {
     const { wrapper, navigation } = createHookTestHarness({
       routeState: { transferId: 'recipient-id', initialTransfer: pendingReceive },

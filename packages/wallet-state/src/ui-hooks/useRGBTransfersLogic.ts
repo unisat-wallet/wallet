@@ -3,11 +3,12 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { useWallet } from '../context'
 import { useCurrentAccount } from '../hooks/accounts'
 import { useCurrentKeyring } from '../hooks/keyrings'
-import { useChainType } from '../hooks/settings'
+import { useChainType, useWalletConfig } from '../hooks/settings'
 import type { RgbAssetDetail, RgbTransferItem, RgbTransferNotification } from '../types'
 import { useInfiniteList } from './useInfiniteList'
 import { getRgbTokenPrecision } from '../utils/rgb-amount-utils'
 import { mergeRgbTransferAssetMetadata } from '../utils/rgb-transfer-metadata'
+import { normalizeConfiguredRgbUsdt } from '../utils/rgb-usdt'
 
 const rgbAssetDetailCache = new Map<string, RgbAssetDetail>()
 const rgbTransferListCache = new Map<string, { list: RgbTransferItem[]; total: number }>()
@@ -37,7 +38,8 @@ export function useRGBTransfersLogic({
   const currentKeyring = useCurrentKeyring()
   const currentAccount = useCurrentAccount()
   const chainType = useChainType()
-  const cacheKey = `${chainType}:${currentKeyring?.key || ''}:${currentAccount?.key || ''}:${currentAccount?.address || ''}:${enabled ? '1' : '0'}`
+  const configuredUsdtAssetId = useWalletConfig().rgbUsdtAssetId?.trim() || ''
+  const cacheKey = `${chainType}:${currentKeyring?.key || ''}:${currentAccount?.key || ''}:${currentAccount?.address || ''}:${enabled ? '1' : '0'}:${configuredUsdtAssetId}`
   const [loadedCacheKey, setLoadedCacheKey] = useState('')
   const [pendingReceivePoll, setPendingReceivePoll] = useState<{ key: string; pending: boolean }>()
   const skipSyncRef = useRef(!initialFullSync)
@@ -88,17 +90,17 @@ export function useRGBTransfersLogic({
           const detail = details.get(item.assetId || '')
           const enriched = mergeRgbTransferAssetMetadata(item, detail)
           const detailPrecision = detail ? getRgbTokenPrecision(detail) : undefined
-          return {
+          return normalizeConfiguredRgbUsdt({
             ...enriched,
             precision:
               detail?.precision !== undefined
                 ? detailPrecision
                 : enriched.precision ?? detailPrecision ?? 0,
-          }
+          }, configuredUsdtAssetId)
         }),
       }
     },
-    [cacheKey, enabled, wallet]
+    [cacheKey, configuredUsdtAssetId, enabled, wallet]
   )
   const {
     data: items,

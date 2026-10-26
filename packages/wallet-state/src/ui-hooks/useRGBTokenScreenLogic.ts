@@ -3,17 +3,13 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import type { RgbActivityItem, RgbActivityType, RgbAssetDetail, RgbBalance } from '..'
 import { useI18n, useNavigation, useWallet, useWalletConfig } from '..'
 import { getRgbIconShortName } from '../utils/rgb-amount-utils'
+import { isSameRgbAssetId, normalizeConfiguredRgbUsdt } from '../utils/rgb-usdt'
 import { useInfiniteList } from './useInfiniteList'
 import { UNCONFIGURED_RGB_USDT_ASSET_ID } from './useRGBListLogic'
 
 export enum RGBTokenScreenTabKey {
   DETAILS = 'details',
   HISTORY = 'history',
-}
-
-function isSameRgbAssetId(left?: string, right?: string) {
-  const normalize = (value?: string) => value?.replace(/^rgb:/, '')
-  return !!left && !!right && normalize(left) === normalize(right)
 }
 
 function hasPositiveAmount(value?: string | number | null) {
@@ -202,6 +198,9 @@ export function useRGBTokenScreenLogic() {
   const displayDetail = detail && isConfiguredUsdt
     ? { ...detail, name: 'USDT', ticker: 'USDT' }
     : detail
+  const displayActivity = isConfiguredUsdt
+    ? activity.map(item => normalizeConfiguredRgbUsdt(item, configuredUsdtAssetId))
+    : activity
 
   const tokenSummary = displayDetail
     ? {
@@ -276,7 +275,7 @@ export function useRGBTokenScreenLogic() {
     assetId,
     tokenBalance: displayTokenBalance,
     detail: displayDetail,
-    activity,
+    activity: displayActivity,
     total,
     loading: detailLoading || balanceLoading,
     detailLoading,
@@ -294,7 +293,7 @@ export function useRGBTokenScreenLogic() {
     tokenSummary,
     iconInfo,
     t,
-    activityItems: activity,
+    activityItems: displayActivity,
     activityTotal: total,
     activityHasMore: hasMore,
     onLoadMoreActivity: onLoadMore,

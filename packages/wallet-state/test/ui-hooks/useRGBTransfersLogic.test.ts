@@ -3,6 +3,7 @@ import { describe, expect, it, vi } from 'vitest'
 
 import { useRGBTransfersLogic } from '../../src/ui-hooks/useRGBTransfersLogic'
 import { accountActions } from '../../src/reducers/accounts'
+import { settingsActions } from '../../src/reducers/settings'
 import { createHookTestHarness } from './testHelpers'
 
 const confirmingReceive = {
@@ -18,6 +19,35 @@ const confirmingReceive = {
 }
 
 describe('useRGBTransfersLogic', () => {
+  it('normalizes configured USDT metadata in RGB history', async () => {
+    const { wrapper, wallet, store } = createHookTestHarness()
+    store.dispatch(settingsActions.updateSettings({
+      walletConfig: {
+        ...store.getState().settings.walletConfig,
+        rgbUsdtAssetId: confirmingReceive.assetId,
+      },
+    }))
+    wallet.getRgbTransfers.mockResolvedValue({
+      list: [{ ...confirmingReceive, name: 'Tether USD', ticker: 'USDT0' }],
+      total: 1,
+    })
+    wallet.getRGBAssetDetail.mockResolvedValue({
+      assetId: confirmingReceive.assetId,
+      name: 'Tether USD',
+      ticker: 'USDT0',
+      precision: 6,
+    })
+
+    const { result } = renderHook(
+      () => useRGBTransfersLogic({ initialFullSync: true, pollingEnabled: false }),
+      { wrapper }
+    )
+
+    await waitFor(() => {
+      expect(result.current.items[0]).toMatchObject({ name: 'USDT', ticker: 'USDT' })
+    })
+  })
+
   it('polls an outstanding invoice even before it has a transfer row', async () => {
     const { wrapper, wallet } = createHookTestHarness()
     wallet.getRgbPendingReceiveInvoices.mockResolvedValue({ list: [{ invoice: 'rgb:witness-invoice' }] })
