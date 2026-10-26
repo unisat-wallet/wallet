@@ -33,12 +33,19 @@ export function toPublicRgbPendingReceiveInvoice(
   recipientType?: 'blind' | 'witness'
   witnessScriptPubKey?: string
     proxyRecipientId?: string
-    pendingAccept?: unknown
+    pendingAccept?: {
+      assetId?: string
+      amount?: string
+      [key: string]: unknown
+    }
     pendingValidationFailure?: unknown
     receivedConsignment?: {
+      assetId?: string
+      amount?: string
       accepted?: boolean
       acknowledgementPending?: boolean
       broadcastDetectedAt?: number
+      [key: string]: unknown
     }
   },
   batchTransferIdx?: number,
@@ -47,11 +54,13 @@ export function toPublicRgbPendingReceiveInvoice(
   const awaitingAcceptance = item.pendingAccept !== undefined
   const awaitingSenderBroadcast = item.receivedConsignment?.accepted === true
   const awaitingSenderConfirmation = item.receivedConsignment?.broadcastDetectedAt !== undefined
+  const assetId = item.receivedConsignment?.assetId ?? item.pendingAccept?.assetId ?? item.assetId
+  const amount = item.receivedConsignment?.amount ?? item.pendingAccept?.amount ?? item.amount
   return {
     invoice: item.invoice,
     recipientId: item.proxyRecipientId || item.recipientId,
-    ...(item.assetId === undefined ? {} : { assetId: item.assetId }),
-    ...(item.amount === undefined ? {} : { amount: item.amount }),
+    ...(assetId === undefined ? {} : { assetId }),
+    ...(amount === undefined ? {} : { amount }),
     ...(item.expirationTimestamp === undefined
       ? {}
       : { expirationTimestamp: item.expirationTimestamp }),

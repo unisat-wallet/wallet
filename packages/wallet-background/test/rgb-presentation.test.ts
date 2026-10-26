@@ -16,4 +16,40 @@ describe('RGB pending invoice presentation', () => {
 
     expect(invoice).toMatchObject({ status: 'PendingAccept', canCancel: false })
   })
+
+  it('exposes the actual asset received by an Any Asset invoice awaiting acceptance', () => {
+    const invoice = toPublicRgbPendingReceiveInvoice({
+      invoice: 'rgb:any-invoice',
+      recipientId: 'recipient-id',
+      pendingAccept: {
+        assetId: 'rgb:received-asset',
+        amount: '42',
+      },
+    })
+
+    expect(invoice).toMatchObject({
+      assetId: 'rgb:received-asset',
+      amount: '42',
+      status: 'PendingAccept',
+    })
+  })
+
+  it('keeps the actual asset on an accepted Any Asset invoice while confirming', () => {
+    const invoice = toPublicRgbPendingReceiveInvoice({
+      invoice: 'rgb:any-invoice',
+      recipientId: 'recipient-id',
+      receivedConsignment: {
+        assetId: 'rgb:received-asset',
+        amount: '42',
+        accepted: true,
+        broadcastDetectedAt: 1,
+      },
+    })
+
+    expect(invoice).toMatchObject({
+      assetId: 'rgb:received-asset',
+      amount: '42',
+      status: 'WaitingSenderConfirmation',
+    })
+  })
 })
