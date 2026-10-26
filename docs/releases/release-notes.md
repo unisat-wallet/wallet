@@ -1,5 +1,25 @@
 # UniSat Wallet Release Notes
 
+## v1.8.1
+
+### RGB Improvements
+
+- Added support for RGB burns on Arbitrum V1 destinations, including clearer destination-network details and a unified burn-proof JSON export.
+- Strengthened RGB asset validation with backend attestations, durable validation snapshots, and compatibility for legacy NIA assets.
+- Improved RGB receive and recovery reliability by retrying transfers awaiting EVM finality, recovering uncertain payment claims, serializing recovery conflict checks, and ignoring unrelated unconfirmed witness branches.
+- Improved invoice and asset presentation by filtering invoices already used by received assets, normalizing configured USDT names, and using consistent token-detail labels.
+
+### Transaction Security
+
+- Improved PSBT signing review for `SIGHASH_NONE`, `SIGHASH_SINGLE`, `ANYONECANPAY` combinations, and invalid sighash values.
+- Added clearer warnings and output-scope details so users can see which transaction outputs a signature commits to before signing.
+
+### Interface and Reliability
+
+- Increased the extension popup width to improve readability and layout consistency.
+- Hid unsupported marketplace links on test networks.
+- Improved Chrome MV3 build artifacts with Git-hash filenames and explicit output-path reporting after a successful build.
+
 ## v1.8.0
 
 ### New Home and Assets Experience
