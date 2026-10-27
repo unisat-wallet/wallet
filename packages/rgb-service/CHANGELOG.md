@@ -1,5 +1,11 @@
 # @unisat/rgb-service
 
+## 2.2.0
+
+### Minor Changes
+
+- bump for v1.8.1
+
 ## 2.1.1
 
 ### Patch Changes

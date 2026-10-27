@@ -1,5 +1,26 @@
 # @unisat/wallet-background
 
+## 11.0.0
+
+### Minor Changes
+
+- bump for v1.8.1
+
+### Patch Changes
+
+- Updated dependencies
+  - @unisat/babylon-service@1.5.0
+  - @unisat/preference-service@0.6.0
+  - @unisat/rgb-service@2.2.0
+  - @unisat/wallet-api@2.1.0
+  - @unisat/wallet-shared@1.1.0
+  - @unisat/notification-service@1.1.6
+  - @unisat/approval-service@1.2.1
+  - @unisat/keyring-service@2.0.1
+  - @unisat/tx-helpers@1.5.1
+  - @unisat/contact-book@1.1.5
+  - @unisat/permission-service@1.3.2
+
 ## 10.0.0
 
 ### Minor Changes

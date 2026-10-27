@@ -1,5 +1,12 @@
 # @unisat/approval-service
 
+## 1.2.1
+
+### Patch Changes
+
+- Updated dependencies
+  - @unisat/wallet-shared@1.1.0
+
 ## 1.2.0
 
 ### Minor Changes

@@ -1,6 +1,6 @@
 {
   "name": "@unisat/preference-service",
-  "version": "0.5.1",
+  "version": "0.6.0",
   "description": "Cross-platform preference management service for UniSat wallet",
   "main": "lib/index.js",
   "module": "lib/index.mjs",

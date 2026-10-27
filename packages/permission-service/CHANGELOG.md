@@ -1,5 +1,11 @@
 # @unisat/permission-service
 
+## 1.3.2
+
+### Patch Changes
+
+- @unisat/wallet-storage@0.2.6
+
 ## 1.3.1
 
 ### Patch Changes

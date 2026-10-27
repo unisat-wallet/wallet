@@ -1,5 +1,12 @@
 # @unisat/wallet-storage
 
+## 0.2.6
+
+### Patch Changes
+
+- Updated dependencies
+  - @unisat/wallet-shared@1.1.0
+
 ## 0.2.5
 
 ### Patch Changes

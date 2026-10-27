@@ -1,5 +1,11 @@
 # @unisat/babylon-service
 
+## 1.5.0
+
+### Minor Changes
+
+- bump for v1.8.1
+
 ## 1.4.0
 
 ### Minor Changes

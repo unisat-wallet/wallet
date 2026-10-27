@@ -1,5 +1,17 @@
 # @unisat/preference-service
 
+## 0.6.0
+
+### Minor Changes
+
+- bump for v1.8.1
+
+### Patch Changes
+
+- Updated dependencies
+  - @unisat/wallet-shared@1.1.0
+  - @unisat/wallet-storage@0.2.6
+
 ## 0.5.1
 
 ### Patch Changes
