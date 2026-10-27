@@ -12,7 +12,7 @@ import { createHookTestHarness } from './testHelpers'
 
 describe('useRGBListLogic', () => {
   const createRgbHookTestHarness = () =>
-    createHookTestHarness({ chainType: ChainType.BITCOIN_MAINNET })
+    createHookTestHarness({ chainType: ChainType.BITCOIN_TESTNET4 })
 
   it('shows the configured USDT asset even before the wallet holds it', async () => {
     const { store, wrapper, wallet } = createRgbHookTestHarness()
