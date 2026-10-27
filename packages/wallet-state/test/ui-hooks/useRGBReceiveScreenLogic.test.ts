@@ -124,6 +124,53 @@ describe('useRGBReceiveScreenLogic', () => {
     expect(result.current.canSetFixedAmount).toBe(false)
   })
 
+  it('keeps BFA bridge invoices amount-open in the receive UI', async () => {
+    const assetId = 'rgb:bfa-asset'
+    const { wrapper, wallet } = createHookTestHarness({
+      routeState: { assetId, tokenBalance: { assetId, ticker: 'USDT', precision: 6, schema: 'BFA' } },
+    })
+    const { result } = renderHook(() => useRGBReceiveScreenLogic(), { wrapper })
+
+    expect(result.current.canSetFixedAmount).toBe(false)
+    await act(async () => {
+      result.current.setMode('fixed')
+      result.current.onAmountChange('1')
+    })
+    expect(result.current.mode).toBe('any')
+    expect(result.current.amount).toBe('')
+
+    await act(async () => {
+      await result.current.onCreateInvoice()
+    })
+    expect(wallet.createRgbBlindReceive).toHaveBeenCalledWith({
+      assetId,
+      durationSeconds: 86_400,
+      skipSync: true,
+    })
+  })
+
+  it('clears a fixed amount when switching from NIA to BFA', async () => {
+    const { wrapper } = createHookTestHarness()
+    const { result } = renderHook(() => useRGBReceiveScreenLogic(), { wrapper })
+
+    await act(async () => {
+      result.current.onSelectAsset({ assetId: 'rgb:nia', ticker: 'NIA', precision: 2, schema: 'NIA' })
+    })
+    await act(async () => {
+      result.current.setMode('fixed')
+      result.current.onAmountChange('10.25')
+    })
+    expect(result.current.mode).toBe('fixed')
+    expect(result.current.amount).toBe('10.25')
+
+    await act(async () => {
+      result.current.onSelectAsset({ assetId: 'rgb:bfa', ticker: 'USDT', precision: 6, schema: 'BFA' })
+    })
+    expect(result.current.canSetFixedAmount).toBe(false)
+    expect(result.current.mode).toBe('any')
+    expect(result.current.amount).toBe('')
+  })
+
   it('never creates an invoice for an unconfigured USDT asset ID', async () => {
     const { wrapper, wallet } = createHookTestHarness({ routeState: { assetId: '-' } })
     const { result } = renderHook(() => useRGBReceiveScreenLogic(), { wrapper })

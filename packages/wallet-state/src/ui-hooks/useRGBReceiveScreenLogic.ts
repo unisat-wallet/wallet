@@ -211,6 +211,13 @@ export const getRgbTokenTicker = (value: unknown) => {
   return readStringPath(tokenInfo, ['ticker']) || DEFAULT_ASSET_TICKER
 }
 
+const isBfaRgbAsset = (value: unknown) => {
+  const tokenInfo = getTokenInfo(value)
+  return String(
+    readStringPath(tokenInfo, ['schema']) || readStringPath(value, ['schema']) || ''
+  ).toUpperCase() === 'BFA'
+}
+
 export const getRgbTokenIconInfo = (value: unknown, ticker: string) => {
   const record = value && typeof value === 'object' ? (value as Record<string, unknown>) : undefined
   const iconInfo =
@@ -396,7 +403,9 @@ export function useRGBReceiveScreenLogic(
   // particular, it cannot state a human-readable amount because the asset
   // precision is unknown. A configured token without local contract metadata
   // also cannot encode a fixed display amount safely.
-  const canSetFixedAmount = Boolean(assetId && !selectedRgbItem['configuredPlaceholder'])
+  const canSetFixedAmount = Boolean(
+    assetId && !selectedRgbItem['configuredPlaceholder'] && !isBfaRgbAsset(selectedRgbItem)
+  )
   const assetTicker = getRgbTokenTicker(selectedRgbItem)
   // Balance list responses can omit metadata; retain the route token's
   // precision so fixed invoice amounts are still encoded in atomic units.
@@ -782,9 +791,12 @@ export function useRGBReceiveScreenLogic(
     const itemAssetId = getRgbAssetId(item)
     const itemPrecision = getRgbTokenPrecision(item)
     const isAnyAsset = !itemAssetId || itemAssetId === ANY_RGB_ASSET_ID
+    const itemRecord = item && typeof item === 'object' ? item as RgbAssetItem : undefined
+    const itemCanSetFixedAmount = !isAnyAsset &&
+      !itemRecord?.['configuredPlaceholder'] && !isBfaRgbAsset(item)
     setSelectedAssetId(isAnyAsset ? ANY_RGB_ASSET_ID : itemAssetId)
     setSelectedTokenBalance(isAnyAsset ? undefined : (item as RgbAssetItem))
-    if (isAnyAsset) {
+    if (!itemCanSetFixedAmount) {
       setModeState('any')
       setAmount('')
     } else {
