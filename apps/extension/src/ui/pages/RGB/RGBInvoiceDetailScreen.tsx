@@ -30,6 +30,7 @@ import {
   isDeletableRgbWitnessInvoice,
   isRgbPendingInvoiceAwaitingSenderBroadcast,
   isRgbPendingInvoiceAwaitingSenderConfirmation,
+  isSameRgbAssetId,
   useI18n,
   useNavigation,
   useRGBListLogic,
@@ -197,7 +198,7 @@ export default function RGBInvoiceDetailScreen() {
     isCancelableRgbPendingInvoice(invoice) || isDeletableRgbWitnessInvoice(invoice) || canAbandonAccepted;
   const isWitnessInvoice = recipientType === 'witness';
   const invoiceAsset = invoice?.assetId
-    ? rgbItems.find((item) => getRgbAssetId(item) === invoice.assetId) || { assetId: invoice.assetId }
+    ? rgbItems.find((item) => isSameRgbAssetId(getRgbAssetId(item), invoice.assetId || undefined)) || { assetId: invoice.assetId }
     : ANY_RGB_ASSET;
   const isAnyRgbAsset = !invoice?.assetId || getRgbAssetId(invoiceAsset) === ANY_RGB_ASSET_ID;
   const invoiceTicker = isAnyRgbAsset ? t('any_rgb_asset') : getRgbTokenTicker(invoiceAsset);

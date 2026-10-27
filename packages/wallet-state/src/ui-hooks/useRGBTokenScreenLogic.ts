@@ -193,10 +193,10 @@ export function useRGBTokenScreenLogic() {
       ? { ...latestTokenBalance, precision: resolvedPrecision }
       : latestTokenBalance
   const displayTokenBalance = resolvedTokenBalance && isConfiguredUsdt
-    ? { ...resolvedTokenBalance, name: 'USDT', ticker: 'USDT' }
+    ? normalizeConfiguredRgbUsdt(resolvedTokenBalance, configuredUsdtAssetId)
     : resolvedTokenBalance
   const displayDetail = detail && isConfiguredUsdt
-    ? { ...detail, name: 'USDT', ticker: 'USDT' }
+    ? normalizeConfiguredRgbUsdt(detail, configuredUsdtAssetId)
     : detail
   const displayActivity = isConfiguredUsdt
     ? activity.map(item => normalizeConfiguredRgbUsdt(item, configuredUsdtAssetId))

@@ -16,6 +16,7 @@ describe('useRGBReceiveScreenLogic', () => {
   it('includes only the selected token and Any RGB Asset invoices for a token', () => {
     const assetId = 'rgb:test-asset'
     expect(isInvoiceForAsset({ invoice: 'specific', assetId }, assetId)).toBe(true)
+    expect(isInvoiceForAsset({ invoice: 'prefixed', assetId }, 'test-asset')).toBe(true)
     expect(isInvoiceForAsset({ invoice: 'any' }, assetId)).toBe(true)
     expect(isInvoiceForAsset({ invoice: 'other', assetId: 'rgb:other-asset' }, assetId)).toBe(false)
     expect(isInvoiceForAsset({ invoice: 'other', assetId: 'rgb:other-asset' })).toBe(true)

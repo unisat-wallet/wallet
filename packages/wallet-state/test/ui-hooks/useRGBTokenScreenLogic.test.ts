@@ -25,7 +25,10 @@ describe('useRGBTokenScreenLogic', () => {
       walletConfig: { ...store.getState().settings.walletConfig, rgbUsdtAssetId: assetId },
     }))
     wallet.getRGBAssetDetail.mockResolvedValue({ ...detail, ticker: 'OTHER', iconUrl: 'https://example.com/other.png' })
-    wallet.getRGBAssetBalance.mockResolvedValue(fetchedBalance)
+    wallet.getRGBAssetBalance.mockResolvedValue({
+      ...fetchedBalance,
+      tokenInfo: { name: 'Tether USD', ticker: 'USDT0' },
+    })
     wallet.getRGBAssetActivity.mockResolvedValue({
       list: [{
         id: 'usdt-history',
@@ -46,6 +49,7 @@ describe('useRGBTokenScreenLogic', () => {
     expect(result.current.iconInfo.assetId).toBe(assetId)
     expect(result.current.tokenSummary?.tokenInfo.ticker).toBe('USDT')
     expect(result.current.tokenBalance?.name).toBe('USDT')
+    expect(result.current.tokenBalance?.tokenInfo).toEqual({ name: 'USDT', ticker: 'USDT' })
     expect(result.current.activityItems[0]).toMatchObject({ name: 'USDT', ticker: 'USDT' })
   })
 

@@ -13,6 +13,7 @@ import {
   toRgbAtomicAmount,
   toRgbDisplayAmount,
 } from 'src/utils/rgb-amount-utils'
+import { isSameRgbAssetId } from 'src/utils/rgb-usdt'
 import { UNCONFIGURED_RGB_USDT_ASSET_ID, useRGBListLogic } from './useRGBListLogic'
 
 export type RGBReceiveMode = 'any' | 'fixed'
@@ -250,7 +251,7 @@ const getPendingInvoiceList = (value: unknown): RgbPendingReceiveInvoice[] => {
 
 export const isInvoiceForAsset = (item: RgbPendingReceiveInvoice, assetId?: string) => {
   if (!assetId) return true
-  return !item.assetId || item.assetId === assetId
+  return !item.assetId || isSameRgbAssetId(item.assetId, assetId)
 }
 
 export const formatRgbPendingAmount = (
@@ -393,7 +394,7 @@ export function useRGBReceiveScreenLogic(
   const selectedRgbItem =
     selectedAssetId === ANY_RGB_ASSET_ID
       ? ANY_RGB_ASSET
-      : rgbItems.find(item => getRgbAssetId(item) === selectedAssetId) ||
+      : rgbItems.find(item => isSameRgbAssetId(getRgbAssetId(item), selectedAssetId)) ||
         selectedTokenBalance ||
         ANY_RGB_ASSET
   const selectedSpecificAssetId =

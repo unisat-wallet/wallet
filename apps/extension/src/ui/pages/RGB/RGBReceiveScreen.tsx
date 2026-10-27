@@ -33,6 +33,7 @@ import {
   isRgbPendingInvoiceAwaitingConfirmation,
   isRgbPendingInvoiceAwaitingSenderBroadcast,
   isRgbPendingInvoiceAwaitingSenderConfirmation,
+  isSameRgbAssetId,
   toRgbDisplayAmount,
   useI18n,
   useNavigation,
@@ -418,7 +419,7 @@ export default function RGBReceiveScreen({ initialStep = 'create_invoice' }: { i
       return ANY_RGB_ASSET;
     }
 
-    return rgbItems.find((rgbItem) => getRgbAssetId(rgbItem) === item.assetId) || selectedRgbItem;
+    return rgbItems.find((rgbItem) => isSameRgbAssetId(getRgbAssetId(rgbItem), item.assetId || undefined)) || selectedRgbItem;
   };
 
   const renderPendingInvoiceIcon = (item: { assetId?: string | null }, size = 32) => {
