@@ -911,6 +911,35 @@ describe('RgbService', () => {
     expect(reopened.getPendingReceives()[0]?.witnessPublicKey).toBe(`02${'22'.repeat(32)}`)
   })
 
+  it('keeps BFA bridge invoices amount-open', async () => {
+    const dependencies = createDependencies()
+    const service = new RgbService(dependencies)
+    const assetId = 'rgb:AQEBAQEB-AQEBAQE-BAQEBAQ-EBAQEBA-QEBAQEB-AQEBAQE'
+    await service.open(wallet)
+    ;(service as any).state.contracts = {
+      [assetId]: { consignment: 'AA==', createdAt: 1,
+        metadata: { ticker: 'USDT', name: 'USDT', precision: 6, schema: 'BFA', issuedSupply: '2000000' } },
+    }
+
+    await expect(service.createBlindReceive({ assetId, amount: '1000000' }))
+      .rejects.toThrow('BFA bridge invoices cannot specify a fixed amount')
+    await expect(service.createWitnessReceive({
+      scriptPubKey: '512079be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798',
+      publicKey: `02${'11'.repeat(32)}`,
+      assetId,
+      amount: '1000000',
+    })).rejects.toThrow('BFA bridge invoices cannot specify a fixed amount')
+
+    const receive = await service.createWitnessReceive({
+      scriptPubKey: '512079be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798',
+      publicKey: `02${'11'.repeat(32)}`,
+      assetId,
+    })
+    expect(receive.amount).toBeUndefined()
+    expect(receive.invoice).toContain('/~/~/bc:wvout:')
+    expect(decodeRgbInvoice(receive.invoice).amount).toBeUndefined()
+  })
+
   it('durably releases an expired unused invoice after confirming the proxy is empty', async () => {
     const dependencies = createDependencies()
     let now = 1_000_000_000_000

@@ -8,6 +8,39 @@ import {
 } from '../src'
 
 describe('decodeRgbInvoice', () => {
+  it('encodes fixed amounts in the RGB assignment-state path segment', () => {
+    const invoice = encodeWitnessRgbInvoice({
+      network: 'mainnet',
+      scriptPubKey: '512079be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798',
+      assetId: 'rgb:BQUFBQUF-BQUFBQU-FBQUFBQ-UFBQUFB-QUFBQUF-BQUFBQU',
+      amount: '2000000',
+      transportEndpoints: ['rpcs://proxy.example'],
+    })
+
+    const knownVector = encodeWitnessRgbInvoice({
+      network: 'mainnet',
+      scriptPubKey: '512079be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798',
+      amount: '100',
+      transportEndpoints: ['rpcs://proxy.example'],
+    })
+    expect(knownVector).toContain('/~/BF/bc:wvout:')
+    expect(invoice).toContain('/~/FccbW/bc:wvout:')
+    expect(invoice).not.toContain('amount=')
+    expect(decodeRgbInvoice(invoice).amount).toBe('2000000')
+  })
+
+  it('keeps amount-open invoices open for bridge receives', () => {
+    const invoice = encodeWitnessRgbInvoice({
+      network: 'mainnet',
+      scriptPubKey: '512079be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798',
+      transportEndpoints: ['rpcs://proxy.example'],
+    })
+
+    expect(invoice).toContain('/~/~/bc:wvout:')
+    expect(invoice).not.toContain('amount=')
+    expect(decodeRgbInvoice(invoice).amount).toBeUndefined()
+  })
+
   it('uses the RGB Signet beneficiary prefix for witness invoices', () => {
     const invoice = encodeWitnessRgbInvoice({
       network: 'signet',

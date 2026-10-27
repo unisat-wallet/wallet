@@ -83,6 +83,8 @@ describe('blind RGB receive', () => {
     })
     const decoded = decodeRgbInvoice(invoice)
 
+    expect(invoice).toContain('/~/fk/bc:utxob:')
+    expect(invoice).not.toContain('amount=')
     expect(decoded).toMatchObject({
       assetId: 'rgb:CgoKCgoK-CgoKCgo-KCgoKCg-oKCgoKC-goKCgoK-CgoKCgo',
       amount: '42',

@@ -794,6 +794,22 @@ export class RgbService {
     }
   }
 
+  private validateReceiveAmount(assetId: string | undefined, amount: string | undefined) {
+    if (amount === undefined) return
+    if (!assetId) {
+      throw new RgbServiceError('A fixed RGB receive amount requires an asset ID')
+    }
+    if (!/^(0|[1-9][0-9]*)$/.test(amount)) {
+      throw new RgbServiceError('RGB receive amount must be an unsigned integer')
+    }
+    if (BigInt(amount) > MAX_RGB_AMOUNT) {
+      throw new RgbServiceError('RGB receive amount exceeds the maximum u64 value')
+    }
+    if (this.getLocalAssetDetail(assetId).schema?.toUpperCase() === 'BFA') {
+      throw new RgbServiceError('BFA bridge invoices cannot specify a fixed amount')
+    }
+  }
+
   async createBlindReceive(input: {
     assetId?: string
     amount?: string
@@ -808,15 +824,7 @@ export class RgbService {
       throw new RgbServiceError('RGB receive minConfirmations must be a positive integer')
     if (!state.snapshot.syncedAt) await this.sync()
     const assetId = input.assetId ? normalizeAssetId(input.assetId) : undefined
-    if (input.amount !== undefined && !assetId) {
-      throw new RgbServiceError('A fixed RGB receive amount requires an asset ID')
-    }
-    if (input.amount !== undefined && !/^(0|[1-9][0-9]*)$/.test(input.amount)) {
-      throw new RgbServiceError('RGB receive amount must be an unsigned integer')
-    }
-    if (input.amount !== undefined && BigInt(input.amount) > MAX_RGB_AMOUNT) {
-      throw new RgbServiceError('RGB receive amount exceeds the maximum u64 value')
-    }
+    this.validateReceiveAmount(assetId, input.amount)
     const now = this.now()
     const expirationTimestamp = Math.floor(now / 1000) + (input.durationSeconds ?? 24 * 60 * 60)
     if (
@@ -905,15 +913,7 @@ export class RgbService {
     if (input.minConfirmations !== undefined && (!Number.isSafeInteger(input.minConfirmations) || input.minConfirmations < 1))
       throw new RgbServiceError('RGB receive minConfirmations must be a positive integer')
     const assetId = input.assetId ? normalizeAssetId(input.assetId) : undefined
-    if (input.amount !== undefined && !assetId) {
-      throw new RgbServiceError('A fixed RGB receive amount requires an asset ID')
-    }
-    if (input.amount !== undefined && !/^(0|[1-9][0-9]*)$/.test(input.amount)) {
-      throw new RgbServiceError('RGB receive amount must be an unsigned integer')
-    }
-    if (input.amount !== undefined && BigInt(input.amount) > MAX_RGB_AMOUNT) {
-      throw new RgbServiceError('RGB receive amount exceeds the maximum u64 value')
-    }
+    this.validateReceiveAmount(assetId, input.amount)
     if (
       input.durationSeconds !== undefined &&
       (!Number.isInteger(input.durationSeconds) || input.durationSeconds <= 0)

@@ -2,6 +2,7 @@ import { sha256 } from '@noble/hashes/sha256'
 import { RgbServiceError } from '../errors'
 import type { RgbNetwork } from '../types'
 import { normalizeRgbAssetId } from './contract-id'
+import { decodeRgbInvoiceAmountState, encodeRgbInvoiceAmountState } from './invoice-amount'
 
 export type RgbInvoiceRecipientType = 'blind' | 'witness'
 export type RgbWitnessAddressType = 'p2pkh' | 'p2sh' | 'p2wpkh' | 'p2wsh' | 'p2tr'
@@ -42,10 +43,8 @@ export interface RgbInvoice {
 
 const OMITTED = '~'
 const PROXY_INVOICE_ID_PREFIX = 'rgb-proxy-server/invoice/v1'
-const AMOUNT_ALPHABET = 'abcdefghkmnABCDEFGHKMNPQRSTVWXYZ'
 const BAID64_ALPHABET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789_~'
 const SECP256K1_FIELD_PRIME = 0xfffffffffffffffffffffffffffffffffffffffffffffffffffffffefffffc2fn
-const amountDecoder = new Map(AMOUNT_ALPHABET.split('').map((char, index) => [char, index]))
 const baid64Decoder = new Map(BAID64_ALPHABET.split('').map((char, index) => [char, index]))
 
 function hex(value: Uint8Array) {
@@ -77,28 +76,6 @@ function getAllQueryValues(query: string, key: string) {
 
 function getQueryValues(query: string, key: string) {
   return getAllQueryValues(query, key).filter(Boolean)
-}
-
-function decodeFast32Amount(value?: string) {
-  if (!value || value === OMITTED) return undefined
-  let buffer = 0
-  let bits = 0
-  const bytes: number[] = []
-  for (const char of value) {
-    const decoded = amountDecoder.get(char)
-    if (decoded === undefined) return undefined
-    buffer = (buffer << 5) | decoded
-    bits += 5
-    while (bits >= 8) {
-      bits -= 8
-      bytes.push((buffer >> bits) & 0xff)
-    }
-  }
-  if (!bytes.length || bytes.length > 8) return undefined
-
-  return bytes
-    .reduce((amount, byte, index) => amount + (BigInt(byte) << BigInt(index * 8)), 0n)
-    .toString()
 }
 
 function normalizeAssetId(value?: string) {
@@ -370,7 +347,7 @@ export function decodeRgbInvoice(invoice: string): RgbInvoice {
       .map(endpoint => endpoint.trim())
       .filter(Boolean)
   )
-  const amount = queryAmount || decodeFast32Amount(segments[2])
+  const amount = queryAmount || decodeRgbInvoiceAmountState(segments[2])
   if (amount !== undefined && !/^(0|[1-9][0-9]*)$/.test(amount)) {
     throw new Error('Invalid RGB invoice amount')
   }
@@ -415,7 +392,6 @@ export function encodeWitnessRgbInvoice(input: {
   const recipientId = witnessRgbInvoiceRecipientId(input.network, input.scriptPubKey)
   const assetId = input.assetId ? normalizeRgbAssetId(input.assetId).replace(/^rgb:/, '') : '~'
   const query = new URLSearchParams()
-  if (input.amount !== undefined) query.set('amount', input.amount)
   if (input.expirationTimestamp !== undefined)
     query.set('expiry', String(input.expirationTimestamp))
   query.set('endpoints', input.transportEndpoints.join(','))
@@ -423,7 +399,8 @@ export function encodeWitnessRgbInvoice(input: {
     rgbProxyInvoiceId(recipientId, input.proxyPublicKey)
     query.set('pk', input.proxyPublicKey)
   }
-  return `rgb:${assetId}/~/${input.amount === undefined ? '~' : '~'}/${recipientId}?${query}`
+  const assignmentState = input.amount === undefined ? '~' : encodeRgbInvoiceAmountState(input.amount)
+  return `rgb:${assetId}/~/${assignmentState}/${recipientId}?${query}`
 }
 
 export function witnessRgbInvoiceRecipientId(network: RgbNetwork, scriptPubKey: string) {

@@ -3,6 +3,7 @@ import { RgbServiceError } from '../errors'
 import type { RgbNetwork } from '../types'
 import { normalizeRgbAssetId } from './contract-id'
 import { rgbProxyInvoiceId } from './invoice'
+import { encodeRgbInvoiceAmountState } from './invoice-amount'
 
 const BAID64_ALPHABET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789_~'
 const TAG_SECRET_SEAL = 'urn:lnp-bp:seals:secret#2024-02-03'
@@ -127,7 +128,6 @@ export function encodeBlindRgbInvoice(input: {
   const recipientId = blindRgbInvoiceRecipientId(input.network, input.seal)
   const assetId = input.assetId ? normalizeRgbAssetId(input.assetId).replace(/^rgb:/, '') : '~'
   const query = new URLSearchParams()
-  if (input.amount !== undefined) query.set('amount', input.amount)
   if (input.expirationTimestamp !== undefined)
     query.set('expiry', String(input.expirationTimestamp))
   if (input.transportEndpoints?.length)
@@ -138,5 +138,6 @@ export function encodeBlindRgbInvoice(input: {
   }
   // Expo's URLSearchParams polyfill supports serialization but has no size property.
   const queryString = query.toString()
-  return `rgb:${assetId}/~/${input.amount === undefined ? '~' : '~'}/${recipientId}${queryString ? `?${queryString}` : ''}`
+  const assignmentState = input.amount === undefined ? '~' : encodeRgbInvoiceAmountState(input.amount)
+  return `rgb:${assetId}/~/${assignmentState}/${recipientId}${queryString ? `?${queryString}` : ''}`
 }
