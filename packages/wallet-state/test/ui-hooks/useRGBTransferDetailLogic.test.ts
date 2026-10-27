@@ -148,23 +148,6 @@ describe('useRGBTransferDetailLogic', () => {
     expect(result.current.transfer?.status).toBe('broadcasted')
   })
 
-  it('creates a receive-confirmed notification after on-chain settlement', async () => {
-    const { wrapper, wallet } = createHookTestHarness({
-      routeState: { transferId: 'recipient-id', initialTransfer: confirmingReceive },
-    })
-    wallet.getRgbTransfers.mockResolvedValue({
-      list: [{ ...confirmingReceive, status: 'confirmed' }],
-      total: 1,
-    })
-
-    const { result } = renderHook(() => useRGBTransferDetailLogic(), { wrapper })
-
-    await waitFor(() => expect(result.current.transfer?.status).toBe('confirmed'))
-    expect(result.current.notification).toEqual(
-      expect.objectContaining({ kind: 'receive_confirmed' })
-    )
-  })
-
   it('hydrates the transfer detail with canonical asset metadata', async () => {
     const hexAssetId = 'rgb:072cd658eb21c9683a226d0507ca2e9a995fe5bbfba2625380196c67f0a6719f'
     const canonicalAssetId = 'rgb:ByzWWOsh-yWg6Im0-FB8oump-lf5bv7o-mJTgBls-Z~CmcZ8'

@@ -138,10 +138,3 @@ export interface RgbTransferItem {
   /** Keep checking for a late legacy proxy ACK/NACK after Bitcoin confirmation. */
   awaitingRecipientAck?: boolean
 }
-
-export type RgbTransferNotificationKind = 'broadcasted' | 'receive_confirmed'
-
-export interface RgbTransferNotification {
-  kind: RgbTransferNotificationKind
-  transfer: RgbTransferItem
-}

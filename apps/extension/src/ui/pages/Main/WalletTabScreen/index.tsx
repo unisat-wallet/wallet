@@ -42,7 +42,6 @@ import {
 
 import { useNavigate } from '../../MainRoute';
 import { RGBTransferDetailSheet } from '../../RGB/RGBTransferDetailSheet';
-import { RGBTransferNotificationPanel } from '../../RGB/components/RGBTransferNotificationPanel';
 import { RgbFeatureActivationModal } from '../../RGB/components/RgbFeatureActivationModal';
 import { RgbRecoveryConflictModal } from '../../RGB/components/RgbRecoveryConflictModal';
 import { SwitchChainModal } from '../../Settings/SwitchChainModal';
@@ -831,22 +830,6 @@ export default function WalletTabScreen({
 
       <Content>
         {mainContent}
-        {isRgbActive ? (
-          <RGBTransferNotificationPanel
-            notification={rgbTransfers.notification}
-            actionText={t('view_transfer')}
-            onClose={rgbTransfers.dismissNotification}
-            onAction={() => {
-              const notification = rgbTransfers.notification;
-              if (!notification) return;
-              rgbTransfers.dismissNotification();
-              nav.navigate('RGBTransferDetailScreen', {
-                transferId: notification.transfer.transferId || notification.transfer.id,
-                initialTransfer: notification.transfer
-              });
-            }}
-          />
-        ) : null}
         {isRgbActive && readyBroadcast ? (
           <RGBTransferDetailSheet
             key={readyBroadcast.transferId || readyBroadcast.id}

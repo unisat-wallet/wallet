@@ -3516,18 +3516,6 @@
   "rgb_status_confirmed": {
     "message": "已確認"
   },
-  "rgb_receive_confirmed_title": {
-    "message": "已收到轉帳"
-  },
-  "rgb_receive_confirmed_description": {
-    "message": "已收到 $1 $2，交易已確認。"
-  },
-  "rgb_transfer_broadcasted_title": {
-    "message": "交易已廣播"
-  },
-  "rgb_transfer_broadcasted_notification": {
-    "message": "接收方已接受 $1 $2，交易已廣播。"
-  },
   "view_transfer": {
     "message": "查看轉帳"
   },

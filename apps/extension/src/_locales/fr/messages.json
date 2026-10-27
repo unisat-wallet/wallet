@@ -3512,12 +3512,6 @@
   "rgb_cancel_send_failed": { "message": "Échec de l'annulation du transfert" },
   "rgb_status_pending_accept": { "message": "En attente de votre acceptation" },
   "rgb_status_confirmed": { "message": "Confirmé" },
-  "rgb_receive_confirmed_title": { "message": "Paiement reçu" },
-  "rgb_receive_confirmed_description": { "message": "$1 $2 reçus. Transaction confirmée." },
-  "rgb_transfer_broadcasted_title": { "message": "Transaction diffusée" },
-  "rgb_transfer_broadcasted_notification": {
-    "message": "Le destinataire a accepté $1 $2. La transaction a été diffusée."
-  },
   "rgb_status_canceled_by_sender": { "message": "Annulé par l'expéditeur" },
   "rgb_status_canceled": { "message": "Annulé" },
   "rgb_status_rejected_by_receiver": { "message": "Rejeté par le destinataire" },

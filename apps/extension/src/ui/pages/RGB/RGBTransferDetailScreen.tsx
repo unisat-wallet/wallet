@@ -15,7 +15,6 @@ import {
   type RgbTransferItem
 } from '@unisat/wallet-state';
 
-import { RGBTransferNotificationPanel } from './components/RGBTransferNotificationPanel';
 import { RGBRejectReceiveConfirmModal } from './components/RGBRejectReceiveConfirmModal';
 import { RGBTransferReasonTooltip } from './components/RGBTransferReasonTooltip';
 import { getRgbBurnNetworkName } from './rgbBurnNetworks';
@@ -100,8 +99,6 @@ export default function RGBTransferDetailScreen() {
     canAcceptReceive,
     canRetryBroadcast,
     canBroadcast,
-    notification,
-    dismissNotification,
     onClickDone,
     onClickExploreTx,
     onAcceptReceive,
@@ -284,12 +281,6 @@ export default function RGBTransferDetailScreen() {
           )}
         </Column>
       </Footer>
-      <RGBTransferNotificationPanel
-        notification={notification}
-        actionText={t('done')}
-        onAction={dismissNotification}
-        onClose={dismissNotification}
-      />
       <RGBRejectReceiveConfirmModal
         visible={rejectConfirmVisible}
         loading={receiveActionLoading}

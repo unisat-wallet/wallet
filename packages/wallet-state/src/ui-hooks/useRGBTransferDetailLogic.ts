@@ -1,8 +1,8 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 
 import { useI18n, useNavigation, useTools, useWallet } from '../context'
 import { useWalletConfig } from '../hooks/settings'
-import type { RgbTransferItem, RgbTransferNotification } from '../types'
+import type { RgbTransferItem } from '../types'
 import { mergeRgbTransferAssetMetadata } from '../utils/rgb-transfer-metadata'
 import { normalizeConfiguredRgbUsdt } from '../utils/rgb-usdt'
 
@@ -72,8 +72,6 @@ export function useRGBTransferDetailLogic() {
   const [cancelLoading, setCancelLoading] = useState(false)
   const [receiveActionLoading, setReceiveActionLoading] = useState(false)
   const [broadcastRetryLoading, setBroadcastRetryLoading] = useState(false)
-  const [notification, setNotification] = useState<RgbTransferNotification>()
-  const previousStatus = useRef(transfer?.status)
 
   const refresh = useCallback(async () => {
     setLoading(true)
@@ -146,35 +144,6 @@ export function useRGBTransferDetailLogic() {
     transfer?.type === 'send' && String(transfer?.status || '').toLowerCase() === 'broadcast_failed'
   const canBroadcast =
     transfer?.type === 'send' && String(transfer?.status || '').toLowerCase() === 'ready_to_broadcast'
-
-  useEffect(() => {
-    const status = transfer?.status?.toLowerCase()
-    const notificationKind =
-      transfer?.type === 'send' &&
-      previousStatus.current === 'waiting_ack' &&
-      status &&
-      [
-        'broadcasting',
-        'broadcasted',
-        'confirming',
-        'pending',
-        'unconfirmed',
-        'settled',
-        'confirmed',
-      ].includes(status)
-        ? 'broadcasted'
-        : transfer?.type === 'receive' &&
-            ['confirming', 'waiting_receive', 'pending', 'unconfirmed'].includes(
-              previousStatus.current || ''
-            ) &&
-            ['settled', 'confirmed'].includes(status || '')
-          ? 'receive_confirmed'
-          : undefined
-    if (notificationKind && transfer) {
-      setNotification({ kind: notificationKind, transfer })
-    }
-    previousStatus.current = status
-  }, [transfer])
 
   const onClickDone = () => {
     nav.navigate('AssetsTabScreen')
@@ -280,9 +249,7 @@ export function useRGBTransferDetailLogic() {
       const result = await wallet.retryRgbBroadcast({ transferId: retryId })
       if (result.broadcast) {
         if (transfer) {
-          const next = { ...transfer, status: 'broadcasted' as const, local: true }
-          setTransfer(next)
-          setNotification({ kind: 'broadcasted', transfer: next })
+          setTransfer({ ...transfer, status: 'broadcasted', local: true })
         }
         return true
       }
@@ -310,8 +277,6 @@ export function useRGBTransferDetailLogic() {
     canAcceptReceive,
     canRetryBroadcast,
     canBroadcast,
-    notification,
-    dismissNotification: () => setNotification(undefined),
     t,
     onClickDone,
     onClickExploreTx,

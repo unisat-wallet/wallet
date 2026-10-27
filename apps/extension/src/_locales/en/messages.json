@@ -3527,18 +3527,6 @@
   "rgb_status_confirmed": {
     "message": "Confirmed"
   },
-  "rgb_receive_confirmed_title": {
-    "message": "Payment received"
-  },
-  "rgb_receive_confirmed_description": {
-    "message": "Received $1 $2. Transaction confirmed."
-  },
-  "rgb_transfer_broadcasted_title": {
-    "message": "Transaction broadcast"
-  },
-  "rgb_transfer_broadcasted_notification": {
-    "message": "Recipient accepted $1 $2. The transaction was broadcast."
-  },
   "view_transfer": {
     "message": "View transfer"
   },

@@ -3512,12 +3512,6 @@
   "rgb_cancel_send_failed": { "message": "送金をキャンセルできませんでした" },
   "rgb_status_pending_accept": { "message": "あなたの承認待ち" },
   "rgb_status_confirmed": { "message": "確認済み" },
-  "rgb_receive_confirmed_title": { "message": "支払いを受け取りました" },
-  "rgb_receive_confirmed_description": { "message": "$1 $2 を受け取りました。トランザクションが確認されました。" },
-  "rgb_transfer_broadcasted_title": { "message": "トランザクションをブロードキャストしました" },
-  "rgb_transfer_broadcasted_notification": {
-    "message": "受信者が $1 $2 を承認しました。トランザクションをブロードキャストしました。"
-  },
   "rgb_status_canceled_by_sender": { "message": "送信者がキャンセルしました" },
   "rgb_status_canceled": { "message": "キャンセル済み" },
   "rgb_status_rejected_by_receiver": { "message": "受取人によって拒否されました" },

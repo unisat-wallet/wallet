@@ -231,41 +231,6 @@ describe('useRGBTransfersLogic', () => {
     expect(wallet.getRGBAssetDetail).toHaveBeenCalledTimes(1)
   })
 
-  it('does not notify for a broadcast that completed before the list was opened', async () => {
-    const { wrapper, wallet } = createHookTestHarness()
-    wallet.getRgbTransfers.mockResolvedValue({
-      list: [{ ...confirmingReceive, type: 'send', status: 'broadcasted' }],
-      total: 1,
-    })
-
-    const { result } = renderHook(() => useRGBTransfersLogic(), { wrapper })
-
-    await waitFor(() => expect(result.current.items[0]?.status).toBe('broadcasted'))
-    expect(result.current.notification).toBeUndefined()
-  })
-
-  it('queues a receive-confirmed notification after settlement', async () => {
-    const { wrapper, wallet } = createHookTestHarness()
-    wallet.getRgbTransfers.mockResolvedValue({ list: [confirmingReceive], total: 1 })
-
-    const { result } = renderHook(() => useRGBTransfersLogic(), { wrapper })
-
-    await waitFor(() => expect(result.current.items[0]?.status).toBe('confirming'))
-    wallet.getRgbTransfers.mockResolvedValue({
-      list: [{ ...confirmingReceive, status: 'confirmed' }],
-      total: 1,
-    })
-    await act(async () => {
-      await result.current.onRefresh()
-    })
-
-    await waitFor(() => {
-      expect(result.current.notification).toEqual(
-        expect.objectContaining({ kind: 'receive_confirmed' })
-      )
-    })
-  })
-
   it('stops loading after the total includes local transfers on the first page', async () => {
     const localTransfer = { ...confirmingReceive, type: 'send' as const }
     const remoteTransfers = Array.from({ length: 100 }, (_, index) => ({
