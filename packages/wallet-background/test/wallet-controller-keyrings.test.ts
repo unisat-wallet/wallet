@@ -652,21 +652,28 @@ describe('RGB HD backup orchestration', () => {
 
   it('does not sign another account without an active HD backup operation', async () => {
     const controller = new WalletController()
+    const getChainType = vi
+      .spyOn(preferenceService, 'getChainType')
+      .mockReturnValue(ChainType.BITCOIN_TESTNET4)
     vi.mocked(preferenceService.getCurrentAccount).mockReturnValue({ index: 0 } as any)
     vi.spyOn(controller as any, 'getRgbWalletRefForAccount').mockResolvedValue({
       walletId: 'wallet-0',
-      network: 'mainnet',
+      network: 'testnet4',
       fundingAddress: 'funding-0',
     })
-    await expect(
-      (controller as any).createRgbRequestAuthorization({
-        method: 'POST',
-        path: '/v5/rgb/recovery/checkpoint/read',
-        body: {
-          wallet: { walletId: 'wallet-2', network: 'mainnet', fundingAddress: 'funding-2' },
-        },
-      })
-    ).rejects.toThrow('RGB operation canceled')
+    try {
+      await expect(
+        (controller as any).createRgbRequestAuthorization({
+          method: 'POST',
+          path: '/v5/rgb/recovery/checkpoint/read',
+          body: {
+            wallet: { walletId: 'wallet-2', network: 'testnet4', fundingAddress: 'funding-2' },
+          },
+        })
+      ).rejects.toThrow('RGB operation canceled')
+    } finally {
+      getChainType.mockRestore()
+    }
   })
 })
 
