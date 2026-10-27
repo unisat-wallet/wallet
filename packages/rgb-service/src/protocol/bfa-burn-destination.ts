@@ -18,7 +18,8 @@ export type UtexoBurnExportV1 = {
     byteLength: number
     data: string
   }
-  burnDestination: BfaBurnDestinationV1
+  /** Present for V1 destination burns; legacy burns retain their destination in the consignment. */
+  burnDestination?: BfaBurnDestinationV1
 }
 
 const TYPEHASH_V1 = 'a1cba9d766975eb04c6a31c3b68dbb2381444a222c9972b6bf3ab26fcb829b00'

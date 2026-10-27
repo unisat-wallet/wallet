@@ -635,7 +635,7 @@ export interface WalletController {
     format: 'utexo-burn'
     version: 1
     consignment: { encoding: 'base64'; byteLength: number; data: string }
-    burnDestination: { version: 1; destinationChainId: number; dstEid: number; recipient: string }
+    burnDestination?: { version: 1; destinationChainId: number; dstEid: number; recipient: string }
   }>
 
   getRGBAssetActivity(

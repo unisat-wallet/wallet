@@ -133,19 +133,6 @@ export default function RGBTransferDetailScreen() {
   const downloadBurn = async () => {
     if (!transfer?.txid) return;
     try {
-      // Burns created before V1 destination support have no separate
-      // destination record to bundle. Preserve their original .rgb export.
-      if (transfer.burnDestinationChainId === undefined) {
-        const payload = await wallet.exportRgbBurnConsignment(transfer.txid);
-        const bytes = Uint8Array.from(atob(payload), (char) => char.charCodeAt(0));
-        const url = URL.createObjectURL(new Blob([bytes], { type: 'application/octet-stream' }));
-        const anchor = document.createElement('a');
-        anchor.href = url;
-        anchor.download = `bfa-burn-${transfer.txid}.rgb`;
-        anchor.click();
-        setTimeout(() => URL.revokeObjectURL(url), 0);
-        return;
-      }
       const burn = await wallet.exportRgbBurn(transfer.txid);
       const url = URL.createObjectURL(new Blob([JSON.stringify(burn, null, 2)], { type: 'application/json' }));
       const anchor = document.createElement('a');

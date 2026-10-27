@@ -2754,6 +2754,11 @@ export class RgbService {
   /** A self-contained UTEXO burn artifact containing both the proof and its destination. */
   exportBurn(txid: string): import('./protocol/bfa-burn-destination').UtexoBurnExportV1 {
     const consignment = this.exportBurnConsignment(txid)
+    const state = this.requireState()
+    const proof = state.burnProofs?.[txid]
+    const pending = Object.values(state.pending).find(item => item.request.burn &&
+      (item.delivery?.completed.txid === txid || item.broadcast?.completed.txid === txid))
+    const hasBurnDestination = Boolean(proof?.burnDestination || pending?.request.burnDestination)
     return {
       format: 'utexo-burn',
       version: 1,
@@ -2762,7 +2767,7 @@ export class RgbService {
         byteLength: consignment.byteLength,
         data: Buffer.from(consignment).toString('base64'),
       },
-      burnDestination: this.exportBurnDestination(txid),
+      ...(hasBurnDestination ? { burnDestination: this.exportBurnDestination(txid) } : {}),
     }
   }
 
