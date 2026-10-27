@@ -18,7 +18,7 @@
     "build:brave": "gulp build --env=pro --browser=brave --manifest=mv2 --channel=github",
     "build:edge": "gulp build --env=pro --browser=edge --manifest=mv2 --channel=github",
     "build:chrome:mv3:dev": "webpack --progress --env browser=chrome manifest=mv3 config=dev channel=github version=1.8.1",
-    "build:chrome:mv3": "gulp build --env=pro --browser=chrome --manifest=mv3 --channel=store",
+    "build:chrome:mv3": "pnpm --dir ../.. build && gulp build --env=pro --browser=chrome --manifest=mv3 --channel=store",
     "package:test": "node ./scripts/package-test.js",
     "lint": "eslint src --ext .js,.ts,.tsx",
     "lint:fix": "eslint --fix src/**/*.{js,jsx,ts,tsx,json}",
