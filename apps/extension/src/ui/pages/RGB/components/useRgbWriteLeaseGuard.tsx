@@ -11,6 +11,7 @@ export function useRgbWriteLeaseGuard() {
   const [leaseModalVisible, setLeaseModalVisible] = useState(false);
   const [recoveryConflictModal, setRecoveryConflictModal] = useState(false);
   const [leaseLoading, setLeaseLoading] = useState(false);
+  const [writeGuardLoading, setWriteGuardLoading] = useState(false);
   const [pendingWrite, setPendingWrite] = useState<(() => void) | undefined>();
 
   const requestLeaseAndWrite = useCallback(async (action: () => void) => {
@@ -41,18 +42,23 @@ export function useRgbWriteLeaseGuard() {
   }, [wallet]);
 
   const requestWrite = useCallback(async (action: () => void) => {
+    setWriteGuardLoading(true);
     try {
-      const recoveryStatus = await wallet.getRgbRecoveryCheckpointStatus();
-      if (recoveryStatus.conflicted) {
-        setPendingWrite(() => action);
-        setRecoveryConflictModal(true);
-        return;
+      try {
+        const recoveryStatus = await wallet.getRgbRecoveryCheckpointStatus();
+        if (recoveryStatus.conflicted) {
+          setPendingWrite(() => action);
+          setRecoveryConflictModal(true);
+          return;
+        }
+      } catch {
+        // Let the operation retain its existing error handling when the
+        // diagnostic status cannot be read.
       }
-    } catch {
-      // Let the operation retain its existing error handling when the
-      // diagnostic status cannot be read.
+      await requestLeaseAndWrite(action);
+    } finally {
+      setWriteGuardLoading(false);
     }
-    await requestLeaseAndWrite(action);
   }, [requestLeaseAndWrite, wallet]);
 
   const onTakeover = useCallback(async () => {
@@ -71,6 +77,7 @@ export function useRgbWriteLeaseGuard() {
 
   return {
     requestWrite,
+    writeGuardLoading,
     writeLeaseModal: (
       <>
         {recoveryConflictModal ? (

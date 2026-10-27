@@ -199,7 +199,7 @@ const selectorOptionStyle = (selected: boolean) => ({
 export default function RGBReceiveScreen({ initialStep = 'create_invoice' }: { initialStep?: RGBReceiveScreenStep }) {
   const { t, locale } = useI18n();
   const nav = useNavigation();
-  const { requestWrite, writeLeaseModal } = useRgbWriteLeaseGuard();
+  const { requestWrite, writeGuardLoading, writeLeaseModal } = useRgbWriteLeaseGuard();
   const amountInputRef = useRef<HTMLInputElement>(null);
   const [invoiceExpirySelectorOpen, setInvoiceExpirySelectorOpen] = useState(false);
   const [invoiceTypeSelectorOpen, setInvoiceTypeSelectorOpen] = useState(false);
@@ -929,9 +929,9 @@ export default function RGBReceiveScreen({ initialStep = 'create_invoice' }: { i
       <Footer>
         <Column gap="md">
           <Button
-            text={loading ? loadingText || t('creating') : t('create_invoice')}
+            text={loading || writeGuardLoading ? loadingText || t('creating') : t('create_invoice')}
             preset="primary"
-            disabled={loading || !isAmountValid}
+            disabled={loading || writeGuardLoading || !isAmountValid}
             onClick={() => void requestWrite(onCreateInvoice)}
           />
         </Column>
