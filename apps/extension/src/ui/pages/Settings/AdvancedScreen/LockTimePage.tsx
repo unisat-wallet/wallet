@@ -1,17 +1,9 @@
-import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
 
 import { Card, Column, Content, Header, Icon, Layout, Loading, Row, Text } from '@/ui/components';
-import { getAutoLockTimes } from '@unisat/wallet-shared';
 import {
-  settingsActions,
-  useAppDispatch,
-  useAutoLockTimeId,
   useI18n,
   useLockTimePageLogic,
-  useNavigation,
-  useTools,
-  useWallet
+  useNavigation
 } from '@unisat/wallet-state';
 
 export function LockTimePage() {

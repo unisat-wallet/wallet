@@ -386,7 +386,7 @@ function TestTxFailed() {
 
 function TestAddressTypeCard() {
   const items = [
-    { address: 'bc1qm72q6wrjy05h9fhu9gury67356nrcnvdd6853x', path: "m/84'/0'/0'/0/0", satoshis: 100 }
+    { address: 'bc1qm72q6wrjy05h9fhu9gury67356nrcnvdd6853x', path: 'm/84\'/0\'/0\'/0/0', satoshis: 100 }
     // { address: 'bc1qug97mq778xeusw66z559uuwcyt7kxsmarrvl90', path: "m/84'/0'/0'/0/1" }
   ];
   return (

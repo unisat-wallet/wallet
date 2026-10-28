@@ -1,6 +1,5 @@
 import BigNumber from 'bignumber.js';
 
-import { colors } from '@/ui/theme/colors';
 import { AlkanesBalance, Inscription, RuneBalance } from '@unisat/wallet-shared';
 import { useCurrentAccount, useI18n } from '@unisat/wallet-state';
 

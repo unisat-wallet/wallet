@@ -10,7 +10,7 @@ import { useI18n } from '@unisat/wallet-state';
 import KeystonePopover from '../Popover';
 import { createKeystoneTransport, handleKeystoneUSBError } from './utils';
 
-const EXPECTED_HD_PATH = ["m/44'/0'/0'", "m/49'/0'/0'", "m/84'/0'/0'", "m/86'/0'/0'"];
+const EXPECTED_HD_PATH = ['m/44\'/0\'/0\'', 'm/49\'/0\'/0\'', 'm/84\'/0\'/0\'', 'm/86\'/0\'/0\''];
 
 // import { Curve, DerivationAlgorithm } from '@keystonehq/keystone-sdk';
 // reduced from @keystonehq/keystone-sdk to avoid increasing package size

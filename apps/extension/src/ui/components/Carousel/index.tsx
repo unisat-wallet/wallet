@@ -82,9 +82,9 @@ const $rightArrow: CSSProperties = {
   right: 8
 };
 
-export function Carousel({ 
-  children, 
-  autoplay = false, 
+export function Carousel({
+  children,
+  autoplay = false,
   autoplaySpeed = 3000,
   showDots = true,
   showArrows = false,
@@ -115,7 +115,7 @@ export function Carousel({
   }, []);
 
   const goToPrevious = useCallback(() => {
-    setCurrentIndex((prevIndex) => 
+    setCurrentIndex((prevIndex) =>
       prevIndex === 0 ? totalSlides - 1 : prevIndex - 1
     );
   }, [totalSlides]);
@@ -146,12 +146,12 @@ export function Carousel({
 
   return (
     <div style={{ ...style }}>
-      <div 
+      <div
         style={$carouselContainer}
         onMouseEnter={handleMouseEnter}
         onMouseLeave={handleMouseLeave}
       >
-        <div 
+        <div
           style={{
             ...$carouselWrapper,
             transform: `translateX(-${currentIndex * 100}%)`
@@ -166,7 +166,7 @@ export function Carousel({
 
         {showArrows && (
           <>
-            <button 
+            <button
               style={$leftArrow}
               onClick={goToPrevious}
               onMouseOver={(e) => {
@@ -178,7 +178,7 @@ export function Carousel({
             >
               ←
             </button>
-            <button 
+            <button
               style={$rightArrow}
               onClick={goToNext}
               onMouseOver={(e) => {

@@ -25,20 +25,20 @@ export function Progress({
     default: { height: 8, fontSize: 14 },
     large: { height: 10, fontSize: 16 }
   };
-  
+
   const config = sizeConfig[size];
   const height = strokeWidth || config.height;
   const clampedPercent = Math.min(Math.max(percent, 0), 100);
-  
+
   return (
-    <div 
+    <div
       className={className}
-      style={{ 
-        width: '100%', 
-        display: 'flex', 
-        alignItems: 'center', 
+      style={{
+        width: '100%',
+        display: 'flex',
+        alignItems: 'center',
         gap: '8px',
-        ...style 
+        ...style
       }}
     >
       <div

@@ -64,7 +64,7 @@ module.exports = {
       }
     ],
     'no-useless-catch': 0,
-    'no-explicit-any': 0
+    '@typescript-eslint/no-explicit-any': 0
   },
   settings: {
     'import/resolver': {
@@ -75,6 +75,13 @@ module.exports = {
     }
   },
   overrides: [
+    {
+      files: ['**/*.{ts,tsx}'],
+      rules: {
+        // TypeScript resolves type names and globals more accurately than ESLint's base rule.
+        'no-undef': 'off'
+      }
+    },
     {
       files: ['src/ui/**/*.{ts,tsx}'],
       rules: {

@@ -130,7 +130,7 @@ export function Slider({
   // Get value from mouse position
   const getValueFromPosition = useCallback((clientX: number) => {
     if (!trackRef.current) return internalValue;
-    
+
     const rect = trackRef.current.getBoundingClientRect();
     const percentage = Math.max(0, Math.min(1, (clientX - rect.left) / rect.width));
     return denormalizeValue(percentage);
@@ -139,11 +139,11 @@ export function Slider({
   // Handle mouse events
   const handleMouseDown = useCallback((e: React.MouseEvent) => {
     if (disabled) return;
-    
+
     e.preventDefault();
     setIsDragging(true);
     setShowTooltip(true);
-    
+
     const newValue = getValueFromPosition(e.clientX);
     setInternalValue(newValue);
     onChange?.(newValue);
@@ -177,7 +177,7 @@ export function Slider({
   // Handle track click
   const handleTrackClick = useCallback((e: React.MouseEvent) => {
     if (disabled || isDragging) return;
-    
+
     const newValue = getValueFromPosition(e.clientX);
     setInternalValue(newValue);
     onChange?.(newValue);
@@ -188,7 +188,7 @@ export function Slider({
   const thumbPosition = `${percentage * 100}%`;
 
   return (
-    <div 
+    <div
       ref={containerRef}
       style={{
         ...$sliderContainer,
@@ -197,18 +197,18 @@ export function Slider({
         ...style
       }}
     >
-      <div 
+      <div
         ref={trackRef}
         style={$sliderTrack}
         onClick={handleTrackClick}
       >
-        <div 
+        <div
           style={{
             ...$sliderFilled,
             width: `${percentage * 100}%`
           }}
         />
-        
+
         <div
           style={{
             ...(isDragging ? $sliderThumbActive : $sliderThumb),

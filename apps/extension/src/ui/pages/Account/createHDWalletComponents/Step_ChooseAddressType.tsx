@@ -243,7 +243,7 @@ export function Step_ChooseAddressType({
   const submitCustomHdPath = (text: string) => {
     setPathError('');
     setError('');
-    text = text.replace(/[\u2018\u2019]/g, "'").trim();
+    text = text.replace(/[\u2018\u2019]/g, '\'').trim();
     setPathText(text);
     if (text !== '') {
       const isValid = isValidHdPath(text);

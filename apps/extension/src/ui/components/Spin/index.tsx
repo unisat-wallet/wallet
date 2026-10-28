@@ -21,13 +21,13 @@ export function Spin({
     default: { size: 20, strokeWidth: 2 },
     large: { size: 32, strokeWidth: 3 }
   };
-  
+
   const config = sizeConfig[size];
-  
+
   if (!spinning && children) {
     return <>{children}</>;
   }
-  
+
   const spinnerElement = (
     <div
       className={className}
@@ -58,7 +58,7 @@ export function Spin({
       </style>
     </div>
   );
-  
+
   if (children) {
     return (
       <div style={{ position: 'relative', ...style }}>
@@ -90,6 +90,6 @@ export function Spin({
       </div>
     );
   }
-  
+
   return spinnerElement;
 }

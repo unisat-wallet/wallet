@@ -411,7 +411,7 @@ export default function ContactsScreen() {
         key={`${contact.address}_${contact.chain}`}
         style={{ cursor: 'pointer' }}
         onClick={() =>
-          nav.navigate(`EditContactScreen`, {
+          nav.navigate('EditContactScreen', {
             selectedNetworkFilter,
             address: contact.address,
             chain: contact.chain

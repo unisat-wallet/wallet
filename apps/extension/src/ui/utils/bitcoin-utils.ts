@@ -59,7 +59,7 @@ export function isValidHdPath(path: string): boolean {
     }
 
     // Check if it's a hardened path (ends with ')
-    const isHardened = component.endsWith("'");
+    const isHardened = component.endsWith('\'');
     const numberPart = isHardened ? component.slice(0, -1) : component;
 
     // Check if the number part is a valid integer

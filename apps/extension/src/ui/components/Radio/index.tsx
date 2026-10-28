@@ -28,7 +28,7 @@ const $radioStyle: CSSProperties = {
   width: 16,
   height: 16,
   borderRadius: '50%',
-  border: `2px solid #666666`,
+  border: '2px solid #666666',
   backgroundColor: 'transparent',
   cursor: 'pointer',
   position: 'relative',

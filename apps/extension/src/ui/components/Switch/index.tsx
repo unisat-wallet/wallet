@@ -27,9 +27,9 @@ export function Switch({
     small: { width: 28, height: 16, dotSize: 12 },
     default: { width: 44, height: 22, dotSize: 18 }
   };
-  
+
   const config = sizeConfig[size];
-  
+
   return (
     <div
       className={className}
@@ -54,8 +54,8 @@ export function Switch({
           borderRadius: '50%',
           position: 'absolute',
           top: '50%',
-          left: checked 
-            ? `${config.width - config.dotSize - 2}px` 
+          left: checked
+            ? `${config.width - config.dotSize - 2}px`
             : '2px',
           transform: 'translateY(-50%)',
           transition: 'left 0.3s ease',

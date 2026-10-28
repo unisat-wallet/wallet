@@ -101,14 +101,14 @@ export function Tooltip({
     // Final boundary checks with auto adjustment
     const shouldAdjustX = autoAdjustOverflow && (align.overflow?.adjustX !== false);
     const shouldAdjustY = autoAdjustOverflow && (align.overflow?.adjustY !== false);
-    
+
     if (shouldAdjustX) {
       if (left < 8) left = 8;
       if (left + tooltipRect.width > viewport.width - 8) {
         left = viewport.width - tooltipRect.width - 8;
       }
     }
-    
+
     if (shouldAdjustY) {
       if (top < 8) top = 8;
       if (top + tooltipRect.height > viewport.height - 8) {

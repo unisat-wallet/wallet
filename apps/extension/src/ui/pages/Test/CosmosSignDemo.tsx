@@ -21,7 +21,7 @@ export default function CosmosSignDemo() {
   const cosmosSignRequest = {
     signData: '',
     dataType: CosmosSignDataType.COSMOS_AMINO,
-    path: "m/84'/0'/0'/0/0",
+    path: 'm/84\'/0\'/0\'/0/0',
     chainId: 'bbn-test-6',
     accountNumber: '0',
     address: signerAddress
