@@ -104,9 +104,6 @@ importers:
       '@fortawesome/react-fontawesome':
         specifier: ^0.1.18
         version: 0.1.18(@fortawesome/fontawesome-svg-core@6.1.1)(react@18.2.0)
-      '@keplr-wallet/proto-types':
-        specifier: ^0.12.188
-        version: 0.12.188
       '@keystonehq/animated-qr':
         specifier: ^0.8.6
         version: 0.8.6(react-dom@18.2.0)(react@18.2.0)
@@ -131,15 +128,6 @@ importers:
       '@reduxjs/toolkit':
         specifier: ^1.9.2
         version: 1.9.2(react-redux@8.0.5)(react@18.2.0)
-      '@sentry/browser':
-        specifier: ^6.19.7
-        version: 6.19.7
-      '@sentry/react':
-        specifier: ^7.48.0
-        version: 7.48.0(react@18.2.0)
-      '@sentry/tracing':
-        specifier: ^6.19.7
-        version: 6.19.7
       '@svgr/webpack':
         specifier: ^5.5.0
         version: 5.5.0
@@ -5767,13 +5755,6 @@ packages:
       '@jridgewell/resolve-uri': 3.1.2
       '@jridgewell/sourcemap-codec': 1.5.5
 
-  /@keplr-wallet/proto-types@0.12.188:
-    resolution: {integrity: sha512-TY78nOsts4cc4et+oT1j/yd3SJMk2SuF42RzgQOdVt+NAxXPW6HysE8tq9cDBG9wj/JtMoZjDQzJezRiJNQEQA==}
-    dependencies:
-      long: 4.0.0
-      protobufjs: 6.11.4
-    dev: false
-
   /@keystonehq/alias-sampling@0.1.2:
     resolution: {integrity: sha512-5ukLB3bcgltgaFfQfYKYwHDUbwHicekYo53fSEa7xhVkAEqsA74kxdIwoBIURmGUtXe3EVIRm4SYlgcrt2Ri0w==}
     dev: false
@@ -6776,49 +6757,6 @@ packages:
     resolution: {integrity: sha512-wwQAWhWSuHaag8c4q/KN/vCoeOJYshAIvMQwD4GpSb3OiZklFfvAgmj0VCBBImRpuF/aFgIRzllXlVX93Jevww==}
     dev: true
 
-  /@protobufjs/aspromise@1.1.2:
-    resolution: {integrity: sha512-j+gKExEuLmKwvz3OgROXtrJ2UG2x8Ch2YZUxahh+s1F2HZ+wAceUNLkvy6zKCPVRkU++ZWQrdxsUeQXmcg4uoQ==}
-    dev: false
-
-  /@protobufjs/base64@1.1.2:
-    resolution: {integrity: sha512-AZkcAA5vnN/v4PDqKyMR5lx7hZttPDgClv83E//FMNhR2TMcLUhfRUBHCmSl0oi9zMgDDqRUJkSxO3wm85+XLg==}
-    dev: false
-
-  /@protobufjs/codegen@2.0.4:
-    resolution: {integrity: sha512-YyFaikqM5sH0ziFZCN3xDC7zeGaB/d0IUb9CATugHWbd1FRFwWwt4ld4OYMPWu5a3Xe01mGAULCdqhMlPl29Jg==}
-    dev: false
-
-  /@protobufjs/eventemitter@1.1.0:
-    resolution: {integrity: sha512-j9ednRT81vYJ9OfVuXG6ERSTdEL1xVsNgqpkxMsbIabzSo3goCjDIveeGv5d03om39ML71RdmrGNjG5SReBP/Q==}
-    dev: false
-
-  /@protobufjs/fetch@1.1.0:
-    resolution: {integrity: sha512-lljVXpqXebpsijW71PZaCYeIcE5on1w5DlQy5WH6GLbFryLUrBD4932W/E2BSpfRJWseIL4v/KPgBFxDOIdKpQ==}
-    dependencies:
-      '@protobufjs/aspromise': 1.1.2
-      '@protobufjs/inquire': 1.1.0
-    dev: false
-
-  /@protobufjs/float@1.0.2:
-    resolution: {integrity: sha512-Ddb+kVXlXst9d+R9PfTIxh1EdNkgoRe5tOX6t01f1lYWOvJnSPDBlG241QLzcyPdoNTsblLUdujGSE4RzrTZGQ==}
-    dev: false
-
-  /@protobufjs/inquire@1.1.0:
-    resolution: {integrity: sha512-kdSefcPdruJiFMVSbn801t4vFK7KB/5gd2fYvrxhuJYg8ILrmn9SKSX2tZdV6V+ksulWqS7aXjBcRXl3wHoD9Q==}
-    dev: false
-
-  /@protobufjs/path@1.1.2:
-    resolution: {integrity: sha512-6JOcJ5Tm08dOHAbdR3GrvP+yUUfkjG5ePsHYczMFLq3ZmMkAD98cDgcT2iA1lJ9NVwFd4tH/iSSoe44YWkltEA==}
-    dev: false
-
-  /@protobufjs/pool@1.1.0:
-    resolution: {integrity: sha512-0kELaGSIDBKvcgS4zkjz1PeddatrjYcmMWOlAuAPwAeccUrPHdUqo/J6LiymHHEiJT5NrF1UVwxY14f+fy4WQw==}
-    dev: false
-
-  /@protobufjs/utf8@1.1.0:
-    resolution: {integrity: sha512-Vvn3zZrhQZkkBE8LSuW3em98c0FwgO4nxzv6OdSxPKJIEKY2bGbHn+mhGIPerzI4twdxaP8/0+06HBpwf345Lw==}
-    dev: false
-
   /@reduxjs/toolkit@1.9.2(react-redux@8.0.5)(react@18.2.0):
     resolution: {integrity: sha512-5ZAZ7hwAKWSii5T6NTPmgIBUqyVdlDs+6JjThz6J6dmHLDm6zCzv2OjHIFAi3Vvs1qjmXU0bm6eBojukYXjVMQ==}
     peerDependencies:
@@ -6950,136 +6888,6 @@ packages:
     dependencies:
       '@noble/curves': 1.7.0
       '@noble/hashes': 1.6.0
-    dev: false
-
-  /@sentry-internal/tracing@7.48.0:
-    resolution: {integrity: sha512-MFAPDTrvCtfSm0/Zbmx7HA0Q5uCfRadOUpN8Y8rP1ndz+329h2kA3mZRCuC+3/aXL11zs2CHUhcAkGjwH2vogg==}
-    engines: {node: '>=8'}
-    dependencies:
-      '@sentry/core': 7.48.0
-      '@sentry/types': 7.48.0
-      '@sentry/utils': 7.48.0
-      tslib: 1.14.1
-    dev: false
-
-  /@sentry/browser@6.19.7:
-    resolution: {integrity: sha512-oDbklp4O3MtAM4mtuwyZLrgO1qDVYIujzNJQzXmi9YzymJCuzMLSRDvhY83NNDCRxf0pds4DShgYeZdbSyKraA==}
-    engines: {node: '>=6'}
-    dependencies:
-      '@sentry/core': 6.19.7
-      '@sentry/types': 6.19.7
-      '@sentry/utils': 6.19.7
-      tslib: 1.14.1
-    dev: false
-
-  /@sentry/browser@7.48.0:
-    resolution: {integrity: sha512-tdx/2nhuiykncmXFlV4Dpp+Hxgt/v31LiyXE79IcM560wc+QmWKtzoW9azBWQ0xt5KOO3ERMib9qPE4/ql1/EQ==}
-    engines: {node: '>=8'}
-    dependencies:
-      '@sentry-internal/tracing': 7.48.0
-      '@sentry/core': 7.48.0
-      '@sentry/replay': 7.48.0
-      '@sentry/types': 7.48.0
-      '@sentry/utils': 7.48.0
-      tslib: 1.14.1
-    dev: false
-
-  /@sentry/core@6.19.7:
-    resolution: {integrity: sha512-tOfZ/umqB2AcHPGbIrsFLcvApdTm9ggpi/kQZFkej7kMphjT+SGBiQfYtjyg9jcRW+ilAR4JXC9BGKsdEQ+8Vw==}
-    engines: {node: '>=6'}
-    dependencies:
-      '@sentry/hub': 6.19.7
-      '@sentry/minimal': 6.19.7
-      '@sentry/types': 6.19.7
-      '@sentry/utils': 6.19.7
-      tslib: 1.14.1
-    dev: false
-
-  /@sentry/core@7.48.0:
-    resolution: {integrity: sha512-8FYuJTMpyuxRZvlen3gQ3rpOtVInSDmSyXqWEhCLuG/w34AtWoTiW7G516rsAAh6Hy1TP91GooMWbonP3XQNTQ==}
-    engines: {node: '>=8'}
-    dependencies:
-      '@sentry/types': 7.48.0
-      '@sentry/utils': 7.48.0
-      tslib: 1.14.1
-    dev: false
-
-  /@sentry/hub@6.19.7:
-    resolution: {integrity: sha512-y3OtbYFAqKHCWezF0EGGr5lcyI2KbaXW2Ik7Xp8Mu9TxbSTuwTe4rTntwg8ngPjUQU3SUHzgjqVB8qjiGqFXCA==}
-    engines: {node: '>=6'}
-    dependencies:
-      '@sentry/types': 6.19.7
-      '@sentry/utils': 6.19.7
-      tslib: 1.14.1
-    dev: false
-
-  /@sentry/minimal@6.19.7:
-    resolution: {integrity: sha512-wcYmSJOdvk6VAPx8IcmZgN08XTXRwRtB1aOLZm+MVHjIZIhHoBGZJYTVQS/BWjldsamj2cX3YGbGXNunaCfYJQ==}
-    engines: {node: '>=6'}
-    dependencies:
-      '@sentry/hub': 6.19.7
-      '@sentry/types': 6.19.7
-      tslib: 1.14.1
-    dev: false
-
-  /@sentry/react@7.48.0(react@18.2.0):
-    resolution: {integrity: sha512-E2HF0njufOI/BWktXfIiPNIh0dh7la9uQmDlYiFAK8MnlW4OOjw4rRJV2qkxKQCYdO9WB+T460DVw102Z/MyUA==}
-    engines: {node: '>=8'}
-    peerDependencies:
-      react: 15.x || 16.x || 17.x || 18.x
-    dependencies:
-      '@sentry/browser': 7.48.0
-      '@sentry/types': 7.48.0
-      '@sentry/utils': 7.48.0
-      hoist-non-react-statics: 3.3.2
-      react: 18.2.0
-      tslib: 1.14.1
-    dev: false
-
-  /@sentry/replay@7.48.0:
-    resolution: {integrity: sha512-8fRHMGJ0NJeIZi6UucxUTvfDPaBa7+jU1kCTLjCcuH3X/UVz5PtGLMtFSO5U8HP+mUDlPs97MP1uoDvMa4S2Ng==}
-    engines: {node: '>=12'}
-    dependencies:
-      '@sentry/core': 7.48.0
-      '@sentry/types': 7.48.0
-      '@sentry/utils': 7.48.0
-    dev: false
-
-  /@sentry/tracing@6.19.7:
-    resolution: {integrity: sha512-ol4TupNnv9Zd+bZei7B6Ygnr9N3Gp1PUrNI761QSlHtPC25xXC5ssSD3GMhBgyQrcvpuRcCFHVNNM97tN5cZiA==}
-    engines: {node: '>=6'}
-    dependencies:
-      '@sentry/hub': 6.19.7
-      '@sentry/minimal': 6.19.7
-      '@sentry/types': 6.19.7
-      '@sentry/utils': 6.19.7
-      tslib: 1.14.1
-    dev: false
-
-  /@sentry/types@6.19.7:
-    resolution: {integrity: sha512-jH84pDYE+hHIbVnab3Hr+ZXr1v8QABfhx39KknxqKWr2l0oEItzepV0URvbEhB446lk/S/59230dlUUIBGsXbg==}
-    engines: {node: '>=6'}
-    dev: false
-
-  /@sentry/types@7.48.0:
-    resolution: {integrity: sha512-kkAszZwQ5/v4n7Yyw/DPNRWx7h724mVNRGZIJa9ggUMvTgMe7UKCZZ5wfQmYiKVlGbwd9pxXAcP8Oq15EbByFQ==}
-    engines: {node: '>=8'}
-    dev: false
-
-  /@sentry/utils@6.19.7:
-    resolution: {integrity: sha512-z95ECmE3i9pbWoXQrD/7PgkBAzJYR+iXtPuTkpBjDKs86O3mT+PXOT3BAn79w2wkn7/i3vOGD2xVr1uiMl26dA==}
-    engines: {node: '>=6'}
-    dependencies:
-      '@sentry/types': 6.19.7
-      tslib: 1.14.1
-    dev: false
-
-  /@sentry/utils@7.48.0:
-    resolution: {integrity: sha512-d977sghkFVMfld0LrEyyY2gYrfayLPdDEpUDT+hg5y79r7zZDCFyHtdB86699E5K89MwDZahW7Erk+a1nk4x5w==}
-    engines: {node: '>=8'}
-    dependencies:
-      '@sentry/types': 7.48.0
-      tslib: 1.14.1
     dev: false
 
   /@sigstore/bundle@4.0.0:
@@ -7564,10 +7372,6 @@ packages:
   /@types/lodash@4.14.195:
     resolution: {integrity: sha512-Hwx9EUgdwf2GLarOjQp5ZH8ZmblzcbTBC2wtQWNKARBSxM9ezRIAUpeDTgoQRAFB0+8CNWXVA9+MaSOzOF3nPg==}
     dev: true
-
-  /@types/long@4.0.2:
-    resolution: {integrity: sha512-MqTGEo5bj5t157U6fA/BiDynNkn0YknVdh48CMPkTSpFTVmvao5UQmm7uEF6xBEo7qIMAlY/JSleYaE6VOdpaA==}
-    dev: false
 
   /@types/minimatch@3.0.5:
     resolution: {integrity: sha512-Klz949h02Gz2uZCMGwDUSDS1YBlTdDDgbWHi+81l29tQALUtvz4rAYi5uoVhE5Lagoq6DeqAUlbrHvW/mXDgdQ==}
@@ -16179,10 +15983,6 @@ packages:
     engines: {node: '>= 0.6.0'}
     dev: false
 
-  /long@4.0.0:
-    resolution: {integrity: sha512-XsP+KhQif4bjX1kbuSiySJFNAehNxgLb6hPRGJ9QsUr8ajHkuXGdrHmFUTUUXhDwVX2R5bY4JNZEwbUiMhV+MA==}
-    dev: false
-
   /loose-envify@1.4.0:
     resolution: {integrity: sha512-lyuxPGr/Wfhrlem2CL/UcnUc1zcqKAImBDzukY7Y5F/yQiNdko6+fRLevlw1HgMySw7f611UIY408EtxRSoK3Q==}
     hasBin: true
@@ -18920,26 +18720,6 @@ packages:
       loose-envify: 1.4.0
       object-assign: 4.1.1
       react-is: 16.13.1
-
-  /protobufjs@6.11.4:
-    resolution: {integrity: sha512-5kQWPaJHi1WoCpjTGszzQ32PG2F4+wRY6BmAT4Vfw56Q2FZ4YZzK20xUYQH4YkfehY1e6QSICrJquM6xXZNcrw==}
-    hasBin: true
-    requiresBuild: true
-    dependencies:
-      '@protobufjs/aspromise': 1.1.2
-      '@protobufjs/base64': 1.1.2
-      '@protobufjs/codegen': 2.0.4
-      '@protobufjs/eventemitter': 1.1.0
-      '@protobufjs/fetch': 1.1.0
-      '@protobufjs/float': 1.0.2
-      '@protobufjs/inquire': 1.1.0
-      '@protobufjs/path': 1.1.2
-      '@protobufjs/pool': 1.1.0
-      '@protobufjs/utf8': 1.1.0
-      '@types/long': 4.0.2
-      '@types/node': 20.8.0
-      long: 4.0.0
-    dev: false
 
   /protocols@2.0.2:
     resolution: {integrity: sha512-hHVTzba3wboROl0/aWRRG9dMytgH6ow//STBZh43l/wQgmMhYhOFi0EHWAPtoCz9IAUymsyP0TSBHkhgMEGNnQ==}
@@ -22202,6 +21982,7 @@ packages:
 
   /tslib@1.14.1:
     resolution: {integrity: sha512-Xni35NKzjgMrwevysHTCArtLDpPvye8zV/0E4EyYn43P7/7qvQwPh9BGkHewbMulVntbigmcT7rdX3BNo9wRJg==}
+    dev: true
 
   /tslib@2.8.1:
     resolution: {integrity: sha512-oJFu94HQb+KVduSUQL7wnpmqnfmLsOA/nAh6b6EH0wCEoK0/mPeXU6c3wKDV83MkOuHPRHtSXKKU99IBazS/2w==}
