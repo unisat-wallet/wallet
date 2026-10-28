@@ -11,21 +11,30 @@ index b071f374f9d9b2a0bb6f4385550ace3166ea16f8..a08a3c3ffebb448736c194713643221b
        results.push(validator(pSig.pubkey, hash, sig.signature));
      }
      return results.every(res => res === true);
-@@ -988,9 +988,10 @@ function canFinalize(input, script, scriptType) {
+@@ -988,9 +988,19 @@ function canFinalize(input, script, scriptType) {
    }
  }
  function checkCache(cache) {
 -  if (cache.__UNSAFE_SIGN_NONSEGWIT !== false) {
 -    throw new Error('Not BIP174 compliant, can not export');
 -  }
-+  // disable check cache
++  // Wallet security model for witnessUtxo-only legacy inputs:
++  // The normal approval flow sends the exact PSBT to /v5/tx/decode2 before
++  // signing. The service resolves every txid:vout through the chain indexer,
++  // returns the authoritative satoshi value and scriptPk, and calculates the
++  // fee from those chain values. A decode/indexer failure leaves the normal
++  // approval unsigned. This online validation is the compensating control for
++  // omitting nonWitnessUtxo to keep transported PSBTs small.
++  //
++  // Quick Multi Sign does not use this approval/decode path and is explicitly
++  // outside the scope of this patch's security model.
 +  // if (cache.__UNSAFE_SIGN_NONSEGWIT !== false) {
 +  //   throw new Error('Not BIP174 compliant, can not export');
 +  // }
  }
  function hasSigs(neededSigs, partialSig, pubkeys) {
    if (!partialSig) return false;
-@@ -1194,7 +1195,7 @@ function getHashAndSighashType(
+@@ -1194,7 +1204,7 @@ function getHashAndSighashType(
      false,
      sighashTypes,
    );
@@ -34,11 +43,13 @@ index b071f374f9d9b2a0bb6f4385550ace3166ea16f8..a08a3c3ffebb448736c194713643221b
    return {
      hash,
      sighashType,
-@@ -1254,25 +1255,26 @@ function getHashForSig(inputIndex, input, cache, forValidate, sighashTypes) {
+@@ -1254,25 +1264,28 @@ function getHashForSig(inputIndex, input, cache, forValidate, sighashTypes) {
        sighashType,
      );
    } else {
-+    // disable check
++    // The wallet's normal approval flow validates this input's exact outpoint,
++    // chain satoshi value, scriptPk, and displayed fee through /v5/tx/decode2
++    // before signing. See checkCache() for the full compensating security model.
      // non-segwit
 -    if (
 -      input.nonWitnessUtxo === undefined &&
@@ -79,7 +90,7 @@ index b071f374f9d9b2a0bb6f4385550ace3166ea16f8..a08a3c3ffebb448736c194713643221b
      hash = unsignedTx.hashForSignature(
        inputIndex,
        meaningfulScript,
-@@ -1342,7 +1344,7 @@ function getTaprootHashesForSig(
+@@ -1342,7 +1355,7 @@ function getTaprootHashesForSig(
      }
    }
    const tapLeafHashes = (input.tapLeafScript || [])

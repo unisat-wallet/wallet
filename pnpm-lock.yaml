@@ -12,7 +12,7 @@ overrides:
 
 patchedDependencies:
   bitcoinjs-lib@6.1.10:
-    hash: njjghiqbctqz4mhotf4wfz33ha
+    hash: womubhjx32gw2feamdxzvinoey
     path: patches/bitcoinjs-lib@6.1.10.patch
   bitcore-lib@10.0.0:
     hash: u3dvb4yhlnk5fun7e4tf7v32ye
@@ -42,7 +42,7 @@ importers:
         version: 6.7.0(eslint@8.50.0)(typescript@5.2.2)
       bitcoinjs-lib:
         specifier: ^6.1.10
-        version: 6.1.10(patch_hash=njjghiqbctqz4mhotf4wfz33ha)
+        version: 6.1.10(patch_hash=womubhjx32gw2feamdxzvinoey)
       eslint:
         specifier: ^8.0.0
         version: 8.50.0
@@ -822,7 +822,7 @@ importers:
         version: 3.1.2
       bitcoinjs-lib:
         specifier: ^6.1.10
-        version: 6.1.10(patch_hash=njjghiqbctqz4mhotf4wfz33ha)
+        version: 6.1.10(patch_hash=womubhjx32gw2feamdxzvinoey)
       bitcore-lib:
         specifier: ^10.0.0
         version: 10.0.0(patch_hash=u3dvb4yhlnk5fun7e4tf7v32ye)
@@ -998,7 +998,7 @@ importers:
         version: link:../base-utils
       bitcoinjs-lib:
         specifier: ^6.1.10
-        version: 6.1.10(patch_hash=njjghiqbctqz4mhotf4wfz33ha)
+        version: 6.1.10(patch_hash=womubhjx32gw2feamdxzvinoey)
     devDependencies:
       '@types/node':
         specifier: ^20.19.0
@@ -1215,7 +1215,7 @@ importers:
         version: link:../wallet-types
       bitcoinjs-lib:
         specifier: ^6.1.10
-        version: 6.1.10(patch_hash=njjghiqbctqz4mhotf4wfz33ha)
+        version: 6.1.10(patch_hash=womubhjx32gw2feamdxzvinoey)
       ecpair:
         specifier: ^2.1.0
         version: 2.1.0
@@ -9001,7 +9001,7 @@ packages:
       sha256-uint8array: 0.10.7
     dev: true
 
-  /bitcoinjs-lib@6.1.10(patch_hash=njjghiqbctqz4mhotf4wfz33ha):
+  /bitcoinjs-lib@6.1.10(patch_hash=womubhjx32gw2feamdxzvinoey):
     resolution: {integrity: sha512-9KpnS5JKVP0j0yfTsBNFIsNA6+JdBDb7VtL35F20I/pJYobosi3TmZFGtu6qxhJCfb0vubJixr5Zv61/lUYETw==}
     engines: {node: '>=8.0.0'}
     dependencies:
