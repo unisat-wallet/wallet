@@ -41,7 +41,7 @@
     "@metamask/obs-store": "^7.0.0",
     "@noble/curves": "^1.0.0",
     "@noble/hashes": "^1.7.1",
-    "@pmmmwh/react-refresh-webpack-plugin": "^0.5.3",
+    "@pmmmwh/react-refresh-webpack-plugin": "^0.6.3",
     "@reduxjs/toolkit": "^1.9.2",
     "@svgr/webpack": "^5.5.0",
     "@testing-library/jest-dom": "^5.16.4",
@@ -167,9 +167,9 @@
     "varuint-bitcoin": "^1.1.2",
     "web-vitals": "^2.1.4",
     "webpack": "^5.112.2",
-    "webpack-dev-server": "^4.6.0",
+    "webpack-dev-server": "^5.2.6",
     "webpack-manifest-plugin": "^4.0.2",
-    "workbox-webpack-plugin": "^6.4.1"
+    "workbox-webpack-plugin": "^7.4.1"
   },
   "browserslist": {
     "production": [
