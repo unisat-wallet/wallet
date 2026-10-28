@@ -95,7 +95,7 @@ All tags reference commits in this repository. Shared package changes are reflec
 ### Install dependencies
 
 ```bash
-pnpm install
+pnpm install --frozen-lockfile
 ```
 
 ### Mobile Inner Repo Setup

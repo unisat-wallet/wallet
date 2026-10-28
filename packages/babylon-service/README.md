@@ -107,7 +107,7 @@ try {
 
 ```bash
 # Install dependencies
-pnpm install
+pnpm install --frozen-lockfile
 
 # Build the package
 pnpm build
