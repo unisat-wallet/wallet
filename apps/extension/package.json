@@ -86,7 +86,7 @@
     "bech32": "^2.0.0",
     "bfj": "^7.0.2",
     "bignumber.js": "^9.1.1",
-    "bip39": "^3.1.0",
+    "bip39": "^3.1.2",
     "browser-passworder": "^2.0.3",
     "browserify": "^17.0.0",
     "browserslist": "^4.18.1",

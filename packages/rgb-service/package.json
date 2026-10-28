@@ -21,7 +21,7 @@
   "dependencies": {
     "@unisat/base-utils": "workspace:*",
     "@noble/hashes": "^1.3.0",
-    "bitcoinjs-lib": "^6.1.5"
+    "bitcoinjs-lib": "^6.1.10"
   },
   "scripts": {
     "build": "tsup",
