@@ -1,5 +1,30 @@
 # UniSat Wallet Release Notes
 
+## v1.8.2
+
+### Dependency and Build Security
+
+- Updated Bitcoin cryptography dependencies to reject malformed proof-of-work targets, unsafe BIP39 wordlist property lookups, and invalid secp256k1 recovery identifiers.
+- Updated vulnerable runtime dependencies used for HTTP requests, object utilities, identifier generation, query serialization, date handling, and WebSocket communication.
+- Removed unused dependency paths that included vulnerable legacy Protobuf and Sentry packages.
+- Updated the extension build, test, SVG, and QR toolchains to patched releases and removed obsolete vulnerable transitive dependencies.
+- Standardized Chrome, Brave, and Edge builds on Manifest V3 while retaining the existing MV3 command aliases for compatibility.
+- Raised the release environment baseline to Node.js 22.23.4 and documented reproducible installs using the frozen pnpm lockfile.
+
+### PSBT Signing Security
+
+- Added an explicit risk confirmation when a PSBT requests a signature from a public key that standard script inspection cannot associate with the input, while preserving compatibility with specialized signing protocols.
+- Tightened Taproot script-path signing so automatic selection only signs leaves containing the signing public key. Specialized leaves must be selected explicitly and now display the same risk confirmation when the key is not directly referenced by the script.
+- Removed the automatic fallback that signed every PSBT input when none belonged to the current account; callers must now explicitly select specialized inputs.
+- Hardened batch signing with local asset checks split into supported 100-outpoint requests and limits of 50 transactions and 1,000 total inputs per request, with explicit invalid-parameter errors when exceeded.
+
+### Cosmos and Babylon
+
+- Redesigned Cosmos connection and signing approvals with clearer network, selected-account, permission, transaction, fee, gas, memo, and signer details.
+- Hardened Direct signing by validating the SignDoc structure, configured chain ID, account number, sequence, signer public key, and message signer before authorization.
+- Added readable transaction summaries for Cosmos sends and Babylon delegation, undelegation, redelegation, unbonding cancellation, reward withdrawal, and reward-address operations.
+- Improved ADR-36 review with domain-separated signing, UTF-8 and Hex previews, and prominent warnings for binary, malformed, or otherwise unreadable content.
+
 ## v1.8.1
 
 ### RGB Improvements
