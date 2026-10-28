@@ -2910,6 +2910,9 @@
   "rgb_invoice_maximum_amount": {
     "message": "最大数量は $amount です。"
   },
+  "rgb_receive_invoice_limit_reached": {
+    "message": "処理中の RGB 受取インボイスは最大 $limit 件です。新しく作成する前に未使用のインボイスをキャンセルしてください。"
+  },
   "rgb_amount_precision_invalid": {
     "message": "小数点以下 $precision 桁までの金額を入力してください。"
   },

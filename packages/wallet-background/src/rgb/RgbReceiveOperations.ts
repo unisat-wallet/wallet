@@ -64,12 +64,16 @@ export class RgbReceiveOperations {
 
   async getPendingReceiveInvoices(
     params: { skipSync?: boolean; providerOrigin?: string } = {}
-  ): Promise<{ list: RgbPendingReceiveInvoice[] }> {
+  ): Promise<{
+    list: RgbPendingReceiveInvoice[]
+    receiveInvoiceCount: number
+    receiveInvoiceLimit: number
+    canCreateReceiveInvoice: boolean
+  }> {
     let { service } = await (this.dependencies.getReadContext?.() ?? this.dependencies.getContext())
     // Hidden expired invoices still need a writer sync to release their
     // durable reservations and recovery-checkpoint entries.
-    if (!service.hasStoredPendingReceives()) return { list: [] }
-    if (!params.skipSync) {
+    if (service.hasStoredPendingReceives() && !params.skipSync) {
       try {
         ;({ service } = await this.dependencies.syncReceivedAllocations())
       } catch {
@@ -77,7 +81,11 @@ export class RgbReceiveOperations {
         // already restored invoice list visible and retry that work later.
       }
     }
+    const capacity = service.getReceiveInvoiceCapacity()
     return {
+      receiveInvoiceCount: capacity.count,
+      receiveInvoiceLimit: capacity.limit,
+      canCreateReceiveInvoice: capacity.available,
       list: service
         .getPendingReceives()
         .map((item, batchTransferIdx) => ({ item, batchTransferIdx }))

@@ -2233,9 +2233,12 @@ describe('RGB wallet references', () => {
       claimPendingReceives: vi.fn(async () => void calls.push('claim')),
       processClaimedReceives: vi.fn(async () => ({ received: 0 })),
       hasStoredPendingReceives: vi.fn(() => false),
+      getReceiveInvoiceCapacity: vi.fn(() => ({ count: 0, limit: 10, available: true })),
       getPendingReceives: vi.fn(() => []),
     }
-    vi.spyOn(wallet as any, 'getLocalRgbService').mockResolvedValue({ service, wallet: { fundingAddress: 'bc1p-rgb-funding' } })
+    const context = { service, wallet: { fundingAddress: 'bc1p-rgb-funding' } }
+    vi.spyOn(wallet as any, 'getLocalRgbReadService').mockResolvedValue(context)
+    vi.spyOn(wallet as any, 'getLocalRgbService').mockResolvedValue(context)
 
     await wallet.getRgbPendingReceiveInvoices()
     expect(calls).toEqual([])
@@ -2254,6 +2257,7 @@ describe('RGB wallet references', () => {
         confirmed = true
       }),
       hasStoredPendingReceives: vi.fn(() => true),
+      getReceiveInvoiceCapacity: vi.fn(() => ({ count: 1, limit: 10, available: true })),
       getPendingReceives: vi.fn(() => [pendingReceive]),
       getSnapshot: vi.fn(() => ({
         utxos: [

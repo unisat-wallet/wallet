@@ -2877,6 +2877,69 @@ describe('RgbService', () => {
       .toBe(2)
   })
 
+  it('shares a serialized ten-invoice limit between blind and witness receives', async () => {
+    const dependencies = createDependencies()
+    vi.mocked(dependencies.stateSource.getSnapshot).mockResolvedValue({
+      syncedAt: 1,
+      utxos: [{
+        outpoint: { txid: 'f'.repeat(64), vout: 0 },
+        satoshis: 1_000,
+        scriptPubKey: `5120${'11'.repeat(32)}`,
+        publicKey: `02${'22'.repeat(32)}`,
+        chainStatus: 'confirmed',
+        confirmations: 1,
+        allocations: [],
+      }],
+    })
+    let releaseBlind!: () => void
+    let blindStarted!: () => void
+    const started = new Promise<void>(resolve => (blindStarted = resolve))
+    dependencies.transport.prepareInvoice = vi.fn()
+      .mockImplementationOnce(async () => {
+        blindStarted()
+        await new Promise<void>(resolve => (releaseBlind = resolve))
+        return undefined
+      })
+      .mockResolvedValue(undefined)
+    const service = new RgbService(dependencies)
+    await service.open(wallet)
+    await service.sync()
+    ;(service as any).state.pendingReceives = Array.from({ length: 9 }, (_, index) => ({
+      recipientId: `existing-${index}`,
+      recipientType: index % 2 ? 'witness' : 'blind',
+      createdAt: index + 1,
+    }))
+    const witnessInput = {
+      scriptPubKey: `5120${'33'.repeat(32)}`,
+      publicKey: `02${'44'.repeat(32)}`,
+    }
+
+    const blind = service.createBlindReceive({})
+    await started
+    const witness = service.createWitnessReceive(witnessInput)
+    await Promise.resolve()
+    expect(dependencies.transport.prepareInvoice).toHaveBeenCalledTimes(1)
+    releaseBlind()
+    const createdBlind = await blind
+
+    await expect(witness).rejects.toThrow(
+      'RGB receive invoice limit reached (maximum 10)'
+    )
+    expect(service.getReceiveInvoiceCapacity()).toEqual({
+      count: 10,
+      limit: 10,
+      available: false,
+    })
+    expect(dependencies.transport.prepareInvoice).toHaveBeenCalledTimes(1)
+
+    await expect(service.cancelBlindReceive(createdBlind.recipientId)).resolves.toEqual({
+      cancelled: true,
+    })
+    await expect(service.createWitnessReceive(witnessInput)).resolves.toMatchObject({
+      recipientType: 'witness',
+    })
+  })
+
   it('preserves unexpired duplicate blind invoices after an empty proxy poll', async () => {
     const dependencies = createDependencies()
     dependencies.transport.getConsignment = vi.fn().mockResolvedValue(undefined)

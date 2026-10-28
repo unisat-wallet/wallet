@@ -46,6 +46,9 @@ type RgbAllocationSummary = {
 
 type RgbPendingReceiveInvoicesResult = {
   list?: RgbPendingReceiveInvoice[]
+  receiveInvoiceCount?: number
+  receiveInvoiceLimit?: number
+  canCreateReceiveInvoice?: boolean
   [key: string]: unknown
 }
 
@@ -130,6 +133,13 @@ const isRgbProxyInvoiceError = (error: unknown) =>
 const isRequestAbortError = (error: unknown) =>
   /signal is aborted without reason|signal timed out|the operation was aborted/i.test(getErrorMessage(error)) ||
   (error as { name?: string } | null)?.name === 'AbortError'
+
+const getRgbReceiveInvoiceLimit = (error: unknown) => {
+  const match = getErrorMessage(error).match(/RGB receive invoice limit reached \(maximum (\d+)\)/i)
+  if (!match) return undefined
+  const limit = Number(match[1])
+  return Number.isSafeInteger(limit) && limit > 0 ? limit : undefined
+}
 
 const getInvoiceCreationErrorMessage = (
   error: unknown,
@@ -372,6 +382,10 @@ export function useRGBReceiveScreenLogic(
   const [cancelLoading, setCancelLoading] = useState(false)
   const [pendingLoading, setPendingLoading] = useState(true)
   const [pendingInvoices, setPendingInvoices] = useState<RgbPendingReceiveInvoice[]>([])
+  const [receiveInvoiceCount, setReceiveInvoiceCount] = useState(0)
+  const [receiveInvoiceLimit, setReceiveInvoiceLimit] = useState(10)
+  const [receiveInvoiceCapacityKnown, setReceiveInvoiceCapacityKnown] = useState(false)
+  const [canCreateReceiveInvoice, setCanCreateReceiveInvoice] = useState<boolean>()
   const [step, setStep] = useState<RGBReceiveScreenStep>(initialStep)
   const [utxoToSignData, setUtxoToSignData] = useState<ToSignData>()
   const [utxoPendingVanillaTxid, setUtxoPendingVanillaTxid] = useState('')
@@ -423,6 +437,9 @@ export function useRGBReceiveScreenLogic(
   const isAmountValid =
     !isFixedMode || (isAmountFormatValid && /[1-9]/.test(normalizedAmount) && !amountExceedsMaximum)
   const amountInvalidVisible = isFixedMode && displayAmount.length > 0 && !isAmountValid
+  const receiveInvoiceLimitReached =
+    canCreateReceiveInvoice === false ||
+    (receiveInvoiceCapacityKnown && receiveInvoiceCount >= receiveInvoiceLimit)
 
   const onAmountChange = (value: string) => {
     if (!canSetFixedAmount) return
@@ -467,6 +484,19 @@ export function useRGBReceiveScreenLogic(
     setPendingLoading(true)
     try {
       const applyPendingInvoices = (value: RgbPendingReceiveInvoicesResult) => {
+        const capacity = getRecordPayload(value) || value
+        const count = Number(capacity['receiveInvoiceCount'])
+        const limit = Number(capacity['receiveInvoiceLimit'])
+        const canCreate = capacity['canCreateReceiveInvoice']
+        if (Number.isSafeInteger(count) && count >= 0) setReceiveInvoiceCount(count)
+        if (Number.isSafeInteger(limit) && limit > 0) setReceiveInvoiceLimit(limit)
+        if (typeof canCreate === 'boolean') setCanCreateReceiveInvoice(canCreate)
+        if (
+          (Number.isSafeInteger(count) && count >= 0 && Number.isSafeInteger(limit) && limit > 0) ||
+          typeof canCreate === 'boolean'
+        ) {
+          setReceiveInvoiceCapacityKnown(true)
+        }
         const list = getPendingInvoiceList(value).filter(
           item => item.invoice && isInvoiceForAsset(item, assetId)
         )
@@ -521,6 +551,7 @@ export function useRGBReceiveScreenLogic(
   const finishCreateInvoice = async (skipSync = false) => {
     setLoadingText(t('rgb_creating_invoice'))
     const value = await createReceiveInvoice(skipSync)
+    setReceiveInvoiceCount(current => current + 1)
     const invoice = getInvoiceText(value)
     const pendingInvoice = getRecordPayload(value)
     const recipientId = readStringPath(pendingInvoice, ['recipientId'])
@@ -589,9 +620,22 @@ export function useRGBReceiveScreenLogic(
     return false
   }
 
+  const handleReceiveInvoiceLimitError = (error: unknown) => {
+    const authoritativeLimit = getRgbReceiveInvoiceLimit(error)
+    if (authoritativeLimit === undefined) return false
+    setReceiveInvoiceLimit(authoritativeLimit)
+    setReceiveInvoiceCount(current => Math.max(current, authoritativeLimit))
+    setCanCreateReceiveInvoice(false)
+    setReceiveInvoiceCapacityKnown(true)
+    // The receive screen renders the localized capacity warning from this state.
+    setError('')
+    return true
+  }
+
   const onCreateInvoice = async () => {
     if (routeAssetId === UNCONFIGURED_RGB_USDT_ASSET_ID) return
     if (!isAmountValid) return
+    if (receiveInvoiceLimitReached) return
     setLoading(true)
     setLoadingText(t('rgb_checking_utxo'))
     setError('')
@@ -608,6 +652,7 @@ export function useRGBReceiveScreenLogic(
       try {
         await finishCreateInvoice(true)
       } catch (invoiceError: unknown) {
+        if (handleReceiveInvoiceLimitError(invoiceError)) return
         if (isInsufficientBtcError(invoiceError)) {
           setInsufficientBtcForInvoice(true)
           setError('')
@@ -670,11 +715,13 @@ export function useRGBReceiveScreenLogic(
       }
     } catch (e: unknown) {
       await abortRgbVanillaTx(utxoPendingVanillaTxid)
-      if (isInsufficientBtcError(e)) {
-        setInsufficientBtcForInvoice(true)
-        setError('')
-      } else {
-        setError(getInvoiceCreationErrorMessage(e, t))
+      if (!handleReceiveInvoiceLimitError(e)) {
+        if (isInsufficientBtcError(e)) {
+          setInsufficientBtcForInvoice(true)
+          setError('')
+        } else {
+          setError(getInvoiceCreationErrorMessage(e, t))
+        }
       }
       setStep('create_invoice')
       setUtxoToSignData(undefined)
@@ -853,6 +900,9 @@ export function useRGBReceiveScreenLogic(
     cancelLoading,
     pendingLoading,
     pendingInvoices,
+    receiveInvoiceCount,
+    receiveInvoiceLimit,
+    receiveInvoiceLimitReached,
     insufficientBtcForInvoice,
     loadPendingInvoices,
     onOpenPendingInvoices,

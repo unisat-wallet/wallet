@@ -2970,6 +2970,9 @@
   "rgb_invoice_maximum_amount": {
     "message": "最大數量為 $amount。"
   },
+  "rgb_receive_invoice_limit_reached": {
+    "message": "最多只能保留 $limit 張尚未結束的 RGB 收款發票。請先取消未使用的發票。"
+  },
   "rgb_amount_precision_invalid": {
     "message": "請輸入最多 $precision 位小數的金額。"
   },

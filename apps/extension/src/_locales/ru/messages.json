@@ -2910,6 +2910,9 @@
   "rgb_invoice_maximum_amount": {
     "message": "Максимальная сумма: $amount."
   },
+  "rgb_receive_invoice_limit_reached": {
+    "message": "Можно иметь не более $limit ожидающих RGB-инвойсов на получение. Отмените неиспользуемый инвойс перед созданием нового."
+  },
   "rgb_amount_precision_invalid": {
     "message": "Введите сумму не более чем с $precision знаками после запятой."
   },

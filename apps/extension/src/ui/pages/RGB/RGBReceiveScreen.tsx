@@ -235,6 +235,8 @@ export default function RGBReceiveScreen({ initialStep = 'create_invoice' }: { i
     setError,
     pendingLoading,
     pendingInvoices,
+    receiveInvoiceLimit,
+    receiveInvoiceLimitReached,
     insufficientBtcForInvoice,
     onClosePendingInvoices,
     onCopyPendingInvoice,
@@ -913,6 +915,14 @@ export default function RGBReceiveScreen({ initialStep = 'create_invoice' }: { i
           ) : null}
 
           {error ? <Text text={error} size="xs" color="danger" wrap /> : null}
+          {receiveInvoiceLimitReached ? (
+            <Text
+              text={t('rgb_receive_invoice_limit_reached', { limit: receiveInvoiceLimit })}
+              size="xs"
+              color="danger"
+              wrap
+            />
+          ) : null}
           {amountInvalidVisible ? (
             <Text
               text={
@@ -932,7 +942,13 @@ export default function RGBReceiveScreen({ initialStep = 'create_invoice' }: { i
           <Button
             text={loading || writeGuardLoading ? loadingText || t('creating') : t('create_invoice')}
             preset="primary"
-            disabled={loading || writeGuardLoading || !isAmountValid}
+            disabled={
+              loading ||
+              writeGuardLoading ||
+              pendingLoading ||
+              receiveInvoiceLimitReached ||
+              !isAmountValid
+            }
             onClick={() => void requestWrite(onCreateInvoice)}
           />
         </Column>

@@ -554,6 +554,9 @@ type RgbPendingReceiveInvoicesRequest = {
 
 type RgbPendingReceiveInvoicesResult = {
   list: RgbPendingReceiveInvoice[]
+  receiveInvoiceCount: number
+  receiveInvoiceLimit: number
+  canCreateReceiveInvoice: boolean
   [key: string]: any
 }
 

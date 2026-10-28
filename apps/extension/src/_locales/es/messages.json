@@ -2901,6 +2901,9 @@
   "rgb_invoice_maximum_amount": {
     "message": "El importe máximo es $amount."
   },
+  "rgb_receive_invoice_limit_reached": {
+    "message": "Puedes tener hasta $limit facturas de recepción RGB pendientes. Cancela una factura sin usar antes de crear otra."
+  },
   "rgb_amount_precision_invalid": {
     "message": "Introduce un importe con hasta $precision decimales."
   },

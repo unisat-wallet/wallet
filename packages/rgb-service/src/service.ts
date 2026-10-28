@@ -64,6 +64,7 @@ import type {
 
 const STORAGE_PREFIX = 'rgb-service:v1:'
 const MAX_RGB_AMOUNT = 0xffff_ffff_ffff_ffffn
+const MAX_PENDING_RECEIVE_INVOICES = 10
 const PROVIDER_ORIGIN_HISTORY_TTL_MS = 24 * 60 * 60 * 1000
 // Keep these in sync with recovery checkpoint validation. Canonical history is
 // wallet state, so accepting a history that cannot be restored would make the
@@ -812,6 +813,24 @@ export class RgbService {
     }
   }
 
+  private assertReceiveInvoiceCapacity() {
+    const capacity = this.getReceiveInvoiceCapacity()
+    if (!capacity.available) {
+      throw new RgbServiceError(
+        `RGB receive invoice limit reached (maximum ${MAX_PENDING_RECEIVE_INVOICES})`
+      )
+    }
+  }
+
+  getReceiveInvoiceCapacity() {
+    const count = this.requireState().pendingReceives?.length || 0
+    return {
+      count,
+      limit: MAX_PENDING_RECEIVE_INVOICES,
+      available: count < MAX_PENDING_RECEIVE_INVOICES,
+    }
+  }
+
   async createBlindReceive(input: {
     assetId?: string
     amount?: string
@@ -846,6 +865,7 @@ export class RgbService {
     ) {
       throw new RgbServiceError('RGB receive duration must be positive')
     }
+    this.assertReceiveInvoiceCapacity()
     const receives = state.pendingReceives || (state.pendingReceives = [])
     const transportEndpoints = this.dependencies.transport.getEndpoints?.() || []
     if (!transportEndpoints.length) {
@@ -922,6 +942,19 @@ export class RgbService {
     providerOrigin?: string
     deferRecoveryCheckpoint?: boolean
   }) {
+    return this.runPendingReceiveOperation(() => this.createWitnessReceiveOnce(input))
+  }
+
+  private async createWitnessReceiveOnce(input: {
+    scriptPubKey: string
+    publicKey: string
+    assetId?: string
+    amount?: string
+    durationSeconds?: number
+    minConfirmations?: number
+    providerOrigin?: string
+    deferRecoveryCheckpoint?: boolean
+  }) {
     const state = this.requireState()
     if (input.minConfirmations !== undefined && (!Number.isSafeInteger(input.minConfirmations) || input.minConfirmations < 1))
       throw new RgbServiceError('RGB receive minConfirmations must be a positive integer')
@@ -933,6 +966,7 @@ export class RgbService {
     ) {
       throw new RgbServiceError('RGB receive duration must be positive')
     }
+    this.assertReceiveInvoiceCapacity()
     const endpoints = this.dependencies.transport.getEndpoints?.() || []
     if (!endpoints.length) throw new RgbServiceError('RGB proxy endpoint is not configured')
     const nonce = randomBytes(16)

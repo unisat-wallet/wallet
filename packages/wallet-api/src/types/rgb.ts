@@ -513,6 +513,9 @@ export interface RgbPendingReceiveInvoice {
 
 export interface RgbPendingReceiveInvoicesResult {
   list: RgbPendingReceiveInvoice[]
+  receiveInvoiceCount: number
+  receiveInvoiceLimit: number
+  canCreateReceiveInvoice: boolean
   [key: string]: any
 }
 

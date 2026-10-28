@@ -2910,6 +2910,9 @@
   "rgb_invoice_maximum_amount": {
     "message": "Le montant maximal est de $amount."
   },
+  "rgb_receive_invoice_limit_reached": {
+    "message": "Vous pouvez avoir jusqu’à $limit factures de réception RGB en attente. Annulez une facture inutilisée avant d’en créer une autre."
+  },
   "rgb_amount_precision_invalid": {
     "message": "Saisissez un montant comportant au maximum $precision décimales."
   },

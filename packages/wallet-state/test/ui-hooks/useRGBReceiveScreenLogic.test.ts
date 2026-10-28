@@ -13,6 +13,49 @@ import {
 import { createHookTestHarness } from './testHelpers'
 
 describe('useRGBReceiveScreenLogic', () => {
+  it('disables invoice creation when the shared receive limit is reached', async () => {
+    const { wrapper, wallet } = createHookTestHarness()
+    wallet.getRgbPendingReceiveInvoices.mockResolvedValue({
+      list: [],
+      receiveInvoiceCount: 10,
+      receiveInvoiceLimit: 10,
+      canCreateReceiveInvoice: false,
+    })
+    const { result } = renderHook(() => useRGBReceiveScreenLogic(), { wrapper })
+
+    await waitFor(() => expect(result.current.receiveInvoiceLimitReached).toBe(true))
+    expect(result.current.receiveInvoiceCount).toBe(10)
+    expect(result.current.receiveInvoiceLimit).toBe(10)
+
+    await act(async () => {
+      await result.current.onCreateInvoice()
+    })
+    expect(wallet.createRgbBlindReceive).not.toHaveBeenCalled()
+    expect(wallet.createRgbWitnessReceive).not.toHaveBeenCalled()
+  })
+
+  it('handles an authoritative invoice-limit rejection before UTXO fallback', async () => {
+    const { wrapper, wallet } = createHookTestHarness()
+    wallet.createRgbWitnessReceive.mockRejectedValue(
+      new Error('RGB receive invoice limit reached (maximum 10)')
+    )
+    const { result } = renderHook(() => useRGBReceiveScreenLogic(), { wrapper })
+
+    await act(async () => {
+      result.current.setRecipientType('witness')
+    })
+    await act(async () => {
+      await result.current.onCreateInvoice()
+    })
+
+    expect(result.current.receiveInvoiceLimitReached).toBe(true)
+    expect(result.current.receiveInvoiceCount).toBe(10)
+    expect(result.current.receiveInvoiceLimit).toBe(10)
+    expect(result.current.error).toBe('')
+    expect(wallet.getRgbAllocationSummary).not.toHaveBeenCalled()
+    expect(wallet.createRgbUtxosBegin).not.toHaveBeenCalled()
+  })
+
   it('includes only the selected token and Any RGB Asset invoices for a token', () => {
     const assetId = 'rgb:test-asset'
     expect(isInvoiceForAsset({ invoice: 'specific', assetId }, assetId)).toBe(true)
