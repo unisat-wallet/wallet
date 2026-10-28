@@ -129,7 +129,7 @@ pnpm mobile:doctor
 ```bash
 # Browser extension
 cd apps/extension
-pnpm build:chrome:mv3:dev
+pnpm build:chrome:dev
 
 ```
 

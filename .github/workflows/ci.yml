@@ -52,4 +52,4 @@ jobs:
         run: pnpm build
 
       - name: Build Chrome MV3 extension
-        run: pnpm --filter unisat-extension build:chrome:mv3
+        run: pnpm --filter unisat-extension build:chrome

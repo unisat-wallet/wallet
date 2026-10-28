@@ -78,7 +78,7 @@ if (artifactVersion !== manifestVersion && !artifactVersion.startsWith(`${manife
 
 const trackedStatusBefore = getGitStatus(['status', '--short', '--untracked-files=no']);
 
-execFileSync('pnpm', ['build:chrome:mv3', `--artifact-version=${artifactVersion}`], {
+execFileSync('pnpm', ['build:chrome', `--artifact-version=${artifactVersion}`], {
   cwd: extensionDir,
   stdio: 'inherit'
 });
