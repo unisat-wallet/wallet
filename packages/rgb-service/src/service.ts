@@ -2,6 +2,7 @@ import {
   RgbBfaValidationUnavailableError,
   RgbInvoiceUnavailableError,
   RgbInsufficientBalanceError,
+  RgbMissingAncestorError,
   RgbProxyOperationNotFoundError,
   RgbServiceError,
   RgbTransferAwaitingAckError,
@@ -114,7 +115,8 @@ function getSpendableAmount(utxo: RgbUtxo, assetId: string) {
 function isIncompleteLocalHistoryError(error: unknown) {
   return (
     error instanceof RgbServiceError &&
-    error.message === 'RGB allocation parent Transition is missing from local history'
+    (error.message === 'RGB allocation parent Transition is missing from local history' ||
+      error instanceof RgbMissingAncestorError)
   )
 }
 
@@ -151,7 +153,7 @@ export class RgbService {
   /** Serialize mutation of each durable send state machine. */
   private readonly pendingTransferOperations = new Map<string, Promise<void>>()
   /** Receive polling and user actions mutate the same durable invoice list. */
-  private pendingReceiveOperation: Promise<void> = Promise.resolve()
+  private pendingReceiveOperation?: Promise<void>
   private openedFromStorage = false
   private recoveryBackupEnabled = false
   private readonly v1AllocationRepairAttempts = new Map<string, number>()
@@ -817,6 +819,17 @@ export class RgbService {
     minConfirmations?: number
     providerOrigin?: string
     /** The caller will immediately claim the recipient and persist the combined state. */
+    deferRecoveryCheckpoint?: boolean
+  }) {
+    return this.runPendingReceiveOperation(() => this.createBlindReceiveOnce(input))
+  }
+
+  private async createBlindReceiveOnce(input: {
+    assetId?: string
+    amount?: string
+    durationSeconds?: number
+    minConfirmations?: number
+    providerOrigin?: string
     deferRecoveryCheckpoint?: boolean
   }) {
     const state = this.requireState()
@@ -1564,10 +1577,13 @@ export class RgbService {
       }
     }
     // Expiration alone does not prove that an offline receiver has not been
-    // sent a consignment. Check the proxy once more before releasing an unused
-    // invoice, and keep it if the proxy is unavailable or has a payload.
-    const getConsignment = this.dependencies.transport.getConsignment
-    if (getConsignment) {
+    // sent a consignment. The durable proxy poll above includes expired
+    // entries and must succeed before this point. Release only entries it did
+    // not return, whether the transport uses single or batch retrieval.
+    if (
+      this.dependencies.transport.getConsignment ||
+      this.dependencies.transport.getConsignments
+    ) {
       const now = Math.floor(this.now() / 1000)
       for (let index = pending.length - 1; index >= 0; index--) {
         const receive = pending[index]!
@@ -1576,18 +1592,11 @@ export class RgbService {
           receive.pendingAccept || receive.pendingValidationFailure || receive.receivedConsignment ||
           receivedByRecipient.has(receive.proxyRecipientId || receive.recipientId)
         ) continue
-        let endpoints: string[]
         try {
-          endpoints = decodeRgbInvoice(receive.invoice).transportEndpoints
+          const endpoints = decodeRgbInvoice(receive.invoice).transportEndpoints
           if (!endpoints.length) continue
-          const consignment = await getConsignment({
-            recipientId: receive.proxyRecipientId || receive.recipientId,
-            endpoints,
-            proxyPrivateKey: receive.proxyPrivateKey,
-          })
-          if (consignment) continue
         } catch {
-          // A network or proxy failure cannot establish that this invoice is unused.
+          // A malformed legacy invoice cannot be confirmed unused.
           continue
         }
         pending.splice(index, 1)
@@ -3834,7 +3843,10 @@ export class RgbService {
     const getConsignment = this.dependencies.transport.getConsignment
     const getConsignments = this.dependencies.transport.getConsignments
     if (!getConsignment && !getConsignments) return []
-    const pending = this.getPendingReceives()
+    // Poll the durable list, including expired entries. A sender may have
+    // uploaded before expiration while this wallet was offline, and cleanup
+    // must observe that payload before releasing the invoice.
+    const pending = (this.requireState().pendingReceives || [])
       .filter(
         receive =>
           (!receive.receivedConsignment?.accepted &&
@@ -3842,10 +3854,16 @@ export class RgbService {
           !receive.receivedConsignment.payload
       )
       .flatMap(receive => {
-        const endpoints = decodeRgbInvoice(receive.invoice).transportEndpoints
-        return endpoints.length
-          ? [{ recipientId: receive.proxyRecipientId || receive.recipientId, endpoints, proxyPrivateKey: receive.proxyPrivateKey }]
-          : []
+        try {
+          const endpoints = decodeRgbInvoice(receive.invoice).transportEndpoints
+          return endpoints.length
+            ? [{ recipientId: receive.proxyRecipientId || receive.recipientId, endpoints, proxyPrivateKey: receive.proxyPrivateKey }]
+            : []
+        } catch {
+          // Malformed migrated state must not block valid receives. Keep the
+          // entry locally because its proxy status cannot be established.
+          return []
+        }
       })
     if (getConsignments) return getConsignments(pending)
     if (!getConsignment) return []
@@ -3896,11 +3914,19 @@ export class RgbService {
    * cannot persist a stale snapshot over another invoice's ACK state.
    */
   private runPendingReceiveOperation<T>(operation: () => Promise<T>) {
-    const current = this.pendingReceiveOperation.catch(() => undefined).then(operation)
-    this.pendingReceiveOperation = current.then(
+    const previous = this.pendingReceiveOperation
+    // Start immediately when the queue is idle. Besides avoiding a needless
+    // microtask delay, this lets invoice creation reserve its outpoint before
+    // another caller can enter the same state machine.
+    const current = previous ? previous.catch(() => undefined).then(operation) : operation()
+    const settled = current.then(
       () => undefined,
       () => undefined
     )
+    this.pendingReceiveOperation = settled
+    void settled.then(() => {
+      if (this.pendingReceiveOperation === settled) this.pendingReceiveOperation = undefined
+    })
     return current
   }
 

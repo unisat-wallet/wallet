@@ -5,6 +5,16 @@ export class RgbServiceError extends Error {
   }
 }
 
+/** A selected allocation points to an operation absent from its validated history DAG. */
+export class RgbMissingAncestorError extends RgbServiceError {
+  readonly code = 'RGB_MISSING_ANCESTOR'
+
+  constructor() {
+    super('RGB v1: selected allocation is missing an ancestor')
+    this.name = 'RgbMissingAncestorError'
+  }
+}
+
 /** Chain data needed for BFA validation is temporarily unavailable. Keep the invoice pending. */
 export class RgbBfaValidationUnavailableError extends RgbServiceError {
   constructor(message: string) {

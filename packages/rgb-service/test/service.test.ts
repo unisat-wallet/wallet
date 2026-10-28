@@ -22,6 +22,7 @@ import {
   rgbProxyInvoiceId,
   RgbBfaValidationUnavailableError,
   RgbInsufficientBalanceError,
+  RgbMissingAncestorError,
   RgbProxyOperationNotFoundError,
   RgbService,
   RgbServiceError,
@@ -765,6 +766,34 @@ describe('RgbService', () => {
       pendingReceives: [],
       releasedReceiveRecipientIds: ['released-recipient'],
     })
+  })
+
+  it('allows a funding UTXO to be reused after its unused blind invoice is cancelled', async () => {
+    const dependencies = createDependencies()
+    vi.mocked(dependencies.stateSource.getSnapshot).mockResolvedValue({
+      syncedAt: 1,
+      utxos: [{
+        outpoint: { txid: 'f'.repeat(64), vout: 0 },
+        satoshis: 1_000,
+        scriptPubKey: `5120${'11'.repeat(32)}`,
+        publicKey: `02${'22'.repeat(32)}`,
+        chainStatus: 'confirmed',
+        confirmations: 1,
+        allocations: [],
+      }],
+    })
+    const service = new RgbService(dependencies)
+    await service.open(wallet)
+    await service.sync()
+
+    const first = await service.createBlindReceive({})
+    await expect(service.cancelBlindReceive(first.recipientId)).resolves.toEqual({
+      cancelled: true,
+    })
+    const second = await service.createBlindReceive({})
+
+    expect(second.seal).toMatchObject({ txid: first.seal.txid, vout: first.seal.vout })
+    expect(second.recipientId).not.toBe(first.recipientId)
   })
 
   it('deletes an unused witness invoice and records a recovery tombstone', async () => {
@@ -2807,6 +2836,245 @@ describe('RgbService', () => {
     expect(service.getAvailableReceiveUtxos()).toEqual([])
   })
 
+  it('serializes concurrent blind invoice creation before selecting a funding UTXO', async () => {
+    const dependencies = createDependencies()
+    vi.mocked(dependencies.stateSource.getSnapshot).mockResolvedValue({
+      syncedAt: 1,
+      utxos: ['e', 'f'].map((prefix, index) => ({
+        outpoint: { txid: prefix.repeat(64), vout: index },
+        satoshis: 1_000,
+        scriptPubKey: `5120${String(index + 1).repeat(64)}`,
+        publicKey: `02${String(index + 2).repeat(64)}`,
+        chainStatus: 'confirmed' as const,
+        confirmations: 1,
+        allocations: [],
+      })),
+    })
+    let releaseFirst!: () => void
+    let firstStarted!: () => void
+    const started = new Promise<void>(resolve => (firstStarted = resolve))
+    dependencies.transport.prepareInvoice = vi.fn()
+      .mockImplementationOnce(async () => {
+        firstStarted()
+        await new Promise<void>(resolve => (releaseFirst = resolve))
+        return undefined
+      })
+      .mockResolvedValue(undefined)
+    const service = new RgbService(dependencies)
+    await service.open(wallet)
+    await service.sync()
+
+    const first = service.createBlindReceive({})
+    await started
+    const second = service.createBlindReceive({})
+    await Promise.resolve()
+    expect(dependencies.transport.prepareInvoice).toHaveBeenCalledTimes(1)
+    releaseFirst()
+
+    const receives = await Promise.all([first, second])
+    expect(dependencies.transport.prepareInvoice).toHaveBeenCalledTimes(2)
+    expect(new Set(receives.map(receive => `${receive.seal.txid}:${receive.seal.vout}`)).size)
+      .toBe(2)
+  })
+
+  it('preserves unexpired duplicate blind invoices after an empty proxy poll', async () => {
+    const dependencies = createDependencies()
+    dependencies.transport.getConsignment = vi.fn().mockResolvedValue(undefined)
+    const service = new RgbService(dependencies)
+    await service.open(wallet)
+    const expirationTimestamp = Math.floor(Date.now() / 1000) + 3_600
+    const outpoint = { txid: 'f'.repeat(64), vout: 2 }
+    const receives = [1n, 2n].map((blinding, index) => {
+      const seal = { ...outpoint, blinding }
+      const invoice = encodeBlindRgbInvoice({
+        network: 'mainnet', seal, expirationTimestamp, transportEndpoints: [proxyEndpoint],
+      })
+      return {
+        invoice,
+        recipientId: decodeRgbInvoice(invoice).recipientId,
+        createdAt: index + 1,
+        expirationTimestamp,
+        seal,
+      }
+    })
+    ;(service as any).state.pendingReceives = receives
+    await service.processClaimedReceives({ includeClaimed: false })
+
+    expect(service.getPendingReceives()).toEqual(receives)
+    expect((service as any).state.releasedReceiveRecipientIds).toBeUndefined()
+  })
+
+  it('releases expired duplicate blind invoices after an empty batch proxy poll', async () => {
+    const dependencies = createDependencies()
+    const getConsignments = vi.fn().mockResolvedValue([])
+    dependencies.transport.getConsignments = getConsignments
+    const service = new RgbService(dependencies)
+    await service.open(wallet)
+    const expirationTimestamp = Math.floor(Date.now() / 1000) - 1
+    const outpoint = { txid: 'f'.repeat(64), vout: 2 }
+    const receives = [1n, 2n].map((blinding, index) => {
+      const seal = { ...outpoint, blinding }
+      const invoice = encodeBlindRgbInvoice({
+        network: 'mainnet', seal, expirationTimestamp, transportEndpoints: [proxyEndpoint],
+      })
+      return {
+        invoice,
+        recipientId: decodeRgbInvoice(invoice).recipientId,
+        createdAt: index + 1,
+        expirationTimestamp,
+        seal,
+      }
+    })
+    const queriedRecipientIds = receives.map(receive => receive.recipientId)
+    ;(service as any).state.pendingReceives = receives
+
+    await service.processClaimedReceives({ includeClaimed: false })
+
+    expect((service as any).state.pendingReceives).toEqual([])
+    expect((service as any).state.releasedReceiveRecipientIds).toEqual(
+      expect.arrayContaining(queriedRecipientIds)
+    )
+    expect(getConsignments).toHaveBeenCalledWith(
+      expect.arrayContaining(queriedRecipientIds.map(recipientId =>
+        expect.objectContaining({ recipientId })
+      ))
+    )
+  })
+
+  it('restores invoice capacity after an empty batch poll for an expired receive', async () => {
+    const dependencies = createDependencies()
+    dependencies.transport.getConsignments = vi.fn().mockResolvedValue([])
+    const service = new RgbService(dependencies)
+    await service.open(wallet)
+    const expirationTimestamp = Math.floor(Date.now() / 1000) - 1
+    const seal = { txid: 'f'.repeat(64), vout: 2, blinding: 1n }
+    const invoice = encodeBlindRgbInvoice({
+      network: 'mainnet', seal, expirationTimestamp, transportEndpoints: [proxyEndpoint],
+    })
+    const receive = {
+      invoice,
+      recipientId: decodeRgbInvoice(invoice).recipientId,
+      createdAt: 1,
+      expirationTimestamp,
+      seal,
+    }
+    ;(service as any).state.pendingReceives = [receive]
+
+    await service.processClaimedReceives({ includeClaimed: false })
+
+    expect((service as any).state.pendingReceives).toEqual([])
+    expect(service.getReceiveInvoiceCapacity()).toEqual({
+      count: 0,
+      limit: 10,
+      available: true,
+    })
+  })
+
+  it('skips a malformed durable invoice while polling valid receives', async () => {
+    const dependencies = createDependencies()
+    const getConsignments = vi.fn().mockResolvedValue([])
+    dependencies.transport.getConsignments = getConsignments
+    const service = new RgbService(dependencies)
+    await service.open(wallet)
+    const now = Math.floor(Date.now() / 1000)
+    const malformedReceive = {
+      invoice: 'not-an-rgb-invoice',
+      recipientId: 'malformed-recipient',
+      createdAt: 1,
+      expirationTimestamp: now - 1,
+    }
+    const seal = { txid: 'f'.repeat(64), vout: 2, blinding: 1n }
+    const invoice = encodeBlindRgbInvoice({
+      network: 'mainnet', seal, expirationTimestamp: now + 3_600,
+      transportEndpoints: [proxyEndpoint],
+    })
+    const validReceive = {
+      invoice,
+      recipientId: decodeRgbInvoice(invoice).recipientId,
+      createdAt: 2,
+      expirationTimestamp: now + 3_600,
+      seal,
+    }
+    ;(service as any).state.pendingReceives = [malformedReceive, validReceive]
+
+    await service.processClaimedReceives({ includeClaimed: false })
+
+    expect(getConsignments).toHaveBeenCalledWith([
+      expect.objectContaining({ recipientId: validReceive.recipientId }),
+    ])
+    expect((service as any).state.pendingReceives).toEqual([
+      malformedReceive,
+      validReceive,
+    ])
+  })
+
+  it('preserves an expired duplicate when its batch proxy entry has a consignment', async () => {
+    const dependencies = createDependencies()
+    const getConsignments = vi.fn()
+    dependencies.transport.getConsignments = getConsignments
+    const service = new RgbService(dependencies)
+    await service.open(wallet)
+    const expirationTimestamp = Math.floor(Date.now() / 1000) - 1
+    const outpoint = { txid: 'f'.repeat(64), vout: 2 }
+    const receives = [1n, 2n].map((blinding, index) => {
+      const seal = { ...outpoint, blinding }
+      const invoice = encodeBlindRgbInvoice({
+        network: 'mainnet', seal, expirationTimestamp, transportEndpoints: [proxyEndpoint],
+      })
+      return {
+        invoice,
+        recipientId: decodeRgbInvoice(invoice).recipientId,
+        createdAt: index + 1,
+        expirationTimestamp,
+        seal,
+      }
+    })
+    const discardedRecipientId = receives[0]!.recipientId
+    const protectedReceive = receives[1]!
+    getConsignments.mockResolvedValue([{
+      recipientId: protectedReceive.recipientId,
+      payload: 'consignment',
+    }])
+    ;(service as any).state.pendingReceives = receives
+
+    await service.processClaimedReceives({ includeClaimed: false })
+
+    expect((service as any).state.pendingReceives).toEqual([
+      expect.objectContaining({ recipientId: protectedReceive.recipientId }),
+    ])
+    expect((service as any).state.releasedReceiveRecipientIds).toEqual([
+      discardedRecipientId,
+    ])
+  })
+
+  it('does not invalidate duplicate blind invoices that are already in use', async () => {
+    const dependencies = createDependencies()
+    dependencies.transport.getConsignment = vi.fn().mockResolvedValue(undefined)
+    const service = new RgbService(dependencies)
+    await service.open(wallet)
+    const expirationTimestamp = Math.floor(Date.now() / 1000) + 3_600
+    const outpoint = { txid: 'f'.repeat(64), vout: 2 }
+    const receives = [1n, 2n].map((blinding, index) => {
+      const seal = { ...outpoint, blinding }
+      const invoice = encodeBlindRgbInvoice({
+        network: 'mainnet', seal, expirationTimestamp, transportEndpoints: [proxyEndpoint],
+      })
+      return {
+        invoice,
+        recipientId: decodeRgbInvoice(invoice).recipientId,
+        createdAt: index + 1,
+        expirationTimestamp,
+        seal,
+        pendingAccept: { payload: 'payload', txid: `${index}`.repeat(64) },
+      }
+    })
+    ;(service as any).state.pendingReceives = receives
+
+    await service.processClaimedReceives({ includeClaimed: false })
+
+    expect(service.getPendingReceives()).toEqual(receives)
+  })
+
   it('stores a proxy v1 invoice key alongside the registered blind receive', async () => {
     const dependencies = createDependencies()
     vi.mocked(dependencies.stateSource.getSnapshot).mockResolvedValue({
@@ -3340,7 +3608,7 @@ describe('RgbService', () => {
     )
   })
 
-  it('refetches history when a checkpoint index claims an allocation missing from its payload', async () => {
+  it('refetches history when a selected allocation is missing from its local payload', async () => {
     const dependencies = createDependencies()
     const service = new RgbService(dependencies)
     await service.open(wallet)
@@ -3357,9 +3625,7 @@ describe('RgbService', () => {
       },
     }
     vi.mocked(dependencies.encoder.prepareTransfer)
-      .mockRejectedValueOnce(
-        new RgbServiceError('RGB allocation parent Transition is missing from local history')
-      )
+      .mockRejectedValueOnce(new RgbMissingAncestorError())
       .mockResolvedValueOnce({
         id: 'transfer-recovered-history',
         psbt: 'cHNidP8=',

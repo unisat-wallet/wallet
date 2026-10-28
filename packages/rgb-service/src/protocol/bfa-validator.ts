@@ -1,6 +1,10 @@
 import { sha256 } from '@noble/hashes/sha256'
 import { Transaction } from 'bitcoinjs-lib'
-import { RgbBfaValidationUnavailableError, RgbServiceError } from '../errors'
+import {
+  RgbBfaValidationUnavailableError,
+  RgbMissingAncestorError,
+  RgbServiceError,
+} from '../errors'
 import { verifyBfaRejectList } from './bfa-reject-list'
 import { transitionBundleId } from './bundle'
 import { BFA_SCHEMA_ID, NIA_V1_SCHEMA_ID, encodeBfaTransferConsignment } from './bfa-consignment'
@@ -170,10 +174,10 @@ export function selectBfaSpendHistory(
   const needed = new Set<number>()
   const visiting = new Set<number>()
   const rootId = rgbContractIdHex(history.assetId)
-  const include = (opId: string) => {
+  const include = (opId: string): void => {
     if (opId.toLowerCase() === rootId) return
     const index = byOperation.get(opId.toLowerCase())
-    if (index === undefined) fail('selected allocation is missing an ancestor')
+    if (index === undefined) throw new RgbMissingAncestorError()
     if (needed.has(index)) return
     if (visiting.has(index)) fail('cyclic witness history')
     visiting.add(index)

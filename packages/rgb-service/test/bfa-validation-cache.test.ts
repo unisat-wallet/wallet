@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
+import { RgbMissingAncestorError } from '../src/errors'
 import { cacheBfaBitcoinStatus, cacheBfaEvmRpc, cacheConfirmedBfaWitnesses, pruneConfirmedBfaWitnesses, selectBfaSpendHistory } from '../src/protocol/bfa-validator'
 
 describe('BFA EVM validation RPC cache', () => {
@@ -138,6 +139,7 @@ describe('outgoing v1 history selection', () => {
     }
     const selectedHistory = selectBfaSpendHistory(history, [selected])
     expect(selectedHistory.witnessBundles.map(bytes => bytes[0])).toEqual([1, 3])
-    expect(() => selectBfaSpendHistory(history, ['55'.repeat(32)])).toThrow('missing an ancestor')
+    expect(() => selectBfaSpendHistory(history, ['55'.repeat(32)]))
+      .toThrow(RgbMissingAncestorError)
   })
 })
