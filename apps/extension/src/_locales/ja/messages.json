@@ -3594,5 +3594,7 @@
   "rgb_donation_send_hint": { "message": "受取人によるRGB転送の承認を待たずに送信します。" },
   "rgb_donation_send_description": { "message": "先にRGB転送を届け、その後、受取人の承認を待たずにBitcoin取引をブロードキャストします。受取人はRGB転送を拒否できますが、承認済みのBitcoin取引は取り消せません。" },
   "rgb_donation_send_ack": { "message": "受取人が拒否してもBitcoin取引は停止されないことを理解しました。" },
-  "rgb_donation_send_enable": { "message": "有効にする" }
+  "rgb_donation_send_enable": { "message": "有効にする" },
+  "signing_pubkey_not_in_script_risk_title": { "message": "署名スクリプトを検証できません" },
+  "signing_pubkey_not_in_script_risk_description": { "message": "1つ以上の入力スクリプトに署名公開鍵が含まれていません。特殊なプロトコルでは正当な場合がありますが、ウォレットは標準のスクリプト検査で署名権限を確認できません。この取引を理解し、信頼できる場合のみ続行してください。" }
 }

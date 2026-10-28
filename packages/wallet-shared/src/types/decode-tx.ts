@@ -24,6 +24,7 @@ export enum RiskType {
   ALKANES_BURNING,
   ALKANES_MULTIPLE_ASSETS,
   UTXO_INDEXING,
+  SIGNING_PUBKEY_NOT_IN_SCRIPT,
 }
 
 export interface Risk {

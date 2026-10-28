@@ -3660,5 +3660,7 @@
   "rgb_donation_send_hint": { "message": "無需等待收款方確認 RGB 轉帳。" },
   "rgb_donation_send_description": { "message": "錢包會先交付 RGB 轉帳，再於收款方接受前廣播 Bitcoin 交易。收款方仍可拒絕 RGB 轉帳，但已確認的 Bitcoin 交易無法撤銷。" },
   "rgb_donation_send_ack": { "message": "我了解收款方拒絕不會阻止 Bitcoin 交易確認。" },
-  "rgb_donation_send_enable": { "message": "啟用" }
+  "rgb_donation_send_enable": { "message": "啟用" },
+  "signing_pubkey_not_in_script_risk_title": { "message": "無法驗證的簽名腳本" },
+  "signing_pubkey_not_in_script_risk_description": { "message": "一個或多個輸入腳本未包含簽名公鑰。特殊協議中這可能是正常情況，但錢包無法透過標準腳本檢查確認簽名權限。請僅在理解並信任此交易時繼續。" }
 }

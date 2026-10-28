@@ -171,6 +171,11 @@ function getRiskContentKey(riskType: RiskType) {
         title: 'utxo_indexing_risk_title',
         description: 'utxo_indexing_risk_description'
       };
+    case RiskType.SIGNING_PUBKEY_NOT_IN_SCRIPT:
+      return {
+        title: 'signing_pubkey_not_in_script_risk_title',
+        description: 'signing_pubkey_not_in_script_risk_description'
+      };
     default:
       return {
         title: 'unknown_risk_title',

@@ -34,16 +34,19 @@ index b071f374f9d9b2a0bb6f4385550ace3166ea16f8..a08a3c3ffebb448736c194713643221b
  }
  function hasSigs(neededSigs, partialSig, pubkeys) {
    if (!partialSig) return false;
-@@ -1194,7 +1204,7 @@ function getHashAndSighashType(
+@@ -1194,7 +1204,10 @@ function getHashAndSighashType(
      false,
      sighashTypes,
    );
 -  checkScriptForPubkey(pubkey, script, 'sign');
++  // Specialized protocols may require signatures where standard script parsing
++  // cannot find the public key. The normal SignPsbt approval adds a danger risk
++  // and requires explicit user confirmation before allowing such a signature.
 +  // checkScriptForPubkey(pubkey, script, 'sign');
    return {
      hash,
      sighashType,
-@@ -1254,25 +1264,28 @@ function getHashForSig(inputIndex, input, cache, forValidate, sighashTypes) {
+@@ -1254,25 +1267,28 @@ function getHashForSig(inputIndex, input, cache, forValidate, sighashTypes) {
        sighashType,
      );
    } else {
@@ -90,12 +93,20 @@ index b071f374f9d9b2a0bb6f4385550ace3166ea16f8..a08a3c3ffebb448736c194713643221b
      hash = unsignedTx.hashForSignature(
        inputIndex,
        meaningfulScript,
-@@ -1342,7 +1355,7 @@ function getTaprootHashesForSig(
+@@ -1342,7 +1358,15 @@ function getTaprootHashesForSig(
      }
    }
    const tapLeafHashes = (input.tapLeafScript || [])
 -    .filter(tapLeaf => (0, psbtutils_1.pubkeyInScript)(pubkey, tapLeaf.script))
-+    // .filter(tapLeaf => (0, psbtutils_1.pubkeyInScript)(pubkey, tapLeaf.script))
++    // Keep the upstream pubkey filter for automatic leaf selection. A specialized
++    // protocol may bypass it only by explicitly selecting tapLeafHashToSign; the
++    // normal SignPsbt approval then adds a user-confirmable danger warning when
++    // the selected leaf does not reference the signing public key.
++    .filter(
++      tapLeaf =>
++        !!tapLeafHashToSign ||
++        (0, psbtutils_1.pubkeyInScript)(pubkey, tapLeaf.script),
++    )
      .map(tapLeaf => {
        const hash = (0, bip341_1.tapleafHash)({
          output: tapLeaf.script,

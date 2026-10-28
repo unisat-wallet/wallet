@@ -100,6 +100,7 @@ import { getChainInfo } from '../shared/utils'
 import { chainTypeToCanonicalNetwork } from '../shared/utils/deriveContextHash'
 import { bgEventBus } from '../utils/eventBus'
 import { getEstimateFee, psbtFromString } from '../utils/psbt-utils'
+import { getSigningPubkeyRisk } from '../utils/psbt-signing-risk'
 
 import { assertValidFeeRate, baseUtils, bnUtils, paramsUtils } from '@unisat/base-utils'
 import {
@@ -3315,8 +3316,16 @@ export class WalletController extends BaseController {
     return walletApiService.brc20.getInscribeResult(orderId)
   }
 
-  decodePsbt = (psbtHex: string, website: string) => {
-    return walletApiService.bitcoin.decodePsbt(psbtHex, website)
+  decodePsbt = async (psbtHex: string, website: string, toSignInputs?: ToSignInput[]) => {
+    const decodedPsbt = await walletApiService.bitcoin.decodePsbt(psbtHex, website)
+    const signingPubkeyRisk = getSigningPubkeyRisk(psbtHex, toSignInputs)
+    if (
+      signingPubkeyRisk &&
+      !decodedPsbt.risks.some(risk => risk.type === signingPubkeyRisk.type)
+    ) {
+      decodedPsbt.risks.push(signingPubkeyRisk)
+    }
+    return decodedPsbt
   }
 
   analyzeLocalPsbts = async (toSignDatas: ToSignData[]): Promise<LocalPsbtSummary> => {

@@ -358,7 +358,11 @@ export interface WalletController {
   ): Promise<InscribeOrder>
   getInscribeResult(orderId: string): Promise<TokenTransfer>
 
-  decodePsbt(psbtHex: string, website: string): Promise<DecodedPsbt>
+  decodePsbt(
+    psbtHex: string,
+    website: string,
+    toSignInputs?: ToSignInput[]
+  ): Promise<DecodedPsbt>
   analyzeLocalPsbts(toSignDatas: ToSignData[]): Promise<LocalPsbtSummary>
 
   decodeContracts(contracts: any[], account: any): Promise<any[]>

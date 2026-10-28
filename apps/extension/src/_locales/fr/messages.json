@@ -3592,5 +3592,7 @@
   "rgb_donation_send_hint": { "message": "Envoyer sans attendre la confirmation RGB du destinataire." },
   "rgb_donation_send_description": { "message": "Le transfert RGB est d’abord livré, puis la transaction Bitcoin est diffusée sans attendre l’acceptation du destinataire. Celui-ci peut refuser le transfert RGB, mais une transaction Bitcoin confirmée ne peut pas être annulée." },
   "rgb_donation_send_ack": { "message": "Je comprends qu’un refus n’arrêtera pas la transaction Bitcoin." },
-  "rgb_donation_send_enable": { "message": "Activer" }
+  "rgb_donation_send_enable": { "message": "Activer" },
+  "signing_pubkey_not_in_script_risk_title": { "message": "Script de signature non vérifié" },
+  "signing_pubkey_not_in_script_risk_description": { "message": "La clé publique de signature n’est pas référencée par un ou plusieurs scripts d’entrée. Cela peut être valide pour des protocoles spécialisés, mais le portefeuille ne peut pas vérifier l’autorisation de signature avec les contrôles de script standard. Continuez uniquement si vous comprenez cette transaction et lui faites confiance." }
 }

@@ -194,7 +194,11 @@ export function useSignPsbtLogic(props: SignPsbtProps) {
     try {
       setLoading(true)
 
-      const decodedPsbt = await wallet.decodePsbt(currentToSignData.psbtHex, session?.origin || '')
+      const decodedPsbt = await wallet.decodePsbt(
+        currentToSignData.psbtHex,
+        session?.origin || '',
+        currentToSignData.toSignInputs
+      )
       decodedPsbtDatas.current[signingTxIndex] = decodedPsbt
     } catch (e) {
       logger.error('Failed to decode PSBT data:', e)
