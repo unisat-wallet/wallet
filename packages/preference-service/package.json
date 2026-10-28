@@ -37,7 +37,7 @@
     "@unisat/wallet-storage": "workspace:*",
     "debounce": "^1.2.1",
     "eventemitter3": "^5.0.1",
-    "lodash": "^4.17.21"
+    "lodash": "^4.18.1"
   },
   "devDependencies": {
     "@types/debounce": "^1.2.4",

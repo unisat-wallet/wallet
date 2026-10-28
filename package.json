@@ -54,7 +54,8 @@
   "packageManager": "pnpm@8.6.0",
   "pnpm": {
     "overrides": {
-      "react-redux": "^8.0.5"
+      "react-redux": "^8.0.5",
+      "ws@>=7.0.0 <8.0.0": "7.5.13"
     },
     "patchedDependencies": {
       "bitcore-lib@10.0.0": "patches/bitcore-lib@10.0.0.patch",

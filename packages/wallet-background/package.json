@@ -58,8 +58,8 @@
     "debounce": "^1.2.1",
     "eventemitter3": "^5.0.1",
     "koa-compose": "^4.1.0",
-    "lodash": "^4.17.21",
-    "lodash-es": "^4.17.21",
+    "lodash": "^4.18.1",
+    "lodash-es": "^4.18.1",
     "loglevel": "^1.8.1",
     "randomstring": "^1.2.3",
     "reflect-metadata": "^0.1.13"
