@@ -7,7 +7,7 @@ import {
   MsgDelegate,
   MsgUndelegate,
 } from 'cosmjs-types/cosmos/staking/v1beta1/tx.js'
-import { TxBody } from 'cosmjs-types/cosmos/tx/v1beta1/tx.js'
+import { AuthInfo, TxBody } from 'cosmjs-types/cosmos/tx/v1beta1/tx.js'
 import { BinaryWriter } from 'cosmjs-types/binary.js'
 
 import {
@@ -184,6 +184,41 @@ describe('cosmos utils', () => {
       ],
       fee: { amounts: [{ denom: 'ubbn', amount: '2' }], gasLimit: '200000' },
     })
+  })
+
+  it('shows timeout height and rejects unsupported transaction-level options', () => {
+    const timedSignDoc = validDirectSignDoc()
+    const timedBody = TxBody.decode(timedSignDoc.bodyBytes)
+    timedBody.timeoutHeight = 123n
+    timedSignDoc.bodyBytes = TxBody.encode(timedBody).finish()
+    expect(validateCosmosDirectSignDoc(timedSignDoc).summary.timeoutHeight).toBe('123')
+
+    const extensionSignDoc = validDirectSignDoc()
+    const extensionBody = TxBody.decode(extensionSignDoc.bodyBytes)
+    extensionBody.extensionOptions.push({
+      typeUrl: '/example.security.v1.Extension',
+      value: new Uint8Array([1]),
+    })
+    extensionSignDoc.bodyBytes = TxBody.encode(extensionBody).finish()
+    expect(() => validateCosmosDirectSignDoc(extensionSignDoc)).toThrow('extension options')
+
+    const nonCriticalSignDoc = validDirectSignDoc()
+    const nonCriticalBody = TxBody.decode(nonCriticalSignDoc.bodyBytes)
+    nonCriticalBody.nonCriticalExtensionOptions.push({
+      typeUrl: '/example.security.v1.NonCriticalExtension',
+      value: new Uint8Array([1]),
+    })
+    nonCriticalSignDoc.bodyBytes = TxBody.encode(nonCriticalBody).finish()
+    expect(() => validateCosmosDirectSignDoc(nonCriticalSignDoc)).toThrow('extension options')
+
+    const tippedSignDoc = validDirectSignDoc()
+    const tippedAuthInfo = AuthInfo.decode(tippedSignDoc.authInfoBytes)
+    tippedAuthInfo.tip = {
+      amount: [{ denom: 'ubbn', amount: '10' }],
+      tipper: signerAddress,
+    }
+    tippedSignDoc.authInfoBytes = AuthInfo.encode(tippedAuthInfo).finish()
+    expect(() => validateCosmosDirectSignDoc(tippedSignDoc)).toThrow('tips are not supported')
   })
 
   it.each([

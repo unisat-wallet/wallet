@@ -48,6 +48,7 @@ export interface CosmosDirectSignSummary {
   accountNumber: string
   sequence: string
   memo: string
+  timeoutHeight: string
   fee: {
     amounts: CosmosSignAmount[]
     gasLimit: string
@@ -476,6 +477,12 @@ export function validateCosmosDirectSignDoc(
     throw new Error('Cosmos SignDoc must contain between 1 and 64 messages')
   }
   assertValidCosmosMemo(txBody.memo)
+  if (txBody.extensionOptions.length > 0 || txBody.nonCriticalExtensionOptions.length > 0) {
+    throw new Error('Cosmos transaction extension options are not supported')
+  }
+  if (authInfo.tip) {
+    throw new Error('Cosmos transaction tips are not supported')
+  }
 
   if (authInfo.signerInfos.length !== 1) {
     throw new Error('Cosmos SignDoc must contain exactly one signer')
@@ -548,6 +555,7 @@ export function validateCosmosDirectSignDoc(
       accountNumber: accountNumber.toString(),
       sequence: signerInfo.sequence.toString(),
       memo: txBody.memo,
+      timeoutHeight: txBody.timeoutHeight.toString(),
       fee: {
         amounts: (authInfo.fee?.amount || []).map(coinToSummary),
         gasLimit: (authInfo.fee?.gasLimit || 0n).toString(),

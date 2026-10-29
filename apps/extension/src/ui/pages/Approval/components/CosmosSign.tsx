@@ -1,4 +1,5 @@
 import { type ReactNode, useState } from 'react';
+import { Buffer } from 'buffer';
 
 import { Button, Card, Column, Content, Footer, Header, Icon, Layout, Row, Text } from '@/ui/components';
 import { CopyableAddress } from '@/ui/components/CopyableAddress';
@@ -241,6 +242,10 @@ function CosmosDirectDetails({ summary }: { summary: CosmosDirectSignSummary }) 
             value={summary.fee.amounts.length ? formatCosmosAmounts(summary.fee.amounts) : 'No fee'}
           />
           <CosmosDetailRow label="Gas limit" value={summary.fee.gasLimit} />
+          <CosmosDetailRow
+            label="Timeout height"
+            value={summary.timeoutHeight === '0' ? 'None' : summary.timeoutHeight}
+          />
           {summary.fee.payer ? <CosmosAddressRow label="Fee payer" address={summary.fee.payer} /> : null}
           {summary.fee.granter ? <CosmosAddressRow label="Fee granter" address={summary.fee.granter} /> : null}
           <CosmosDetailRow label="Memo" value={summary.memo || 'None'} />
@@ -255,29 +260,32 @@ function CosmosArbitraryDetails({
 }: {
   data: Props['params']['data'];
 }) {
-  const message = data.data === '' || data.data === undefined ? '(empty message)' : String(data.data);
+  const display = decodeCosmosArbitraryDisplay(data);
   return (
     <>
+      {display.warning ? <CosmosNotice text={display.warning} danger /> : null}
       <Card style={{ display: 'block' }}>
         <Column gap="md" fullX>
           <Row itemsCenter gap="sm">
             <Icon icon="singer-info" color="gold" size={20} />
             <Text text="Message to sign" preset="bold" />
           </Row>
-          <div
-            style={{
-              padding: 12,
-              borderRadius: 10,
-              background: 'rgba(255,255,255,0.05)',
-              userSelect: 'text',
-              maxHeight: 220,
-              overflow: 'auto',
-              whiteSpace: 'pre-wrap',
-              wordBreak: 'break-word',
-              lineHeight: '20px'
-            }}>
-            {message}
-          </div>
+          {display.isBinary ? (
+            <>
+              {display.utf8Text !== undefined ? (
+                <Column gap="xs" fullX>
+                  <Text text="UTF-8" size="xs" color="textDim" />
+                  <CosmosMessageBlock text={display.utf8Text || '(empty message)'} />
+                </Column>
+              ) : null}
+              <Column gap="xs" fullX>
+                <Text text="Hex" size="xs" color="textDim" />
+                <CosmosMessageBlock text={display.hex || '0x'} />
+              </Column>
+            </>
+          ) : (
+            <CosmosMessageBlock text={display.text} />
+          )}
         </Column>
       </Card>
       <Card style={{ display: 'block' }}>
@@ -287,10 +295,111 @@ function CosmosArbitraryDetails({
           <CosmosAddressRow label="Signer" address={data.signerAddress} />
           <CosmosDetailRow label="Format" value="ADR-36 (domain-separated)" />
           <CosmosDetailRow label="Data encoding" value={data.dataType || 'Unknown'} />
+          {display.isBinary ? <CosmosDetailRow label="Byte length" value={String(display.byteLength)} /> : null}
         </Column>
       </Card>
     </>
   );
+}
+
+function CosmosMessageBlock({ text }: { text: string }) {
+  return (
+    <div
+      style={{
+        padding: 12,
+        borderRadius: 10,
+        background: 'rgba(255,255,255,0.05)',
+        userSelect: 'text',
+        maxHeight: 220,
+        overflow: 'auto',
+        whiteSpace: 'pre-wrap',
+        wordBreak: 'break-word',
+        lineHeight: '20px'
+      }}>
+      {text}
+    </div>
+  );
+}
+
+function decodeCosmosArbitraryDisplay(data: Props['params']['data']): {
+  isBinary: boolean;
+  text: string;
+  utf8Text?: string;
+  hex?: string;
+  byteLength?: number;
+  warning?: string;
+} {
+  if (data.dataType !== 'Uint8Array') {
+    return {
+      isBinary: false,
+      text: data.data === '' || data.data === undefined ? '(empty message)' : String(data.data)
+    };
+  }
+
+  if (typeof data.data !== 'string') {
+    return {
+      isBinary: true,
+      text: '',
+      hex: '',
+      byteLength: 0,
+      warning: 'This binary message could not be decoded. Do not sign unless you can verify the exact data.'
+    };
+  }
+
+  const bytes = Buffer.from(data.data, 'base64');
+  if (bytes.toString('base64') !== data.data) {
+    return {
+      isBinary: true,
+      text: '',
+      hex: '',
+      byteLength: bytes.length,
+      warning: 'This binary message has invalid Base64 encoding. Signing is unsafe.'
+    };
+  }
+
+  const hex = `0x${bytes.toString('hex')}`;
+  try {
+    const utf8Text = new TextDecoder('utf-8', { fatal: true }).decode(bytes);
+    const containsInvisibleControls = hasInvisibleOrControlCharacters(utf8Text);
+    return {
+      isBinary: true,
+      text: '',
+      utf8Text,
+      hex,
+      byteLength: bytes.length,
+      warning: containsInvisibleControls
+        ? 'This binary message contains invisible or control characters. Verify the Hex data before signing.'
+        : undefined
+    };
+  } catch {
+    return {
+      isBinary: true,
+      text: '',
+      hex,
+      byteLength: bytes.length,
+      warning: 'This binary message is not valid UTF-8 and cannot be interpreted as readable text. Verify the Hex data before signing.'
+    };
+  }
+}
+
+function hasInvisibleOrControlCharacters(text: string) {
+  for (const character of text) {
+    const codePoint = character.codePointAt(0) ?? 0;
+    if (
+      (codePoint >= 0x00 && codePoint <= 0x08) ||
+      codePoint === 0x0b ||
+      codePoint === 0x0c ||
+      (codePoint >= 0x0e && codePoint <= 0x1f) ||
+      (codePoint >= 0x7f && codePoint <= 0x9f) ||
+      (codePoint >= 0x200b && codePoint <= 0x200f) ||
+      (codePoint >= 0x202a && codePoint <= 0x202e) ||
+      (codePoint >= 0x2060 && codePoint <= 0x206f) ||
+      codePoint === 0xfeff
+    ) {
+      return true;
+    }
+  }
+  return false;
 }
 
 function CosmosAddressRow({ label, address }: { label: string; address: string }) {
