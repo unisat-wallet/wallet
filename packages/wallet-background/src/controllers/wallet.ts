@@ -11,6 +11,7 @@ import {
   arbitrarySignDocToBytesHex,
   assertValidCosmosMemo,
   getDelegationsV2,
+  publicKeyHexToAddress,
   validateCosmosDirectSignDoc,
 } from '@unisat/babylon-service'
 import { ColdWalletKeyring, KeystoneKeyring } from '@unisat/keyring-service'
@@ -7208,10 +7209,21 @@ export class WalletController extends BaseController {
   }
 
   getBabylonAddress = async (chainId: string) => {
-    const cosmosKeyring = await this.getCosmosKeyring(chainId)
-    if (!cosmosKeyring) return null
-    const address = cosmosKeyring.getKey().bech32Address
-    return address
+    if (!hasOwn(this.cosmosChainInfoMap, chainId)) {
+      throw new Error('Not supported chainId')
+    }
+    if (!keyringService.memStore.getState().isUnlocked) {
+      throw new Error(t('you_need_to_unlock_wallet_first'))
+    }
+
+    const currentAccount = await this.getCurrentAccount()
+    if (!currentAccount) return null
+
+    const chainInfo = this.cosmosChainInfoMap[chainId]!
+    return publicKeyHexToAddress(
+      currentAccount.pubkey,
+      chainInfo.bech32Config.bech32PrefixAccAddr
+    )
   }
 
   getBabylonAddressSummary = async (babylonChainId: string, babylonConfig: BabylonConfigV2) => {

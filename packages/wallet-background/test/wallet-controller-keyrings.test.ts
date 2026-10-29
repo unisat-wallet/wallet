@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
+import { publicKeyHexToAddress } from '@unisat/babylon-service'
 import { KeyringType } from '@unisat/keyring-service/types'
 import { RgbTransferAwaitingAckError, RgbTransferRejectedError } from '@unisat/rgb-service'
 import * as txHelpers from '@unisat/tx-helpers'
@@ -32,6 +33,7 @@ vi.mock('@unisat/babylon-service', () => ({
     }
   }),
   getDelegationsV2: vi.fn(),
+  publicKeyHexToAddress: vi.fn(),
   CosmosKeyring: vi.fn(),
 }))
 
@@ -45,6 +47,9 @@ vi.mock('../src/services', () => ({
     importPublicKeyOnly: vi.fn(),
     getEncryptedStorageItem: vi.fn(),
     setEncryptedStorageItem: vi.fn(),
+    memStore: {
+      getState: vi.fn(() => ({ isUnlocked: true })),
+    },
     keyrings: [],
   },
   preferenceService: {
@@ -98,6 +103,27 @@ describe('chain type validation', () => {
       await expect(wallet.getCosmosKeyring(chainType)).rejects.toThrow('Not supported chainId')
     }
   )
+})
+
+describe('Babylon address derivation', () => {
+  it('derives the address locally without creating an RPC-backed Cosmos keyring', async () => {
+    const wallet = new WalletController()
+    wallet.cosmosChainInfoMap['bbn-1'] = {
+      bech32Config: { bech32PrefixAccAddr: 'bbn' },
+    } as any
+    vi.spyOn(wallet, 'getCurrentAccount').mockResolvedValue({
+      pubkey: validCompressedPubkey,
+      type: KeyringType.HdKeyring,
+    } as any)
+    const getCosmosKeyring = vi.spyOn(wallet, 'getCosmosKeyring')
+    vi.mocked(publicKeyHexToAddress).mockReturnValue('bbn1locallyderived')
+
+    await expect(wallet.getBabylonAddress('bbn-1')).resolves.toBe('bbn1locallyderived')
+
+    expect(publicKeyHexToAddress).toHaveBeenCalledWith(validCompressedPubkey, 'bbn')
+    expect(getCosmosKeyring).not.toHaveBeenCalled()
+    expect(keyringService.getKeyringForAccount).not.toHaveBeenCalled()
+  })
 })
 
 describe('Cosmos memo validation', () => {
