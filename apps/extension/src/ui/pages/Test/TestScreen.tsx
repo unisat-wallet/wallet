@@ -79,6 +79,7 @@ export default function TestScreen() {
           chainId: COSMOS_TEST_CHAIN_ID,
           accountNumber: 'Preview value',
           sequence: 'Preview value',
+          timeoutHeight: '0',
           memo: 'UniSat Cosmos signing authorization test',
           fee: {
             amounts: [{ denom: chain.feeCurrencies[0].coinMinimalDenom, amount: '1' }],
