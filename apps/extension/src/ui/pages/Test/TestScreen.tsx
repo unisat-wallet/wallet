@@ -1,12 +1,12 @@
 import { useRef, useState } from 'react';
 
 import { Button, Column, Content, Header, Layout, Text } from '@/ui/components';
-import { CosmosDirectSignSummary } from '@unisat/babylon-service';
+import type { CosmosDirectSignSummary } from '@unisat/babylon-service';
 import { COSMOS_CHAINS_MAP } from '@unisat/babylon-service/types';
 import { ProviderMethodArgs, ProviderMethods } from '@unisat/wallet-background/types';
 import { DummyTxType, SignMessageType, ToSignData } from '@unisat/wallet-shared';
 import { useAsyncEffect, useTools, useWallet } from '@unisat/wallet-state';
-import { ChainType } from '@unisat/wallet-types';
+import { ChainType, NetworkType } from '@unisat/wallet-types';
 import { CosmosSign } from '../Approval/components';
 
 const DUMMY_SESSION = {
@@ -140,7 +140,8 @@ export default function TestScreen() {
     <Layout>
       <Header title="TestScreen" />
       <Content>
-        <Column>
+        <Column gap="md">
+          <Text text="Bitcoin signing authorization" preset="bold" />
           <Button
             text="SignPsbt"
             onClick={() => {
@@ -203,7 +204,19 @@ export default function TestScreen() {
           <Text text="Cosmos signing authorization" preset="bold" />
           <Button text="Cosmos Direct Sign (Self Transfer Preview)" onClick={requestCosmosDirectApproval} />
           <Button text="Cosmos ADR-36 Sign" onClick={requestCosmosArbitraryApproval} />
+          <Button
+            text="Cosmos Enable"
+            onClick={() => {
+              requestApproval({
+                method: 'cosmosEnable',
+                params: {
+                  chainId: COSMOS_TEST_CHAIN_ID
+                }
+              });
+            }}
+          />
 
+          <Text text="Network authorization" preset="bold" />
           <Button
             text="Switch Chain"
             onClick={() => {
@@ -211,6 +224,31 @@ export default function TestScreen() {
                 method: 'switchChain',
                 params: {
                   chain: ChainType.BITCOIN_MAINNET
+                }
+              });
+            }}
+          />
+          <Button
+            text="Switch Network"
+            onClick={() => {
+              requestApproval({
+                method: 'switchNetwork',
+                params: {
+                  network: NetworkType.MAINNET
+                }
+              });
+            }}
+          />
+
+          <Text text="Protocol authorization" preset="bold" />
+          <Button
+            text="Inscribe Transfer"
+            onClick={() => {
+              requestApproval({
+                method: 'inscribeTransfer',
+                params: {
+                  ticker: 'sFB___000',
+                  amount: '1000'
                 }
               });
             }}
