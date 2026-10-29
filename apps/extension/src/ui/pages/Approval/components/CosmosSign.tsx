@@ -1,6 +1,6 @@
-import { useState } from 'react';
+import { type ReactNode, useState } from 'react';
 
-import { Button, Card, Column, Content, Footer, Header, Layout, Row, Text } from '@/ui/components';
+import { Button, Card, Column, Content, Footer, Header, Icon, Layout, Row, Text } from '@/ui/components';
 import { CopyableAddress } from '@/ui/components/CopyableAddress';
 import WebsiteBar from '@/ui/components/WebsiteBar';
 import KeystoneSignScreen from '@/ui/pages/Wallet/KeystoneSignScreen';
@@ -10,7 +10,7 @@ import type { CosmosDirectSignSummary } from '@unisat/babylon-service';
 
 interface Props {
   params: {
-    method: 'cosmos_signDirect' | 'cosmos_signArbitrary';
+    method: 'cosmos_signDirect' | 'cosmos_signArbitrary' | 'cosmosSignDirect' | 'cosmosSignArbitrary';
     data: {
       chainId: string;
       signerAddress: string;
@@ -28,9 +28,17 @@ interface Props {
   };
   origin?: string;
   requestDefer?: any;
+  previewOnly?: boolean;
+  previewNotice?: string;
+  onPreviewClose?: () => void;
 }
 
-export default function CosmosSign({ params: { method, data, session }, origin }: Props) {
+export default function CosmosSign({
+  params: { method, data, session },
+  previewOnly,
+  previewNotice,
+  onPreviewClose
+}: Props) {
   const { resolveApproval, rejectApproval } = useApproval();
   const account = useCurrentAccount();
   const [isKeystoneSigning, setIsKeystoneSigning] = useState(false);
@@ -40,14 +48,23 @@ export default function CosmosSign({ params: { method, data, session }, origin }
 
   const wallet = useWallet();
 
-  const isDirect = method === 'cosmos_signDirect';
+  const isDirect = method === 'cosmos_signDirect' || method === 'cosmosSignDirect';
+  const isArbitrary = method === 'cosmos_signArbitrary' || method === 'cosmosSignArbitrary';
+  const isSupportedMethod = isDirect || isArbitrary;
+  const hasVerifiedDisplayData = !isDirect || Boolean(data.summary);
+  const canSign = isSupportedMethod && hasVerifiedDisplayData;
   const keystoneSignType = isDirect ? KeystoneSignEnum.COSMOS_DIRECT : KeystoneSignEnum.COSMOS_ARBITRARY;
 
   const handleCancel = () => {
+    if (previewOnly) {
+      onPreviewClose?.();
+      return;
+    }
     rejectApproval();
   };
 
   const handleConfirm = async () => {
+    if (!isSupportedMethod) return;
     if (isKeystone) {
       setIsKeystoneSigning(true);
     } else if (isDirect) {
@@ -86,48 +103,258 @@ export default function CosmosSign({ params: { method, data, session }, origin }
 
   return (
     <Layout>
+      <Header>
+        <WebsiteBar session={session} />
+      </Header>
       <Content>
-        <Header>
-          <WebsiteBar session={session} />
-        </Header>
-        <Column>
-          <Text text={t('cosmos_sign_request')} preset="title-bold" textCenter mt="lg" />
+        <Column mt="lg" gap="md">
+          <Text text={t('cosmos_sign_request')} preset="title-bold" textCenter />
+          <Text
+            text={
+              isDirect
+                ? 'Review the decoded transaction before signing.'
+                : 'Review the message this site wants you to sign.'
+            }
+            preset="sub"
+            textCenter
+          />
 
-          <Row justifyCenter>
-            <Row justifyCenter px="lg" py="sm" style={{ backgroundColor: '#3F3227', borderRadius: 10 }}>
-              <CopyableAddress address={data.signerAddress} />
+          <Card style={{ display: 'block' }}>
+            <Row justifyBetween itemsCenter gap="md" fullX>
+              <Row itemsCenter gap="md" style={{ minWidth: 0, flex: 1 }}>
+                <div
+                  style={{
+                    width: 44,
+                    height: 44,
+                    flex: '0 0 44px',
+                    borderRadius: 14,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    background: 'rgba(235, 185, 76, 0.14)'
+                  }}>
+                  <Icon icon="baby" size={28} />
+                </div>
+                <Column gap="xs" style={{ minWidth: 0 }}>
+                  <Text text={isDirect ? 'Cosmos transaction' : 'ADR-36 message'} preset="bold" />
+                  <Text text={data.chainId} size="xs" color="textDim" style={{ wordBreak: 'break-all' }} />
+                </Column>
+              </Row>
+              <div
+                style={{
+                  padding: '6px 9px',
+                  borderRadius: 8,
+                  flex: '0 0 auto',
+                  background: isDirect ? 'rgba(235, 185, 76, 0.14)' : 'rgba(255,255,255,0.08)'
+                }}>
+                <Text text={isDirect ? 'DIRECT' : 'ADR-36'} size="xxs" color={isDirect ? 'gold' : 'textDim'} />
+              </div>
             </Row>
-          </Row>
+          </Card>
 
-          <Text text={t('only_sign_if_you_fully_understand_the_content_and_')} preset="sub" textCenter mt="lg" />
-          <Text text={t('you_are_signing')} textCenter mt="lg" />
+          {previewOnly && previewNotice && <CosmosNotice text={previewNotice} />}
+          {!isSupportedMethod && (
+            <CosmosNotice text="Unsupported Cosmos signing method. Signing is disabled." danger />
+          )}
+          {isDirect && !data.summary && (
+            <CosmosNotice text="Verified transaction details are unavailable. Signing is disabled." danger />
+          )}
 
-          <Card>
-            <div
-              style={{
-                userSelect: 'text',
-                maxHeight: 384,
-                overflow: 'auto',
-                whiteSpace: 'pre-wrap',
-                wordBreak: 'break-word',
-                flexWrap: 'wrap'
-              }}>
-              {isDirect
-                ? JSON.stringify(data.summary, null, 2)
-                : method === 'cosmos_signArbitrary'
-                  ? data.data
-                  : ''}
-            </div>
+          {isDirect && data.summary ? <CosmosDirectDetails summary={data.summary} /> : null}
+          {isArbitrary ? <CosmosArbitraryDetails data={data} /> : null}
+
+          <Card style={{ display: 'block', background: 'rgba(255,255,255,0.04)' }}>
+            <Row itemsCenter gap="sm">
+              <Icon icon="warning" color="warning" size={17} />
+              <Text
+                text={t('only_sign_if_you_fully_understand_the_content_and_')}
+                size="xs"
+                color="textDim"
+                style={{ flex: 1, lineHeight: '17px' }}
+              />
+            </Row>
           </Card>
         </Column>
       </Content>
 
       <Footer>
-        <Row full>
-          <Button text={t('reject')} full preset="default" onClick={handleCancel} />
-          <Button text={t('sign')} full preset="primary" onClick={handleConfirm} />
-        </Row>
+        {previewOnly ? (
+          <Button text="Back to Test Screen" full preset="primary" onClick={handleCancel} />
+        ) : (
+          <Row full>
+            <Button text={t('reject')} full preset="default" onClick={handleCancel} />
+            <Button text={t('sign')} full preset="primary" disabled={!canSign} onClick={handleConfirm} />
+          </Row>
+        )}
       </Footer>
     </Layout>
   );
+}
+
+function CosmosDirectDetails({ summary }: { summary: CosmosDirectSignSummary }) {
+  return (
+    <>
+      {summary.messages.map((message, index) => (
+        <Card key={`${message.type}-${index}`} style={{ display: 'block' }}>
+          <Column gap="md" fullX>
+            <Row justifyBetween itemsCenter gap="md" fullX>
+              <Column gap="xs" style={{ minWidth: 0 }}>
+                <Text text={getCosmosMessageTitle(message)} size="sm" color="textDim" />
+                {message.amounts?.length ? (
+                  <Text text={formatCosmosAmounts(message.amounts)} size="xl" preset="title-bold" />
+                ) : (
+                  <Text text="No token amount" preset="bold" />
+                )}
+              </Column>
+              <Icon icon={message.recipient ? 'send' : 'baby-staking'} size={26} />
+            </Row>
+            <div style={{ height: 1, background: 'rgba(255,255,255,0.10)' }} />
+            {message.signer ? <CosmosAddressRow label="From" address={message.signer} /> : null}
+            {message.recipient ? <CosmosAddressRow label="To" address={message.recipient} /> : null}
+            {message.validator ? <CosmosAddressRow label="Validator" address={message.validator} /> : null}
+            {message.sourceValidator ? (
+              <CosmosAddressRow label="Source validator" address={message.sourceValidator} />
+            ) : null}
+            {message.destinationValidator ? (
+              <CosmosAddressRow label="Destination validator" address={message.destinationValidator} />
+            ) : null}
+            <CosmosDetailRow label="Message type" value={message.type} />
+          </Column>
+        </Card>
+      ))}
+
+      <Card style={{ display: 'block' }}>
+        <Column gap="md" fullX>
+          <Text text="Transaction details" preset="bold" />
+          <CosmosDetailRow label="Chain ID" value={summary.chainId} />
+          <CosmosDetailRow label="Account number" value={summary.accountNumber} />
+          <CosmosDetailRow label="Sequence" value={summary.sequence} />
+          <CosmosDetailRow
+            label="Network fee"
+            value={summary.fee.amounts.length ? formatCosmosAmounts(summary.fee.amounts) : 'No fee'}
+          />
+          <CosmosDetailRow label="Gas limit" value={summary.fee.gasLimit} />
+          {summary.fee.payer ? <CosmosAddressRow label="Fee payer" address={summary.fee.payer} /> : null}
+          {summary.fee.granter ? <CosmosAddressRow label="Fee granter" address={summary.fee.granter} /> : null}
+          <CosmosDetailRow label="Memo" value={summary.memo || 'None'} />
+        </Column>
+      </Card>
+    </>
+  );
+}
+
+function CosmosArbitraryDetails({
+  data
+}: {
+  data: Props['params']['data'];
+}) {
+  const message = data.data === '' || data.data === undefined ? '(empty message)' : String(data.data);
+  return (
+    <>
+      <Card style={{ display: 'block' }}>
+        <Column gap="md" fullX>
+          <Row itemsCenter gap="sm">
+            <Icon icon="singer-info" color="gold" size={20} />
+            <Text text="Message to sign" preset="bold" />
+          </Row>
+          <div
+            style={{
+              padding: 12,
+              borderRadius: 10,
+              background: 'rgba(255,255,255,0.05)',
+              userSelect: 'text',
+              maxHeight: 220,
+              overflow: 'auto',
+              whiteSpace: 'pre-wrap',
+              wordBreak: 'break-word',
+              lineHeight: '20px'
+            }}>
+            {message}
+          </div>
+        </Column>
+      </Card>
+      <Card style={{ display: 'block' }}>
+        <Column gap="md" fullX>
+          <Text text="Signing details" preset="bold" />
+          <CosmosDetailRow label="Chain ID" value={data.chainId} />
+          <CosmosAddressRow label="Signer" address={data.signerAddress} />
+          <CosmosDetailRow label="Format" value="ADR-36 (domain-separated)" />
+          <CosmosDetailRow label="Data encoding" value={data.dataType || 'Unknown'} />
+        </Column>
+      </Card>
+    </>
+  );
+}
+
+function CosmosAddressRow({ label, address }: { label: string; address: string }) {
+  return <CosmosDetailRow label={label} value={<CopyableAddress address={address} copyPosition="after" len={10} />} />;
+}
+
+function CosmosDetailRow({ label, value }: { label: string; value: ReactNode }) {
+  return (
+    <Row justifyBetween itemsCenter gap="md" fullX>
+      <Text text={label} size="xs" color="textDim" />
+      {typeof value === 'string' ? (
+        <Text
+          text={value}
+          size="sm"
+          preset="bold"
+          style={{ maxWidth: '68%', textAlign: 'right', wordBreak: 'break-word' }}
+        />
+      ) : (
+        value
+      )}
+    </Row>
+  );
+}
+
+function CosmosNotice({ text, danger }: { text: string; danger?: boolean }) {
+  return (
+    <Card
+      style={{
+        display: 'block',
+        padding: 12,
+        background: danger ? 'rgba(237, 51, 75, 0.12)' : 'rgba(235, 185, 76, 0.10)'
+      }}>
+      <Row itemsCenter gap="sm">
+        <Icon icon="warning" color={danger ? 'red' : 'warning'} size={18} />
+        <Text
+          text={text}
+          size="xs"
+          color={danger ? 'red' : 'warning'}
+          style={{ flex: 1, lineHeight: '17px' }}
+        />
+      </Row>
+    </Card>
+  );
+}
+
+function formatCosmosAmounts(amounts: Array<{ amount: string; denom: string }>) {
+  return amounts.map((amount) => `${amount.amount} ${amount.denom}`).join(' + ');
+}
+
+function getCosmosMessageTitle(message: CosmosDirectSignSummary['messages'][number]) {
+  if (
+    message.type === '/cosmos.bank.v1beta1.MsgSend' &&
+    message.signer &&
+    message.recipient &&
+    message.signer === message.recipient
+  ) {
+    return 'Self transfer';
+  }
+
+  switch (message.type) {
+    case '/cosmos.bank.v1beta1.MsgSend':
+      return 'Send tokens';
+    case '/cosmos.staking.v1beta1.MsgDelegate':
+      return 'Delegate tokens';
+    case '/cosmos.staking.v1beta1.MsgUndelegate':
+      return 'Undelegate tokens';
+    case '/cosmos.staking.v1beta1.MsgBeginRedelegate':
+      return 'Redelegate tokens';
+    case '/cosmos.distribution.v1beta1.MsgWithdrawDelegatorReward':
+      return 'Withdraw staking rewards';
+    default:
+      return 'Cosmos message';
+  }
 }
