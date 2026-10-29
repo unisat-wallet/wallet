@@ -2024,13 +2024,7 @@ export class WalletController extends BaseController {
       })
 
       if (toSignInputs.length === 0) {
-        psbt.data.inputs.forEach((input, index) => {
-          // if no toSignInputs, sign all inputs
-          toSignInputs.push({
-            index: index,
-            publicKey: account.pubkey,
-          })
-        })
+        throw new Error('no signable inputs for current account')
       }
     }
 

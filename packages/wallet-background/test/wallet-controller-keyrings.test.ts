@@ -88,6 +88,55 @@ vi.mock('../src/services/approval', () => ({
 const validCompressedPubkey = '0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798'
 const invalidPubkey = 'aa'.repeat(32)
 
+describe('PSBT signing input selection', () => {
+  function createWalletAndUnrelatedPsbt() {
+    const wallet = new WalletController()
+    const ownerPubkey = Buffer.from(validCompressedPubkey, 'hex')
+    const ownerAddress = bitcoin.payments.p2wpkh({
+      pubkey: ownerPubkey,
+      network: bitcoin.networks.bitcoin,
+    }).address!
+    const unrelatedScript = bitcoin.payments.p2wpkh({
+      hash: Buffer.alloc(20, 2),
+      network: bitcoin.networks.bitcoin,
+    }).output!
+    const psbt = new bitcoin.Psbt({ network: bitcoin.networks.bitcoin })
+      .addInput({
+        hash: '11'.repeat(32),
+        index: 0,
+        witnessUtxo: { script: unrelatedScript, value: 10_000 },
+      })
+      .addOutput({ script: Buffer.from('6a', 'hex'), value: 0 })
+
+    vi.spyOn(wallet, 'getCurrentAccount').mockResolvedValue({
+      address: ownerAddress,
+      pubkey: validCompressedPubkey,
+      type: KeyringType.HdKeyring,
+    } as any)
+    vi.spyOn(wallet, 'getNetworkType').mockReturnValue(NetworkType.MAINNET)
+
+    return { wallet, psbt }
+  }
+
+  it('rejects automatic signing when no input belongs to the current account', async () => {
+    const { wallet, psbt } = createWalletAndUnrelatedPsbt()
+
+    await expect(wallet.formatOptionsToSignInputs(psbt)).rejects.toThrow(
+      'no signable inputs for current account'
+    )
+  })
+
+  it('keeps explicitly selected specialized inputs available for approval', async () => {
+    const { wallet, psbt } = createWalletAndUnrelatedPsbt()
+
+    await expect(
+      wallet.formatOptionsToSignInputs(psbt, {
+        toSignInputs: [{ index: 0, publicKey: validCompressedPubkey }],
+      })
+    ).resolves.toEqual([{ index: 0, publicKey: validCompressedPubkey }])
+  })
+})
+
 describe('chain type validation', () => {
   it.each(['constructor', 'toString', 'valueOf', '__proto__'])(
     'rejects inherited object key %s before persistence',
