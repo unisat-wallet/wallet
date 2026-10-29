@@ -3,7 +3,10 @@ import { describe, expect, it } from 'vitest'
 import { RiskType } from '@unisat/wallet-shared'
 import { bitcoin, eccManager, toXOnly } from '@unisat/wallet-bitcoin'
 import { tapleafHash } from 'bitcoinjs-lib/src/payments/bip341.js'
-import { getSigningPubkeyRisk } from '../src/utils/psbt-signing-risk'
+import {
+  getSigningPubkeyRisk,
+  validateTaprootSigningSelection,
+} from '../src/utils/psbt-signing-risk'
 
 const ownerPubkey = Buffer.from(
   '0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798',
@@ -92,6 +95,16 @@ describe('PSBT signing pubkey risk', () => {
     ).toBeUndefined()
   })
 
+  it('rejects before approval when implicit Taproot leaf selection cannot find the pubkey', () => {
+    const psbt = createTaprootPsbt(bitcoin.script.compile([bitcoin.opcodes.OP_TRUE]))
+
+    expect(() =>
+      validateTaprootSigningSelection(psbt.toHex(), [
+        { index: 0, publicKey: ownerPubkey.toString('hex') },
+      ])
+    ).toThrow('specialized leaves require an explicit tapLeafHashToSign')
+  })
+
   it('warns when a specialized tapleaf without the pubkey is explicitly selected', () => {
     const leafScript = bitcoin.script.compile([bitcoin.opcodes.OP_TRUE])
     const psbt = createTaprootPsbt(leafScript)
@@ -108,6 +121,16 @@ describe('PSBT signing pubkey risk', () => {
       type: RiskType.SIGNING_PUBKEY_NOT_IN_SCRIPT,
       level: 'danger',
     })
+
+    expect(() =>
+      validateTaprootSigningSelection(psbt.toHex(), [
+        {
+          index: 0,
+          publicKey: ownerPubkey.toString('hex'),
+          tapLeafHashToSign: getTapleafHash(leafScript),
+        },
+      ])
+    ).not.toThrow()
   })
 
   it('does not warn when the explicitly selected tapleaf references the x-only pubkey', () => {

@@ -104,7 +104,10 @@ import { getChainInfo } from '../shared/utils'
 import { chainTypeToCanonicalNetwork } from '../shared/utils/deriveContextHash'
 import { bgEventBus } from '../utils/eventBus'
 import { getEstimateFee, psbtFromString } from '../utils/psbt-utils'
-import { getSigningPubkeyRisk } from '../utils/psbt-signing-risk'
+import {
+  getSigningPubkeyRisk,
+  validateTaprootSigningSelection,
+} from '../utils/psbt-signing-risk'
 
 import { assertValidFeeRate, baseUtils, bnUtils, paramsUtils } from '@unisat/base-utils'
 import {
@@ -2029,6 +2032,8 @@ export class WalletController extends BaseController {
       }
     }
 
+    const psbtHex = typeof _psbt === 'string' ? _psbt : _psbt.toHex()
+    validateTaprootSigningSelection(psbtHex, toSignInputs)
     return toSignInputs
   }
 

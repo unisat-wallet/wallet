@@ -72,6 +72,46 @@ function selectedTapleafDoesNotReferencePubkey(
   return selectedLeaf ? !pubkeyInScript(pubkey, selectedLeaf.script) : false
 }
 
+function canSignTaprootKeyPath(prevoutScript: Buffer, pubkey: Buffer) {
+  try {
+    const payment = bitcoin.payments.p2tr({ internalPubkey: pubkey.slice(-32) })
+    return payment.output?.equals(prevoutScript) === true
+  } catch {
+    return false
+  }
+}
+
+/**
+ * Rejects an implicit Taproot script-path request when automatic leaf selection
+ * cannot associate any available leaf with the requested signing public key.
+ * Specialized leaves remain available through an explicit tapLeafHashToSign.
+ */
+export function validateTaprootSigningSelection(
+  psbtHex: string,
+  toSignInputs: ToSignInput[] | undefined
+) {
+  if (!toSignInputs?.length) return
+
+  const psbt = bitcoin.Psbt.fromHex(psbtHex)
+  for (const toSignInput of toSignInputs) {
+    if (toSignInput.tapLeafHashToSign) continue
+
+    const input = psbt.data.inputs[toSignInput.index]
+    const prevoutScript = getPrevoutScript(psbt, toSignInput.index)
+    if (!input || !prevoutScript || !isP2tr(prevoutScript)) continue
+    if (canSignTaprootKeyPath(prevoutScript, Buffer.from(toSignInput.publicKey, 'hex'))) continue
+    if (!input.tapLeafScript?.length) continue
+
+    const pubkey = Buffer.from(toSignInput.publicKey, 'hex')
+    if (input.tapLeafScript.some(tapLeaf => pubkeyInScript(pubkey, tapLeaf.script))) continue
+
+    throw new Error(
+      `No Taproot leaf references the signing public key for input ${toSignInput.index}; ` +
+        'specialized leaves require an explicit tapLeafHashToSign'
+    )
+  }
+}
+
 /**
  * Detects inputs that bitcoinjs-lib's upstream checkScriptForPubkey would reject.
  * The wallet permits these signatures for specialized protocols, but surfaces an
