@@ -1,6 +1,7 @@
 import React, { ReactNode, useContext } from 'react'
 
 import { BabylonConfigV2 } from '@unisat/babylon-service/types'
+import type { CosmosDirectSignDocInput } from '@unisat/babylon-service'
 
 import {
   Account,
@@ -479,10 +480,24 @@ export interface WalletController {
   }): Promise<{ type: string; cbor: string; requestId: string }>
   parseCosmosSignUr(type: string, cbor: string): Promise<any>
 
-  cosmosSignData(
-    chainId: string,
-    signBytesHex: string
-  ): Promise<{
+  cosmosSignDirect(request: {
+    chainId: string
+    signerAddress: string
+    signDoc: CosmosDirectSignDocInput
+  }): Promise<{
+    publicKey: string
+    signature: string
+  }>
+  cosmosSignArbitrary(request: {
+    chainId: string
+    signerAddress: string
+    dataType: string
+    data: unknown
+  }): Promise<{
+    publicKey: string
+    signature: string
+  }>
+  cosmosSignPreparedData(chainId: string, signBytesHex: string): Promise<{
     publicKey: string
     signature: string
   }>

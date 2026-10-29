@@ -5,10 +5,13 @@ import {
   BabylonConfigV2,
   COSMOS_CHAINS_MAP,
   CosmosChainInfo,
+  CosmosDirectSignDocInput,
   CosmosKeyring,
   DelegationV2StakingState,
+  arbitrarySignDocToBytesHex,
   assertValidCosmosMemo,
   getDelegationsV2,
+  validateCosmosDirectSignDoc,
 } from '@unisat/babylon-service'
 import { ColdWalletKeyring, KeystoneKeyring } from '@unisat/keyring-service'
 import { DisplayedKeyring, Keyring, KeyringType, ToSignInput } from '@unisat/keyring-service/types'
@@ -7328,11 +7331,103 @@ export class WalletController extends BaseController {
     return await keyring.parseSignCosmosUr(type, cbor)
   }
 
-  cosmosSignData = async (chainId: string, signBytesHex: string) => {
+  prepareCosmosDirectSignRequest = async ({
+    chainId,
+    signerAddress,
+    signDoc,
+  }: {
+    chainId: string
+    signerAddress: string
+    signDoc: CosmosDirectSignDocInput
+  }) => {
     const keyring = await this.getCosmosKeyring(chainId)
-    if (!keyring) return null
-    const result = await keyring.cosmosSignData(signBytesHex)
-    return result
+    if (!keyring) throw new Error('Cosmos keyring is unavailable')
+    const key = keyring.getKey()
+    if (signerAddress !== key.bech32Address) {
+      throw new Error('Cosmos signerAddress does not match the current account')
+    }
+    const { accountNumber, sequence } = await keyring.getAccountSequence()
+    return validateCosmosDirectSignDoc(signDoc, {
+      chainId,
+      signerAddress,
+      publicKeyHex: Buffer.from(key.pubKey).toString('hex'),
+      accountNumber,
+      sequence,
+    })
+  }
+
+  cosmosSignDirect = async ({
+    chainId,
+    signerAddress,
+    signDoc,
+  }: {
+    chainId: string
+    signerAddress: string
+    signDoc: CosmosDirectSignDocInput
+  }) => {
+    const validated = await this.prepareCosmosDirectSignRequest({ chainId, signerAddress, signDoc })
+    const keyring = await this.getCosmosKeyring(chainId)
+    if (!keyring) throw new Error('Cosmos keyring is unavailable')
+    return await keyring.cosmosSignDirect(validated.signDoc)
+  }
+
+  private normalizeCosmosArbitraryData = (dataType: string, data: unknown): string | Uint8Array => {
+    if (dataType === 'string') {
+      if (typeof data !== 'string') throw new Error('Invalid Cosmos arbitrary signing data')
+      if (Buffer.byteLength(data, 'utf8') > 256 * 1024) {
+        throw new Error('Cosmos arbitrary signing data is too large')
+      }
+      return data
+    }
+    if (dataType !== 'Uint8Array' || typeof data !== 'string') {
+      throw new Error('Invalid Cosmos arbitrary signing data type')
+    }
+    const bytes = Buffer.from(data, 'base64')
+    if (bytes.length > 256 * 1024 || bytes.toString('base64') !== data) {
+      throw new Error('Invalid Cosmos arbitrary signing data')
+    }
+    return new Uint8Array(bytes)
+  }
+
+  prepareCosmosArbitrarySignRequest = async ({
+    chainId,
+    signerAddress,
+    dataType,
+    data,
+  }: {
+    chainId: string
+    signerAddress: string
+    dataType: string
+    data: unknown
+  }) => {
+    const keyring = await this.getCosmosKeyring(chainId)
+    if (!keyring) throw new Error('Cosmos keyring is unavailable')
+    if (signerAddress !== keyring.getKey().bech32Address) {
+      throw new Error('Cosmos signerAddress does not match the current account')
+    }
+    const normalizedData = this.normalizeCosmosArbitraryData(dataType, data)
+    return {
+      signBytesHex: arbitrarySignDocToBytesHex(signerAddress, normalizedData),
+      normalizedData,
+    }
+  }
+
+  cosmosSignArbitrary = async (request: {
+    chainId: string
+    signerAddress: string
+    dataType: string
+    data: unknown
+  }) => {
+    const { normalizedData } = await this.prepareCosmosArbitrarySignRequest(request)
+    const keyring = await this.getCosmosKeyring(request.chainId)
+    if (!keyring) throw new Error('Cosmos keyring is unavailable')
+    return await keyring.cosmosSignArbitrary(request.signerAddress, normalizedData)
+  }
+
+  cosmosSignPreparedData = async (chainId: string, signBytesHex: string) => {
+    const keyring = await this.getCosmosKeyring(chainId)
+    if (!keyring) throw new Error('Cosmos keyring is unavailable')
+    return await keyring.cosmosSignPreparedData(signBytesHex)
   }
 
   createSendTokenStep1 = async (

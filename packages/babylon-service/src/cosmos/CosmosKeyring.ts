@@ -21,7 +21,13 @@ import {
 } from '@cosmjs/stargate'
 import { Tendermint34Client } from '@cosmjs/tendermint-rpc'
 
-import { assertValidCosmosMemo, encodeSecp256k1Pubkey } from './utils'
+import {
+  CosmosDirectSignDocInput,
+  arbitrarySignDocToBytesHex,
+  assertValidCosmosMemo,
+  encodeSecp256k1Pubkey,
+  validateCosmosDirectSignDoc,
+} from './utils'
 import { PubKeySecp256k1 } from './crypto'
 import type { Key, CosmosBalance, CosmosChainInfo } from '../types/cosmos'
 import { DEFAULT_BBN_GAS_PRICE } from '../types'
@@ -46,6 +52,7 @@ export class CosmosKeyring {
   private client: SigningStargateClient
   private _signDoc_bodyBytes: any = null
   private _signDoc_authInfoBytes: any = null
+  private _preparedSignBytesHex: string | null = null
 
   constructor({
     key,
@@ -149,11 +156,14 @@ export class CosmosKeyring {
     return coins.reduce((acc, coin) => acc + Number(coin.amount), 0) - (withdrawnCoins || 0)
   }
 
-  async cosmosSignData(signBytesHex: string): Promise<{
+  private async signBytes(signBytes: Uint8Array): Promise<{
     publicKey: string
     signature: string
   }> {
-    const messageHash = sha256(encoding.fromHex(signBytesHex))
+    if (signBytes.length === 32) {
+      throw new Error('Refusing unsafe 32-byte Cosmos signing payload')
+    }
+    const messageHash = sha256(signBytes)
     const _sig = await Secp256k1.createSignature(messageHash, (this.signer as any).privkey)
     const signature = new Uint8Array([..._sig.r(32), ..._sig.s(32)])
     return {
@@ -162,12 +172,34 @@ export class CosmosKeyring {
     }
   }
 
+  async cosmosSignDirect(signDoc: CosmosDirectSignDocInput) {
+    const validated = validateCosmosDirectSignDoc(signDoc)
+    return await this.signBytes(encoding.fromHex(validated.signBytesHex))
+  }
+
+  async cosmosSignArbitrary(signerAddress: string, data: string | Uint8Array) {
+    const signBytesHex = arbitrarySignDocToBytesHex(signerAddress, data)
+    return await this.signBytes(encoding.fromHex(signBytesHex))
+  }
+
+  async cosmosSignPreparedData(signBytesHex: string) {
+    if (!this._preparedSignBytesHex || signBytesHex !== this._preparedSignBytesHex) {
+      throw new Error('Cosmos signing payload does not match the prepared transaction')
+    }
+    return await this.signBytes(encoding.fromHex(signBytesHex))
+  }
+
+  async getAccountSequence() {
+    return await this.client.getSequence(this.key.bech32Address)
+  }
+
   destroy() {
     const signer = this.signer as any
     signer?.privkey?.fill(0)
     this.signer = undefined
     this._signDoc_bodyBytes?.fill?.(0)
     this._signDoc_authInfoBytes?.fill?.(0)
+    this._preparedSignBytesHex = null
     this._signDoc_bodyBytes = null
     this._signDoc_authInfoBytes = null
   }
@@ -257,7 +289,9 @@ export class CosmosKeyring {
 
     const signBytes = makeSignBytes(signDoc)
 
-    return encoding.toHex(signBytes)
+    this._preparedSignBytesHex = encoding.toHex(signBytes)
+
+    return this._preparedSignBytesHex
   }
 
   async createSendTokenStep2(signature: string) {

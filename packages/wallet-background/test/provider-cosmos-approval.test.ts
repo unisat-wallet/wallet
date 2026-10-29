@@ -1,5 +1,8 @@
 import 'reflect-metadata'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { encodePubkey, makeAuthInfoBytes } from '@cosmjs/proto-signing'
+import { MsgSend } from 'cosmjs-types/cosmos/bank/v1beta1/tx.js'
+import { TxBody } from 'cosmjs-types/cosmos/tx/v1beta1/tx.js'
 
 vi.mock('@unisat/babylon-service', async () => import('../../babylon-service/src/cosmos/utils'))
 vi.mock('../src/services', () => ({
@@ -8,7 +11,25 @@ vi.mock('../src/services', () => ({
   sessionService: {},
   walletApiService: {},
 }))
-vi.mock('../src/controllers/wallet', () => ({ default: {} }))
+vi.mock('../src/controllers/wallet', async () => {
+  const {
+    arbitrarySignDocToBytesHex,
+    validateCosmosDirectSignDoc,
+  } = await import('../../babylon-service/src/cosmos/utils')
+  return {
+    default: {
+      prepareCosmosDirectSignRequest: vi.fn(async ({ chainId, signDoc }) =>
+        validateCosmosDirectSignDoc(signDoc, { chainId })
+      ),
+      prepareCosmosArbitrarySignRequest: vi.fn(
+        async ({ signerAddress, data }: { signerAddress: string; data: string }) => ({
+          normalizedData: data,
+          signBytesHex: arbitrarySignDocToBytesHex(signerAddress, data),
+        })
+      ),
+    },
+  }
+})
 vi.mock('src/services/approval', () => ({
   default: { requestApproval: vi.fn(), unLock: vi.fn() },
 }))
@@ -21,15 +42,33 @@ import {
   arbitrarySignDocToBytesHex,
 } from '../../babylon-service/src/cosmos/utils'
 
-const signDoc = () => ({
-  bodyBytes: { 0: 10, 1: 0 },
-  authInfoBytes: { 0: 18, 1: 0 },
-  chainId: 'bbn-1',
-  accountNumber: '0',
-})
 const signerAddress = 'bbn1test'
+const publicKey = new Uint8Array([0x02, ...new Uint8Array(32).fill(0x11)])
+const signDoc = () => {
+  const message = MsgSend.fromPartial({
+    fromAddress: signerAddress,
+    toAddress: 'bbn1recipient',
+    amount: [{ denom: 'ubbn', amount: '12' }],
+  })
+  const bodyBytes = TxBody.encode(
+    TxBody.fromPartial({
+      messages: [
+        {
+          typeUrl: '/cosmos.bank.v1beta1.MsgSend',
+          value: MsgSend.encode(message).finish(),
+        },
+      ],
+    })
+  ).finish()
+  const pubkey = encodePubkey({
+    type: 'tendermint/PubKeySecp256k1',
+    value: Buffer.from(publicKey).toString('base64'),
+  })
+  const authInfoBytes = makeAuthInfoBytes([{ pubkey, sequence: 0 }], [], 200000)
+  return { bodyBytes, authInfoBytes, chainId: 'bbn-1', accountNumber: '0' }
+}
 const request = (method: string, params: any) => ({
-  data: { method, params },
+  data: { method, params: { chainId: 'bbn-1', ...params } },
   session: { origin: 'https://dapp.example', name: 'Test', icon: '' },
 })
 
@@ -53,14 +92,18 @@ describe('Cosmos approval payload binding', () => {
     const result = await rpcFlow(request('cosmos_signDirect', original))
     const approval = vi.mocked(approvalService.requestApproval).mock.calls[0][0] as any
     expect(approval.params.method).toBe('cosmos_signDirect')
-    expect(approval.params.data).toEqual({
+    expect(approval.params.data).toEqual(expect.objectContaining({
+      chainId: 'bbn-1',
       signerAddress,
       signDoc: {
         ...signDoc(),
-        bodyBytes: new Uint8Array([10, 0]),
-        authInfoBytes: new Uint8Array([18, 0]),
       },
       signBytesHex: directSignDocToBytesHex(signDoc()),
+    }))
+    expect(approval.params.data.summary.messages[0]).toMatchObject({
+      type: '/cosmos.bank.v1beta1.MsgSend',
+      signer: signerAddress,
+      recipient: 'bbn1recipient',
     })
     expect(approval.params.data).not.toBe(original)
     expect(result.signed).toEqual(approval.params.data.signDoc)
@@ -79,6 +122,7 @@ describe('Cosmos approval payload binding', () => {
       request('cosmos_signArbitrary', {
         signerAddress,
         data,
+        type: 'string',
         signDoc: signDoc(),
         signBytesHex: 'deadbeef',
         chainId: 'bbn-1',
@@ -87,7 +131,9 @@ describe('Cosmos approval payload binding', () => {
     const approval = vi.mocked(approvalService.requestApproval).mock.calls[0][0] as any
     expect(approval.params.method).toBe('cosmos_signArbitrary')
     expect(approval.params.data).toEqual({
+      chainId: 'bbn-1',
       signerAddress,
+      dataType: 'string',
       data,
       signBytesHex: arbitrarySignDocToBytesHex(signerAddress, data),
     })

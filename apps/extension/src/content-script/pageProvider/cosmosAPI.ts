@@ -93,6 +93,7 @@ export class CosmJSOfflineSigner {
     const response: any = await this.#provider[requestMethodKey]({
       method: 'cosmos_signDirect',
       params: {
+        chainId: this.chainId,
         signerAddress,
         signDoc: {
           bodyBytes: signDoc.bodyBytes,

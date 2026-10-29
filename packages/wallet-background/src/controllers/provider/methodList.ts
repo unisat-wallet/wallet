@@ -34,10 +34,14 @@ export type ProviderMethodList = {
     chainId: string
   }
   cosmosSignDirect: {
+    chainId: string
+    signerAddress: string
     signDoc: any
   }
   cosmosSignArbitrary: {
+    chainId: string
     signerAddress: string
+    type: 'string' | 'Uint8Array'
     data: string
   }
   /**

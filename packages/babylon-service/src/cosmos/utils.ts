@@ -1,8 +1,75 @@
 import { Buffer } from 'buffer'
 import * as encoding from '@cosmjs/encoding'
 import { makeSignBytes } from '@cosmjs/proto-signing'
+import { MsgSend } from 'cosmjs-types/cosmos/bank/v1beta1/tx.js'
+import { PubKey } from 'cosmjs-types/cosmos/crypto/secp256k1/keys.js'
+import { MsgWithdrawDelegatorReward } from 'cosmjs-types/cosmos/distribution/v1beta1/tx.js'
+import {
+  MsgBeginRedelegate,
+  MsgDelegate,
+  MsgUndelegate,
+} from 'cosmjs-types/cosmos/staking/v1beta1/tx.js'
+import { SignMode } from 'cosmjs-types/cosmos/tx/signing/v1beta1/signing.js'
+import { AuthInfo, TxBody } from 'cosmjs-types/cosmos/tx/v1beta1/tx.js'
 
 export const MAX_COSMOS_MEMO_LENGTH = 256
+const MAX_COSMOS_BODY_BYTES = 256 * 1024
+const MAX_COSMOS_AUTH_INFO_BYTES = 64 * 1024
+
+export interface CosmosDirectSignDocInput {
+  bodyBytes: unknown
+  authInfoBytes: unknown
+  chainId: unknown
+  accountNumber: unknown
+}
+
+export interface CosmosSignAmount {
+  denom: string
+  amount: string
+}
+
+export interface CosmosMessageSummary {
+  type: string
+  signer?: string
+  recipient?: string
+  validator?: string
+  sourceValidator?: string
+  destinationValidator?: string
+  amounts?: CosmosSignAmount[]
+}
+
+export interface CosmosDirectSignSummary {
+  chainId: string
+  accountNumber: string
+  sequence: string
+  memo: string
+  fee: {
+    amounts: CosmosSignAmount[]
+    gasLimit: string
+    payer?: string
+    granter?: string
+  }
+  messages: CosmosMessageSummary[]
+}
+
+export interface CosmosDirectSignConstraints {
+  chainId?: string
+  signerAddress?: string
+  publicKeyHex?: string
+  accountNumber?: string | number | bigint
+  sequence?: string | number | bigint
+}
+
+export interface ValidatedCosmosDirectSignDoc {
+  signDoc: {
+    bodyBytes: Uint8Array
+    authInfoBytes: Uint8Array
+    chainId: string
+    accountNumber: string
+  }
+  signBytesHex: string
+  summary: CosmosDirectSignSummary
+}
 
 export function assertValidCosmosMemo(memo: unknown): asserts memo is string {
   if (typeof memo !== 'string') {
@@ -121,11 +188,231 @@ export const objToUint8Array = (obj: unknown): Uint8Array => {
   return bytes
 }
 
+function parseUnsignedInteger(value: unknown, name: string): bigint {
+  if (typeof value === 'bigint') {
+    if (value < 0n) throw new Error(`Invalid Cosmos ${name}`)
+    return value
+  }
+  if (typeof value === 'number') {
+    if (!Number.isSafeInteger(value) || value < 0) throw new Error(`Invalid Cosmos ${name}`)
+    return BigInt(value)
+  }
+  if (typeof value !== 'string' || !/^(0|[1-9]\d*)$/.test(value)) {
+    throw new Error(`Invalid Cosmos ${name}`)
+  }
+  return BigInt(value)
+}
+
+function assertByteLength(bytes: Uint8Array, name: string, maximum: number) {
+  if (bytes.length === 0 || bytes.length > maximum) {
+    throw new Error(`Invalid Cosmos ${name}`)
+  }
+}
+
+function coinToSummary(coin: { denom: string; amount: string }): CosmosSignAmount {
+  if (!coin.denom || !/^(0|[1-9]\d*)$/.test(coin.amount)) {
+    throw new Error('Invalid Cosmos coin')
+  }
+  return { denom: coin.denom, amount: coin.amount }
+}
+
+function decodeMessageSummary(typeUrl: string, value: Uint8Array): CosmosMessageSummary {
+  switch (typeUrl) {
+    case '/cosmos.bank.v1beta1.MsgSend': {
+      const message = MsgSend.decode(value)
+      if (!message.fromAddress || !message.toAddress || message.amount.length === 0) {
+        throw new Error('Invalid MsgSend')
+      }
+      return {
+        type: typeUrl,
+        signer: message.fromAddress,
+        recipient: message.toAddress,
+        amounts: message.amount.map(coinToSummary),
+      }
+    }
+    case '/cosmos.staking.v1beta1.MsgDelegate': {
+      const message = MsgDelegate.decode(value)
+      if (!message.delegatorAddress || !message.validatorAddress || !message.amount) {
+        throw new Error('Invalid MsgDelegate')
+      }
+      return {
+        type: typeUrl,
+        signer: message.delegatorAddress,
+        validator: message.validatorAddress,
+        amounts: [coinToSummary(message.amount)],
+      }
+    }
+    case '/cosmos.staking.v1beta1.MsgUndelegate': {
+      const message = MsgUndelegate.decode(value)
+      if (!message.delegatorAddress || !message.validatorAddress || !message.amount) {
+        throw new Error('Invalid MsgUndelegate')
+      }
+      return {
+        type: typeUrl,
+        signer: message.delegatorAddress,
+        validator: message.validatorAddress,
+        amounts: [coinToSummary(message.amount)],
+      }
+    }
+    case '/cosmos.staking.v1beta1.MsgBeginRedelegate': {
+      const message = MsgBeginRedelegate.decode(value)
+      if (
+        !message.delegatorAddress ||
+        !message.validatorSrcAddress ||
+        !message.validatorDstAddress ||
+        !message.amount
+      ) {
+        throw new Error('Invalid MsgBeginRedelegate')
+      }
+      return {
+        type: typeUrl,
+        signer: message.delegatorAddress,
+        sourceValidator: message.validatorSrcAddress,
+        destinationValidator: message.validatorDstAddress,
+        amounts: [coinToSummary(message.amount)],
+      }
+    }
+    case '/cosmos.distribution.v1beta1.MsgWithdrawDelegatorReward': {
+      const message = MsgWithdrawDelegatorReward.decode(value)
+      if (!message.delegatorAddress || !message.validatorAddress) {
+        throw new Error('Invalid MsgWithdrawDelegatorReward')
+      }
+      return {
+        type: typeUrl,
+        signer: message.delegatorAddress,
+        validator: message.validatorAddress,
+      }
+    }
+    default:
+      return { type: typeUrl }
+  }
+}
+
+export function validateCosmosDirectSignDoc(
+  input: CosmosDirectSignDocInput,
+  constraints: CosmosDirectSignConstraints = {}
+): ValidatedCosmosDirectSignDoc {
+  if (!input || typeof input !== 'object' || Array.isArray(input)) {
+    throw new Error('Invalid Cosmos signDoc')
+  }
+
+  const bodyBytes = objToUint8Array(input.bodyBytes)
+  const authInfoBytes = objToUint8Array(input.authInfoBytes)
+  assertByteLength(bodyBytes, 'TxBody', MAX_COSMOS_BODY_BYTES)
+  assertByteLength(authInfoBytes, 'AuthInfo', MAX_COSMOS_AUTH_INFO_BYTES)
+
+  if (typeof input.chainId !== 'string' || !input.chainId) {
+    throw new Error('Invalid Cosmos chainId')
+  }
+  if (constraints.chainId !== undefined && input.chainId !== constraints.chainId) {
+    throw new Error('Cosmos chainId does not match the requested chain')
+  }
+
+  const accountNumber = parseUnsignedInteger(input.accountNumber, 'accountNumber')
+  if (
+    constraints.accountNumber !== undefined &&
+    accountNumber !== parseUnsignedInteger(constraints.accountNumber, 'accountNumber')
+  ) {
+    throw new Error('Cosmos accountNumber does not match the current account')
+  }
+
+  let txBody: TxBody
+  let authInfo: AuthInfo
+  try {
+    txBody = TxBody.decode(bodyBytes)
+    authInfo = AuthInfo.decode(authInfoBytes)
+  } catch {
+    throw new Error('Invalid Cosmos SignDoc encoding')
+  }
+
+  if (txBody.messages.length === 0 || txBody.messages.length > 64) {
+    throw new Error('Cosmos SignDoc must contain between 1 and 64 messages')
+  }
+  assertValidCosmosMemo(txBody.memo)
+
+  if (authInfo.signerInfos.length !== 1) {
+    throw new Error('Cosmos SignDoc must contain exactly one signer')
+  }
+  const signerInfo = authInfo.signerInfos[0]!
+  if (signerInfo.modeInfo?.single?.mode !== SignMode.SIGN_MODE_DIRECT) {
+    throw new Error('Cosmos SignDoc must use SIGN_MODE_DIRECT')
+  }
+  if (!signerInfo.publicKey || signerInfo.publicKey.typeUrl !== '/cosmos.crypto.secp256k1.PubKey') {
+    throw new Error('Cosmos SignDoc must include a secp256k1 public key')
+  }
+
+  let signerPublicKey: Uint8Array
+  try {
+    signerPublicKey = PubKey.decode(signerInfo.publicKey.value).key
+  } catch {
+    throw new Error('Invalid Cosmos signer public key')
+  }
+  if (signerPublicKey.length !== 33 || (signerPublicKey[0] !== 0x02 && signerPublicKey[0] !== 0x03)) {
+    throw new Error('Invalid Cosmos signer public key')
+  }
+  if (
+    constraints.publicKeyHex !== undefined &&
+    encoding.toHex(signerPublicKey) !== constraints.publicKeyHex.toLowerCase()
+  ) {
+    throw new Error('Cosmos signer public key does not match the current account')
+  }
+
+  if (
+    constraints.sequence !== undefined &&
+    signerInfo.sequence !== parseUnsignedInteger(constraints.sequence, 'sequence')
+  ) {
+    throw new Error('Cosmos sequence does not match the current account')
+  }
+
+  const messages = txBody.messages.map(message => {
+    if (!message.typeUrl.startsWith('/') || message.value.length === 0) {
+      throw new Error('Invalid Cosmos message')
+    }
+    try {
+      return decodeMessageSummary(message.typeUrl, message.value)
+    } catch {
+      throw new Error(`Invalid Cosmos message: ${message.typeUrl}`)
+    }
+  })
+  if (
+    constraints.signerAddress !== undefined &&
+    messages.some(message => message.signer && message.signer !== constraints.signerAddress)
+  ) {
+    throw new Error('Cosmos message signer does not match the current account')
+  }
+
+  const normalizedSignDoc = {
+    bodyBytes,
+    authInfoBytes,
+    chainId: input.chainId,
+    accountNumber: accountNumber.toString(),
+  }
+  const signBytes = makeSignBytes({ ...normalizedSignDoc, accountNumber })
+  if (signBytes.length === 32) {
+    throw new Error('Refusing unsafe 32-byte Cosmos signing payload')
+  }
+
+  return {
+    signDoc: normalizedSignDoc,
+    signBytesHex: encoding.toHex(signBytes),
+    summary: {
+      chainId: input.chainId,
+      accountNumber: accountNumber.toString(),
+      sequence: signerInfo.sequence.toString(),
+      memo: txBody.memo,
+      fee: {
+        amounts: (authInfo.fee?.amount || []).map(coinToSummary),
+        gasLimit: (authInfo.fee?.gasLimit || 0n).toString(),
+        payer: authInfo.fee?.payer || undefined,
+        granter: authInfo.fee?.granter || undefined,
+      },
+      messages,
+    },
+  }
+}
+
 export function directSignDocToBytesHex(signDoc: any): string {
-  signDoc.bodyBytes = objToUint8Array(signDoc.bodyBytes)
-  signDoc.authInfoBytes = objToUint8Array(signDoc.authInfoBytes)
-  const signBytes = makeSignBytes(signDoc)
-  return encoding.toHex(signBytes)
+  return validateCosmosDirectSignDoc(signDoc).signBytesHex
 }
 
 export function arbitrarySignDocToBytesHex(signerAddress: string, data: any): string {

@@ -26,9 +26,17 @@ export {
   assertValidCosmosMemo,
   MAX_COSMOS_MEMO_LENGTH,
   objToUint8Array,
+  validateCosmosDirectSignDoc,
   directSignDocToBytesHex,
   arbitrarySignDocToBytesHex,
   encodeSignature,
+} from './cosmos'
+export type {
+  CosmosDirectSignDocInput,
+  CosmosDirectSignConstraints,
+  CosmosDirectSignSummary,
+  CosmosMessageSummary,
+  ValidatedCosmosDirectSignDoc,
 } from './cosmos'
 
 // Utility functions

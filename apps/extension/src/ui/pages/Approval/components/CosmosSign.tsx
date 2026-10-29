@@ -1,21 +1,24 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 
-import { objToUint8Array } from '@/shared/utils';
 import { Button, Card, Column, Content, Footer, Header, Layout, Row, Text } from '@/ui/components';
 import { CopyableAddress } from '@/ui/components/CopyableAddress';
 import WebsiteBar from '@/ui/components/WebsiteBar';
 import KeystoneSignScreen from '@/ui/pages/Wallet/KeystoneSignScreen';
 import { KeyringType, KeystoneSignEnum } from '@unisat/keyring-service/types';
-import { useApproval, useBabylonConfig, useCurrentAccount, useI18n, useWallet } from '@unisat/wallet-state';
+import { useApproval, useCurrentAccount, useI18n, useWallet } from '@unisat/wallet-state';
+import type { CosmosDirectSignSummary } from '@unisat/babylon-service';
 
 interface Props {
   params: {
     method: 'cosmos_signDirect' | 'cosmos_signArbitrary';
     data: {
+      chainId: string;
       signerAddress: string;
       signDoc?: any;
       data?: any;
+      dataType?: string;
       signBytesHex: string;
+      summary?: CosmosDirectSignSummary;
     };
     session: {
       origin: string;
@@ -35,26 +38,10 @@ export default function CosmosSign({ params: { method, data, session }, origin }
 
   const isKeystone = account.type === KeyringType.KeystoneKeyring;
 
-  const [babylonAddress, setBabylonAddress] = useState('');
-
-  const babylonConfig = useBabylonConfig();
-  const babylonChainId = babylonConfig.chainId;
   const wallet = useWallet();
 
   const isDirect = method === 'cosmos_signDirect';
   const keystoneSignType = isDirect ? KeystoneSignEnum.COSMOS_DIRECT : KeystoneSignEnum.COSMOS_ARBITRARY;
-
-  useEffect(() => {
-    wallet.getBabylonAddress(babylonChainId).then((address) => {
-      setBabylonAddress(address);
-    });
-
-    // TODO: decode signDoc
-    // if (data.signDoc) {
-    //   const aminoTypes = new AminoTypes(createDefaultAminoConverters());
-    //   const decodedBody = aminoTypes.fromAmino({ type: 'cosmos-sdk/MsgSend', value: data.signDoc });
-    // }
-  }, []);
 
   const handleCancel = () => {
     rejectApproval();
@@ -63,8 +50,20 @@ export default function CosmosSign({ params: { method, data, session }, origin }
   const handleConfirm = async () => {
     if (isKeystone) {
       setIsKeystoneSigning(true);
+    } else if (isDirect) {
+      const result = await wallet.cosmosSignDirect({
+        chainId: data.chainId,
+        signerAddress: data.signerAddress,
+        signDoc: data.signDoc
+      });
+      resolveApproval(result);
     } else {
-      const result = await wallet.cosmosSignData(babylonChainId, data.signBytesHex);
+      const result = await wallet.cosmosSignArbitrary({
+        chainId: data.chainId,
+        signerAddress: data.signerAddress,
+        dataType: data.dataType || '',
+        data: data.data
+      });
       resolveApproval(result);
     }
   };
@@ -96,7 +95,7 @@ export default function CosmosSign({ params: { method, data, session }, origin }
 
           <Row justifyCenter>
             <Row justifyCenter px="lg" py="sm" style={{ backgroundColor: '#3F3227', borderRadius: 10 }}>
-              <CopyableAddress address={babylonAddress} />
+              <CopyableAddress address={data.signerAddress} />
             </Row>
           </Row>
 
@@ -114,18 +113,7 @@ export default function CosmosSign({ params: { method, data, session }, origin }
                 flexWrap: 'wrap'
               }}>
               {isDirect
-                ? JSON.stringify(
-                    Object.assign({}, data.signDoc, {
-                      bodyBytes: data.signDoc.bodyBytes
-                        ? Buffer.from(objToUint8Array(data.signDoc.bodyBytes)).toString('hex')
-                        : undefined,
-                      authInfoBytes: data.signDoc.authInfoBytes
-                        ? Buffer.from(objToUint8Array(data.signDoc.authInfoBytes)).toString('hex')
-                        : undefined
-                    }),
-                    null,
-                    2
-                  )
+                ? JSON.stringify(data.summary, null, 2)
                 : method === 'cosmos_signArbitrary'
                   ? data.data
                   : ''}

@@ -19,8 +19,6 @@ import BaseController from '../base'
 import wallet from '../wallet'
 
 import {
-  arbitrarySignDocToBytesHex,
-  directSignDocToBytesHex,
   encodeSignature,
 } from '@unisat/babylon-service'
 import {
@@ -1513,7 +1511,7 @@ class ProviderController extends BaseController {
   @Reflect.metadata('APPROVAL', [
     'CosmosSign',
     async req => {
-      const { signerAddress, signDoc: input } = req.data.params
+      const { chainId, signerAddress, signDoc: input } = req.data.params
       if (!input || typeof input !== 'object' || Array.isArray(input)) {
         throw new Error('Invalid Cosmos signDoc')
       }
@@ -1525,8 +1523,14 @@ class ProviderController extends BaseController {
         chainId: input.chainId,
         accountNumber: input.accountNumber,
       }
-      const signBytesHex = directSignDocToBytesHex(signDoc)
-      req.data.params = { signerAddress, signDoc, signBytesHex }
+      const prepared = await wallet.prepareCosmosDirectSignRequest({ chainId, signerAddress, signDoc })
+      req.data.params = {
+        chainId,
+        signerAddress,
+        signDoc: prepared.signDoc,
+        signBytesHex: prepared.signBytesHex,
+        summary: prepared.summary,
+      }
     },
   ])
   cosmosSignDirect = async ({ data: { params: msg }, approvalRes }) => {
@@ -1550,9 +1554,14 @@ class ProviderController extends BaseController {
   @Reflect.metadata('APPROVAL', [
     'CosmosSign',
     async req => {
-      const { signerAddress, data } = req.data.params
-      const signBytesHex = arbitrarySignDocToBytesHex(signerAddress, data)
-      req.data.params = { signerAddress, data, signBytesHex }
+      const { chainId, signerAddress, type: dataType, data } = req.data.params
+      const prepared = await wallet.prepareCosmosArbitrarySignRequest({
+        chainId,
+        signerAddress,
+        dataType,
+        data,
+      })
+      req.data.params = { chainId, signerAddress, dataType, data, signBytesHex: prepared.signBytesHex }
     },
   ])
   cosmosSignArbitrary = async ({ data: { params: msg }, approvalRes }) => {

@@ -5,6 +5,34 @@ vi.mock('@babylonlabs-io/babylon-proto-ts', () => ({ incentivequery: {} }))
 import { CosmosKeyring } from '../src/cosmos/CosmosKeyring'
 
 describe('CosmosKeyring', () => {
+  it('refuses raw 32-byte payloads before hashing or signing', async () => {
+    const keyring = new CosmosKeyring({
+      key: { pubKey: new Uint8Array(33) } as any,
+      signer: { privkey: new Uint8Array(32).fill(1) } as any,
+      client: {} as any,
+      provider: {} as any,
+      chainId: 'bbn-1',
+    })
+
+    await expect((keyring as any).signBytes(new Uint8Array(32))).rejects.toThrow(
+      'unsafe 32-byte Cosmos signing payload'
+    )
+  })
+
+  it('only signs raw bytes that match the wallet-prepared transaction', async () => {
+    const keyring = new CosmosKeyring({
+      key: { pubKey: new Uint8Array(33) } as any,
+      signer: { privkey: new Uint8Array(32).fill(1) } as any,
+      client: {} as any,
+      provider: {} as any,
+      chainId: 'bbn-1',
+    })
+
+    await expect(keyring.cosmosSignPreparedData('00'.repeat(64))).rejects.toThrow(
+      'does not match the prepared transaction'
+    )
+  })
+
   it('zeros cached signer and transaction bytes on destroy', () => {
     const privateKey = new Uint8Array(32).fill(1)
     const bodyBytes = new Uint8Array([1, 2, 3])

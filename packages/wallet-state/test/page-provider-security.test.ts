@@ -66,6 +66,7 @@ describe('page provider private request surface', () => {
     expect(request).toHaveBeenCalledWith({
       method: 'cosmos_signDirect',
       params: {
+        chainId: 'bbn-1',
         signerAddress: 'bbn1signer',
         signDoc: {
           bodyBytes: new Uint8Array([10]),

@@ -1,4 +1,7 @@
 import { describe, expect, it } from 'vitest'
+import { encodePubkey, makeAuthInfoBytes } from '@cosmjs/proto-signing'
+import { MsgSend } from 'cosmjs-types/cosmos/bank/v1beta1/tx.js'
+import { TxBody } from 'cosmjs-types/cosmos/tx/v1beta1/tx.js'
 
 import {
   assertValidCosmosMemo,
@@ -12,7 +15,37 @@ import {
   objToUint8Array,
   sortObjectByKey,
   sortedJsonByKeyStringify,
+  validateCosmosDirectSignDoc,
 } from '../src/cosmos/utils'
+
+const publicKey = new Uint8Array([0x02, ...new Uint8Array(32).fill(0x11)])
+const signerAddress = 'bbn1signer'
+
+function validDirectSignDoc() {
+  const message = MsgSend.fromPartial({
+    fromAddress: signerAddress,
+    toAddress: 'bbn1recipient',
+    amount: [{ denom: 'ubbn', amount: '123' }],
+  })
+  const bodyBytes = TxBody.encode(
+    TxBody.fromPartial({
+      messages: [
+        {
+          typeUrl: '/cosmos.bank.v1beta1.MsgSend',
+          value: MsgSend.encode(message).finish(),
+        },
+      ],
+      memo: 'test transfer',
+    })
+  ).finish()
+  const pubkey = encodePubkey(encodeSecp256k1Pubkey(publicKey))
+  const authInfoBytes = makeAuthInfoBytes(
+    [{ pubkey, sequence: 8 }],
+    [{ denom: 'ubbn', amount: '2' }],
+    200000
+  )
+  return { bodyBytes, authInfoBytes, chainId: 'bbn-1', accountNumber: '7' }
+}
 
 describe('cosmos utils', () => {
   it('limits Cosmos memos to 256 Unicode characters', () => {
@@ -88,12 +121,7 @@ describe('cosmos utils', () => {
   })
 
   it('directSignDocToBytesHex and arbitrarySignDocToBytesHex produce hex output', () => {
-    const signDoc = {
-      bodyBytes: { 0: 1, 1: 2, 2: 3 },
-      authInfoBytes: { 0: 4, 1: 5 },
-      chainId: 'bbn-test',
-      accountNumber: 7,
-    }
+    const signDoc = validDirectSignDoc()
 
     const directHex = directSignDocToBytesHex(signDoc)
     const arbitraryHex = arbitrarySignDocToBytesHex('bbn1abc', 'hello')
@@ -101,6 +129,78 @@ describe('cosmos utils', () => {
     expect(directHex).toMatch(/^[0-9a-f]+$/)
     expect(arbitraryHex).toMatch(/^[0-9a-f]+$/)
     expect(arbitraryHex.length).toBeGreaterThan(0)
+  })
+
+  it('decodes and validates a Direct SignDoc against the active Cosmos account', () => {
+    const result = validateCosmosDirectSignDoc(validDirectSignDoc(), {
+      chainId: 'bbn-1',
+      signerAddress,
+      publicKeyHex: Buffer.from(publicKey).toString('hex'),
+      accountNumber: 7,
+      sequence: 8,
+    })
+
+    expect(result.summary).toMatchObject({
+      chainId: 'bbn-1',
+      accountNumber: '7',
+      sequence: '8',
+      memo: 'test transfer',
+      messages: [
+        {
+          type: '/cosmos.bank.v1beta1.MsgSend',
+          signer: signerAddress,
+          recipient: 'bbn1recipient',
+          amounts: [{ denom: 'ubbn', amount: '123' }],
+        },
+      ],
+      fee: { amounts: [{ denom: 'ubbn', amount: '2' }], gasLimit: '200000' },
+    })
+  })
+
+  it('rejects degenerate, mismatched, or cross-account Direct SignDocs', () => {
+    expect(() =>
+      validateCosmosDirectSignDoc({
+        bodyBytes: new Uint8Array(32),
+        authInfoBytes: new Uint8Array([0]),
+        chainId: 'bbn-1',
+        accountNumber: '7',
+      })
+    ).toThrow()
+    expect(() =>
+      validateCosmosDirectSignDoc(validDirectSignDoc(), { chainId: 'bbn-test-6' })
+    ).toThrow('chainId')
+    expect(() =>
+      validateCosmosDirectSignDoc(validDirectSignDoc(), { signerAddress: 'bbn1attacker' })
+    ).toThrow('message signer')
+    expect(() =>
+      validateCosmosDirectSignDoc(validDirectSignDoc(), { publicKeyHex: `03${'22'.repeat(32)}` })
+    ).toThrow('public key')
+    expect(() =>
+      validateCosmosDirectSignDoc(validDirectSignDoc(), { accountNumber: 9 })
+    ).toThrow('accountNumber')
+    expect(() => validateCosmosDirectSignDoc(validDirectSignDoc(), { sequence: 9 })).toThrow(
+      'sequence'
+    )
+  })
+
+  it('rejects known Cosmos messages with missing required signing fields', () => {
+    const signDoc = validDirectSignDoc()
+    const invalidMessage = MsgSend.fromPartial({
+      toAddress: 'bbn1recipient',
+      amount: [{ denom: 'ubbn', amount: '1' }],
+    })
+    signDoc.bodyBytes = TxBody.encode(
+      TxBody.fromPartial({
+        messages: [
+          {
+            typeUrl: '/cosmos.bank.v1beta1.MsgSend',
+            value: MsgSend.encode(invalidMessage).finish(),
+          },
+        ],
+      })
+    ).finish()
+
+    expect(() => validateCosmosDirectSignDoc(signDoc)).toThrow('Invalid Cosmos message')
   })
 
   it('converts only dense byte-indexed objects without sparse allocation', () => {

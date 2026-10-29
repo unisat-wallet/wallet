@@ -215,7 +215,7 @@ export default function BabylonTxConfirmScreen() {
         setIsCosmosSignScreenOpen(true);
       } else {
         try {
-          const result = await wallet.cosmosSignData(babylonConfig.chainId, signDataBytesHex);
+          const result = await wallet.cosmosSignPreparedData(babylonConfig.chainId, signDataBytesHex);
           const txid = await wallet.createSendTokenStep2(babylonChain.chainId, result.signature);
           setResult({ result: 'success', txid: txid });
         } catch (e) {
