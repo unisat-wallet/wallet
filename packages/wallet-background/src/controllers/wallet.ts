@@ -512,6 +512,7 @@ const RGB_FEATURE_STORAGE_KEY_PREFIX = 'rgb-feature-enabled:v1'
 const RGB_FEATURE_TERMS_VERSION = 'rgb-terms-v1'
 const RGB_LOCAL_HISTORY_STORAGE_NAMESPACE = 'rgb-local-history-v1'
 const RGB_FEE_POOL_WITHDRAWAL_HISTORY_LIMIT = 20
+const UTXO_ASSET_LOOKUP_BATCH_SIZE = 100
 
 type RgbFeePoolWithdrawalHistoryItem = {
   txid: string
@@ -3409,16 +3410,25 @@ export class WalletController extends BaseController {
       }
     }
 
-    // Phase 2: one batch API call to check asset coverage on inputs
+    // Phase 2: batch API calls to check asset coverage on inputs. The asset
+    // lookup endpoint accepts at most 100 outpoints per request.
     let hasAssets = false
     if (outpointSet.size > 0) {
       try {
-        const utxoAssets = await walletApiService.bitcoin.getUtxoAssetsByOutpoints(
-          Array.from(outpointSet)
-        )
-        hasAssets = utxoAssets.some(
-          u => u.inscriptions.length > 0 || u.runes.length > 0 || u.alkanes.length > 0
-        )
+        const outpoints = Array.from(outpointSet)
+        for (
+          let offset = 0;
+          offset < outpoints.length;
+          offset += UTXO_ASSET_LOOKUP_BATCH_SIZE
+        ) {
+          const utxoAssets = await walletApiService.bitcoin.getUtxoAssetsByOutpoints(
+            outpoints.slice(offset, offset + UTXO_ASSET_LOOKUP_BATCH_SIZE)
+          )
+          hasAssets = utxoAssets.some(
+            u => u.inscriptions.length > 0 || u.runes.length > 0 || u.alkanes.length > 0
+          )
+          if (hasAssets) break
+        }
       } catch (e) {
         log.warn('Failed to fetch UTXO assets for PSBT analysis:', e)
       }

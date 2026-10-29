@@ -71,6 +71,8 @@ vi.mock('../src/services', () => ({
       getBTCUtxos: vi.fn().mockResolvedValue([]),
       getAllBTCUtxos: vi.fn().mockResolvedValue([]),
       getAddressAssetOverview: vi.fn(),
+      getFeeSummary: vi.fn(),
+      getUtxoAssetsByOutpoints: vi.fn(),
     },
   },
   sessionService: {
@@ -134,6 +136,55 @@ describe('PSBT signing input selection', () => {
         toSignInputs: [{ index: 0, publicKey: validCompressedPubkey }],
       })
     ).resolves.toEqual([{ index: 0, publicKey: validCompressedPubkey }])
+  })
+})
+
+describe('batch PSBT asset analysis', () => {
+  afterEach(() => vi.restoreAllMocks())
+
+  it('queries UTXO assets in batches of at most 100 outpoints', async () => {
+    const wallet = new WalletController()
+    const inputInfos = Array.from({ length: 201 }, (_, index) => ({
+      txid: index.toString(16).padStart(64, '0'),
+      vout: index,
+      value: 10_000,
+    }))
+    vi.spyOn(txHelpers.PsbtDecoder.prototype, 'decode').mockResolvedValue({
+      inputInfos,
+      outputInfos: [],
+      feeRate: '-',
+      fee: 0,
+      isCompleted: false,
+      risks: [],
+      recommendedFeeRate: 1,
+      shouldWarnFeeRate: false,
+    } as any)
+    vi.mocked(walletApiService.bitcoin.getFeeSummary).mockResolvedValue({ list: [] } as any)
+    vi.mocked(walletApiService.bitcoin.getUtxoAssetsByOutpoints).mockImplementation(
+      async outpoints =>
+        outpoints.map(outpoint => ({
+          txid: outpoint.slice(0, 64),
+          vout: Number(outpoint.slice(65)),
+          inscriptions:
+            outpoint === `${inputInfos[200]!.txid}:${inputInfos[200]!.vout}`
+              ? [{ inscriptionId: 'asset', inscriptionNumber: 1, offset: 0 }]
+              : [],
+          runes: [],
+          alkanes: [],
+        }))
+    )
+
+    const summary = await wallet.analyzeLocalPsbts([
+      { psbtHex: new bitcoin.Psbt().toHex(), toSignInputs: [], autoFinalized: false },
+    ])
+
+    expect(walletApiService.bitcoin.getUtxoAssetsByOutpoints).toHaveBeenCalledTimes(3)
+    expect(
+      vi.mocked(walletApiService.bitcoin.getUtxoAssetsByOutpoints).mock.calls.map(([outpoints]) =>
+        outpoints.length
+      )
+    ).toEqual([100, 100, 1])
+    expect(summary.hasAssets).toBe(true)
   })
 })
 
