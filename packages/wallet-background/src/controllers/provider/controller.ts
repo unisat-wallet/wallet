@@ -47,6 +47,13 @@ function validateRgbProviderFeeRate(req: { data: { params: { feeRate?: number } 
   if (feeRate !== undefined) assertValidFeeRate(feeRate, { supportLowFeeMode: true })
 }
 
+function validateCosmosEnableRequest(req: { data: { params?: { chainId?: unknown } } }) {
+  const chainId = req.data.params?.chainId
+  if (typeof chainId !== 'string' || !hasOwn(wallet.cosmosChainInfoMap, chainId)) {
+    throw new Error(`Unsupported Cosmos network: ${String(chainId)}`)
+  }
+}
+
 type RgbProxyApprovalRequirement = { endpoints: string[] }
 
 function prepareRgbPaymentApproval(req: {
@@ -1459,19 +1466,15 @@ class ProviderController extends BaseController {
     return currentKeyring?.type === 'keystone'
   }
 
-  @Reflect.metadata('APPROVAL', [
-    'CosmosConnect',
-    req => {
-      // todo check
-    },
-  ])
+  @Reflect.metadata('PRECHECK', validateCosmosEnableRequest)
+  @Reflect.metadata('APPROVAL', ['CosmosConnect'])
   cosmosEnable = async ({
     data: {
       params: { chainId },
     },
   }) => {
     if (!hasOwn(wallet.cosmosChainInfoMap, chainId)) {
-      throw new Error('Not supported chainId')
+      throw new Error(`Unsupported Cosmos network: ${String(chainId)}`)
     }
   }
 

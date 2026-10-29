@@ -59,6 +59,13 @@ const flowContext = flow
     return next()
   })
   .use(async (ctx, next) => {
+    const precheck = Reflect.getMetadata('PRECHECK', providerController, ctx.mapMethod)
+    if (precheck) {
+      await precheck(ctx.request)
+    }
+    return next()
+  })
+  .use(async (ctx, next) => {
     const { mapMethod } = ctx
     if (mapMethod.startsWith('webRgb') && mapMethod !== 'webRgbEnable' &&
         !permissionService.hasPermission(ctx.request.session.origin)) {

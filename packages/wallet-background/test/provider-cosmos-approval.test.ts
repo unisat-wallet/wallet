@@ -7,7 +7,11 @@ import { TxBody } from 'cosmjs-types/cosmos/tx/v1beta1/tx.js'
 vi.mock('@unisat/babylon-service', async () => import('../../babylon-service/src/cosmos/utils'))
 vi.mock('../src/services', () => ({
   keyringService: { memStore: { getState: () => ({ isUnlocked: true }) } },
-  permissionService: { hasPermission: () => true, touchConnectedSite: vi.fn() },
+  permissionService: {
+    hasPermission: vi.fn(() => true),
+    touchConnectedSite: vi.fn(),
+    addConnectedSite: vi.fn(),
+  },
   sessionService: {},
   walletApiService: {},
 }))
@@ -18,6 +22,7 @@ vi.mock('../src/controllers/wallet', async () => {
   } = await import('../../babylon-service/src/cosmos/utils')
   return {
     default: {
+      cosmosChainInfoMap: { 'bbn-1': {} },
       prepareCosmosDirectSignRequest: vi.fn(async ({ chainId, signDoc }) =>
         validateCosmosDirectSignDoc(signDoc, { chainId })
       ),
@@ -37,6 +42,7 @@ vi.mock('src/utils/eventBus', () => ({ bgEventBus: { emit: vi.fn() } }))
 
 import rpcFlow from '../src/controllers/provider/rpcFlow'
 import approvalService from 'src/services/approval'
+import { permissionService } from '../src/services'
 import {
   directSignDocToBytesHex,
   arbitrarySignDocToBytesHex,
@@ -75,10 +81,22 @@ const request = (method: string, params: any) => ({
 describe('Cosmos approval payload binding', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    vi.mocked(permissionService.hasPermission).mockReturnValue(true)
     vi.mocked(approvalService.requestApproval).mockResolvedValue({
       publicKey: `02${'11'.repeat(32)}`,
       signature: '22'.repeat(64),
     })
+  })
+
+  it('rejects an unsupported Cosmos network before any connection approval', async () => {
+    vi.mocked(permissionService.hasPermission).mockReturnValue(false)
+
+    await expect(rpcFlow(request('cosmos_enable', { chainId: 'cosmoshub-4' }))).rejects.toThrow(
+      'Unsupported Cosmos network: cosmoshub-4'
+    )
+
+    expect(approvalService.requestApproval).not.toHaveBeenCalled()
+    expect(permissionService.addConnectedSite).not.toHaveBeenCalled()
   })
 
   it('strips injected display text and bytes before requesting Direct approval', async () => {

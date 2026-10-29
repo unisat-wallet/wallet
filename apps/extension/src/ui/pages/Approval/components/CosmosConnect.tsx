@@ -27,6 +27,16 @@ interface Props {
   };
 }
 
+function getErrorMessage(error: unknown): string {
+  if (error instanceof Error) return error.message;
+  if (typeof error === 'string') return error;
+  if (error && typeof error === 'object' && 'message' in error) {
+    const message = (error as { message?: unknown }).message;
+    if (typeof message === 'string') return message;
+  }
+  return 'Unable to load Cosmos address';
+}
+
 export default function CosmosConnect({ params: { session, data } }: Props) {
   const { resolveApproval, rejectApproval } = useApproval();
   const { t } = useI18n();
@@ -68,7 +78,8 @@ export default function CosmosConnect({ params: { session, data } }: Props) {
       })
       .catch((error) => {
         if (!active) return;
-        setAddressError(error instanceof Error ? error.message : 'Unable to load Cosmos address');
+        const message = getErrorMessage(error);
+        setAddressError(message);
       })
       .finally(() => {
         if (active) setAddressLoading(false);
