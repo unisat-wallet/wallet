@@ -6,6 +6,7 @@ import { PubKey } from 'cosmjs-types/cosmos/crypto/secp256k1/keys.js'
 import { MsgWithdrawDelegatorReward } from 'cosmjs-types/cosmos/distribution/v1beta1/tx.js'
 import {
   MsgBeginRedelegate,
+  MsgCancelUnbondingDelegation,
   MsgDelegate,
   MsgUndelegate,
 } from 'cosmjs-types/cosmos/staking/v1beta1/tx.js'
@@ -37,6 +38,9 @@ export interface CosmosMessageSummary {
   sourceValidator?: string
   destinationValidator?: string
   amounts?: CosmosSignAmount[]
+  rewardType?: string
+  withdrawAddress?: string
+  creationHeight?: string
 }
 
 export interface CosmosDirectSignSummary {
@@ -289,6 +293,78 @@ function redelegateToSummary(
   }
 }
 
+function cancelUnbondingToSummary(
+  type: string,
+  message: ReturnType<typeof MsgCancelUnbondingDelegation.decode>
+): CosmosMessageSummary {
+  if (
+    !message.delegatorAddress ||
+    !message.validatorAddress ||
+    !message.amount ||
+    message.creationHeight <= 0n
+  ) {
+    throw new Error('Invalid MsgCancelUnbondingDelegation')
+  }
+  return {
+    type,
+    signer: message.delegatorAddress,
+    validator: message.validatorAddress,
+    amounts: [coinToSummary(message.amount)],
+    creationHeight: message.creationHeight.toString(),
+  }
+}
+
+function decodeBabylonIncentiveFields(value: Uint8Array): [string, string] {
+  const reader = new BinaryReader(value)
+  let first = ''
+  let second = ''
+
+  while (reader.pos < reader.len) {
+    const tag = reader.uint32()
+    if ((tag & 7) !== 2 && (tag >>> 3 === 1 || tag >>> 3 === 2)) {
+      throw new Error('Invalid Babylon incentive message')
+    }
+    switch (tag >>> 3) {
+      case 1:
+        first = reader.string()
+        break
+      case 2:
+        second = reader.string()
+        break
+      default:
+        reader.skipType(tag & 7)
+    }
+  }
+
+  return [first, second]
+}
+
+function withdrawRewardToSummary(type: string, value: Uint8Array): CosmosMessageSummary {
+  const [rewardType, address] = decodeBabylonIncentiveFields(value)
+  if (!address || !['finality_provider', 'btc_staker', 'costaker'].includes(rewardType)) {
+    throw new Error('Invalid MsgWithdrawReward')
+  }
+  return {
+    type,
+    signer: address,
+    rewardType,
+  }
+}
+
+function setWithdrawAddressToSummary(type: string, value: Uint8Array): CosmosMessageSummary {
+  const [delegatorAddress, withdrawAddress] = decodeBabylonIncentiveFields(value)
+  if (!delegatorAddress || !withdrawAddress) {
+    throw new Error('Invalid MsgSetWithdrawAddress')
+  }
+  return {
+    type,
+    signer: delegatorAddress,
+    withdrawAddress,
+  }
+}
+
+class UnsupportedCosmosMessageError extends Error {}
+
 function decodeMessageSummary(typeUrl: string, value: Uint8Array): CosmosMessageSummary {
   switch (typeUrl) {
     case '/cosmos.bank.v1beta1.MsgSend': {
@@ -312,6 +388,9 @@ function decodeMessageSummary(typeUrl: string, value: Uint8Array): CosmosMessage
     case '/cosmos.staking.v1beta1.MsgBeginRedelegate': {
       return redelegateToSummary(typeUrl, MsgBeginRedelegate.decode(value))
     }
+    case '/cosmos.staking.v1beta1.MsgCancelUnbondingDelegation': {
+      return cancelUnbondingToSummary(typeUrl, MsgCancelUnbondingDelegation.decode(value))
+    }
     case '/babylon.epoching.v1.MsgWrappedDelegate': {
       const message = decodeWrappedStakingMessage(value, (reader, length) =>
         MsgDelegate.decode(reader, length)
@@ -330,6 +409,16 @@ function decodeMessageSummary(typeUrl: string, value: Uint8Array): CosmosMessage
       )
       return redelegateToSummary(typeUrl, message)
     }
+    case '/babylon.epoching.v1.MsgWrappedCancelUnbondingDelegation': {
+      const message = decodeWrappedStakingMessage(value, (reader, length) =>
+        MsgCancelUnbondingDelegation.decode(reader, length)
+      )
+      return cancelUnbondingToSummary(typeUrl, message)
+    }
+    case '/babylon.incentive.MsgWithdrawReward':
+      return withdrawRewardToSummary(typeUrl, value)
+    case '/babylon.incentive.MsgSetWithdrawAddress':
+      return setWithdrawAddressToSummary(typeUrl, value)
     case '/cosmos.distribution.v1beta1.MsgWithdrawDelegatorReward': {
       const message = MsgWithdrawDelegatorReward.decode(value)
       if (!message.delegatorAddress || !message.validatorAddress) {
@@ -342,7 +431,7 @@ function decodeMessageSummary(typeUrl: string, value: Uint8Array): CosmosMessage
       }
     }
     default:
-      return { type: typeUrl }
+      throw new UnsupportedCosmosMessageError(`Unsupported Cosmos message: ${typeUrl}`)
   }
 }
 
@@ -428,7 +517,8 @@ export function validateCosmosDirectSignDoc(
     }
     try {
       return decodeMessageSummary(message.typeUrl, message.value)
-    } catch {
+    } catch (error) {
+      if (error instanceof UnsupportedCosmosMessageError) throw error
       throw new Error(`Invalid Cosmos message: ${message.typeUrl}`)
     }
   })

@@ -3,6 +3,7 @@ import { encodePubkey, makeAuthInfoBytes } from '@cosmjs/proto-signing'
 import { MsgSend } from 'cosmjs-types/cosmos/bank/v1beta1/tx.js'
 import {
   MsgBeginRedelegate,
+  MsgCancelUnbondingDelegation,
   MsgDelegate,
   MsgUndelegate,
 } from 'cosmjs-types/cosmos/staking/v1beta1/tx.js'
@@ -54,12 +55,25 @@ function validDirectSignDoc() {
 }
 
 function wrappedStakingDirectSignDoc(typeUrl: string, messageBytes: Uint8Array) {
+  return directSignDocWithMessage(
+    typeUrl,
+    BinaryWriter.create().uint32(10).bytes(messageBytes).finish()
+  )
+}
+
+function directSignDocWithMessage(typeUrl: string, messageBytes: Uint8Array) {
   const signDoc = validDirectSignDoc()
-  const wrappedMessage = BinaryWriter.create().uint32(10).bytes(messageBytes).finish()
   signDoc.bodyBytes = TxBody.encode(
-    TxBody.fromPartial({ messages: [{ typeUrl, value: wrappedMessage }] })
+    TxBody.fromPartial({ messages: [{ typeUrl, value: messageBytes }] })
   ).finish()
   return signDoc
+}
+
+function encodeBabylonIncentiveFields(first: string, second: string) {
+  const writer = BinaryWriter.create()
+  if (first) writer.uint32(10).string(first)
+  if (second) writer.uint32(18).string(second)
+  return writer.finish()
 }
 
 describe('cosmos utils', () => {
@@ -220,6 +234,23 @@ describe('cosmos utils', () => {
         amounts: [{ denom: 'ubbn', amount: '3000000' }],
       },
     },
+    {
+      typeUrl: '/babylon.epoching.v1.MsgWrappedCancelUnbondingDelegation',
+      messageBytes: MsgCancelUnbondingDelegation.encode(
+        MsgCancelUnbondingDelegation.fromPartial({
+          delegatorAddress: signerAddress,
+          validatorAddress: 'bbnvaloper1validator',
+          amount: { denom: 'ubbn', amount: '4000000' },
+          creationHeight: 123n,
+        })
+      ).finish(),
+      expected: {
+        signer: signerAddress,
+        validator: 'bbnvaloper1validator',
+        amounts: [{ denom: 'ubbn', amount: '4000000' }],
+        creationHeight: '123',
+      },
+    },
   ])('decodes and validates Babylon $typeUrl messages', ({ typeUrl, messageBytes, expected }) => {
     const result = validateCosmosDirectSignDoc(
       wrappedStakingDirectSignDoc(typeUrl, messageBytes),
@@ -260,6 +291,64 @@ describe('cosmos utils', () => {
       })
     ).finish()
     expect(() => validateCosmosDirectSignDoc(signDoc)).toThrow('Invalid Cosmos message')
+  })
+
+  it('decodes Babylon reward claims and reward address changes', () => {
+    const rewardTypeUrl = '/babylon.incentive.MsgWithdrawReward'
+    const rewardResult = validateCosmosDirectSignDoc(
+      directSignDocWithMessage(
+        rewardTypeUrl,
+        encodeBabylonIncentiveFields('btc_staker', signerAddress)
+      ),
+      { signerAddress }
+    )
+    expect(rewardResult.summary.messages[0]).toMatchObject({
+      type: rewardTypeUrl,
+      signer: signerAddress,
+      rewardType: 'btc_staker',
+    })
+
+    const addressTypeUrl = '/babylon.incentive.MsgSetWithdrawAddress'
+    const addressResult = validateCosmosDirectSignDoc(
+      directSignDocWithMessage(
+        addressTypeUrl,
+        encodeBabylonIncentiveFields(signerAddress, 'bbn1rewards')
+      ),
+      { signerAddress }
+    )
+    expect(addressResult.summary.messages[0]).toMatchObject({
+      type: addressTypeUrl,
+      signer: signerAddress,
+      withdrawAddress: 'bbn1rewards',
+    })
+  })
+
+  it('rejects invalid Babylon rewards, cross-account changes, and unsupported messages', () => {
+    expect(() =>
+      validateCosmosDirectSignDoc(
+        directSignDocWithMessage(
+          '/babylon.incentive.MsgWithdrawReward',
+          encodeBabylonIncentiveFields('unknown_reward', signerAddress)
+        ),
+        { signerAddress }
+      )
+    ).toThrow('Invalid Cosmos message')
+
+    expect(() =>
+      validateCosmosDirectSignDoc(
+        directSignDocWithMessage(
+          '/babylon.incentive.MsgSetWithdrawAddress',
+          encodeBabylonIncentiveFields('bbn1attacker', 'bbn1rewards')
+        ),
+        { signerAddress }
+      )
+    ).toThrow('message signer')
+
+    expect(() =>
+      validateCosmosDirectSignDoc(
+        directSignDocWithMessage('/babylon.example.v1.MsgUnknown', new Uint8Array([8, 1]))
+      )
+    ).toThrow('Unsupported Cosmos message')
   })
 
   it('rejects degenerate, mismatched, or cross-account Direct SignDocs', () => {

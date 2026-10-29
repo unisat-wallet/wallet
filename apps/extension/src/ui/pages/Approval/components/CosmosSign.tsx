@@ -203,7 +203,7 @@ function CosmosDirectDetails({ summary }: { summary: CosmosDirectSignSummary }) 
                 {message.amounts?.length ? (
                   <Text text={formatCosmosAmounts(message.amounts)} size="xl" preset="title-bold" />
                 ) : (
-                  <Text text="No token amount" preset="bold" />
+                  <Text text={getCosmosMessageHeadline(message)} preset="bold" />
                 )}
               </Column>
               <Icon icon={message.recipient ? 'send' : 'baby-staking'} size={26} />
@@ -217,6 +217,13 @@ function CosmosDirectDetails({ summary }: { summary: CosmosDirectSignSummary }) 
             ) : null}
             {message.destinationValidator ? (
               <CosmosAddressRow label="Destination validator" address={message.destinationValidator} />
+            ) : null}
+            {message.rewardType ? <CosmosDetailRow label="Reward type" value={message.rewardType} /> : null}
+            {message.withdrawAddress ? (
+              <CosmosAddressRow label="New reward address" address={message.withdrawAddress} />
+            ) : null}
+            {message.creationHeight ? (
+              <CosmosDetailRow label="Original unbonding height" value={message.creationHeight} />
             ) : null}
             <CosmosDetailRow label="Message type" value={message.type} />
           </Column>
@@ -333,6 +340,18 @@ function formatCosmosAmounts(amounts: Array<{ amount: string; denom: string }>) 
   return amounts.map((amount) => `${amount.amount} ${amount.denom}`).join(' + ');
 }
 
+function getCosmosMessageHeadline(message: CosmosDirectSignSummary['messages'][number]) {
+  switch (message.type) {
+    case '/babylon.incentive.MsgWithdrawReward':
+    case '/cosmos.distribution.v1beta1.MsgWithdrawDelegatorReward':
+      return 'All available rewards';
+    case '/babylon.incentive.MsgSetWithdrawAddress':
+      return 'No token transfer';
+    default:
+      return 'No token amount';
+  }
+}
+
 function getCosmosMessageTitle(message: CosmosDirectSignSummary['messages'][number]) {
   if (
     message.type === '/cosmos.bank.v1beta1.MsgSend' &&
@@ -355,8 +374,15 @@ function getCosmosMessageTitle(message: CosmosDirectSignSummary['messages'][numb
     case '/cosmos.staking.v1beta1.MsgBeginRedelegate':
     case '/babylon.epoching.v1.MsgWrappedBeginRedelegate':
       return 'Redelegate tokens';
+    case '/cosmos.staking.v1beta1.MsgCancelUnbondingDelegation':
+    case '/babylon.epoching.v1.MsgWrappedCancelUnbondingDelegation':
+      return 'Cancel unbonding';
     case '/cosmos.distribution.v1beta1.MsgWithdrawDelegatorReward':
       return 'Withdraw staking rewards';
+    case '/babylon.incentive.MsgWithdrawReward':
+      return 'Claim Babylon rewards';
+    case '/babylon.incentive.MsgSetWithdrawAddress':
+      return 'Change reward address';
     default:
       return 'Cosmos message';
   }
