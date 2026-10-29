@@ -42,6 +42,9 @@ import {
 import { NetworkType } from '@unisat/wallet-types'
 import { formatPsbtHex } from '../../utils/psbt-utils'
 
+const MAX_MULTI_SIGN_PSBT_COUNT = 50
+const MAX_MULTI_SIGN_PSBT_INPUT_COUNT = 1000
+
 function validateRgbProviderFeeRate(req: { data: { params: { feeRate?: number } } }) {
   const { feeRate } = req.data.params
   if (feeRate !== undefined) assertValidFeeRate(feeRate, { supportLowFeeMode: true })
@@ -714,13 +717,36 @@ class ProviderController extends BaseController {
     'SignPsbt',
     async req => {
       const params: RequestMethodSignPsbtsParams = req.data.params
-      if (!params.psbtHexs) {
-        throw new Error('psbtHex is required')
+      if (!Array.isArray(params.psbtHexs) || params.psbtHexs.length === 0) {
+        throw new WalletError(ErrorCodes.INVALID_PARAMS, 'psbtHexs is required')
+      }
+      if (params.psbtHexs.length > MAX_MULTI_SIGN_PSBT_COUNT) {
+        throw new WalletError(
+          ErrorCodes.INVALID_PARAMS,
+          `Cannot sign more than ${MAX_MULTI_SIGN_PSBT_COUNT} transactions at once`
+        )
+      }
+
+      const formattedPsbtHexs: string[] = []
+      let totalInputCount = 0
+      for (const psbt of params.psbtHexs) {
+        const psbtHex = formatPsbtHex(psbt)
+        totalInputCount += bitcoin.Psbt.fromHex(psbtHex).inputCount
+        if (totalInputCount > MAX_MULTI_SIGN_PSBT_INPUT_COUNT) {
+          throw new WalletError(
+            ErrorCodes.INVALID_PARAMS,
+            `Cannot sign more than ${MAX_MULTI_SIGN_PSBT_INPUT_COUNT} UTXOs at once`
+          )
+        }
+        formattedPsbtHexs.push(psbtHex)
       }
 
       params.toSignDatas = []
-      for (let i = 0; i < params.psbtHexs.length; i++) {
-        const toSignData = await getPsbtToSignData(params.psbtHexs[i]!, params.options?.[i])
+      for (let i = 0; i < formattedPsbtHexs.length; i++) {
+        const toSignData = await wallet.getToSignData({
+          psbtHex: formattedPsbtHexs[i]!,
+          ...(params.options?.[i] ? { options: params.options[i] } : {}),
+        })
         params.toSignDatas.push(toSignData)
       }
       delete params.psbtHexs
