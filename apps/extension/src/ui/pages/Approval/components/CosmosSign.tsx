@@ -347,10 +347,13 @@ function getCosmosMessageTitle(message: CosmosDirectSignSummary['messages'][numb
     case '/cosmos.bank.v1beta1.MsgSend':
       return 'Send tokens';
     case '/cosmos.staking.v1beta1.MsgDelegate':
+    case '/babylon.epoching.v1.MsgWrappedDelegate':
       return 'Delegate tokens';
     case '/cosmos.staking.v1beta1.MsgUndelegate':
+    case '/babylon.epoching.v1.MsgWrappedUndelegate':
       return 'Undelegate tokens';
     case '/cosmos.staking.v1beta1.MsgBeginRedelegate':
+    case '/babylon.epoching.v1.MsgWrappedBeginRedelegate':
       return 'Redelegate tokens';
     case '/cosmos.distribution.v1beta1.MsgWithdrawDelegatorReward':
       return 'Withdraw staking rewards';

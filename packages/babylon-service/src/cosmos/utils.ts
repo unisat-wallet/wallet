@@ -9,6 +9,7 @@ import {
   MsgDelegate,
   MsgUndelegate,
 } from 'cosmjs-types/cosmos/staking/v1beta1/tx.js'
+import { BinaryReader } from 'cosmjs-types/binary.js'
 import { SignMode } from 'cosmjs-types/cosmos/tx/signing/v1beta1/signing.js'
 import { AuthInfo, TxBody } from 'cosmjs-types/cosmos/tx/v1beta1/tx.js'
 
@@ -216,6 +217,78 @@ function coinToSummary(coin: { denom: string; amount: string }): CosmosSignAmoun
   return { denom: coin.denom, amount: coin.amount }
 }
 
+function decodeWrappedStakingMessage<T>(
+  value: Uint8Array,
+  decode: (reader: BinaryReader, length: number) => T
+): T {
+  const reader = new BinaryReader(value)
+  let message: T | undefined
+
+  while (reader.pos < reader.len) {
+    const tag = reader.uint32()
+    if (tag >>> 3 === 1) {
+      if ((tag & 7) !== 2) throw new Error('Invalid wrapped staking message')
+      message = decode(reader, reader.uint32())
+    } else {
+      reader.skipType(tag & 7)
+    }
+  }
+
+  if (!message) throw new Error('Invalid wrapped staking message')
+  return message
+}
+
+function delegateToSummary(
+  type: string,
+  message: ReturnType<typeof MsgDelegate.decode>
+): CosmosMessageSummary {
+  if (!message.delegatorAddress || !message.validatorAddress || !message.amount) {
+    throw new Error('Invalid MsgDelegate')
+  }
+  return {
+    type,
+    signer: message.delegatorAddress,
+    validator: message.validatorAddress,
+    amounts: [coinToSummary(message.amount)],
+  }
+}
+
+function undelegateToSummary(
+  type: string,
+  message: ReturnType<typeof MsgUndelegate.decode>
+): CosmosMessageSummary {
+  if (!message.delegatorAddress || !message.validatorAddress || !message.amount) {
+    throw new Error('Invalid MsgUndelegate')
+  }
+  return {
+    type,
+    signer: message.delegatorAddress,
+    validator: message.validatorAddress,
+    amounts: [coinToSummary(message.amount)],
+  }
+}
+
+function redelegateToSummary(
+  type: string,
+  message: ReturnType<typeof MsgBeginRedelegate.decode>
+): CosmosMessageSummary {
+  if (
+    !message.delegatorAddress ||
+    !message.validatorSrcAddress ||
+    !message.validatorDstAddress ||
+    !message.amount
+  ) {
+    throw new Error('Invalid MsgBeginRedelegate')
+  }
+  return {
+    type,
+    signer: message.delegatorAddress,
+    sourceValidator: message.validatorSrcAddress,
+    destinationValidator: message.validatorDstAddress,
+    amounts: [coinToSummary(message.amount)],
+  }
+}
+
 function decodeMessageSummary(typeUrl: string, value: Uint8Array): CosmosMessageSummary {
   switch (typeUrl) {
     case '/cosmos.bank.v1beta1.MsgSend': {
@@ -231,46 +304,31 @@ function decodeMessageSummary(typeUrl: string, value: Uint8Array): CosmosMessage
       }
     }
     case '/cosmos.staking.v1beta1.MsgDelegate': {
-      const message = MsgDelegate.decode(value)
-      if (!message.delegatorAddress || !message.validatorAddress || !message.amount) {
-        throw new Error('Invalid MsgDelegate')
-      }
-      return {
-        type: typeUrl,
-        signer: message.delegatorAddress,
-        validator: message.validatorAddress,
-        amounts: [coinToSummary(message.amount)],
-      }
+      return delegateToSummary(typeUrl, MsgDelegate.decode(value))
     }
     case '/cosmos.staking.v1beta1.MsgUndelegate': {
-      const message = MsgUndelegate.decode(value)
-      if (!message.delegatorAddress || !message.validatorAddress || !message.amount) {
-        throw new Error('Invalid MsgUndelegate')
-      }
-      return {
-        type: typeUrl,
-        signer: message.delegatorAddress,
-        validator: message.validatorAddress,
-        amounts: [coinToSummary(message.amount)],
-      }
+      return undelegateToSummary(typeUrl, MsgUndelegate.decode(value))
     }
     case '/cosmos.staking.v1beta1.MsgBeginRedelegate': {
-      const message = MsgBeginRedelegate.decode(value)
-      if (
-        !message.delegatorAddress ||
-        !message.validatorSrcAddress ||
-        !message.validatorDstAddress ||
-        !message.amount
-      ) {
-        throw new Error('Invalid MsgBeginRedelegate')
-      }
-      return {
-        type: typeUrl,
-        signer: message.delegatorAddress,
-        sourceValidator: message.validatorSrcAddress,
-        destinationValidator: message.validatorDstAddress,
-        amounts: [coinToSummary(message.amount)],
-      }
+      return redelegateToSummary(typeUrl, MsgBeginRedelegate.decode(value))
+    }
+    case '/babylon.epoching.v1.MsgWrappedDelegate': {
+      const message = decodeWrappedStakingMessage(value, (reader, length) =>
+        MsgDelegate.decode(reader, length)
+      )
+      return delegateToSummary(typeUrl, message)
+    }
+    case '/babylon.epoching.v1.MsgWrappedUndelegate': {
+      const message = decodeWrappedStakingMessage(value, (reader, length) =>
+        MsgUndelegate.decode(reader, length)
+      )
+      return undelegateToSummary(typeUrl, message)
+    }
+    case '/babylon.epoching.v1.MsgWrappedBeginRedelegate': {
+      const message = decodeWrappedStakingMessage(value, (reader, length) =>
+        MsgBeginRedelegate.decode(reader, length)
+      )
+      return redelegateToSummary(typeUrl, message)
     }
     case '/cosmos.distribution.v1beta1.MsgWithdrawDelegatorReward': {
       const message = MsgWithdrawDelegatorReward.decode(value)
