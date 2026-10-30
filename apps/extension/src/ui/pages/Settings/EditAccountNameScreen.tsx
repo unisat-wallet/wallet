@@ -18,8 +18,15 @@ export default function EditAccountNameScreen() {
           onKeyUp={handleOnKeyUp}
           autoFocus={true}
           maxLength={MAX_ALIAS_NAME_LENGTH}
+          data-testid="edit-account-name-input"
         />
-        <Button disabled={!isValidName} text={t('change_account_name')} preset="primary" onClick={handleOnClick} />
+        <Button
+          disabled={!isValidName}
+          text={t('change_account_name')}
+          preset="primary"
+          onClick={handleOnClick}
+          data-testid="edit-account-name-confirm-button"
+        />
       </Content>
     </Layout>
   );

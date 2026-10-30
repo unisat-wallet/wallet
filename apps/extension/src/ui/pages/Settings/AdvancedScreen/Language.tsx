@@ -12,6 +12,7 @@ export function LanguageCard() {
 
   return (
     <Card
+      data-testid="advanced-language-card"
       style={{ borderRadius: 10, padding: '12px 16px', cursor: 'pointer' }}
       onClick={() => navigate('/settings/language')}>
       <Row full justifyBetween>

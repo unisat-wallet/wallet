@@ -24,14 +24,14 @@ export default function NotificationListScreen() {
         }
       />
       <Content>
-        <div style={{ height: layoutHeight, overflowY: 'auto' }}>
+        <div data-testid="notifications-screen" style={{ height: layoutHeight, overflowY: 'auto' }}>
           <Column gap="md">
             {loading ? (
               <Column justifyCenter itemsCenter py="xxl">
                 <Text text={t('loading')} color="textDim" />
               </Column>
             ) : notifications.length === 0 ? (
-              <Column justifyCenter itemsCenter py="xxl">
+              <Column data-testid="notifications-empty" justifyCenter itemsCenter py="xxl">
                 <Text text={t('no_notifications')} color="textDim" />
               </Column>
             ) : (
@@ -39,6 +39,7 @@ export default function NotificationListScreen() {
                 {notifications.map((notification) => (
                   <Column
                     key={notification.id}
+                    data-testid="notification-item"
                     style={{
                       background: '#1A1A1A',
                       borderRadius: 12,

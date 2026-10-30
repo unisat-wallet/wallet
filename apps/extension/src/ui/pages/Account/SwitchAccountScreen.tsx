@@ -108,6 +108,7 @@ export function MyItem({ account, autoNav }: MyItemProps, ref) {
         )}
 
         <Icon
+          data-testid="account-options-button"
           onClick={async (e) => {
             setOptionsVisible(!optionsVisible);
           }}
@@ -127,6 +128,7 @@ export function MyItem({ account, autoNav }: MyItemProps, ref) {
             }}
           >
             <Row
+              data-testid="account-option-edit-name"
               onClick={() => {
                 navigate('EditAccountNameScreen', { account });
               }}
@@ -135,6 +137,7 @@ export function MyItem({ account, autoNav }: MyItemProps, ref) {
               <Text text={t('edit_name')} size="sm" />
             </Row>
             <Row
+              data-testid="account-option-copy-address"
               onClick={() => {
                 copyToClipboard(account.address);
                 tools.toastSuccess(t('copied'));
@@ -155,6 +158,7 @@ export function MyItem({ account, autoNav }: MyItemProps, ref) {
             </Row> */}
             {canExportPrivateKey && (
               <Row
+                data-testid="account-option-export-private-key"
                 onClick={() => {
                   navigate('ExportPrivateKeyScreen', { account });
                 }}

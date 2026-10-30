@@ -168,8 +168,8 @@ export default function Connect({ params: { session } }: Props) {
 
       <Footer>
         <Row full>
-          <Button text={t('cancel')} preset="default" onClick={handleCancel} full />
-          <Button text={t('connect')} preset="primary" onClick={handleConnect} full />
+          <Button text={t('cancel')} preset="default" onClick={handleCancel} full data-testid="connect-cancel-button" />
+          <Button text={t('connect')} preset="primary" onClick={handleConnect} full data-testid="connect-approve-button" />
         </Row>
       </Footer>
     </Layout>

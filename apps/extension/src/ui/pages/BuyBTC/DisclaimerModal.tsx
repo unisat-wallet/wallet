@@ -25,11 +25,12 @@ export default function DisclaimerModal({ channelType, onClose }: { channelType:
 
   return (
     <BottomModal onClose={onClose}>
-      <Column>
+      <Column data-testid="buy-disclaimer-modal">
         <Row justifyBetween itemsCenter style={{ height: 20 }}>
           <Row />
           <Text text={t('disclaimer')} textCenter size="md" />
           <Row
+            data-testid="buy-disclaimer-close-button"
             onClick={() => {
               onClose();
             }}>
@@ -58,6 +59,7 @@ export default function DisclaimerModal({ channelType, onClose }: { channelType:
 
         <Row justifyCenter>
           <Checkbox
+            data-testid="buy-disclaimer-checkbox"
             onChange={() => {
               setUnderstand(!understand);
             }}
@@ -68,6 +70,7 @@ export default function DisclaimerModal({ channelType, onClose }: { channelType:
         </Row>
 
         <Button
+          data-testid="buy-disclaimer-continue-button"
           text={`${t('continue_with')} ${channelInfo.name}`}
           preset="primaryV2"
           disabled={!understand}

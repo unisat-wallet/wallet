@@ -95,7 +95,7 @@ export default function TxCreateScreen() {
             <RBFBar value={enableRBF} onChange={onRBFChange} />
           </Column>
 
-          {error && <Text text={error} color="error" />}
+          {error && <Text data-testid="tx-create-error" text={error} color="error" />}
 
           <Button
             disabled={disabled}

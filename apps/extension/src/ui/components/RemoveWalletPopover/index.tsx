@@ -63,6 +63,7 @@ export const RemoveWalletPopover = ({ keyring, onClose }: { keyring: WalletKeyri
           <Button
             text={t('cancel')}
             full
+            data-testid="remove-wallet-cancel-button"
             onClick={(e) => {
               if (onClose) {
                 onClose();
@@ -73,6 +74,7 @@ export const RemoveWalletPopover = ({ keyring, onClose }: { keyring: WalletKeyri
             text={t('remove')}
             preset="danger"
             full
+            data-testid="remove-wallet-confirm-button"
             onClick={async () => {
               const nextKeyring = await wallet.removeKeyring(keyring);
               const keyrings = await wallet.getKeyrings();

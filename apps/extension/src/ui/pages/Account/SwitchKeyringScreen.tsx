@@ -156,6 +156,7 @@ export function MyItem({ keyring, autoNav }: MyItemProps, ref) {
         )}
 
         <Icon
+          data-testid="wallet-options-button"
           onClick={async (e) => {
             setOptionsVisible(!optionsVisible);
           }}
@@ -176,6 +177,7 @@ export function MyItem({ keyring, autoNav }: MyItemProps, ref) {
           >
             <Column>
               <Row
+                data-testid="wallet-option-edit-name"
                 onClick={() => {
                   navigate('EditWalletNameScreen', { keyring });
                 }}
@@ -186,6 +188,7 @@ export function MyItem({ keyring, autoNav }: MyItemProps, ref) {
 
               {keyring.type === KeyringType.HdKeyring && (
                 <Row
+                  data-testid="wallet-option-show-mnemonic"
                   onClick={() => {
                     navigate('ExportMnemonicsScreen', { keyring });
                   }}
@@ -196,6 +199,7 @@ export function MyItem({ keyring, autoNav }: MyItemProps, ref) {
               )}
               {canExportPrivateKey && (
                 <Row
+                  data-testid="wallet-option-export-private-key"
                   onClick={() => {
                     navigate('ExportPrivateKeyScreen', { account: keyring.accounts[0] });
                   }}
@@ -205,6 +209,7 @@ export function MyItem({ keyring, autoNav }: MyItemProps, ref) {
                 </Row>
               )}
               <Row
+                data-testid="wallet-option-remove"
                 onClick={() => {
                   // TODO: Treat corrupted keyrings separately in this "last wallet" check.
                   if (keyrings.length == 1) {

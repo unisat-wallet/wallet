@@ -179,13 +179,13 @@ function AddressHistoryUnavailable({ address }: { address: string }) {
   const nav = useNavigation();
   const { t } = useI18n();
   return (
-    <Column gap="lg" fullX classname={styles.historySection}>
+    <Column gap="lg" fullX classname={styles.historySection} data-testid="history-section">
       <div className={styles.historyHeader}>
         <Text text={t('history')} size="md" color="white" />
       </div>
       <Text text={t('home_history_shortcut_description')} color="textDim" size="sm" />
       {address && (
-        <button type="button" className={styles.viewAllButton} onClick={() => nav.navToExplorerAddress(address)}>
+        <button type="button" className={styles.viewAllButton} data-testid="history-explorer-button" onClick={() => nav.navToExplorerAddress(address)}>
           {t(chain.unisatExplorerUrl ? 'view_on_uniscan' : 'view_on_explorer')}
           <span className={styles.viewAllArrow} aria-hidden="true">
             <img src="/images/history/view-all-arrow.svg" alt="" />
@@ -263,7 +263,7 @@ function AddressHistoryContent({
   }, []);
 
   return (
-    <Column gap="lg" fullX classname={styles.historySection}>
+    <Column gap="lg" fullX classname={styles.historySection} data-testid="history-section">
       <div className={styles.historyHeader}>
         {preview && (
           <div className={styles.historyTitle}>
@@ -352,7 +352,7 @@ function AddressHistoryContent({
         </div>
       )}
       {preview && address && history.total > 0 && (
-        <button type="button" className={styles.viewAllButton} onClick={() => nav.navToExplorerAddress(address)}>
+        <button type="button" className={styles.viewAllButton} data-testid="history-explorer-button" onClick={() => nav.navToExplorerAddress(address)}>
           {t('view_on_uniscan')}
           <span className={styles.viewAllArrow} aria-hidden="true">
             <img src="/images/history/view-all-arrow.svg" alt="" />

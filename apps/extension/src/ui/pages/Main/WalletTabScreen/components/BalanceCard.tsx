@@ -39,6 +39,7 @@ export function BalanceCard() {
 
   return (
     <Column
+      data-testid="balance-card"
       fullX
       style={{
         background: 'linear-gradient(117deg, #ffda8d 1.38%, #bf630f 94.19%)',
@@ -84,6 +85,7 @@ export function BalanceCard() {
 
       {isDetailExpanded && isCurrentChainBalance && (
         <Row
+          data-testid="balance-breakdown"
           style={{
             width: '100%',
             padding: 12,

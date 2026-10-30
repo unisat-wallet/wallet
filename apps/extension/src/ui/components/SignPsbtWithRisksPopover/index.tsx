@@ -321,6 +321,7 @@ export const SignPsbtWithRisksPopover = ({
               text={t('understand_the_risks_continue')}
               preset="delete"
               disabled={!risksAccepted}
+              data-testid="risks-continue-button"
               full
               onClick={() => {
                 onConfirm();

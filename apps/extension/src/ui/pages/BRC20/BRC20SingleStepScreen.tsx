@@ -74,6 +74,7 @@ export default function BRC20SingleStepScreen() {
         <Column mt="lg">
           <Input
             preset="address"
+            data-testid="brc20-recipient-address-input"
             addressInputData={toInfo}
             onAddressInputChange={(val) => {
               setToInfo(val);
@@ -86,6 +87,7 @@ export default function BRC20SingleStepScreen() {
         <Column mt="lg">
           <TransferAmountSection>
             <TransferAmountCard
+              inputTestId="brc20-amount-input"
               amount={inputAmount.toString()}
               onAmountChange={setInputAmount}
               showMax
@@ -105,7 +107,7 @@ export default function BRC20SingleStepScreen() {
 
         {error && <Text text={error} color="error" />}
 
-        <Button disabled={disabled} preset="primary" text={t('next')} onClick={onClickConfirmStep1}></Button>
+        <Button data-testid="brc20-next-button" disabled={disabled} preset="primary" text={t('next')} onClick={onClickConfirmStep1}></Button>
       </Content>
     </Layout>
   );

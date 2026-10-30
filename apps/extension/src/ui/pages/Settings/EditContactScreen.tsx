@@ -43,6 +43,7 @@ function EditContactScreen() {
               value={name}
               onChange={handleNameChange}
               placeholder={t('please_enter_name')}
+              data-testid="contact-name-input"
               containerStyle={inputStyle}
               style={{ color: 'white' }}
             />
@@ -55,6 +56,7 @@ function EditContactScreen() {
               value={contactAddress}
               onChange={handleAddressChange}
               placeholder={t('please_enter_address')}
+              data-testid="contact-address-input"
               containerStyle={inputStyle}
               style={{ color: 'white' }}
             />
@@ -92,6 +94,7 @@ function EditContactScreen() {
       <Footer style={{ padding: '16px 16px 32px 16px' }}>
         <Column full gap="lg" style={{ marginBottom: 0 }}>
           <Button
+            data-testid="contact-save-button"
             text={loading ? t('saving') : t('save')}
             onClick={handleSubmit}
             disabled={loading}
@@ -103,6 +106,7 @@ function EditContactScreen() {
           />
           {address && (
             <Button
+              data-testid="contact-delete-button"
               text={t('delete')}
               preset="delete"
               onClick={handleDelete}

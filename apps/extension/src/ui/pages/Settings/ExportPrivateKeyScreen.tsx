@@ -133,10 +133,18 @@ export default function ExportPrivateKeyScreen() {
               }}
               onKeyUp={(e: KeyboardEvent<HTMLInputElement>) => handleOnKeyUp(e)}
               autoFocus={true}
+              data-testid="export-private-key-password-input"
             />
-            {error && <Text text={error} preset="regular" color="error" />}
+            {error && <Text data-testid="export-private-key-error" text={error} preset="regular" color="error" />}
 
-            <Button mt="lg" text={t('show_private_key')} preset="primary" disabled={disabled} onClick={btnClick} />
+            <Button
+              mt="lg"
+              text={t('show_private_key')}
+              preset="primary"
+              disabled={disabled}
+              onClick={btnClick}
+              data-testid="export-private-key-submit-button"
+            />
           </Column>
         ) : (
           <Column>

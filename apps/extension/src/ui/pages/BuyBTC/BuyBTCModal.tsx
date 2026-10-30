@@ -33,7 +33,7 @@ function PaymentItem({ channel, onClick }: { channel: BtcChannelItem; onClick: (
   const channelInfo = PAYMENT_CHANNELS[channel.channel];
   if (!channelInfo) return <></>;
   return (
-    <Card style={{ backgroundColor: 'rgba(255,255,255,0.1)', borderRadius: 10 }} mt="lg" onClick={onClick}>
+    <Card data-testid={`buy-provider-${channel.channel}`} style={{ backgroundColor: 'rgba(255,255,255,0.1)', borderRadius: 10 }} mt="lg" onClick={onClick}>
       <Column fullX gap={'md'}>
         <Row fullX justifyBetween>
           <Row itemsCenter>
@@ -84,7 +84,7 @@ export const BuyBTCModal = ({ onClose }: { onClose: () => void }) => {
   return (
     <>
       <BottomModal onClose={handleBuyModalClose}>
-        <Column justifyCenter itemsCenter>
+        <Column justifyCenter itemsCenter data-testid="buy-modal">
           <Row justifyBetween itemsCenter style={{ height: 20 }} fullX>
             <Text text={`${t('buy')} ${chain.unit}`} size="md" />
             <Row

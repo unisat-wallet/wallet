@@ -61,8 +61,9 @@ export default function ExportMnemonicsScreen() {
               }}
               onKeyUp={(e: KeyboardEvent<HTMLInputElement>) => handleOnKeyUp(e)}
               autoFocus={true}
+              data-testid="export-mnemonic-password-input"
             />
-            {error && <Text text={error} preset="regular" color="error" />}
+            {error && <Text data-testid="export-mnemonic-error" text={error} preset="regular" color="error" />}
 
             <Button
               mt="lg"
@@ -70,6 +71,7 @@ export default function ExportMnemonicsScreen() {
               text={t('show_secret_recovery_phrase')}
               preset="primary"
               onClick={btnClick}
+              data-testid="export-mnemonic-submit-button"
             />
           </Column>
         ) : (

@@ -21,6 +21,7 @@ export default function ReceiveScreen() {
       <Content>
         <Column gap="lg">
           <ReceiveQRCodeCard
+            data-testid="receive-address-card"
             title={currentAccount?.alianName || ''}
             description={t('use_this_address_to_receive', { unit: chain.unit, chain: chain.label })}
             value={address || ''}

@@ -292,6 +292,7 @@ export function TransferAmountCard({
             {amount && !readOnly ? (
               <button
                 type="button"
+                data-testid={inputTestId ? `${inputTestId}-clear-button` : undefined}
                 style={clearButtonStyle}
                 onClick={() => onAmountChange('')}
                 aria-label="Clear amount">
@@ -299,7 +300,11 @@ export function TransferAmountCard({
               </button>
             ) : null}
             {showMax ? (
-              <button type="button" style={maxButtonStyle} onClick={onMaxClick}>
+              <button
+                type="button"
+                data-testid={inputTestId ? `${inputTestId}-max-button` : undefined}
+                style={maxButtonStyle}
+                onClick={onMaxClick}>
                 {t('max')}
               </button>
             ) : null}

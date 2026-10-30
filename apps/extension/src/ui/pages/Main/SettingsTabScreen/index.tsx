@@ -104,6 +104,7 @@ export default function SettingsTabScreen() {
           .map((item) => (
             <Button
               key={item.key}
+              data-testid={item.key}
               style={{
                 height: 50,
                 backgroundColor: 'rgba(20, 20, 20, 0.8)',
@@ -134,6 +135,7 @@ export default function SettingsTabScreen() {
             <BaseView style={{ position: 'relative' }}>
               <Icon
                 icon="notification"
+                data-testid="settings-notifications-button"
                 size={20}
                 color="textDim"
                 onClick={() => {
@@ -145,6 +147,7 @@ export default function SettingsTabScreen() {
             <BaseView style={{ position: 'relative', marginRight: 5 }}>
               <Icon
                 icon="language"
+                data-testid="settings-language-button"
                 size={22}
                 color="textDim"
                 onClick={() => {
@@ -173,6 +176,7 @@ export default function SettingsTabScreen() {
           <Row justifyCenter gap="xl" mt="lg">
             <Icon
               icon="website"
+              data-testid="settings-official-website"
               size={fontSizes.iconMiddle}
               color="textDim"
               onClick={() => {
@@ -181,6 +185,7 @@ export default function SettingsTabScreen() {
             />
             <Icon
               icon="discord"
+              data-testid="settings-official-discord"
               size={fontSizes.iconMiddle}
               color="textDim"
               onClick={() => {
@@ -190,6 +195,7 @@ export default function SettingsTabScreen() {
 
             <Icon
               icon="twitter"
+              data-testid="settings-official-twitter"
               size={fontSizes.iconMiddle}
               color="textDim"
               onClick={() => {
@@ -199,6 +205,7 @@ export default function SettingsTabScreen() {
 
             <Icon
               icon="github"
+              data-testid="settings-official-github"
               size={fontSizes.iconMiddle}
               color="textDim"
               onClick={() => {

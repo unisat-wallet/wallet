@@ -58,7 +58,7 @@ function SortableContactItem({ contact, index }: { contact: ContactBookItem; ind
   };
 
   return (
-    <div ref={setNodeRef} style={style} className="sortable-item" {...attributes}>
+    <div ref={setNodeRef} style={style} className="sortable-item" data-testid={`contact-sort-item-${index}`} {...attributes}>
       <Card
         mt="md"
         style={{
@@ -409,6 +409,7 @@ export default function ContactsScreen() {
     return filteredContacts.map((contact, index) => (
       <div
         key={`${contact.address}_${contact.chain}`}
+        data-testid={`contact-item-${index}`}
         style={{ cursor: 'pointer' }}
         onClick={() =>
           nav.navigate('EditContactScreen', {
@@ -474,6 +475,7 @@ export default function ContactsScreen() {
           background: isSidePanel ? 'black' : 'transparent'
         }}>
         <Row
+          data-testid="contacts-network-selector"
           style={{
             border: `1px solid ${colors.gold}`,
             borderRadius: 20,
@@ -490,6 +492,7 @@ export default function ContactsScreen() {
 
         {!showEmptyState && !showEmptyFilteredState && !isSortingMode ? (
           <Row
+            data-testid="contacts-sort-button"
             style={{
               width: 36,
               height: 36,
@@ -552,6 +555,7 @@ export default function ContactsScreen() {
               }}>
               <SearchOutlined style={{ color: '#888', marginRight: 8, fontSize: 20, display: 'flex' }} />
               <input
+                data-testid="contacts-search-input"
                 type="text"
                 placeholder={t('search_address_or_name')}
                 value={searchKeyword}
@@ -611,6 +615,7 @@ export default function ContactsScreen() {
       </Content>
       <Footer>
         <Button
+          data-testid={isSortingMode ? 'contacts-sort-finish-button' : 'contacts-add-button'}
           text={isSortingMode ? t('finish') : t('add_address')}
           preset="primary"
           onClick={

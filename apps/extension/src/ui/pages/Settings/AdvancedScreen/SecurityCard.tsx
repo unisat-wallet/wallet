@@ -16,6 +16,7 @@ export function SecurityCard() {
       <Column fullX>
         {/* Change Password Option */}
         <Row
+          data-testid="change-password-card"
           justifyBetween
           style={{
             cursor: 'pointer',
@@ -28,6 +29,7 @@ export function SecurityCard() {
 
         {/* Auto Lock Time Option */}
         <Row
+          data-testid="auto-lock-time-card"
           justifyBetween
           style={{
             cursor: 'pointer'

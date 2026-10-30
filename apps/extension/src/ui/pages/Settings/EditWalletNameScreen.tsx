@@ -24,11 +24,13 @@ export default function EditWalletNameScreen() {
           onKeyUp={(e) => handleOnKeyUp(e)}
           autoFocus={true}
           maxLength={MAX_ALIAS_NAME_LENGTH}
+          data-testid="edit-wallet-name-input"
         />
         <Button
           disabled={!isValidName}
           text={t('change_wallet_name')}
           preset="primary"
+          data-testid="edit-wallet-name-confirm-button"
           onClick={(e) => handleOnClick()}
         />
       </Content>

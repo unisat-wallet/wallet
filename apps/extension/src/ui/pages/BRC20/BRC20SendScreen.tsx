@@ -46,7 +46,7 @@ function Step1({ contextData, updateContextData }: BRC20SendStepParams) {
           </Row>
         </Column>
 
-        <Button text={t('next')} preset="primary" onClick={onClickNext} disabled={disabled} />
+        <Button data-testid="brc20-next-button" text={t('next')} preset="primary" onClick={onClickNext} disabled={disabled} />
       </Column>
     </Content>
   );
@@ -60,6 +60,7 @@ const InscribeTransferButton = ({ tokenBalance }: { tokenBalance: TokenBalance }
   return (
     <Column fullX>
       <Button
+        data-testid="brc20-transfer-inscribe-button"
         preset="default"
         onClick={() => {
           nav.navigate('InscribeTransferScreen', { ticker: tokenBalance.ticker });
@@ -214,6 +215,7 @@ function Step2({ contextData, updateContextData }: BRC20SendStepParams) {
         <Column>
           <Input
             preset="address"
+            data-testid="brc20-recipient-address-input"
             addressInputData={{
               address: '',
               domain: ''
@@ -238,7 +240,7 @@ function Step2({ contextData, updateContextData }: BRC20SendStepParams) {
         </Column>
       </Column>
 
-      <Button text={t('next')} preset="primary" onClick={onStep2ClickNext} disabled={disabled} />
+      <Button data-testid="brc20-next-button" text={t('next')} preset="primary" onClick={onStep2ClickNext} disabled={disabled} />
     </Content>
   );
 }

@@ -65,6 +65,7 @@ export default function LanguageScreen() {
                   <Column key={locale} fullX>
                     {index > 0 && <Row style={{ height: 1, backgroundColor: 'rgba(255, 255, 255, 0.1)' }} />}
                     <Row
+                      data-testid={`language-option-${locale}`}
                       onClick={() => handleLanguageSelect(locale)}
                       itemsCenter
                       justifyBetween

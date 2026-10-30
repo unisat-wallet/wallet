@@ -21,6 +21,7 @@ export default function AddressTypeScreen() {
             return (
               <AddressTypeCard
                 key={index}
+                data-testid={`address-type-option-${item.value}`}
                 label={item.name}
                 address={item.address}
                 assets={item.assets}

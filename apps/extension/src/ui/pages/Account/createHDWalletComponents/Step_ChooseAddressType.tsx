@@ -511,11 +511,11 @@ export function Step_ChooseAddressType({
               data-testid="custom-hdpath-input"
             />
           )}
-          {pathError && <Text text={pathError} color="error" />}
+          {pathError && <Text data-testid="custom-hdpath-error" text={pathError} color="error" />}
         </Column>
       )}
 
-      {!pathError && error && <Text text={error} color="error" />}
+      {!pathError && error && <Text data-testid="address-type-error" text={error} color="error" />}
 
       <FooterButtonContainer>
         <Button

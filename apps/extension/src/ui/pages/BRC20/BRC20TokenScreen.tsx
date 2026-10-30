@@ -257,6 +257,7 @@ export default function BRC20TokenScreen() {
             />
 
             <Button
+              data-testid="brc20-send-button"
               text={t('send')}
               preset="brc20-action"
               icon="send"
@@ -280,6 +281,7 @@ export default function BRC20TokenScreen() {
 
           {chain.enableBrc20SingleStep ? (
             <Button
+              data-testid="brc20-one-step-transfer-button"
               text={t('single_step_transfer')}
               preset="home"
               icon="brc20-single-step"

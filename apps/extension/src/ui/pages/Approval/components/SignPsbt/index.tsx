@@ -408,7 +408,13 @@ export default function SignPsbt(props: SignPsbtProps) {
       {/* footer buttons */}
       <Footer>
         <Row full>
-          <Button preset="default" text={t('reject')} onClick={onClickBack} full />
+          <Button
+            preset="default"
+            text={t('reject')}
+            onClick={onClickBack}
+            full
+            data-testid="sign-psbt-reject-button"
+          />
           <Button
             preset="primary"
             icon={hasRisk ? 'risk' : undefined}

@@ -298,7 +298,7 @@ export default function DiscoverTabScreen() {
         }
         RightComponent={<SwitchNetworkBar />}
       />
-      <Content>
+      <Content data-testid="discover-screen">
         <Column justifyCenter>
           {(chainType === ChainType.FRACTAL_BITCOIN_MAINNET || chainType === ChainType.BITCOIN_MAINNET) && (
             <>

@@ -92,6 +92,7 @@ export function OutputValueBar({
           return (
             <div
               key={v.title}
+              data-testid={`output-value-option-${index}`}
               onClick={() => {
                 if (defaultValue < minValue && index === 0) {
                   tools.showTip(t('can_not_change_to_a_lower_value'));
@@ -131,6 +132,7 @@ export function OutputValueBar({
             }
           }}
           autoFocus={true}
+          data-testid="output-value-custom-input"
         />
       )}
     </Column>

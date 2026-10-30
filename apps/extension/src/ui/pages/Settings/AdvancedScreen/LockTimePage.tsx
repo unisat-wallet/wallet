@@ -50,6 +50,7 @@ export function LockTimePage() {
                     <Column key={index} fullX>
                       {index > 0 && <Row style={{ height: 1, backgroundColor: 'rgba(255, 255, 255, 0.1)' }} />}
                       <Row
+                        data-testid={`auto-lock-time-option-${option.id}`}
                         onClick={() => handleSelectOption(option)}
                         itemsCenter
                         justifyBetween

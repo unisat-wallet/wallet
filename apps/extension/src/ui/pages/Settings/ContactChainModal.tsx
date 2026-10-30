@@ -20,6 +20,7 @@ function ChainItem(props: {
 
   return (
     <Card
+      data-testid={`contact-chain-${props.chainType}`}
       style={Object.assign(
         {},
         {

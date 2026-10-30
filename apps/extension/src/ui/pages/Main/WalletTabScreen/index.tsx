@@ -673,7 +673,7 @@ export default function WalletTabScreen({
             rgbStatusContextKey !== rgbContextKey ? (
               <Text text={t('loading')} color="white_muted" />
             ) : rgbStatusErrorKey === rgbContextKey ? (
-              <Column itemsCenter gap="md">
+              <Column itemsCenter gap="md" data-testid="asset-load-error">
                 <Text text={t('load_failed')} color="white_muted" />
                 <Button
                   text={t('try_again')}
@@ -745,7 +745,7 @@ export default function WalletTabScreen({
           </Column>
         </>
       ) : (
-        <Column mt="md" gap="zero">
+        <Column mt="md" gap="zero" data-testid="assets-screen">
           {assetTabsLoading ? (
             <Row itemsCenter aria-label={t('loading')} style={{ flexWrap: 'wrap', gap: 8, rowGap: 8 }}>
               <div style={{ width: 72, height: 32, borderRadius: 16, backgroundColor: 'rgba(255,255,255,0.08)' }} />

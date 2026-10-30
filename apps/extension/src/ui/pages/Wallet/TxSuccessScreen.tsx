@@ -27,7 +27,7 @@ export default function TxSuccessScreen() {
     <Layout>
       <Header />
 
-      <Content style={{ gap: spacing.small }}>
+      <Content data-testid="tx-success-screen" style={{ gap: spacing.small }}>
         <Column justifyCenter mt="xxl" gap="xl">
           <Row justifyCenter>
             <Icon icon="success" size={72} style={{ alignSelf: 'center' }} />

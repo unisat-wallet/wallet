@@ -30,7 +30,7 @@ function formatBalance(value: string) {
   return fraction ? `${grouped}.${fraction}` : grouped;
 }
 
-function AssetOverviewCard({ item, onClick, isUsdt }: { item: AddressAssetOverviewItem; onClick: () => void; isUsdt: boolean }) {
+function AssetOverviewCard({ item, onClick, isUsdt, index }: { item: AddressAssetOverviewItem; onClick: () => void; isUsdt: boolean; index: number }) {
   const { t } = useI18n();
   const [imageError, setImageError] = useState(false);
   const name = isToken(item) ? item.displayName || item.name || item.symbol :
@@ -47,6 +47,7 @@ function AssetOverviewCard({ item, onClick, isUsdt }: { item: AddressAssetOvervi
   return (
     <button
       type="button"
+      data-testid={`asset-overview-item-${index}`}
       className={styles.card}
       onClick={onClick}
       onDragStart={(event) => event.preventDefault()}
@@ -103,10 +104,10 @@ function AssetOverviewUnavailable() {
   const nav = useNavigation();
   const { t } = useI18n();
   return (
-    <section className={styles.section} aria-label={t('assets')}>
+    <section className={styles.section} aria-label={t('assets')} data-testid="asset-overview-section">
       <div className={styles.header}>
         <span className={styles.title}>{t('assets')}</span>
-        <button type="button" className={styles.viewAll} onClick={() => nav.navigate('AssetsTabScreen')}>
+        <button type="button" className={styles.viewAll} data-testid="asset-overview-view-all" onClick={() => nav.navigate('AssetsTabScreen')}>
           {t('view_all')}
           <svg className={styles.viewAllArrow} viewBox="0 0 12 6.7301" aria-hidden="true">
             <path
@@ -243,13 +244,13 @@ function AssetOverviewContent({ address, isRgbActive, rgbUsdtAssetId }: { addres
   };
 
   return (
-    <section className={styles.section} aria-label={t('assets')}>
+    <section className={styles.section} aria-label={t('assets')} data-testid="asset-overview-section">
       <div className={styles.header}>
         <div className={styles.titleRow}>
           <Icon icon="assets" size={14} style={{ backgroundColor: '#FFFFFF' }} />
           <span className={styles.title}>{t('assets')}</span>
         </div>
-        <button type="button" className={styles.viewAll} onClick={openAssets}>
+        <button type="button" className={styles.viewAll} data-testid="asset-overview-view-all" onClick={openAssets}>
           {t('view_all')}
           <svg className={styles.viewAllArrow} viewBox="0 0 12 6.7301" aria-hidden="true">
             <path
@@ -292,11 +293,11 @@ function AssetOverviewContent({ address, isRgbActive, rgbUsdtAssetId }: { addres
               }
             }}
           >
-            {items.map((item) => <AssetOverviewCard key={getItemKey(item)} item={item} isUsdt={isRgbUsdt(item)} onClick={() => openItem(item)} />)}
+            {items.map((item, index) => <AssetOverviewCard key={getItemKey(item)} item={item} index={index} isUsdt={isRgbUsdt(item)} onClick={() => openItem(item)} />)}
           </div>
         </div>
       ) : (
-        <div className={styles.emptyRow}>
+        <div className={styles.emptyRow} data-testid="asset-overview-empty">
           {errorAddress === address ? (
             <button type="button" className={styles.retry} onClick={() => setRefreshKey((key) => key + 1)}>
               {t('try_again')}

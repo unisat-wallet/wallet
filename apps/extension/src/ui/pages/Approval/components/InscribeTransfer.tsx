@@ -244,13 +244,13 @@ function Step1(params: BRC20InscribeTransferParams) {
         <Footer>
           <Row full>
             <Button text={t('cancel')} preset="default" onClick={handleCancel} full />
-            <Button text={t('next')} preset="primary" onClick={onClickInscribe} full disabled={disabled} />
+            <Button data-testid="brc20-next-button" text={t('next')} preset="primary" onClick={onClickInscribe} full disabled={disabled} />
           </Row>
         </Footer>
       ) : (
         <Footer>
           <Row full>
-            <Button text={t('next')} preset="primary" onClick={onClickInscribe} full disabled={disabled} />
+            <Button data-testid="brc20-next-button" text={t('next')} preset="primary" onClick={onClickInscribe} full disabled={disabled} />
           </Row>
         </Footer>
       )}
@@ -449,7 +449,7 @@ function Step4(params: BRC20InscribeTransferParams) {
         ) : (
           <Header />
         )}
-        <Content style={{ gap: spacing.small }}>
+        <Content data-testid="brc20-inscribing-screen" style={{ gap: spacing.small }}>
           <Column justifyCenter mt="xxl" gap="xl">
             <Row justifyCenter>
               <Icon icon="success" size={72} style={{ alignSelf: 'center' }} />
@@ -478,7 +478,7 @@ function Step4(params: BRC20InscribeTransferParams) {
       ) : (
         <Header />
       )}
-      <Content style={{ gap: spacing.small }}>
+      <Content data-testid="brc20-inscribe-success-screen" style={{ gap: spacing.small }}>
         <Column justifyCenter mt="xxl" gap="xl">
           <Text text={t('inscribe_success')} preset="title-bold" textCenter />
           <Column justifyCenter itemsCenter style={{ width: '100%', alignItems: 'center' }}>
@@ -496,6 +496,7 @@ function Step4(params: BRC20InscribeTransferParams) {
         <Footer>
           <Row full>
             <Button
+              data-testid="brc20-inscribe-done-button"
               text={t('done')}
               preset="primary"
               onClick={() => {
@@ -509,6 +510,7 @@ function Step4(params: BRC20InscribeTransferParams) {
         <Footer>
           <Row full>
             <Button
+              data-testid="brc20-inscribe-done-button"
               text={t('done')}
               preset="primary"
               onClick={() => {

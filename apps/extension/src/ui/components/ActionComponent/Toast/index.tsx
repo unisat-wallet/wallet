@@ -55,7 +55,7 @@ export function Toast(props: ToastProps) {
 
   return (
     <div className="action-container">
-      <div className="toast" style={$viewPresets[preset]}>
+      <div className="toast" data-testid={`toast-${preset}`} style={$viewPresets[preset]}>
         <Text text={content} preset="regular" color="white" textCenter />
       </div>
     </div>

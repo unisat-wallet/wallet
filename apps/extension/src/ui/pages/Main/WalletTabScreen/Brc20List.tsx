@@ -11,8 +11,12 @@ export function BRC20List() {
       data={items}
       total={total}
       keyExtractor={(item) => item.ticker}
-      renderItem={({ item }) => {
-        return <BRC20BalanceCard tokenBalance={item} price={priceMap[item.ticker]} onClick={() => onClickItem(item)} />;
+      renderItem={({ item, index }) => {
+        return (
+          <div data-testid={`brc20-item-${index}`}>
+            <BRC20BalanceCard tokenBalance={item} price={priceMap[item.ticker]} onClick={() => onClickItem(item)} />
+          </div>
+        );
       }}
       onLoadMore={onLoadMore}
       onRefresh={onRefresh}

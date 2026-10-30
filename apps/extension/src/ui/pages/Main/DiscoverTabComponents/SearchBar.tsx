@@ -168,6 +168,7 @@ export function SearchBar() {
         }}
         preset={'search'}
         placeholder={t('search_address_and_txids')}
+        data-testid="discover-search-input"
         value={value}
         onChange={(e) => setValue(e.target.value)}
         onSearch={onSearch}
