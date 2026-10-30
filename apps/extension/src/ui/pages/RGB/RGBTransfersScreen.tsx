@@ -11,7 +11,7 @@ export default function RGBTransfersScreen() {
     <Layout>
       <Header onBack={() => window.history.go(-1)} title={t('rgb_history')} />
       <Content>
-        <Column fullX>
+        <Column fullX data-testid="rgb-transfers-screen">
           <RGBTransfersList transfers={transfers} />
         </Column>
       </Content>

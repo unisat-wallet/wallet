@@ -24,16 +24,18 @@ function SettingsAction({
   iconColor,
   title,
   description,
+  testId,
   onClick
 }: {
   icon: IconTypes;
   iconColor: ColorTypes;
   title: string;
   description: string;
+  testId: string;
   onClick: () => void;
 }) {
   return (
-    <Row full itemsCenter justifyBetween style={actionStyle} onClick={onClick}>
+    <Row data-testid={testId} full itemsCenter justifyBetween style={actionStyle} onClick={onClick}>
       <Row gap="md" itemsCenter style={{ minWidth: 0 }}>
         <Icon icon={icon} color={iconColor} size={20} />
         <Column gap="xs" style={{ minWidth: 0 }}>
@@ -82,6 +84,7 @@ export default function RgbSettingsScreen() {
           <Column fullX gap="md">
             <Text text={t('backup_and_recovery')} color="textDim" size="xs" />
             <SettingsAction
+              testId="rgb-settings-export-backup"
               icon="wallet-info"
               iconColor="ticker_color2"
               title={t('rgb_export_backup_entry')}
@@ -89,6 +92,7 @@ export default function RgbSettingsScreen() {
               onClick={() => navigate('/settings/rgb/backup/export')}
             />
             <SettingsAction
+              testId="rgb-settings-import-backup"
               icon="wallet-info"
               iconColor="ticker_color2"
               title={t('rgb_import_backup_entry')}
@@ -96,6 +100,7 @@ export default function RgbSettingsScreen() {
               onClick={() => navigate('/settings/rgb/backup/restore')}
             />
             <SettingsAction
+              testId="rgb-settings-cloud-recovery"
               icon="rgb"
               iconColor="ticker_color2"
               title={t('rgb_recover_latest_cloud_state')}
@@ -107,6 +112,7 @@ export default function RgbSettingsScreen() {
           <Column fullX gap="md">
             <Text text={t('advanced')} color="textDim" size="xs" />
             <SettingsAction
+              testId="rgb-settings-asset-address"
               icon="rgb"
               iconColor="ticker_color2"
               title={t('rgb_asset_address')}
@@ -114,6 +120,7 @@ export default function RgbSettingsScreen() {
               onClick={() => navigate('/settings/rgb-utxos')}
             />
             <SettingsAction
+              testId="rgb-settings-fee-pool"
               icon="btc"
               iconColor="gold"
               title={t('rgb_fee_pool_title')}

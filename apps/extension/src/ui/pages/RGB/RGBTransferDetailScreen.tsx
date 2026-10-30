@@ -266,6 +266,7 @@ export default function RGBTransferDetailScreen() {
                 full
                 text={t('rgb_accept_transfer')}
                 disabled={receiveActionLoading}
+                data-testid="rgb-transfer-accept-button"
                 onClick={() => void onAcceptReceive()}
               />
             </Row>

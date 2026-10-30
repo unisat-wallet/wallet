@@ -86,7 +86,7 @@ export function RgbRecoveryConflictModal({
           ? undefined
           : close
       }>
-      <Column gap="lg">
+      <Column gap="lg" data-testid="rgb-recovery-conflict-modal">
         <Text text={t('rgb_state_conflict_title')} color="white" size="lg" textCenter />
         <Text text={t('rgb_state_conflict_description')} color="white_muted2" size="sm" wrap />
         <Column gap="xs">
@@ -120,6 +120,7 @@ export function RgbRecoveryConflictModal({
           text={t('not_now')}
           preset="default"
           disabled={Boolean(resolving)}
+          data-testid="rgb-recovery-conflict-not-now"
           onClick={close}
           full
           style={{ background: 'transparent' }}

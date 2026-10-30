@@ -85,6 +85,7 @@ export function ReceiveQRCodeCard(props: ReceiveQRCodeCardProps) {
       ) : null}
 
       <Column
+        data-testid={testId ? `${testId}-qr` : undefined}
         itemsCenter
         justifyCenter
         style={{

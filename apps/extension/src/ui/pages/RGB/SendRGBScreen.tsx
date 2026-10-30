@@ -371,7 +371,7 @@ export default function SendRGBScreen() {
             </button>
           ) : null}
 
-          {error ? <Text text={error} color="error" wrap /> : null}
+          {error ? <Text data-testid="send-rgb-error" text={error} color="error" wrap /> : null}
 
           <Button
             disabled={disabled}
@@ -400,6 +400,7 @@ export default function SendRGBScreen() {
             <Checkbox
               checked={understandDonation}
               onChange={(event) => setUnderstandDonation(event.target.checked)}
+              data-testid="rgb-donation-acknowledgement"
               style={{ alignItems: 'flex-start', margin: '4px 0 12px' }}>
               <Text text={t('rgb_donation_send_ack')} size="xs" color="textDim" wrap />
             </Checkbox>
@@ -409,6 +410,7 @@ export default function SendRGBScreen() {
                 text={t('rgb_donation_send_enable')}
                 preset="primaryV2"
                 disabled={!understandDonation}
+                data-testid="rgb-donation-confirm-button"
                 full
                 onClick={() => {
                   setDonation(true);

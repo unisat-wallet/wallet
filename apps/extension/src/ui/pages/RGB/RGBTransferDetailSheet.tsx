@@ -566,6 +566,7 @@ export function RGBTransferDetailSheet({
                   text={t('rgb_accept_transfer')}
                   preset="primary"
                   disabled={actionLoading}
+                  data-testid="rgb-transfer-accept-button"
                   onClick={() => void requestWrite(() => void onAcceptReceive())}
                   full
                   style={{ height: 48, minHeight: 48, flex: 1 }}
