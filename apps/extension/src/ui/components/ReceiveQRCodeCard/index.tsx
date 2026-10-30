@@ -9,6 +9,7 @@ import { useI18n, useTools } from '@unisat/wallet-state';
 const GOLD = '#F4B62C';
 
 type ReceiveQRCodeCardProps = {
+  'data-testid'?: string;
   title?: ReactNode;
   description?: string;
   value: string;
@@ -48,6 +49,7 @@ export function ReceiveQRCodeCard(props: ReceiveQRCodeCardProps) {
   const { t } = useI18n();
   const resolvedCopyText = copyText || t('copy_to_clipboard');
   const resolvedCopiedText = copiedText || t('copied');
+  const testId = props['data-testid'];
   const onCopy = async () => {
     if (!copyValue || copyDisabled) return;
     await copyToClipboard(copyValue);
@@ -58,6 +60,7 @@ export function ReceiveQRCodeCard(props: ReceiveQRCodeCardProps) {
 
   return (
     <Column
+      data-testid={testId}
       gap="lg"
       itemsCenter
       style={{
@@ -143,6 +146,7 @@ export function ReceiveQRCodeCard(props: ReceiveQRCodeCardProps) {
           {valueLabel ? <Text text={valueLabel} size="xs" color="white_muted" textCenter /> : null}
           {valuePrefix}
           <Text
+            data-testid={testId ? `${testId}-value` : undefined}
             text={value}
             textCenter
             wrap
@@ -154,6 +158,7 @@ export function ReceiveQRCodeCard(props: ReceiveQRCodeCardProps) {
           <>
             <div style={{ width: '100%', height: 1, background: 'rgba(255,255,255,0.12)' }} />
             <Row
+              data-testid={testId ? `${testId}-copy-button` : undefined}
               justifyCenter
               itemsCenter
               gap="sm"

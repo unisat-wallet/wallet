@@ -689,6 +689,7 @@ export default function WalletTabScreen({
                 <Button
                   text={t(rgbRecoveryAvailable ? 'restore_rgb' : 'enable_rgb')}
                   preset="primary"
+                  data-testid="rgb-enable-button"
                   onClick={() => setRgbActivationOpen(true)}
                 />
               </Column>

@@ -47,6 +47,7 @@ export function RgbFeatureActivationModal({
           wrap
         />
         <Checkbox
+          data-testid="rgb-terms-checkbox"
           checked={termsAccepted}
           disabled={loading}
           onChange={(event) => setTermsAccepted(event.target.checked)}
@@ -74,6 +75,7 @@ export function RgbFeatureActivationModal({
         <Row gap="sm" fullX>
           <Button text={t('not_now')} preset="default" disabled={loading} onClick={onClose} style={{ flex: 1 }} />
           <Button
+            data-testid="rgb-enable-confirm-button"
             text={
               loading
                 ? t(recoveryAvailable ? 'restoring_rgb' : 'enabling_rgb')

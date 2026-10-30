@@ -747,6 +747,7 @@ export default function RGBReceiveScreen({ initialStep = 'create_invoice' }: { i
         <Content>
           <Column gap="zero">
             <ReceiveQRCodeCard
+              data-testid="rgb-invoice-result"
               title={
                 <Column fullX itemsCenter gap="sm">
                   {renderInvoiceTitle()}
@@ -785,7 +786,7 @@ export default function RGBReceiveScreen({ initialStep = 'create_invoice' }: { i
               style={{ marginTop: 16 }}
             />
 
-            {error ? <Text text={error} size="xs" color="danger" wrap style={{ marginTop: 12 }} /> : null}
+            {error ? <Text data-testid="rgb-invoice-error" text={error} size="xs" color="danger" wrap style={{ marginTop: 12 }} /> : null}
           </Column>
         </Content>
         {writeLeaseModal}
@@ -804,7 +805,12 @@ export default function RGBReceiveScreen({ initialStep = 'create_invoice' }: { i
           </Column>
         </Content>
         <Footer>
-          <Button text={t('next')} preset="primary" onClick={() => setCreationStep('configure_invoice')} />
+          <Button
+            data-testid="rgb-invoice-next-button"
+            text={t('next')}
+            preset="primary"
+            onClick={() => setCreationStep('configure_invoice')}
+          />
         </Footer>
       </Layout>
     );
@@ -907,6 +913,7 @@ export default function RGBReceiveScreen({ initialStep = 'create_invoice' }: { i
 
           {recipientType === 'blind' && insufficientBtcForInvoice ? (
             <Text
+              data-testid="rgb-invoice-insufficient-btc"
               text={`${t('not_enough_btc_for_rgb_utxo')} ${t('rgb_utxo_recommended_balance')}`}
               wrap
               size="xs"
@@ -914,7 +921,7 @@ export default function RGBReceiveScreen({ initialStep = 'create_invoice' }: { i
             />
           ) : null}
 
-          {error ? <Text text={error} size="xs" color="danger" wrap /> : null}
+          {error ? <Text data-testid="rgb-invoice-error" text={error} size="xs" color="danger" wrap /> : null}
           {receiveInvoiceLimitReached ? (
             <Text
               text={t('rgb_receive_invoice_limit_reached', { limit: receiveInvoiceLimit })}
@@ -940,6 +947,7 @@ export default function RGBReceiveScreen({ initialStep = 'create_invoice' }: { i
       <Footer>
         <Column gap="md">
           <Button
+            data-testid="rgb-invoice-create-button"
             text={loading || writeGuardLoading ? loadingText || t('creating') : t('create_invoice')}
             preset="primary"
             disabled={
