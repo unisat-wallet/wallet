@@ -24,6 +24,9 @@ import type {
   RgbConsignmentHistoryResult,
   RgbConsignmentValidationRequest,
   RgbConsignmentValidationResult,
+  RgbReceiveValidationFailureReportRequest,
+  RgbReceiveValidationFailureStatusRequest,
+  RgbReceiveValidationFailureStatusResult,
   RgbTransferSyncRequest,
   RgbUtxoSyncRequest,
   RgbWalletUtxoSnapshotRequest,
@@ -332,6 +335,24 @@ export class RgbService {
     params: RgbConsignmentValidationRequest
   ): Promise<RgbConsignmentValidationResult> {
     return this.privatePost('/v5/rgb/consignments/validate', params)
+  }
+
+  async reportRgbReceiveValidationFailure(
+    params: RgbReceiveValidationFailureReportRequest
+  ): Promise<RgbReceiveValidationFailureStatusResult & { caseId: string }> {
+    return this.privatePost('/v5/rgb/receive-validation-failures/report', params)
+  }
+
+  async getRgbReceiveValidationFailureStatus(
+    params: RgbReceiveValidationFailureStatusRequest
+  ): Promise<RgbReceiveValidationFailureStatusResult> {
+    return this.privatePost('/v5/rgb/receive-validation-failures/status', params)
+  }
+
+  async resolveRgbReceiveValidationFailure(
+    params: RgbReceiveValidationFailureStatusRequest
+  ): Promise<{ resolved: boolean }> {
+    return this.privatePost('/v5/rgb/receive-validation-failures/resolve', params)
   }
 
   async publishRgbConsignment(params: RgbConsignmentPublishRequest): Promise<void> {

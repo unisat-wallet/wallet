@@ -98,6 +98,21 @@ export type RgbBackendApi = {
     recipientId: string
     txid: string
   }) => Promise<{ canceled: boolean }>
+  reportRgbReceiveValidationFailure: (params: {
+    wallet: RgbWalletRef
+    recipientId: string
+    txid?: string
+    payload: string
+    reason: string
+  }) => Promise<{ caseId: string; status: 'under_review' | 'rejection_allowed'; reviewReason?: string }>
+  getRgbReceiveValidationFailureStatus: (params: {
+    wallet: RgbWalletRef
+    caseId: string
+  }) => Promise<{ status: 'under_review' | 'rejection_allowed'; reviewReason?: string }>
+  resolveRgbReceiveValidationFailure: (params: {
+    wallet: RgbWalletRef
+    caseId: string
+  }) => Promise<{ resolved: boolean }>
   verifyRgbUtxos: (params: {
     wallet: RgbWalletRef & { network: string }
     deviceId: string
@@ -187,6 +202,13 @@ export function createRgbBackendAdapter(
     getBroadcastCancellation: async (wallet, recipientId, txid) => {
       const result = await api.getRgbBroadcastFailureStatus({ wallet, recipientId, txid })
       return result.canceled
+    },
+    reportReceiveValidationFailure: (wallet, failure) =>
+      api.reportRgbReceiveValidationFailure({ wallet, ...failure }),
+    getReceiveValidationFailureStatus: (wallet, caseId) =>
+      api.getRgbReceiveValidationFailureStatus({ wallet, caseId }),
+    resolveReceiveValidationFailure: async (wallet, caseId) => {
+      await api.resolveRgbReceiveValidationFailure({ wallet, caseId })
     },
     verifyUtxos: async (wallet, outpoints) => {
       const lease = dependencies.getActiveWriteLease(wallet)

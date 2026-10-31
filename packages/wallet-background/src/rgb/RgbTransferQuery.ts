@@ -320,7 +320,7 @@ export class RgbTransferQuery {
           timestamp: receive.pendingValidationFailure.discoveredAt,
           status: 'validation_failed',
           rejectionReason: receive.pendingValidationFailure.reason,
-          canReject: true,
+          canReject: receive.pendingValidationFailure.reviewStatus === 'rejection_allowed',
           rejectLocally: !receive.pendingValidationFailure.endpoint,
           local: true,
         }]

@@ -3479,7 +3479,7 @@
   "rgb_rejection_reason_unavailable": {"message": "Esta versión de la cartera no registró el motivo del rechazo." },
   "rgb_validation_reason": {"message": "Problema de verificación" },
   "rgb_status_validation_failed": {"message": "Requiere revisión" },
-  "rgb_transfer_validation_failed_description": {"message": "No se pudo verificar esta transferencia. La factura se conserva y se volverá a verificar. Revisa el motivo antes de rechazarla." },
+  "rgb_transfer_validation_failed_description": {"message": "No se pudo verificar esta transferencia y se envió para revisión. La verificación se reintentará automáticamente. Solo se podrá rechazar si la revisión confirma que no es válida." },
   "rgb_transfer_id": {
     "message": "ID de transferencia"
   },

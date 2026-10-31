@@ -5,6 +5,31 @@ import { normalizeRgbAssetId, normalizeRgbAssetRecord } from '../src/services/rg
 import { ApiClientError } from '../src/utils/errors'
 
 describe('RgbService', () => {
+  it('reports and polls RGB receive validation review through authenticated endpoints', async () => {
+    const httpClient = { post: vi.fn()
+      .mockResolvedValueOnce({ caseId: 'c'.repeat(64), status: 'under_review' })
+      .mockResolvedValueOnce({ status: 'rejection_allowed', reviewReason: 'invalid assignment' })
+      .mockResolvedValueOnce({ resolved: true }), get: vi.fn() }
+    const service = new RgbService(httpClient as any)
+    service.setRequestAuthenticator(vi.fn().mockResolvedValue({
+      fundingAddress: 'bc1p-funding', nonce: 'a'.repeat(32), expiresAt: 1, signature: 'signature',
+    }))
+    const wallet = { fundingAddress: 'bc1p-funding', network: 'mainnet' as const }
+
+    await service.reportRgbReceiveValidationFailure({
+      wallet, recipientId: 'recipient', payload: 'YQ==', reason: 'invalid',
+    })
+    await service.getRgbReceiveValidationFailureStatus({ wallet, caseId: 'c'.repeat(64) })
+    await service.resolveRgbReceiveValidationFailure({ wallet, caseId: 'c'.repeat(64) })
+
+    expect(httpClient.post).toHaveBeenNthCalledWith(1, '/v5/rgb/receive-validation-failures/report',
+      expect.objectContaining({ wallet, recipientId: 'recipient', auth: expect.any(Object) }))
+    expect(httpClient.post).toHaveBeenNthCalledWith(2, '/v5/rgb/receive-validation-failures/status',
+      expect.objectContaining({ wallet, caseId: 'c'.repeat(64), auth: expect.any(Object) }))
+    expect(httpClient.post).toHaveBeenNthCalledWith(3, '/v5/rgb/receive-validation-failures/resolve',
+      expect.objectContaining({ wallet, caseId: 'c'.repeat(64), auth: expect.any(Object) }))
+  })
+
   it('keeps an absent RGB asset ID empty instead of producing a prefix-only ID', () => {
     expect(normalizeRgbAssetId('')).toBe('')
     expect(normalizeRgbAssetId('rgb:')).toBe('')

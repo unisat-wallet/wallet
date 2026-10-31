@@ -1792,6 +1792,9 @@ describe('RgbService', () => {
 
   it('keeps an invalid receive for review without attempting an automatic NACK', async () => {
     const dependencies = createDependencies()
+    dependencies.stateSource.reportReceiveValidationFailure = vi.fn().mockResolvedValue({
+      caseId: 'e'.repeat(64), status: 'under_review',
+    })
     dependencies.transport.getConsignment = vi.fn().mockResolvedValue({
       recipientId: 'recipient',
       payload: 'invalid-consignment',
@@ -1823,8 +1826,17 @@ describe('RgbService', () => {
         reason: 'Consignment does not match this invoice',
         txid: 'c'.repeat(64),
         endpoint: proxyEndpoint,
+        reviewCaseId: 'e'.repeat(64),
+        reviewStatus: 'under_review',
       }) }),
     ])
+    expect(dependencies.stateSource.reportReceiveValidationFailure).toHaveBeenCalledWith(
+      wallet,
+      expect.objectContaining({ recipientId: 'recipient', payload: 'invalid-consignment' })
+    )
+    await expect(service.rejectReceive('recipient')).rejects.toThrow(
+      'RGB receive is still under validation review'
+    )
     expect(service.getPendingReceiveHistory()).toEqual([])
   })
 
@@ -1888,6 +1900,7 @@ describe('RgbService', () => {
         discoveredAt: 1,
         txid: 'c'.repeat(64),
         endpoint: proxyEndpoint,
+        reviewStatus: 'rejection_allowed',
       },
     }]
 
@@ -1916,6 +1929,7 @@ describe('RgbService', () => {
       pendingValidationFailure: {
         reason: 'No matching blind assignment was found',
         discoveredAt: 1,
+        reviewStatus: 'rejection_allowed',
       },
     }]
 
@@ -1933,6 +1947,10 @@ describe('RgbService', () => {
 
   it('clears a validation failure when a later poll verifies the consignment', async () => {
     const dependencies = createDependencies()
+    dependencies.stateSource.reportReceiveValidationFailure = vi.fn().mockResolvedValue({
+      caseId: 'e'.repeat(64), status: 'under_review',
+    })
+    dependencies.stateSource.resolveReceiveValidationFailure = vi.fn()
     dependencies.transport.getConsignment = vi.fn().mockResolvedValue({
       recipientId: 'recipient', payload: 'consignment', endpoint: proxyEndpoint,
     })
@@ -1960,6 +1978,10 @@ describe('RgbService', () => {
     expect(service.getPendingReceives()[0]?.pendingAccept).toMatchObject({
       txid: 'c'.repeat(64), amount: '60',
     })
+    expect(dependencies.stateSource.resolveReceiveValidationFailure).toHaveBeenCalledWith(
+      wallet,
+      'e'.repeat(64)
+    )
     expect(dependencies.transport.acknowledgeConsignment).not.toHaveBeenCalled()
   })
 

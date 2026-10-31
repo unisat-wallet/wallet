@@ -1446,10 +1446,51 @@ export class RgbService {
           ...(item.proxySenderPublicKey ? { proxySenderPublicKey: item.proxySenderPublicKey } : {}),
           ...(item.proxySenderEndpoint ? { proxySenderEndpoint: item.proxySenderEndpoint } : {}),
           ...(item.proxyConsignmentHash ? { proxyConsignmentHash: item.proxyConsignmentHash } : {}),
+          ...(previous?.reviewCaseId ? { reviewCaseId: previous.reviewCaseId } : {}),
+          ...(previous?.reviewStatus ? { reviewStatus: previous.reviewStatus } : {}),
+          ...(previous?.reviewCheckedAt ? { reviewCheckedAt: previous.reviewCheckedAt } : {}),
+          ...(previous?.reviewReason ? { reviewReason: previous.reviewReason } : {}),
         }
         if (JSON.stringify(previous) !== JSON.stringify(failure)) {
           receive.pendingValidationFailure = failure
           changed = true
+        }
+      }
+      const refreshValidationReview = async (reason: string) => {
+        const failure = receive.pendingValidationFailure
+        if (!failure) return
+        const now = this.now()
+        // Polling the transfer list can run every few seconds. Review state is
+        // operational metadata, so a one-minute refresh is enough while the
+        // consignment itself continues to be validated on every receive pass.
+        if (failure.reviewCheckedAt && now - failure.reviewCheckedAt < 60_000) return
+        try {
+          const result = failure.reviewCaseId
+            ? await this.dependencies.stateSource.getReceiveValidationFailureStatus?.(
+                state.wallet,
+                failure.reviewCaseId
+              )
+            : await this.dependencies.stateSource.reportReceiveValidationFailure?.(
+                state.wallet,
+                {
+                  recipientId: receive.proxyRecipientId || receive.recipientId,
+                  ...(item.txid ? { txid: item.txid } : {}),
+                  payload: item.payload,
+                  reason,
+                }
+              )
+          if (!result) return
+          const previous = JSON.stringify(failure)
+          const caseId = (result as { caseId?: string }).caseId
+          if (caseId) failure.reviewCaseId = caseId
+          failure.reviewStatus = result.status
+          failure.reviewCheckedAt = now
+          if (result.reviewReason) failure.reviewReason = result.reviewReason
+          else delete failure.reviewReason
+          if (JSON.stringify(failure) !== previous) changed = true
+        } catch {
+          // Reporting is best effort. Never turn a diagnostics outage into a
+          // NACK or prevent the local validator from retrying the consignment.
         }
       }
       try {
@@ -1457,8 +1498,21 @@ export class RgbService {
           mismatchReason = describeReceiveMismatch(reason, details, receive)
         })
         if (!match) {
-          stageValidationFailure(mismatchReason || 'Consignment does not match this invoice')
+          const reason = mismatchReason || 'Consignment does not match this invoice'
+          stageValidationFailure(reason)
+          await refreshValidationReview(reason)
           continue
+        }
+        const resolvedReviewCaseId = receive.pendingValidationFailure?.reviewCaseId
+        if (resolvedReviewCaseId) {
+          try {
+            await this.dependencies.stateSource.resolveReceiveValidationFailure?.(
+              state.wallet,
+              resolvedReviewCaseId
+            )
+          } catch {
+            // Review bookkeeping must not block a receive that now validates.
+          }
         }
         if (receive.pendingValidationFailure) {
           delete receive.pendingValidationFailure
@@ -1607,7 +1661,9 @@ export class RgbService {
           continue
         }
         const message = error instanceof Error ? error.message : String(error)
-        stageValidationFailure(`Consignment validation failed: ${message.slice(0, 300)}`)
+        const reason = `Consignment validation failed: ${message.slice(0, 300)}`
+        stageValidationFailure(reason)
+        await refreshValidationReview(reason)
       }
     }
     // Expiration alone does not prove that an offline receiver has not been
@@ -1771,6 +1827,9 @@ export class RgbService {
       receive.receivedConsignment?.acknowledgementPending
     ) {
       throw new RgbServiceError(`RGB receive ${recipientId} was already accepted`)
+    }
+    if (validationFailure && validationFailure.reviewStatus !== 'rejection_allowed') {
+      throw new RgbServiceError('RGB receive is still under validation review')
     }
 
     const proposal = pendingAccept || validationFailure

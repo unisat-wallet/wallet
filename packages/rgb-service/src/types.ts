@@ -304,6 +304,11 @@ export interface RgbPendingReceive {
     proxySenderPublicKey?: string
     proxySenderEndpoint?: string
     proxyConsignmentHash?: string
+    /** Backend review is advisory: it can allow rejection, but never acceptance. */
+    reviewCaseId?: string
+    reviewStatus?: 'under_review' | 'rejection_allowed'
+    reviewCheckedAt?: number
+    reviewReason?: string
   }
   /** Recently rejected consignments, retained so delayed proxy responses are ignored. */
   rejectedConsignmentTxids?: string[]
@@ -545,6 +550,15 @@ export interface RgbStateSource {
     error: string
   }): Promise<void>
   getBroadcastCancellation?(wallet: RgbWalletRef, recipientId: string, txid: string): Promise<boolean>
+  reportReceiveValidationFailure?(
+    wallet: RgbWalletRef,
+    failure: { recipientId: string; txid?: string; payload: string; reason: string }
+  ): Promise<{ caseId: string; status: 'under_review' | 'rejection_allowed'; reviewReason?: string }>
+  getReceiveValidationFailureStatus?(
+    wallet: RgbWalletRef,
+    caseId: string
+  ): Promise<{ status: 'under_review' | 'rejection_allowed'; reviewReason?: string }>
+  resolveReceiveValidationFailure?(wallet: RgbWalletRef, caseId: string): Promise<void>
   /** Verify locally selected Bitcoin outpoints before an RGB transfer is encoded. */
   verifyUtxos?(
     wallet: RgbWalletRef,

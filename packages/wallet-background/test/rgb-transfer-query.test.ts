@@ -120,7 +120,7 @@ describe('RgbTransferQuery', () => {
     ])
   })
 
-  it('shows an unverified receive for review with its reason and reject capability', async () => {
+  it('keeps rejection unavailable until backend review explicitly allows it', async () => {
     const service = {
       getPendingTransfers: vi.fn().mockReturnValue([]),
       getPendingSendHistory: vi.fn().mockReturnValue([]),
@@ -146,8 +146,34 @@ describe('RgbTransferQuery', () => {
     const result = await query.getTransfers(1, 20, { skipSync: true })
     expect(result.list).toEqual([expect.objectContaining({
       id: 'local-receive:recipient', status: 'validation_failed',
-      rejectionReason: 'No matching blind assignment was found', canReject: true, rejectLocally: true,
+      rejectionReason: 'No matching blind assignment was found', canReject: false, rejectLocally: true,
     })])
+  })
+
+  it('allows rejection after backend review confirms the receive is invalid', async () => {
+    const service = {
+      getPendingTransfers: vi.fn().mockReturnValue([]),
+      getPendingSendHistory: vi.fn().mockReturnValue([]),
+      getIssueHistory: vi.fn().mockReturnValue([]),
+      getPendingReceiveHistory: vi.fn().mockReturnValue([]),
+      getPendingReceives: vi.fn().mockReturnValue([{
+        recipientId: 'recipient', createdAt: 1,
+        pendingValidationFailure: {
+          reason: 'No matching blind assignment was found', discoveredAt: 2,
+          reviewStatus: 'rejection_allowed',
+        },
+      }]),
+    }
+    const context = { service, wallet: { walletId: 'wallet', fundingAddress: 'funding', network: 'mainnet' } }
+    const query = new RgbTransferQuery({
+      getContext: vi.fn().mockResolvedValue(context as never),
+      syncReceiveHistory: vi.fn(), syncPendingTransfers: vi.fn(),
+      syncReceivedAllocations: vi.fn().mockResolvedValue(context as never),
+      getRemoteActivity: vi.fn().mockResolvedValue({ total: 0, list: [] }), warn: vi.fn(),
+    })
+
+    const result = await query.getTransfers(1, 20, { skipSync: true })
+    expect(result.list[0]).toMatchObject({ status: 'validation_failed', canReject: true })
   })
 
   it('keeps a burn proof visible and confirms it from Bitcoin status', async () => {

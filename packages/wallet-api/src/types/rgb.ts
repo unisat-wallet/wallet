@@ -309,6 +309,25 @@ export interface RgbConsignmentValidationResult {
   signature: string
 }
 
+export interface RgbReceiveValidationFailureReportRequest {
+  wallet: RgbWalletRef
+  recipientId: string
+  txid?: string
+  payload: string
+  reason: string
+}
+
+export interface RgbReceiveValidationFailureStatusRequest {
+  wallet: RgbWalletRef
+  caseId: string
+}
+
+export interface RgbReceiveValidationFailureStatusResult {
+  caseId?: string
+  status: 'under_review' | 'rejection_allowed'
+  reviewReason?: string
+}
+
 /** Post-broadcast index update. No key material or transaction construction is sent to the API. */
 export interface RgbTransferSyncRequest {
   wallet: RgbWalletRef
