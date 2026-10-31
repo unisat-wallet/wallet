@@ -7,6 +7,7 @@ import { uiEventBus, useI18n, useNavigation, useReloadAccounts, useTools, useWal
 import { BUS_METHODS } from '@unisat/wallet-shared';
 
 import { RgbBackupStepBar } from './RgbBackupStepBar';
+import { getRgbBackupNetworkLabel } from './rgbBackupNetworkLabel';
 
 type BackupPreview = Awaited<ReturnType<ReturnType<typeof useWallet>['inspectRgbBackupFile']>>;
 type RestoreProgressBase = {
@@ -199,7 +200,11 @@ export default function RgbBackupRestoreScreen() {
               <Card style={{ flexDirection: 'column', alignItems: 'stretch', gap: 8 }}>
                 <Text text={t('rgb_backup_file', { filename: filename || '' })} color="white" size="xs" wrap />
                 <Text text={t('rgb_backup_created', { date: new Date(preview.createdAt).toLocaleString() })} color="textDim" size="xs" />
-                <Text text={t('rgb_backup_network', { network: preview.network })} color="textDim" size="xs" />
+                <Text
+                  text={t('rgb_backup_network', { network: getRgbBackupNetworkLabel(preview.network) })}
+                  color="textDim"
+                  size="xs"
+                />
                 <Text text={t('rgb_restore_account_count', { count: preview.accountIndexes.length })} color="white" size="sm" preset="bold" />
                 <Text text={t('rgb_backup_accounts', { accounts: preview.accountIndexes.map(index => index + 1).join(', ') })} color="textDim" size="xs" wrap />
                 {!!preview.accountsToCreateIndexes?.length && (

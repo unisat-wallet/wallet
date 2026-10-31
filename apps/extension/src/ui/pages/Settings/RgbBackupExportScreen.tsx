@@ -4,6 +4,7 @@ import { Button, Card, Column, Content, Header, Layout, Text } from '@/ui/compon
 import { useI18n, useNavigation, useTools, useWallet } from '@unisat/wallet-state';
 
 import { RgbBackupStepBar } from './RgbBackupStepBar';
+import { getRgbBackupNetworkLabel } from './rgbBackupNetworkLabel';
 
 type BackupPlan = Awaited<ReturnType<ReturnType<typeof useWallet>['getRgbHdBackupPlan']>>;
 
@@ -85,7 +86,11 @@ export default function RgbBackupExportScreen() {
           {step === 2 && plan ? (
             <>
               <Card style={{ flexDirection: 'column', alignItems: 'stretch', gap: 8 }}>
-                <Text text={t('rgb_backup_network', { network: plan.network })} color="textDim" size="xs" />
+                <Text
+                  text={t('rgb_backup_network', { network: getRgbBackupNetworkLabel(plan.network) })}
+                  color="textDim"
+                  size="xs"
+                />
                 <Text
                   text={t('rgb_backup_account_count', { count: plan.accountIndexes.length })}
                   color="white"
