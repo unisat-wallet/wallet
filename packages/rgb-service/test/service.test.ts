@@ -1865,6 +1865,42 @@ describe('RgbService', () => {
     expect(service.getPendingReceiveHistory()).toEqual([])
   })
 
+  it('reports an existing validation failure even when the proxy payload is unavailable', async () => {
+    const dependencies = createDependencies()
+    dependencies.transport.getConsignment = vi.fn().mockRejectedValue(new Error('proxy unavailable'))
+    dependencies.stateSource.reportReceiveValidationFailure = vi.fn().mockResolvedValue({
+      caseId: 'e'.repeat(64), status: 'under_review',
+    })
+    const service = new RgbService(dependencies)
+    await service.open(wallet)
+    ;(service as any).state.pendingReceives = [{
+      invoice: rgbInvoice(), recipientId: 'recipient', createdAt: 1,
+      seal: { txid: 'a'.repeat(64), vout: 0, blinding: 1n },
+      pendingValidationFailure: {
+        reason: 'No matching blind assignment was found', discoveredAt: 2,
+        txid: 'c'.repeat(64), endpoint: proxyEndpoint,
+        proxyTransferId: 'd'.repeat(64), proxyConsignmentHash: 'f'.repeat(64),
+      },
+    }]
+
+    await expect(service.processClaimedReceives({ includeClaimed: false }))
+      .rejects.toThrow('proxy unavailable')
+
+    expect(dependencies.stateSource.reportReceiveValidationFailure).toHaveBeenCalledWith(
+      wallet,
+      expect.objectContaining({
+        recipientId: 'recipient', txid: 'c'.repeat(64),
+        reason: 'No matching blind assignment was found', endpoint: proxyEndpoint,
+        proxyTransferId: 'd'.repeat(64), proxyConsignmentHash: 'f'.repeat(64),
+      })
+    )
+    const report = vi.mocked(dependencies.stateSource.reportReceiveValidationFailure).mock.calls[0]?.[1]
+    expect(report).not.toHaveProperty('payload')
+    expect(service.getPendingReceives()[0]?.pendingValidationFailure).toMatchObject({
+      reviewCaseId: 'e'.repeat(64), reviewStatus: 'under_review',
+    })
+  })
+
   it('does not record a backend-claimed consignment as rejected without a proxy ACK endpoint', async () => {
     const dependencies = createDependencies()
     dependencies.stateSource.getClaimedConsignments = vi.fn().mockResolvedValue([{

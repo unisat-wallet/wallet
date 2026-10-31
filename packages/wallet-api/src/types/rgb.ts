@@ -313,8 +313,11 @@ export interface RgbReceiveValidationFailureReportRequest {
   wallet: RgbWalletRef
   recipientId: string
   txid?: string
-  payload: string
+  payload?: string
   reason: string
+  endpoint?: string
+  proxyTransferId?: string
+  proxyConsignmentHash?: string
 }
 
 export interface RgbReceiveValidationFailureStatusRequest {

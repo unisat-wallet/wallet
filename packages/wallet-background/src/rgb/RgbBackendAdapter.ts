@@ -102,8 +102,11 @@ export type RgbBackendApi = {
     wallet: RgbWalletRef
     recipientId: string
     txid?: string
-    payload: string
+    payload?: string
     reason: string
+    endpoint?: string
+    proxyTransferId?: string
+    proxyConsignmentHash?: string
   }) => Promise<{ caseId: string; status: 'under_review' | 'rejection_allowed'; reviewReason?: string }>
   getRgbReceiveValidationFailureStatus: (params: {
     wallet: RgbWalletRef

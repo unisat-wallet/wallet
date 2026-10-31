@@ -1375,6 +1375,62 @@ export class RgbService {
   }) {
     const state = this.requireState()
     const rollback = snapshotState(state)
+    const pending = state.pendingReceives || []
+    let changed = false
+    const refreshValidationReview = async (
+      receive: RgbPendingReceive,
+      failure: NonNullable<RgbPendingReceive['pendingValidationFailure']>,
+      payload?: string
+    ) => {
+      const now = this.now()
+      const payloadNeedsReport = !!payload && failure.reviewPayloadReported !== true
+      // Polling the transfer list can run every few seconds. Review state is
+      // operational metadata, so a one-minute refresh is enough. A newly
+      // recovered payload bypasses the throttle so it reaches an existing
+      // metadata-only case immediately.
+      if (
+        failure.reviewCheckedAt &&
+        now - failure.reviewCheckedAt < 60_000 &&
+        !payloadNeedsReport
+      ) return
+      try {
+        const shouldReport = !failure.reviewCaseId || payloadNeedsReport
+        const result = shouldReport
+          ? await this.dependencies.stateSource.reportReceiveValidationFailure?.(
+              state.wallet,
+              {
+                recipientId: receive.proxyRecipientId || receive.recipientId,
+                ...(failure.txid ? { txid: failure.txid } : {}),
+                ...(payload ? { payload } : {}),
+                reason: failure.reason,
+                ...(failure.endpoint ? { endpoint: failure.endpoint } : {}),
+                ...(failure.proxyTransferId
+                  ? { proxyTransferId: failure.proxyTransferId }
+                  : {}),
+                ...(failure.proxyConsignmentHash
+                  ? { proxyConsignmentHash: failure.proxyConsignmentHash }
+                  : {}),
+              }
+            )
+          : await this.dependencies.stateSource.getReceiveValidationFailureStatus?.(
+              state.wallet,
+              failure.reviewCaseId!
+            )
+        if (!result) return
+        const previous = JSON.stringify(failure)
+        const caseId = (result as { caseId?: string }).caseId
+        if (caseId) failure.reviewCaseId = caseId
+        if (shouldReport && payload) failure.reviewPayloadReported = true
+        failure.reviewStatus = result.status
+        failure.reviewCheckedAt = now
+        if (result.reviewReason) failure.reviewReason = result.reviewReason
+        else delete failure.reviewReason
+        if (JSON.stringify(failure) !== previous) changed = true
+      } catch {
+        // Reporting is best effort. Never turn a diagnostics outage into a
+        // NACK or prevent the local validator from retrying the consignment.
+      }
+    }
     const getClaimed = this.dependencies.stateSource.getClaimedConsignments
     let received: Array<{ recipientId: string; payload: string }> = []
     if (includeClaimed) {
@@ -1384,11 +1440,25 @@ export class RgbService {
         if (!this.dependencies.transport.getConsignment) throw error
       }
     }
-    const proxyReceived = await this.getProxyConsignments()
+    let proxyReceived: RgbReceivedConsignment[]
+    try {
+      proxyReceived = await this.getProxyConsignments()
+    } catch (error) {
+      // Existing failures must still become visible to support when the proxy
+      // itself is offline or has already removed the consignment payload.
+      for (const receive of pending) {
+        if (receive.pendingValidationFailure) {
+          await refreshValidationReview(receive, receive.pendingValidationFailure)
+        }
+      }
+      if (changed) {
+        try { await this.persistWithRecoveryRollback(rollback) } catch { /* retry on the next sync */ }
+      }
+      throw error
+    }
     // Claimed consignments have no txid field. Let validation recover the
     // witness txid from the payload instead of treating an empty ID as a match constraint.
     const receivedItems: Array<RgbReceivedConsignment> = [...received, ...proxyReceived]
-    const pending = state.pendingReceives || []
     // Once ACK intent is durable, the consignment itself is a local receipt.
     // Prefer it over refetching from transport so proxy cleanup or an
     // extension restart cannot prevent acknowledgement or chain settlement.
@@ -1414,8 +1484,16 @@ export class RgbService {
     )
     const itemsToProcess = [...receivedByRecipient.values()]
     let count = 0
-    let changed = false
     let snapshotRequired = false
+
+    // A prior validation error may outlive the proxy payload. Report its
+    // metadata and poll its review decision even when there is nothing left
+    // to validate during this pass.
+    for (const receive of pending) {
+      const failure = receive.pendingValidationFailure
+      if (!failure || receivedByRecipient.has(receive.proxyRecipientId || receive.recipientId)) continue
+      await refreshValidationReview(receive, failure)
+    }
 
     // Detect sender cancel for consignments already staged for manual accept.
     for (let index = pending.length - 1; index >= 0; index--) {
@@ -1450,47 +1528,13 @@ export class RgbService {
           ...(previous?.reviewStatus ? { reviewStatus: previous.reviewStatus } : {}),
           ...(previous?.reviewCheckedAt ? { reviewCheckedAt: previous.reviewCheckedAt } : {}),
           ...(previous?.reviewReason ? { reviewReason: previous.reviewReason } : {}),
+          ...(previous?.reviewPayloadReported
+            ? { reviewPayloadReported: previous.reviewPayloadReported }
+            : {}),
         }
         if (JSON.stringify(previous) !== JSON.stringify(failure)) {
           receive.pendingValidationFailure = failure
           changed = true
-        }
-      }
-      const refreshValidationReview = async (reason: string) => {
-        const failure = receive.pendingValidationFailure
-        if (!failure) return
-        const now = this.now()
-        // Polling the transfer list can run every few seconds. Review state is
-        // operational metadata, so a one-minute refresh is enough while the
-        // consignment itself continues to be validated on every receive pass.
-        if (failure.reviewCheckedAt && now - failure.reviewCheckedAt < 60_000) return
-        try {
-          const result = failure.reviewCaseId
-            ? await this.dependencies.stateSource.getReceiveValidationFailureStatus?.(
-                state.wallet,
-                failure.reviewCaseId
-              )
-            : await this.dependencies.stateSource.reportReceiveValidationFailure?.(
-                state.wallet,
-                {
-                  recipientId: receive.proxyRecipientId || receive.recipientId,
-                  ...(item.txid ? { txid: item.txid } : {}),
-                  payload: item.payload,
-                  reason,
-                }
-              )
-          if (!result) return
-          const previous = JSON.stringify(failure)
-          const caseId = (result as { caseId?: string }).caseId
-          if (caseId) failure.reviewCaseId = caseId
-          failure.reviewStatus = result.status
-          failure.reviewCheckedAt = now
-          if (result.reviewReason) failure.reviewReason = result.reviewReason
-          else delete failure.reviewReason
-          if (JSON.stringify(failure) !== previous) changed = true
-        } catch {
-          // Reporting is best effort. Never turn a diagnostics outage into a
-          // NACK or prevent the local validator from retrying the consignment.
         }
       }
       try {
@@ -1500,7 +1544,7 @@ export class RgbService {
         if (!match) {
           const reason = mismatchReason || 'Consignment does not match this invoice'
           stageValidationFailure(reason)
-          await refreshValidationReview(reason)
+          await refreshValidationReview(receive, receive.pendingValidationFailure!, item.payload)
           continue
         }
         const resolvedReviewCaseId = receive.pendingValidationFailure?.reviewCaseId
@@ -1663,7 +1707,7 @@ export class RgbService {
         const message = error instanceof Error ? error.message : String(error)
         const reason = `Consignment validation failed: ${message.slice(0, 300)}`
         stageValidationFailure(reason)
-        await refreshValidationReview(reason)
+        await refreshValidationReview(receive, receive.pendingValidationFailure!, item.payload)
       }
     }
     // Expiration alone does not prove that an offline receiver has not been

@@ -309,6 +309,7 @@ export interface RgbPendingReceive {
     reviewStatus?: 'under_review' | 'rejection_allowed'
     reviewCheckedAt?: number
     reviewReason?: string
+    reviewPayloadReported?: boolean
   }
   /** Recently rejected consignments, retained so delayed proxy responses are ignored. */
   rejectedConsignmentTxids?: string[]
@@ -552,7 +553,15 @@ export interface RgbStateSource {
   getBroadcastCancellation?(wallet: RgbWalletRef, recipientId: string, txid: string): Promise<boolean>
   reportReceiveValidationFailure?(
     wallet: RgbWalletRef,
-    failure: { recipientId: string; txid?: string; payload: string; reason: string }
+    failure: {
+      recipientId: string
+      txid?: string
+      payload?: string
+      reason: string
+      endpoint?: string
+      proxyTransferId?: string
+      proxyConsignmentHash?: string
+    }
   ): Promise<{ caseId: string; status: 'under_review' | 'rejection_allowed'; reviewReason?: string }>
   getReceiveValidationFailureStatus?(
     wallet: RgbWalletRef,
