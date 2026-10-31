@@ -20,6 +20,7 @@ import { convertNiaV0ConsignmentToV1 } from '../src/protocol/nia-v0-migration'
 import { serializeStrictBitcoinTransaction } from '../src/protocol/fascia'
 import { StrictWriter } from '../src/protocol/strict'
 import { wrapRgbTransferConsignment } from '../src/protocol/consignment'
+import { RgbBfaValidationUnavailableError } from '../src/errors'
 
 const genesisTxid = '8d54c98d4c29a1ec4fd90635f543f0f7a871a78eb6a6e706342f831d92e3ba19'
 
@@ -157,6 +158,19 @@ describe('NIA v1 transfer', () => {
     await expect(refreshPersistedBfaValidation(consignment, {
       network: 0, isBitcoinTxConfirmed: async () => false,
     }, snapshot)).rejects.toThrow('Bitcoin witness is not confirmed')
+  })
+
+  it('treats a Bitcoin witness status query error as temporarily unavailable', async () => {
+    const { consignment } = fixture()
+    const statusError = new Error('Request timeout after 30000ms')
+
+    await expect(validateBfaTransferConsignment(consignment, {
+      network: 0,
+      isBitcoinTxConfirmed: async () => { throw statusError },
+    })).rejects.toMatchObject({
+      name: 'RgbBfaValidationUnavailableError',
+      message: expect.stringContaining('Bitcoin witness status is unavailable'),
+    } satisfies Partial<RgbBfaValidationUnavailableError>)
   })
 
   it('rejects a changed NIA issued supply', async () => {

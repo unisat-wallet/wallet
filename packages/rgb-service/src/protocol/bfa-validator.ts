@@ -810,12 +810,37 @@ export async function refreshPersistedBfaValidation(
   const pendingTxid = options.pendingWitnessTxid ??
     (options.allowPendingLastWitness ? history.bundles.at(-1)?.txid : undefined)
   for (const txid of new Set(history.bundles.map(bundle => bundle.txid))) {
-    if (txid !== pendingTxid && !await options.isBitcoinTxConfirmed(txid))
-      throw new RgbBfaValidationUnavailableError(
-        `${history.metadata.schema === 'NIA' ? 'NIA' : 'BFA'} Bitcoin witness is not confirmed: ${txid}`
+    if (txid !== pendingTxid) {
+      await requireConfirmedBitcoinWitness(
+        history.metadata.schema === 'NIA' ? 'NIA' : 'BFA',
+        txid,
+        options.isBitcoinTxConfirmed
       )
+    }
   }
   return history
+}
+
+async function requireConfirmedBitcoinWitness(
+  schema: 'NIA' | 'BFA',
+  txid: string,
+  isBitcoinTxConfirmed: BfaValidationOptions['isBitcoinTxConfirmed']
+): Promise<void> {
+  let confirmed: boolean
+  try {
+    confirmed = await isBitcoinTxConfirmed(txid)
+  } catch (error) {
+    if (error instanceof RgbBfaValidationUnavailableError) throw error
+    const message = error instanceof Error ? error.message : String(error)
+    throw new RgbBfaValidationUnavailableError(
+      `${schema} Bitcoin witness status is unavailable for ${txid}: ${message}`
+    )
+  }
+  if (!confirmed) {
+    throw new RgbBfaValidationUnavailableError(
+      `${schema} Bitcoin witness is not confirmed: ${txid}`
+    )
+  }
 }
 function hexQuantity(value: unknown, name: string): bigint {
   if (typeof value !== 'string' || !/^0x(?:0|[1-9a-f][0-9a-f]*)$/i.test(value)) fail(`invalid ${name}`)
@@ -908,9 +933,13 @@ export async function validateBfaTransferConsignment(
     for (const opId of options.requiredOperationIds) include(opId)
   }
   for (const bundle of bundles) {
-    if ((!requiredBundles || requiredBundles.has(bundle)) &&
-      bundle.txid !== pendingTxid && !await options.isBitcoinTxConfirmed(bundle.txid))
-      throw new RgbBfaValidationUnavailableError(`${nia ? 'NIA' : 'BFA'} Bitcoin witness is not confirmed: ${bundle.txid}`)
+    if ((!requiredBundles || requiredBundles.has(bundle)) && bundle.txid !== pendingTxid) {
+      await requireConfirmedBitcoinWitness(
+        nia ? 'NIA' : 'BFA',
+        bundle.txid,
+        options.isBitcoinTxConfirmed
+      )
+    }
   }
   // Every disclosed transition must trace back to the authenticated Genesis.
   // Conservation alone would also accept a closed cycle of fabricated NIA
