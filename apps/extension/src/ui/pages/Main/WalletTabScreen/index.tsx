@@ -685,7 +685,6 @@ export default function WalletTabScreen({
               <RGBHomeTabs key={`${chain.enum}:${currentAccount.key}`} transfers={rgbTransfers} list={rgbList} />
             ) : (
               <Column itemsCenter gap="md">
-                <Text text={t('rgb_assets')} color="white_muted" />
                 <Button
                   text={t(rgbRecoveryAvailable ? 'restore_rgb' : 'enable_rgb')}
                   preset="primary"
