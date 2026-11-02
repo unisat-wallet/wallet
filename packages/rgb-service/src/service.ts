@@ -3457,7 +3457,7 @@ export class RgbService {
     const pending = state.pending[transferId]
     if (!pending) {
       const history = state.pendingSendHistory?.find(item => item.transferId === transferId)
-      return history?.status === 'broadcasted' || history?.status === 'confirmed'
+      return history?.status === 'broadcasted'
         ? { aborted: false, reason: 'already_broadcast' as const }
         : { aborted: false, reason: 'transfer_not_found' as const }
     }
