@@ -5649,9 +5649,14 @@ export class WalletController extends BaseController {
   /** Read-only local status for a dApp-created RGB payment. */
   getRgbPaymentStatus = async (params: { transferId: string }) => {
     const { service } = await this.getLocalRgbReadService()
+    const requestedId = params.transferId.replace(/^local-send:/, '')
     const pending = service
       .getPendingTransfers()
-      .find(transfer => transfer.id === params.transferId)
+      .find(transfer =>
+        transfer.id === requestedId ||
+        transfer.delivery?.completed.txid === requestedId ||
+        transfer.broadcast?.completed.txid === requestedId
+      )
     if (pending) {
       return {
         transferId: pending.id,
@@ -5675,7 +5680,7 @@ export class WalletController extends BaseController {
     }
     const history = service
       .getPendingSendHistory()
-      .find(item => item.transferId === params.transferId)
+      .find(item => item.transferId === requestedId || item.txid === requestedId)
     if (!history) return { transferId: params.transferId, status: 'unknown' as const }
     return {
       transferId: history.transferId,

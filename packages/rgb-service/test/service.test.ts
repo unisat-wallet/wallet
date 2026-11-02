@@ -3871,6 +3871,42 @@ describe('RgbService', () => {
     expect(service.getPendingTransfers()).toEqual([])
   })
 
+  it('releases a non-broadcast external swap through the acknowledged abort path', async () => {
+    const dependencies = createDependencies()
+    const service = new RgbService(dependencies)
+    await service.open(wallet)
+    await service.sync()
+    await service.prepareSend(
+      {
+        assetId: 'rgb:AQEBAQEB-AQEBAQE-BAQEBAQ-EBAQEBA-QEBAQEB-AQEBAQE',
+        amount: '60',
+        invoice: rgbInvoice(),
+        feeRate: 2,
+      },
+      { providerOrigin: 'https://dapp.example' }
+    )
+    await service.publishSwap('transfer-1', 'maker-signed-psbt')
+    const completed = await service.completePublishedSwap('transfer-1', 'fully-signed-psbt', {
+      externalBroadcast: true,
+    })
+
+    await expect(service.getTransferProviderOrigin(completed.txid)).resolves.toBe(
+      'https://dapp.example'
+    )
+    await expect(service.abortSend('transfer-1')).resolves.toEqual({
+      aborted: false,
+      reason: 'acknowledged_requires_agreement',
+    })
+    await expect(service.abortAcknowledgedSwap('transfer-1')).resolves.toEqual({
+      aborted: true,
+      status: 'canceled',
+    })
+    expect(service.getPendingTransfers()).toEqual([])
+    expect(service.getPendingSendHistory()).toEqual([
+      expect.objectContaining({ transferId: 'transfer-1', status: 'canceled', txid: completed.txid }),
+    ])
+  })
+
   it('does not re-fetch a consignment immediately after accepting it', async () => {
     const dependencies = createDependencies()
     dependencies.transport.acknowledgeConsignment = vi.fn().mockResolvedValue(undefined)
@@ -4830,7 +4866,7 @@ describe('RgbService', () => {
     ])
     resolveBroadcast?.('c'.repeat(64))
     await completing
-    await expect(aborting).resolves.toEqual({ aborted: false })
+    await expect(aborting).resolves.toEqual({ aborted: false, reason: 'already_broadcast' })
   })
 
   it('serializes cancellation behind an in-flight send completion', async () => {
@@ -4874,7 +4910,10 @@ describe('RgbService', () => {
     finishEncoding?.()
 
     await completing
-    await expect(aborting).resolves.toEqual({ aborted: false })
+    await expect(aborting).resolves.toEqual({
+      aborted: false,
+      reason: 'acknowledged_requires_agreement',
+    })
     expect(dependencies.broadcaster.broadcast).not.toHaveBeenCalled()
   })
 
@@ -5116,7 +5155,10 @@ describe('RgbService', () => {
       donationReadyAt: expect.any(Number), broadcastError: 'Bitcoin node unavailable',
     })
     expect(dependencies.transport.getAcknowledgement).not.toHaveBeenCalled()
-    await expect(service.abortSend('transfer-1')).resolves.toEqual({ aborted: false })
+    await expect(service.abortSend('transfer-1')).resolves.toEqual({
+      aborted: false,
+      reason: 'donation_already_published',
+    })
     const state = (service as any).state
     state.pending['transfer-2'] = {
       ...state.pending['transfer-1'],
@@ -5503,7 +5545,10 @@ describe('RgbService', () => {
     expect(service.getPendingTransfers()).toEqual([
       expect.objectContaining({ id: 'transfer-1', broadcast: expect.any(Object) }),
     ])
-    await expect(service.abortSend('transfer-1')).resolves.toEqual({ aborted: false })
+    await expect(service.abortSend('transfer-1')).resolves.toEqual({
+      aborted: false,
+      reason: 'already_broadcast',
+    })
 
     const reopened = new RgbService(dependencies)
     await reopened.open(wallet)

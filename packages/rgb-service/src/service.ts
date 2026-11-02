@@ -2934,11 +2934,19 @@ export class RgbService {
    */
   async getTransferProviderOrigin(transferId: string) {
     const state = this.requireState()
-    const pendingOrigin = state.pending[transferId]?.providerOrigin
+    const requestedId = transferId.replace(/^local-send:/, '')
+    const pending = Object.entries(state.pending).find(([id, item]) =>
+      id === requestedId ||
+      item.delivery?.completed.txid === requestedId ||
+      item.broadcast?.completed.txid === requestedId
+    )?.[1]
+    const pendingOrigin = pending?.providerOrigin
     if (pendingOrigin) return pendingOrigin
 
     if (this.pruneExpiredProviderOrigins()) await this.persist({ skipRecovery: true })
-    const history = state.pendingSendHistory?.find(item => item.transferId === transferId)
+    const history = state.pendingSendHistory?.find(item =>
+      item.transferId === requestedId || item.txid === requestedId
+    )
     if (!history?.providerOrigin) return undefined
     return history.providerOrigin
   }
@@ -3447,16 +3455,24 @@ export class RgbService {
   ) {
     const state = this.requireState()
     const pending = state.pending[transferId]
-    if (!pending) return { aborted: false }
+    if (!pending) {
+      const history = state.pendingSendHistory?.find(item => item.transferId === transferId)
+      return history?.status === 'broadcasted' || history?.status === 'confirmed'
+        ? { aborted: false, reason: 'already_broadcast' as const }
+        : { aborted: false, reason: 'transfer_not_found' as const }
+    }
     // Allow cancel until the Bitcoin transaction is broadcast. Consignment
     // delivery alone is still off-chain and can be discarded by the sender.
     // An acknowledged consignment is committed to the receiver and is about
     // to be broadcast. It is no longer safe to signal cancellation, including
     // while the broadcast request itself is in flight.
-    if (pending.broadcast || (pending.delivery?.acknowledgedAt && !allowAcknowledged) ||
-      (pending.request.donation && pending.delivery?.publishedAt))
-      return { aborted: false }
-    if (allowAcknowledged && !pending.delivery) return { aborted: false }
+    if (pending.broadcast) return { aborted: false, reason: 'already_broadcast' as const }
+    if (pending.delivery?.acknowledgedAt && !allowAcknowledged)
+      return { aborted: false, reason: 'acknowledged_requires_agreement' as const }
+    if (pending.request.donation && pending.delivery?.publishedAt)
+      return { aborted: false, reason: 'donation_already_published' as const }
+    if (allowAcknowledged && !pending.delivery)
+      return { aborted: false, reason: 'delivery_not_found' as const }
 
     // V1 must clear the unreleased signed transaction before its local inputs
     // can be reused. Legacy transport retains its best-effort cancel signal.
