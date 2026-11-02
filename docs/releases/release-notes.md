@@ -1,5 +1,42 @@
 # UniSat Wallet Release Notes
 
+## v1.8.3
+
+This release focuses on improving the stability, compatibility, and usability of RGB asset transfers. It also enhances transaction recovery, batch receiving, and asset management while fixing several known issues.
+
+### RGB Transfer Reliability
+
+- Fixed some RGB transfers becoming stuck, balances remaining unavailable, and broadcast prompts continuing after a transaction had already been published.
+- Improved transfer cancellation, status synchronization, and recovery to reduce the impact of failed or interrupted transfers.
+- Fixed transfer-history recovery issues affecting consecutive transfers, asset burns, self-transfers, and related scenarios.
+- Improved error isolation so one problematic transfer does not prevent other assets from synchronizing normally.
+
+### RGB Compatibility and Connectivity
+
+- Added support for RGB Proxy v0.4.0 while retaining compatibility with legacy v0.3 proxies.
+- Improved RGB data uploads, receive acknowledgements, retries, and endpoint failover for more reliable transfers.
+- Strengthened RGB invoice validation and error messages, with better compatibility across RGB asset and transfer-data versions.
+
+### Batch Receive and Performance
+
+- Improved the presentation of large pending-acceptance sets with a summary view and a dedicated View All screen.
+- Improved batch-acceptance progress and transaction-status feedback for a clearer receive flow.
+- Reduced repeated network requests to improve batch transfer synchronization and acceptance performance.
+
+### RGB Asset Management and WebRGB
+
+- Expanded BFA asset support and improved minting, burning, and related validation flows.
+- Improved BFA asset burns with more flexible asset selection and burn-proof export.
+- Added compatibility warnings for non-standard NIA assets to help users identify potential risks.
+- Expanded the WebRGB API with asset burning, consignment lookup, and burn-proof retrieval.
+
+### Other Improvements
+
+- Improved RGB asset receiving and recovery to reduce the impact of expired or invalid records.
+- Improved the display of transfer statuses, failure reasons, cancellation actions, and UniScan confirmations.
+- Improved RGB key handling and cache cleanup for better wallet security.
+- Fixed other known issues to improve overall stability and usability.
+
 ## v1.8.2
 
 ### Dependency and Build Security
