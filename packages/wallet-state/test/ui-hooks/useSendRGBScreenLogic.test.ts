@@ -658,7 +658,7 @@ describe('useSendRGBScreenLogic', () => {
     expect(result.current.signPsbtParams.data.toSignDatas[0]?.psbtHex).toBe('top-up')
   })
 
-  it('blocks a new send while the same asset is awaiting recipient acknowledgement', async () => {
+  it('uses service-reported spendable balance while another send is pending', async () => {
     const assetId = 'rgb:test-asset'
     const invoice = 'rgb:test-asset/~/~/bc:utxob:test?endpoints=rpc://proxy'
     const { wrapper, wallet } = createHookTestHarness({
@@ -679,7 +679,7 @@ describe('useSendRGBScreenLogic', () => {
       ],
       total: 1,
     })
-    wallet.createRgbSendBegin = vi.fn()
+    wallet.createRgbSendBegin = vi.fn().mockResolvedValue({ toSignData: {} })
 
     const { result } = renderHook(() => useSendRGBScreenLogic(), { wrapper })
 
@@ -689,17 +689,16 @@ describe('useSendRGBScreenLogic', () => {
     })
 
     await waitFor(() => {
-      expect(result.current.blockingSendMessage).not.toBe('')
-      expect(result.current.disabled).toBe(true)
-      expect(result.current.spendable).toBe('0')
+      expect(result.current.blockingSendMessage).toBe('')
+      expect(result.current.disabled).toBe(false)
+      expect(result.current.spendable).toBe('10')
     })
 
     await act(async () => {
       await result.current.onClickNext()
     })
 
-    expect(wallet.createRgbSendBegin).not.toHaveBeenCalled()
-    expect(result.current.error).toBe(result.current.blockingSendMessage)
+    expect(wallet.createRgbSendBegin).toHaveBeenCalled()
   })
 
   it('localizes an invoice-unavailable error returned after signing', async () => {

@@ -29,6 +29,8 @@ function getStatusLabel(status: string, t: (key: string) => string, type?: RgbTr
       return t('rgb_status_waiting_ack');
     case 'ready_to_broadcast':
       return t('rgb_status_ready_to_broadcast');
+    case 'ready_for_dapp_finalize':
+      return t('rgb_status_ready_for_dapp_finalize');
     case 'broadcasting':
       return t('rgb_status_broadcasting');
     case 'broadcasted':
@@ -69,6 +71,7 @@ function getTransferTitle(type: RgbTransferItem['type'] | undefined, t: (key: st
 function getDescription(transfer: RgbTransferItem | undefined, t: (key: string) => string) {
   if (transfer?.status === 'waiting_ack') return t('rgb_transfer_waiting_ack_description');
   if (transfer?.status === 'ready_to_broadcast') return t('rgb_transfer_ready_to_broadcast_description');
+  if (transfer?.status === 'ready_for_dapp_finalize') return t('rgb_transfer_ready_for_dapp_finalize_description');
   if (transfer?.status === 'broadcasting') return t('rgb_transfer_broadcasting_description');
   if (transfer?.status === 'broadcasted') return t('rgb_transfer_broadcasted_description');
   if (transfer?.status === 'broadcast_failed') return t('rgb_transfer_broadcast_failed_description');
@@ -234,7 +237,7 @@ export function RGBTransferDetailSheet({
   const description = getDescription(transfer, t);
   const canExplore =
     !!transfer?.txid &&
-    !['waiting_ack', 'ready_to_broadcast', 'broadcasting', 'broadcast_failed', 'pending_accept', 'validation_failed', 'rejected', 'canceled', 'cancelled'].includes(status.toLowerCase()) &&
+    !['waiting_ack', 'ready_to_broadcast', 'ready_for_dapp_finalize', 'broadcasting', 'broadcast_failed', 'pending_accept', 'validation_failed', 'rejected', 'canceled', 'cancelled'].includes(status.toLowerCase()) &&
     !!onClickExploreTx;
   const canCancelSend =
     transfer?.type === 'send' && ['signed', 'waiting_ack'].includes(String(transfer?.status || '').toLowerCase());

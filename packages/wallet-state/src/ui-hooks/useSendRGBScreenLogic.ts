@@ -17,12 +17,6 @@ export enum SendRGBScreenStep {
   FEE_POOL_COMPLETED,
 }
 
-const BLOCKING_RGB_SEND_STATUSES = new Set([
-  'signed',
-  'waiting_ack',
-  'broadcasting',
-  'broadcast_failed',
-])
 const RGB_INVOICE_UNAVAILABLE_ERROR_CODE = 'RGB_INVOICE_UNAVAILABLE'
 const RGB_FEE_POOL_INSUFFICIENT_BTC_ERROR_CODE = 'RGB_FEE_POOL_INSUFFICIENT_BTC'
 
@@ -126,21 +120,6 @@ export function getSendErrorMessage(
   return getRgbErrorMessage(error) || fallback
 }
 
-function getBlockingRgbSendStatus(
-  transfers: {
-    list?: Array<{ assetId?: string; local?: boolean; status?: string; type?: string }>
-  },
-  assetId: string
-) {
-  return transfers.list?.find(
-    transfer =>
-      transfer.local &&
-      transfer.type === 'send' &&
-      isSameRgbAssetId(transfer.assetId, assetId) &&
-      BLOCKING_RGB_SEND_STATUSES.has(String(transfer.status || '').toLowerCase())
-  )?.status
-}
-
 function isSameRgbAssetId(a?: string, b?: string) {
   const normalize = (value?: string) => value?.replace(/^rgb:/, '')
   return !!a && !!b && normalize(a) === normalize(b)
@@ -200,7 +179,6 @@ export function useSendRGBScreenLogic() {
   const [feePoolRequirement, setFeePoolRequirement] = useState<RgbFeePoolRequirement>()
   const [step, setStep] = useState(SendRGBScreenStep.CREATE_TX)
   const [signRequestVersion, setSignRequestVersion] = useState(0)
-  const [blockingSendStatus, setBlockingSendStatus] = useState<string>()
   const [invoiceAvailability, setInvoiceAvailability] = useState<InvoiceAvailability>('idle')
   const [invoiceAvailabilityError, setInvoiceAvailabilityError] = useState('')
   const [proxyApprovalStatus, setProxyApprovalStatus] = useState<ProxyApprovalStatus>('idle')
@@ -255,7 +233,9 @@ export function useSendRGBScreenLogic() {
   const requiresAmount = burn || (invoice.trim().length > 0 && decodedInvoice.needsAmount)
   const amountInput = amount.trim()
   const assetPrecision = getRgbTokenPrecision(tokenBalance)
-  const spendable = blockingSendStatus ? '0' : toRgbDisplayAmount(rawSpendable, assetPrecision)
+  // The RGB service already excludes reserved allocations from spendable.
+  // Do not hide unrelated spendable allocations merely because another send is pending.
+  const spendable = toRgbDisplayAmount(rawSpendable, assetPrecision)
   const normalizedAmount = toRgbAtomicAmount(amountInput, assetPrecision)
   const isAmountFormatValid = isValidRgbDecimalAmount(amountInput, assetPrecision)
   const burnBelowMinimum = burn && isAmountFormatValid &&
@@ -280,33 +260,12 @@ export function useSendRGBScreenLogic() {
       : burnBelowMinimum
         ? t('rgb_burn_minimum_amount', { ticker })
       : t('enter_amount_greater_than_0')
-  const blockingSendMessage =
-    blockingSendStatus === 'waiting_ack'
-      ? t('rgb_transfer_waiting_ack_description')
-      : blockingSendStatus
-        ? t('rgb_transfer_broadcasting_description')
-        : ''
+  const blockingSendMessage = ''
 
   const proxyApprovalReady =
     burn ||
     (proxyApprovalStatus === 'ready' &&
       (proxyApprovalEndpoints.length === 0 || proxyApprovalAccepted))
-
-  useEffect(() => {
-    let canceled = false
-    void wallet
-      .getRgbTransfers(1, 50)
-      .then(transfers => {
-        if (!canceled) setBlockingSendStatus(getBlockingRgbSendStatus(transfers, assetId))
-      })
-      .catch(() => {
-        if (!canceled) setBlockingSendStatus(undefined)
-      })
-
-    return () => {
-      canceled = true
-    }
-  }, [assetId, wallet])
 
   useEffect(() => {
     if (
@@ -436,10 +395,9 @@ export function useSendRGBScreenLogic() {
         ? !(/^T[1-9A-HJ-NP-Za-km-z]{33}$/.test(burnReason.trim()) ||
           /^(?:0x)?41[0-9a-f]{40}$/i.test(burnReason.trim()))
         : !/^(?:0x)?[0-9a-f]{40}$/i.test(burnReason.trim()) ||
-          /^0+$/.test(burnReason.trim().replace(/^0x/i, '')))) ||
-      !!blockingSendStatus
+          /^0+$/.test(burnReason.trim().replace(/^0x/i, ''))))
     )
-  }, [invoiceReadyForAmount, proxyApprovalReady, feeRate, isAmountValid, insufficientBalance, blockingSendStatus, invoiceAvailability, burn, burnReason, burnDestinationChainId])
+  }, [invoiceReadyForAmount, proxyApprovalReady, feeRate, isAmountValid, insufficientBalance, invoiceAvailability, burn, burnReason, burnDestinationChainId])
 
   const onClickBack = () => {
     nav.goBack()
@@ -513,16 +471,6 @@ export function useSendRGBScreenLogic() {
     setFeePoolRequirement(undefined)
     tools.showLoading(true)
     try {
-      const transfers = await wallet.getRgbTransfers(1, 50)
-      const pendingStatus = getBlockingRgbSendStatus(transfers, assetId)
-      if (pendingStatus) {
-        setBlockingSendStatus(pendingStatus)
-        throw new Error(
-          pendingStatus === 'waiting_ack'
-            ? t('rgb_transfer_waiting_ack_description')
-            : t('rgb_transfer_broadcasting_description')
-        )
-      }
       if (!burn && (!decodedInvoice.valid || !hasTransportEndpoint || invoiceAssetMismatch || bfaInvoiceUnsupported)) {
         throw new Error(invoiceValidationMessage || t('invalid_rgb_invoice'))
       }

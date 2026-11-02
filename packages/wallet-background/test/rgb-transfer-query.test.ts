@@ -84,6 +84,40 @@ describe('RgbTransferQuery', () => {
     })])
   })
 
+  it('reports a dApp-finalized swap as waiting for the app instead of broadcasting', async () => {
+    const service = {
+      getPendingTransfers: vi.fn().mockReturnValue([{
+        id: 'swap-1', request: { assetId: 'rgb:asset', amount: '1', precision: 0 },
+        prepared: { lockedOutpoints: [] },
+        delivery: {
+          externalBroadcast: true,
+          acknowledgedAt: 2,
+          completed: { txid: 'b'.repeat(64) },
+        },
+        createdAt: 1,
+      }]),
+      getSnapshot: vi.fn().mockReturnValue({ utxos: [] }),
+      getPendingSendHistory: vi.fn().mockReturnValue([]),
+      getIssueHistory: vi.fn().mockReturnValue([]),
+      getPendingReceiveHistory: vi.fn().mockReturnValue([]),
+      getPendingReceives: vi.fn().mockReturnValue([]),
+      getLocalAssetDetail: vi.fn().mockReturnValue({ name: 'Token', ticker: 'TKN' }),
+    }
+    const context = { service, wallet: { walletId: 'wallet', fundingAddress: 'funding', network: 'signet' } }
+    const query = new RgbTransferQuery({
+      getContext: vi.fn().mockResolvedValue(context as never),
+      syncReceiveHistory: vi.fn(), syncPendingTransfers: vi.fn(),
+      syncReceivedAllocations: vi.fn().mockResolvedValue(context as never),
+      getRemoteActivity: vi.fn().mockResolvedValue({ total: 0, list: [] }),
+      warn: vi.fn(),
+    })
+
+    const result = await query.getTransfers(1, 20, { skipSync: true })
+    expect(result.list).toEqual([
+      expect.objectContaining({ id: 'local-send:swap-1', status: 'ready_for_dapp_finalize' }),
+    ])
+  })
+
   it('uses the issuance order transaction for an issue activity link', async () => {
     const anchorTxid = 'a'.repeat(64)
     const issuanceTxid = 'b'.repeat(64)

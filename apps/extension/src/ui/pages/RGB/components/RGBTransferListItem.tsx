@@ -39,6 +39,8 @@ function getStatusLabel(status: string, t: (key: string) => string, type: RgbTra
       return t('rgb_status_waiting_ack');
     case 'ready_to_broadcast':
       return t('rgb_status_ready_to_broadcast');
+    case 'ready_for_dapp_finalize':
+      return t('rgb_status_ready_for_dapp_finalize');
     case 'broadcasting':
       return t('rgb_status_broadcasting');
     case 'broadcasted':

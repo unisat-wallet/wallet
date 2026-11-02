@@ -219,7 +219,7 @@ export class RgbTransferQuery {
       status: transfer.delivery?.broadcastError
         ? 'broadcast_failed'
         : transfer.delivery?.externalBroadcast
-          ? 'broadcasting'
+          ? 'ready_for_dapp_finalize'
           : transfer.delivery?.acknowledgedAt
             ? 'ready_to_broadcast'
             : transfer.delivery?.donationReadyAt
