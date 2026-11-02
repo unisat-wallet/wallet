@@ -252,7 +252,7 @@ locked allocation before the signing approval opens.
 const prepared = await rgb.preparePayment({
   invoice: receiverInvoice,
   assetId: 'rgb:...',
-  amount: '1000', // optional only when the invoice fixes the amount
+  amount: '1000', // a positive integer string or safe JavaScript integer
   feeRate: 5,
 })
 
@@ -296,6 +296,11 @@ and one of `prepared`, `waiting_ack`, `broadcasting`, `broadcasted`,
 `broadcast_failed`, `canceled`, `rejected`, or `unknown`. Swap operations may
 additionally report `awaiting_buyer_signature` or `ready_for_dapp_finalize`.
 Cancellation is only possible before a valid ACK or broadcast.
+An unsuccessful cancellation includes a machine-readable `reason`, such as
+`transfer_not_found`, `already_broadcast`, or
+`acknowledged_requires_agreement`. A payment amount supplied as a JavaScript
+number is normalized to its decimal string before approval; fractions, unsafe
+integers, and non-positive values are rejected.
 
 ## RGB/BTC atomic swap: buy RGB with BTC
 
