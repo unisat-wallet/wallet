@@ -136,7 +136,10 @@ export function useRGBTransferDetailLogic() {
   }, [refresh, transfer])
 
   const canCancelSend =
-    transfer?.type === 'send' && String(transfer?.status || '').toLowerCase() === 'waiting_ack'
+    transfer?.type === 'send' &&
+    ['waiting_ack', 'ready_for_dapp_finalize'].includes(
+      String(transfer?.status || '').toLowerCase()
+    )
   const canAcceptReceive =
     transfer?.type === 'receive' &&
     transfer.local === true &&
@@ -164,9 +167,13 @@ export function useRGBTransferDetailLogic() {
 
     setCancelLoading(true)
     try {
-      const result = await wallet.abortRgbVanillaTx({ txid: abortId })
+      const requiresAcknowledgedAbort =
+        String(transfer?.status || '').toLowerCase() === 'ready_for_dapp_finalize'
+      const result = requiresAcknowledgedAbort
+        ? await wallet.abortRgbAcknowledgedSwap({ txid: abortId })
+        : await wallet.abortRgbVanillaTx({ txid: abortId })
       if (!result?.aborted) {
-        throw new Error(t('rgb_cancel_send_failed'))
+        throw new Error(result?.['reason'] || t('rgb_cancel_send_failed'))
       }
       tools.toastSuccess(t('rgb_cancel_send_success'))
       setTransfer(current =>

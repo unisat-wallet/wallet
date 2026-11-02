@@ -856,6 +856,12 @@ export interface WalletController {
     [key: string]: any
   }>
 
+  abortRgbAcknowledgedSwap(params: { txid: string }): Promise<{
+    aborted: boolean
+    reason?: string
+    [key: string]: any
+  }>
+
   retryRgbBroadcast(params: { transferId: string }): Promise<{
     broadcast: boolean
     status: 'confirming' | 'broadcast_failed' | 'waiting_ack' | 'not_retryable' | 'canceled'

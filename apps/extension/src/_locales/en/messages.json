@@ -3512,6 +3512,12 @@
   "rgb_cancel_send_acknowledgement": {
     "message": "I understand that canceling permanently discards this pending transfer."
   },
+  "rgb_abort_external_swap_confirm_description": {
+    "message": "The connected app has not broadcast this accepted swap. Abort only after both parties have agreed that the swap is terminal and will not be broadcast."
+  },
+  "rgb_abort_external_swap_acknowledgement": {
+    "message": "Both parties agreed to abort, and I understand that broadcasting the old transaction afterward may cause an RGB state conflict."
+  },
   "rgb_cancel_send_success": {
     "message": "Transfer canceled"
   },

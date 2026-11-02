@@ -27,6 +27,12 @@ const failedSend = {
   local: true,
 }
 
+const externalBroadcastSend = {
+  ...failedSend,
+  txid: 'b'.repeat(64),
+  status: 'ready_for_dapp_finalize',
+}
+
 const confirmingReceive = {
   ...pendingReceive,
   txid: 'a'.repeat(64),
@@ -146,6 +152,24 @@ describe('useRGBTransferDetailLogic', () => {
 
     expect(wallet.retryRgbBroadcast).toHaveBeenCalledWith({ transferId: 'transfer-id' })
     expect(result.current.transfer?.status).toBe('broadcasted')
+  })
+
+  it('offers the acknowledged abort path for an external swap that was not broadcast', async () => {
+    const { wrapper, wallet } = createHookTestHarness({
+      routeState: { transferId: 'transfer-id', initialTransfer: externalBroadcastSend },
+    })
+    wallet.abortRgbAcknowledgedSwap.mockResolvedValue({ aborted: true, status: 'canceled' })
+
+    const { result } = renderHook(() => useRGBTransferDetailLogic(), { wrapper })
+
+    await waitFor(() => expect(result.current.canCancelSend).toBe(true))
+    await act(async () => {
+      await result.current.onCancelSend()
+    })
+
+    expect(wallet.abortRgbAcknowledgedSwap).toHaveBeenCalledWith({ txid: 'transfer-id' })
+    expect(wallet.abortRgbVanillaTx).not.toHaveBeenCalled()
+    expect(result.current.transfer?.status).toBe('canceled')
   })
 
   it('hydrates the transfer detail with canonical asset metadata', async () => {

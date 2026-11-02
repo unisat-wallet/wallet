@@ -1,6 +1,6 @@
 import { useState } from 'react';
 
-import { Button, Card, Column, Content, CopyableAddress, Footer, Header, Icon, Layout, Row, Text } from '@/ui/components';
+import { Button, Card, Checkbox, Column, Content, CopyableAddress, Footer, Header, Icon, Layout, Row, Text } from '@/ui/components';
 import { BottomModal } from '@/ui/components/BottomModal';
 import { TxResultStatusMark } from '@/ui/components/TxResultStatusMark';
 import { colors } from '@/ui/theme/colors';
@@ -93,12 +93,16 @@ export default function RGBTransferDetailScreen() {
   const chain = useChain();
   const [dismissedBroadcastId, setDismissedBroadcastId] = useState<string>();
   const [rejectConfirmVisible, setRejectConfirmVisible] = useState(false);
+  const [cancelConfirmVisible, setCancelConfirmVisible] = useState(false);
+  const [cancelAcknowledged, setCancelAcknowledged] = useState(false);
   const {
     transfer,
     transferId,
     loading,
     receiveActionLoading,
     broadcastRetryLoading,
+    cancelLoading,
+    canCancelSend,
     canAcceptReceive,
     canRetryBroadcast,
     canBroadcast,
@@ -107,6 +111,7 @@ export default function RGBTransferDetailScreen() {
     onAcceptReceive,
     onRejectReceive,
     onRetryBroadcast,
+    onCancelSend,
     t
   } = useRGBTransferDetailLogic();
   const status = transfer?.status || 'pending';
@@ -280,6 +285,16 @@ export default function RGBTransferDetailScreen() {
               disabled={broadcastRetryLoading}
               onClick={() => void onRetryBroadcast()}
             />
+          ) : canCancelSend ? (
+            <Button
+              full
+              text={t('cancel_transfer')}
+              disabled={cancelLoading}
+              onClick={() => {
+                setCancelAcknowledged(false);
+                setCancelConfirmVisible(true);
+              }}
+            />
           ) : (
             <Button full text={t('done')} onClick={onClickDone} />
           )}
@@ -295,6 +310,44 @@ export default function RGBTransferDetailScreen() {
           });
         }}
       />
+      {cancelConfirmVisible ? (
+        <BottomModal onClose={() => setCancelConfirmVisible(false)}>
+          <Column fullX gap="lg">
+            <Text preset="title" text={t('rgb_cancel_send_confirm_title')} />
+            <Text
+              text={t(
+                status === 'ready_for_dapp_finalize'
+                  ? 'rgb_abort_external_swap_confirm_description'
+                  : 'rgb_cancel_send_confirm_description'
+              )}
+              color="textDim"
+            />
+            <Checkbox
+              checked={cancelAcknowledged}
+              onChange={(event) => setCancelAcknowledged(event.target.checked)}
+            >
+              <Text
+                text={t(
+                  status === 'ready_for_dapp_finalize'
+                    ? 'rgb_abort_external_swap_acknowledgement'
+                    : 'rgb_cancel_send_acknowledgement'
+                )}
+                wrap
+              />
+            </Checkbox>
+            <Button
+              full
+              text={t('cancel_transfer')}
+              disabled={cancelLoading || !cancelAcknowledged}
+              onClick={() => {
+                void onCancelSend().then(canceled => {
+                  if (canceled) setCancelConfirmVisible(false);
+                });
+              }}
+            />
+          </Column>
+        </BottomModal>
+      ) : null}
       {canBroadcast && dismissedBroadcastId !== transferId ? (
         <BottomModal onClose={() => setDismissedBroadcastId(transferId)}>
           <Column fullX gap="lg">

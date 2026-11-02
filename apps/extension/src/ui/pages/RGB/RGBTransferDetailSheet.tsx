@@ -240,7 +240,12 @@ export function RGBTransferDetailSheet({
     !['waiting_ack', 'ready_to_broadcast', 'ready_for_dapp_finalize', 'broadcasting', 'broadcast_failed', 'pending_accept', 'validation_failed', 'rejected', 'canceled', 'cancelled'].includes(status.toLowerCase()) &&
     !!onClickExploreTx;
   const canCancelSend =
-    transfer?.type === 'send' && ['signed', 'waiting_ack'].includes(String(transfer?.status || '').toLowerCase());
+    transfer?.type === 'send' &&
+    ['signed', 'waiting_ack', 'ready_for_dapp_finalize'].includes(
+      String(transfer?.status || '').toLowerCase()
+    );
+  const requiresAcknowledgedAbort =
+    String(transfer?.status || '').toLowerCase() === 'ready_for_dapp_finalize';
   const canAcceptReceive =
     transfer?.type === 'receive' &&
     transfer.local === true &&
@@ -266,9 +271,11 @@ export function RGBTransferDetailSheet({
 
     setCancelLoading(true);
     try {
-      const result = await wallet.abortRgbVanillaTx({ txid: abortId });
+      const result = requiresAcknowledgedAbort
+        ? await wallet.abortRgbAcknowledgedSwap({ txid: abortId })
+        : await wallet.abortRgbVanillaTx({ txid: abortId });
       if (!result?.aborted) {
-        throw new Error(t('rgb_cancel_send_failed'));
+        throw new Error(result?.['reason'] || t('rgb_cancel_send_failed'));
       }
       tools.toastSuccess(t('rgb_cancel_send_success'));
       onClose();
@@ -357,7 +364,11 @@ export function RGBTransferDetailSheet({
           />
           <Text text={t('rgb_cancel_send_confirm_title')} color="white" size="md" textCenter />
           <Text
-            text={t('rgb_cancel_send_confirm_description')}
+            text={t(
+              requiresAcknowledgedAbort
+                ? 'rgb_abort_external_swap_confirm_description'
+                : 'rgb_cancel_send_confirm_description'
+            )}
             color="white_muted2"
             size="sm"
             wrap
@@ -370,7 +381,11 @@ export function RGBTransferDetailSheet({
             data-testid="rgb-cancel-transfer-checkbox"
           >
             <Text
-              text={t('rgb_cancel_send_acknowledgement')}
+              text={t(
+                requiresAcknowledgedAbort
+                  ? 'rgb_abort_external_swap_acknowledgement'
+                  : 'rgb_cancel_send_acknowledgement'
+              )}
               size="sm"
               wrap
               style={{ lineHeight: '20px', color: 'rgba(255, 255, 255, 0.65)' }}

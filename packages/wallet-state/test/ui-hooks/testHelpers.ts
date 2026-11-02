@@ -150,6 +150,7 @@ export function createWalletMock() {
     createRgbUtxosEnd: vi.fn(),
     getRgbPendingVanillaTxs: vi.fn().mockResolvedValue({ list: [] }),
     abortRgbVanillaTx: vi.fn(),
+    abortRgbAcknowledgedSwap: vi.fn(),
     retryRgbBroadcast: vi.fn(),
     acceptRgbReceive: vi.fn(),
     rejectRgbReceive: vi.fn(),
