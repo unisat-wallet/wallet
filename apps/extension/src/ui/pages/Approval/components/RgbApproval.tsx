@@ -457,10 +457,11 @@ function RgbPaymentApproval({ data, session }: { data: Props['params']['data']; 
   const [error, setError] = useState('');
   const proxyEndpoints = data.rgbProxyApproval?.endpoints || [];
 
-  const amount = data.amount?.trim() || t('rgb_approval_use_invoice_amount');
+  const normalizedAmount = data.amount == null ? '' : String(data.amount).trim();
+  const amount = normalizedAmount || t('rgb_approval_use_invoice_amount');
   const ticker = assetMetadata?.ticker?.trim();
   const assetName = assetMetadata?.name?.trim();
-  const amountLabel = ticker && data.amount?.trim() ? `${amount} ${ticker}` : amount;
+  const amountLabel = ticker && normalizedAmount ? `${amount} ${ticker}` : amount;
   const assetLabel = data.assetId
     ? [ticker, assetName && assetName !== ticker ? assetName : ''].filter(Boolean).join(' · ') ||
       `${t('rgb_approval_rgb_asset')} · ${shortAddress(data.assetId, 6)}`

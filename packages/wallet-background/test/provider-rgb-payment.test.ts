@@ -83,6 +83,45 @@ describe('provider RGB payment ownership', () => {
     })
   })
 
+  it('normalizes a numeric payment amount before approval and preparation', async () => {
+    const approval = Reflect.getMetadata('APPROVAL', providerController, 'prepareRgbPayment')
+    const invoice =
+      'rgb:BQUFBQUF-BQUFBQU-FBQUFBQ-UFBQUFB-QUFBQUF-BQUFBQU/schema-id/~/bc:wvout:A8cJ7Ww3-NIzADo3-Tzp_5aD-7CTBWmA-AAAAAAA-AAAAAAA-ALSQkcw?amount=42&endpoints=rpcs%3A%2F%2Fproxy.example'
+    const request = {
+      data: {
+        params: { invoice, assetId: 'rgb:asset', amount: 100 } as Record<string, any>,
+      },
+      session: { origin: 'https://dapp.example' },
+    }
+    vi.mocked(wallet.getRgbProxyApprovalRequirement).mockResolvedValue({ endpoints: [] })
+    vi.mocked(wallet.createRgbSendBegin).mockResolvedValue({ id: 'transfer-1' } as any)
+
+    await approval[1](request)
+    expect(request.data.params.amount).toBe('100')
+
+    await providerController.prepareRgbPayment(request as any)
+    expect(wallet.createRgbSendBegin).toHaveBeenCalledWith({
+      invoice,
+      assetId: 'rgb:asset',
+      amount: '100',
+      providerOrigin: 'https://dapp.example',
+    })
+  })
+
+  it.each([0, -1, 1.5, Number.MAX_SAFE_INTEGER + 1, {}, '1.5', '01']) (
+    'rejects invalid payment amount %j before approval',
+    async amount => {
+      const approval = Reflect.getMetadata('APPROVAL', providerController, 'prepareRgbPayment')
+      const request = {
+        data: { params: { invoice: 'rgb:invoice', assetId: 'rgb:asset', amount } },
+        session: { origin: 'https://dapp.example' },
+      }
+
+      expect(() => approval[1](request)).toThrow(/amount must be/)
+      expect(wallet.getRgbProxyApprovalRequirement).not.toHaveBeenCalled()
+    }
+  )
+
   it.each(['prepareRgbPayment', 'prepareRgbSwap'])(
     'adds untrusted invoice proxies to the existing %s approval',
     async method => {

@@ -101,7 +101,7 @@ export type ProviderMethodList = {
   prepareRgbPayment: {
     invoice: string
     assetId: string
-    amount?: string
+    amount?: string | number
     feeRate?: number
   }
   signRgbPayment: {

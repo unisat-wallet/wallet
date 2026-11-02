@@ -26,7 +26,7 @@ export class UnisatProvider extends EventEmitter {
     getPendingReceives: () => Promise<any>;
     acceptReceive: (recipientId: string) => Promise<any>;
     rejectReceive: (recipientId: string) => Promise<any>;
-    preparePayment: (params: { invoice: string; assetId: string; amount?: string; feeRate?: number }) => Promise<any>;
+    preparePayment: (params: { invoice: string; assetId: string; amount?: string | number; feeRate?: number }) => Promise<any>;
     signPayment: (transferId: string) => Promise<any>;
     cancelPayment: (transferId: string) => Promise<any>;
     getPaymentStatus: (transferId: string) => Promise<any>;

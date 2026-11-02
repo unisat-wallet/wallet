@@ -59,13 +59,28 @@ function validateCosmosEnableRequest(req: { data: { params?: { chainId?: unknown
 
 type RgbProxyApprovalRequirement = { endpoints: string[] }
 
+function normalizeRgbPaymentAmount(value: unknown): string | undefined {
+  if (value === undefined) return undefined
+  if (typeof value === 'number') {
+    if (!Number.isSafeInteger(value) || value <= 0) {
+      throw new Error('amount must be a positive safe integer')
+    }
+    return String(value)
+  }
+  if (typeof value !== 'string') throw new Error('amount must be a string or number')
+  const amount = value.trim()
+  if (!/^[1-9][0-9]*$/.test(amount)) throw new Error('amount must be a positive integer')
+  return amount
+}
+
 function prepareRgbPaymentApproval(req: {
-  data: { params: { invoice?: string; feeRate?: number; rgbProxyApproval?: unknown } }
+  data: { params: { invoice?: string; amount?: unknown; feeRate?: number; rgbProxyApproval?: unknown } }
 }) {
   validateRgbProviderFeeRate(req)
   const params = req.data.params
   delete params.rgbProxyApproval
   if (!params.invoice) throw new Error('invoice is required')
+  if (params.amount !== undefined) params.amount = normalizeRgbPaymentAmount(params.amount)
   const invoice = decodeLocalRgbInvoice(params.invoice)
   return wallet
     .getRgbProxyApprovalRequirement({ endpoints: invoice.transportEndpoints })
@@ -1116,7 +1131,7 @@ class ProviderController extends BaseController {
     session: { origin },
     approvalRes,
   }: {
-    data: { params: { invoice: string; assetId: string; amount?: string; feeRate?: number; rgbProxyApproval?: RgbProxyApprovalRequirement } }
+    data: { params: { invoice: string; assetId: string; amount?: string | number; feeRate?: number; rgbProxyApproval?: RgbProxyApprovalRequirement } }
     session: { origin: string }
     approvalRes?: { approvedRgbProxyEndpoints?: unknown }
   }) => {
@@ -1127,7 +1142,7 @@ class ProviderController extends BaseController {
     const prepared = await wallet.createRgbSendBegin({
       invoice: params.invoice,
       assetId: params.assetId,
-      ...(params.amount === undefined ? {} : { amount: params.amount }),
+      ...(params.amount === undefined ? {} : { amount: normalizeRgbPaymentAmount(params.amount) }),
       ...(params.feeRate === undefined ? {} : { feeRate: params.feeRate }),
       providerOrigin: origin,
     })
