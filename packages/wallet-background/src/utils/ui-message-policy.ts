@@ -5,6 +5,7 @@ const FORBIDDEN_OBJECT_KEYS = new Set(['__proto__', 'constructor', 'prototype'])
 /** Methods used by the extension UI through the background wallet proxy. */
 const UI_CONTROLLER_METHODS = new Set([
   'abandonRgbAcceptedReceive',
+  'abortRgbAcknowledgedSwap',
   'abortRgbVanillaTx',
   'acceptRgbReceive',
   'activateRgbWriteLease',

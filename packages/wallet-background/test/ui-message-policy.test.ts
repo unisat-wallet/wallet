@@ -30,6 +30,7 @@ describe('UI message policy', () => {
   it('allows controller methods used by wallet screens and RGB receive', () => {
     for (const method of [
       'boot',
+      'abortRgbAcknowledgedSwap',
       'createBuyCoinPaymentUrl',
       'createRgbBlindReceive',
       'createRgbWitnessReceive',
