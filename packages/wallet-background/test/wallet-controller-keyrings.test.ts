@@ -1235,6 +1235,103 @@ describe('RGB wallet references', () => {
     expect((wallet as any).rgbRecoveryVerifiedFingerprints.size).toBe(0)
   })
 
+  it('uses recovery metadata without downloading an unchanged checkpoint', async () => {
+    const wallet = new WalletController()
+    const walletRef = {
+      walletId: 'rgb-wallet',
+      network: 'mainnet',
+      fundingAddress: 'bc1p-rgb-funding',
+    }
+    const revision = 'a'.repeat(24)
+    const service = {
+      needsRecoveryRestore: vi.fn(() => false),
+      getRecoveryCheckpointRevision: vi.fn(() => revision),
+      setRecoveryCheckpointVersion: vi.fn(),
+      setRecoveryCheckpointRevision: vi.fn(),
+      setRecoveryCheckpointGeneration: vi.fn(),
+      setRecoveryCheckpointKind: vi.fn(),
+      hasRecoveryConflict: vi.fn(() => false),
+      enableRecoveryBackup: vi.fn(),
+      getRecoveryCheckpointStatus: vi.fn(() => ({ dirty: false, verified: true })),
+    }
+    const getRgbRecoveryCheckpointMetadata = vi.fn().mockResolvedValue({
+      exists: true,
+      updatedAt: 2,
+      revision,
+      generation: 3,
+      kind: 'normal',
+    })
+    const getRgbRecoveryCheckpoint = vi.fn()
+    ;(walletApiService as any).rgb = {
+      getRgbRecoveryCheckpointMetadata,
+      getRgbRecoveryCheckpoint,
+    }
+
+    await (wallet as any).restoreRgbRecoveryIfNeeded({ service, wallet: walletRef })
+
+    expect(getRgbRecoveryCheckpointMetadata).toHaveBeenCalledWith({ wallet: walletRef })
+    expect(getRgbRecoveryCheckpoint).not.toHaveBeenCalled()
+    expect(service.setRecoveryCheckpointRevision).toHaveBeenCalledWith(revision)
+    expect(service.enableRecoveryBackup).toHaveBeenCalledTimes(1)
+  })
+
+  it('falls back to a full checkpoint read when metadata is unsupported', async () => {
+    const wallet = new WalletController()
+    const walletRef = {
+      walletId: 'rgb-wallet',
+      network: 'mainnet',
+      fundingAddress: 'bc1p-rgb-funding',
+    }
+    const revision = 'a'.repeat(24)
+    const service = {
+      needsRecoveryRestore: vi.fn(() => false),
+      getRecoveryCheckpointRevision: vi.fn(() => revision),
+      setRecoveryCheckpointVersion: vi.fn(),
+      setRecoveryCheckpointRevision: vi.fn(),
+      setRecoveryCheckpointGeneration: vi.fn(),
+      setRecoveryCheckpointKind: vi.fn(),
+      hasRecoveryConflict: vi.fn(() => false),
+      enableRecoveryBackup: vi.fn(),
+      getRecoveryCheckpointStatus: vi.fn(() => ({ dirty: false, verified: true })),
+    }
+    const getRgbRecoveryCheckpointMetadata = vi
+      .fn()
+      .mockRejectedValue(new Error('not found'))
+    const getRgbRecoveryCheckpoint = vi.fn().mockResolvedValue({
+      payload: 'legacy-encrypted-payload',
+      updatedAt: 2,
+      revision,
+    })
+    ;(walletApiService as any).rgb = {
+      getRgbRecoveryCheckpointMetadata,
+      getRgbRecoveryCheckpoint,
+    }
+
+    await (wallet as any).restoreRgbRecoveryIfNeeded({ service, wallet: walletRef })
+
+    expect(getRgbRecoveryCheckpointMetadata).toHaveBeenCalledTimes(1)
+    expect(getRgbRecoveryCheckpoint).toHaveBeenCalledWith({ wallet: walletRef })
+    expect(service.setRecoveryCheckpointRevision).toHaveBeenCalledWith(revision)
+  })
+
+  it('does not amplify transient metadata failures with a full checkpoint read', async () => {
+    const wallet = new WalletController()
+    const walletRef = {
+      walletId: 'rgb-wallet',
+      network: 'mainnet',
+      fundingAddress: 'bc1p-rgb-funding',
+    }
+    const getRgbRecoveryCheckpoint = vi.fn()
+    ;(walletApiService as any).rgb = {
+      getRgbRecoveryCheckpointMetadata: vi.fn().mockRejectedValue(new Error('request timeout')),
+      getRgbRecoveryCheckpoint,
+    }
+
+    await expect((wallet as any).getRgbRecoveryCheckpointControl(walletRef))
+      .rejects.toThrow('request timeout')
+    expect(getRgbRecoveryCheckpoint).not.toHaveBeenCalled()
+  })
+
   it('adopts a newer recovery revision when the decrypted checkpoint matches local state', async () => {
     const wallet = new WalletController()
     const walletRef = {
@@ -1265,6 +1362,11 @@ describe('RGB wallet references', () => {
       getRecoveryCheckpointStatus: vi.fn(() => ({ dirty: false, verified: true })),
     }
     ;(walletApiService as any).rgb = {
+      getRgbRecoveryCheckpointMetadata: vi.fn().mockResolvedValue({
+        exists: true,
+        updatedAt: 2,
+        revision: 'b'.repeat(24),
+      }),
       getRgbRecoveryCheckpoint: vi.fn().mockResolvedValue({
         payload,
         updatedAt: 2,

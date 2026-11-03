@@ -5889,6 +5889,70 @@ export class WalletController extends BaseController {
     )
   }
 
+  /** Prefer the lightweight control record while retaining old-backend compatibility. */
+  private isRgbRecoveryMetadataUnsupported(error: unknown) {
+    const candidate = error as {
+      status?: unknown
+      details?: { status?: unknown }
+    }
+    const status = candidate?.status ?? candidate?.details?.status
+    return (
+      status === 404 ||
+      status === 405 ||
+      /(?:http\s*)?(?:404|405)|not found|method not allowed/i.test(String(error))
+    )
+  }
+
+  private getRgbRecoveryCheckpointControl = async (
+    wallet: LocalRgbWallet
+  ): Promise<{
+    metadata: {
+      exists: boolean
+      updatedAt?: number
+      revision?: string
+      generation?: number
+      kind?: 'normal' | 'replacement'
+    }
+    checkpoint?: {
+      payload?: string
+      updatedAt?: number
+      revision?: string
+      generation?: number
+      kind?: 'normal' | 'replacement'
+    }
+  }> => {
+    const api = getRgbApiService()
+    if (typeof api.getRgbRecoveryCheckpointMetadata === 'function') {
+      try {
+        return {
+          metadata: await api.getRgbRecoveryCheckpointMetadata({ wallet }),
+        }
+      } catch (error) {
+        if (!this.isRgbRecoveryMetadataUnsupported(error)) throw error
+        // Backends released before the metadata endpoint must remain usable.
+        // The authenticated full read below preserves their existing behavior.
+        log.debug('RGB recovery metadata unavailable; falling back to checkpoint read', {
+          wallet: rgbRecoveryWalletTag(wallet),
+          error: String(error),
+        })
+      }
+    }
+    const checkpoint = await api.getRgbRecoveryCheckpoint({ wallet })
+    return {
+      metadata: {
+        exists:
+          checkpoint.payload !== undefined ||
+          checkpoint.updatedAt !== undefined ||
+          checkpoint.revision !== undefined,
+        ...(checkpoint.updatedAt === undefined ? {} : { updatedAt: checkpoint.updatedAt }),
+        ...(checkpoint.revision === undefined ? {} : { revision: checkpoint.revision }),
+        ...(checkpoint.generation === undefined ? {} : { generation: checkpoint.generation }),
+        ...(checkpoint.kind === undefined ? {} : { kind: checkpoint.kind }),
+      },
+      checkpoint,
+    }
+  }
+
   private restoreRgbRecoveryIfNeeded = async (context: LocalRgbServiceContext) => {
     const { service, wallet } = context
     const key = `${wallet.network}:${wallet.fundingAddress}`
@@ -5898,20 +5962,32 @@ export class WalletController extends BaseController {
     const restore = (async () => {
       let recoveryReady = false
       try {
-        log.debug('RGB recovery: requesting checkpoint', { wallet: rgbRecoveryWalletTag(wallet) })
-        const checkpoint = await getRgbApiService().getRgbRecoveryCheckpoint({ wallet })
-        log.debug('RGB recovery: checkpoint response received', {
+        log.debug('RGB recovery: requesting checkpoint metadata', {
+          wallet: rgbRecoveryWalletTag(wallet),
+        })
+        const control = await this.getRgbRecoveryCheckpointControl(wallet)
+        const metadata = control.metadata
+        const needsRestore = service.needsRecoveryRestore?.()
+        const localRevision = service.getRecoveryCheckpointRevision()
+        const revisionChanged = localRevision !== metadata.revision
+        const remoteCheckpointMissing = metadata.exists === false
+        let checkpoint: {
+          payload?: string
+          updatedAt?: number
+          revision?: string
+          generation?: number
+          kind?: 'normal' | 'replacement'
+        } = control.checkpoint ?? metadata
+        if (!control.checkpoint && metadata.exists && (needsRestore || revisionChanged)) {
+          checkpoint = await getRgbApiService().getRgbRecoveryCheckpoint({ wallet })
+        }
+        log.debug('RGB recovery: checkpoint control received', {
           wallet: rgbRecoveryWalletTag(wallet),
           hasPayload: Boolean(checkpoint.payload),
           updatedAt: checkpoint.updatedAt,
+          revisionChanged,
+          needsRestore,
         })
-        const needsRestore = service.needsRecoveryRestore?.()
-        const localRevision = service.getRecoveryCheckpointRevision()
-        const revisionChanged = localRevision !== checkpoint.revision
-        const remoteCheckpointMissing =
-          !checkpoint.payload &&
-          checkpoint.updatedAt === undefined &&
-          checkpoint.revision === undefined
         if (
           !needsRestore &&
           revisionChanged &&
@@ -6152,9 +6228,12 @@ export class WalletController extends BaseController {
           expected?.revision === undefined &&
           expected?.updatedAt === undefined
         ) {
-          const checkpoint = await getRgbApiService().getRgbRecoveryCheckpoint({ wallet })
+          const { metadata: checkpoint } = await this.getRgbRecoveryCheckpointControl(wallet)
           await this.assertRgbRecoveryWallet(wallet)
-          if (checkpoint.revision === undefined && checkpoint.updatedAt === undefined) {
+          if (
+            !checkpoint.exists ||
+            (checkpoint.revision === undefined && checkpoint.updatedAt === undefined)
+          ) {
             throw new Error('RGB recovery replacement requires an existing cloud checkpoint')
           }
           expected = {
@@ -6454,13 +6533,8 @@ export class WalletController extends BaseController {
         // that the checkpoint is also absent before replacing both bases.
         this.rgbWriteLeases.delete(key)
         try {
-          const checkpoint = await getRgbApiService().getRgbRecoveryCheckpoint({
-            wallet: context.wallet,
-          })
-          const remoteCheckpointMissing =
-            !checkpoint.payload &&
-            checkpoint.updatedAt === undefined &&
-            checkpoint.revision === undefined
+          const { metadata: checkpoint } = await this.getRgbRecoveryCheckpointControl(context.wallet)
+          const remoteCheckpointMissing = checkpoint.exists === false
           if (
             remoteCheckpointMissing &&
             context.service.getRecoveryCheckpointRevision?.() !== undefined
