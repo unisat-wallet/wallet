@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { RgbProxyOperationNotFoundError } from '@unisat/rgb-service'
 
 import { createRgbProxyTransport } from '../src/adapters/rgb-proxy'
-import { proxyV1DecryptBlob, proxyV1EncryptBlob, proxyV1Hash, proxyV1PublicKey, proxyV1Sign, proxyV1TransferId, proxyV1Verify } from '../src/adapters/rgb-proxy-v1'
+import { proxyV1DecryptBlob, proxyV1EncryptBlob, proxyV1Hash, proxyV1HashText, proxyV1PublicKey, proxyV1Sign, proxyV1TransferId, proxyV1Verify } from '../src/adapters/rgb-proxy-v1'
 
 const endpoint = 'rpcs://proxy.example'
 const recipientId = 'bc:utxob:recipient'
@@ -13,8 +13,8 @@ function rpcResponse(result: unknown) {
   })
 }
 
-function rpcError(code: number, message: string) {
-  return new Response(JSON.stringify({ jsonrpc: '2.0', id: '1', error: { code, message } }), {
+function rpcError(code: number, message: string, data?: Record<string, unknown>) {
+  return new Response(JSON.stringify({ jsonrpc: '2.0', id: '1', error: { code, message, data } }), {
     headers: { 'Content-Type': 'application/json' },
   })
 }
@@ -322,6 +322,48 @@ describe('RGB proxy transport', () => {
       signedRawTx: '01000000', donation: true,
     })
     expect(methods).toEqual(['invoice.check', 'consignment.post'])
+  })
+
+  it('recalculates proxy v1 proof of work when the server raises its difficulty', async () => {
+    const invoiceId = '22'.repeat(32)
+    const senderPrivateKey = '11'.repeat(32)
+    const recipientPk = proxyV1PublicKey('33'.repeat(32))
+    const attempts: Array<{ timestamp: string; nonce: string }> = []
+    fetchMock.mockImplementation(async (_url, init: RequestInit) => {
+      const json = typeof init.body === 'string' ? JSON.parse(init.body) : undefined
+      if (json?.method === 'invoice.check') {
+        return rpcResponse({ [invoiceId]: { status: 'available', pow_difficulty: '0' } })
+      }
+      const form = await new Response(init.body, { headers: init.headers }).formData()
+      expect(form.get('method')).toBe('consignment.post')
+      attempts.push({
+        timestamp: String(form.get('params[pow_timestamp]')),
+        nonce: String(form.get('params[pow_nonce]')),
+      })
+      return attempts.length === 1
+        ? rpcError(-114, 'Invalid proof of work', { pow_difficulty: '8' })
+        : rpcResponse(true)
+    })
+
+    await createRgbProxyTransport([endpoint]).publishConsignment({
+      recipientId: invoiceId,
+      payload: Buffer.from('donation').toString('base64'),
+      assetId: 'rgb:asset',
+      opIds: ['aa'.repeat(32)],
+      txid: 'bb'.repeat(32),
+      endpoints: [endpoint],
+      proxyInvoiceId: invoiceId,
+      proxyRecipientPublicKey: recipientPk,
+      proxySenderPrivateKey: senderPrivateKey,
+      proxyEncryption: 'unsupported',
+      signedRawTx: '01000000',
+      donation: true,
+    })
+
+    expect(attempts).toHaveLength(2)
+    const transferId = proxyV1TransferId(invoiceId, proxyV1PublicKey(senderPrivateKey))
+    expect(proxyV1HashText(transferId + attempts[1]!.timestamp + attempts[1]!.nonce))
+      .toMatch(/^00/)
   })
 
   it.each([

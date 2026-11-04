@@ -21,7 +21,7 @@ import {
 
 type JsonRpcResponse<T> = {
   result?: T
-  error?: { code?: number; message?: string }
+  error?: { code?: number; message?: string; data?: Record<string, unknown> }
 }
 
 type ProxyConsignment = {
@@ -377,52 +377,60 @@ async function postProxyV1Consignment(
     )
   }
 
-  const timestamp = String(Math.floor(Date.now() / 1000))
-  const nonce = await proxyV1Pow(transferId, Number(invoiceStatus.pow_difficulty), timestamp)
-  const boundary = `----unisat-rgb-${rpcId()}`
-  const fields = [
-    ['jsonrpc', '2.0'],
-    ['id', rpcId()],
-    ['method', 'consignment.post'],
-    ['params[invoice_id]', invoiceId],
-    ['params[transfer_id]', transferId],
-    ['params[sender_transport_endpoint]', senderEndpoint],
-    ['params[sender_pk]', senderPublicKey],
-    ['params[consignment_hash]', consignmentHash],
-    ['params[batch]', 'false'],
-    ['params[file_size]', String(file.length)],
-    ['params[signature]', proxyV1Sign(senderPrivateKey, transferId + consignmentHash + blobHash)],
-    ['params[pow_timestamp]', timestamp],
-    ['params[pow_nonce]', nonce],
-  ]
-  const encoder = new TextEncoder()
-  const prefix = encoder.encode(
-    fields
-      .map(
-        ([name, value]) =>
-          `--${boundary}\r\nContent-Disposition: form-data; name="${name}"\r\n\r\n${value}\r\n`
-      )
-      .join('') +
-      `--${boundary}\r\nContent-Disposition: form-data; name="file"; filename="consignment.rgb"\r\nContent-Type: application/octet-stream\r\n\r\n`
-  )
-  const suffix = encoder.encode(`\r\n--${boundary}--\r\n`)
-  const multipart = new Uint8Array(prefix.length + file.length + suffix.length)
-  multipart.set(prefix)
-  multipart.set(file, prefix.length)
-  multipart.set(suffix, prefix.length + file.length)
-  const response = await fetchWithTimeout(
-    toHttpEndpoint(endpoint),
-    {
-      method: 'POST',
-      headers: { 'Content-Type': `multipart/form-data; boundary=${boundary}` },
-      body: multipart.buffer,
-    },
-    'consignment.post',
-    options
-  )
-  const body = await readRpcResponse<boolean>(response)
-  if (body.error)
+  let difficulty = Number(invoiceStatus.pow_difficulty)
+  for (let attempt = 0; attempt < 3; attempt++) {
+    const timestamp = String(Math.floor(Date.now() / 1000))
+    const nonce = await proxyV1Pow(transferId, difficulty, timestamp)
+    const boundary = `----unisat-rgb-${rpcId()}`
+    const fields = [
+      ['jsonrpc', '2.0'],
+      ['id', rpcId()],
+      ['method', 'consignment.post'],
+      ['params[invoice_id]', invoiceId],
+      ['params[transfer_id]', transferId],
+      ['params[sender_transport_endpoint]', senderEndpoint],
+      ['params[sender_pk]', senderPublicKey],
+      ['params[consignment_hash]', consignmentHash],
+      ['params[batch]', 'false'],
+      ['params[file_size]', String(file.length)],
+      ['params[signature]', proxyV1Sign(senderPrivateKey, transferId + consignmentHash + blobHash)],
+      ['params[pow_timestamp]', timestamp],
+      ['params[pow_nonce]', nonce],
+    ]
+    const encoder = new TextEncoder()
+    const prefix = encoder.encode(
+      fields
+        .map(
+          ([name, value]) =>
+            `--${boundary}\r\nContent-Disposition: form-data; name="${name}"\r\n\r\n${value}\r\n`
+        )
+        .join('') +
+        `--${boundary}\r\nContent-Disposition: form-data; name="file"; filename="consignment.rgb"\r\nContent-Type: application/octet-stream\r\n\r\n`
+    )
+    const suffix = encoder.encode(`\r\n--${boundary}--\r\n`)
+    const multipart = new Uint8Array(prefix.length + file.length + suffix.length)
+    multipart.set(prefix)
+    multipart.set(file, prefix.length)
+    multipart.set(suffix, prefix.length + file.length)
+    const response = await fetchWithTimeout(
+      toHttpEndpoint(endpoint),
+      {
+        method: 'POST',
+        headers: { 'Content-Type': `multipart/form-data; boundary=${boundary}` },
+        body: multipart.buffer,
+      },
+      'consignment.post',
+      options
+    )
+    const body = await readRpcResponse<boolean>(response)
+    if (!body.error) return
+    const required = body.error.code === -114 ? Number(body.error.data?.['pow_difficulty']) : NaN
+    if (Number.isInteger(required) && required >= 0 && required <= 24 && attempt < 2) {
+      difficulty = required
+      continue
+    }
     throw new Error(`RGB proxy consignment.post failed: ${body.error.message || body.error.code}`)
+  }
 }
 
 async function getProxyV1Consignment(
