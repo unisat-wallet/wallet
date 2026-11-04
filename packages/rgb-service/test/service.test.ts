@@ -3335,6 +3335,57 @@ describe('RgbService', () => {
     })
   })
 
+  it('releases a rejected blind receive outpoint while retaining its recovery tombstone', async () => {
+    const dependencies = createDependencies()
+    const funding = {
+      outpoint: { txid: 'f'.repeat(64), vout: 0 },
+      satoshis: 1_000,
+      scriptPubKey: `5120${'11'.repeat(32)}`,
+      publicKey: `02${'22'.repeat(32)}`,
+      chainStatus: 'confirmed' as const,
+      confirmations: 1,
+      allocations: [],
+    }
+    vi.mocked(dependencies.stateSource.getSnapshot).mockResolvedValue({
+      syncedAt: 1, utxos: [funding],
+    })
+    const service = new RgbService(dependencies)
+    await service.open(wallet)
+    await service.sync()
+    ;(service as any).state.pendingReceives = [{
+      invoice: rgbInvoice(), recipientId: 'rejected-recipient', createdAt: 1,
+      seal: { ...funding.outpoint, blinding: 1n },
+      pendingValidationFailure: { reason: 'invalid', discoveredAt: 1 },
+      rejection: {
+        kind: 'local_donation_reject', rejectedAt: 2, reason: 'Rejected by you',
+      },
+    }]
+
+    expect(service.getPendingReceives()).toHaveLength(1)
+    expect(service.getAvailableReceiveUtxos()).toEqual([funding])
+    expect(service.getAvailableIssueUtxos()).toEqual([funding])
+  })
+
+  it('does not count hidden expired invoices against active receive capacity', async () => {
+    const dependencies = createDependencies()
+    dependencies.now = () => 2_000_000
+    const service = new RgbService(dependencies)
+    await service.open(wallet)
+    ;(service as any).state.pendingReceives = Array.from({ length: 10 }, (_, index) => ({
+      invoice: `expired-${index}`,
+      recipientId: `expired-${index}`,
+      createdAt: 1,
+      expirationTimestamp: 1_999,
+    }))
+
+    expect(service.getPendingReceives()).toEqual([])
+    expect(service.getReceiveInvoiceCapacity()).toEqual({
+      count: 0,
+      limit: 10,
+      available: true,
+    })
+  })
+
   it('preserves unexpired duplicate blind invoices after an empty proxy poll', async () => {
     const dependencies = createDependencies()
     dependencies.transport.getConsignment = vi.fn().mockResolvedValue(undefined)

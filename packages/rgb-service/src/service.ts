@@ -825,9 +825,9 @@ export class RgbService {
   }
 
   getReceiveInvoiceCapacity() {
-    // Rejected receives retain encrypted recovery material, but their invoice
-    // is consumed and must not use one of the active invoice slots.
-    const count = (this.requireState().pendingReceives || []).filter(
+    // Durable expired/rejected tombstones remain recoverable, but only
+    // invoices visible to the active receive state machine consume slots.
+    const count = this.getPendingReceives().filter(
       receive => !receive.rejection
     ).length
     return {
@@ -1357,7 +1357,7 @@ export class RgbService {
       this.getPendingReceives()
         .filter(
           (receive): receive is typeof receive & { seal: NonNullable<typeof receive.seal> } =>
-            !!receive.seal
+            !!receive.seal && !receive.rejection
         )
         .map(receive => `${receive.seal.txid}:${receive.seal.vout}`)
     )
