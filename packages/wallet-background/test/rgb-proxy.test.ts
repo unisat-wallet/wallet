@@ -241,7 +241,7 @@ describe('RGB proxy transport', () => {
           ack = params.ack
           ackSignature = params.signature
           expect(proxyV1Verify(recipientPk, ackSignature, transferId + 'true' + consignmentHash)).toBe(true)
-          return rpcResponse({ sender_pk: senderPk, signed_tx: signedTx, signed_tx_hash: signedTxHash, expires_at: String(expiresAt) })
+          return rpcResponse({ result: true, sender_pk: senderPk, signed_tx: signedTx, signed_tx_hash: signedTxHash, expires_at: String(expiresAt) })
         case 'ack.get':
           expect(proxyV1Verify(senderPk, params.signature, transferId + params.timestamp)).toBe(true)
           return rpcResponse({ acks: { [transferId]: ack }, signatures: { [transferId]: ackSignature } })
@@ -271,7 +271,7 @@ describe('RGB proxy transport', () => {
     expect(received?.proxyTransferId).toBe(transferId)
     expect(received?.payload).toBe(payload)
     expect(received).not.toHaveProperty('txid')
-    await transport.acknowledgeConsignment?.({
+    await expect(transport.acknowledgeConsignment?.({
       recipientId: invoiceId,
       endpoints: [endpoint],
       acknowledged: true,
@@ -280,7 +280,7 @@ describe('RGB proxy transport', () => {
       proxySenderPublicKey: received!.proxySenderPublicKey,
       proxySenderEndpoint: received!.proxySenderEndpoint,
       proxyConsignmentHash: received!.proxyConsignmentHash,
-    })
+    })).resolves.toEqual({ signedRawTx: rawTx })
     await transport.markConsignmentRetrieved?.({
       endpoint,
       proxyTransferId: received!.proxyTransferId!,
@@ -322,6 +322,28 @@ describe('RGB proxy transport', () => {
       signedRawTx: '01000000', donation: true,
     })
     expect(methods).toEqual(['invoice.check', 'consignment.post'])
+  })
+
+  it('keeps a batched proxy v1 receive pending until its signed transaction is released', async () => {
+    const recipientPrivateKey = '33'.repeat(32)
+    const senderPk = proxyV1PublicKey('11'.repeat(32))
+    fetchMock.mockResolvedValueOnce(rpcResponse({
+      result: true,
+      sender_pk: senderPk,
+      signed_tx_hash: '44'.repeat(32),
+      expires_at: String(Math.floor(Date.now() / 1000) + 3600),
+    }))
+
+    await expect(createRgbProxyTransport([endpoint]).acknowledgeConsignment?.({
+      recipientId: '22'.repeat(32),
+      endpoints: [endpoint],
+      acknowledged: true,
+      proxyPrivateKey: recipientPrivateKey,
+      proxyTransferId: '55'.repeat(32),
+      proxySenderPublicKey: senderPk,
+      proxySenderEndpoint: endpoint,
+      proxyConsignmentHash: '66'.repeat(32),
+    })).resolves.toEqual({ releasePending: true })
   })
 
   it('recalculates proxy v1 proof of work when the server raises its difficulty', async () => {

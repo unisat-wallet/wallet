@@ -703,7 +703,7 @@ export function createRgbProxyTransport(
         await tryEndpoints(consignment.endpoints, endpoint =>
           postProxyV1Consignment(endpoint, consignment, endpoints, options)
         )
-        return
+        return undefined
       }
       await tryEndpoints(consignment.endpoints, endpoint =>
         postConsignment(endpoint, consignment, options)
@@ -956,6 +956,7 @@ export function createRgbProxyTransport(
           throw new Error('RGB proxy v1 acknowledgement state is incomplete')
         }
         const body = await postJson<{
+          result?: boolean
           sender_pk?: string
           signed_tx?: string
           signed_tx_hash?: string
@@ -975,13 +976,17 @@ export function createRgbProxyTransport(
         if (body.error?.code === -104) throw new RgbProxyOperationNotFoundError()
         if (body.error)
           throw new Error(`RGB proxy ack.post failed: ${body.error.message || body.error.code}`)
+        if (!body.result || typeof body.result.result !== 'boolean') {
+          throw new Error('RGB proxy ack.post returned an incomplete response')
+        }
         if (acknowledged) {
-          if (!body.result?.signed_tx || !body.result.sender_pk || !body.result.signed_tx_hash) {
-            throw new Error('RGB proxy signed transaction was cleared by sender')
+          if (!body.result.sender_pk || !body.result.signed_tx_hash) {
+            throw new Error('RGB proxy ack.post returned incomplete signed transaction metadata')
           }
           if (body.result.sender_pk !== proxySenderPublicKey) {
             throw new Error('RGB proxy returned a different signed transaction sender')
           }
+          if (!body.result.signed_tx) return { releasePending: true }
           const rawTx = await proxyV1DecryptSignedTx(
             body.result.signed_tx,
             proxyPrivateKey,
@@ -991,6 +996,7 @@ export function createRgbProxyTransport(
           if (proxyV1Hash(Buffer.from(rawTx, 'hex')) !== body.result.signed_tx_hash) {
             throw new Error('RGB proxy returned a signed transaction with an invalid hash')
           }
+          return { signedRawTx: rawTx }
         }
         return
       }
@@ -1007,6 +1013,7 @@ export function createRgbProxyTransport(
         if (body.error)
           throw new Error(`RGB proxy ack.post failed: ${body.error.message || body.error.code}`)
       })
+      return undefined
     },
 
     markConsignmentRetrieved: async ({ endpoint, proxyTransferId, proxyPrivateKey }) => {

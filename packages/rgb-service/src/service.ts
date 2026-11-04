@@ -1604,7 +1604,14 @@ export class RgbService {
             // not evidence of sender cancellation, so leave the receipt for
             // the next polling cycle without sending a compensating NACK.
             try {
-              await this.acknowledgeProxyConsignment(item, true)
+              const acknowledgementResult = await this.acknowledgeProxyConsignment(item, true)
+              if (acknowledgementResult?.releasePending) continue
+              if (acknowledgementResult?.signedRawTx) {
+                await this.ensureReceiveAnchorBroadcast(
+                  match.txid,
+                  acknowledgementResult.signedRawTx
+                )
+              }
             } catch (error) {
               if (!(error instanceof RgbProxyOperationNotFoundError &&
                 await this.ensureDonationAnchorBroadcast(
@@ -1853,8 +1860,9 @@ export class RgbService {
         return { accepted: false, status: 'canceled' as const }
       }
     }
+    let acknowledgementResult: Awaited<ReturnType<RgbService['acknowledgeProxyConsignment']>> = undefined
     try {
-      await this.acknowledgeProxyConsignment(item, true)
+      acknowledgementResult = await this.acknowledgeProxyConsignment(item, true)
     } catch (error) {
       if (!(error instanceof RgbProxyOperationNotFoundError &&
         await this.ensureDonationAnchorBroadcast(item.txid, receive.pendingAccept.signedRawTx))) {
@@ -1864,6 +1872,12 @@ export class RgbService {
         await this.persist()
         return { accepted: false, status: 'canceled' as const }
       }
+    }
+    if (acknowledgementResult?.releasePending) {
+      return { accepted: false, status: 'pending' as const }
+    }
+    if (acknowledgementResult?.signedRawTx) {
+      await this.ensureReceiveAnchorBroadcast(item.txid, acknowledgementResult.signedRawTx)
     }
     receive.receivedConsignment!.accepted = true
     delete receive.receivedConsignment!.acknowledgementPending
@@ -2377,11 +2391,15 @@ export class RgbService {
 
   /** A v1 donation has no sender ACK operation; broadcast its validated signed witness if needed. */
   private async ensureDonationAnchorBroadcast(txid: string, signedRawTx?: string) {
+    return this.ensureReceiveAnchorBroadcast(txid, signedRawTx)
+  }
+
+  private async ensureReceiveAnchorBroadcast(txid: string, signedRawTx?: string) {
     if (await this.isReceiveAnchorBroadcast(txid)) return true
     if (!signedRawTx) return false
     const broadcastTxid = await this.dependencies.broadcaster.broadcast(signedRawTx)
     if (broadcastTxid !== txid) {
-      throw new RgbServiceError('Broadcast transaction ID does not match the RGB donation')
+      throw new RgbServiceError('Broadcast transaction ID does not match the RGB receive')
     }
     return true
   }
@@ -4218,11 +4236,11 @@ export class RgbService {
     item: { recipientId: string; endpoint?: string; proxyTransferId?: string; proxySenderPublicKey?: string; proxySenderEndpoint?: string; proxyConsignmentHash?: string },
     acknowledged: boolean
   ) {
-    if (!item.endpoint || !this.dependencies.transport.acknowledgeConsignment) return
+    if (!item.endpoint || !this.dependencies.transport.acknowledgeConsignment) return undefined
     const receive = this.getPendingReceives().find(receive =>
       (receive.proxyRecipientId || receive.recipientId) === item.recipientId
     )
-    await this.dependencies.transport.acknowledgeConsignment({
+    return this.dependencies.transport.acknowledgeConsignment({
       recipientId: item.recipientId,
       endpoints: [item.endpoint],
       acknowledged,

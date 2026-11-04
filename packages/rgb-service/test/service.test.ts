@@ -4884,6 +4884,48 @@ describe('RgbService', () => {
     })
   })
 
+  it('waits for a batched proxy v1 transaction release and broadcasts it on retry', async () => {
+    const dependencies = createDependencies()
+    dependencies.transport.acknowledgeConsignment = vi.fn()
+      .mockResolvedValueOnce({ releasePending: true })
+      .mockResolvedValueOnce({ signedRawTx: '01000000' })
+    const service = new RgbService(dependencies)
+    await service.open(wallet)
+    ;(service as any).state.pendingReceives = [
+      {
+        invoice: rgbInvoice(),
+        recipientId: 'recipient',
+        proxyRecipientId: 'proxy-recipient',
+        proxyPrivateKey: '11'.repeat(32),
+        assetId: 'rgb:AQEBAQEB-AQEBAQE-BAQEBAQ-EBAQEBA-QEBAQEB-AQEBAQE',
+        amount: '60',
+        createdAt: 1,
+        pendingAccept: {
+          payload: 'consignment',
+          txid: 'c'.repeat(64),
+          endpoint: proxyEndpoint,
+          assetId: 'rgb:AQEBAQEB-AQEBAQE-BAQEBAQ-EBAQEBA-QEBAQEB-AQEBAQE',
+          amount: '60',
+          discoveredAt: 1,
+        },
+      },
+    ]
+
+    await expect(service.acceptReceive('proxy-recipient')).resolves.toEqual({
+      accepted: false,
+      status: 'pending',
+    })
+    expect(service.getPendingReceives()[0]?.receivedConsignment).toMatchObject({
+      acknowledgementPending: true,
+    })
+
+    await expect(service.acceptReceive('proxy-recipient')).resolves.toEqual({
+      accepted: true,
+      status: 'accepted',
+    })
+    expect(dependencies.broadcaster.broadcast).toHaveBeenCalledWith('01000000')
+  })
+
   it('does not reject or cancel a receive once ACK intent is durable', async () => {
     const dependencies = createDependencies()
     dependencies.transport.acknowledgeConsignment = vi.fn()

@@ -647,7 +647,12 @@ export interface RgbTransport {
     proxySenderPublicKey?: string
     proxySenderEndpoint?: string
     proxyConsignmentHash?: string
-  }): Promise<void>
+  }): Promise<{
+    /** ACK was recorded, but a batched operation has not released its transaction yet. */
+    releasePending?: boolean
+    /** Proxy v1 transaction released to the recipient after all operation ACKs. */
+    signedRawTx?: string
+  } | undefined>
   /** Allow a Proxy v1 recipient to delete payload bytes after durable local handling. */
   markConsignmentRetrieved?(input: {
     endpoint: string
