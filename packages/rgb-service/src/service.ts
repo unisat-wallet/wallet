@@ -180,6 +180,7 @@ export class RgbService {
         ? normalizeStateAssetIds(hydrateState(stored))
         : {
             version: 1,
+            witnessBlindingPolicyVersion: 1,
             wallet,
             recoveryRemoteStateKnown: false,
             snapshot: { utxos: [], syncedAt: 0 },
@@ -2043,7 +2044,11 @@ export class RgbService {
     // Transfers created by older UniSat versions used a random witness
     // blinding. Keep them recoverable, while preferring the Proxy v1-derived
     // match for all newly compliant transfers.
-    if (!candidates.length && expectedWitnessBlinding !== undefined) {
+    if (
+      !candidates.length &&
+      expectedWitnessBlinding !== undefined &&
+      receive.allowLegacyWitnessBlinding === true
+    ) {
       candidates = bfa.terminalAssignments.filter(matchesRecipient)
     }
     if (!candidates.length) return mismatch(
@@ -4770,6 +4775,18 @@ function sameSnapshotContents(left: RgbWalletSnapshot, right: RgbWalletSnapshot)
 }
 
 function normalizeStateAssetIds(state: RgbServiceState): RgbServiceState {
+  if (state.witnessBlindingPolicyVersion !== 1) {
+    // Only invoices already present when strict matching is first deployed may
+    // recover transfers emitted by old UniSat senders with random blinding.
+    // Fresh invoices are created after the state marker is set and never gain
+    // this capability merely by being persisted or restored later.
+    state.pendingReceives?.forEach(receive => {
+      if (receive.recipientType === 'witness' && receive.proxyPrivateKey) {
+        receive.allowLegacyWitnessBlinding = true
+      }
+    })
+    state.witnessBlindingPolicyVersion = 1
+  }
   state.snapshot = normalizeSnapshot(state.snapshot)
   for (const pending of Object.values(state.pending)) {
     pending.request.assetId = normalizeAssetId(pending.request.assetId)

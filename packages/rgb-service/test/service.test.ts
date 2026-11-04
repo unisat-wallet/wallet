@@ -150,6 +150,32 @@ function createDependencies(): RgbServiceDependencies {
 }
 
 describe('RgbService', () => {
+  it('grants legacy witness blinding fallback only to proxy invoices migrated from old state', async () => {
+    const dependencies = createDependencies()
+    await dependencies.storage.set(
+      `rgb-service:v1:${wallet.network}:${wallet.fundingAddress}`,
+      {
+        version: 1,
+        wallet,
+        snapshot: { utxos: [], syncedAt: 1 },
+        pending: {},
+        pendingReceives: [{
+          invoice: 'legacy', recipientId: 'recipient', recipientType: 'witness',
+          proxyPrivateKey: '44'.repeat(32), createdAt: 1,
+        }],
+      } as any
+    )
+    const service = new RgbService(dependencies)
+    await service.open(wallet)
+
+    expect((service as any).state).toMatchObject({ witnessBlindingPolicyVersion: 1 })
+    expect(service.getPendingReceives()[0]).toMatchObject({ allowLegacyWitnessBlinding: true })
+
+    const fresh = new RgbService(createDependencies())
+    await fresh.open(wallet)
+    expect((fresh as any).state).toMatchObject({ witnessBlindingPolicyVersion: 1 })
+  })
+
   it('reports an active send lock separately from settled and available amounts', async () => {
     const service = new RgbService(createDependencies())
     await service.open(wallet)
@@ -1432,7 +1458,7 @@ describe('RgbService', () => {
     expect(reasons).toEqual(['ambiguous_recipient_assignment'])
   })
 
-  it('prefers the Proxy v1-derived witness blinding and accepts a legacy fallback', async () => {
+  it('requires derived witness blinding except for migrated legacy invoices', async () => {
     const dependencies = createDependencies()
     const scriptPubKey = `5120${'11'.repeat(32)}`
     const recipientPrivateKey = '22'.repeat(32)
@@ -1477,7 +1503,17 @@ describe('RgbService', () => {
       terminalAssignments: [legacy],
     } as any)
     await expect((service as any).validateIncomingConsignment(receive, item))
-      .resolves.toMatchObject({ opId: legacy.opId })
+      .resolves.toBeUndefined()
+
+    vi.mocked(dependencies.validateBfaConsignment!).mockResolvedValueOnce({
+      ...(await dependencies.validateBfaConsignment!({
+        wallet, payload: new Uint8Array(),
+      } as any)),
+      terminalAssignments: [legacy],
+    } as any)
+    await expect((service as any).validateIncomingConsignment(
+      { ...receive, allowLegacyWitnessBlinding: true }, item
+    )).resolves.toMatchObject({ opId: legacy.opId })
   })
 
   it('matches a v0 witness receive only in the newest witness bundle', async () => {

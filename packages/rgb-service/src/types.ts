@@ -253,6 +253,8 @@ export interface RgbPendingReceive {
   proxyPrivateKey?: string
   proxyPublicKey?: string
   proxyInvoiceId?: string
+  /** Migration-only permission for invoices created before derived witness blinding was enforced. */
+  allowLegacyWitnessBlinding?: boolean
   /** Confirmations required before this receipt becomes settled. */
   minConfirmations?: number
   /** dApp origin that created this invoice; local-only and excluded from recovery checkpoints. */
@@ -443,6 +445,8 @@ export interface RgbPendingAssetMetadata {
 
 export interface RgbServiceState {
   version: 1
+  /** Existing pending invoices were tagged when strict Proxy v1 witness matching was introduced. */
+  witnessBlindingPolicyVersion?: 1
   wallet: RgbWalletRef
   /**
    * False only when this installation could not read the remote checkpoint.
