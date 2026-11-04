@@ -2063,16 +2063,22 @@ export class RgbService {
       assetId, destinationCount: destinations.size,
     })
     const candidate = candidates[0]!
-    if (receive.amount && receive.amount !== candidate.amount)
-      return mismatch(v1 ? 'amount' : 'asset_or_amount', { actualAmount: candidate.amount })
+    const amount = candidates.reduce((sum, assignment) => sum + BigInt(assignment.amount), 0n).toString()
+    if (receive.amount && receive.amount !== amount)
+      return mismatch(v1 ? 'amount' : 'asset_or_amount', { actualAmount: amount })
     const output = candidate.output
     return {
       decoded: { metadata: bfa.metadata, genesis: { strict: bfa.genesis } },
       witness: { outputs: output && candidate.vout >= 0 ? Array.from({ length: candidate.vout + 1 }, (_, index) =>
         index === candidate.vout ? output : undefined) : [] },
-      assetId, amount: candidate.amount, txid: candidate.txid,
+      assetId, amount, txid: candidate.txid,
       vout: receive.seal?.vout ?? candidate.vout,
       opId: candidate.opId, assignmentIndex: candidate.assignmentIndex,
+      assignments: candidates.map(assignment => ({
+        opId: assignment.opId,
+        assignmentIndex: assignment.assignmentIndex,
+        amount: assignment.amount,
+      })),
       counterpartyScriptPubKeys: bfa.witnessOutputScripts,
       historyPayload: Buffer.from(payload).toString('base64'),
       ...(v1 ? {} : { legacyPayload: item.payload }),
@@ -2129,14 +2135,20 @@ export class RgbService {
     if (!utxo) return false
     if (deferConfirmedSettlement) return 'snapshot_required' as const
     const assetId = normalizeAssetId(validated.assetId)
-    const existingAllocation = utxo.allocations.find(allocation =>
-      allocation.opId === validated.opId &&
-      allocation.assignmentIndex === validated.assignmentIndex
-    )
-    if (existingAllocation &&
-      (normalizeAssetId(existingAllocation.assetId) !== assetId ||
-        existingAllocation.amount !== validated.amount)) {
-      throw new RgbServiceError('RGB receive allocation conflicts with the validated consignment')
+    const receivedAssignments = validated.assignments || [{
+      opId: validated.opId,
+      assignmentIndex: validated.assignmentIndex,
+      amount: validated.amount,
+    }]
+    for (const assignment of receivedAssignments) {
+      const existing = utxo.allocations.find(allocation =>
+        allocation.opId === assignment.opId &&
+        allocation.assignmentIndex === assignment.assignmentIndex
+      )
+      if (existing &&
+        (normalizeAssetId(existing.assetId) !== assetId || existing.amount !== assignment.amount)) {
+        throw new RgbServiceError('RGB receive allocation conflicts with the validated consignment')
+      }
     }
     // Do this before mutating the allocation/receive state. A conflicting or
     // malformed branch must reject atomically rather than leave a spendable
@@ -2155,19 +2167,25 @@ export class RgbService {
         metadata: validated.decoded.metadata,
       })
     }
-    if (existingAllocation) {
-      existingAllocation.settled = true
-      existingAllocation.spendable = true
-    } else {
-      utxo.allocations.push({
-        assetId: validated.assetId,
-        amount: validated.amount,
-        settled: true,
-        spendable: true,
-        opId: validated.opId,
-        assignmentIndex: validated.assignmentIndex,
-        assignmentType: 4000,
-      })
+    for (const assignment of receivedAssignments) {
+      const existing = utxo.allocations.find(allocation =>
+        allocation.opId === assignment.opId &&
+        allocation.assignmentIndex === assignment.assignmentIndex
+      )
+      if (existing) {
+        existing.settled = true
+        existing.spendable = true
+      } else {
+        utxo.allocations.push({
+          assetId: validated.assetId,
+          amount: assignment.amount,
+          settled: true,
+          spendable: true,
+          opId: assignment.opId,
+          assignmentIndex: assignment.assignmentIndex,
+          assignmentType: 4000,
+        })
+      }
     }
     if (!utxo.chainStatus || utxo.chainStatus === 'mempool' || utxo.chainStatus === 'confirmed') {
       utxo.chainStatus = 'confirmed'

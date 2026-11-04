@@ -1458,6 +1458,64 @@ describe('RgbService', () => {
     expect(reasons).toEqual(['ambiguous_recipient_assignment'])
   })
 
+  it('aggregates every asset assignment paid to one terminal destination', async () => {
+    const dependencies = createDependencies()
+    const scriptPubKey = `5120${'11'.repeat(32)}`
+    const txid = 'b'.repeat(64)
+    const assetId = 'rgb:AQEBAQEB-AQEBAQE-BAQEBAQ-EBAQEBA-QEBAQEB-AQEBAQE'
+    const assignments = [
+      { opId: 'c'.repeat(64), assignmentIndex: 0, amount: '6', secretSeal: 'seal-a' },
+      { opId: 'd'.repeat(64), assignmentIndex: 1, amount: '9', secretSeal: 'seal-b' },
+    ].map(assignment => ({
+      ...assignment, bundleId: 'bundle', txid, vout: 1,
+      output: { scriptPubKey, satoshis: 330 },
+    }))
+    dependencies.validateBfaConsignment = vi.fn().mockResolvedValue({
+      assetId, genesis: new Uint8Array(),
+      metadata: { schema: 'NIA', ticker: 'NIA', name: 'NIA', precision: 0, issuedSupply: '100' },
+      witnessOutputScripts: [scriptPubKey],
+      terminals: [{ bundleId: 'bundle', secretSeals: ['seal-a', 'seal-b'] }],
+      bundles: [{ id: 'bundle' }], terminalAssignments: assignments,
+    } as any)
+    dependencies.stateSource.getTransactionStatus = vi.fn().mockResolvedValue({
+      status: 'confirmed', confirmations: 1,
+    })
+    const service = new RgbService(dependencies)
+    await service.open(wallet)
+    vi.spyOn(service as any, 'needsV1HistoryMerge').mockReturnValue(false)
+    vi.spyOn(service as any, 'storeAcceptedHistory').mockImplementation(() => undefined)
+    const receive = {
+      invoice: '', recipientId: 'recipient', recipientType: 'witness' as const,
+      witnessScriptPubKey: scriptPubKey, witnessPublicKey: `02${'22'.repeat(32)}`,
+      amount: '15', createdAt: 1,
+      receivedConsignment: { accepted: true, assetId, amount: '15', txid, receivedAt: 1 },
+    }
+    const item = {
+      recipientId: 'recipient',
+      payload: Buffer.from(Uint8Array.from([
+        1, 1, 0, 0, 0, 0, ...Buffer.from(NIA_V1_SCHEMA_ID, 'hex'),
+      ])).toString('base64'),
+    }
+
+    const validated = await (service as any).validateIncomingConsignment(receive, item)
+    expect(validated).toMatchObject({
+      amount: '15',
+      assignments: [
+        { opId: 'c'.repeat(64), assignmentIndex: 0, amount: '6' },
+        { opId: 'd'.repeat(64), assignmentIndex: 1, amount: '9' },
+      ],
+    })
+    await expect((service as any).advanceAcceptedReceive(receive, item, validated, false))
+      .resolves.toBe(true)
+    const utxo = (service as any).state.snapshot.utxos.find(
+      (candidate: any) => candidate.outpoint.txid === txid && candidate.outpoint.vout === 1
+    )
+    expect(utxo.allocations).toEqual([
+      expect.objectContaining({ opId: 'c'.repeat(64), assignmentIndex: 0, amount: '6' }),
+      expect.objectContaining({ opId: 'd'.repeat(64), assignmentIndex: 1, amount: '9' }),
+    ])
+  })
+
   it('requires derived witness blinding except for migrated legacy invoices', async () => {
     const dependencies = createDependencies()
     const scriptPubKey = `5120${'11'.repeat(32)}`
