@@ -54,6 +54,7 @@ export class RgbReceiveOperations {
     await service.claimPendingReceives()
     const batchTransferIdx = service
       .getPendingReceives()
+      .filter(item => !item.rejection)
       .findIndex(item => item.recipientId === receive.recipientId)
     return toPublicRgbPendingReceiveInvoice(
       receive,
@@ -82,12 +83,12 @@ export class RgbReceiveOperations {
       }
     }
     const capacity = service.getReceiveInvoiceCapacity()
+    const activeReceives = service.getPendingReceives().filter(item => !item.rejection)
     return {
       receiveInvoiceCount: capacity.count,
       receiveInvoiceLimit: capacity.limit,
       canCreateReceiveInvoice: capacity.available,
-      list: service
-        .getPendingReceives()
+      list: activeReceives
         .map((item, batchTransferIdx) => ({ item, batchTransferIdx }))
         .filter(({ item }) =>
           params.providerOrigin === undefined || item.providerOrigin === params.providerOrigin
@@ -108,7 +109,7 @@ export class RgbReceiveOperations {
   ): Promise<{ changed: boolean }> {
     const context = boundContext ?? (await this.dependencies.getContext())
     const { service } = context
-    const pending = service.getPendingReceives()[batchTransferIdx]
+    const pending = service.getPendingReceives().filter(item => !item.rejection)[batchTransferIdx]
     if (!pending) return { changed: false }
     await this.dependencies.ensureWriteLease?.(context)
     await this.dependencies.assertContext?.(context)

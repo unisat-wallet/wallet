@@ -824,7 +824,11 @@ export class RgbService {
   }
 
   getReceiveInvoiceCapacity() {
-    const count = this.requireState().pendingReceives?.length || 0
+    // Rejected receives retain encrypted recovery material, but their invoice
+    // is consumed and must not use one of the active invoice slots.
+    const count = (this.requireState().pendingReceives || []).filter(
+      receive => !receive.rejection
+    ).length
     return {
       count,
       limit: MAX_PENDING_RECEIVE_INVOICES,
@@ -1513,6 +1517,9 @@ export class RgbService {
       )
       if (receiveIndex < 0) continue
       const receive = pending[receiveIndex]!
+      // A successfully posted NACK is protocol-terminal. Keep its encrypted
+      // recovery tombstone, but never reprocess or reverse it automatically.
+      if (receive.rejection?.kind === 'proxy_nack') continue
       let mismatchReason: string | undefined
       const stageValidationFailure = (reason: string) => {
         const previous = receive.pendingValidationFailure
@@ -1547,6 +1554,11 @@ export class RgbService {
           stageValidationFailure(reason)
           await refreshValidationReview(receive, receive.pendingValidationFailure!, item.payload)
           continue
+        }
+        if (receive.rejection?.kind === 'local_donation_reject') {
+          delete receive.rejection
+          this.removeRejectedReceiveHistory(receive)
+          changed = true
         }
         const resolvedReviewCaseId = receive.pendingValidationFailure?.reviewCaseId
         if (resolvedReviewCaseId) {
@@ -1766,6 +1778,9 @@ export class RgbService {
     if (!receive?.pendingAccept) {
       throw new RgbServiceError(`RGB receive ${recipientId} is not awaiting acceptance`)
     }
+    if (receive.rejection) {
+      throw new RgbServiceError(`RGB receive ${recipientId} was already rejected`)
+    }
     if (
       !receive.receivedConsignment?.acknowledgementPending &&
       (await this.isReceiveCanceledBySender(receive))
@@ -1859,6 +1874,9 @@ export class RgbService {
       item => item.recipientId === recipientId || item.proxyRecipientId === recipientId
     )
     if (!receive) throw new RgbServiceError(`RGB receive ${recipientId} was not found`)
+    if (receive.rejection) {
+      throw new RgbServiceError(`RGB receive ${recipientId} was already rejected`)
+    }
     const pendingAccept = receive.pendingAccept
     const validationFailure = receive.pendingValidationFailure
     if (!pendingAccept && !validationFailure && !receive.receivedConsignment) {
@@ -1884,6 +1902,8 @@ export class RgbService {
     if (!proposal.endpoint && !validationFailure) {
       throw new RgbServiceError('RGB receive cannot be rejected without a proxy endpoint')
     }
+    const rollback = snapshotState(state)
+    let proxyNackPosted = false
     if (proposal.endpoint) {
       try {
         await this.acknowledgeProxyConsignment(
@@ -1897,23 +1917,34 @@ export class RgbService {
           },
           false
         )
+        proxyNackPosted = !!this.dependencies.transport.acknowledgeConsignment
       } catch (error) {
         // Donations have no sender ACK operation. Rejection is still a local
         // decision even though the Bitcoin transaction may already be public.
         if (!(error instanceof RgbProxyOperationNotFoundError)) throw error
       }
     }
+    const rejectionKind = proxyNackPosted
+      ? 'proxy_nack' as const
+      : 'local_donation_reject' as const
+    const rejectionReason = validationFailure
+      ? `${proxyNackPosted ? 'Rejected by you' : 'Discarded locally by you without notifying the sender'} after validation failed: ${validationFailure.reason}`
+      : 'Rejected by you'
     this.recordReceiveOutcome(
       receive, 'rejected', proposal.txid || '',
-      validationFailure
-        ? `${proposal.endpoint ? 'Rejected by you' : 'Discarded locally by you without notifying the sender'} after validation failed: ${validationFailure.reason}`
-        : 'Rejected by you'
+      rejectionReason,
+      false
     )
-    // Proxy recipient IDs are single-use upload keys. Once a consignment has
-    // been posted, a later transfer cannot replace its file even after NACK.
-    // Discard the invoice so the user creates a fresh blinded recipient ID.
-    state.pendingReceives = pending.filter(item => item !== receive)
-    await this.persist()
+    // The recipient ID remains single-use, but the random Proxy v1 private key
+    // cannot be reconstructed from the wallet seed. Retain the complete
+    // receive inside encrypted state/checkpoints instead of conflating Reject
+    // with permanent key destruction.
+    receive.rejection = {
+      kind: rejectionKind,
+      rejectedAt: this.now(),
+      reason: rejectionReason,
+    }
+    await this.persistWithRecoveryRollback(rollback)
     return { rejected: true }
   }
 
@@ -2143,10 +2174,11 @@ export class RgbService {
     receive: import('./types').RgbPendingReceive,
     status: 'settled' | 'canceled' | 'rejected',
     txid: string,
-    rejectionReason?: string
+    rejectionReason?: string,
+    releaseRecipient = true
   ) {
     const state = this.requireState()
-    this.recordReleasedReceiveRecipient(receive.recipientId)
+    if (releaseRecipient) this.recordReleasedReceiveRecipient(receive.recipientId)
     const pendingReceiveHistory = state.pendingReceiveHistory || (state.pendingReceiveHistory = [])
     const transferId = `receive:${receive.proxyRecipientId || receive.recipientId}`
     // Any Asset / Any Amount invoices intentionally omit these constraints.
@@ -2191,6 +2223,15 @@ export class RgbService {
         receive.pendingAccept?.counterpartyScriptPubKeys ||
         receive.receivedConsignment?.counterpartyScriptPubKeys,
     })
+  }
+
+  /** Remove the display-only rejection row when a local donation validates after an upgrade. */
+  private removeRejectedReceiveHistory(receive: import('./types').RgbPendingReceive) {
+    const state = this.requireState()
+    const transferId = `receive:${receive.proxyRecipientId || receive.recipientId}`
+    state.pendingReceiveHistory = state.pendingReceiveHistory?.filter(
+      item => item.transferId !== transferId || item.status !== 'rejected'
+    )
   }
 
   private async getProxyAcknowledgement(
@@ -4031,9 +4072,10 @@ export class RgbService {
     const pending = (this.requireState().pendingReceives || [])
       .filter(
         receive =>
-          (!receive.receivedConsignment?.accepted &&
+          receive.rejection?.kind !== 'proxy_nack' &&
+          ((!receive.receivedConsignment?.accepted &&
             !receive.receivedConsignment?.acknowledgementPending) ||
-          !receive.receivedConsignment.payload
+          !receive.receivedConsignment?.payload)
       )
       .flatMap(receive => {
         try {

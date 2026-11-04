@@ -33,6 +33,10 @@ describe('RgbReceiveOperations', () => {
   it('cancels a witness invoice by its unique proxy recipient ID', async () => {
     const pendingReceives = [
       {
+        recipientId: 'rejected-recipient',
+        rejection: { kind: 'proxy_nack' as const, rejectedAt: 1, reason: 'Rejected by you' },
+      },
+      {
         recipientId: 'shared-witness-recipient',
         proxyRecipientId: 'proxy-witness-first',
         recipientType: 'witness' as const,

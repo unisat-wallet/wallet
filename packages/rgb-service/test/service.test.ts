@@ -1925,6 +1925,7 @@ describe('RgbService', () => {
     await service.open(wallet)
     ;(service as any).state.pendingReceives = [{
       invoice: rgbInvoice(), recipientId: 'recipient', createdAt: 1,
+      proxyPrivateKey: '44'.repeat(32),
       seal: { txid: 'a'.repeat(64), vout: 0, blinding: 1n },
     }]
     ;(service as any).validateIncomingConsignment = vi.fn().mockReturnValue(undefined)
@@ -1947,6 +1948,7 @@ describe('RgbService', () => {
     await service.open(wallet)
     ;(service as any).state.pendingReceives = [{
       invoice: rgbInvoice(), recipientId: 'recipient', createdAt: 1,
+      proxyPrivateKey: '44'.repeat(32),
       seal: { txid: 'a'.repeat(64), vout: 0, blinding: 1n },
       pendingValidationFailure: {
         reason: 'No matching blind assignment was found', discoveredAt: 2,
@@ -2002,6 +2004,7 @@ describe('RgbService', () => {
     await service.open(wallet)
     ;(service as any).state.pendingReceives = [{
       invoice: rgbInvoice(), recipientId: 'recipient', createdAt: 1,
+      proxyPrivateKey: '44'.repeat(32),
       seal: { txid: 'a'.repeat(64), vout: 0, blinding: 1n },
       pendingValidationFailure: {
         reason: 'No matching blind assignment was found',
@@ -2017,7 +2020,18 @@ describe('RgbService', () => {
     expect(dependencies.transport.acknowledgeConsignment).toHaveBeenCalledWith(
       expect.objectContaining({ acknowledged: false, endpoints: [proxyEndpoint] })
     )
-    expect(service.getPendingReceives()).toEqual([])
+    expect(service.getPendingReceives()).toEqual([
+      expect.objectContaining({
+        proxyPrivateKey: '44'.repeat(32),
+        rejection: expect.objectContaining({ kind: 'proxy_nack' }),
+      }),
+    ])
+    expect(service.exportRecoveryState().pendingReceives).toEqual([
+      expect.objectContaining({
+        proxyPrivateKey: '44'.repeat(32),
+        rejection: expect.objectContaining({ kind: 'proxy_nack' }),
+      }),
+    ])
     expect(service.getPendingReceiveHistory()).toEqual([
       expect.objectContaining({
         status: 'rejected', txid: 'c'.repeat(64),
@@ -2033,6 +2047,7 @@ describe('RgbService', () => {
     await service.open(wallet)
     ;(service as any).state.pendingReceives = [{
       invoice: rgbInvoice(), recipientId: 'recipient', createdAt: 1,
+      proxyPrivateKey: '44'.repeat(32),
       seal: { txid: 'a'.repeat(64), vout: 0, blinding: 1n },
       pendingValidationFailure: {
         reason: 'No matching blind assignment was found',
@@ -2044,7 +2059,12 @@ describe('RgbService', () => {
     await expect(service.rejectReceive('recipient')).resolves.toEqual({ rejected: true })
 
     expect(dependencies.transport.acknowledgeConsignment).not.toHaveBeenCalled()
-    expect(service.getPendingReceives()).toEqual([])
+    expect(service.getPendingReceives()).toEqual([
+      expect.objectContaining({
+        proxyPrivateKey: '44'.repeat(32),
+        rejection: expect.objectContaining({ kind: 'local_donation_reject' }),
+      }),
+    ])
     expect(service.getPendingReceiveHistory()).toEqual([
       expect.objectContaining({
         status: 'rejected',
@@ -2091,6 +2111,50 @@ describe('RgbService', () => {
       'e'.repeat(64)
     )
     expect(dependencies.transport.acknowledgeConsignment).not.toHaveBeenCalled()
+  })
+
+  it('reopens a locally rejected donation after a later validator accepts it', async () => {
+    const dependencies = createDependencies()
+    dependencies.transport.getConsignment = vi.fn().mockResolvedValue({
+      recipientId: 'recipient', payload: 'consignment', endpoint: proxyEndpoint,
+    })
+    const service = new RgbService(dependencies)
+    await service.open(wallet)
+    ;(service as any).state.pendingReceives = [{
+      invoice: rgbInvoice(), recipientId: 'recipient', createdAt: 1,
+      proxyPrivateKey: '44'.repeat(32),
+      pendingValidationFailure: {
+        reason: 'Old validator mismatch', discoveredAt: 1,
+        endpoint: proxyEndpoint, reviewStatus: 'rejection_allowed',
+      },
+      rejection: {
+        kind: 'local_donation_reject', rejectedAt: 2,
+        reason: 'Discarded locally by you after validation failed: Old validator mismatch',
+      },
+    }]
+    ;(service as any).state.pendingReceiveHistory = [{
+      transferId: 'receive:recipient', assetId: '', amount: '', txid: '',
+      createdAt: 1, status: 'rejected', rejectionReason: 'Old validator mismatch',
+    }]
+    ;(service as any).validateIncomingConsignment = vi.fn().mockReturnValue({
+      assetId: 'rgb:AQEBAQEB-AQEBAQE-BAQEBAQ-EBAQEBA-QEBAQEB-AQEBAQE',
+      amount: '60', txid: 'c'.repeat(64),
+      decoded: { metadata: {
+        ticker: 'TOK', name: 'Token', precision: 0, schema: 'NIA', issuedSupply: '60',
+      } },
+    })
+
+    await service.processClaimedReceives({ includeClaimed: false })
+
+    expect(service.getPendingReceives()).toEqual([
+      expect.objectContaining({
+        proxyPrivateKey: '44'.repeat(32),
+        pendingAccept: expect.objectContaining({ txid: 'c'.repeat(64) }),
+      }),
+    ])
+    expect(service.getPendingReceives()[0]).not.toHaveProperty('rejection')
+    expect(service.getPendingReceives()[0]).not.toHaveProperty('pendingValidationFailure')
+    expect(service.getPendingReceiveHistory()).toEqual([])
   })
 
   it('keeps a receive pending while EVM mint finality is unavailable and retries it', async () => {
@@ -4989,7 +5053,7 @@ describe('RgbService', () => {
     expect(dependencies.broadcaster.broadcast).not.toHaveBeenCalled()
   })
 
-  it('discards a rejected receive invoice because its proxy recipient ID is single-use', async () => {
+  it('retains a rejected receive recovery tombstone while keeping its proxy recipient ID single-use', async () => {
     const dependencies = createDependencies()
     dependencies.transport.acknowledgeConsignment = vi.fn().mockResolvedValue(undefined)
     dependencies.transport.getConsignment = vi.fn().mockResolvedValue({
@@ -5004,6 +5068,7 @@ describe('RgbService', () => {
       {
         invoice: rgbInvoice(),
         recipientId: 'recipient',
+        proxyPrivateKey: '44'.repeat(32),
         assetId: 'rgb:AQEBAQEB-AQEBAQE-BAQEBAQ-EBAQEBA-QEBAQEB-AQEBAQE',
         amount: '60',
         createdAt: 1,
@@ -5026,12 +5091,17 @@ describe('RgbService', () => {
 
     await expect(service.rejectReceive('recipient')).resolves.toEqual({ rejected: true })
 
-    expect(dependencies.transport.acknowledgeConsignment).toHaveBeenCalledWith({
+    expect(dependencies.transport.acknowledgeConsignment).toHaveBeenCalledWith(expect.objectContaining({
       recipientId: 'recipient',
       endpoints: [proxyEndpoint],
       acknowledged: false,
-    })
-    expect(service.getPendingReceives()).toEqual([])
+    }))
+    expect(service.getPendingReceives()).toEqual([
+      expect.objectContaining({
+        proxyPrivateKey: '44'.repeat(32),
+        rejection: expect.objectContaining({ kind: 'proxy_nack' }),
+      }),
+    ])
     expect(service.getPendingReceiveHistory()).toEqual([
       expect.objectContaining({
         transferId: 'receive:recipient',
@@ -5041,7 +5111,7 @@ describe('RgbService', () => {
     ])
   })
 
-  it('discards an Any Amount invoice after rejecting a consignment', async () => {
+  it('retains an Any Amount invoice recovery tombstone after rejecting a consignment', async () => {
     const dependencies = createDependencies()
     dependencies.transport.acknowledgeConsignment = vi.fn().mockResolvedValue(undefined)
     dependencies.transport.getConsignment = vi.fn().mockResolvedValue({
@@ -5079,7 +5149,9 @@ describe('RgbService', () => {
     await service.processClaimedReceives({ includeClaimed: false })
     await service.rejectReceive('recipient')
 
-    expect(service.getPendingReceives()).toEqual([])
+    expect(service.getPendingReceives()).toEqual([
+      expect.objectContaining({ rejection: expect.objectContaining({ kind: 'proxy_nack' }) }),
+    ])
   })
 
   it('persists a signed transfer without broadcasting until the proxy returns an acknowledgement', async () => {
@@ -5259,6 +5331,7 @@ describe('RgbService', () => {
     await service.open(wallet)
     ;(service as any).state.pendingReceives = [{
       invoice: rgbInvoice(), recipientId: 'recipient',
+      proxyPrivateKey: '44'.repeat(32),
       assetId: 'rgb:AQEBAQEB-AQEBAQE-BAQEBAQ-EBAQEBA-QEBAQEB-AQEBAQE',
       amount: '60', createdAt: 1,
       pendingAccept: {
@@ -5269,7 +5342,12 @@ describe('RgbService', () => {
     }]
 
     await expect(service.rejectReceive('recipient')).resolves.toEqual({ rejected: true })
-    expect(service.getPendingReceives()).toEqual([])
+    expect(service.getPendingReceives()).toEqual([
+      expect.objectContaining({
+        proxyPrivateKey: '44'.repeat(32),
+        rejection: expect.objectContaining({ kind: 'local_donation_reject' }),
+      }),
+    ])
   })
 
   it('explains when a proxy rejects an invoice that was already used', async () => {

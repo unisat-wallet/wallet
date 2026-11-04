@@ -313,6 +313,16 @@ export interface RgbPendingReceive {
     reviewReason?: string
     reviewPayloadReported?: boolean
   }
+  /**
+   * Durable rejection tombstone. The receive itself remains in encrypted
+   * storage so its one-time Proxy v1 key and validation context are not lost.
+   */
+  rejection?: {
+    /** A proxy NACK is terminal; a donation reject is local and can be revalidated. */
+    kind: 'proxy_nack' | 'local_donation_reject'
+    rejectedAt: number
+    reason: string
+  }
   /** Recently rejected consignments, retained so delayed proxy responses are ignored. */
   rejectedConsignmentTxids?: string[]
   /** Local receipt retained while acknowledgement and settlement are finalized. */

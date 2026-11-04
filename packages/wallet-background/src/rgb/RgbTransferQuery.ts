@@ -72,6 +72,8 @@ export class RgbTransferQuery {
         receive.recipientId,
         receive.pendingAccept?.txid,
         receive.pendingValidationFailure?.reason,
+        receive.rejection?.kind,
+        receive.rejection?.rejectedAt,
         receive.receivedConsignment?.txid,
         receive.receivedConsignment?.accepted,
         receive.receivedConsignment?.broadcastDetectedAt,
@@ -276,6 +278,10 @@ export class RgbTransferQuery {
       precision: issue.asset.precision,
     }))
     const localReceives = service.getPendingReceives().flatMap(receive => {
+      // Rejected receives remain encrypted recovery tombstones. Their
+      // display-only history row is the public activity; never expose the
+      // retained invoice, payload, or Proxy key through the pending list.
+      if (receive.rejection) return []
       // Witness invoices created by the same account share the beneficiary
       // script recipient ID. The nonce-derived proxy recipient is the unique
       // transport/action identity for each invoice.

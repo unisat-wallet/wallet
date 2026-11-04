@@ -210,6 +210,41 @@ describe('RgbTransferQuery', () => {
     expect(result.list[0]).toMatchObject({ status: 'validation_failed', canReject: true })
   })
 
+  it('shows rejected recovery tombstones only through their non-sensitive history row', async () => {
+    const service = {
+      getPendingTransfers: vi.fn().mockReturnValue([]),
+      getPendingSendHistory: vi.fn().mockReturnValue([]),
+      getIssueHistory: vi.fn().mockReturnValue([]),
+      getPendingReceiveHistory: vi.fn().mockReturnValue([{
+        transferId: 'receive:recipient', assetId: '', amount: '', txid: 'c'.repeat(64),
+        createdAt: 2, status: 'rejected', rejectionReason: 'Rejected by you',
+      }]),
+      getPendingReceives: vi.fn().mockReturnValue([{
+        recipientId: 'recipient', createdAt: 1, invoice: 'sensitive-invoice',
+        proxyPrivateKey: '44'.repeat(32),
+        rejection: { kind: 'local_donation_reject', rejectedAt: 2, reason: 'Rejected by you' },
+      }]),
+    }
+    const context = {
+      service,
+      wallet: { walletId: 'wallet', fundingAddress: 'funding', network: 'mainnet' },
+    }
+    const query = new RgbTransferQuery({
+      getContext: vi.fn().mockResolvedValue(context as never),
+      syncReceiveHistory: vi.fn(), syncPendingTransfers: vi.fn(),
+      syncReceivedAllocations: vi.fn().mockResolvedValue(context as never),
+      getRemoteActivity: vi.fn().mockResolvedValue({ total: 0, list: [] }), warn: vi.fn(),
+    })
+
+    const result = await query.getTransfers(1, 20, { skipSync: true })
+
+    expect(result.list).toEqual([
+      expect.objectContaining({ id: 'receive:recipient', status: 'rejected' }),
+    ])
+    expect(JSON.stringify(result)).not.toContain('sensitive-invoice')
+    expect(JSON.stringify(result)).not.toContain('44444444')
+  })
+
   it('keeps a burn proof visible and confirms it from Bitcoin status', async () => {
     const txid = 'b'.repeat(64)
     const service = {
