@@ -1349,7 +1349,7 @@ describe('RgbService', () => {
     expect(dependencies.stateSource.getClaimedConsignments).not.toHaveBeenCalled()
   })
 
-  it('matches a v1 witness receive only in the newest witness bundle', async () => {
+  it('matches a v1 witness receive only through its declared terminal', async () => {
     const dependencies = createDependencies()
     const scriptPubKey = `5120${'11'.repeat(32)}`
     const oldTxid = 'a'.repeat(64)
@@ -1367,7 +1367,8 @@ describe('RgbService', () => {
       assetId: 'rgb:AQEBAQEB-AQEBAQE-BAQEBAQ-EBAQEBA-QEBAQEB-AQEBAQE',
       genesis: new Uint8Array(),
       metadata: { schema: 'NIA', ticker: 'NIA', name: 'NIA', precision: 0, issuedSupply: '100' },
-      witnessOutputScripts: [scriptPubKey], terminals: [],
+      witnessOutputScripts: [scriptPubKey],
+      terminals: [{ bundleId: 'old-bundle', secretSeals: [''] }],
       bundles: [{ id: 'old-bundle' }, { id: 'new-bundle' }],
       terminalAssignments: [oldAssignment, newAssignment],
     }
@@ -1381,14 +1382,54 @@ describe('RgbService', () => {
     const item = { recipientId: 'recipient', payload }
 
     await expect((service as any).validateIncomingConsignment(receive, item))
-      .resolves.toMatchObject({ txid: newTxid, amount: '10', opId: newAssignment.opId })
-    await expect((service as any).validateIncomingConsignment(receive, { ...item, txid: oldTxid }))
+      .resolves.toMatchObject({ txid: oldTxid, amount: '40', opId: oldAssignment.opId })
+    await expect((service as any).validateIncomingConsignment(receive, { ...item, txid: newTxid }))
       .resolves.toBeUndefined()
     vi.mocked(dependencies.validateBfaConsignment!).mockResolvedValueOnce({
-      ...validated, terminalAssignments: [oldAssignment],
+      ...validated, terminals: [], terminalAssignments: [oldAssignment],
     } as any)
     await expect((service as any).validateIncomingConsignment(receive, item))
       .resolves.toBeUndefined()
+  })
+
+  it('refuses a v1 witness receive with multiple terminal destinations', async () => {
+    const dependencies = createDependencies()
+    const scriptPubKey = `5120${'11'.repeat(32)}`
+    const assignment = (bundleId: string, txid: string, vout: number, secretSeal: string) => ({
+      opId: txid, assignmentIndex: 0, amount: '10', bundleId, txid, vout, secretSeal,
+      output: { scriptPubKey, satoshis: 330 },
+    })
+    dependencies.validateBfaConsignment = vi.fn().mockResolvedValue({
+      assetId: 'rgb:AQEBAQEB-AQEBAQE-BAQEBAQ-EBAQEBA-QEBAQEB-AQEBAQE',
+      genesis: new Uint8Array(),
+      metadata: { schema: 'NIA', ticker: 'NIA', name: 'NIA', precision: 0, issuedSupply: '100' },
+      witnessOutputScripts: [scriptPubKey],
+      terminals: [
+        { bundleId: 'bundle-a', secretSeals: ['seal-a'] },
+        { bundleId: 'bundle-b', secretSeals: ['seal-b'] },
+      ],
+      bundles: [{ id: 'bundle-a' }, { id: 'bundle-b' }],
+      terminalAssignments: [
+        assignment('bundle-a', 'a'.repeat(64), 0, 'seal-a'),
+        assignment('bundle-b', 'b'.repeat(64), 1, 'seal-b'),
+      ],
+    } as any)
+    const service = new RgbService(dependencies)
+    await service.open(wallet)
+    const reasons: string[] = []
+    const result = await (service as any).validateIncomingConsignment(
+      { recipientType: 'witness', witnessScriptPubKey: scriptPubKey },
+      {
+        recipientId: 'recipient',
+        payload: Buffer.from(Uint8Array.from([
+          1, 1, 0, 0, 0, 0, ...Buffer.from(NIA_V1_SCHEMA_ID, 'hex'),
+        ])).toString('base64'),
+      },
+      (reason: string) => reasons.push(reason)
+    )
+
+    expect(result).toBeUndefined()
+    expect(reasons).toEqual(['ambiguous_recipient_assignment'])
   })
 
   it('prefers the Proxy v1-derived witness blinding and accepts a legacy fallback', async () => {
@@ -1408,7 +1449,8 @@ describe('RgbService', () => {
       assetId: 'rgb:AQEBAQEB-AQEBAQE-BAQEBAQ-EBAQEBA-QEBAQEB-AQEBAQE',
       genesis: new Uint8Array(),
       metadata: { schema: 'NIA', ticker: 'NIA', name: 'NIA', precision: 0, issuedSupply: '100' },
-      witnessOutputScripts: [scriptPubKey], terminals: [],
+      witnessOutputScripts: [scriptPubKey],
+      terminals: [{ bundleId: 'new-bundle', secretSeals: [''] }],
       bundles: [{ id: 'new-bundle' }], terminalAssignments: [legacy, compliant],
     } as any)
     const service = new RgbService(dependencies)

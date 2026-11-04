@@ -2019,30 +2019,45 @@ export class RgbService {
       receive.proxyPrivateKey && item.proxySenderPublicKey
       ? deriveProxyV1SealBlinding(receive.proxyPrivateKey, item.proxySenderPublicKey)
       : undefined
+    const isDeclaredTerminal = (assignment: (typeof bfa.terminalAssignments)[number]) =>
+      bfa.terminals.some(terminal =>
+        terminal.bundleId === assignment.bundleId &&
+        terminal.secretSeals.includes(assignment.secretSeal)
+      )
     const matchesRecipient = (assignment: (typeof bfa.terminalAssignments)[number]) => {
       if (expectedTxid && assignment.txid !== expectedTxid) return false
       if (receive.recipientType === 'witness') {
-        if (!latestBundleId || assignment.bundleId !== latestBundleId) return false
+        // Native v1 consignments must explicitly declare the payment terminal.
+        // The constrained NIA v0 migration format had no witness terminals, so
+        // keep its existing newest-bundle rule until those records are gone.
+        if (v1 ? !isDeclaredTerminal(assignment) : assignment.bundleId !== latestBundleId)
+          return false
         return assignment.output?.scriptPubKey.toLowerCase() === receive.witnessScriptPubKey?.toLowerCase()
       }
-      return assignment.secretSeal === secret && bfa.terminals.some(terminal =>
-        terminal.bundleId === assignment.bundleId && terminal.secretSeals.includes(secret!))
+      return assignment.secretSeal === secret && isDeclaredTerminal(assignment)
     }
-    let candidate = bfa.terminalAssignments.find(assignment =>
+    let candidates = bfa.terminalAssignments.filter(assignment =>
       matchesRecipient(assignment) &&
       (expectedWitnessBlinding === undefined || assignment.blinding === expectedWitnessBlinding)
     )
     // Transfers created by older UniSat versions used a random witness
     // blinding. Keep them recoverable, while preferring the Proxy v1-derived
     // match for all newly compliant transfers.
-    if (!candidate && expectedWitnessBlinding !== undefined) {
-      candidate = bfa.terminalAssignments.find(matchesRecipient)
+    if (!candidates.length && expectedWitnessBlinding !== undefined) {
+      candidates = bfa.terminalAssignments.filter(matchesRecipient)
     }
-    if (!candidate) return mismatch(
+    if (!candidates.length) return mismatch(
       v1 ? 'v1_recipient_assignment' :
         receive.recipientType === 'witness' ? 'nia_witness_assignment' : 'nia_blind_assignment',
-      { assetId, terminalAssignmentCount: bfa.terminalAssignments.length, latestBundleId }
+      { assetId, terminalAssignmentCount: bfa.terminalAssignments.length }
     )
+    const destinations = new Set(candidates.map(assignment =>
+      `${assignment.bundleId}:${assignment.txid}:${assignment.vout}`
+    ))
+    if (destinations.size !== 1) return mismatch('ambiguous_recipient_assignment', {
+      assetId, destinationCount: destinations.size,
+    })
+    const candidate = candidates[0]!
     if (receive.amount && receive.amount !== candidate.amount)
       return mismatch(v1 ? 'amount' : 'asset_or_amount', { actualAmount: candidate.amount })
     const output = candidate.output
