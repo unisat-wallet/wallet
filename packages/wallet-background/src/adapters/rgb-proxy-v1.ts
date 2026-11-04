@@ -4,6 +4,7 @@ import { hkdf } from '@noble/hashes/hkdf'
 import { sha256 } from '@noble/hashes/sha256'
 
 const encoder = new TextEncoder()
+export const RGB_PROXY_MAX_POW_DIFFICULTY = 28
 
 function bytes(value: string) {
   return encoder.encode(value)
@@ -119,11 +120,15 @@ export async function proxyV1DecryptSignedTx(encrypted: string, recipientPrivate
 }
 
 export async function proxyV1Pow(transferId: string, difficulty: number, timestamp: string) {
-  if (!Number.isInteger(difficulty) || difficulty < 0 || difficulty > 24) {
+  if (
+    !Number.isInteger(difficulty) ||
+    difficulty < 0 ||
+    difficulty > RGB_PROXY_MAX_POW_DIFFICULTY
+  ) {
     throw new Error('RGB proxy proof-of-work difficulty is invalid')
   }
   if (difficulty === 0) return '0'
-  for (let nonce = 0; nonce < 1 << 28; nonce++) {
+  for (let nonce = 0; nonce < Number.MAX_SAFE_INTEGER; nonce++) {
     const value = sha256(bytes(transferId + timestamp + String(nonce)))
     let zeroBits = 0
     for (const byte of value) {

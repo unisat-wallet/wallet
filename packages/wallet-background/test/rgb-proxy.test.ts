@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { RgbProxyOperationNotFoundError } from '@unisat/rgb-service'
 
 import { createRgbProxyTransport } from '../src/adapters/rgb-proxy'
-import { proxyV1DecryptBlob, proxyV1EncryptBlob, proxyV1Hash, proxyV1HashText, proxyV1PublicKey, proxyV1Sign, proxyV1TransferId, proxyV1Verify } from '../src/adapters/rgb-proxy-v1'
+import { proxyV1DecryptBlob, proxyV1EncryptBlob, proxyV1Hash, proxyV1HashText, proxyV1Pow, proxyV1PublicKey, proxyV1Sign, proxyV1TransferId, proxyV1Verify, RGB_PROXY_MAX_POW_DIFFICULTY } from '../src/adapters/rgb-proxy-v1'
 
 const endpoint = 'rpcs://proxy.example'
 const recipientId = 'bc:utxob:recipient'
@@ -364,6 +364,12 @@ describe('RGB proxy transport', () => {
     const transferId = proxyV1TransferId(invoiceId, proxyV1PublicKey(senderPrivateKey))
     expect(proxyV1HashText(transferId + attempts[1]!.timestamp + attempts[1]!.nonce))
       .toMatch(/^00/)
+  })
+
+  it('uses the rgb-lib-bfa proxy proof-of-work safety limit', async () => {
+    expect(RGB_PROXY_MAX_POW_DIFFICULTY).toBe(28)
+    await expect(proxyV1Pow('transfer', 29, 'timestamp'))
+      .rejects.toThrow('difficulty is invalid')
   })
 
   it.each([

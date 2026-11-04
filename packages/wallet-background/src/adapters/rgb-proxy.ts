@@ -13,6 +13,7 @@ import {
   proxyV1EncryptSignedTx,
   proxyV1Hash,
   proxyV1Pow,
+  RGB_PROXY_MAX_POW_DIFFICULTY,
   proxyV1PublicKey,
   proxyV1Sign,
   proxyV1TransferId,
@@ -427,7 +428,12 @@ async function postProxyV1Consignment(
     const body = await readRpcResponse<boolean>(response)
     if (!body.error) return
     const required = body.error.code === -114 ? Number(body.error.data?.['pow_difficulty']) : NaN
-    if (Number.isInteger(required) && required >= 0 && required <= 24 && attempt < 2) {
+    if (
+      Number.isInteger(required) &&
+      required >= 0 &&
+      required <= RGB_PROXY_MAX_POW_DIFFICULTY &&
+      attempt < 2
+    ) {
       difficulty = required
       continue
     }
