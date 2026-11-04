@@ -369,8 +369,12 @@ describe('RgbService', () => {
     await service.sync()
     ;(service as any).state.snapshot.utxos[0].allocations[0].amount = '100'
     await expect(service.prepareBurn({ assetId, amount: '60', feeRate: 1 })).rejects.toThrow('requires an EVM address')
-    await service.prepareBurn({ assetId, amount: '60', feeRate: 1, burnReason, burnDestination })
+    await service.prepareBurn(
+      { assetId, amount: '60', feeRate: 1, burnReason, burnDestination },
+      { providerOrigin: 'https://dapp.example' }
+    )
     expect(service.getPendingTransfers()[0]?.request.burnReason).toBe(expectedReason)
+    expect(service.getPendingTransfers()[0]?.providerOrigin).toBe('https://dapp.example')
     await service.completeSend('burn-1', 'signed-psbt')
 
     expect(dependencies.transport.publishConsignment).not.toHaveBeenCalled()
@@ -389,6 +393,11 @@ describe('RgbService', () => {
       allocations: [expect.objectContaining({ assetId, amount: '40', settled: false })],
     }))
     expect(Buffer.from(service.exportBurnConsignment(txid))).toEqual(proof)
+    expect(Buffer.from(service.exportBurnConsignment(txid, assetId))).toEqual(proof)
+    expect(() => service.exportBurnConsignment(
+      txid,
+      'rgb:AgICAgIC-AgICAgI-CAgICAg-ICAgICA-gICAgIC-AgICAgI'
+    )).toThrow('does not match the requested asset')
     const reopened = new RgbService(dependencies)
     await reopened.open(wallet)
     expect(reopened.getPendingUtxoSync()?.txid).toBe(txid)

@@ -3,7 +3,8 @@ import { announceWebRgbProvider, WebRgbProvider } from './webRgb';
 import { describe, expect, it, vi } from 'vitest';
 
 const methods = ['enable', 'getInfo', 'getAddress', 'blindReceive', 'witnessReceive', 'listAssets',
-  'getAssetBalance', 'sendAsset', 'listTransfers', 'getTransferStatus', 'decodeRgbInvoice', 'on', 'off'];
+  'getAssetBalance', 'sendAsset', 'burnAsset', 'getConsignment', 'listTransfers',
+  'getTransferStatus', 'decodeRgbInvoice', 'on', 'off'];
 
 function createProvider(overrides: Record<string, any> = {}) {
   const rpc = vi.fn(async (method: string, params?: Record<string, unknown>) => {
@@ -14,7 +15,10 @@ function createProvider(overrides: Record<string, any> = {}) {
     switch (method) {
       case 'webRgbEnable': return undefined;
       case 'getAccounts': return ['bc1qtest'];
-      case 'webRgbGetInfo': return { ready: true, network: 'T0', protocol: 'RGB_L1', methods };
+      case 'webRgbGetInfo': return {
+        ready: true, network: 'T0', protocol: 'RGB_L1', methods,
+        burnRecipientNamespaces: ['eip155', 'tron']
+      };
       case 'webRgbGetAssetBalance': return { assetId: params?.assetId, balance: 20, raw: {} };
       default: throw new Error(`Unexpected method: ${method}`);
     }
@@ -34,7 +38,9 @@ describe('WebRGB provider', () => {
     expect(rpc).not.toHaveBeenCalled();
     await provider.enable();
     expect(provider.enabled).toBe(true);
-    expect((await provider.getInfo()).methods).toContain('sendAsset');
+    const info = await provider.getInfo();
+    expect(info.methods).toEqual(expect.arrayContaining(['sendAsset', 'burnAsset', 'getConsignment']));
+    expect(info.burnRecipientNamespaces).toEqual(['eip155', 'tron']);
   });
 
   it('maps numeric wallet RPC codes to stable WebRGB codes', async () => {
@@ -151,6 +157,68 @@ describe('WebRGB provider', () => {
     await provider.enable();
     await expect(provider.sendAsset({ invoice: 'rgb:invoice' })).rejects.toMatchObject({ code: 'INTERNAL_ERROR' });
     expect(rpc).not.toHaveBeenCalledWith('webRgbReleasePreparedPayment', expect.anything());
+  });
+
+  it('burns a BFA with a decimal-string amount and returns the effective confirmation target', async () => {
+    const { provider, rpc } = createProvider({
+      webRgbPrepareBurn: { id: 'burn-1', minConfirmations: 3 },
+      signRgbPayment: { txid: 'ab'.repeat(32) }
+    });
+    await provider.enable();
+
+    await expect(provider.burnAsset({
+      network: 'T0',
+      assetId: 'rgb:bfa',
+      amount: '18446744073709551615',
+      burnRecipient: { chainId: 'eip155:42161', address: `0x${'11'.repeat(20)}` },
+      minConfirmations: 1
+    })).resolves.toMatchObject({
+      transferId: 'burn-1',
+      txid: 'ab'.repeat(32),
+      amount: '18446744073709551615',
+      status: 'WaitingConfirmations',
+      minConfirmations: 3
+    });
+    expect(rpc).toHaveBeenCalledWith('webRgbPrepareBurn', expect.objectContaining({
+      amount: '18446744073709551615',
+      burnRecipient: { chainId: 'eip155:42161', address: `0x${'11'.repeat(20)}` }
+    }));
+  });
+
+  it('rejects an out-of-range burn before reserving funds', async () => {
+    const { provider, rpc } = createProvider();
+    await provider.enable();
+    await expect(provider.burnAsset({
+      network: 'T0', assetId: 'rgb:bfa', amount: '18446744073709551616',
+      burnRecipient: { chainId: 'eip155:42161', address: `0x${'11'.repeat(20)}` }
+    })).rejects.toMatchObject({ code: 'INVALID_PARAMS' });
+    expect(rpc).not.toHaveBeenCalledWith('webRgbPrepareBurn', expect.anything());
+  });
+
+  it('releases an unsigned burn reservation when signing is rejected', async () => {
+    const { provider, rpc } = createProvider({
+      webRgbPrepareBurn: { id: 'burn-1', minConfirmations: 3 },
+      signRgbPayment: () => { throw Object.assign(new Error('User rejected'), { code: 4001 }); },
+      webRgbReleasePreparedPayment: { changed: true }
+    });
+    await provider.enable();
+    await expect(provider.burnAsset({
+      network: 'T0', assetId: 'rgb:bfa', amount: '1',
+      burnRecipient: { chainId: 'tron:728126428', address: 'TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t' }
+    })).rejects.toMatchObject({ code: 'USER_REJECTED' });
+    expect(rpc).toHaveBeenCalledWith('webRgbReleasePreparedPayment', { transferId: 'burn-1' });
+  });
+
+  it('exports a burn consignment by asset and transaction ID', async () => {
+    const txid = 'cd'.repeat(32);
+    const proof = {
+      assetId: 'rgb:bfa', txid, encoding: 'base64', data: 'UkdCAFRGUg==', byteLength: 7,
+      digest: { algorithm: 'keccak256', value: `0x${'12'.repeat(32)}` }
+    };
+    const { provider, rpc } = createProvider({ webRgbGetConsignment: proof });
+    await provider.enable();
+    await expect(provider.getConsignment({ assetId: 'rgb:bfa', txid: txid.toUpperCase() })).resolves.toEqual(proof);
+    expect(rpc).toHaveBeenCalledWith('webRgbGetConsignment', { assetId: 'rgb:bfa', txid });
   });
 
   it('announces the same provider on load and discovery requests', () => {

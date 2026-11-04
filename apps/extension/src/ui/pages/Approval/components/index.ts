@@ -10,6 +10,8 @@ export { default as SwitchNetwork } from './SwitchNetwork';
 export { default as RgbProxy } from './RgbProxy';
 export {
   RgbPayment,
+  RgbBurn,
+  RgbConsignment,
   RgbPaymentCancel,
   RgbIssue,
   RgbReceive,

@@ -1,6 +1,11 @@
 import { bitcoin, scriptPkToAddress, toPsbtNetwork, verifyMessageOfBIP322Simple, verifyMessageOfECDSA } from '@unisat/wallet-bitcoin'
 import { assertValidFeeRate } from '@unisat/base-utils'
-import { decodeRgbInvoice as decodeLocalRgbInvoice } from '@unisat/rgb-service'
+import {
+  createBfaBurnDestinationV1,
+  decodeRgbInvoice as decodeLocalRgbInvoice,
+} from '@unisat/rgb-service'
+import type { BfaBurnDestinationV1 } from '@unisat/rgb-service'
+import { keccak_256 } from '@noble/hashes/sha3'
 import {
   RequestMethodDeriveContextHashParams,
   RequestMethodGetInscriptionsParams,
@@ -114,6 +119,83 @@ function webRgbSafeNumber(value: string | number | undefined, name: string): num
   const parsed = Number(value ?? 0)
   if (!Number.isSafeInteger(parsed) || parsed < 0) webRgbInvalid(`${name} exceeds the WebRGB number range`)
   return parsed
+}
+
+type WebRgbBurnRecipient = { chainId: string; address: string }
+type WebRgbBurnParams = {
+  network: string
+  assetId: string
+  amount: string
+  burnRecipient: WebRgbBurnRecipient
+  feeRate?: number
+  minConfirmations?: number
+  burnDestination?: BfaBurnDestinationV1
+}
+
+const WEB_RGB_MAX_U64 = (1n << 64n) - 1n
+
+function parseWebRgbBurnDestination(recipient: WebRgbBurnRecipient): BfaBurnDestinationV1 {
+  if (!recipient || typeof recipient !== 'object' || Array.isArray(recipient))
+    webRgbInvalid('burnRecipient is required')
+  if (typeof recipient.chainId !== 'string' || typeof recipient.address !== 'string' || !recipient.address.trim())
+    webRgbInvalid('burnRecipient.chainId and burnRecipient.address are required')
+  const match = /^(eip155|tron):([1-9][0-9]*)$/.exec(recipient.chainId)
+  if (!match) webRgbInvalid('burnRecipient.chainId must be a supported CAIP-2 chain ID')
+  const destinationChainId = Number(match[2])
+  if (!Number.isSafeInteger(destinationChainId)) webRgbInvalid('burnRecipient.chainId is out of range')
+  if ((match[1] === 'tron') !== (destinationChainId === 728126428))
+    webRgbInvalid('burnRecipient namespace does not match its destination chain')
+  try {
+    return createBfaBurnDestinationV1(destinationChainId, recipient.address)
+  } catch (error) {
+    webRgbInvalid(error instanceof Error ? error.message : String(error))
+  }
+}
+
+async function validateWebRgbBurnRequest(req: { data: { params: WebRgbBurnParams } }) {
+  validateRgbProviderFeeRate(req)
+  const params = req.data.params
+  if (!params || typeof params !== 'object' || Array.isArray(params)) webRgbInvalid('burnAsset arguments are required')
+  if (typeof params.network !== 'string' || !params.network) webRgbInvalid('network is required')
+  if (typeof params.assetId !== 'string' || !params.assetId) webRgbInvalid('assetId is required')
+  if (typeof params.amount !== 'string' || !/^[1-9][0-9]*$/.test(params.amount) || BigInt(params.amount) > WEB_RGB_MAX_U64)
+    webRgbInvalid('amount must be a positive u64 decimal string')
+  if (params.minConfirmations !== undefined &&
+      (!Number.isSafeInteger(params.minConfirmations) || params.minConfirmations < 0))
+    webRgbInvalid('minConfirmations must be a nonnegative integer')
+  const current = await wallet.getCurrentRgbWalletRef()
+  if (params.network !== current.network) webRgbInvalid('network does not match the current RGB wallet')
+  params.burnDestination = parseWebRgbBurnDestination(params.burnRecipient)
+  params.minConfirmations = Math.max(3, params.minConfirmations || 0)
+}
+
+async function getWebRgbBurnConsignment(assetId: string, txid: string) {
+  const data = await wallet.exportRgbBurnConsignment(txid, assetId)
+  const bytes = Buffer.from(data, 'base64')
+  return {
+    assetId,
+    txid,
+    encoding: 'base64' as const,
+    data,
+    byteLength: bytes.byteLength,
+    digest: {
+      algorithm: 'keccak256' as const,
+      value: `0x${Buffer.from(keccak_256(bytes)).toString('hex')}`,
+    },
+  }
+}
+
+async function prepareWebRgbConsignmentApproval(req: {
+  data: { params: { assetId?: string; txid?: string; proof?: unknown } }
+}) {
+  const params = req.data.params
+  delete params.proof
+  if (typeof params?.assetId !== 'string' || !params.assetId) webRgbInvalid('assetId is required')
+  if (typeof params.txid !== 'string' || !/^[0-9a-f]{64}$/i.test(params.txid))
+    webRgbInvalid('txid must be 64 hexadecimal characters')
+  const proof = await getWebRgbBurnConsignment(params.assetId, params.txid.toLowerCase())
+  params.txid = proof.txid
+  params.proof = { byteLength: proof.byteLength, digest: proof.digest.value }
 }
 
 function assertReadonlyMessageSignature(
@@ -854,9 +936,10 @@ class ProviderController extends BaseController {
       protocol: ready ? 'RGB_L1' : null,
       methods: ready
         ? ['enable', 'getInfo', 'getAddress', 'blindReceive', 'witnessReceive', 'listAssets',
-          'getAssetBalance', 'sendAsset', 'listTransfers', 'getTransferStatus',
+          'getAssetBalance', 'sendAsset', 'burnAsset', 'getConsignment', 'listTransfers', 'getTransferStatus',
           'decodeRgbInvoice', 'on', 'off']
         : ['enable', 'getInfo'],
+      ...(ready ? { burnRecipientNamespaces: ['eip155', 'tron'] } : {}),
     }
   }
 
@@ -911,6 +994,38 @@ class ProviderController extends BaseController {
     return transfer
       ? { found: true, status: transfer.status || null, transfer }
       : { found: false, status: null, transfer: null }
+  }
+
+  @Reflect.metadata('APPROVAL', ['RgbBurn', validateWebRgbBurnRequest])
+  webRgbPrepareBurn = async ({
+    data: { params },
+    session: { origin },
+  }: {
+    data: { params: WebRgbBurnParams }
+    session: { origin: string }
+  }) => {
+    await validateWebRgbBurnRequest({ data: { params } })
+    const prepared = await wallet.createRgbSendBegin({
+      invoice: '',
+      assetId: params.assetId,
+      amount: params.amount,
+      burn: true,
+      burnDestination: params.burnDestination,
+      minConfirmations: params.minConfirmations,
+      ...(params.feeRate === undefined ? {} : { feeRate: params.feeRate }),
+      providerOrigin: origin,
+    })
+    return { ...prepared, minConfirmations: params.minConfirmations }
+  }
+
+  @Reflect.metadata('APPROVAL', ['RgbConsignment', prepareWebRgbConsignmentApproval])
+  webRgbGetConsignment = async ({ data: { params } }: {
+    data: { params: { assetId: string; txid: string; proof?: unknown } }
+  }) => {
+    if (typeof params?.assetId !== 'string' || !params.assetId) webRgbInvalid('assetId is required')
+    if (typeof params.txid !== 'string' || !/^[0-9a-f]{64}$/i.test(params.txid))
+      webRgbInvalid('txid must be 64 hexadecimal characters')
+    return getWebRgbBurnConsignment(params.assetId, params.txid.toLowerCase())
   }
 
   @Reflect.metadata('SAFE', true)

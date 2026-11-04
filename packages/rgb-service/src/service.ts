@@ -3068,7 +3068,7 @@ export class RgbService {
   }
 
   /** Exact RGB\0TFR file bytes, retained after a BFA burn has been broadcast. */
-  exportBurnConsignment(txid: string): Uint8Array {
+  exportBurnConsignment(txid: string, expectedAssetId?: string): Uint8Array {
     const state = this.requireState()
     const proof = state.burnProofs?.[txid]
     const pending = Object.values(state.pending).find(item =>
@@ -3077,6 +3077,10 @@ export class RgbService {
     const payload = proof?.payload || pending?.delivery?.completed.consignments[0]?.payload ||
       pending?.broadcast?.completed.consignments[0]?.payload
     if (!payload) throw new RgbServiceError('BFA burn consignment is unavailable')
+    const assetId = proof?.assetId || pending?.request.assetId
+    if (expectedAssetId && assetId !== normalizeAssetId(expectedAssetId)) {
+      throw new RgbServiceError('BFA burn consignment does not match the requested asset')
+    }
     return Uint8Array.from(Buffer.from(payload, 'base64'))
   }
 
@@ -3196,8 +3200,11 @@ export class RgbService {
   }
 
   /** Prepare a BFA burn using the same local allocation reservation as a send. */
-  async prepareBurn(request: Omit<RgbTransferRequest, 'invoice' | 'burn'> & { amount: string }) {
-    return this.prepareSend({ ...request, invoice: '', burn: true })
+  async prepareBurn(
+    request: Omit<RgbTransferRequest, 'invoice' | 'burn'> & { amount: string },
+    options: { providerOrigin?: string } = {}
+  ) {
+    return this.prepareSend({ ...request, invoice: '', burn: true }, options)
   }
 
   private requireBurnEncoder(): NonNullable<RgbServiceDependencies['encoder']['prepareBurn']> {

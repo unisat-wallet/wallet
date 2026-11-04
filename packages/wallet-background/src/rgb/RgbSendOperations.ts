@@ -88,15 +88,21 @@ export class RgbSendOperations {
           : { minConfirmations: params.minConfirmations }),
         ...(params.swapPsbt === undefined ? {} : { swapPsbt: params.swapPsbt }),
       }
+    const burnRequest = {
+      assetId: params.assetId,
+      amount: String(params.amount || ''),
+      feeRate: validatedFeeRate,
+      ...(params.precision === undefined ? {} : { precision: params.precision }),
+      ...(params.burnReason === undefined ? {} : { burnReason: params.burnReason }),
+      ...(burnDestination === undefined ? {} : { burnDestination }),
+      ...(params.minConfirmations === undefined
+        ? {}
+        : { minConfirmations: params.minConfirmations }),
+    }
     const prepared = params.burn
-      ? await service.prepareBurn({
-          assetId: params.assetId,
-          amount: String(params.amount || ''),
-          feeRate: validatedFeeRate,
-          ...(params.precision === undefined ? {} : { precision: params.precision }),
-          ...(params.burnReason === undefined ? {} : { burnReason: params.burnReason }),
-          ...(burnDestination === undefined ? {} : { burnDestination }),
-        })
+      ? params.providerOrigin === undefined
+        ? await service.prepareBurn(burnRequest)
+        : await service.prepareBurn(burnRequest, { providerOrigin: params.providerOrigin })
       : await service.prepareSend(
           sendRequest,
           params.providerOrigin === undefined ? {} : { providerOrigin: params.providerOrigin }

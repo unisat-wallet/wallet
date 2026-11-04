@@ -3902,10 +3902,10 @@ export class WalletController extends BaseController {
   }
 
   /** Export the exact terminal-free RGB Transfer file proving a BFA burn. */
-  exportRgbBurnConsignment = async (txid: string): Promise<string> => {
+  exportRgbBurnConsignment = async (txid: string, assetId?: string): Promise<string> => {
     await this.assertRgbEnabled()
     const { service } = await this.getLocalRgbReadService()
-    return Buffer.from(service.exportBurnConsignment(txid)).toString('base64')
+    return Buffer.from(service.exportBurnConsignment(txid, assetId)).toString('base64')
   }
 
   exportRgbBurnDestination = async (txid: string) => {
@@ -5639,7 +5639,7 @@ export class WalletController extends BaseController {
       psbt: signingPsbt.toHex(),
       toSignInputs,
       action: {
-        name: 'Send RGB',
+        name: pending.request?.burn ? 'Burn RGB' : 'Send RGB',
         description: '',
         type: PsbtActionType.CUSTOM,
       },

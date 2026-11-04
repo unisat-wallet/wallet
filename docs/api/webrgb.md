@@ -7,7 +7,7 @@ It is separate from UniSat's native API:
 
 | Provider            | Purpose                                               | Amount representation             |
 | ------------------- | ----------------------------------------------------- | --------------------------------- |
-| `window.rgb`        | WebRGB v1 interoperability                            | Positive JavaScript safe integers |
+| `window.rgb`        | WebRGB v1 interoperability                            | Safe integers; burn uses a u64 string |
 | `window.unisat.rgb` | UniSat-specific issuance, payments, and RGB/BTC swaps | Unsigned decimal strings          |
 
 For the native API, see [Native RGB API](./rgb.md). Methods from the two
@@ -73,6 +73,7 @@ type RgbInfo = {
   network: string
   protocol: 'RGB_L1' | null
   methods: string[]
+  burnRecipientNamespaces?: string[]
 }
 ```
 
@@ -95,6 +96,8 @@ On an RGB-enabled L1 wallet, `getInfo().methods` contains:
 | `listAssets`        |              No | Return all locally known RGB assets.                                        |
 | `getAssetBalance`   |              No | Return one asset balance.                                                   |
 | `sendAsset`         |             Yes | Prepare, sign, deliver, ACK, and broadcast an RGB payment.                  |
+| `burnAsset`         |             Yes | Burn a BFA asset to an approved bridge destination.                        |
+| `getConsignment`    |             Yes | Share a saved BFA burn proof with the requesting site.                     |
 | `listTransfers`     |              No | Return local send/receive history.                                          |
 | `getTransferStatus` |              No | Find one transfer by wallet ID, recipient ID, or txid.                      |
 | `decodeRgbInvoice`  |              No | Decode an invoice without moving funds.                                     |
@@ -107,8 +110,6 @@ The following WebRGB methods are present on the JavaScript object for
 compatibility but are not advertised and reject with `METHOD_NOT_SUPPORTED`:
 
 - `issueAsset`
-- `burnAsset`
-- `getConsignment`
 - `signMessage`
 - `makeLnInvoice`
 - `payLnInvoice`
@@ -120,7 +121,7 @@ payment that WebRGB's arguments cannot represent.
 
 ## Amount rules
 
-WebRGB fungible amounts are JavaScript `number` values and must be safe
+Most WebRGB fungible amounts are JavaScript `number` values and must be safe
 integers:
 
 ```ts
@@ -131,6 +132,10 @@ They are atomic/base units; apply the asset's `precision` only for display.
 UniSat rejects values above `Number.MAX_SAFE_INTEGER` rather than rounding
 them. This differs from the native API, which accepts decimal strings and can
 represent the full protocol range.
+
+`burnAsset.amount` is the intentional exception: it is a positive decimal
+`string` up to `18446744073709551615` (`u64::MAX`). This lets a dApp burn the
+full protocol range without JavaScript number rounding.
 
 `feeRate`, `durationSeconds`, and `minConfirmations` are also numeric. Do not
 pass decimal strings to WebRGB methods unless a future advertised capability
@@ -304,6 +309,52 @@ The result includes normalized tracking fields:
 
 Persist `transferId`. A send can return before settlement when it is waiting
 for the receiver ACK or Bitcoin confirmations.
+
+## Burn and proof export
+
+### `burnAsset(args)`
+
+`burnAsset` is available only for BFA assets. It validates the expected RGB
+network, CAIP-2 destination chain and native recipient address before opening
+the confirmation flow:
+
+```ts
+const burn = await rgb.burnAsset({
+  network: info.network,
+  assetId: 'rgb:...',
+  amount: '1000000000000000000',
+  burnRecipient: {
+    chainId: 'eip155:42161',
+    address: '0x...',
+  },
+  feeRate: 2,
+  minConfirmations: 3,
+})
+```
+
+Use `getInfo().burnRecipientNamespaces` to feature-detect destination address
+families. UniSat currently returns `['eip155', 'tron']`; the concrete chain
+must also be one of the wallet's configured BFA bridge routes. A signing
+rejection releases the unsigned RGB allocation reservation.
+
+### `getConsignment({ assetId, txid })`
+
+This method exports the exact saved transfer consignment for a completed BFA
+burn. It does not export arbitrary transfers and never performs another burn.
+UniSat confirms sharing with the user and verifies that `assetId` and `txid`
+identify the same saved proof.
+
+```ts
+const proof = await rgb.getConsignment({ assetId: burn.assetId, txid: burn.txid })
+
+// {
+//   assetId, txid,
+//   encoding: 'base64',
+//   data,
+//   byteLength,
+//   digest: { algorithm: 'keccak256', value: '0x...' },
+// }
+```
 
 ## Transfers
 

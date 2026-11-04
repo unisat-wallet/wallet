@@ -63,6 +63,15 @@ export type ProviderMethodList = {
   webRgbGetAssetBalance: { assetId: string }
   webRgbListTransfers: { assetId?: string }
   webRgbGetTransferStatus: { transferId: string; assetId?: string }
+  webRgbPrepareBurn: {
+    network: string
+    assetId: string
+    amount: string
+    burnRecipient: { chainId: string; address: string }
+    feeRate?: number
+    minConfirmations?: number
+  }
+  webRgbGetConsignment: { assetId: string; txid: string }
   webRgbDecodeInvoice: { invoice: string }
   webRgbBuildInvoice: {
     assetId: string

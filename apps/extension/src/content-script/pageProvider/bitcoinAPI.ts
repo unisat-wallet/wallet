@@ -301,7 +301,7 @@ export class BitcoinAPIMethods {
     return this.provider[requestMethodKey]({ method: 'rejectRgbReceive', params: { recipientId } });
   };
 
-  prepareRgbPayment = async (params: { invoice: string; assetId: string; amount?: string; feeRate?: number }) => {
+  prepareRgbPayment = async (params: { invoice: string; assetId: string; amount?: string | number; feeRate?: number }) => {
     return this.provider[requestMethodKey]({ method: 'prepareRgbPayment', params });
   };
 

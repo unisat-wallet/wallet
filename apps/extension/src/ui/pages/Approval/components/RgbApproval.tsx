@@ -51,6 +51,16 @@ interface Props {
       rgbProxyApproval?: {
         endpoints: string[];
       };
+      network?: string;
+      burnRecipient?: {
+        chainId: string;
+        address: string;
+      };
+      proof?: {
+        byteLength: number;
+        digest: string;
+      };
+      txid?: string;
     };
     session: {
       origin: string;
@@ -444,7 +454,19 @@ export function RgbPayment({ params: { data, session } }: Props) {
   return <RgbPaymentApproval data={data} session={session} />;
 }
 
-function RgbPaymentApproval({ data, session }: { data: Props['params']['data']; session: Props['params']['session'] }) {
+export function RgbBurn({ params: { data, session } }: Props) {
+  return <RgbPaymentApproval data={data} session={session} burn />;
+}
+
+function RgbPaymentApproval({
+  data,
+  session,
+  burn = false
+}: {
+  data: Props['params']['data'];
+  session: Props['params']['session'];
+  burn?: boolean;
+}) {
   const wallet = useWallet();
   const { t } = useI18n();
   const { resolveApproval, rejectApproval } = useApproval();
@@ -570,8 +592,8 @@ function RgbPaymentApproval({ data, session }: { data: Props['params']['data']; 
       </Header>
       <Content>
         <Column mt="lg" gap="md">
-          <Text text={t('rgb_approval_prepare_payment_title')} preset="title-bold" textCenter />
-          <Text text={t('rgb_approval_prepare_payment_description')} preset="sub" textCenter />
+          <Text text={t(burn ? 'rgb_approval_burn_title' : 'rgb_approval_prepare_payment_title')} preset="title-bold" textCenter />
+          <Text text={t(burn ? 'rgb_approval_burn_description' : 'rgb_approval_prepare_payment_description')} preset="sub" textCenter />
 
           <Card style={{ display: 'block' }}>
             <Column gap="md" fullX>
@@ -585,7 +607,7 @@ function RgbPaymentApproval({ data, session }: { data: Props['params']['data']; 
                     size={52}
                   />
                   <Column gap="xs" style={{ minWidth: 0, flex: 1 }}>
-                    <Text text={t('rgb_approval_pay')} size="sm" color="textDim" />
+                    <Text text={t(burn ? 'rgb_approval_burn' : 'rgb_approval_pay')} size="sm" color="textDim" />
                     <Text text={amountLabel} size="xxl" preset="title-bold" style={{ wordBreak: 'break-word' }} />
                     <Text text={assetLabel} size="sm" color="textDim" max2Lines style={{ wordBreak: 'break-word' }} />
                   </Column>
@@ -636,7 +658,7 @@ function RgbPaymentApproval({ data, session }: { data: Props['params']['data']; 
           <Card style={{ display: 'block', padding: 0 }}>
             <RgbApprovalAccordion
               title={t('rgb_approval_how_it_works')}
-              description={t('rgb_approval_payment_how_it_works_description')}
+              description={t(burn ? 'rgb_approval_burn_how_it_works_description' : 'rgb_approval_payment_how_it_works_description')}
               expanded={howItWorksExpanded}
               onClick={() => setHowItWorksExpanded((value) => !value)}
             >
@@ -647,11 +669,11 @@ function RgbPaymentApproval({ data, session }: { data: Props['params']['data']; 
                 color="textDim"
                 style={{ lineHeight: '18px' }}
               />
-              <Text text={t('rgb_approval_payment_step_review')} size="xs" color="success" />
+              <Text text={t(burn ? 'rgb_approval_burn_step_review' : 'rgb_approval_payment_step_review')} size="xs" color="success" />
             </RgbApprovalAccordion>
             <RgbApprovalAccordion
-              title={t('rgb_approval_payment_details')}
-              description={t('rgb_approval_payment_details_description')}
+              title={t(burn ? 'rgb_approval_burn_details' : 'rgb_approval_payment_details')}
+              description={t(burn ? 'rgb_approval_burn_details_description' : 'rgb_approval_payment_details_description')}
               expanded={paymentDetailsExpanded}
               onClick={() => setPaymentDetailsExpanded((value) => !value)}
               bordered
@@ -659,15 +681,22 @@ function RgbPaymentApproval({ data, session }: { data: Props['params']['data']; 
               <Column gap="sm">
                 <RgbReceiveDetail label={t('asset')} value={assetLabel} />
                 <RgbReceiveDetail label={t('amount')} value={amountLabel} />
-                <RgbReceiveDetail
-                  label={t('rgb_approval_recipient_invoice')}
-                  value={data.invoice ? shortAddress(data.invoice, 10) : t('rgb_approval_not_provided')}
-                />
+                {burn ? (
+                  <>
+                    <RgbReceiveDetail label={t('network')} value={data.burnRecipient?.chainId || '-'} />
+                    <RgbReceiveDetail label={t('address')} value={data.burnRecipient?.address || '-'} />
+                  </>
+                ) : (
+                  <RgbReceiveDetail
+                    label={t('rgb_approval_recipient_invoice')}
+                    value={data.invoice ? shortAddress(data.invoice, 10) : t('rgb_approval_not_provided')}
+                  />
+                )}
               </Column>
             </RgbApprovalAccordion>
           </Card>
 
-          {proxyEndpoints.length > 0 ? (
+          {!burn && proxyEndpoints.length > 0 ? (
             <Card style={{ display: 'block', padding: 12, background: 'rgba(235, 185, 76, 0.12)' }}>
               <Column gap="sm">
                 <Row itemsCenter gap="sm">
@@ -705,7 +734,7 @@ function RgbPaymentApproval({ data, session }: { data: Props['params']['data']; 
         <Row full>
           <Button text={t('cancel')} preset="default" onClick={() => rejectApproval()} full />
           <Button
-            text={loading ? t('rgb_approval_checking') : t('rgb_approval_prepare_payment')}
+            text={loading ? t('rgb_approval_checking') : t(burn ? 'rgb_approval_prepare_burn' : 'rgb_approval_prepare_payment')}
             preset="primary"
             onClick={() => void requestWrite(() => void onPreparePayment())}
             disabled={loading}
@@ -715,6 +744,25 @@ function RgbPaymentApproval({ data, session }: { data: Props['params']['data']; 
       </Footer>
       {writeLeaseModal}
     </Layout>
+  );
+}
+
+export function RgbConsignment({ params: { data, session } }: Props) {
+  const { t } = useI18n();
+  return (
+    <RgbApprovalLayout
+      session={session}
+      title={t('rgb_approval_share_burn_proof_title')}
+      description={t('rgb_approval_share_burn_proof_description')}
+      rows={[
+        [t('asset_id'), data.assetId || '-'],
+        [t('transaction_id'), data.txid || '-'],
+        [t('rgb_approval_proof_size'), data.proof ? `${data.proof.byteLength} bytes` : '-'],
+        [t('rgb_approval_proof_digest'), data.proof?.digest || '-']
+      ]}
+      confirmText={t('rgb_approval_share_burn_proof')}
+      requiresWrite={false}
+    />
   );
 }
 
@@ -927,7 +975,8 @@ function RgbApprovalLayout({
   onConfirm,
   onCancel,
   confirmDisabled = false,
-  error
+  error,
+  requiresWrite = true
 }: {
   session: Props['params']['session'];
   title: string;
@@ -939,6 +988,7 @@ function RgbApprovalLayout({
   onCancel?: () => void;
   confirmDisabled?: boolean;
   error?: string;
+  requiresWrite?: boolean;
 }) {
   const { resolveApproval, rejectApproval } = useApproval();
   const { t } = useI18n();
@@ -977,12 +1027,14 @@ function RgbApprovalLayout({
           <Button
             text={confirmText}
             preset={confirmPreset}
-            onClick={() =>
-              void requestWrite(() => {
+            onClick={() => {
+              const confirm = () => {
                 if (onConfirm) onConfirm();
                 else resolveApproval();
-              })
-            }
+              };
+              if (requiresWrite) void requestWrite(confirm);
+              else confirm();
+            }}
             disabled={confirmDisabled}
             full
           />

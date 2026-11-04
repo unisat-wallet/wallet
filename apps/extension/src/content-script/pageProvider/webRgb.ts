@@ -4,6 +4,23 @@ import { ErrorCodes } from '@unisat/wallet-shared';
 type WebRgbCode = 'USER_REJECTED' | 'NOT_ENABLED' | 'METHOD_NOT_SUPPORTED' | 'INVALID_PARAMS' | 'ASSET_NOT_FOUND' | 'INTERNAL_ERROR';
 type RgbEvent = 'transferReceived' | 'transferSettled';
 type RgbTransfer = Record<string, any>;
+type RgbBurnRecipient = { chainId: string; address: string };
+type RgbBurnAssetArgs = {
+  network: string;
+  assetId: string;
+  amount: string;
+  burnRecipient: RgbBurnRecipient;
+  feeRate?: number;
+  minConfirmations?: number;
+};
+
+const MAX_U64_DECIMAL = '18446744073709551615';
+
+function isPositiveU64Decimal(value: unknown): value is string {
+  return typeof value === 'string' && /^[1-9][0-9]*$/.test(value) &&
+    (value.length < MAX_U64_DECIMAL.length ||
+      (value.length === MAX_U64_DECIMAL.length && value <= MAX_U64_DECIMAL));
+}
 
 function providerError(code: WebRgbCode, message: string): Error & { code: WebRgbCode } {
   return Object.assign(new Error(message), { code });
@@ -26,7 +43,7 @@ function normalizeError(error: unknown): Error & { code: WebRgbCode } {
       /user (?:rejected|cancelled|canceled)|connection was not approved|approval.*(?:rejected|cancelled|canceled)/i.test(message))
     return providerError('USER_REJECTED', message);
   if (/not found|unknown asset/i.test(message)) return providerError('ASSET_NOT_FOUND', message);
-  if (/invalid|must be|required|mismatch/i.test(message)) return providerError('INVALID_PARAMS', message);
+  if (/invalid|must be|required|mismatch|does not match/i.test(message)) return providerError('INVALID_PARAMS', message);
   return providerError('INTERNAL_ERROR', message);
 }
 
@@ -105,6 +122,7 @@ export class WebRgbProvider {
   async #requireCapability(method: string) {
     const info = await this.#requireEnabled();
     if (!info.methods?.includes(method)) unsupported(method);
+    return info;
   }
 
   getAddress = async () => {
@@ -245,8 +263,65 @@ export class WebRgbProvider {
   };
 
   issueAsset = async () => { await this.#requireEnabled(); unsupported('issueAsset'); };
-  burnAsset = async () => { await this.#requireEnabled(); unsupported('burnAsset'); };
-  getConsignment = async () => { await this.#requireEnabled(); unsupported('getConsignment'); };
+
+  burnAsset = async (args: RgbBurnAssetArgs) => {
+    const info = await this.#requireCapability('burnAsset');
+    if (!args || typeof args !== 'object' || Array.isArray(args))
+      throw providerError('INVALID_PARAMS', 'burnAsset arguments are required');
+    if (typeof args.network !== 'string' || !args.network)
+      throw providerError('INVALID_PARAMS', 'network is required');
+    if (args.network !== info.network)
+      throw providerError('INVALID_PARAMS', 'network does not match the current RGB wallet');
+    if (typeof args.assetId !== 'string' || !args.assetId)
+      throw providerError('INVALID_PARAMS', 'assetId is required');
+    if (!isPositiveU64Decimal(args.amount))
+      throw providerError('INVALID_PARAMS', 'amount must be a positive u64 decimal string');
+    if (!args.burnRecipient || typeof args.burnRecipient !== 'object' || Array.isArray(args.burnRecipient) ||
+        typeof args.burnRecipient.chainId !== 'string' || !args.burnRecipient.chainId ||
+        typeof args.burnRecipient.address !== 'string' || !args.burnRecipient.address.trim())
+      throw providerError('INVALID_PARAMS', 'burnRecipient.chainId and burnRecipient.address are required');
+    const namespace = args.burnRecipient.chainId.split(':', 1)[0];
+    const supportedNamespaces = info.burnRecipientNamespaces || ['eip155'];
+    if (!supportedNamespaces.includes(namespace))
+      throw providerError('INVALID_PARAMS', 'burnRecipient namespace is not supported');
+    if (args.minConfirmations !== undefined &&
+        (!Number.isSafeInteger(args.minConfirmations) || args.minConfirmations < 0))
+      throw providerError('INVALID_PARAMS', 'minConfirmations must be a nonnegative integer');
+
+    const prepared = await this.#call('webRgbPrepareBurn', args as unknown as Record<string, unknown>);
+    const transferId = prepared.id || prepared.transferId;
+    if (!transferId) throw providerError('INTERNAL_ERROR', 'RGB burn transfer ID is missing');
+    let result: any;
+    try {
+      result = await this.#call('signRgbPayment', { transferId });
+    } catch (error) {
+      if ((error as { code?: string }).code === 'USER_REJECTED') {
+        try { await this.#call('webRgbReleasePreparedPayment', { transferId }); } catch { /* Preserve the approval result. */ }
+      }
+      throw error;
+    }
+    return {
+      ...result,
+      transferId,
+      txid: result.txid,
+      assetId: args.assetId,
+      amount: args.amount,
+      burnRecipient: args.burnRecipient,
+      status: result.status ? transferStatus(result.status) : 'WaitingConfirmations',
+      minConfirmations: prepared.minConfirmations || Math.max(3, args.minConfirmations || 0),
+    };
+  };
+
+  getConsignment = async (args: { assetId: string; txid: string }) => {
+    await this.#requireCapability('getConsignment');
+    if (!args || typeof args !== 'object' || Array.isArray(args))
+      throw providerError('INVALID_PARAMS', 'getConsignment arguments are required');
+    if (typeof args.assetId !== 'string' || !args.assetId)
+      throw providerError('INVALID_PARAMS', 'assetId is required');
+    if (typeof args.txid !== 'string' || !/^[0-9a-f]{64}$/i.test(args.txid))
+      throw providerError('INVALID_PARAMS', 'txid must be 64 hexadecimal characters');
+    return this.#call('webRgbGetConsignment', { assetId: args.assetId, txid: args.txid.toLowerCase() });
+  };
   signMessage = async () => { await this.#requireEnabled(); unsupported('signMessage'); };
   makeLnInvoice = async () => { await this.#requireEnabled(); unsupported('makeLnInvoice'); };
   payLnInvoice = async () => { await this.#requireEnabled(); unsupported('payLnInvoice'); };

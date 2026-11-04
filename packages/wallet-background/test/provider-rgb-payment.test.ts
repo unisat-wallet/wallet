@@ -26,6 +26,10 @@ vi.mock('../src/controllers/wallet', () => ({
     abandonRgbAcceptedReceive: vi.fn(),
     getRgbProxyApprovalRequirement: vi.fn(),
     approveRgbProxyEndpoints: vi.fn(),
+    getCurrentRgbWalletRef: vi.fn(),
+    exportRgbBurnConsignment: vi.fn(),
+    getRgbFeatureStatus: vi.fn(),
+    getChainType: vi.fn(),
   },
 }))
 
@@ -48,6 +52,8 @@ describe('provider RGB payment ownership', () => {
       'webRgbGetAssetBalance',
       'webRgbListTransfers',
       'webRgbGetTransferStatus',
+      'webRgbPrepareBurn',
+      'webRgbGetConsignment',
       'webRgbReleasePreparedPayment',
       'getRgbFundingUtxos',
       'getRgbFeeUtxos',
@@ -66,6 +72,19 @@ describe('provider RGB payment ownership', () => {
   it('keeps account-independent invoice helpers callable while locked', () => {
     expect(Reflect.getMetadata('SAFE', providerController, 'webRgbDecodeInvoice')).toBe(true)
     expect(Reflect.getMetadata('SAFE', providerController, 'webRgbBuildInvoice')).toBe(true)
+  })
+
+  it('advertises the WebRGB burn and proof routes with supported namespaces', async () => {
+    vi.mocked(wallet.getRgbFeatureStatus).mockResolvedValue({ enabled: true, supported: true } as any)
+    vi.mocked(wallet.getCurrentRgbWalletRef).mockResolvedValue({ network: 'T0' } as any)
+
+    await expect(providerController.webRgbGetInfo()).resolves.toMatchObject({
+      ready: true,
+      network: 'T0',
+      protocol: 'RGB_L1',
+      methods: expect.arrayContaining(['burnAsset', 'getConsignment']),
+      burnRecipientNamespaces: ['eip155', 'tron'],
+    })
   })
 
   it('persists the trusted request origin while preparing a payment', async () => {
@@ -222,6 +241,72 @@ describe('provider RGB payment ownership', () => {
 
     expect(() => approval[1](request)).toThrow('fee rate must be between')
     expect(wallet.createRgbSendBegin).not.toHaveBeenCalled()
+  })
+
+  it('validates and origin-binds a WebRGB BFA burn before reserving funds', async () => {
+    vi.mocked(wallet.getCurrentRgbWalletRef).mockResolvedValue({ network: 'T0' } as any)
+    vi.mocked(wallet.createRgbSendBegin).mockResolvedValue({ id: 'burn-1' } as any)
+    const approval = Reflect.getMetadata('APPROVAL', providerController, 'webRgbPrepareBurn')
+    const params: Record<string, any> = {
+      network: 'T0',
+      assetId: 'rgb:bfa',
+      amount: '18446744073709551615',
+      burnRecipient: { chainId: 'eip155:42161', address: `0x${'11'.repeat(20)}` },
+      minConfirmations: 1,
+    }
+    await approval[1]({ data: { params } })
+    expect(params.minConfirmations).toBe(3)
+    expect(params.burnDestination).toMatchObject({
+      destinationChainId: 42161,
+      recipient: '11'.repeat(20),
+    })
+
+    await providerController.webRgbPrepareBurn({
+      data: { params },
+      session: { origin: 'https://dapp.example' },
+    } as any)
+    expect(wallet.createRgbSendBegin).toHaveBeenCalledWith(expect.objectContaining({
+      invoice: '',
+      assetId: 'rgb:bfa',
+      amount: '18446744073709551615',
+      burn: true,
+      minConfirmations: 3,
+      providerOrigin: 'https://dapp.example',
+    }))
+  })
+
+  it.each([
+    ['18446744073709551616', 'T0'],
+    ['01', 'T0'],
+    ['1', 'OTHER'],
+  ])('rejects an invalid WebRGB burn amount/network before preparation', async (amount, network) => {
+    vi.mocked(wallet.getCurrentRgbWalletRef).mockResolvedValue({ network: 'T0' } as any)
+    const approval = Reflect.getMetadata('APPROVAL', providerController, 'webRgbPrepareBurn')
+    await expect(approval[1]({ data: { params: {
+      network, assetId: 'rgb:bfa', amount,
+      burnRecipient: { chainId: 'eip155:42161', address: `0x${'11'.repeat(20)}` },
+    } } })).rejects.toThrow()
+    expect(wallet.createRgbSendBegin).not.toHaveBeenCalled()
+  })
+
+  it('validates a saved burn proof before opening the sharing approval', async () => {
+    vi.mocked(wallet.exportRgbBurnConsignment).mockResolvedValue(Buffer.from('RGB\0TFRproof').toString('base64'))
+    const txid = 'ab'.repeat(32)
+    const approval = Reflect.getMetadata('APPROVAL', providerController, 'webRgbGetConsignment')
+    const request = { data: { params: { assetId: 'rgb:bfa', txid } as Record<string, any> } }
+    await approval[1](request)
+    expect(request.data.params.proof).toMatchObject({
+      byteLength: 12,
+      digest: expect.stringMatching(/^0x[0-9a-f]{64}$/),
+    })
+    await expect(providerController.webRgbGetConsignment(request as any)).resolves.toMatchObject({
+      assetId: 'rgb:bfa',
+      txid,
+      encoding: 'base64',
+      byteLength: 12,
+      digest: { algorithm: 'keccak256', value: expect.stringMatching(/^0x[0-9a-f]{64}$/) },
+    })
+    expect(wallet.exportRgbBurnConsignment).toHaveBeenCalledWith(txid, 'rgb:bfa')
   })
 
   it('authorizes payment status from the persisted owner after a worker restart', async () => {
