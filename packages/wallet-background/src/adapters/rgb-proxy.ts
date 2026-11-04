@@ -965,6 +965,23 @@ export function createRgbProxyTransport(
       })
     },
 
+    markConsignmentRetrieved: async ({ endpoint, proxyTransferId, proxyPrivateKey }) => {
+      const body = await postJson<boolean>(
+        endpoint,
+        'transfer.retrieved',
+        {
+          transfer_id: proxyTransferId,
+          signature: proxyV1Sign(proxyPrivateKey, proxyTransferId + 'retrieved'),
+        },
+        options
+      )
+      if (body.error) {
+        throw new Error(
+          `RGB proxy transfer.retrieved failed: ${body.error.message || body.error.code}`
+        )
+      }
+    },
+
     cancelConsignment: async ({
       proxyInvoiceId,
       proxySenderPrivateKey,

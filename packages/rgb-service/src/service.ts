@@ -1597,6 +1597,7 @@ export class RgbService {
             receive.receivedConsignment.accepted = true
             delete receive.receivedConsignment.acknowledgementPending
             delete receive.pendingAccept
+            this.markProxyDataReleasePending(receive)
             changed = true
           } else if (acknowledgement === undefined) {
             // The durable intent makes ACK retries safe. A request failure is
@@ -1620,6 +1621,7 @@ export class RgbService {
             receive.receivedConsignment.accepted = true
             delete receive.receivedConsignment.acknowledgementPending
             delete receive.pendingAccept
+            this.markProxyDataReleasePending(receive)
             changed = true
           } else {
             this.recordReceiveOutcome(receive, 'canceled', match.txid)
@@ -1760,6 +1762,9 @@ export class RgbService {
       // are needed to prove ownership and later spend the allocation.
       await this.persistWithRecoveryRollback(rollback)
     }
+    if (await this.releaseHandledProxyData()) {
+      await this.persist({ waitForRecovery: true })
+    }
     return { received: count, snapshotRequired }
   }
 
@@ -1834,7 +1839,11 @@ export class RgbService {
         receive.receivedConsignment!.accepted = true
         delete receive.receivedConsignment!.acknowledgementPending
         delete receive.pendingAccept
+        this.markProxyDataReleasePending(receive)
         await this.persist({ waitForRecovery: true })
+        if (await this.releaseHandledProxyData(receive)) {
+          await this.persist({ waitForRecovery: true })
+        }
         return { accepted: true, status: 'accepted' as const }
       }
       if (acknowledgement === false) {
@@ -1859,7 +1868,11 @@ export class RgbService {
     receive.receivedConsignment!.accepted = true
     delete receive.receivedConsignment!.acknowledgementPending
     delete receive.pendingAccept
+    this.markProxyDataReleasePending(receive)
     await this.persist({ waitForRecovery: true })
+    if (await this.releaseHandledProxyData(receive)) {
+      await this.persist({ waitForRecovery: true })
+    }
 
     // The sender cannot broadcast until this ACK returns, so settlement is
     // deferred to the next receive refresh instead of fetching the same
@@ -2317,6 +2330,49 @@ export class RgbService {
     } catch {
       return false
     }
+  }
+
+  private markProxyDataReleasePending(receive: import('./types').RgbPendingReceive) {
+    const receipt = receive.receivedConsignment
+    if (
+      receive.proxyPrivateKey &&
+      receipt?.endpoint &&
+      receipt.proxyTransferId &&
+      this.dependencies.transport.markConsignmentRetrieved
+    ) {
+      receipt.proxyDataReleasePending = true
+    }
+  }
+
+  /** Best-effort cleanup: failure only retains remote bytes until a later retry or expiry. */
+  private async releaseHandledProxyData(only?: import('./types').RgbPendingReceive) {
+    const release = this.dependencies.transport.markConsignmentRetrieved
+    if (!release) return false
+    let changed = false
+    const receives = only ? [only] : this.requireState().pendingReceives || []
+    for (const receive of receives) {
+      const receipt = receive.receivedConsignment
+      if (
+        !receipt?.accepted ||
+        !receipt.proxyDataReleasePending ||
+        !receipt.endpoint ||
+        !receipt.proxyTransferId ||
+        !receive.proxyPrivateKey
+      ) continue
+      try {
+        await release({
+          endpoint: receipt.endpoint,
+          proxyTransferId: receipt.proxyTransferId,
+          proxyPrivateKey: receive.proxyPrivateKey,
+        })
+        delete receipt.proxyDataReleasePending
+        receipt.proxyDataReleasedAt = this.now()
+        changed = true
+      } catch {
+        // The proxy expires payloads independently; retain the retry marker.
+      }
+    }
+    return changed
   }
 
   /** A v1 donation has no sender ACK operation; broadcast its validated signed witness if needed. */

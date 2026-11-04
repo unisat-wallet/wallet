@@ -4264,12 +4264,14 @@ describe('RgbService', () => {
     const dependencies = createDependencies()
     dependencies.transport.getAcknowledgement = vi.fn().mockResolvedValue(undefined)
     dependencies.transport.acknowledgeConsignment = vi.fn().mockRejectedValue(new RgbProxyOperationNotFoundError())
+    dependencies.transport.markConsignmentRetrieved = vi.fn()
     dependencies.stateSource.getTransactionStatus = vi.fn().mockResolvedValue({ status: 'unknown', confirmations: 0 })
     const service = new RgbService(dependencies)
     await service.open(wallet)
     ;(service as any).state.pendingReceives = [{
       invoice: rgbInvoice(),
       recipientId: 'recipient',
+      proxyPrivateKey: '44'.repeat(32),
       createdAt: 1,
       seal: { txid: 'a'.repeat(64), vout: 0, blinding: 1n },
       pendingAccept: {
@@ -4289,6 +4291,38 @@ describe('RgbService', () => {
     expect((service as any).state.pendingReceives[0].receivedConsignment).not.toHaveProperty('acknowledgementPending')
     expect(dependencies.transport.acknowledgeConsignment).toHaveBeenCalledTimes(1)
     expect(dependencies.broadcaster.broadcast).toHaveBeenCalledWith('020000000001')
+    expect(dependencies.transport.markConsignmentRetrieved).toHaveBeenCalledWith({
+      endpoint: proxyEndpoint,
+      proxyTransferId: 'd'.repeat(64),
+      proxyPrivateKey: '44'.repeat(32),
+    })
+    expect((service as any).state.pendingReceives[0].receivedConsignment)
+      .toMatchObject({ proxyDataReleasedAt: expect.any(Number) })
+  })
+
+  it('retries Proxy v1 payload release for an already durable accepted receive', async () => {
+    const dependencies = createDependencies()
+    dependencies.transport.getConsignment = vi.fn().mockResolvedValue(undefined)
+    dependencies.transport.markConsignmentRetrieved = vi.fn()
+    const service = new RgbService(dependencies)
+    await service.open(wallet)
+    ;(service as any).state.pendingReceives = [{
+      invoice: rgbInvoice(), recipientId: 'recipient', proxyPrivateKey: '44'.repeat(32), createdAt: 1,
+      receivedConsignment: {
+        txid: 'c'.repeat(64), receivedAt: 1, accepted: true,
+        payload: 'durable-consignment', endpoint: proxyEndpoint,
+        proxyTransferId: 'd'.repeat(64), proxyDataReleasePending: true,
+      },
+    }]
+
+    await service.processClaimedReceives({ includeClaimed: false })
+
+    expect(dependencies.transport.markConsignmentRetrieved).toHaveBeenCalledOnce()
+    expect((service as any).state.pendingReceives[0].receivedConsignment).toMatchObject({
+      accepted: true, proxyDataReleasedAt: expect.any(Number),
+    })
+    expect((service as any).state.pendingReceives[0].receivedConsignment)
+      .not.toHaveProperty('proxyDataReleasePending')
   })
 
   it('shows an accepted receive as incoming pending without making it spendable or counting it twice', async () => {

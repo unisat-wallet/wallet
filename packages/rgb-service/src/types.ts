@@ -344,6 +344,9 @@ export interface RgbPendingReceive {
     accepted?: boolean
     /** ACK intent was durably recorded before the proxy acknowledgement request. */
     acknowledgementPending?: boolean
+    /** Retry transfer.retrieved only after this receipt has been durably persisted. */
+    proxyDataReleasePending?: boolean
+    proxyDataReleasedAt?: number
     /** Validated payload retained so settlement survives proxy cleanup or restart. */
     payload?: string
     /** Proxy endpoint which supplied the validated payload. */
@@ -643,6 +646,12 @@ export interface RgbTransport {
     proxySenderPublicKey?: string
     proxySenderEndpoint?: string
     proxyConsignmentHash?: string
+  }): Promise<void>
+  /** Allow a Proxy v1 recipient to delete payload bytes after durable local handling. */
+  markConsignmentRetrieved?(input: {
+    endpoint: string
+    proxyTransferId: string
+    proxyPrivateKey: string
   }): Promise<void>
   /** Clear an unreleased proxy v1 signed transaction before releasing local inputs. */
   cancelConsignment?(input: {

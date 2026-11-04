@@ -233,6 +233,10 @@ describe('RGB proxy transport', () => {
           return rpcResponse({ [transferId]: 'pending' })
         case 'consignment.get':
           return rpcResponse({ consignment: postedPayload, sender_transport_endpoint: 'rpc://proxy.example/json-rpc', sender_pk: senderPk, consignment_hash: consignmentHash, batch: false })
+        case 'transfer.retrieved':
+          expect(params.transfer_id).toBe(transferId)
+          expect(proxyV1Verify(recipientPk, params.signature, transferId + 'retrieved')).toBe(true)
+          return rpcResponse(true)
         case 'ack.post':
           ack = params.ack
           ackSignature = params.signature
@@ -276,6 +280,11 @@ describe('RGB proxy transport', () => {
       proxySenderPublicKey: received!.proxySenderPublicKey,
       proxySenderEndpoint: received!.proxySenderEndpoint,
       proxyConsignmentHash: received!.proxyConsignmentHash,
+    })
+    await transport.markConsignmentRetrieved?.({
+      endpoint,
+      proxyTransferId: received!.proxyTransferId!,
+      proxyPrivateKey: prepared!.privateKey,
     })
     expect(fetchMock.mock.calls.find(([, options]) =>
       typeof options?.body === 'string' && JSON.parse(options.body).method === 'ack.post'
