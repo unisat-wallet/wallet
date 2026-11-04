@@ -28,7 +28,7 @@ const TS_MINT = 8013
 const TS_BURN = 8010
 const TS_TRANSFER = 10000
 
-type Seal = { txid: string | null; vout: number; secret: string }
+type Seal = { txid: string | null; vout: number; secret: string; blinding?: bigint }
 type Assignment = { type: number; index: number; seal: Seal | null; amount: bigint }
 type Input = { opId: string; type: number; index: number }
 type Operation = {
@@ -49,7 +49,7 @@ export interface ValidatedBfaConsignment extends ValidatedBfaTransferHistory {
   terminals: Array<{ bundleId: string; secretSeals: string[] }>
   terminalAssignments: Array<{
     opId: string; assignmentIndex: number; amount: string; bundleId: string
-    txid: string; vout: number; secretSeal: string
+    txid: string; vout: number; secretSeal: string; blinding?: bigint
     output?: { scriptPubKey: string; satoshis: number }
   }>
   bundles: Array<{ id: string; txid: string; strict: Uint8Array; operationIds: string[]; parentOpIds: string[] }>
@@ -381,8 +381,8 @@ function sealed(reader: StrictReader, genesis: boolean, known: Map<string, RgbBl
     txid = pointer === 1 ? hex(reader.readFixedBytes(32).reverse()) : null
   }
   const vout = reader.readU32()
-  reader.readU64()
-  return { txid, vout, secret: hex(hash(TAG_SEAL, reader.slice(revealedStart))) }
+  const blinding = reader.readU64()
+  return { txid, vout, blinding, secret: hex(hash(TAG_SEAL, reader.slice(revealedStart))) }
 }
 function readAssignments(reader: StrictReader, genesis: boolean, known: Map<string, RgbBlindSeal>, patches: SealPatch[], schema = BFA_SCHEMA_ID): Assignment[] {
   const count = reader.readU16()
@@ -738,6 +738,7 @@ function buildValidatedConsignment(
     terminalAssignments.push({
       opId: operation.id, assignmentIndex: item.index, amount: item.amount.toString(),
       bundleId: bundle.id, txid: bundle.txid, vout: item.seal.vout, secretSeal: item.seal.secret,
+      ...(item.seal.blinding === undefined ? {} : { blinding: item.seal.blinding }),
       ...(output ? { output: { scriptPubKey: output.script.toString('hex'), satoshis: output.value } } : {}),
     })
   }

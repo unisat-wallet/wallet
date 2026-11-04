@@ -38,6 +38,7 @@ import {
   encodeBlindRgbInvoice,
 } from './protocol/receive'
 import { getSwapPsbtInputOutpoints } from './protocol/opret-transfer'
+import { deriveProxyV1SealBlinding } from './protocol/proxy-v1'
 import { planFungibleTransition } from './protocol/transition'
 import type {
   RgbCompletedTransfer,
@@ -1943,7 +1944,14 @@ export class RgbService {
 
   private async validateIncomingConsignment(
     receive: import('./types').RgbPendingReceive,
-    item: { recipientId: string; payload: string; txid?: string; endpoint?: string; proxyTransferId?: string },
+    item: {
+      recipientId: string
+      payload: string
+      txid?: string
+      endpoint?: string
+      proxyTransferId?: string
+      proxySenderPublicKey?: string
+    },
     onMismatch?: (reason: string, details: Record<string, unknown>) => void
   ) {
     const mismatch = (reason: string, details: Record<string, unknown> = {}): undefined => {
@@ -1976,7 +1984,11 @@ export class RgbService {
       return mismatch(v1 ? 'asset_id' : 'asset_or_amount', { actualAssetId: assetId })
     const secret = receive.seal ? Buffer.from(concealBlindSeal(receive.seal)).toString('hex') : undefined
     const latestBundleId = bfa.bundles.at(-1)?.id
-    const candidate = bfa.terminalAssignments.find(assignment => {
+    const expectedWitnessBlinding = receive.recipientType === 'witness' &&
+      receive.proxyPrivateKey && item.proxySenderPublicKey
+      ? deriveProxyV1SealBlinding(receive.proxyPrivateKey, item.proxySenderPublicKey)
+      : undefined
+    const matchesRecipient = (assignment: (typeof bfa.terminalAssignments)[number]) => {
       if (expectedTxid && assignment.txid !== expectedTxid) return false
       if (receive.recipientType === 'witness') {
         if (!latestBundleId || assignment.bundleId !== latestBundleId) return false
@@ -1984,7 +1996,17 @@ export class RgbService {
       }
       return assignment.secretSeal === secret && bfa.terminals.some(terminal =>
         terminal.bundleId === assignment.bundleId && terminal.secretSeals.includes(secret!))
-    })
+    }
+    let candidate = bfa.terminalAssignments.find(assignment =>
+      matchesRecipient(assignment) &&
+      (expectedWitnessBlinding === undefined || assignment.blinding === expectedWitnessBlinding)
+    )
+    // Transfers created by older UniSat versions used a random witness
+    // blinding. Keep them recoverable, while preferring the Proxy v1-derived
+    // match for all newly compliant transfers.
+    if (!candidate && expectedWitnessBlinding !== undefined) {
+      candidate = bfa.terminalAssignments.find(matchesRecipient)
+    }
     if (!candidate) return mismatch(
       v1 ? 'v1_recipient_assignment' :
         receive.recipientType === 'witness' ? 'nia_witness_assignment' : 'nia_blind_assignment',
@@ -3157,10 +3179,17 @@ export class RgbService {
           ),
         }
       : undefined
+    // Proxy v1 binds a witness seal to both operation keys. Generate the
+    // sender key before encoding so the exact same key is persisted for
+    // transport publication and used for the seal blinding derivation.
+    const proxySenderPrivateKey = invoice?.proxyPublicKey
+      ? Buffer.from(randomBytes(32)).toString('hex')
+      : undefined
     const intent = invoice ? {
       assetId: requestedAssetId,
       amount,
       invoice,
+      ...(proxySenderPrivateKey ? { proxySenderPrivateKey } : {}),
       transition: planFungibleTransition({
         assetId: requestedAssetId,
         amount,
@@ -3214,7 +3243,7 @@ export class RgbService {
       prepared,
       request: resolvedRequest,
       createdAt: this.now(),
-      ...(invoice?.proxyPublicKey ? { proxySenderPrivateKey: Buffer.from(randomBytes(32)).toString('hex') } : {}),
+      ...(proxySenderPrivateKey ? { proxySenderPrivateKey } : {}),
       ...(options.providerOrigin ? { providerOrigin: options.providerOrigin } : {}),
     }
     // The unsigned reservation is locally durable and can be rebuilt after a

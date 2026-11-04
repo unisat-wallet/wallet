@@ -17,6 +17,7 @@ import {
   encodeRgbContractId,
   decodeNiaConsignment,
   decodeRgbInvoice,
+  deriveProxyV1SealBlinding,
   prepareNiaOpretTransfer,
   serializeNiaOpretWitnessBundle,
   rgbProxyInvoiceId,
@@ -607,6 +608,30 @@ describe('RgbService', () => {
       endpoints: decodeRgbInvoice(v1Invoice).transportEndpoints,
       protocol: 'v1',
     })
+  })
+
+  it('uses one stable Proxy v1 sender key for seal encoding and publication', async () => {
+    const dependencies = createDependencies()
+    const service = new RgbService(dependencies)
+    await service.open(wallet)
+    await service.sync()
+    const assetId = 'rgb:AQEBAQEB-AQEBAQE-BAQEBAQ-EBAQEBA-QEBAQEB-AQEBAQE'
+    const invoice = encodeWitnessRgbInvoice({
+      network: 'mainnet',
+      scriptPubKey: '512079be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798',
+      assetId,
+      amount: '60',
+      transportEndpoints: [proxyEndpoint],
+      proxyPublicKey: 'a09aa5f47a6759802ff955f8dc2d2a14a5c99d23be97f864127ff9383455a4f0',
+    })
+
+    await service.prepareSend({ assetId, amount: '60', invoice, feeRate: 2 })
+
+    const encoderInput = vi.mocked(dependencies.encoder.prepareTransfer).mock.calls[0]![0]
+    const senderPrivateKey = encoderInput.intent.proxySenderPrivateKey
+    expect(senderPrivateKey).toMatch(/^[0-9a-f]{64}$/)
+    expect((service as any).state.pending['transfer-1'].proxySenderPrivateKey)
+      .toBe(senderPrivateKey)
   })
 
   it('enforces the expiration time on legacy invoices', async () => {
@@ -1364,6 +1389,53 @@ describe('RgbService', () => {
     } as any)
     await expect((service as any).validateIncomingConsignment(receive, item))
       .resolves.toBeUndefined()
+  })
+
+  it('prefers the Proxy v1-derived witness blinding and accepts a legacy fallback', async () => {
+    const dependencies = createDependencies()
+    const scriptPubKey = `5120${'11'.repeat(32)}`
+    const recipientPrivateKey = '22'.repeat(32)
+    const senderPublicKey = 'd04ab232742bb4ab3a1368bd4615e4e6d0224ab71a016baf8520a332c9778737'
+    const expectedBlinding = deriveProxyV1SealBlinding(recipientPrivateKey, senderPublicKey)
+    const assignment = (opId: string, blinding: bigint) => ({
+      opId, assignmentIndex: 0, amount: '10', bundleId: 'new-bundle',
+      txid: 'b'.repeat(64), vout: 1, secretSeal: '', blinding,
+      output: { scriptPubKey, satoshis: 330 },
+    })
+    const legacy = assignment('c'.repeat(64), 7n)
+    const compliant = assignment('d'.repeat(64), expectedBlinding)
+    dependencies.validateBfaConsignment = vi.fn().mockResolvedValue({
+      assetId: 'rgb:AQEBAQEB-AQEBAQE-BAQEBAQ-EBAQEBA-QEBAQEB-AQEBAQE',
+      genesis: new Uint8Array(),
+      metadata: { schema: 'NIA', ticker: 'NIA', name: 'NIA', precision: 0, issuedSupply: '100' },
+      witnessOutputScripts: [scriptPubKey], terminals: [],
+      bundles: [{ id: 'new-bundle' }], terminalAssignments: [legacy, compliant],
+    } as any)
+    const service = new RgbService(dependencies)
+    await service.open(wallet)
+    const receive = {
+      recipientType: 'witness', witnessScriptPubKey: scriptPubKey,
+      proxyPrivateKey: recipientPrivateKey,
+    }
+    const item = {
+      recipientId: 'recipient',
+      payload: Buffer.from(Uint8Array.from([
+        1, 1, 0, 0, 0, 0, ...Buffer.from(NIA_V1_SCHEMA_ID, 'hex'),
+      ])).toString('base64'),
+      proxySenderPublicKey: senderPublicKey,
+    }
+
+    await expect((service as any).validateIncomingConsignment(receive, item))
+      .resolves.toMatchObject({ opId: compliant.opId })
+
+    vi.mocked(dependencies.validateBfaConsignment!).mockResolvedValueOnce({
+      ...(await dependencies.validateBfaConsignment!({
+        wallet, payload: new Uint8Array(),
+      } as any)),
+      terminalAssignments: [legacy],
+    } as any)
+    await expect((service as any).validateIncomingConsignment(receive, item))
+      .resolves.toMatchObject({ opId: legacy.opId })
   })
 
   it('matches a v0 witness receive only in the newest witness bundle', async () => {

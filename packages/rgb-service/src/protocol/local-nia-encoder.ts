@@ -15,6 +15,7 @@ import { decodeNiaConsignment } from './nia-consignment'
 import { encodeNiaTransferConsignment } from './nia-contract'
 import { mergeNiaConsignmentHistory } from './nia-history'
 import { prepareNiaOpretTransfer } from './opret-transfer'
+import { deriveProxyV1SealBlinding } from './proxy-v1'
 import { witnessSealDustLimit } from './witness'
 
 // rgb-lib requires the sender to attach a dust-safe Bitcoin output to a witness seal.
@@ -153,7 +154,15 @@ export const localNiaProtocolEncoder: RgbProtocolEncoder = {
 
     const nonce = randomU64()
     const entropy = randomU64()
-    const recipientBlinding = randomU64()
+    let recipientBlinding = randomU64()
+    if (input.intent.invoice.seal.type === 'witness' && input.intent.invoice.proxyPublicKey) {
+      if (!input.intent.proxySenderPrivateKey)
+        throw new RgbServiceError('RGB proxy sender operation key is missing')
+      recipientBlinding = deriveProxyV1SealBlinding(
+        input.intent.proxySenderPrivateKey,
+        input.intent.invoice.proxyPublicKey
+      )
+    }
     const changeBlinding = randomU64()
 
     const prepared = prepareNiaOpretTransfer({

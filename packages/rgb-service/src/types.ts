@@ -115,6 +115,8 @@ export interface RgbTransferIntent {
   amount: string
   invoice: import('./protocol/invoice').RgbInvoice
   transition: import('./protocol/transition').RgbFungibleTransitionPlan
+  /** Stable Proxy v1 sender operation key used to derive a witness seal. */
+  proxySenderPrivateKey?: string
 }
 
 /** Opaque RGB state received through transport, never constructed by an API. */

@@ -28,6 +28,7 @@ import { serializeBfaOpretWitnessBundle } from './consignment'
 import { prepareNiaOpretTransfer } from './opret-transfer'
 import { encodeBfaBurnTransition, niaInputFromAllocation } from './nia'
 import { commitOpretRgbPsbt } from './psbt-commit'
+import { deriveProxyV1SealBlinding } from './proxy-v1'
 import { localNiaProtocolEncoder } from './local-nia-encoder'
 import { convertNiaV0ConsignmentToV1 } from './nia-v0-migration'
 import { witnessSealDustLimit } from './witness'
@@ -141,6 +142,15 @@ export function prepareBfaTransfer(input: {
   }
   const nonce = randomU64()
   const entropy = randomU64()
+  let recipientBlinding = randomU64()
+  if (input.intent.invoice.seal.type === 'witness' && input.intent.invoice.proxyPublicKey) {
+    if (!input.intent.proxySenderPrivateKey)
+      throw new RgbServiceError('RGB proxy sender operation key is missing')
+    recipientBlinding = deriveProxyV1SealBlinding(
+      input.intent.proxySenderPrivateKey,
+      input.intent.invoice.proxyPublicKey
+    )
+  }
   const prepared = prepareNiaOpretTransfer({
     network: input.wallet.network,
     assetId: input.intent.assetId,
@@ -153,7 +163,7 @@ export function prepareBfaTransfer(input: {
       : {}),
     nonce,
     entropy,
-    recipientBlinding: randomU64(),
+    recipientBlinding,
     changeBlinding: randomU64(),
     ...(input.feeFunding ? { feeFunding: input.feeFunding } : {}),
     ...(input.swapPsbt ? { swapPsbt: input.swapPsbt } : {}),
