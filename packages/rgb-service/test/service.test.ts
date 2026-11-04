@@ -660,6 +660,32 @@ describe('RgbService', () => {
       .toBe(senderPrivateKey)
   })
 
+  it('rejects an asset whose schema conflicts with an open invoice constraint', async () => {
+    const dependencies = createDependencies()
+    const service = new RgbService(dependencies)
+    await service.open(wallet)
+    const assetId = 'rgb:AQEBAQEB-AQEBAQE-BAQEBAQ-EBAQEBA-QEBAQEB-AQEBAQE'
+    ;(service as any).state.contracts = {
+      [assetId]: {
+        consignment: Buffer.from([1]).toString('base64'),
+        createdAt: 1,
+        metadata: {
+          ticker: 'BFA', name: 'Bridge Asset', precision: 0,
+          schema: 'BFA', issuedSupply: '100',
+        },
+      },
+    }
+    const invoice =
+      `rgb:~/RWhwUfTMpuP2Zfx1~j4nswCANGeJrYOqDcKelaMV4zU/~/` +
+      `bc:wvout:A8cJ7Ww3-NIzADo3-Tzp_5aD-7CTBWmA-AAAAAAA-AAAAAAA-ALSQkcw` +
+      `?pk=${'ab'.repeat(32)}&endpoints=${encodeURIComponent(proxyEndpoint)}`
+
+    await expect(service.prepareSend({ assetId, amount: '60', invoice, feeRate: 2 }))
+      .rejects.toThrow('RGB invoice schema does not match the requested asset')
+    expect(dependencies.encoder.prepareTransfer).not.toHaveBeenCalled()
+    expect(service.getPendingTransfers()).toEqual([])
+  })
+
   it('enforces the expiration time on legacy invoices', async () => {
     const service = new RgbService(createDependencies())
     await service.open(wallet)
@@ -1573,6 +1599,44 @@ describe('RgbService', () => {
     await expect((service as any).validateIncomingConsignment(
       { ...receive, allowLegacyWitnessBlinding: true }, item
     )).resolves.toMatchObject({ opId: legacy.opId })
+  })
+
+  it('requires sender key metadata before matching a Proxy v1 witness receive', async () => {
+    const dependencies = createDependencies()
+    const scriptPubKey = `5120${'11'.repeat(32)}`
+    dependencies.validateBfaConsignment = vi.fn().mockResolvedValue({
+      assetId: 'rgb:AQEBAQEB-AQEBAQE-BAQEBAQ-EBAQEBA-QEBAQEB-AQEBAQE',
+      genesis: new Uint8Array(),
+      metadata: { schema: 'NIA', ticker: 'NIA', name: 'NIA', precision: 0, issuedSupply: '100' },
+      witnessOutputScripts: [scriptPubKey],
+      terminals: [{ bundleId: 'new-bundle', secretSeals: [''] }],
+      bundles: [{ id: 'new-bundle' }],
+      terminalAssignments: [{
+        opId: 'd'.repeat(64), assignmentIndex: 0, amount: '10',
+        bundleId: 'new-bundle', txid: 'b'.repeat(64), vout: 1,
+        secretSeal: '', blinding: 7n, output: { scriptPubKey, satoshis: 330 },
+      }],
+    } as any)
+    const service = new RgbService(dependencies)
+    await service.open(wallet)
+    const reasons: string[] = []
+
+    const result = await (service as any).validateIncomingConsignment(
+      {
+        recipientType: 'witness', witnessScriptPubKey: scriptPubKey,
+        proxyPrivateKey: '22'.repeat(32), proxyPublicKey: '33'.repeat(32),
+      },
+      {
+        recipientId: 'recipient',
+        payload: Buffer.from(Uint8Array.from([
+          1, 1, 0, 0, 0, 0, ...Buffer.from(NIA_V1_SCHEMA_ID, 'hex'),
+        ])).toString('base64'),
+      },
+      (reason: string) => reasons.push(reason)
+    )
+
+    expect(result).toBeUndefined()
+    expect(reasons).toEqual(['missing_proxy_sender_public_key'])
   })
 
   it('matches a v0 witness receive only in the newest witness bundle', async () => {

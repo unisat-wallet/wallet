@@ -2046,6 +2046,12 @@ export class RgbService {
       return mismatch(v1 ? 'asset_id' : 'asset_or_amount', { actualAssetId: assetId })
     const secret = receive.seal ? Buffer.from(concealBlindSeal(receive.seal)).toString('hex') : undefined
     const latestBundleId = bfa.bundles.at(-1)?.id
+    const proxyV1Witness = receive.recipientType === 'witness' &&
+      Boolean(receive.proxyPrivateKey || receive.proxyPublicKey)
+    if (proxyV1Witness && !receive.proxyPrivateKey)
+      return mismatch('missing_proxy_receiver_private_key')
+    if (proxyV1Witness && !item.proxySenderPublicKey)
+      return mismatch('missing_proxy_sender_public_key')
     const expectedWitnessBlinding = receive.recipientType === 'witness' &&
       receive.proxyPrivateKey && item.proxySenderPublicKey
       ? deriveProxyV1SealBlinding(receive.proxyPrivateKey, item.proxySenderPublicKey)
@@ -3211,13 +3217,18 @@ export class RgbService {
     }
     const invoice = burn ? undefined : decodeRgbInvoice(request.invoice)
     const requestedAssetId = normalizeAssetId(request.assetId)
-    if (burn && this.getLocalAssetDetail(requestedAssetId).schema?.toUpperCase() !== 'BFA')
+    const requestedAsset = this.getLocalAssetDetail(requestedAssetId)
+    const requestedAssetSchema = requestedAsset.schema?.toUpperCase()
+    if (burn && requestedAssetSchema !== 'BFA')
       throw new RgbServiceError('Only BFA assets can be burned')
     if (invoice?.assetId && invoice.assetId !== requestedAssetId) {
       throw new RgbServiceError('RGB invoice asset does not match the requested asset')
     }
+    if (invoice?.schema && requestedAssetSchema !== invoice.schema) {
+      throw new RgbServiceError('RGB invoice schema does not match the requested asset')
+    }
     if (
-      this.getLocalAssetDetail(requestedAssetId).schema?.toUpperCase() === 'BFA' &&
+      requestedAssetSchema === 'BFA' &&
       !burn && !invoice?.proxyPublicKey
     ) {
       throw new RgbServiceError('This invoice does not support the selected asset')
