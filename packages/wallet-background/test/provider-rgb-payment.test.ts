@@ -86,7 +86,7 @@ describe('provider RGB payment ownership', () => {
   it('normalizes a numeric payment amount before approval and preparation', async () => {
     const approval = Reflect.getMetadata('APPROVAL', providerController, 'prepareRgbPayment')
     const invoice =
-      'rgb:BQUFBQUF-BQUFBQU-FBQUFBQ-UFBQUFB-QUFBQUF-BQUFBQU/schema-id/~/bc:wvout:A8cJ7Ww3-NIzADo3-Tzp_5aD-7CTBWmA-AAAAAAA-AAAAAAA-ALSQkcw?amount=42&endpoints=rpcs%3A%2F%2Fproxy.example'
+      'rgb:BQUFBQUF-BQUFBQU-FBQUFBQ-UFBQUFB-QUFBQUF-BQUFBQU/~/~/bc:wvout:A8cJ7Ww3-NIzADo3-Tzp_5aD-7CTBWmA-AAAAAAA-AAAAAAA-ALSQkcw?amount=42&endpoints=rpcs%3A%2F%2Fproxy.example'
     const request = {
       data: {
         params: { invoice, assetId: 'rgb:asset', amount: 100 } as Record<string, any>,
@@ -126,7 +126,7 @@ describe('provider RGB payment ownership', () => {
     'adds untrusted invoice proxies to the existing %s approval',
     async method => {
       const invoice =
-        'rgb:BQUFBQUF-BQUFBQU-FBQUFBQ-UFBQUFB-QUFBQUF-BQUFBQU/schema-id/~/bc:wvout:A8cJ7Ww3-NIzADo3-Tzp_5aD-7CTBWmA-AAAAAAA-AAAAAAA-ALSQkcw?amount=42&endpoints=rpcs%3A%2F%2Fproxy.example'
+        'rgb:BQUFBQUF-BQUFBQU-FBQUFBQ-UFBQUFB-QUFBQUF-BQUFBQU/~/~/bc:wvout:A8cJ7Ww3-NIzADo3-Tzp_5aD-7CTBWmA-AAAAAAA-AAAAAAA-ALSQkcw?amount=42&endpoints=rpcs%3A%2F%2Fproxy.example'
       vi.mocked(wallet.getRgbProxyApprovalRequirement).mockResolvedValue({
         endpoints: ['https://proxy.example'],
       })

@@ -168,7 +168,10 @@ export class RgbTransferQuery {
         if (visited.has(key)) continue
         visited.add(key)
         const utxo = snapshotUtxos.get(key)
-        if (!utxo || ['spent', 'replaced', 'pending_spend'].includes(utxo.chainStatus)) continue
+        if (
+          !utxo?.chainStatus ||
+          ['spent', 'replaced', 'pending_spend'].includes(utxo.chainStatus)
+        ) continue
         for (const allocation of utxo.allocations) {
           if (allocation.assetId === transfer.request.assetId && allocation.settled && allocation.spendable)
             amount += BigInt(allocation.amount)

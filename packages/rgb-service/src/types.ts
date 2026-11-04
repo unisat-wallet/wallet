@@ -192,6 +192,7 @@ export interface RgbTransportConsignment extends RgbConsignment {
   proxyInvoiceId?: string
   proxyRecipientPublicKey?: string
   proxySenderPrivateKey?: string
+  proxyEncryption?: import('./protocol/invoice').RgbInvoiceEncryption
   signedRawTx?: string
   proxyExpirationTimestamp?: number
 }

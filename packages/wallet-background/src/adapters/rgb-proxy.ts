@@ -214,7 +214,9 @@ async function fetchWithTimeout(
       )
       return new Response(base64ToBytes(relayed.bodyBase64), {
         status: relayed.status,
-        headers: relayed.contentType ? { 'Content-Type': relayed.contentType } : undefined,
+        ...(relayed.contentType
+          ? { headers: { 'Content-Type': relayed.contentType } }
+          : {}),
       })
     }
     const response = await fetch(input, {

@@ -1139,10 +1139,11 @@ class ProviderController extends BaseController {
     if (!params.invoice) throw new Error('invoice is required')
     if (!params.assetId) throw new Error('assetId is required')
     await approveRgbPaymentProxy(params.rgbProxyApproval, approvalRes)
+    const amount = normalizeRgbPaymentAmount(params.amount)
     const prepared = await wallet.createRgbSendBegin({
       invoice: params.invoice,
       assetId: params.assetId,
-      ...(params.amount === undefined ? {} : { amount: normalizeRgbPaymentAmount(params.amount) }),
+      ...(amount === undefined ? {} : { amount }),
       ...(params.feeRate === undefined ? {} : { feeRate: params.feeRate }),
       providerOrigin: origin,
     })
