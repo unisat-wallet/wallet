@@ -117,6 +117,7 @@ export interface RgbTransferIntent {
   transition: import('./protocol/transition').RgbFungibleTransitionPlan
   /** Stable Proxy v1 sender operation key used to derive a witness seal. */
   proxySenderPrivateKey?: string
+  proxyEncryption?: import('./protocol/invoice').RgbInvoiceEncryption
 }
 
 /** Opaque RGB state received through transport, never constructed by an API. */
@@ -614,6 +615,7 @@ export interface RgbTransport {
     recipientId: string
     endpoints: string[]
     proxyPrivateKey?: string
+    encryption?: import('./protocol/invoice').RgbInvoiceEncryption
   }): Promise<RgbReceivedConsignment | undefined>
   /** Optional extension for fetching several receive invoices from a trusted proxy in one request. */
   getConsignments?(
@@ -621,6 +623,7 @@ export interface RgbTransport {
       recipientId: string
       endpoints: string[]
       proxyPrivateKey?: string
+      encryption?: import('./protocol/invoice').RgbInvoiceEncryption
     }>
   ): Promise<RgbReceivedConsignment[]>
   /** Read-only availability check using the invoice's declared proxy protocol. */

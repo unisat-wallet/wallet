@@ -1,11 +1,13 @@
 import { sha256 } from '@noble/hashes/sha256'
 import { RgbServiceError } from '../errors'
 import type { RgbNetwork } from '../types'
+import { BFA_SCHEMA_ID, NIA_V1_SCHEMA_ID } from './bfa-consignment'
 import { normalizeRgbAssetId } from './contract-id'
 import { decodeRgbInvoiceAmountState, encodeRgbInvoiceAmountState } from './invoice-amount'
 
 export type RgbInvoiceRecipientType = 'blind' | 'witness'
 export type RgbWitnessAddressType = 'p2pkh' | 'p2sh' | 'p2wpkh' | 'p2wsh' | 'p2tr'
+export type RgbInvoiceEncryption = 'required' | 'unsupported' | 'optional'
 
 export type RgbInvoiceSeal =
   | {
@@ -31,6 +33,9 @@ export interface RgbInvoice {
   proxyInvoiceId?: string
   assetId?: string
   amount?: string
+  schema?: 'NIA' | 'BFA'
+  assignmentName?: 'assetOwner'
+  encryption: RgbInvoiceEncryption
   recipientId: string
   /** Per-invoice proxy key: v1 invoice ID, legacy nonce key, or beneficiary. */
   proxyRecipientId: string
@@ -81,6 +86,19 @@ function getQueryValues(query: string, key: string) {
 function normalizeAssetId(value?: string) {
   if (!value || value === OMITTED) return undefined
   return normalizeRgbAssetId(value)
+}
+
+function decodeInvoiceSchema(value: string): RgbInvoice['schema'] {
+  if (value === OMITTED) return undefined
+  let schemaId: string
+  try {
+    schemaId = hex(decodeBaid64(value, 'rgb:sch', 32))
+  } catch {
+    throw new RgbServiceError('RGB invoice schema is invalid')
+  }
+  if (schemaId === NIA_V1_SCHEMA_ID) return 'NIA'
+  if (schemaId === BFA_SCHEMA_ID) return 'BFA'
+  throw new RgbServiceError('RGB invoice schema is not supported')
 }
 
 function invoiceNetwork(recipientId: string): RgbNetwork | undefined {
@@ -351,12 +369,32 @@ export function decodeRgbInvoice(invoice: string): RgbInvoice {
   if (amount !== undefined && !/^(0|[1-9][0-9]*)$/.test(amount)) {
     throw new Error('Invalid RGB invoice amount')
   }
+  const assignmentNames = getAllQueryValues(query, 'assignment_name')
+  if (assignmentNames.length > 1) throw new RgbServiceError('RGB invoice assignment is ambiguous')
+  const assignmentName = assignmentNames[0]
+  if (assignmentName !== undefined && assignmentName !== 'assetOwner') {
+    throw new RgbServiceError('RGB invoice assignment is not supported')
+  }
+  const supportedAssignmentName = assignmentName as 'assetOwner' | undefined
+  const encryptions = getAllQueryValues(query, 'enc')
+  if (encryptions.length > 1) throw new RgbServiceError('RGB invoice encryption is ambiguous')
+  const encryption: RgbInvoiceEncryption = encryptions[0] === undefined
+    ? 'required'
+    : encryptions[0] === '0'
+      ? 'unsupported'
+      : encryptions[0] === '1'
+        ? 'optional'
+        : (() => { throw new RgbServiceError('RGB invoice encryption preference is invalid') })()
+  const schema = decodeInvoiceSchema(segments[1]!)
 
   return {
     raw,
     ...(proxyPublicKey ? { proxyPublicKey, proxyInvoiceId: rgbProxyInvoiceId(recipientId, proxyPublicKey) } : {}),
     assetId: normalizeAssetId(queryAssetId || segments[0]),
     amount,
+    schema,
+    ...(supportedAssignmentName ? { assignmentName: supportedAssignmentName } : {}),
+    encryption,
     recipientId,
     proxyRecipientId: proxyPublicKey
       ? rgbProxyInvoiceId(recipientId, proxyPublicKey)
@@ -395,6 +433,7 @@ export function encodeWitnessRgbInvoice(input: {
   if (input.expirationTimestamp !== undefined)
     query.set('expiry', String(input.expirationTimestamp))
   query.set('endpoints', input.transportEndpoints.join(','))
+  query.set('assignment_name', 'assetOwner')
   if (input.proxyPublicKey) {
     rgbProxyInvoiceId(recipientId, input.proxyPublicKey)
     query.set('pk', input.proxyPublicKey)

@@ -300,6 +300,8 @@ describe('RGB proxy transport', () => {
       }
       expect(method).toBe('consignment.post')
       expect(form?.get('params[transfer_id]')).toBe(transferId)
+      expect(Buffer.from(await (form!.get('file') as File).arrayBuffer()).toString())
+        .toBe('donation')
       return rpcResponse(true)
     })
     const transport = createRgbProxyTransport([endpoint])
@@ -307,7 +309,8 @@ describe('RGB proxy transport', () => {
       recipientId: invoiceId, payload: Buffer.from('donation').toString('base64'),
       assetId: 'rgb:asset', opIds: ['aa'.repeat(32)], txid: 'bb'.repeat(32),
       endpoints: [endpoint], proxyInvoiceId: invoiceId, proxyRecipientPublicKey: recipientPk,
-      proxySenderPrivateKey: senderPrivateKey, signedRawTx: '01000000', donation: true,
+      proxySenderPrivateKey: senderPrivateKey, proxyEncryption: 'unsupported',
+      signedRawTx: '01000000', donation: true,
     })
     expect(methods).toEqual(['invoice.check', 'consignment.post'])
   })
@@ -407,13 +410,17 @@ describe('RGB proxy transport', () => {
 
       await expect(createRgbProxyTransport([endpoint]).getConsignment?.({
         recipientId: invoiceId, endpoints: [firstEndpoint, nextEndpoint],
-        proxyPrivateKey: '33'.repeat(32),
+        proxyPrivateKey: '33'.repeat(32), encryption: 'unsupported',
       })).resolves.toMatchObject({
         recipientId: invoiceId,
         payload: plaintext.toString('base64'),
         endpoint: nextEndpoint,
         proxyTransferId: transferId,
       })
+      await expect(createRgbProxyTransport([endpoint]).getConsignment?.({
+        recipientId: invoiceId, endpoints: [firstEndpoint, nextEndpoint],
+        proxyPrivateKey: '33'.repeat(32), encryption: 'required',
+      })).rejects.toThrow('cleartext for an encrypted invoice')
     }
   )
 

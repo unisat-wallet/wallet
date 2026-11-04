@@ -314,7 +314,9 @@ async function postProxyV1Consignment(
   const transferId = proxyV1TransferId(invoiceId, senderPublicKey)
   const plaintext = base64ToBytes(consignment.payload)
   const consignmentHash = proxyV1Hash(plaintext)
-  const file = proxyV1EncryptBlob(plaintext, senderPrivateKey, recipientPublicKey)
+  const file = consignment.proxyEncryption === 'unsupported'
+    ? plaintext
+    : proxyV1EncryptBlob(plaintext, senderPrivateKey, recipientPublicKey)
   const blobHash = proxyV1Hash(file)
   const check = await postJson<Record<string, { status: string; pow_difficulty: string }>>(
     endpoint,
@@ -428,6 +430,7 @@ async function getProxyV1Consignment(
     recipientId: string
     endpoints: string[]
     proxyPrivateKey?: string
+    encryption?: 'required' | 'unsupported' | 'optional'
   },
   options?: RgbProxyTransportOptions
 ): Promise<RgbReceivedConsignment | undefined> {
@@ -482,12 +485,19 @@ async function getProxyV1Consignment(
         throw new Error('RGB proxy returned a transfer with an invalid ID')
       }
       const blob = base64ToBytes(result.consignment)
+      const cleartext = proxyV1Hash(blob) === result.consignment_hash
+      const encryption = input.encryption ?? 'required'
+      if (encryption === 'required' && cleartext) {
+        throw new Error('RGB proxy returned cleartext for an encrypted invoice')
+      }
+      if (encryption === 'unsupported' && !cleartext) {
+        throw new Error('RGB proxy returned encrypted data for a cleartext invoice')
+      }
       let plaintext: Uint8Array
       try {
-        plaintext =
-          proxyV1Hash(blob) === result.consignment_hash
-            ? blob
-            : proxyV1DecryptBlob(blob, privateKey, result.sender_pk, result.consignment_hash)
+        plaintext = cleartext
+          ? blob
+          : proxyV1DecryptBlob(blob, privateKey, result.sender_pk, result.consignment_hash)
       } catch {
         throw new Error('RGB proxy returned a consignment with an invalid hash')
       }

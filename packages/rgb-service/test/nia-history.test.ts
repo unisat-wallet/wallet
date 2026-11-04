@@ -37,7 +37,7 @@ function transfer(input: {
 }) {
   const invoice = decodeRgbInvoice(
     input.invoice ||
-      `rgb:${input.assetId.slice(4)}/schema/~/bc:utxob:xDfmDF9g-yNOjriV-6Anbe6H-MLJ__g6-lo7Dd4f-dhWBW8S-XYGBm?amount=60`
+      `rgb:${input.assetId.slice(4)}/~/~/bc:utxob:xDfmDF9g-yNOjriV-6Anbe6H-MLJ__g6-lo7Dd4f-dhWBW8S-XYGBm?amount=60`
   )
   const prepared = prepareNiaOpretTransfer({
     network: 'mainnet',

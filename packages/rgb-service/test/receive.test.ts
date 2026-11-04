@@ -42,7 +42,7 @@ describe('blind RGB receive', () => {
         transportEndpoints: input.transportEndpoints,
       })
       const emptyQuery = encodeBlindRgbInvoice({ network: input.network, seal: input.seal })
-      expect(emptyQuery).not.toContain('?')
+      expect(emptyQuery).toContain('?assignment_name=assetOwner')
     } finally {
       vi.unstubAllGlobals()
     }

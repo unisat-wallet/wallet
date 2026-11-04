@@ -2153,7 +2153,7 @@ describe('RGB wallet references', () => {
     const ensureLease = vi.spyOn(wallet as any, 'ensureRgbWriteLease').mockResolvedValue(undefined)
 
     await wallet.createRgbSendBegin({
-      invoice: 'rgb:asset/schema/~/bc:utxob:recipient?amount=8888888888&endpoints=rpc://proxy',
+      invoice: 'rgb:asset/~/~/bc:utxob:recipient?amount=8888888888&endpoints=rpc://proxy',
       assetId: 'rgb:asset',
       amount: '8888888888',
       ticker: '*',

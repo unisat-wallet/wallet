@@ -132,6 +132,7 @@ export function encodeBlindRgbInvoice(input: {
     query.set('expiry', String(input.expirationTimestamp))
   if (input.transportEndpoints?.length)
     query.set('endpoints', input.transportEndpoints.join(','))
+  query.set('assignment_name', 'assetOwner')
   if (input.proxyPublicKey) {
     rgbProxyInvoiceId(recipientId, input.proxyPublicKey)
     query.set('pk', input.proxyPublicKey)

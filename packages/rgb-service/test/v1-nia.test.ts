@@ -31,7 +31,7 @@ function fixture() {
   })
   const assetId = `rgb:${Buffer.from(genesis.assetId).toString('hex')}`
   const invoice = decodeRgbInvoice(
-    `rgb:${assetId.slice(4)}/schema/~/bc:utxob:xDfmDF9g-yNOjriV-6Anbe6H-MLJ__g6-lo7Dd4f-dhWBW8S-XYGBm?amount=60`
+    `rgb:${assetId.slice(4)}/~/~/bc:utxob:xDfmDF9g-yNOjriV-6Anbe6H-MLJ__g6-lo7Dd4f-dhWBW8S-XYGBm?amount=60`
   )
   const prepared = prepareNiaOpretTransfer({
     network: 'mainnet', assetId, amount: '60',
@@ -249,7 +249,7 @@ describe('NIA v1 transfer', () => {
       }],
     }
     const invoice = decodeRgbInvoice(
-      `rgb:${assetId.slice(4)}/schema/~/bc:utxob:xDfmDF9g-yNOjriV-6Anbe6H-MLJ__g6-lo7Dd4f-dhWBW8S-XYGBm?amount=10`
+      `rgb:${assetId.slice(4)}/~/~/bc:utxob:xDfmDF9g-yNOjriV-6Anbe6H-MLJ__g6-lo7Dd4f-dhWBW8S-XYGBm?amount=10`
     )
     const validateForSend = vi.fn(validate)
     const encoder = createLocalRgbProtocolEncoder(validateForSend)
@@ -339,7 +339,7 @@ describe('NIA v1 transfer', () => {
       }],
     }
     const invoice = decodeRgbInvoice(
-      `rgb:${assetId.slice(4)}/schema/~/bc:utxob:xDfmDF9g-yNOjriV-6Anbe6H-MLJ__g6-lo7Dd4f-dhWBW8S-XYGBm?amount=10`
+      `rgb:${assetId.slice(4)}/~/~/bc:utxob:xDfmDF9g-yNOjriV-6Anbe6H-MLJ__g6-lo7Dd4f-dhWBW8S-XYGBm?amount=10`
     )
 
     await expect(encoder.prepareTransfer({
@@ -392,7 +392,7 @@ describe('NIA v1 transfer', () => {
     })
     const assetId = `rgb:${Buffer.from(genesis.assetId).toString('hex')}`
     const invoice = decodeRgbInvoice(
-      `rgb:${assetId.slice(4)}/schema/~/bc:utxob:xDfmDF9g-yNOjriV-6Anbe6H-MLJ__g6-lo7Dd4f-dhWBW8S-XYGBm?amount=60`
+      `rgb:${assetId.slice(4)}/~/~/bc:utxob:xDfmDF9g-yNOjriV-6Anbe6H-MLJ__g6-lo7Dd4f-dhWBW8S-XYGBm?amount=60`
     )
     const makeBranch = (vout: number) => {
       const assignmentIndex = genesis.allocationIndexes.indexOf(vout)

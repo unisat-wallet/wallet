@@ -41,7 +41,7 @@ const wallet: RgbWalletRef = {
 const blindRecipient = 'bc:utxob:xDfmDF9g-yNOjriV-6Anbe6H-MLJ__g6-lo7Dd4f-dhWBW8S-XYGBm'
 const proxyEndpoint = 'rpcs://proxy.example/json-rpc'
 const rgbInvoice = (amount = 60) =>
-  `rgb:AQEBAQEB-AQEBAQE-BAQEBAQ-EBAQEBA-QEBAQEB-AQEBAQE/schema/~/${blindRecipient}?amount=${amount}&endpoints=${encodeURIComponent(proxyEndpoint)}`
+  `rgb:AQEBAQEB-AQEBAQE-BAQEBAQ-EBAQEBA-QEBAQEB-AQEBAQE/~/~/${blindRecipient}?amount=${amount}&endpoints=${encodeURIComponent(proxyEndpoint)}`
 
 function swapPsbt(outpoints: Array<{ txid: string; vout: number }>) {
   const psbt = new Psbt()
@@ -1052,6 +1052,7 @@ describe('RgbService', () => {
       recipientId: receive.proxyRecipientId,
       endpoints: decodeRgbInvoice(receive.invoice).transportEndpoints,
       proxyPrivateKey: receive.proxyPrivateKey,
+      encryption: 'required',
     })
     expect(service.hasStoredPendingReceives()).toBe(false)
     expect(service.getUtxoInspection().invoiceReservations).toEqual([])
@@ -1591,7 +1592,7 @@ describe('RgbService', () => {
       const assignmentIndex = allocations.findIndex(item => item.txid === parentTxids[index])
       expect(assignmentIndex).toBeGreaterThanOrEqual(0)
       const invoice = decodeRgbInvoice(
-        `rgb:${contractId.slice(4)}/schema/~/${witnessRecipient}?amount=${amount}`
+        `rgb:${contractId.slice(4)}/~/~/${witnessRecipient}?amount=${amount}`
       )
       const prepared = prepareNiaOpretTransfer({
         network: 'mainnet', assetId: contractId, amount, recipientSeal: invoice.seal,
@@ -1690,7 +1691,7 @@ describe('RgbService', () => {
               transportEndpoints: [proxyEndpoint], proxyPublicKey: '33'.repeat(32),
             } : { assetId: contractId, amount: '60' }),
           })
-        : `rgb:${contractId.slice(4)}/schema/~/bc:wvout:A8cJ7Ww3-NIzADo3-Tzp_5aD-7CTBWmA-AAAAAAA-AAAAAAA-ALSQkcw?amount=60`)
+        : `rgb:${contractId.slice(4)}/~/~/bc:wvout:A8cJ7Ww3-NIzADo3-Tzp_5aD-7CTBWmA-AAAAAAA-AAAAAAA-ALSQkcw?amount=60`)
       const prepared = prepareNiaOpretTransfer({
         network: 'mainnet', assetId: contractId, amount: '60', recipientSeal: invoice.seal,
         selectedUtxos: [{
@@ -1783,7 +1784,7 @@ describe('RgbService', () => {
     await (service as any).getProxyConsignments()
 
     expect(getConsignments).toHaveBeenCalledWith([
-      { recipientId: 'recipient', endpoints: [proxyEndpoint] },
+      { recipientId: 'recipient', endpoints: [proxyEndpoint], encryption: 'required' },
     ])
     expect(dependencies.transport.getConsignment).not.toHaveBeenCalled()
   })
@@ -2541,7 +2542,7 @@ describe('RgbService', () => {
     const receivedSeal = { txid: 'd'.repeat(64), vout: 0, blinding: 5n }
     const invoice = decodeRgbInvoice(recipient === 'blind'
       ? encodeBlindRgbInvoice({ network: 'mainnet', seal: receivedSeal, assetId, amount: '60' })
-      : `${rawAssetId}/schema/~/` + blindRecipient + '?amount=60')
+      : `${rawAssetId}/~/~/` + blindRecipient + '?amount=60')
     const prepared = prepareNiaOpretTransfer({
       network: 'mainnet', assetId: rawAssetId, amount: '60',
       selectedUtxos: [{
@@ -2729,7 +2730,7 @@ describe('RgbService', () => {
       service.prepareSend({
         assetId: 'rgb:AQEBAQEB-AQEBAQE-BAQEBAQ-EBAQEBA-QEBAQEB-AQEBAQE',
         amount: '60',
-        invoice: `rgb:AQEBAQEB-AQEBAQE-BAQEBAQ-EBAQEBA-QEBAQEB-AQEBAQE/schema/~/${blindRecipient}?amount=60`,
+        invoice: `rgb:AQEBAQEB-AQEBAQE-BAQEBAQ-EBAQEBA-QEBAQEB-AQEBAQE/~/~/${blindRecipient}?amount=60`,
         feeRate: 2,
       })
     ).rejects.toThrow('RGB invoice has no proxy transport endpoint')
@@ -3902,7 +3903,7 @@ describe('RgbService', () => {
       service.prepareSend({
         assetId: 'rgb:AQEBAQEB-AQEBAQE-BAQEBAQ-EBAQEBA-QEBAQEB-AQEBAQE',
         amount: '60',
-        invoice: `rgb:AgICAgIC-AgICAgI-CAgICAg-ICAgICA-gICAgIC-AgICAgI/schema/~/${blindRecipient}`,
+        invoice: `rgb:AgICAgIC-AgICAgI-CAgICAg-ICAgICA-gICAgIC-AgICAgI/~/~/${blindRecipient}`,
         feeRate: 2,
       })
     ).rejects.toThrow('RGB invoice asset does not match the requested asset')
@@ -3939,7 +3940,7 @@ describe('RgbService', () => {
     await service.prepareSend({
       assetId: 'rgb:AQEBAQEB-AQEBAQE-BAQEBAQ-EBAQEBA-QEBAQEB-AQEBAQE',
       amount: '60',
-      invoice: `rgb:AQEBAQEB-AQEBAQE-BAQEBAQ-EBAQEBA-QEBAQEB-AQEBAQE/schema/~/${blindRecipient}?amount=60&endpoints=${encodeURIComponent(proxyEndpoint)}`,
+      invoice: `rgb:AQEBAQEB-AQEBAQE-BAQEBAQ-EBAQEBA-QEBAQEB-AQEBAQE/~/~/${blindRecipient}?amount=60&endpoints=${encodeURIComponent(proxyEndpoint)}`,
       feeRate: 2,
     })
 
@@ -4949,6 +4950,7 @@ describe('RgbService', () => {
     expect(dependencies.transport.getConsignment).toHaveBeenCalledWith({
       recipientId: 'recipient',
       endpoints: [proxyEndpoint],
+      encryption: 'required',
     })
     expect(advanceAcceptedReceive).toHaveBeenCalled()
   })

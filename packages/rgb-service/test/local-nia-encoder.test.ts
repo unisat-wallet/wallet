@@ -27,8 +27,8 @@ function rootTransferInput({ witness = false } = {}) {
   const contract = Buffer.from(encodeNiaContract(genesis).strict).toString('base64')
   const invoice = decodeRgbInvoice(
     witness
-      ? `rgb:${assetId.slice(4)}/schema/~/bc:wvout:A8cJ7Ww3-NIzADo3-Tzp_5aD-7CTBWmA-AAAAAAA-AAAAAAA-ALSQkcw?amount=60`
-      : `rgb:${assetId.slice(4)}/schema/~/bc:utxob:xDfmDF9g-yNOjriV-6Anbe6H-MLJ__g6-lo7Dd4f-dhWBW8S-XYGBm?amount=60`
+      ? `rgb:${assetId.slice(4)}/~/~/bc:wvout:A8cJ7Ww3-NIzADo3-Tzp_5aD-7CTBWmA-AAAAAAA-AAAAAAA-ALSQkcw?amount=60`
+      : `rgb:${assetId.slice(4)}/~/~/bc:utxob:xDfmDF9g-yNOjriV-6Anbe6H-MLJ__g6-lo7Dd4f-dhWBW8S-XYGBm?amount=60`
   )
   const utxo = {
     outpoint: { txid, vout: 0 },

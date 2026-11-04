@@ -5,7 +5,7 @@ import { decodeRgbInvoice, prepareNiaOpretTransfer } from '../src'
 describe('prepareNiaOpretTransfer', () => {
   it('locally combines NIA transition, bundle message and Opret PSBT commitment', () => {
     const invoice = decodeRgbInvoice(
-      'rgb:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/schema/~/bc:utxob:xDfmDF9g-yNOjriV-6Anbe6H-MLJ__g6-lo7Dd4f-dhWBW8S-XYGBm'
+      'rgb:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/~/~/bc:utxob:xDfmDF9g-yNOjriV-6Anbe6H-MLJ__g6-lo7Dd4f-dhWBW8S-XYGBm'
     )
     const prepared = prepareNiaOpretTransfer({
       network: 'mainnet',

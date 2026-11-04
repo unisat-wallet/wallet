@@ -54,12 +54,15 @@ describe('decodeRgbInvoice', () => {
 
   it('decodes invoice identity, amount and transport without a network request', () => {
     const invoice = decodeRgbInvoice(
-      'rgb:BQUFBQUF-BQUFBQU-FBQUFBQ-UFBQUFB-QUFBQUF-BQUFBQU/schema-id/~/bc:wvout:A8cJ7Ww3-NIzADo3-Tzp_5aD-7CTBWmA-AAAAAAA-AAAAAAA-ALSQkcw?amount=42&endpoints=rpcs%3A%2F%2Fproxy.example'
+      'rgb:BQUFBQUF-BQUFBQU-FBQUFBQ-UFBQUFB-QUFBQUF-BQUFBQU/RWhwUfTMpuP2Zfx1~j4nswCANGeJrYOqDcKelaMV4zU/~/bc:wvout:A8cJ7Ww3-NIzADo3-Tzp_5aD-7CTBWmA-AAAAAAA-AAAAAAA-ALSQkcw?amount=42&assignment_name=assetOwner&enc=1&endpoints=rpcs%3A%2F%2Fproxy.example'
     )
 
     expect(invoice).toMatchObject({
       assetId: 'rgb:BQUFBQUF-BQUFBQU-FBQUFBQ-UFBQUFB-QUFBQUF-BQUFBQU',
       amount: '42',
+      schema: 'NIA',
+      assignmentName: 'assetOwner',
+      encryption: 'optional',
       recipientId: 'bc:wvout:A8cJ7Ww3-NIzADo3-Tzp_5aD-7CTBWmA-AAAAAAA-AAAAAAA-ALSQkcw',
       recipientType: 'witness',
       network: 'mainnet',
@@ -69,9 +72,21 @@ describe('decodeRgbInvoice', () => {
     expect(invoice.seal.type === 'witness' && invoice.seal.pay2vout).toHaveLength(33)
   })
 
+  it('rejects unsupported assignment, schema and encryption semantics', () => {
+    const recipientId = 'bc:utxob:xDfmDF9g-yNOjriV-6Anbe6H-MLJ__g6-lo7Dd4f-dhWBW8S-XYGBm'
+    expect(() => decodeRgbInvoice(
+      `rgb:~/~/~/${recipientId}?assignment_name=mintRight`
+    )).toThrow('assignment is not supported')
+    expect(() => decodeRgbInvoice(
+      `rgb:~/RWhwUfTMpuP2Zfx1~j4nswCANGeJrYOqDcKelaMV4zV/~/${recipientId}`
+    )).toThrow('schema')
+    expect(() => decodeRgbInvoice(`rgb:~/~/~/${recipientId}?enc=2`))
+      .toThrow('encryption preference')
+  })
+
   it('decodes and validates blind seals locally', () => {
     const invoice = decodeRgbInvoice(
-      'rgb:AQEBAQEB-AQEBAQE-BAQEBAQ-EBAQEBA-QEBAQEB-AQEBAQE/schema/~/bc:utxob:xDfmDF9g-yNOjriV-6Anbe6H-MLJ__g6-lo7Dd4f-dhWBW8S-XYGBm'
+      'rgb:AQEBAQEB-AQEBAQE-BAQEBAQ-EBAQEBA-QEBAQEB-AQEBAQE/~/~/bc:utxob:xDfmDF9g-yNOjriV-6Anbe6H-MLJ__g6-lo7Dd4f-dhWBW8S-XYGBm'
     )
     expect(invoice.recipientType).toBe('blind')
     expect(invoice.seal).toMatchObject({ type: 'confidential' })
@@ -81,10 +96,10 @@ describe('decodeRgbInvoice', () => {
   it('rejects malformed beneficiary seals before planning a transfer', () => {
     expect(() =>
       decodeRgbInvoice(
-        'rgb:AQEBAQEB-AQEBAQE-BAQEBAQ-EBAQEBA-QEBAQEB-AQEBAQE/schema/~/bc:utxob:xDfmDF9g-yNOjriV-6Anbe6H-MLJ__g6-lo7Dd4f-dhWBW8S-XYGBn'
+        'rgb:AQEBAQEB-AQEBAQE-BAQEBAQ-EBAQEBA-QEBAQEB-AQEBAQE/~/~/bc:utxob:xDfmDF9g-yNOjriV-6Anbe6H-MLJ__g6-lo7Dd4f-dhWBW8S-XYGBn'
       )
     ).toThrow('checksum')
-    expect(() => decodeRgbInvoice('rgb:AQEBAQEB-AQEBAQE-BAQEBAQ-EBAQEBA-QEBAQEB-AQEBAQE/schema/~/bc:tapret:recipient')).toThrow(
+    expect(() => decodeRgbInvoice('rgb:AQEBAQEB-AQEBAQE-BAQEBAQ-EBAQEBA-QEBAQEB-AQEBAQE/~/~/bc:tapret:recipient')).toThrow(
       'utxob or wvout'
     )
   })
@@ -94,7 +109,7 @@ describe('decodeRgbInvoice', () => {
       'bc:utxob:xDfmDF9g-yNOjriV-6Anbe6H-MLJ__g6-lo7Dd4f-dhWBW8S-XYGBm'
     const assetId = 'AQEBAQEB-AQEBAQE-BAQEBAQ-EBAQEBA-QEBAQEB-AQEBAQE'
 
-    expect(() => decodeRgbInvoice(`rgb:${assetId}/extra/schema/~/${recipientId}`)).toThrow(
+    expect(() => decodeRgbInvoice(`rgb:${assetId}/extra/~/~/${recipientId}`)).toThrow(
       'Invalid RGB invoice payload'
     )
   })

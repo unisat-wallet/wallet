@@ -4,7 +4,7 @@ import { completeRgbOpretPsbt, decodeRgbInvoice, prepareNiaOpretTransfer } from 
 
 function preparedPsbt() {
   const invoice = decodeRgbInvoice(
-    'rgb:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/schema/~/bc:utxob:xDfmDF9g-yNOjriV-6Anbe6H-MLJ__g6-lo7Dd4f-dhWBW8S-XYGBm'
+    'rgb:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/~/~/bc:utxob:xDfmDF9g-yNOjriV-6Anbe6H-MLJ__g6-lo7Dd4f-dhWBW8S-XYGBm'
   )
   return prepareNiaOpretTransfer({
     network: 'mainnet',

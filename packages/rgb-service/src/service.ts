@@ -3839,6 +3839,7 @@ export class RgbService {
         proxyInvoiceId: invoice.proxyInvoiceId,
         proxyRecipientPublicKey: invoice.proxyPublicKey,
         proxySenderPrivateKey: pending.proxySenderPrivateKey,
+        proxyEncryption: invoice.encryption,
         signedRawTx: delivery.completed.rawTx,
         proxyExpirationTimestamp: invoice.expirationTimestamp,
       } : {}),
@@ -3927,6 +3928,7 @@ export class RgbService {
         proxyInvoiceId: invoice.proxyInvoiceId,
         proxyRecipientPublicKey: invoice.proxyPublicKey,
         proxySenderPrivateKey: pending.proxySenderPrivateKey,
+        proxyEncryption: invoice.encryption,
         signedRawTx: delivery.completed.rawTx,
         proxyExpirationTimestamp: invoice.expirationTimestamp,
       } : {}),
@@ -4117,9 +4119,15 @@ export class RgbService {
       )
       .flatMap(receive => {
         try {
-          const endpoints = decodeRgbInvoice(receive.invoice).transportEndpoints
+          const invoice = decodeRgbInvoice(receive.invoice)
+          const endpoints = invoice.transportEndpoints
           return endpoints.length
-            ? [{ recipientId: receive.proxyRecipientId || receive.recipientId, endpoints, proxyPrivateKey: receive.proxyPrivateKey }]
+            ? [{
+                recipientId: receive.proxyRecipientId || receive.recipientId,
+                endpoints,
+                ...(receive.proxyPrivateKey ? { proxyPrivateKey: receive.proxyPrivateKey } : {}),
+                encryption: invoice.encryption,
+              }]
             : []
         } catch {
           // Malformed migrated state must not block valid receives. Keep the

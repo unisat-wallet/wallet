@@ -54,7 +54,7 @@ describe('decodeNiaConsignment', () => {
     const encoded = genesis()
     const assetId = `rgb:${Buffer.from(encoded.assetId).toString('hex')}`
     const invoice = decodeRgbInvoice(
-      `rgb:${assetId.slice(4)}/schema/~/bc:utxob:xDfmDF9g-yNOjriV-6Anbe6H-MLJ__g6-lo7Dd4f-dhWBW8S-XYGBm?amount=60`
+      `rgb:${assetId.slice(4)}/~/~/bc:utxob:xDfmDF9g-yNOjriV-6Anbe6H-MLJ__g6-lo7Dd4f-dhWBW8S-XYGBm?amount=60`
     )
     const prepared = prepareNiaOpretTransfer({
       network: 'mainnet',
@@ -158,7 +158,7 @@ describe('decodeNiaConsignment', () => {
     const encoded = genesis()
     const assetId = `rgb:${Buffer.from(encoded.assetId).toString('hex')}`
     const invoice = decodeRgbInvoice(
-      `rgb:${assetId.slice(4)}/schema/~/bc:wvout:A8cJ7Ww3-NIzADo3-Tzp_5aD-7CTBWmA-AAAAAAA-AAAAAAA-ALSQkcw?amount=60`
+      `rgb:${assetId.slice(4)}/~/~/bc:wvout:A8cJ7Ww3-NIzADo3-Tzp_5aD-7CTBWmA-AAAAAAA-AAAAAAA-ALSQkcw?amount=60`
     )
     const prepared = prepareNiaOpretTransfer({
       network: 'mainnet',
@@ -233,7 +233,7 @@ describe('decodeNiaConsignment', () => {
     const encoded = genesis()
     const assetId = `rgb:${Buffer.from(encoded.assetId).toString('hex')}`
     const invoice = decodeRgbInvoice(
-      `rgb:${assetId.slice(4)}/schema/~/bc:utxob:xDfmDF9g-yNOjriV-6Anbe6H-MLJ__g6-lo7Dd4f-dhWBW8S-XYGBm?amount=60`
+      `rgb:${assetId.slice(4)}/~/~/bc:utxob:xDfmDF9g-yNOjriV-6Anbe6H-MLJ__g6-lo7Dd4f-dhWBW8S-XYGBm?amount=60`
     )
     const prepared = prepareNiaOpretTransfer({
       network: 'mainnet',
@@ -311,7 +311,7 @@ describe('decodeNiaConsignment', () => {
     const encoded = genesis()
     const assetId = `rgb:${Buffer.from(encoded.assetId).toString('hex')}`
     const invoice = decodeRgbInvoice(
-      `rgb:${assetId.slice(4)}/schema/~/bc:utxob:xDfmDF9g-yNOjriV-6Anbe6H-MLJ__g6-lo7Dd4f-dhWBW8S-XYGBm?amount=60`
+      `rgb:${assetId.slice(4)}/~/~/bc:utxob:xDfmDF9g-yNOjriV-6Anbe6H-MLJ__g6-lo7Dd4f-dhWBW8S-XYGBm?amount=60`
     )
     if (invoice.seal.type !== 'confidential') throw new Error('Expected a confidential invoice')
     const revealedTxid = '000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f'
