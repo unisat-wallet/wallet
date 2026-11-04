@@ -291,6 +291,8 @@ export interface RgbPendingReceive {
     proxySenderPublicKey?: string
     proxySenderEndpoint?: string
     proxyConsignmentHash?: string
+    /** Fully signed terminal witness embedded by a donation sender. */
+    signedRawTx?: string
     assetId: string
     amount: string
     /** Contract precision decoded from the validated consignment. */

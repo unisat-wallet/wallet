@@ -52,7 +52,10 @@ export interface ValidatedBfaConsignment extends ValidatedBfaTransferHistory {
     txid: string; vout: number; secretSeal: string; blinding?: bigint
     output?: { scriptPubKey: string; satoshis: number }
   }>
-  bundles: Array<{ id: string; txid: string; strict: Uint8Array; operationIds: string[]; parentOpIds: string[] }>
+  bundles: Array<{
+    id: string; txid: string; strict: Uint8Array; signedRawTx?: string
+    operationIds: string[]; parentOpIds: string[]
+  }>
 }
 
 /** Local-only validation summary; the canonical consignment remains the source of bundle bytes. */
@@ -754,9 +757,14 @@ function buildValidatedConsignment(
       .map(output => output.script.toString('hex')),
     terminals: terminals.map(item => ({ bundleId: item.bundleId, secretSeals: item.secrets })),
     terminalAssignments,
-    bundles: bundles.map(bundle => ({ id: bundle.id, txid: bundle.txid, strict: bundle.strict,
+    bundles: bundles.map(bundle => ({
+      id: bundle.id, txid: bundle.txid, strict: bundle.strict,
+      ...(bundle.tx.ins.length && bundle.tx.ins.every(input =>
+        input.witness.length > 0 || input.script.length > 0
+      ) ? { signedRawTx: bundle.tx.toHex() } : {}),
       operationIds: bundle.operations.map(operation => operation.id),
-      parentOpIds: bundle.operations.flatMap(operation => operation.inputs.map(input => input.opId)) })),
+      parentOpIds: bundle.operations.flatMap(operation => operation.inputs.map(input => input.opId)),
+    })),
   }
 }
 

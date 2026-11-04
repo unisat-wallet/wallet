@@ -1606,7 +1606,9 @@ export class RgbService {
               await this.acknowledgeProxyConsignment(item, true)
             } catch (error) {
               if (!(error instanceof RgbProxyOperationNotFoundError &&
-                await this.isReceiveAnchorBroadcast(match.txid))) {
+                await this.ensureDonationAnchorBroadcast(
+                  match.txid, match.signedRawTx || receive.pendingAccept?.signedRawTx
+                ))) {
                 if (isProxySignedTransactionCleared(error)) {
                   this.recordReceiveOutcome(receive, 'canceled', match.txid)
                   pending.splice(receiveIndex, 1)
@@ -1686,6 +1688,7 @@ export class RgbService {
             proxySenderPublicKey: item.proxySenderPublicKey,
             proxySenderEndpoint: item.proxySenderEndpoint,
             proxyConsignmentHash: item.proxyConsignmentHash,
+            signedRawTx: match.signedRawTx,
             assetId: match.assetId,
             amount: match.amount,
             precision,
@@ -1845,7 +1848,7 @@ export class RgbService {
       await this.acknowledgeProxyConsignment(item, true)
     } catch (error) {
       if (!(error instanceof RgbProxyOperationNotFoundError &&
-        await this.isReceiveAnchorBroadcast(item.txid))) {
+        await this.ensureDonationAnchorBroadcast(item.txid, receive.pendingAccept.signedRawTx))) {
         if (!isProxySignedTransactionCleared(error)) throw error
         this.recordReceiveOutcome(receive, 'canceled', receive.pendingAccept.txid)
         state.pendingReceives = pending.filter(item => item !== receive)
@@ -2079,6 +2082,7 @@ export class RgbService {
         assignmentIndex: assignment.assignmentIndex,
         amount: assignment.amount,
       })),
+      signedRawTx: bfa.bundles.find(bundle => bundle.id === candidate.bundleId)?.signedRawTx,
       counterpartyScriptPubKeys: bfa.witnessOutputScripts,
       historyPayload: Buffer.from(payload).toString('base64'),
       ...(v1 ? {} : { legacyPayload: item.payload }),
@@ -2299,13 +2303,15 @@ export class RgbService {
     if (await this.isProxyAckRejected(receive, receive.pendingAccept?.endpoint)) return true
     const getConsignment = this.dependencies.transport.getConsignment
     if (!getConsignment || !receive.pendingAccept) return false
-    const endpoints = decodeRgbInvoice(receive.invoice).transportEndpoints
+    const invoice = decodeRgbInvoice(receive.invoice)
+    const endpoints = invoice.transportEndpoints
     if (!endpoints.length) return false
     try {
       const consignment = await getConsignment({
         recipientId: receive.proxyRecipientId || receive.recipientId,
         endpoints,
         proxyPrivateKey: receive.proxyPrivateKey,
+        encryption: invoice.encryption,
       })
       return !consignment
     } catch {
@@ -2313,7 +2319,17 @@ export class RgbService {
     }
   }
 
-  /** A v1 donation has no sender ACK operation; its valid witness must already be on Bitcoin. */
+  /** A v1 donation has no sender ACK operation; broadcast its validated signed witness if needed. */
+  private async ensureDonationAnchorBroadcast(txid: string, signedRawTx?: string) {
+    if (await this.isReceiveAnchorBroadcast(txid)) return true
+    if (!signedRawTx) return false
+    const broadcastTxid = await this.dependencies.broadcaster.broadcast(signedRawTx)
+    if (broadcastTxid !== txid) {
+      throw new RgbServiceError('Broadcast transaction ID does not match the RGB donation')
+    }
+    return true
+  }
+
   private async isReceiveAnchorBroadcast(txid: string) {
     const getStatus = this.dependencies.stateSource.getTransactionStatus
     if (!getStatus) return false

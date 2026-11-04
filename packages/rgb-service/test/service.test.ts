@@ -4260,7 +4260,7 @@ describe('RgbService', () => {
     expect((service as any).state.pendingReceives[0].receivedConsignment).toBeUndefined()
   })
 
-  it('accepts a proxy v1 donation only after its Bitcoin witness is broadcast', async () => {
+  it('broadcasts the signed witness when accepting a proxy v1 donation', async () => {
     const dependencies = createDependencies()
     dependencies.transport.getAcknowledgement = vi.fn().mockResolvedValue(undefined)
     dependencies.transport.acknowledgeConsignment = vi.fn().mockRejectedValue(new RgbProxyOperationNotFoundError())
@@ -4277,24 +4277,18 @@ describe('RgbService', () => {
         txid: 'c'.repeat(64),
         endpoint: proxyEndpoint,
         proxyTransferId: 'd'.repeat(64),
+        signedRawTx: '020000000001',
         assetId: 'rgb:AQEBAQEB-AQEBAQE-BAQEBAQ-EBAQEBA-QEBAQEB-AQEBAQE',
         amount: '60',
         discoveredAt: 1,
       },
     }]
 
-    await expect(service.acceptReceive('recipient')).rejects.toBeInstanceOf(RgbProxyOperationNotFoundError)
-    expect((service as any).state.pendingReceives[0].receivedConsignment).toMatchObject({
-      acknowledgementPending: true,
-    })
-    expect((service as any).state.pendingReceives[0].receivedConsignment.accepted).toBeUndefined()
-
-    vi.mocked(dependencies.stateSource.getTransactionStatus!).mockResolvedValue({ status: 'mempool', confirmations: 0 })
     await expect(service.acceptReceive('recipient')).resolves.toEqual({ accepted: true, status: 'accepted' })
     expect((service as any).state.pendingReceives[0].receivedConsignment).toMatchObject({ accepted: true })
     expect((service as any).state.pendingReceives[0].receivedConsignment).not.toHaveProperty('acknowledgementPending')
-    expect(dependencies.transport.acknowledgeConsignment).toHaveBeenCalledTimes(2)
-    expect(dependencies.broadcaster.broadcast).not.toHaveBeenCalled()
+    expect(dependencies.transport.acknowledgeConsignment).toHaveBeenCalledTimes(1)
+    expect(dependencies.broadcaster.broadcast).toHaveBeenCalledWith('020000000001')
   })
 
   it('shows an accepted receive as incoming pending without making it spendable or counting it twice', async () => {
