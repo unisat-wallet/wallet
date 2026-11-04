@@ -599,65 +599,93 @@ export function createRgbProxyTransport(
     getEndpoints: () => endpoints,
 
     prepareInvoice: async ({ recipientId, endpoints: invoiceEndpoints, expirationTimestamp }) => {
-      const serverInfos = await Promise.all(
+      const serverResults = await Promise.all(
         invoiceEndpoints.map(async endpoint => {
-          const body = await postJson<ProxyServerInfo>(endpoint, 'server.info', {}, options)
-          if (body.error?.code === -32601) return { protocol_version: '0.2' } as ProxyServerInfo
-          if (body.error || !body.result?.protocol_version) {
-            throw new Error(
-              `RGB proxy server.info failed: ${body.error?.message || body.error?.code || 'invalid response'}`
-            )
+          try {
+            const body = await postJson<ProxyServerInfo>(endpoint, 'server.info', {}, options)
+            if (body.error?.code === -32601) {
+              return { endpoint, protocol: 'legacy' as const }
+            }
+            if (body.error || !body.result?.protocol_version) {
+              throw new Error(
+                `RGB proxy server.info failed: ${body.error?.message || body.error?.code || 'invalid response'}`
+              )
+            }
+            if (body.result.protocol_version === '0.2') {
+              return { endpoint, protocol: 'legacy' as const }
+            }
+            if (body.result.protocol_version !== '1.0') {
+              throw new Error(
+                `RGB proxy server.info returned unsupported protocol ${body.result.protocol_version}`
+              )
+            }
+            return { endpoint, protocol: 'v1' as const, info: body.result }
+          } catch (error) {
+            return { endpoint, protocol: 'error' as const, error }
           }
-          return body.result
         })
       )
-      if (serverInfos.every(info => info.protocol_version === '0.2')) return undefined
-      if (!serverInfos.every(info => info.protocol_version === '1.0')) {
-        throw new Error('RGB invoice endpoints use incompatible proxy protocol versions')
+      const hasLegacyEndpoint = serverResults.some(result => result.protocol === 'legacy')
+      let lastError: unknown
+      const v1Endpoints: Array<{ endpoint: string; info: ProxyServerInfo }> = []
+      for (const result of serverResults) {
+        if (result.protocol === 'error') lastError = result.error
+        if (result.protocol === 'v1') {
+          v1Endpoints.push({ endpoint: result.endpoint, info: result.info })
+        }
+      }
+      if (!v1Endpoints.length) {
+        if (hasLegacyEndpoint || !invoiceEndpoints.length) return undefined
+        throw lastError || new Error('RGB proxy endpoint is missing')
       }
       const now = Math.floor(Date.now() / 1000)
       const expiresAt = expirationTimestamp ?? now + 7 * 24 * 60 * 60
       if (!Number.isSafeInteger(expiresAt) || expiresAt <= now) {
         throw new Error('RGB proxy v1 invoice requires a future expiration time')
       }
-      for (const info of serverInfos) {
-        const serverNow = Number(info.current_time)
-        const maxExpiry = Number(info.max_expiry_secs)
-        if (
-          !Number.isSafeInteger(serverNow) ||
-          !Number.isSafeInteger(maxExpiry) ||
-          expiresAt <= serverNow ||
-          expiresAt > serverNow + maxExpiry
-        ) {
-          throw new Error('RGB invoice expiration exceeds the proxy v1 limit')
-        }
-      }
       const privateKey = ed25519.utils.randomPrivateKey()
       const publicKey = Buffer.from(ed25519.getPublicKey(privateKey)).toString('hex')
       const invoiceId = rgbProxyInvoiceId(recipientId, publicKey)
-      for (const endpoint of invoiceEndpoints) {
-        const body = await postJson<boolean>(
-          endpoint,
-          'invoice.prepare',
-          {
-            invoice_id: invoiceId,
-            expires_at: String(expiresAt),
-            recipient_pk: publicKey,
-            quota: '1',
-          },
-          options
-        )
-        if (body.error)
-          throw new Error(
-            `RGB proxy invoice.prepare failed: ${body.error.message || body.error.code}`
+      for (const { endpoint, info } of v1Endpoints) {
+        try {
+          const serverNow = Number(info.current_time)
+          const maxExpiry = Number(info.max_expiry_secs)
+          if (
+            !Number.isSafeInteger(serverNow) ||
+            !Number.isSafeInteger(maxExpiry) ||
+            expiresAt <= serverNow ||
+            expiresAt > serverNow + maxExpiry
+          ) {
+            throw new Error('RGB invoice expiration exceeds the proxy v1 limit')
+          }
+          const body = await postJson<boolean>(
+            endpoint,
+            'invoice.prepare',
+            {
+              invoice_id: invoiceId,
+              expires_at: String(expiresAt),
+              recipient_pk: publicKey,
+              quota: '1',
+            },
+            options
           )
+          if (body.error) {
+            throw new Error(
+              `RGB proxy invoice.prepare failed: ${body.error.message || body.error.code}`
+            )
+          }
+          return {
+            publicKey,
+            privateKey: Buffer.from(privateKey).toString('hex'),
+            invoiceId,
+            expirationTimestamp: expiresAt,
+          }
+        } catch (error) {
+          lastError = error
+        }
       }
-      return {
-        publicKey,
-        privateKey: Buffer.from(privateKey).toString('hex'),
-        invoiceId,
-        expirationTimestamp: expiresAt,
-      }
+      if (hasLegacyEndpoint) return undefined
+      throw lastError || new Error('RGB proxy invoice.prepare failed')
     },
 
     publishConsignment: async consignment => {

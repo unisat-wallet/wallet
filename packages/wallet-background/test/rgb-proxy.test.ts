@@ -521,6 +521,76 @@ describe('RGB proxy transport', () => {
     })).resolves.toBeUndefined()
   })
 
+  it('prepares an invoice when at least one proxy v1 endpoint is available', async () => {
+    const offlineEndpoint = 'rpcs://offline.example/json-rpc'
+    const availableEndpoint = 'rpcs://available.example/json-rpc'
+    const expiresAt = Math.floor(Date.now() / 1000) + 3600
+    const methods: Array<{ url: string; method: string }> = []
+    fetchMock.mockImplementation(async (url: string, init: RequestInit) => {
+      const { method } = JSON.parse(init.body as string)
+      methods.push({ url, method })
+      if (url === 'https://offline.example/json-rpc') throw new Error('proxy offline')
+      if (method === 'server.info') {
+        return rpcResponse({
+          protocol_version: '1.0',
+          current_time: String(Math.floor(Date.now() / 1000)),
+          max_expiry_secs: '86400',
+        })
+      }
+      expect(method).toBe('invoice.prepare')
+      return rpcResponse(true)
+    })
+
+    await expect(createRgbProxyTransport([availableEndpoint]).prepareInvoice?.({
+      recipientId,
+      endpoints: [offlineEndpoint, availableEndpoint],
+      expirationTimestamp: expiresAt,
+    })).resolves.toEqual(expect.objectContaining({ expirationTimestamp: expiresAt }))
+    expect(methods).toContainEqual({
+      url: 'https://available.example/json-rpc',
+      method: 'invoice.prepare',
+    })
+  })
+
+  it('uses a healthy legacy proxy when proxy v1 registration is unavailable', async () => {
+    const legacyEndpoint = 'rpcs://legacy.example/json-rpc'
+    const v1Endpoint = 'rpcs://v1.example/json-rpc'
+    const expiresAt = Math.floor(Date.now() / 1000) + 3600
+    fetchMock.mockImplementation(async (url: string, init: RequestInit) => {
+      const { method } = JSON.parse(init.body as string)
+      if (url === 'https://legacy.example/json-rpc') {
+        expect(method).toBe('server.info')
+        return rpcError(-32601, 'Method not found')
+      }
+      if (method === 'server.info') {
+        return rpcResponse({
+          protocol_version: '1.0',
+          current_time: String(Math.floor(Date.now() / 1000)),
+          max_expiry_secs: '86400',
+        })
+      }
+      expect(method).toBe('invoice.prepare')
+      return rpcError(-32000, 'registration unavailable')
+    })
+
+    await expect(createRgbProxyTransport([legacyEndpoint, v1Endpoint]).prepareInvoice?.({
+      recipientId,
+      endpoints: [legacyEndpoint, v1Endpoint],
+      expirationTimestamp: expiresAt,
+    })).resolves.toBeUndefined()
+  })
+
+  it('reports the final preparation error when every invoice proxy fails', async () => {
+    fetchMock
+      .mockRejectedValueOnce(new Error('first proxy offline'))
+      .mockRejectedValueOnce(new Error('second proxy offline'))
+
+    await expect(createRgbProxyTransport([endpoint]).prepareInvoice?.({
+      recipientId,
+      endpoints: ['rpcs://first.example/json-rpc', 'rpcs://second.example/json-rpc'],
+    })).rejects.toThrow('second proxy offline')
+  })
+
   it('clears an unreleased v1 signed transaction before canceling locally', async () => {
     const senderPrivateKey = '11'.repeat(32)
     const invoiceId = '22'.repeat(32)
