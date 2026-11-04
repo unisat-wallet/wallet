@@ -324,6 +324,32 @@ describe('RGB proxy transport', () => {
     expect(methods).toEqual(['invoice.check', 'consignment.post'])
   })
 
+  it('rejects a proxy upload response without a result', async () => {
+    const invoiceId = '22'.repeat(32)
+    fetchMock
+      .mockResolvedValueOnce(rpcResponse({
+        [invoiceId]: { status: 'available', pow_difficulty: '0' },
+      }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ jsonrpc: '2.0', id: '1' }), {
+        headers: { 'Content-Type': 'application/json' },
+      }))
+
+    await expect(createRgbProxyTransport([endpoint]).publishConsignment({
+      recipientId: invoiceId,
+      payload: Buffer.from('donation').toString('base64'),
+      assetId: 'rgb:asset',
+      opIds: ['aa'.repeat(32)],
+      txid: 'bb'.repeat(32),
+      endpoints: [endpoint],
+      proxyInvoiceId: invoiceId,
+      proxyRecipientPublicKey: proxyV1PublicKey('33'.repeat(32)),
+      proxySenderPrivateKey: '11'.repeat(32),
+      proxyEncryption: 'unsupported',
+      signedRawTx: '01000000',
+      donation: true,
+    })).rejects.toThrow('consignment.post returned an incomplete response')
+  })
+
   it('keeps a batched proxy v1 receive pending until its signed transaction is released', async () => {
     const recipientPrivateKey = '33'.repeat(32)
     const senderPk = proxyV1PublicKey('11'.repeat(32))

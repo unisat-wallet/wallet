@@ -298,6 +298,9 @@ async function postConsignment(
   const body = await readRpcResponse<boolean>(response)
   if (body.error)
     throw new Error(`RGB proxy consignment.post failed: ${body.error.message || body.error.code}`)
+  if (typeof body.result !== 'boolean') {
+    throw new Error('RGB proxy consignment.post returned an incomplete response')
+  }
 }
 
 async function postProxyV1Consignment(
@@ -426,7 +429,12 @@ async function postProxyV1Consignment(
       options
     )
     const body = await readRpcResponse<boolean>(response)
-    if (!body.error) return
+    if (!body.error) {
+      if (typeof body.result !== 'boolean') {
+        throw new Error('RGB proxy consignment.post returned an incomplete response')
+      }
+      return
+    }
     const required = body.error.code === -114 ? Number(body.error.data?.['pow_difficulty']) : NaN
     if (
       Number.isInteger(required) &&
