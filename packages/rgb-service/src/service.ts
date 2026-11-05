@@ -73,6 +73,24 @@ const PROVIDER_ORIGIN_HISTORY_TTL_MS = 24 * 60 * 60 * 1000
 const MAX_RECOVERY_HISTORY_PAYLOAD_LENGTH = 48_000_000
 const MAX_RECOVERY_HISTORY_OPERATION_IDS = 65_535
 
+/** Node responses which unambiguously mean these exact transaction bytes were already accepted. */
+function isDuplicateBitcoinBroadcastError(error: unknown) {
+  let detail: string
+  if (error instanceof Error) detail = error.message
+  else if (error && typeof error === 'object') {
+    try { detail = JSON.stringify(error) }
+    catch { detail = String(error) }
+  } else detail = String(error)
+  const message = detail.toLowerCase()
+  return [
+    'transaction outputs already in utxo set',
+    'txn-already-known',
+    'transaction already in mempool',
+    'already in block chain',
+    'already in blockchain',
+  ].some(fragment => message.includes(fragment))
+}
+
 function describeReceiveMismatch(
   reason: string,
   details: Record<string, unknown>,
@@ -780,8 +798,16 @@ export class RgbService {
           else if (pending.request.burn && pending.delivery)
             // Burn has no recipient. Only an explicit user action may retry its broadcast.
             return
-          else if (pending.delivery && !pending.delivery.requiresCounterpartySignature)
+          else if (pending.delivery && !pending.delivery.requiresCounterpartySignature) {
             await this.advancePendingDelivery(transferId, pending)
+            const current = state.pending[transferId]
+            if (
+              current?.delivery?.acknowledgedAt &&
+              await this.observePendingDeliveryBroadcast(current)
+            ) {
+              await this.syncBroadcastedTransfer(transferId, current)
+            }
+          }
         } catch (error) {
           // A delivery awaiting its recipient is a durable local state, not a
           // wallet-wide sync failure. A rejection has already removed its
@@ -2449,6 +2475,7 @@ export class RgbService {
     try {
       broadcastTxid = await this.dependencies.broadcaster.broadcast(signedRawTx)
     } catch (error) {
+      if (isDuplicateBitcoinBroadcastError(error)) return true
       // A sender and receiver can race to submit the same transaction. Treat
       // an already-visible transaction as success regardless of which side won.
       if (await this.isReceiveAnchorBroadcast(txid)) return true
@@ -3637,6 +3664,9 @@ export class RgbService {
         throw new RgbServiceError('RGB transfer is not ready for sender broadcast')
       }
       if (pending.request.burn) return this.advanceBurnDelivery(transferId, pending)
+      if (await this.observePendingDeliveryBroadcast(pending)) {
+        return this.syncBroadcastedTransfer(transferId, pending)
+      }
       let canceled = false
       try {
         canceled = (await this.dependencies.stateSource.getBroadcastCancellation?.(
@@ -4035,6 +4065,10 @@ export class RgbService {
     try {
       broadcastTxid = await this.dependencies.broadcaster.broadcast(delivery.completed.rawTx)
     } catch (error) {
+      if (isDuplicateBitcoinBroadcastError(error)) {
+        await this.adoptPendingDeliveryBroadcast(pending)
+        return this.syncBroadcastedTransfer(transferId, pending)
+      }
       delivery.broadcastError = error instanceof Error ? error.message : String(error)
       await this.persist({ waitForRecovery: true })
       const recovery = await this.reconcileFailedBroadcast(transferId, pending)
@@ -4177,6 +4211,10 @@ export class RgbService {
     try {
       broadcastTxid = await this.dependencies.broadcaster.broadcast(delivery.completed.rawTx)
     } catch (error) {
+      if (isDuplicateBitcoinBroadcastError(error)) {
+        await this.adoptPendingDeliveryBroadcast(pending)
+        return this.syncBroadcastedTransfer(transferId, pending)
+      }
       delivery.broadcastError = error instanceof Error ? error.message : String(error)
       delete delivery.failureReportedAt
       await this.persist({ waitForRecovery: true })
@@ -4191,12 +4229,42 @@ export class RgbService {
     if (broadcastTxid !== delivery.completed.txid) {
       throw new RgbServiceError('Broadcast transaction ID does not match the RGB transfer')
     }
+    await this.adoptPendingDeliveryBroadcast(pending)
+    return this.syncBroadcastedTransfer(transferId, pending)
+  }
+
+  /** Move an externally observed transaction into the same durable state as a local broadcast. */
+  private async adoptPendingDeliveryBroadcast(pending: RgbPendingTransfer) {
+    const delivery = pending.delivery
+    if (!delivery) return false
     this.applyFundingUpdate(delivery.completed)
     await this.retainCompletedLocalHistory(delivery.completed)
+    this.recordBurnProof(pending, delivery.completed)
     pending.broadcast = { completed: delivery.completed, broadcastAt: this.now() }
     delete pending.delivery
     await this.persist({ waitForRecovery: true })
-    return this.syncBroadcastedTransfer(transferId, pending)
+    return true
+  }
+
+  /** Detect a receiver-first Proxy v1 broadcast before offering sender broadcast actions. */
+  private async observePendingDeliveryBroadcast(pending: RgbPendingTransfer) {
+    const delivery = pending.delivery
+    const getTransactionStatus = this.dependencies.stateSource.getTransactionStatus
+    if (!delivery || !getTransactionStatus) return false
+    let chain: Awaited<ReturnType<NonNullable<typeof getTransactionStatus>>>
+    try {
+      chain = await getTransactionStatus(
+        this.requireState().wallet,
+        delivery.completed.txid
+      )
+    } catch {
+      // An unavailable or stale chain source must not discard the signed transfer.
+      return false
+    }
+    if (chain.status !== 'mempool' && chain.status !== 'confirmed') return false
+    // Once observed, persistence failures must propagate. Swallowing one here
+    // could leave an in-memory broadcast state that was not durably recorded.
+    return this.adoptPendingDeliveryBroadcast(pending)
   }
 
   /**
@@ -4204,33 +4272,12 @@ export class RgbService {
    * Always reconcile the actual txid before retaining a lock or canceling it.
    */
   private async reconcileFailedBroadcast(
-    transferId: string,
+    _transferId: string,
     pending: RgbPendingTransfer
   ): Promise<'broadcasted' | 'unknown'> {
-    const state = this.requireState()
-    const delivery = pending.delivery
-    if (!delivery) return 'unknown'
-    const getTransactionStatus = this.dependencies.stateSource.getTransactionStatus
-    if (getTransactionStatus) {
-      try {
-        const chain = await getTransactionStatus(state.wallet, delivery.completed.txid)
-        if (chain.status === 'mempool' || chain.status === 'confirmed') {
-          this.applyFundingUpdate(delivery.completed)
-          await this.retainCompletedLocalHistory(delivery.completed)
-          this.recordBurnProof(pending, delivery.completed)
-          pending.broadcast = { completed: delivery.completed, broadcastAt: this.now() }
-          delete pending.delivery
-          await this.persist({ waitForRecovery: true })
-          return 'broadcasted'
-        }
-        // A missing txid or a policy rejection is not proof that these signed
-        // bytes can never be mined. Admin review handles terminal conflicts.
-      } catch {
-        // Preserve the lock only when status itself is unavailable. The
-        // previous broadcast outcome is then genuinely ambiguous.
-        return 'unknown'
-      }
-    }
+    if (await this.observePendingDeliveryBroadcast(pending)) return 'broadcasted'
+    // A missing txid or policy rejection is not proof that these signed bytes
+    // can never be mined. Admin review handles terminal conflicts.
     return 'unknown'
   }
 

@@ -5593,6 +5593,85 @@ describe('RgbService', () => {
     expect(service.getPendingTransfers()).toEqual([])
   })
 
+  it('observes a receiver-first broadcast after ACK without offering sender broadcast', async () => {
+    const dependencies = createDependencies()
+    vi.mocked(dependencies.transport.getAcknowledgement!)
+      .mockResolvedValueOnce(undefined)
+      .mockResolvedValueOnce(true)
+    const service = new RgbService(dependencies)
+    await service.open(wallet)
+    await service.sync()
+    await service.prepareSend({
+      assetId: 'rgb:AQEBAQEB-AQEBAQE-BAQEBAQ-EBAQEBA-QEBAQEB-AQEBAQE',
+      amount: '60', invoice: rgbInvoice(), feeRate: 2,
+    })
+    await expect(service.completeSend('transfer-1', 'signed-psbt')).rejects.toThrow(
+      'awaiting recipient acknowledgement'
+    )
+    dependencies.stateSource.getTransactionStatus = vi.fn().mockResolvedValue({
+      status: 'confirmed', confirmations: 1,
+    })
+
+    await service.syncPendingTransfers()
+
+    expect(dependencies.broadcaster.broadcast).not.toHaveBeenCalled()
+    expect(service.getPendingTransfers()).toEqual([])
+    expect(service.getPendingSendHistory()).toEqual([
+      expect.objectContaining({
+        transferId: 'transfer-1', txid: 'c'.repeat(64), status: 'broadcasted',
+      }),
+    ])
+  })
+
+  it('preflights an already-broadcast transaction before sender retry', async () => {
+    const dependencies = createDependencies()
+    const service = new RgbService(dependencies)
+    await service.open(wallet)
+    await service.sync()
+    await service.prepareSend({
+      assetId: 'rgb:AQEBAQEB-AQEBAQE-BAQEBAQ-EBAQEBA-QEBAQEB-AQEBAQE',
+      amount: '60', invoice: rgbInvoice(), feeRate: 2,
+    })
+    await service.completeSend('transfer-1', 'signed-psbt')
+    dependencies.stateSource.getTransactionStatus = vi.fn().mockResolvedValue({
+      status: 'mempool', confirmations: 0,
+    })
+
+    await expect(service.broadcastPendingSend('transfer-1')).resolves.toMatchObject({
+      txid: 'c'.repeat(64),
+    })
+
+    expect(dependencies.broadcaster.broadcast).not.toHaveBeenCalled()
+    expect(service.getPendingTransfers()).toEqual([])
+  })
+
+  it('treats an already-confirmed node broadcast response as idempotent success', async () => {
+    const dependencies = createDependencies()
+    dependencies.broadcaster.broadcast = vi.fn().mockRejectedValue(
+      { code: -1, msg: 'Error: Transaction outputs already in utxo set' }
+    )
+    dependencies.stateSource.getTransactionStatus = vi.fn().mockResolvedValue({
+      status: 'unknown', confirmations: 0,
+    })
+    const service = new RgbService(dependencies)
+    await service.open(wallet)
+    await service.sync()
+    await service.prepareSend({
+      assetId: 'rgb:AQEBAQEB-AQEBAQE-BAQEBAQ-EBAQEBA-QEBAQEB-AQEBAQE',
+      amount: '60', invoice: rgbInvoice(), feeRate: 2,
+    })
+    await service.completeSend('transfer-1', 'signed-psbt')
+
+    await expect(service.broadcastPendingSend('transfer-1')).resolves.toMatchObject({
+      txid: 'c'.repeat(64),
+    })
+
+    expect(service.getPendingTransfers()).toEqual([])
+    expect(service.getPendingSendHistory()).toEqual([
+      expect.objectContaining({ status: 'broadcasted', txid: 'c'.repeat(64) }),
+    ])
+  })
+
   it('observes a rejection without re-publishing the immutable proxy operation', async () => {
     const dependencies = createDependencies()
     vi.mocked(dependencies.transport.getAcknowledgement!)
