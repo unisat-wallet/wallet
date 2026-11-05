@@ -5649,6 +5649,30 @@ describe('RgbService', () => {
     await expect(aborting).resolves.toEqual({ aborted: false, reason: 'already_broadcast' })
   })
 
+  it('does not automatically retry a transport publication that exhausted a local budget', async () => {
+    const dependencies = createDependencies()
+    const error = Object.assign(new Error('RGB proxy proof of work exceeded the local work budget'), {
+      automaticRetry: false,
+    })
+    dependencies.transport.publishConsignment = vi.fn().mockRejectedValue(error)
+    const service = new RgbService(dependencies)
+    await service.open(wallet)
+    await service.sync()
+    await service.prepareSend({
+      assetId: 'rgb:AQEBAQEB-AQEBAQE-BAQEBAQ-EBAQEBA-QEBAQEB-AQEBAQE',
+      amount: '60', invoice: rgbInvoice(), feeRate: 2,
+    })
+
+    await expect(service.completeSend('transfer-1', 'signed-psbt')).rejects.toThrow(
+      'exceeded the local work budget'
+    )
+    expect(service.getPendingTransfers()[0]?.delivery?.publishError)
+      .toContain('exceeded the local work budget')
+    await service.syncPendingTransfers()
+    await service.syncPendingTransfers()
+    expect(dependencies.transport.publishConsignment).toHaveBeenCalledTimes(1)
+  })
+
   it('serializes cancellation behind an in-flight send completion', async () => {
     const dependencies = createDependencies()
     let finishEncoding: (() => void) | undefined

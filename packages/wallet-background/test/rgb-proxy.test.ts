@@ -484,10 +484,37 @@ describe('RGB proxy transport', () => {
       .toMatch(/^00/)
   })
 
-  it('uses the rgb-lib-bfa proxy proof-of-work safety limit', async () => {
-    expect(RGB_PROXY_MAX_POW_DIFFICULTY).toBe(28)
-    await expect(proxyV1Pow('transfer', 29, 'timestamp'))
-      .rejects.toThrow('difficulty is invalid')
+  it('uses a local proxy proof-of-work safety limit below the protocol maximum', async () => {
+    expect(RGB_PROXY_MAX_POW_DIFFICULTY).toBe(18)
+    await expect(proxyV1Pow('transfer', 19, 'timestamp')).rejects.toMatchObject({
+      name: 'RgbProxyProofOfWorkError', automaticRetry: false,
+    })
+  })
+
+  it('allows only one server-requested proof-of-work recalculation', async () => {
+    const invoiceId = '22'.repeat(32)
+    const recipientPk = proxyV1PublicKey('33'.repeat(32))
+    let posts = 0
+    fetchMock.mockImplementation(async (_url, init: RequestInit) => {
+      const json = typeof init.body === 'string' ? JSON.parse(init.body) : undefined
+      if (json?.method === 'invoice.check') {
+        return rpcResponse({ [invoiceId]: { status: 'available', pow_difficulty: '0' } })
+      }
+      posts++
+      return rpcError(-114, 'Invalid proof of work', { pow_difficulty: '8' })
+    })
+
+    await expect(createRgbProxyTransport([endpoint]).publishConsignment({
+      recipientId: invoiceId,
+      payload: Buffer.from('bounded-pow').toString('base64'),
+      assetId: 'rgb:asset', opIds: ['aa'.repeat(32)], txid: 'bb'.repeat(32),
+      endpoints: [endpoint], proxyInvoiceId: invoiceId,
+      proxyRecipientPublicKey: recipientPk, proxySenderPrivateKey: '11'.repeat(32),
+      proxyEncryption: 'unsupported', signedRawTx: '01000000', donation: true,
+    })).rejects.toMatchObject({
+      name: 'RgbProxyProofOfWorkError', automaticRetry: false,
+    })
+    expect(posts).toBe(2)
   })
 
   it.each([

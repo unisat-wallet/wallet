@@ -4,7 +4,18 @@ import { hkdf } from '@noble/hashes/hkdf'
 import { sha256 } from '@noble/hashes/sha256'
 
 const encoder = new TextEncoder()
-export const RGB_PROXY_MAX_POW_DIFFICULTY = 28
+export const RGB_PROXY_MAX_POW_DIFFICULTY = 18
+export const RGB_PROXY_MAX_POW_ATTEMPTS = 1_048_576
+
+/** Untrusted proxy work requests must never be retried by background polling. */
+export class RgbProxyProofOfWorkError extends Error {
+  readonly automaticRetry = false
+
+  constructor(message: string) {
+    super(message)
+    this.name = 'RgbProxyProofOfWorkError'
+  }
+}
 
 function bytes(value: string) {
   return encoder.encode(value)
@@ -125,10 +136,10 @@ export async function proxyV1Pow(transferId: string, difficulty: number, timesta
     difficulty < 0 ||
     difficulty > RGB_PROXY_MAX_POW_DIFFICULTY
   ) {
-    throw new Error('RGB proxy proof-of-work difficulty is invalid')
+    throw new RgbProxyProofOfWorkError('RGB proxy proof-of-work difficulty exceeds the local safety limit')
   }
   if (difficulty === 0) return '0'
-  for (let nonce = 0; nonce < Number.MAX_SAFE_INTEGER; nonce++) {
+  for (let nonce = 0; nonce < RGB_PROXY_MAX_POW_ATTEMPTS; nonce++) {
     const value = sha256(bytes(transferId + timestamp + String(nonce)))
     let zeroBits = 0
     for (const byte of value) {
@@ -139,5 +150,5 @@ export async function proxyV1Pow(transferId: string, difficulty: number, timesta
     if (zeroBits >= difficulty) return String(nonce)
     if (nonce % 4096 === 0) await new Promise(resolve => setTimeout(resolve, 0))
   }
-  throw new Error('RGB proxy proof of work could not be completed')
+  throw new RgbProxyProofOfWorkError('RGB proxy proof of work exceeded the local work budget')
 }

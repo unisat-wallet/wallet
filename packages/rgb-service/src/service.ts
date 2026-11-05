@@ -170,6 +170,11 @@ function isIncompleteLocalHistoryError(error: unknown) {
   )
 }
 
+function isNonRetryableTransportError(error: unknown) {
+  return Boolean(error && typeof error === 'object' &&
+    (error as { automaticRetry?: unknown }).automaticRetry === false)
+}
+
 /** RGB invoices use the shared `tb:` beneficiary prefix for Testnet and Testnet4. */
 function isCompatibleInvoiceNetwork(
   invoiceNetwork: RgbWalletRef['network'],
@@ -827,6 +832,10 @@ export class RgbService {
             return
           else if (pending.request.burn && pending.delivery)
             // Burn has no recipient. Only an explicit user action may retry its broadcast.
+            return
+          else if (pending.delivery?.publishError)
+            // An untrusted endpoint exhausted a local resource budget. Only an
+            // explicit user retry may attempt publication again.
             return
           else if (pending.delivery && !pending.delivery.requiresCounterpartySignature) {
             await this.advancePendingDelivery(transferId, pending)
@@ -4291,10 +4300,15 @@ export class RgbService {
             await this.persist()
             throw new RgbInvoiceUnavailableError()
           }
+          if (isNonRetryableTransportError(error)) {
+            delivery.publishError = error instanceof Error ? error.message : String(error)
+            await this.persist({ skipRecovery: true })
+          }
           throw error
         }
       }
       if (!delivery.publishedAt) {
+        delete delivery.publishError
         delivery.publishedAt = this.now()
         // The v1 proxy operation is immutable after publication. Poll ACKs
         // without re-preparing it after the recipient responds.

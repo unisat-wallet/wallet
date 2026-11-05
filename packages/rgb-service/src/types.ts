@@ -231,6 +231,8 @@ export interface RgbPendingTransfer {
     completed: RgbCompletedTransfer
     endpoints: string[]
     publishedAt?: number
+    /** Non-retryable transport failure; background sync must not repeat publication. */
+    publishError?: string
     /** Donation publication and its signed transaction are durably recoverable. */
     donationReadyAt?: number
     /** Set after every recipient endpoint has ACKed the consignment. */

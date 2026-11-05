@@ -13,6 +13,7 @@ import {
   proxyV1EncryptSignedTx,
   proxyV1Hash,
   proxyV1Pow,
+  RgbProxyProofOfWorkError,
   RGB_PROXY_MAX_POW_DIFFICULTY,
   proxyV1PublicKey,
   proxyV1Sign,
@@ -563,11 +564,16 @@ async function postProxyV1Consignment(
       Number.isInteger(required) &&
       required >= 0 &&
       required <= RGB_PROXY_MAX_POW_DIFFICULTY &&
-      powRetries < 2
+      powRetries < 1
     ) {
       powRetries += 1
       difficulty = required
       continue
+    }
+    if (body.error.code === -114) {
+      throw new RgbProxyProofOfWorkError(
+        'RGB proxy proof-of-work requirement exceeds the local safety budget'
+      )
     }
     // Proxy 0.4 domain-separates endpoint signatures with the literal
     // "consignment". An endpoint without a versioned path can still expose
@@ -694,6 +700,8 @@ async function tryEndpoints<T>(endpoints: string[], request: (endpoint: string) 
     try {
       return await request(endpoint)
     } catch (error) {
+      if (error && typeof error === 'object' &&
+        (error as { automaticRetry?: unknown }).automaticRetry === false) throw error
       lastError = error
     }
   }
