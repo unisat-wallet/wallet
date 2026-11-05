@@ -379,7 +379,12 @@ export default function WalletTabScreen({
     enabled: isRgbActive && isRgbAssetTab,
     focused: isRgbAssetTab
   });
-  const rgbTransfers = useRGBTransfersLogic({ enabled: isRgbActive });
+  // This list drives the global Accept/Reject sheet, so its first request must
+  // advance receive state instead of only rendering cached activity. In
+  // particular, a sender can press Done before its self-transfer consignment
+  // reaches the proxy; the assets screen must then take over polling from the
+  // transfer-detail screen without waiting for another navigation or focus.
+  const rgbTransfers = useRGBTransfersLogic({ enabled: isRgbActive, initialFullSync: true });
   const [broadcastQueue, setBroadcastQueue] = useState<{
     contextKey: string;
     activeId?: string;

@@ -476,6 +476,14 @@ async function getProxyV1Consignment(
         },
         options
       )
+      if (listed.error?.code === -101) {
+        // The local recovery state can intentionally retain an expired invoice
+        // after the proxy has already released its reservation. This is a
+        // definitive empty result for that endpoint, not a transport failure:
+        // let receive cleanup converge and do not block polling other invoices.
+        sawHealthyEndpoint = true
+        continue
+      }
       if (listed.error)
         throw new Error(
           `RGB proxy transfer.list failed: ${listed.error.message || listed.error.code}`

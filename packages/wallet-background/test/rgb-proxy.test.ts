@@ -557,6 +557,16 @@ describe('RGB proxy transport', () => {
     })).resolves.toBeUndefined()
   })
 
+  it('treats an unreserved v1 invoice as an empty healthy result', async () => {
+    fetchMock.mockResolvedValueOnce(rpcError(-101, 'Invoice not reserved'))
+
+    await expect(createRgbProxyTransport([endpoint]).getConsignment?.({
+      recipientId: '22'.repeat(32),
+      endpoints: [endpoint],
+      proxyPrivateKey: '33'.repeat(32),
+    })).resolves.toBeUndefined()
+  })
+
   it('decrypts proxy v1 consignments across the 64 KiB chunk boundary and rejects altered ciphertext', () => {
     const senderKey = '11'.repeat(32)
     const recipientKey = '22'.repeat(32)
