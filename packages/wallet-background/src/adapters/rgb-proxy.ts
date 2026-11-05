@@ -36,6 +36,7 @@ type ProxyBatchConsignment = ProxyConsignment & {
 
 type ProxyServerInfo = {
   protocol_version: string
+  version?: string
   current_time: string
   max_expiry_secs: string
 }
@@ -303,6 +304,121 @@ async function postConsignment(
   }
 }
 
+type ProxyV1AckPrepareInput = {
+  transferId: string
+  recipientPublicKey: string
+  consignmentHash: string
+  signedTx: string
+  expiresAt: number
+  signedTxHash: string
+  senderPublicKey: string
+}
+
+function isProxyV04OrNewer(version: string | undefined) {
+  const match = version?.match(/^(\d+)\.(\d+)\.(\d+)/)
+  if (!match) return false
+  const [, major, minor] = match.map(Number)
+  return major > 0 || minor >= 4
+}
+
+function usesProxyV04Route(endpoint: string) {
+  try {
+    return new URL(toHttpEndpoint(endpoint)).pathname.split('/').includes('v0_4_0')
+  } catch {
+    return false
+  }
+}
+
+async function postProxyV1AckPrepareMultipart(
+  endpoint: string,
+  input: ProxyV1AckPrepareInput,
+  options?: RgbProxyTransportOptions
+) {
+  const file = new TextEncoder().encode(JSON.stringify({ [input.transferId]: input.signedTx }))
+  const params = {
+    transfer_data: {
+      [input.transferId]: {
+        recipient_pk: input.recipientPublicKey,
+        consignment_hash: input.consignmentHash,
+      },
+    },
+    expires_at: String(input.expiresAt),
+    signed_tx_hash: input.signedTxHash,
+    sender_pk: input.senderPublicKey,
+    file_size: String(file.length),
+  }
+  const boundary = `----unisat-rgb-${rpcId()}`
+  const fields = [
+    ['jsonrpc', '2.0'],
+    ['id', rpcId()],
+    ['method', 'ack.prepare'],
+    ['params', JSON.stringify(params)],
+  ]
+  const encoder = new TextEncoder()
+  const prefix = encoder.encode(
+    fields
+      .map(
+        ([name, value]) =>
+          `--${boundary}\r\nContent-Disposition: form-data; name="${name}"\r\n\r\n${value}\r\n`
+      )
+      .join('') +
+      `--${boundary}\r\nContent-Disposition: form-data; name="file"; filename="signed_txs.json"\r\nContent-Type: application/json\r\n\r\n`
+  )
+  const suffix = encoder.encode(`\r\n--${boundary}--\r\n`)
+  const multipart = new Uint8Array(prefix.length + file.length + suffix.length)
+  multipart.set(prefix)
+  multipart.set(file, prefix.length)
+  multipart.set(suffix, prefix.length + file.length)
+  const response = await fetchWithTimeout(
+    toHttpEndpoint(endpoint),
+    {
+      method: 'POST',
+      headers: { 'Content-Type': `multipart/form-data; boundary=${boundary}` },
+      body: multipart.buffer,
+    },
+    'ack.prepare',
+    options
+  )
+  return readRpcResponse<boolean>(response)
+}
+
+async function postProxyV1AckPrepare(
+  endpoint: string,
+  input: ProxyV1AckPrepareInput,
+  serverVersion?: string,
+  options?: RgbProxyTransportOptions
+) {
+  if (isProxyV04OrNewer(serverVersion) || usesProxyV04Route(endpoint)) {
+    return postProxyV1AckPrepareMultipart(endpoint, input, options)
+  }
+  const legacy = await postJson<boolean>(
+    endpoint,
+    'ack.prepare',
+    {
+      transfer_data: {
+        [input.transferId]: {
+          recipient_pk: input.recipientPublicKey,
+          consignment_hash: input.consignmentHash,
+          signed_tx: input.signedTx,
+        },
+      },
+      expires_at: String(input.expiresAt),
+      signed_tx_hash: input.signedTxHash,
+      sender_pk: input.senderPublicKey,
+    },
+    options
+  )
+  const missing = legacy.error?.data?.['fields']
+  if (
+    legacy.error?.code === -300 &&
+    Array.isArray(missing) &&
+    missing.includes('file_size')
+  ) {
+    return postProxyV1AckPrepareMultipart(endpoint, input, options)
+  }
+  return legacy
+}
+
 async function postProxyV1Consignment(
   endpoint: string,
   consignment: RgbTransportConsignment,
@@ -357,21 +473,18 @@ async function postProxyV1Consignment(
         ) {
           throw new Error('RGB proxy sender operation expiration is invalid')
         }
-        const prepared = await postJson<boolean>(
+        const prepared = await postProxyV1AckPrepare(
           candidate,
-          'ack.prepare',
           {
-            transfer_data: {
-              [transferId]: {
-                recipient_pk: recipientPublicKey,
-                consignment_hash: consignmentHash,
-                signed_tx: signedTx,
-              },
-            },
-            expires_at: String(expiresAt),
-            signed_tx_hash: proxyV1Hash(Buffer.from(rawTx, 'hex')),
-            sender_pk: senderPublicKey,
+            transferId,
+            recipientPublicKey,
+            consignmentHash,
+            signedTx,
+            expiresAt,
+            signedTxHash: proxyV1Hash(Buffer.from(rawTx, 'hex')),
+            senderPublicKey,
           },
+          senderInfo.result.version,
           options
         )
         if (prepared.error)

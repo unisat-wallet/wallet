@@ -327,6 +327,65 @@ describe('RGB proxy transport', () => {
     expect(methods).toEqual(['invoice.check', 'consignment.post'])
   })
 
+  it('uploads ack.prepare signed transactions as multipart on the proxy 0.4 route', async () => {
+    const recipientEndpoint = 'rpcs://recipient.example/_/rgb/v1/json-rpc'
+    const senderEndpoint = 'rpcs://sender.example/_/rgb/custom/v1/json-rpc'
+    const invoiceId = '22'.repeat(32)
+    const senderPrivateKey = '11'.repeat(32)
+    const recipientPk = proxyV1PublicKey('33'.repeat(32))
+    const expiresAt = Math.floor(Date.now() / 1000) + 3600
+    let sawMultipartAck = false
+    fetchMock.mockImplementation(async (url: string, init: RequestInit) => {
+      const json = typeof init.body === 'string' ? JSON.parse(init.body) : undefined
+      if (json?.method === 'invoice.check') {
+        expect(url).toBe('https://recipient.example/_/rgb/v1/json-rpc')
+        return rpcResponse({ [invoiceId]: { status: 'available', pow_difficulty: '0' } })
+      }
+      if (json?.method === 'server.info') {
+        expect(url).toBe('https://sender.example/_/rgb/custom/v1/json-rpc')
+        return rpcResponse({
+          version: '0.4.0', protocol_version: '1.0',
+          current_time: String(Math.floor(Date.now() / 1000)), max_expiry_secs: '86400',
+        })
+      }
+      const form = await new Response(init.body, { headers: init.headers }).formData()
+      const method = form.get('method')
+      if (method === 'ack.prepare') {
+        sawMultipartAck = true
+        expect(url).toBe('https://sender.example/_/rgb/custom/v1/json-rpc')
+        const params = JSON.parse(String(form.get('params')))
+        const transferId = Object.keys(params.transfer_data)[0]!
+        expect(params.transfer_data[transferId]).toEqual({
+          recipient_pk: recipientPk,
+          consignment_hash: expect.stringMatching(/^[0-9a-f]{64}$/),
+        })
+        expect(params.transfer_data[transferId]).not.toHaveProperty('signed_tx')
+        const file = form.get('file') as File
+        const bytes = Buffer.from(await file.arrayBuffer())
+        expect(params.file_size).toBe(String(bytes.length))
+        expect(JSON.parse(bytes.toString())).toEqual({
+          [transferId]: expect.any(String),
+        })
+        return rpcResponse(true)
+      }
+      expect(method).toBe('consignment.post')
+      expect(url).toBe('https://recipient.example/_/rgb/v1/json-rpc')
+      expect(form.get('params[sender_transport_endpoint]')).toBe(senderEndpoint)
+      return rpcResponse(true)
+    })
+
+    await createRgbProxyTransport([senderEndpoint]).publishConsignment({
+      recipientId: invoiceId,
+      payload: Buffer.from('nia consignment').toString('base64'),
+      assetId: 'rgb:asset', opIds: ['aa'.repeat(32)], txid: 'bb'.repeat(32),
+      endpoints: [recipientEndpoint], proxyInvoiceId: invoiceId,
+      proxyRecipientPublicKey: recipientPk, proxySenderPrivateKey: senderPrivateKey,
+      proxyEncryption: 'unsupported', signedRawTx: '01000000',
+      proxyExpirationTimestamp: expiresAt,
+    })
+    expect(sawMultipartAck).toBe(true)
+  })
+
   it('rejects a proxy upload response without a result', async () => {
     const invoiceId = '22'.repeat(32)
     fetchMock
