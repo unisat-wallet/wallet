@@ -32,7 +32,7 @@ function getStatusLabel(status: string, t: (key: string) => string, type?: RgbTr
     case 'broadcasting':
       return t('rgb_status_broadcasting');
     case 'broadcasted':
-      return t('rgb_status_broadcasted');
+      return t('rgb_status_confirming');
     case 'broadcast_failed':
       return t('rgb_status_broadcast_failed');
     case 'pending_accept':
@@ -67,7 +67,7 @@ function getDescription(transfer: RgbTransferItem | undefined, t: (key: string) 
   if (transfer?.status === 'ready_to_broadcast') return t('rgb_transfer_ready_to_broadcast_description');
   if (transfer?.status === 'ready_for_dapp_finalize') return t('rgb_transfer_ready_for_dapp_finalize_description');
   if (transfer?.status === 'broadcasting') return t('rgb_transfer_broadcasting_description');
-  if (transfer?.status === 'broadcasted') return t('rgb_transfer_broadcasted_description');
+  if (transfer?.status === 'broadcasted') return t('rgb_transfer_confirming_description');
   if (transfer?.status === 'broadcast_failed') return t('rgb_transfer_broadcast_failed_description');
   if (transfer?.status === 'pending_accept') return t('rgb_transfer_pending_accept_description');
   if (transfer?.status === 'waiting_batch_release') return t('rgb_status_waiting_batch_release');
@@ -109,12 +109,14 @@ export default function RGBTransferDetailScreen() {
     canAcceptReceive,
     canRetryBroadcast,
     canBroadcast,
+    senderCanceledVisible,
     onClickDone,
     onClickExploreTx,
     onAcceptReceive,
     onRejectReceive,
     onRetryBroadcast,
     onCancelSend,
+    dismissSenderCanceled,
     t
   } = useRGBTransferDetailLogic();
   const status = transfer?.status || 'pending';
@@ -319,6 +321,15 @@ export default function RGBTransferDetailScreen() {
           });
         }}
       />
+      {senderCanceledVisible ? (
+        <BottomModal onClose={dismissSenderCanceled}>
+          <Column fullX gap="lg">
+            <Text preset="title" text={t('rgb_status_canceled_by_sender')} />
+            <Text text={t('rgb_transfer_canceled_by_sender_description')} color="textDim" wrap />
+            <Button full text={t('i_understand')} onClick={dismissSenderCanceled} />
+          </Column>
+        </BottomModal>
+      ) : null}
       {cancelConfirmVisible ? (
         <BottomModal onClose={() => setCancelConfirmVisible(false)}>
           <Column fullX gap="lg">

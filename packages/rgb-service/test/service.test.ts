@@ -4554,6 +4554,85 @@ describe('RgbService', () => {
     })
   })
 
+  it('reports sender cancellation when Accept finds a cleaned proxy v1 operation', async () => {
+    const dependencies = createDependencies()
+    dependencies.transport.acknowledgeConsignment = vi.fn().mockRejectedValue(
+      new RgbProxyOperationNotFoundError()
+    )
+    dependencies.stateSource.getTransactionStatus = vi.fn().mockResolvedValue({
+      status: 'unknown', confirmations: 0,
+    })
+    const service = new RgbService(dependencies)
+    await service.open(wallet)
+    ;(service as any).state.pendingReceives = [{
+      invoice: rgbInvoice(),
+      recipientId: 'recipient',
+      proxyPrivateKey: '44'.repeat(32),
+      createdAt: 1,
+      seal: { txid: 'a'.repeat(64), vout: 0, blinding: 1n },
+      pendingAccept: {
+        payload: 'validated-consignment',
+        txid: 'c'.repeat(64),
+        endpoint: proxyEndpoint,
+        proxyTransferId: 'd'.repeat(64),
+        assetId: 'rgb:AQEBAQEB-AQEBAQE-BAQEBAQ-EBAQEBA-QEBAQEB-AQEBAQE',
+        amount: '60',
+        discoveredAt: 1,
+      },
+    }]
+
+    await expect(service.acceptReceive('recipient')).resolves.toEqual({
+      accepted: false,
+      status: 'canceled',
+    })
+    expect(dependencies.broadcaster.broadcast).not.toHaveBeenCalled()
+    expect(service.getPendingReceives()).toEqual([])
+    expect(service.getPendingReceiveHistory()).toEqual([
+      expect.objectContaining({
+        transferId: 'receive:recipient',
+        status: 'canceled',
+        txid: 'c'.repeat(64),
+      }),
+    ])
+  })
+
+  it('reports sender cancellation when a single-recipient ACK has no signed transaction', async () => {
+    const dependencies = createDependencies()
+    dependencies.transport.acknowledgeConsignment = vi.fn().mockResolvedValue({
+      releasePending: true,
+    })
+    const service = new RgbService(dependencies)
+    await service.open(wallet)
+    ;(service as any).state.pendingReceives = [{
+      invoice: rgbInvoice(),
+      recipientId: 'recipient',
+      proxyPrivateKey: '44'.repeat(32),
+      createdAt: 1,
+      pendingAccept: {
+        payload: 'validated-consignment',
+        txid: 'c'.repeat(64),
+        endpoint: proxyEndpoint,
+        proxyTransferId: 'd'.repeat(64),
+        batch: false,
+        assetId: 'rgb:AQEBAQEB-AQEBAQE-BAQEBAQ-EBAQEBA-QEBAQEB-AQEBAQE',
+        amount: '60',
+        discoveredAt: 1,
+      },
+    }]
+
+    await expect(service.acceptReceive('recipient')).resolves.toEqual({
+      accepted: false,
+      status: 'canceled',
+    })
+    expect(service.getPendingReceives()).toEqual([])
+    expect(service.getPendingReceiveHistory()).toEqual([
+      expect.objectContaining({
+        transferId: 'receive:recipient',
+        status: 'canceled',
+      }),
+    ])
+  })
+
   it('serializes acceptance of multiple witness invoices without waiting for confirmation', async () => {
     const dependencies = createDependencies()
     let activeAcknowledgements = 0
@@ -5069,6 +5148,7 @@ describe('RgbService', () => {
           payload: 'consignment',
           txid: 'c'.repeat(64),
           endpoint: proxyEndpoint,
+          batch: true,
           assetId: 'rgb:AQEBAQEB-AQEBAQE-BAQEBAQ-EBAQEBA-QEBAQEB-AQEBAQE',
           amount: '60',
           discoveredAt: 1,

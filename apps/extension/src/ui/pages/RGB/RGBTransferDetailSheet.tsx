@@ -34,7 +34,7 @@ function getStatusLabel(status: string, t: (key: string) => string, type?: RgbTr
     case 'broadcasting':
       return t('rgb_status_broadcasting');
     case 'broadcasted':
-      return t('rgb_status_broadcasted');
+      return t('rgb_status_confirming');
     case 'broadcast_failed':
       return t('rgb_status_broadcast_failed');
     case 'pending_accept':
@@ -75,7 +75,7 @@ function getDescription(transfer: RgbTransferItem | undefined, t: (key: string) 
   if (transfer?.status === 'ready_to_broadcast') return t('rgb_transfer_ready_to_broadcast_description');
   if (transfer?.status === 'ready_for_dapp_finalize') return t('rgb_transfer_ready_for_dapp_finalize_description');
   if (transfer?.status === 'broadcasting') return t('rgb_transfer_broadcasting_description');
-  if (transfer?.status === 'broadcasted') return t('rgb_transfer_broadcasted_description');
+  if (transfer?.status === 'broadcasted') return t('rgb_transfer_confirming_description');
   if (transfer?.status === 'broadcast_failed') return t('rgb_transfer_broadcast_failed_description');
   if (transfer?.status === 'pending_accept') return t('rgb_transfer_pending_accept_description');
   if (transfer?.status === 'waiting_batch_release') return t('rgb_status_waiting_batch_release');
@@ -221,6 +221,7 @@ export function RGBTransferDetailSheet({
   const [cancelLoading, setCancelLoading] = useState(false);
   const [actionLoading, setActionLoading] = useState(false);
   const [broadcastRetryLoading, setBroadcastRetryLoading] = useState(false);
+  const [senderCanceledVisible, setSenderCanceledVisible] = useState(false);
 
   const status = transfer?.status || 'pending';
   const ticker = transfer?.ticker || transfer?.name || 'RGB';
@@ -300,7 +301,8 @@ export function RGBTransferDetailSheet({
     try {
       const result = await wallet.acceptRgbReceive({ recipientId });
       if (result?.status === 'canceled') {
-        tools.toastError(t('rgb_status_canceled_by_sender'));
+        setSenderCanceledVisible(true);
+        return;
       } else if (result?.status === 'pending') {
         tools.toastSuccess(t('rgb_status_waiting_batch_release'));
         onAccepted?.();
@@ -665,6 +667,29 @@ export function RGBTransferDetailSheet({
           void requestWrite(() => void onRejectReceive());
         }}
       />
+      {senderCanceledVisible ? (
+        <BottomModal
+          onClose={() => {
+            setSenderCanceledVisible(false);
+            onClose();
+            onCanceled?.();
+          }}
+        >
+          <Column fullX gap="lg">
+            <Text preset="title" text={t('rgb_status_canceled_by_sender')} />
+            <Text text={t('rgb_transfer_canceled_by_sender_description')} color="textDim" wrap />
+            <Button
+              full
+              text={t('i_understand')}
+              onClick={() => {
+                setSenderCanceledVisible(false);
+                onClose();
+                onCanceled?.();
+              }}
+            />
+          </Column>
+        </BottomModal>
+      ) : null}
       {writeLeaseModal}
     </>
   );

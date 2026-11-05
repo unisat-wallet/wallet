@@ -1638,7 +1638,18 @@ export class RgbService {
             // the next polling cycle without sending a compensating NACK.
             try {
               const acknowledgementResult = await this.acknowledgeProxyConsignment(item, true)
-              if (acknowledgementResult?.releasePending) continue
+              if (acknowledgementResult?.releasePending) {
+                if (item.batch || receive.pendingAccept?.batch || receive.receivedConsignment.batch) {
+                  continue
+                }
+                // A single-recipient operation releases its transaction on
+                // the first ACK. A successful ACK without signed_tx means the
+                // sender removed it with ack.clean before this retry.
+                this.recordReceiveOutcome(receive, 'canceled', match.txid)
+                pending.splice(receiveIndex, 1)
+                changed = true
+                continue
+              }
               if (acknowledgementResult?.signedRawTx) {
                 await this.persistAndBroadcastReceiveAnchor(
                   receive,
@@ -1910,10 +1921,21 @@ export class RgbService {
     try {
       acknowledgementResult = await this.acknowledgeProxyConsignment(item, true)
     } catch (error) {
-      if (!(error instanceof RgbProxyOperationNotFoundError &&
-        await this.ensureDonationAnchorBroadcast(
+      if (error instanceof RgbProxyOperationNotFoundError) {
+        const alreadyBroadcast = await this.ensureDonationAnchorBroadcast(
           receive, item.txid, receive.pendingAccept.signedRawTx
-        ))) {
+        )
+        if (!alreadyBroadcast) {
+          // ack.clean is the only cancellation signal available to a Proxy v1
+          // receiver without a read-only operation-status endpoint. Convert
+          // the failed Accept into a terminal sender-canceled result instead
+          // of leaving a stale Pending acceptance action behind.
+          this.recordReceiveOutcome(receive, 'canceled', receive.pendingAccept.txid)
+          state.pendingReceives = pending.filter(item => item !== receive)
+          await this.persist()
+          return { accepted: false, status: 'canceled' as const }
+        }
+      } else {
         if (!isProxySignedTransactionCleared(error)) throw error
         this.recordReceiveOutcome(receive, 'canceled', receive.pendingAccept.txid)
         state.pendingReceives = pending.filter(item => item !== receive)
@@ -1922,6 +1944,15 @@ export class RgbService {
       }
     }
     if (acknowledgementResult?.releasePending) {
+      if (receive.pendingAccept.batch !== true) {
+        // For a non-batch operation there are no other recipients to wait
+        // for. Proxy 0.4 returns this same shape after ack.clean removed the
+        // signed transaction, so surface the sender cancellation instead.
+        this.recordReceiveOutcome(receive, 'canceled', receive.pendingAccept.txid)
+        state.pendingReceives = pending.filter(item => item !== receive)
+        await this.persist()
+        return { accepted: false, status: 'canceled' as const }
+      }
       return { accepted: false, status: 'pending' as const }
     }
     if (acknowledgementResult?.signedRawTx) {

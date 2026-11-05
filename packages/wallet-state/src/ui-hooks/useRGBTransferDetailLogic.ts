@@ -74,6 +74,7 @@ export function useRGBTransferDetailLogic() {
   const [cancelLoading, setCancelLoading] = useState(false)
   const [receiveActionLoading, setReceiveActionLoading] = useState(false)
   const [broadcastRetryLoading, setBroadcastRetryLoading] = useState(false)
+  const [senderCanceledVisible, setSenderCanceledVisible] = useState(false)
 
   const refresh = useCallback(async () => {
     setLoading(true)
@@ -209,10 +210,10 @@ export function useRGBTransferDetailLogic() {
     try {
       const result = await wallet.acceptRgbReceive({ recipientId })
       if (result?.status === 'canceled') {
-        tools.toastError(t('rgb_status_canceled_by_sender'))
         setTransfer(current =>
           current ? { ...current, status: 'canceled', local: true } : current
         )
+        setSenderCanceledVisible(true)
         return false
       }
       if (result?.status === 'pending') {
@@ -294,6 +295,7 @@ export function useRGBTransferDetailLogic() {
     canAcceptReceive,
     canRetryBroadcast,
     canBroadcast,
+    senderCanceledVisible,
     t,
     onClickDone,
     onClickExploreTx,
@@ -301,5 +303,6 @@ export function useRGBTransferDetailLogic() {
     onAcceptReceive,
     onRejectReceive,
     onRetryBroadcast,
+    dismissSenderCanceled: () => setSenderCanceledVisible(false),
   }
 }

@@ -111,6 +111,25 @@ describe('useRGBTransferDetailLogic', () => {
     expect(result.current.transfer?.status).toBe('waiting_batch_release')
   })
 
+  it('opens an explicit sender-canceled notice when Accept discovers cancellation', async () => {
+    const { wrapper, wallet, tools } = createHookTestHarness({
+      routeState: { transferId: 'recipient-id', initialTransfer: pendingReceive },
+    })
+    wallet.acceptRgbReceive.mockResolvedValue({ accepted: false, status: 'canceled' })
+
+    const { result } = renderHook(() => useRGBTransferDetailLogic(), { wrapper })
+
+    await act(async () => {
+      await expect(result.current.onAcceptReceive()).resolves.toBe(false)
+    })
+
+    expect(tools.toastError).not.toHaveBeenCalled()
+    expect(result.current.transfer?.status).toBe('canceled')
+    expect(result.current.senderCanceledVisible).toBe(true)
+    act(() => result.current.dismissSenderCanceled())
+    expect(result.current.senderCanceledVisible).toBe(false)
+  })
+
   it('does not offer accept for remote activity without a local consignment', async () => {
     const { wrapper } = createHookTestHarness({
       routeState: {
