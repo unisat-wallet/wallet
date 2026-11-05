@@ -29,9 +29,11 @@ import {
   RgbServiceError,
 } from '../src'
 import {
+  BFA_SCHEMA_ID,
   encodeBfaContractConsignment,
   encodeBfaTransferConsignment,
   isSupportedV1TransferConsignment,
+  LEGACY_BFA_SCHEMA_ID,
   NIA_V1_SCHEMA_ID,
 } from '../src/protocol/bfa-consignment'
 import { serializeBfaOpretWitnessBundle } from '../src/protocol/consignment'
@@ -453,6 +455,76 @@ describe('RgbService', () => {
       burnReason: '0xf39fd6e51aad88f6f4ce6ab8827279cfffb92266' }))
       .rejects.toThrow('at least one token')
     expect(service.getPendingTransfers()).toEqual([])
+  })
+
+  it('selects an exact UTXO subset for current-schema BFA burns', async () => {
+    const dependencies = createDependencies()
+    dependencies.encoder.prepareBurn = vi.fn(async input => ({
+      id: 'burn-exact', psbt: 'cHNidP8=', toSignInputs: [],
+      lockedOutpoints: input.selectedUtxos.map(utxo => utxo.outpoint),
+    }))
+    const service = new RgbService(dependencies)
+    const assetId = 'rgb:AQEBAQEB-AQEBAQE-BAQEBAQ-EBAQEBA-QEBAQEB-AQEBAQE'
+    await service.open(wallet)
+    ;(service as any).state.contracts = {
+      [assetId]: {
+        consignment: 'AA==', createdAt: 1,
+        genesis: Buffer.from(`0000${BFA_SCHEMA_ID}`, 'hex').toString('base64'),
+        metadata: { ticker: 'BFA', name: 'Burnable', precision: 0, schema: 'BFA', issuedSupply: '9' },
+      },
+    }
+    ;(service as any).state.snapshot.utxos = [2, 3, 4].map((value, index) => ({
+      outpoint: { txid: String(index + 1).repeat(64), vout: index },
+      satoshis: 1000, scriptPubKey: `5120${String(index + 1).repeat(64)}`,
+      publicKey: `02${String(index + 1).repeat(64)}`,
+      allocations: [{ assetId, amount: String(value), settled: true, spendable: true,
+        opId: String(index + 4).repeat(64), assignmentIndex: 0, assignmentType: 4000 }],
+    }))
+
+    await service.prepareBurn({ assetId, amount: '7', feeRate: 1,
+      burnReason: '0xf39fd6e51aad88f6f4ce6ab8827279cfffb92266' })
+
+    const selected = vi.mocked(dependencies.encoder.prepareBurn!).mock.calls[0]![0].selectedUtxos
+    expect(selected.flatMap(utxo => utxo.allocations.map(item => item.amount))).toEqual(['3', '4'])
+  })
+
+  it('reports an exact-selection error only for current-schema BFA burns', async () => {
+    const assetId = 'rgb:AQEBAQEB-AQEBAQE-BAQEBAQ-EBAQEBA-QEBAQEB-AQEBAQE'
+    const setup = async (schemaId: string) => {
+      const dependencies = createDependencies()
+      dependencies.encoder.prepareBurn = vi.fn(async input => ({
+        id: 'burn-selection', psbt: 'cHNidP8=', toSignInputs: [],
+        lockedOutpoints: input.selectedUtxos.map(utxo => utxo.outpoint),
+      }))
+      const service = new RgbService(dependencies)
+      await service.open(wallet)
+      ;(service as any).state.contracts = {
+        [assetId]: { consignment: 'AA==', createdAt: 1,
+          genesis: Buffer.from(`0000${schemaId}`, 'hex').toString('base64'),
+          metadata: { ticker: 'BFA', name: 'Burnable', precision: 0, schema: 'BFA', issuedSupply: '6' } },
+      }
+      ;(service as any).state.snapshot.utxos = [2, 4].map((value, index) => ({
+        outpoint: { txid: String(index + 1).repeat(64), vout: index }, satoshis: 1000,
+        scriptPubKey: `5120${String(index + 1).repeat(64)}`,
+        publicKey: `02${String(index + 1).repeat(64)}`,
+        allocations: [{ assetId, amount: String(value), settled: true, spendable: true,
+          opId: String(index + 4).repeat(64), assignmentIndex: 0, assignmentType: 4000 }],
+      }))
+      return { dependencies, service }
+    }
+    const request = { assetId, amount: '5', feeRate: 1,
+      burnReason: '0xf39fd6e51aad88f6f4ce6ab8827279cfffb92266' }
+
+    const current = await setup(BFA_SCHEMA_ID)
+    await expect(current.service.prepareBurn(request)).rejects.toThrow(
+      'cannot be formed exactly from spendable allocations'
+    )
+    expect(current.dependencies.encoder.prepareBurn).not.toHaveBeenCalled()
+
+    const legacy = await setup(LEGACY_BFA_SCHEMA_ID)
+    await expect(legacy.service.prepareBurn(request)).resolves.toMatchObject({ id: 'burn-selection' })
+    expect(vi.mocked(legacy.dependencies.encoder.prepareBurn!).mock.calls[0]![0].selectedUtxos)
+      .toHaveLength(2)
   })
 
   it('does not rebroadcast a failed BFA burn during sync and allows explicit retry', async () => {

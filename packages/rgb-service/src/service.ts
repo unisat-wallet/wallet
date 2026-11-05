@@ -20,6 +20,7 @@ import { hashBfaBurnDestinationV1, normalizeBfaBurnDestination } from './protoco
 import { decodeNiaConsignment } from './protocol/nia-consignment'
 import { mergeNiaConsignmentHistory } from './protocol/nia-history'
 import {
+  BFA_SCHEMA_ID,
   encodeBfaContractConsignment,
   isSupportedV1ContractConsignment,
   isSupportedV1TransferConsignment,
@@ -74,6 +75,7 @@ const PROVIDER_ORIGIN_HISTORY_TTL_MS = 24 * 60 * 60 * 1000
 // wallet locally usable only until its next recovery.
 const MAX_RECOVERY_HISTORY_PAYLOAD_LENGTH = 48_000_000
 const MAX_RECOVERY_HISTORY_OPERATION_IDS = 65_535
+const MAX_EXACT_BURN_SELECTION_STATES = 100_000
 
 /** Node responses which unambiguously mean these exact transaction bytes were already accepted. */
 function isDuplicateBitcoinBroadcastError(error: unknown) {
@@ -132,6 +134,31 @@ function getSpendableAmount(utxo: RgbUtxo, assetId: string) {
       allocation => allocation.assetId === assetId && allocation.settled && allocation.spendable
     )
     .reduce((total, allocation) => total + BigInt(allocation.amount), 0n)
+}
+
+/** Deterministic bounded subset-sum selection for current-schema terminal burns. */
+function selectExactBurnUtxos(
+  candidates: Array<{ utxo: RgbUtxo; amount: bigint }>,
+  required: bigint
+) {
+  const states = new Map<bigint, number[]>([[0n, []]])
+  for (let index = 0; index < candidates.length; index++) {
+    for (const [sum, selected] of [...states]) {
+      const next = sum + candidates[index]!.amount
+      if (next > required) continue
+      const proposal = [...selected, index]
+      const existing = states.get(next)
+      if (!existing || proposal.length < existing.length) states.set(next, proposal)
+    }
+    if (states.size > MAX_EXACT_BURN_SELECTION_STATES) {
+      const exact = states.get(required)
+      if (exact) return exact.map(selected => candidates[selected]!.utxo)
+      throw new RgbServiceError(
+        'Current BFA burn allocations are too fragmented for exact selection'
+      )
+    }
+  }
+  return states.get(required)?.map(index => candidates[index]!.utxo)
 }
 
 function isIncompleteLocalHistoryError(error: unknown) {
@@ -3443,7 +3470,11 @@ export class RgbService {
     const swapInputOutpoints = request.swapPsbt
       ? getSwapPsbtInputOutpoints(request.swapPsbt)
       : undefined
-    const selectedUtxos = this.selectUtxos(requestedAssetId, amount, swapInputOutpoints)
+    const requireExactSelection = burn &&
+      this.getStoredV1SchemaId(requestedAssetId) === BFA_SCHEMA_ID
+    const selectedUtxos = this.selectUtxos(
+      requestedAssetId, amount, swapInputOutpoints, requireExactSelection
+    )
     await this.verifySelectedUtxos(state.wallet, selectedUtxos)
     const allocations = selectedUtxos.flatMap(utxo =>
       utxo.allocations
@@ -4480,7 +4511,35 @@ export class RgbService {
     return current
   }
 
-  private selectUtxos(assetId: string, amount: string, allowedOutpoints?: Set<string>) {
+  private getStoredV1SchemaId(assetId: string) {
+    const contract = this.requireState().contracts?.[normalizeAssetId(assetId)]
+    if (!contract) return undefined
+    try {
+      if (contract.genesis) {
+        const genesis = Buffer.from(contract.genesis, 'base64')
+        if (genesis.length >= 34 && genesis[0] === 0 && genesis[1] === 0)
+          return genesis.subarray(2, 34).toString('hex')
+      }
+      const stored = Uint8Array.from(Buffer.from(contract.consignment, 'base64'))
+      const transferSchema = v1TransferSchemaId(stored)
+      if (transferSchema) return transferSchema
+      if (isSupportedV1ContractConsignment(stored)) {
+        const body = unwrapRgbContractConsignment(stored)
+        if (body.length >= 36 && body[0] === 1 && body[1] === 0 &&
+          body[2] === 0 && body[3] === 0) return Buffer.from(body.slice(4, 36)).toString('hex')
+      }
+    } catch {
+      // The encoder will report malformed local contract history precisely.
+    }
+    return undefined
+  }
+
+  private selectUtxos(
+    assetId: string,
+    amount: string,
+    allowedOutpoints?: Set<string>,
+    requireExact = false
+  ) {
     const state = this.requireState()
     let required: bigint
     try {
@@ -4508,7 +4567,9 @@ export class RgbService {
       )
       .map(utxo => ({ utxo, amount: getSpendableAmount(utxo, assetId) }))
       .filter(candidate => candidate.amount > 0n)
-      .sort((a, b) => (a.amount === b.amount ? 0 : a.amount < b.amount ? -1 : 1))
+      .sort((a, b) => a.amount === b.amount
+        ? outpointKey(a.utxo).localeCompare(outpointKey(b.utxo))
+        : a.amount < b.amount ? -1 : 1)
 
     if (allowedOutpoints !== undefined) {
       const total = candidates.reduce((sum, candidate) => sum + candidate.amount, 0n)
@@ -4521,6 +4582,16 @@ export class RgbService {
 
     const exact = candidates.find(candidate => candidate.amount === required)
     if (exact) return [exact.utxo]
+
+    if (requireExact) {
+      const total = candidates.reduce((sum, candidate) => sum + candidate.amount, 0n)
+      if (total < required) throw new RgbInsufficientBalanceError(assetId, amount)
+      const selected = selectExactBurnUtxos(candidates, required)
+      if (selected) return selected
+      throw new RgbServiceError(
+        'Current BFA burn amount cannot be formed exactly from spendable allocations'
+      )
+    }
 
     const selected: RgbUtxo[] = []
     let total = 0n
