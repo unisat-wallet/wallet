@@ -497,7 +497,10 @@ async function postProxyV1Consignment(
   }
 
   let difficulty = Number(invoiceStatus.pow_difficulty)
-  for (let attempt = 0; attempt < 3; attempt++) {
+  let powRetries = 0
+  let domainSeparatedSignature = usesProxyV04Route(endpoint)
+  let triedAlternateSignature = false
+  while (true) {
     const timestamp = String(Math.floor(Date.now() / 1000))
     const nonce = await proxyV1Pow(transferId, difficulty, timestamp)
     const boundary = `----unisat-rgb-${rpcId()}`
@@ -512,7 +515,14 @@ async function postProxyV1Consignment(
       ['params[consignment_hash]', consignmentHash],
       ['params[batch]', String(consignment.batch === true)],
       ['params[file_size]', String(file.length)],
-      ['params[signature]', proxyV1Sign(senderPrivateKey, transferId + consignmentHash + blobHash)],
+      [
+        'params[signature]',
+        proxyV1Sign(
+          senderPrivateKey,
+          transferId + consignmentHash + blobHash +
+            (domainSeparatedSignature ? 'consignment' : '')
+        ),
+      ],
       ['params[pow_timestamp]', timestamp],
       ['params[pow_nonce]', nonce],
     ]
@@ -553,9 +563,20 @@ async function postProxyV1Consignment(
       Number.isInteger(required) &&
       required >= 0 &&
       required <= RGB_PROXY_MAX_POW_DIFFICULTY &&
-      attempt < 2
+      powRetries < 2
     ) {
+      powRetries += 1
       difficulty = required
+      continue
+    }
+    // Proxy 0.4 domain-separates endpoint signatures with the literal
+    // "consignment". An endpoint without a versioned path can still expose
+    // 0.4, while an older deployment may be mounted below a versioned gateway;
+    // an auth failure is safe to retry because the proxy validates the
+    // signature before storing the upload.
+    if (body.error.code === -502 && !triedAlternateSignature) {
+      triedAlternateSignature = true
+      domainSeparatedSignature = !domainSeparatedSignature
       continue
     }
     throw new Error(`RGB proxy consignment.post failed: ${body.error.message || body.error.code}`)

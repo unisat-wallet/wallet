@@ -328,7 +328,7 @@ describe('RGB proxy transport', () => {
   })
 
   it('uploads ack.prepare signed transactions as multipart on the proxy 0.4 route', async () => {
-    const recipientEndpoint = 'rpcs://recipient.example/_/rgb/v1/json-rpc'
+    const recipientEndpoint = 'rpcs://recipient.example/_/rgb/v0_4_0/v1/json-rpc'
     const senderEndpoint = 'rpcs://sender.example/_/rgb/custom/v1/json-rpc'
     const invoiceId = '22'.repeat(32)
     const senderPrivateKey = '11'.repeat(32)
@@ -338,7 +338,7 @@ describe('RGB proxy transport', () => {
     fetchMock.mockImplementation(async (url: string, init: RequestInit) => {
       const json = typeof init.body === 'string' ? JSON.parse(init.body) : undefined
       if (json?.method === 'invoice.check') {
-        expect(url).toBe('https://recipient.example/_/rgb/v1/json-rpc')
+        expect(url).toBe('https://recipient.example/_/rgb/v0_4_0/v1/json-rpc')
         return rpcResponse({ [invoiceId]: { status: 'available', pow_difficulty: '0' } })
       }
       if (json?.method === 'server.info') {
@@ -369,8 +369,16 @@ describe('RGB proxy transport', () => {
         return rpcResponse(true)
       }
       expect(method).toBe('consignment.post')
-      expect(url).toBe('https://recipient.example/_/rgb/v1/json-rpc')
+      expect(url).toBe('https://recipient.example/_/rgb/v0_4_0/v1/json-rpc')
       expect(form.get('params[sender_transport_endpoint]')).toBe(senderEndpoint)
+      const transferId = String(form.get('params[transfer_id]'))
+      const consignmentHash = String(form.get('params[consignment_hash]'))
+      const file = Buffer.from(await (form.get('file') as File).arrayBuffer())
+      expect(proxyV1Verify(
+        proxyV1PublicKey(senderPrivateKey),
+        String(form.get('params[signature]')),
+        transferId + consignmentHash + proxyV1Hash(file) + 'consignment'
+      )).toBe(true)
       return rpcResponse(true)
     })
 
