@@ -132,7 +132,9 @@ export function encodeBlindRgbInvoice(input: {
     query.set('expiry', String(input.expirationTimestamp))
   if (input.transportEndpoints?.length)
     query.set('endpoints', input.transportEndpoints.join(','))
-  query.set('assignment_name', 'assetOwner')
+  // An amount-open invoice has neither assignment state nor schema. Omitting
+  // the name expresses Assignment::Any without guessing fungible vs NFT.
+  if (input.amount !== undefined) query.set('assignment_name', 'assetOwner')
   if (input.proxyPublicKey) {
     rgbProxyInvoiceId(recipientId, input.proxyPublicKey)
     query.set('pk', input.proxyPublicKey)

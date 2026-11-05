@@ -433,7 +433,10 @@ export function encodeWitnessRgbInvoice(input: {
   if (input.expirationTimestamp !== undefined)
     query.set('expiry', String(input.expirationTimestamp))
   query.set('endpoints', input.transportEndpoints.join(','))
-  query.set('assignment_name', 'assetOwner')
+  // Without an amount or schema, `assetOwner` is ambiguous between fungible
+  // and non-fungible state. Leave the assignment open so standards-compliant
+  // senders decode it as Assignment::Any and narrow it using the chosen asset.
+  if (input.amount !== undefined) query.set('assignment_name', 'assetOwner')
   if (input.proxyPublicKey) {
     rgbProxyInvoiceId(recipientId, input.proxyPublicKey)
     query.set('pk', input.proxyPublicKey)

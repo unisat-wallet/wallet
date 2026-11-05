@@ -35,14 +35,16 @@ describe('blind RGB receive', () => {
       expect(invoice).toBe(expected)
       expect(invoice).toContain('expiry=1800000000')
       expect(invoice).not.toContain('expirationTimestamp=')
-      expect(decodeRgbInvoice(invoice)).toMatchObject({
+      const decoded = decodeRgbInvoice(invoice)
+      expect(decoded).toMatchObject({
         assetId,
         amount,
         expirationTimestamp: input.expirationTimestamp,
         transportEndpoints: input.transportEndpoints,
       })
+      expect(decoded.assignmentName).toBe(amount === undefined ? undefined : 'assetOwner')
       const emptyQuery = encodeBlindRgbInvoice({ network: input.network, seal: input.seal })
-      expect(emptyQuery).toContain('?assignment_name=assetOwner')
+      expect(emptyQuery).not.toContain('assignment_name=')
     } finally {
       vi.unstubAllGlobals()
     }

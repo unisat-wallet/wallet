@@ -38,7 +38,22 @@ describe('decodeRgbInvoice', () => {
 
     expect(invoice).toContain('/~/~/bc:wvout:')
     expect(invoice).not.toContain('amount=')
-    expect(decodeRgbInvoice(invoice).amount).toBeUndefined()
+    expect(invoice).not.toContain('assignment_name=')
+    const decoded = decodeRgbInvoice(invoice)
+    expect(decoded.amount).toBeUndefined()
+    expect(decoded.assignmentName).toBeUndefined()
+  })
+
+  it('keeps assetOwner only when an amount makes the assignment fungible', () => {
+    const invoice = encodeWitnessRgbInvoice({
+      network: 'mainnet',
+      scriptPubKey: '512079be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798',
+      amount: '1',
+      transportEndpoints: ['rpcs://proxy.example'],
+    })
+
+    expect(invoice).toContain('assignment_name=assetOwner')
+    expect(decodeRgbInvoice(invoice)).toMatchObject({ amount: '1', assignmentName: 'assetOwner' })
   })
 
   it('uses the RGB Signet beneficiary prefix for witness invoices', () => {
