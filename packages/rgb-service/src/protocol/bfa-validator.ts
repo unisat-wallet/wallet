@@ -80,7 +80,7 @@ export interface CachedValidatedBfaHistory {
   bundles: Array<{ id: string; txid: string; operationIds: string[]; parentOpIds: string[] }>
 }
 
-export const BFA_VALIDATOR_VERSION = 'bfa-v1-2026-11-05-current-schema'
+export const BFA_VALIDATOR_VERSION = 'bfa-v1-2026-11-06-current-schema'
 
 export interface BfaValidationAttestationPayload {
   version: 1
@@ -942,6 +942,29 @@ export function bfaMintLockId(operationId: string, witnessTxid: string) {
   )))
 }
 
+/** @internal Classify the finalized EVM observation for a current-schema mint lock. */
+export function validateCurrentBfaMintLockRecord(
+  operationId: string,
+  beforeBlock: bigint,
+  finalizedBlock: bigint,
+  blockPlusOne: bigint
+) {
+  if (blockPlusOne > 0n) {
+    const recordedBlock = blockPlusOne - 1n
+    if (recordedBlock < beforeBlock) return
+    fail(`BFA FundsIn event was recorded after the mint deadline for ${operationId}`)
+  }
+  // beforeBlock is exclusive. Once beforeBlock - 1 is finalized, every block
+  // in which the lock could have been recorded is immutable, so a missing
+  // record is permanently invalid rather than a retryable RPC/finality gap.
+  if (finalizedBlock + 1n < beforeBlock) {
+    throw new RgbBfaValidationUnavailableError(
+      `BFA FundsIn event is not finalized yet for mint ${operationId}`
+    )
+  }
+  fail(`Finalized BFA FundsIn event is missing for mint ${operationId}`)
+}
+
 async function verifyCurrentMintLock(
   operation: Operation,
   witnessTxid: string,
@@ -966,21 +989,7 @@ async function verifyCurrentMintLock(
   if (typeof result !== 'string' || !/^0x[0-9a-f]{64}$/i.test(result)) {
     fail('invalid getFundsInBlock result')
   }
-  const blockPlusOne = BigInt(result)
-  if (blockPlusOne > 0n) {
-    const recordedBlock = blockPlusOne - 1n
-    if (recordedBlock < beforeBlock) return
-    fail(`BFA FundsIn event was recorded after the mint deadline for ${operation.id}`)
-  }
-  // Once the finalized head reaches the exclusive beforeBlock bound, the
-  // required lock can no longer become valid. Before then this remains a
-  // retryable finality condition rather than an invalid consignment.
-  if (finalizedBlock + 1n < beforeBlock) {
-    throw new RgbBfaValidationUnavailableError(
-      `BFA FundsIn event is not finalized yet for mint ${operation.id}`
-    )
-  }
-  throw new RgbBfaValidationUnavailableError(`Finalized BFA FundsIn event is missing for mint ${operation.id}`)
+  validateCurrentBfaMintLockRecord(operation.id, beforeBlock, finalizedBlock, BigInt(result))
 }
 
 async function verifyLegacyMintEvent(

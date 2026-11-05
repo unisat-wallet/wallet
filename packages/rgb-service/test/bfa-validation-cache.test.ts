@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
-import { RgbMissingAncestorError } from '../src/errors'
-import { bfaMintLockId, cacheBfaBitcoinStatus, cacheBfaEvmRpc, cacheConfirmedBfaWitnesses, pruneConfirmedBfaWitnesses, selectBfaSpendHistory } from '../src/protocol/bfa-validator'
+import { RgbBfaValidationUnavailableError, RgbMissingAncestorError } from '../src/errors'
+import { bfaMintLockId, cacheBfaBitcoinStatus, cacheBfaEvmRpc, cacheConfirmedBfaWitnesses, pruneConfirmedBfaWitnesses, selectBfaSpendHistory, validateCurrentBfaMintLockRecord } from '../src/protocol/bfa-validator'
 
 describe('BFA mint lock ID', () => {
   it('commits to the operation ID and internal-order witness txid like rgb-ops', () => {
@@ -12,6 +12,31 @@ describe('BFA mint lock ID', () => {
       '6c2ace88bc04cce7d108f6cf1535a46564ba938db9e870325f11ebf8a8d23e27',
       '00112233445566778899aabbccddeeff00112233445566778899aabbccddeeff'
     )).toBe('a0f145a18cd58a42232653004cae6fe518a206a1459d0fbaa605def8c392c61b')
+  })
+})
+
+describe('current BFA mint lock deadline', () => {
+  const operationId = 'ab'.repeat(32)
+
+  it('keeps a missing lock retryable while an eligible block is not finalized', () => {
+    expect(() => validateCurrentBfaMintLockRecord(operationId, 100n, 98n, 0n))
+      .toThrow(RgbBfaValidationUnavailableError)
+  })
+
+  it.each([99n, 100n, 101n])(
+    'rejects a missing lock permanently at finalized block %s',
+    finalizedBlock => {
+      expect(() => validateCurrentBfaMintLockRecord(
+        operationId, 100n, finalizedBlock, 0n
+      )).toThrow(`Finalized BFA FundsIn event is missing for mint ${operationId}`)
+    }
+  )
+
+  it('accepts a lock before the exclusive deadline and rejects one at the deadline', () => {
+    expect(() => validateCurrentBfaMintLockRecord(operationId, 100n, 100n, 100n))
+      .not.toThrow()
+    expect(() => validateCurrentBfaMintLockRecord(operationId, 100n, 100n, 101n))
+      .toThrow(`BFA FundsIn event was recorded after the mint deadline for ${operationId}`)
   })
 })
 
