@@ -74,13 +74,14 @@ export interface ValidatedBfaConsignment extends ValidatedBfaTransferHistory {
 /** Local-only validation summary; the canonical consignment remains the source of bundle bytes. */
 export interface CachedValidatedBfaHistory {
   version: 1
+  validatorVersion: string
   fingerprint: string
   assetId: string
   allocations: ValidatedBfaTransferHistory['allocations']
   bundles: Array<{ id: string; txid: string; operationIds: string[]; parentOpIds: string[] }>
 }
 
-export const BFA_VALIDATOR_VERSION = 'bfa-v1-2026-11-06-current-schema'
+export const BFA_VALIDATOR_VERSION = 'bfa-v1-2026-11-06-burn-inputs'
 
 export interface BfaValidationAttestationPayload {
   version: 1
@@ -135,7 +136,7 @@ export function cacheValidatedBfaHistory(
   history: ValidatedBfaConsignment
 ): CachedValidatedBfaHistory {
   return {
-    version: 1,
+    version: 1, validatorVersion: BFA_VALIDATOR_VERSION,
     fingerprint: validatedHistoryFingerprint(payload, knownBlindSeals),
     assetId: history.assetId,
     allocations: history.allocations,
@@ -151,7 +152,7 @@ export function restoreValidatedBfaHistory(
   knownBlindSeals: RgbBlindSeal[],
   cached: CachedValidatedBfaHistory
 ): (ValidatedBfaTransferHistory & { bundles: ValidatedBfaConsignment['bundles'] }) | undefined {
-  if (cached?.version !== 1 ||
+  if (cached?.version !== 1 || cached.validatorVersion !== BFA_VALIDATOR_VERSION ||
     cached.fingerprint !== validatedHistoryFingerprint(payload, knownBlindSeals) ||
     !Array.isArray(cached.bundles) || !Array.isArray(cached.allocations)) return undefined
   const disclosed = revealBfaConsignmentBlindSeals(payload, network, knownBlindSeals)
@@ -965,6 +966,20 @@ export function validateCurrentBfaMintLockRecord(
   fail(`Finalized BFA FundsIn event is missing for mint ${operationId}`)
 }
 
+/** Enforce the current BFA schema's terminal, asset-only Burn semantics. */
+export function validateCurrentBfaBurnConservation(input: {
+  mintInputs: number
+  linkInputs: number
+  assetInputs: number
+  outputAssignments: number
+  burnedAmount: bigint
+  inputAmount: bigint
+}): void {
+  if (input.mintInputs || input.linkInputs || !input.assetInputs || input.outputAssignments ||
+    !input.burnedAmount || input.burnedAmount !== input.inputAmount)
+    fail('invalid burn conservation')
+}
+
 async function verifyCurrentMintLock(
   operation: Operation,
   witnessTxid: string,
@@ -1148,8 +1163,11 @@ export async function validateBfaTransferConsignment(
           outputMintRights || outputLinkRights) fail('invalid mint conservation')
         await verifyCurrentMintLock(operation, bundle.txid, genesis.chainId, genesis.address, options)
       } else if (operation.type === TS_BURN) {
-        if (!operation.inputs.length || operation.assignments.length || operation.amount !== inputAmount)
-          fail('invalid burn conservation')
+        validateCurrentBfaBurnConservation({
+          mintInputs, linkInputs, assetInputs,
+          outputAssignments: operation.assignments.length,
+          burnedAmount: operation.amount, inputAmount,
+        })
       } else if (operation.type === TS_PROPAGATE) {
         if (mintInputs !== 1 || assetInputs || linkInputs || outputMintRights < 1 ||
           outputAmount || outputLinkRights) fail('invalid mint-right propagation')

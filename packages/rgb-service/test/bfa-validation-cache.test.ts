@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
 import { RgbBfaValidationUnavailableError, RgbMissingAncestorError } from '../src/errors'
-import { bfaMintLockId, cacheBfaBitcoinStatus, cacheBfaEvmRpc, cacheConfirmedBfaWitnesses, pruneConfirmedBfaWitnesses, selectBfaSpendHistory, validateCurrentBfaMintLockRecord } from '../src/protocol/bfa-validator'
+import { bfaMintLockId, cacheBfaBitcoinStatus, cacheBfaEvmRpc, cacheConfirmedBfaWitnesses, pruneConfirmedBfaWitnesses, selectBfaSpendHistory, validateCurrentBfaBurnConservation, validateCurrentBfaMintLockRecord } from '../src/protocol/bfa-validator'
 
 describe('BFA mint lock ID', () => {
   it('commits to the operation ID and internal-order witness txid like rgb-ops', () => {
@@ -37,6 +37,31 @@ describe('current BFA mint lock deadline', () => {
       .not.toThrow()
     expect(() => validateCurrentBfaMintLockRecord(operationId, 100n, 100n, 101n))
       .toThrow(`BFA FundsIn event was recorded after the mint deadline for ${operationId}`)
+  })
+})
+
+describe('current BFA burn conservation', () => {
+  const valid = {
+    mintInputs: 0, linkInputs: 0, assetInputs: 1, outputAssignments: 0,
+    burnedAmount: 100n, inputAmount: 100n,
+  }
+
+  it('accepts a non-zero terminal burn funded only by asset inputs', () => {
+    expect(() => validateCurrentBfaBurnConservation(valid)).not.toThrow()
+  })
+
+  it.each([
+    ['mint-right only', { ...valid, mintInputs: 1, assetInputs: 0, burnedAmount: 0n, inputAmount: 0n }],
+    ['link-right only', { ...valid, linkInputs: 1, assetInputs: 0, burnedAmount: 0n, inputAmount: 0n }],
+    ['asset and mint-right', { ...valid, mintInputs: 1 }],
+    ['asset and link-right', { ...valid, linkInputs: 1 }],
+    ['no asset input', { ...valid, assetInputs: 0, inputAmount: 0n }],
+    ['missing burned amount', { ...valid, burnedAmount: 0n }],
+    ['an output assignment', { ...valid, outputAssignments: 1 }],
+    ['a mismatched amount', { ...valid, burnedAmount: 99n }],
+  ])('rejects %s', (_name, input) => {
+    expect(() => validateCurrentBfaBurnConservation(input))
+      .toThrow('invalid burn conservation')
   })
 })
 

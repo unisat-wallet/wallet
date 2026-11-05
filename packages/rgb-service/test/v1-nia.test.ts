@@ -301,6 +301,9 @@ describe('NIA v1 transfer', () => {
     expect(Object.keys(validatedV1SendHistories)).toHaveLength(1)
     const saved = validatedV1SendHistories[assetId]!
     expect(restoreValidatedBfaHistory(consignment, 0, [], saved)).toBeDefined()
+    expect(restoreValidatedBfaHistory(consignment, 0, [], {
+      ...saved, validatorVersion: 'outdated-validator',
+    })).toBeUndefined()
     expect(restoreValidatedBfaHistory(consignment, 0,
       [{ txid: genesisTxid, vout: 0, blinding: 99n }], saved)).toBeUndefined()
     const changedPayload = Uint8Array.from(consignment)
