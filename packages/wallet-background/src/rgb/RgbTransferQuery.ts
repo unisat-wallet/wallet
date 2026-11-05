@@ -299,8 +299,8 @@ export class RgbTransferQuery {
       const acknowledgementPending =
         (receivedConsignment as { acknowledgementPending?: boolean } | undefined)
           ?.acknowledgementPending === true
-      // ACK intent is durable and cannot be rejected. Show it as waiting for
-      // the sender rather than exposing the pending-accept actions again.
+      // ACK intent is durable and cannot be rejected. A Proxy v1 batch may
+      // still be waiting for its other recipients before releasing the TX.
       if (receivedConsignment && acknowledgementPending) {
         return [
           {
@@ -310,9 +310,10 @@ export class RgbTransferQuery {
             type: 'receive' as const,
             amount: receivedAmount,
             precision: receivedPrecision,
+            batch: receivedConsignment.batch,
             txid: receivedConsignment.txid,
             timestamp: receivedConsignment.receivedAt,
-            status: 'waiting_receive',
+            status: 'waiting_batch_release',
             local: true,
           },
         ]
@@ -344,6 +345,7 @@ export class RgbTransferQuery {
             type: 'receive' as const,
             amount: receivedAmount,
             precision: receivedPrecision,
+            batch: receive.pendingAccept.batch,
             txid: receive.pendingAccept.txid,
             timestamp: receive.pendingAccept.discoveredAt || receive.createdAt,
             status: 'pending_accept',
@@ -370,6 +372,7 @@ export class RgbTransferQuery {
             type: 'receive' as const,
             amount: receivedAmount,
             precision: receivedPrecision,
+            batch: receivedConsignment.batch,
             txid: receivedConsignment.txid,
             timestamp: receivedConsignment.receivedAt,
             status: 'pending_accept',
@@ -385,6 +388,7 @@ export class RgbTransferQuery {
           type: 'receive' as const,
           amount: receivedAmount,
           precision: receivedPrecision,
+          batch: receivedConsignment.batch,
           txid: receivedConsignment.txid,
           timestamp: receivedConsignment.receivedAt,
           status: receivedConsignment.broadcastDetectedAt ? 'confirming' : 'waiting_receive',
@@ -399,6 +403,7 @@ export class RgbTransferQuery {
       type: 'receive' as const,
       amount: receive.amount,
       precision: receive.precision,
+      batch: receive.batch,
       txid: receive.txid,
       timestamp: receive.createdAt,
       status: receive.status ?? 'settled',
@@ -480,7 +485,7 @@ export class RgbTransferQuery {
         const status = String(item.status ?? '').toLowerCase()
         const inProgressReceive =
           item.type === 'receive' &&
-          ['waiting_receive', 'waitingcounterparty', 'pending', 'unconfirmed'].includes(status)
+          ['waiting_batch_release', 'waiting_receive', 'waitingcounterparty', 'pending', 'unconfirmed'].includes(status)
         if (inProgressReceive && pendingAcceptCount > 0) return false
         return true
       })
@@ -499,7 +504,7 @@ export class RgbTransferQuery {
         timestamp: item.timestamp ?? item.createdAt ?? 0,
         status:
           item.type === 'receive' &&
-          ['waiting_receive', 'waitingcounterparty'].includes(
+          ['waiting_batch_release', 'waiting_receive', 'waitingcounterparty'].includes(
             String(item.status ?? '').toLowerCase()
           )
             ? 'confirming'

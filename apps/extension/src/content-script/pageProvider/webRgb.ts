@@ -56,6 +56,7 @@ function transferStatus(status: unknown): string {
     case 'settled': case 'confirmed': return 'Settled';
     case 'failed': case 'rejected': case 'canceled': case 'broadcast_failed': return 'Failed';
     case 'confirming': case 'broadcasted': case 'waiting_receive': return 'WaitingConfirmations';
+    case 'waiting_batch_release': return 'WaitingCounterparty';
     default: return 'WaitingCounterparty';
   }
 }

@@ -27,6 +27,7 @@ function isInProgress(transfer?: RgbTransferItem) {
       'ready_for_dapp_finalize',
       'pending_accept',
       'confirming',
+      'waiting_batch_release',
       'waiting_receive',
       'pending',
       'unconfirmed',
@@ -213,6 +214,13 @@ export function useRGBTransferDetailLogic() {
           current ? { ...current, status: 'canceled', local: true } : current
         )
         return false
+      }
+      if (result?.status === 'pending') {
+        tools.toastSuccess(t('rgb_status_waiting_batch_release'))
+        setTransfer(current =>
+          current ? { ...current, status: 'waiting_batch_release', local: true } : current
+        )
+        return true
       }
       if (!result?.accepted) throw new Error(t('rgb_accept_transfer_failed'))
       tools.toastSuccess(t('rgb_accept_transfer_success'))

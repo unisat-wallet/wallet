@@ -1507,6 +1507,7 @@ export class RgbService {
               proxySenderPublicKey: receipt.proxySenderPublicKey,
               proxySenderEndpoint: receipt.proxySenderEndpoint,
               proxyConsignmentHash: receipt.proxyConsignmentHash,
+              batch: receipt.batch,
             },
           ]
         : []
@@ -1611,6 +1612,10 @@ export class RgbService {
         const precision = match.decoded.metadata.precision
         if (receive.receivedConsignment && receive.receivedConsignment.precision !== precision) {
           receive.receivedConsignment.precision = precision
+          changed = true
+        }
+        if (item.batch && receive.receivedConsignment && !receive.receivedConsignment.batch) {
+          receive.receivedConsignment.batch = true
           changed = true
         }
 
@@ -1723,7 +1728,8 @@ export class RgbService {
           !receive.pendingAccept ||
           receive.pendingAccept.txid !== match.txid ||
           receive.pendingAccept.payload !== item.payload ||
-          receive.pendingAccept.precision !== precision
+          receive.pendingAccept.precision !== precision ||
+          receive.pendingAccept.batch !== item.batch
         ) {
           receive.pendingAccept = {
             payload: item.payload,
@@ -1733,6 +1739,7 @@ export class RgbService {
             proxySenderPublicKey: item.proxySenderPublicKey,
             proxySenderEndpoint: item.proxySenderEndpoint,
             proxyConsignmentHash: item.proxyConsignmentHash,
+            batch: item.batch,
             signedRawTx: match.signedRawTx,
             assetId: match.assetId,
             amount: match.amount,
@@ -1872,6 +1879,7 @@ export class RgbService {
         proxySenderPublicKey: receive.pendingAccept.proxySenderPublicKey,
         proxySenderEndpoint: receive.pendingAccept.proxySenderEndpoint,
         proxyConsignmentHash: receive.pendingAccept.proxyConsignmentHash,
+        batch: receive.pendingAccept.batch,
         counterpartyScriptPubKeys: receive.pendingAccept.counterpartyScriptPubKeys,
       }
       await this.persist({ waitForRecovery: true })
@@ -2306,6 +2314,7 @@ export class RgbService {
     const amount =
       receive.receivedConsignment?.amount ?? receive.pendingAccept?.amount ?? receive.amount
     const precision = receive.receivedConsignment?.precision ?? receive.pendingAccept?.precision
+    const batch = receive.receivedConsignment?.batch ?? receive.pendingAccept?.batch
     const existing = pendingReceiveHistory.find(item => item.transferId === transferId)
     if (existing) {
       // Settlement is terminal. A delayed proxy poll (especially after local
@@ -2318,6 +2327,7 @@ export class RgbService {
       if (assetId) existing.assetId = assetId
       if (amount) existing.amount = amount
       if (precision !== undefined) existing.precision = precision
+      if (batch) existing.batch = true
       existing.counterpartyScriptPubKeys =
         existing.counterpartyScriptPubKeys ||
         receive.pendingAccept?.counterpartyScriptPubKeys ||
@@ -2329,6 +2339,7 @@ export class RgbService {
       assetId: assetId || '',
       amount: amount || '',
       ...(precision === undefined ? {} : { precision }),
+      ...(batch ? { batch: true } : {}),
       txid,
       createdAt:
         receive.receivedConsignment?.receivedAt ||
@@ -4022,6 +4033,7 @@ export class RgbService {
       transportId: `${transferId}:${index}`,
       txid: delivery.completed.txid,
       endpoints: delivery.endpoints,
+      ...(delivery.completed.consignments.length > 1 ? { batch: true } : {}),
       ...(pending.request.donation ? { donation: true } : {}),
       ...(invoice.proxyInvoiceId ? {
         proxyInvoiceId: invoice.proxyInvoiceId,
@@ -4115,6 +4127,7 @@ export class RgbService {
       transportId: `${transferId}:${index}`,
       txid: delivery.completed.txid,
       endpoints: delivery.endpoints,
+      ...(delivery.completed.consignments.length > 1 ? { batch: true } : {}),
       ...(pending.request.donation ? { donation: true } : {}),
       ...(invoice.proxyInvoiceId ? {
         proxyInvoiceId: invoice.proxyInvoiceId,

@@ -3527,6 +3527,8 @@
   "rgb_confirm_reject_transfer": { "message": "拒否を確定" },
   "rgb_reject_receive_local_only_description": {"message": "この送金は検証できませんでした。プロキシのアドレスがないため、拒否するとこのウォレットからのみ削除されます。送信者には通知されず、後から受け取ることもできません。"},
   "rgb_accept_transfer_success": { "message": "送金を承認しました" },
+  "rgb_status_waiting_batch_release": { "message": "承認済み、他の受取人を待っています" },
+  "rgb_batch_transfer": { "message": "一括送金" },
   "rgb_reject_transfer_success": { "message": "送金を拒否しました" },
   "rgb_accept_transfer_failed": { "message": "送金を承認できませんでした" },
   "rgb_reject_transfer_failed": { "message": "送金を拒否できませんでした" },

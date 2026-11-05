@@ -3509,6 +3509,7 @@ describe('RGB wallet references', () => {
             txid: 'a'.repeat(64),
             receivedAt: 94,
             acknowledgementPending: true,
+            batch: true,
           },
         },
         {
@@ -3572,8 +3573,9 @@ describe('RGB wallet references', () => {
       }),
       expect.objectContaining({
         id: 'local-receive:ack-intent',
-        status: 'waiting_receive',
+        status: 'waiting_batch_release',
         amount: '6',
+        batch: true,
       }),
       expect.objectContaining({
         id: 'local-receive:accepted-unbroadcast',

@@ -225,6 +225,7 @@ describe('RGB proxy transport', () => {
           postedPayload = file.toString('base64')
           expect(Buffer.from(proxyV1DecryptBlob(file, prepared!.privateKey, senderPk, consignmentHash)).toString('base64')).toBe(payload)
           expect(params.transfer_id).toBe(transferId)
+          expect(params.batch).toBe('true')
           expect(proxyV1Verify(senderPk, params.signature, transferId + consignmentHash + blobHash)).toBe(true)
           return rpcResponse(true)
         }
@@ -232,7 +233,7 @@ describe('RGB proxy transport', () => {
           expect(proxyV1Verify(recipientPk, params.signature, invoiceId + params.timestamp)).toBe(true)
           return rpcResponse({ [transferId]: 'pending' })
         case 'consignment.get':
-          return rpcResponse({ consignment: postedPayload, sender_transport_endpoint: 'rpc://proxy.example/json-rpc', sender_pk: senderPk, consignment_hash: consignmentHash, batch: false })
+          return rpcResponse({ consignment: postedPayload, sender_transport_endpoint: 'rpc://proxy.example/json-rpc', sender_pk: senderPk, consignment_hash: consignmentHash, batch: true })
         case 'transfer.retrieved':
           expect(params.transfer_id).toBe(transferId)
           expect(proxyV1Verify(recipientPk, params.signature, transferId + 'retrieved')).toBe(true)
@@ -264,12 +265,14 @@ describe('RGB proxy transport', () => {
       proxyRecipientPublicKey: prepared!.publicKey,
       proxySenderPrivateKey: senderPrivateKey,
       signedRawTx: rawTx,
+      batch: true,
       proxyExpirationTimestamp: expiresAt,
     }
     await transport.publishConsignment(consignment)
     const received = await transport.getConsignment?.({ recipientId: invoiceId, endpoints: [endpoint], proxyPrivateKey: prepared!.privateKey })
     expect(received?.proxyTransferId).toBe(transferId)
     expect(received?.payload).toBe(payload)
+    expect(received?.batch).toBe(true)
     expect(received).not.toHaveProperty('txid')
     await expect(transport.acknowledgeConsignment?.({
       recipientId: invoiceId,

@@ -3518,6 +3518,8 @@
   "rgb_confirm_reject_transfer": { "message": "Confirmar rechazo" },
   "rgb_reject_receive_local_only_description": {"message": "No se pudo verificar esta transferencia. No hay una dirección del proxy disponible, así que rechazarla solo la eliminará de esta cartera. El remitente no recibirá aviso y no podrás aceptarla después."},
   "rgb_accept_transfer_success": { "message": "Transferencia aceptada" },
+  "rgb_status_waiting_batch_release": { "message": "Aceptada, esperando a los otros destinatarios" },
+  "rgb_batch_transfer": { "message": "Transferencia por lotes" },
   "rgb_reject_transfer_success": { "message": "Transferencia rechazada" },
   "rgb_accept_transfer_failed": { "message": "No se pudo aceptar la transferencia" },
   "rgb_reject_transfer_failed": { "message": "No se pudo rechazar la transferencia" },

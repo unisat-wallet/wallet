@@ -3579,6 +3579,12 @@
   "rgb_accept_transfer_success": {
     "message": "Transfer accepted"
   },
+  "rgb_status_waiting_batch_release": {
+    "message": "Accepted, waiting for other recipients"
+  },
+  "rgb_batch_transfer": {
+    "message": "Batch transfer"
+  },
   "rgb_reject_transfer_success": {
     "message": "Transfer rejected"
   },

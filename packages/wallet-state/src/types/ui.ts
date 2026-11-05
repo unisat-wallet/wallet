@@ -73,6 +73,8 @@ export interface RgbActivityItem {
   /** Present when this activity comes from a local transfer. */
   transferId?: string
   local?: boolean
+  /** This receive is one member of a multi-recipient Proxy v1 transaction. */
+  batch?: boolean
   /** Unilateral BFA burn with a downloadable consignment proof. */
   burn?: boolean
   /** Destination chain committed by a V1 burn. */
@@ -99,6 +101,7 @@ export type RgbTransferStatus =
   | 'pending_accept'
   | 'validation_failed'
   | 'confirming'
+  | 'waiting_batch_release'
   | 'waiting_receive'
   | 'settled'
   | 'rejected'
@@ -129,6 +132,8 @@ export interface RgbTransferItem {
   /** The proxy cannot be notified because the consignment has no ACK endpoint. */
   rejectLocally?: boolean
   local?: boolean
+  /** This receive is one member of a multi-recipient Proxy v1 transaction. */
+  batch?: boolean
   /** Unilateral BFA burn with a downloadable consignment proof. */
   burn?: boolean
   /** Destination chain committed by a V1 burn. */

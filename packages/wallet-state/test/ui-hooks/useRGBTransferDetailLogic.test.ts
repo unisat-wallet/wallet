@@ -94,6 +94,23 @@ describe('useRGBTransferDetailLogic', () => {
     expect(result.current.transfer?.status).toBe('waiting_receive')
   })
 
+  it('shows a successful batch wait after ACK is accepted but the transaction is not released', async () => {
+    const { wrapper, wallet, tools } = createHookTestHarness({
+      routeState: { transferId: 'recipient-id', initialTransfer: pendingReceive },
+    })
+    wallet.acceptRgbReceive.mockResolvedValue({ accepted: false, status: 'pending' })
+
+    const { result } = renderHook(() => useRGBTransferDetailLogic(), { wrapper })
+
+    await act(async () => {
+      await expect(result.current.onAcceptReceive()).resolves.toBe(true)
+    })
+
+    expect(tools.toastError).not.toHaveBeenCalled()
+    expect(tools.toastSuccess).toHaveBeenCalledWith('rgb_status_waiting_batch_release')
+    expect(result.current.transfer?.status).toBe('waiting_batch_release')
+  })
+
   it('does not offer accept for remote activity without a local consignment', async () => {
     const { wrapper } = createHookTestHarness({
       routeState: {

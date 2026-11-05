@@ -397,7 +397,7 @@ async function postProxyV1Consignment(
       ['params[sender_transport_endpoint]', senderEndpoint],
       ['params[sender_pk]', senderPublicKey],
       ['params[consignment_hash]', consignmentHash],
-      ['params[batch]', 'false'],
+      ['params[batch]', String(consignment.batch === true)],
       ['params[file_size]', String(file.length)],
       ['params[signature]', proxyV1Sign(senderPrivateKey, transferId + consignmentHash + blobHash)],
       ['params[pow_timestamp]', timestamp],
@@ -536,6 +536,7 @@ async function getProxyV1Consignment(
         proxySenderPublicKey: result.sender_pk,
         proxySenderEndpoint: result.sender_transport_endpoint,
         proxyConsignmentHash: result.consignment_hash,
+        ...(result.batch ? { batch: true } : {}),
       }
     } catch (error) {
       lastError = error

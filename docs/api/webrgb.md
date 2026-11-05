@@ -374,6 +374,7 @@ wallet states as follows:
 | `settled`, `confirmed`                               | `Settled`              |
 | `failed`, `rejected`, `canceled`, `broadcast_failed` | `Failed`               |
 | `confirming`, `broadcasted`, `waiting_receive`       | `WaitingConfirmations` |
+| `waiting_batch_release`                              | `WaitingCounterparty`  |
 | Other pending states                                 | `WaitingCounterparty`  |
 
 ### `getTransferStatus(transferId, assetId?)`

@@ -3527,6 +3527,8 @@
   "rgb_confirm_reject_transfer": { "message": "Confirmer le refus" },
   "rgb_reject_receive_local_only_description": {"message": "Ce transfert n'a pas pu être vérifié. Aucune adresse de proxy n'est disponible : le rejet ne le supprimera que de ce portefeuille. L'expéditeur ne sera pas informé et vous ne pourrez plus l'accepter."},
   "rgb_accept_transfer_success": { "message": "Transfert accepté" },
+  "rgb_status_waiting_batch_release": { "message": "Accepté, en attente des autres destinataires" },
+  "rgb_batch_transfer": { "message": "Transfert groupé" },
   "rgb_reject_transfer_success": { "message": "Transfert refusé" },
   "rgb_accept_transfer_failed": { "message": "Échec de l'acceptation du transfert" },
   "rgb_reject_transfer_failed": { "message": "Échec du refus du transfert" },

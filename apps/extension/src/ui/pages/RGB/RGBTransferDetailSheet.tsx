@@ -49,6 +49,8 @@ function getStatusLabel(status: string, t: (key: string) => string, type?: RgbTr
     case 'waiting_receive':
     case 'waitingcounterparty':
       return t('rgb_status_waiting_receive');
+    case 'waiting_batch_release':
+      return t('rgb_status_waiting_batch_release');
     case 'settled':
     case 'confirmed':
       return t('rgb_status_confirmed');
@@ -76,6 +78,7 @@ function getDescription(transfer: RgbTransferItem | undefined, t: (key: string) 
   if (transfer?.status === 'broadcasted') return t('rgb_transfer_broadcasted_description');
   if (transfer?.status === 'broadcast_failed') return t('rgb_transfer_broadcast_failed_description');
   if (transfer?.status === 'pending_accept') return t('rgb_transfer_pending_accept_description');
+  if (transfer?.status === 'waiting_batch_release') return t('rgb_status_waiting_batch_release');
   if (transfer?.status === 'validation_failed') return t('rgb_transfer_validation_failed_description');
   if (transfer?.status === 'confirming') {
     return t('rgb_transfer_confirming_description');
@@ -298,6 +301,9 @@ export function RGBTransferDetailSheet({
       const result = await wallet.acceptRgbReceive({ recipientId });
       if (result?.status === 'canceled') {
         tools.toastError(t('rgb_status_canceled_by_sender'));
+      } else if (result?.status === 'pending') {
+        tools.toastSuccess(t('rgb_status_waiting_batch_release'));
+        onAccepted?.();
       } else if (!result?.accepted) {
         throw new Error(t('rgb_accept_transfer_failed'));
       } else {
@@ -485,6 +491,7 @@ export function RGBTransferDetailSheet({
 
             <Column fullX style={{ gap: 12 }}>
               <DetailRow label={t('date')} value={formatDate(transfer?.timestamp || 0)} />
+              {transfer?.batch ? <DetailRow label={t('type')} value={t('rgb_batch_transfer')} /> : null}
               <Row fullX justifyBetween itemsCenter style={{ minHeight: 32 }}>
                 <Text text={t('status')} style={{ fontSize: 14, fontWeight: 500, color: 'rgba(255,255,255,0.45)' }} />
                 <Row itemsCenter gap="xs">

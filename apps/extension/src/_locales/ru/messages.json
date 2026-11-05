@@ -3525,6 +3525,8 @@
   "rgb_confirm_reject_transfer": { "message": "Подтвердить отклонение" },
   "rgb_reject_receive_local_only_description": {"message": "Не удалось проверить перевод. Адрес прокси недоступен, поэтому отказ удалит его только из этого кошелька. Отправитель не получит уведомление, а вы не сможете принять перевод позже."},
   "rgb_accept_transfer_success": { "message": "Перевод принят" },
+  "rgb_status_waiting_batch_release": { "message": "Принято, ожидание других получателей" },
+  "rgb_batch_transfer": { "message": "Пакетный перевод" },
   "rgb_reject_transfer_success": { "message": "Перевод отклонён" },
   "rgb_accept_transfer_failed": { "message": "Не удалось принять перевод" },
   "rgb_reject_transfer_failed": { "message": "Не удалось отклонить перевод" },

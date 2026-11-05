@@ -47,6 +47,8 @@ function getStatusLabel(status: string, t: (key: string) => string, type?: RgbTr
     case 'waiting_receive':
     case 'waitingcounterparty':
       return t('rgb_status_waiting_receive');
+    case 'waiting_batch_release':
+      return t('rgb_status_waiting_batch_release');
     case 'settled':
     case 'confirmed':
       return t('rgb_status_confirmed');
@@ -68,6 +70,7 @@ function getDescription(transfer: RgbTransferItem | undefined, t: (key: string) 
   if (transfer?.status === 'broadcasted') return t('rgb_transfer_broadcasted_description');
   if (transfer?.status === 'broadcast_failed') return t('rgb_transfer_broadcast_failed_description');
   if (transfer?.status === 'pending_accept') return t('rgb_transfer_pending_accept_description');
+  if (transfer?.status === 'waiting_batch_release') return t('rgb_status_waiting_batch_release');
   if (transfer?.status === 'confirming') {
     return t('rgb_transfer_confirming_description');
   }
@@ -205,6 +208,12 @@ export default function RGBTransferDetailScreen() {
               <Text text={t('amount')} color="textDim" />
               <Text text={displayAmount} color="ticker_color2" />
             </Row>
+            {transfer?.batch ? (
+              <Row justifyBetween itemsCenter>
+                <Text text={t('type')} color="textDim" />
+                <Text text={t('rgb_batch_transfer')} color="ticker_color2" />
+              </Row>
+            ) : null}
             {burnDestinationChainId !== undefined ? (
               <Row justifyBetween itemsCenter>
                 <Text text={t('rgb_burn_network')} color="textDim" />

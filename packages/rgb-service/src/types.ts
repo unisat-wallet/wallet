@@ -188,6 +188,8 @@ export interface RgbTransportConsignment extends RgbConsignment {
   endpoints: string[]
   /** Broadcast after publication without waiting for a recipient ACK. */
   donation?: boolean
+  /** This consignment shares its Bitcoin transaction with other recipients. */
+  batch?: boolean
   /** Proxy v1 send details, present only for invoices carrying `pk`. */
   proxyInvoiceId?: string
   proxyRecipientPublicKey?: string
@@ -206,6 +208,8 @@ export interface RgbReceivedConsignment {
   proxySenderPublicKey?: string
   proxySenderEndpoint?: string
   proxyConsignmentHash?: string
+  /** Proxy v1 marks consignments sharing one Bitcoin transaction with other recipients. */
+  batch?: boolean
   /** The endpoint which returned the payload and must receive the ACK/NACK. */
   endpoint?: string
 }
@@ -292,6 +296,7 @@ export interface RgbPendingReceive {
     proxySenderPublicKey?: string
     proxySenderEndpoint?: string
     proxyConsignmentHash?: string
+    batch?: boolean
     /** Fully signed terminal witness embedded by a donation sender. */
     signedRawTx?: string
     assetId: string
@@ -356,6 +361,7 @@ export interface RgbPendingReceive {
     proxySenderPublicKey?: string
     proxySenderEndpoint?: string
     proxyConsignmentHash?: string
+    batch?: boolean
     /** Proxy v1 transaction released after every operation ACK; retained for crash-safe rebroadcast. */
     signedRawTx?: string
     /** Set when the sender's Bitcoin transaction is visible in the chain source. */
@@ -371,6 +377,7 @@ export interface RgbPendingReceiveHistory {
   amount: string
   /** Contract precision decoded from the validated consignment. */
   precision?: number
+  batch?: boolean
   txid: string
   createdAt: number
   status?: 'settled' | 'canceled' | 'rejected'

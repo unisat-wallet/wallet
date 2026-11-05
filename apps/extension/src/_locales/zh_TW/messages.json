@@ -3556,6 +3556,12 @@
   "rgb_accept_transfer_success": {
     "message": "已接受轉帳"
   },
+  "rgb_status_waiting_batch_release": {
+    "message": "已接受，等待其他接收方"
+  },
+  "rgb_batch_transfer": {
+    "message": "批量轉帳"
+  },
   "rgb_reject_transfer_success": {
     "message": "已拒絕轉帳"
   },

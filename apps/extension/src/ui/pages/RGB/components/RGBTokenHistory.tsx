@@ -30,6 +30,7 @@ function toTransferItem(
     id: item.id || item.txid,
     transferId: item.transferId,
     local: item.local,
+    batch: item.batch,
     burn: item.burn,
     assetId: item.assetId,
     ticker: item.ticker || fallbackTicker,

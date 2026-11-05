@@ -23,7 +23,7 @@ function isInProgress(item: RgbTransferItem) {
   }
   return (
     item.local ||
-    ['signed', 'waiting_ack', 'broadcasting', 'broadcasted', 'broadcast_failed', 'pending_accept', 'validation_failed', 'confirming', 'waiting_receive', 'pending', 'unconfirmed'].includes(
+    ['signed', 'waiting_ack', 'broadcasting', 'broadcasted', 'broadcast_failed', 'pending_accept', 'validation_failed', 'confirming', 'waiting_batch_release', 'waiting_receive', 'pending', 'unconfirmed'].includes(
       item.status.toLowerCase()
     )
   )

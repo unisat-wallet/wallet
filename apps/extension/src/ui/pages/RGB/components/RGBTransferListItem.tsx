@@ -59,6 +59,8 @@ function getStatusLabel(status: string, t: (key: string) => string, type: RgbTra
     case 'waiting_receive':
     case 'waitingcounterparty':
       return t('rgb_status_waiting_receive');
+    case 'waiting_batch_release':
+      return t('rgb_status_waiting_batch_release');
     case 'settled':
     case 'confirmed':
       return t('rgb_status_confirmed');
@@ -148,6 +150,7 @@ export function RGBTransferListItem({
           <Column gap="xs" style={{ minWidth: 0, overflow: 'hidden' }}>
             <Row style={{ minWidth: 0, flexDirection: 'column', alignItems: 'flex-start', gap: 4 }}>
               <Text text={item.burn ? t('rgb_burn') : getTransferTitle(item.type, t)} style={{ flexShrink: 0, lineHeight: '20px' }} />
+              {item.batch ? <Text text={t('rgb_batch_transfer')} color="textDim" size="xs" /> : null}
               {showStatus ? (
                 <Row
                   style={{

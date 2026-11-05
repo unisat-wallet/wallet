@@ -870,7 +870,7 @@ export interface WalletController {
 
   acceptRgbReceive(params: { recipientId: string }): Promise<{
     accepted: boolean
-    status: 'accepted' | 'canceled'
+    status: 'accepted' | 'pending' | 'canceled'
     [key: string]: any
   }>
 
