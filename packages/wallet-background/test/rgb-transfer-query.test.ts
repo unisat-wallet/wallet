@@ -84,6 +84,48 @@ describe('RgbTransferQuery', () => {
     })])
   })
 
+  it('waits for receiver broadcast propagation before offering the sender fallback', async () => {
+    const acknowledgedAt = 1_000_000
+    const service = {
+      getPendingTransfers: vi.fn().mockReturnValue([{
+        id: 'send-1', request: { assetId: 'rgb:asset', amount: '1', precision: 0 },
+        prepared: { lockedOutpoints: [] },
+        delivery: { acknowledgedAt, completed: { txid: 'b'.repeat(64) } },
+        createdAt: 1,
+      }]),
+      getSnapshot: vi.fn().mockReturnValue({ utxos: [] }),
+      getPendingSendHistory: vi.fn().mockReturnValue([]),
+      getIssueHistory: vi.fn().mockReturnValue([]),
+      getPendingReceiveHistory: vi.fn().mockReturnValue([]),
+      getPendingReceives: vi.fn().mockReturnValue([]),
+      getLocalAssetDetail: vi.fn().mockReturnValue({ name: 'Token', ticker: 'TKN' }),
+    }
+    const context = {
+      service,
+      wallet: { walletId: 'wallet', fundingAddress: 'funding', network: 'signet' },
+    }
+    const query = new RgbTransferQuery({
+      getContext: vi.fn().mockResolvedValue(context as never),
+      syncReceiveHistory: vi.fn(), syncPendingTransfers: vi.fn(),
+      syncReceivedAllocations: vi.fn().mockResolvedValue(context as never),
+      getRemoteActivity: vi.fn().mockResolvedValue({ total: 0, list: [] }),
+      warn: vi.fn(),
+    })
+    const now = vi.spyOn(Date, 'now').mockReturnValue(acknowledgedAt + 1_000)
+    try {
+      await expect(query.getTransfers(1, 20, { skipSync: true })).resolves.toMatchObject({
+        list: [expect.objectContaining({ status: 'broadcasting' })],
+      })
+
+      now.mockReturnValue(acknowledgedAt + 15_000)
+      await expect(query.getTransfers(1, 20, { skipSync: true })).resolves.toMatchObject({
+        list: [expect.objectContaining({ status: 'ready_to_broadcast' })],
+      })
+    } finally {
+      now.mockRestore()
+    }
+  })
+
   it('reports reserved allocations from migrated snapshots without chain status', async () => {
     const txid = 'a'.repeat(64)
     const service = {

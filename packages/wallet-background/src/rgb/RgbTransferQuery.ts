@@ -5,6 +5,12 @@ import {
 } from '@unisat/rgb-service'
 import type { LocalRgbServiceContext } from './RgbWalletCoordinator'
 
+// Proxy v1 releases the signed transaction to the receiver after ACK. Give
+// its broadcast a short propagation window before offering the sender-side
+// fallback action, otherwise a just-accepted transfer briefly opens a stale
+// Broadcast sheet while the chain source is still catching up.
+const RECEIVER_BROADCAST_PROPAGATION_MS = 15_000
+
 export type RgbRemoteActivity = {
   id?: string
   assetId?: string
@@ -206,6 +212,7 @@ export class RgbTransferQuery {
         this.dependencies.warn('Failed to check BFA burn confirmation', error)
       }
     }))
+    const now = Date.now()
     const localSends = pendingTransfers.map(transfer => ({
       id: `local-send:${transfer.id}`,
       transferId: transfer.id,
@@ -227,7 +234,9 @@ export class RgbTransferQuery {
         : transfer.delivery?.externalBroadcast
           ? 'ready_for_dapp_finalize'
           : transfer.delivery?.acknowledgedAt
-            ? 'ready_to_broadcast'
+            ? now - transfer.delivery.acknowledgedAt < RECEIVER_BROADCAST_PROPAGATION_MS
+              ? 'broadcasting'
+              : 'ready_to_broadcast'
             : transfer.delivery?.donationReadyAt
               ? 'broadcasting'
               : transfer.delivery
