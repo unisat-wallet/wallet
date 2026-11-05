@@ -2,15 +2,15 @@ import { Psbt } from 'bitcoinjs-lib'
 import { describe, expect, it } from 'vitest'
 import {
   concealBlindSeal,
+  createLocalRgbProtocolEncoder,
   decodeRgbInvoice,
-  decodeNiaConsignment,
   encodeBlindRgbInvoice,
   encodeNiaContract,
   encodeNiaGenesis,
+  isSupportedV1TransferConsignment,
   localNiaProtocolEncoder,
-  validateNiaConsignmentParentSpends,
+  validateBfaTransferConsignment,
 } from '../src'
-import { verifyRevealedNiaAllocations } from '../src/protocol/nia-allocation'
 
 const txid = '8d54c98d4c29a1ec4fd90635f543f0f7a871a78eb6a6e706342f831d92e3ba19'
 
@@ -143,17 +143,16 @@ describe('localNiaProtocolEncoder', () => {
       },
       signedPsbt: signed.toHex(),
     })
-    const decoded = decodeNiaConsignment(
-      Uint8Array.from(Buffer.from(completed.consignments[0]!.payload, 'base64'))
-    )
-
-    expect(decoded.terminals).toEqual([])
-    const recipientAssignment = decoded.transitions[0]?.assignments.find(
-      assignment => !('secretSeal' in assignment.seal) && assignment.seal.vout === 1
+    const payload = Uint8Array.from(Buffer.from(completed.consignments[0]!.payload, 'base64'))
+    expect(isSupportedV1TransferConsignment(payload)).toBe(true)
+    const decoded = await validateBfaTransferConsignment(payload, {
+      network: 0, isBitcoinTxConfirmed: async () => true, allowPendingLastWitness: true,
+    })
+    const recipientAssignment = decoded.terminalAssignments.find(
+      assignment => assignment.vout === 1
     )
     expect(recipientAssignment).toMatchObject({
-      amount: 60n,
-      seal: { txid: null, vout: 1 },
+      amount: '60', vout: 1,
     })
   })
 
@@ -185,15 +184,17 @@ describe('localNiaProtocolEncoder', () => {
       signedPsbt: firstSigned.toHex(),
     })
     const firstPayload = firstCompleted.consignments[0]!.payload
-    const firstConsignment = decodeNiaConsignment(
-      Uint8Array.from(Buffer.from(firstPayload, 'base64'))
-    )
-    const firstTransition = firstConsignment.transitions[0]!
+    const firstPayloadBytes = Uint8Array.from(Buffer.from(firstPayload, 'base64'))
+    expect(isSupportedV1TransferConsignment(firstPayloadBytes)).toBe(true)
+    const firstConsignment = await validateBfaTransferConsignment(firstPayloadBytes, {
+      network: 0, isBitcoinTxConfirmed: async () => true,
+      allowPendingLastWitness: true, knownBlindSeals: [receiveSeal],
+    })
     const secretSeal = Buffer.from(concealBlindSeal(receiveSeal)).toString('hex')
-    const assignmentIndex = firstTransition.assignments.findIndex(
-      assignment => 'secretSeal' in assignment.seal && assignment.seal.secretSeal === secretSeal
+    const firstTransition = firstConsignment.terminalAssignments.find(
+      assignment => assignment.secretSeal === secretSeal
     )
-    expect(assignmentIndex).toBeGreaterThanOrEqual(0)
+    expect(firstTransition).toBeDefined()
 
     const nextInvoice = decodeRgbInvoice(
       encodeBlindRgbInvoice({
@@ -213,8 +214,8 @@ describe('localNiaProtocolEncoder', () => {
           amount: '60',
           settled: true,
           spendable: true,
-          opId: firstTransition.opId,
-          assignmentIndex,
+          opId: firstTransition!.opId,
+          assignmentIndex: firstTransition!.assignmentIndex,
           assignmentType: 4000,
         },
       ],
@@ -242,51 +243,49 @@ describe('localNiaProtocolEncoder', () => {
         ...first.validationHistory,
         consignments: [
           first.validationHistory.consignments[0]!,
-          { opId: firstTransition.opId, payload: firstPayload },
+          { opId: firstTransition!.opId, payload: firstPayload },
         ],
         knownBlindSeals: [receiveSeal],
       },
     }
 
-    const secondPrepared = await localNiaProtocolEncoder.prepareTransfer(second)
+    const encoder = createLocalRgbProtocolEncoder(input => validateBfaTransferConsignment(
+      input.payload,
+      {
+        network: 0,
+        isBitcoinTxConfirmed: async () => true,
+        knownBlindSeals: input.knownBlindSeals,
+        ...(input.pendingWitnessTxid ? { pendingWitnessTxid: input.pendingWitnessTxid } : {}),
+        ...(input.allowPendingLastWitness ? { allowPendingLastWitness: true } : {}),
+        ...(input.requiredOperationIds ? { requiredOperationIds: input.requiredOperationIds } : {}),
+      }
+    ))
+    const secondPrepared = await encoder.prepareTransfer(second)
     const secondSigned = Psbt.fromHex(secondPrepared.psbt)
     secondSigned.data.inputs.forEach((_, index) => {
       secondSigned.updateInput(index, { finalScriptWitness: finalWitness })
     })
-    const secondCompleted = await localNiaProtocolEncoder.completeTransfer({
+    const secondCompleted = await encoder.completeTransfer({
       wallet: second.wallet,
       pending: { prepared: secondPrepared, request: second.request, createdAt: 2 },
       signedPsbt: secondSigned.toHex(),
     })
-    const secondConsignment = decodeNiaConsignment(
-      Uint8Array.from(Buffer.from(secondCompleted.consignments[0]!.payload, 'base64'))
+    const secondPayload = Uint8Array.from(
+      Buffer.from(secondCompleted.consignments[0]!.payload, 'base64')
     )
-
-    const revealedParent = secondConsignment.transitions.find(
-      transition => transition.opId === firstTransition.opId
-    )?.assignments[assignmentIndex]
-    expect(revealedParent).toMatchObject({
-      amount: 60n,
-      seal: receiveSeal,
+    expect(isSupportedV1TransferConsignment(secondPayload)).toBe(true)
+    const secondConsignment = await validateBfaTransferConsignment(secondPayload, {
+      network: 0, isBitcoinTxConfirmed: async () => true,
+      allowPendingLastWitness: true, knownBlindSeals: [receiveSeal],
     })
-    expect(() => verifyRevealedNiaAllocations({
-      assetId: first.request.assetId,
-      consignments: [secondConsignment],
-      utxos: [receivedUtxo],
-    })).not.toThrow()
-    expect(() => validateNiaConsignmentParentSpends(secondConsignment)).not.toThrow()
-    if (!revealedParent || 'secretSeal' in revealedParent.seal)
-      throw new Error('Expected the local blind parent seal to be revealed')
-    expect(() =>
-      validateNiaConsignmentParentSpends({
-        ...secondConsignment,
-        witnessBundles: secondConsignment.witnessBundles.map(bundle =>
-          bundle.transitions.some(transition => transition.opId === secondPrepared.id)
-            ? { ...bundle, inputs: [] }
-            : bundle
-        ),
-      })
-    ).toThrow('witness does not spend its parent seal')
+    expect(secondConsignment.bundles).toHaveLength(2)
+    expect(secondConsignment.bundles.at(-1)?.parentOpIds).toContain(firstTransition!.opId)
+    const nextSecretSeal = nextInvoice.seal.type === 'confidential'
+      ? Buffer.from(nextInvoice.seal.secretSeal).toString('hex')
+      : ''
+    expect(secondConsignment.terminalAssignments).toContainEqual(expect.objectContaining({
+      amount: '50', secretSeal: nextSecretSeal,
+    }))
   })
 
   it('refuses malformed history before constructing a PSBT', async () => {

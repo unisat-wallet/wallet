@@ -57,9 +57,6 @@ function fixture() {
   })
   const consignment = encodeBfaTransferConsignment({
     genesis: genesis.strict, validatedWitnessBundles: [], witnessBundle: bundle.strict,
-    terminals: [{ bundleId: bundle.bundleId, secretSeals: [
-      invoice.seal.type === 'confidential' ? invoice.seal.secretSeal : new Uint8Array(32),
-    ] }],
   })
   const v0Bundle = serializeNiaOpretWitnessBundle({
     witnessTx: transaction, contractId: assetId, transitionId: prepared.transitionId,
@@ -198,7 +195,6 @@ describe('NIA v1 transfer', () => {
     ])
     const payload = encodeBfaTransferConsignment({
       genesis: genesis.strict, validatedWitnessBundles: [], witnessBundle: withProof,
-      terminals: [],
     })
     const result = await validateBfaTransferConsignment(payload, {
       network: 0, isBitcoinTxConfirmed: async txid => txid === transaction.getId(),
@@ -206,7 +202,7 @@ describe('NIA v1 transfer', () => {
     expect(result.assetId).toBe(encodeRgbContractId(Uint8Array.from(Buffer.from(assetId.slice(4), 'hex'))))
   })
 
-  it('accepts a revealed v1 terminal seal for a witness recipient', async () => {
+  it('rejects the removed v1 terminals map layout', async () => {
     const { genesis, bundle, prepared } = fixture()
     const terminal = new StrictWriter()
       .writeU8(1).writeU8(1).writeU16(1)
@@ -216,11 +212,9 @@ describe('NIA v1 transfer', () => {
     const payload = wrapRgbTransferConsignment(Uint8Array.from([
       ...terminal, ...genesis.strict, ...new StrictWriter().writeU32(1).toBytes(), ...bundle.strict,
     ]))
-    const result = await validateBfaTransferConsignment(payload, {
+    await expect(validateBfaTransferConsignment(payload, {
       network: 0, isBitcoinTxConfirmed: async () => true, allowPendingLastWitness: true,
-    })
-    expect(result.terminals).toHaveLength(1)
-    expect(result.terminalAssignments).toContainEqual(expect.objectContaining({ amount: '40' }))
+    })).rejects.toThrow('unsupported Genesis version')
   })
 
   it('uses validated v1 history when preparing a subsequent NIA send', async () => {
@@ -425,7 +419,7 @@ describe('NIA v1 transfer', () => {
     const right = makeBranch(1)
     const validate = (bundle: typeof left) => validateBfaTransferConsignment(
       encodeBfaTransferConsignment({
-        genesis: genesis.strict, validatedWitnessBundles: [], witnessBundle: bundle.strict, terminals: [],
+        genesis: genesis.strict, validatedWitnessBundles: [], witnessBundle: bundle.strict,
       }), { network: 0, isBitcoinTxConfirmed: async () => true }
     )
     const leftOpId = Buffer.from(left.transitionId).toString('hex')
@@ -448,7 +442,7 @@ describe('NIA v1 transfer', () => {
     expect(selected.witnessBundles).toHaveLength(1)
     const portable = encodeBfaTransferConsignment({
       genesis: selected.genesis, validatedWitnessBundles: [],
-      witnessBundle: selected.witnessBundles[0]!, terminals: [],
+      witnessBundle: selected.witnessBundles[0]!,
     })
     const recipientCheck = await validateBfaTransferConsignment(portable, {
       network: 0, isBitcoinTxConfirmed: async () => true,

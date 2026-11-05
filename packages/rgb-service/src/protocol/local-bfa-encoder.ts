@@ -361,15 +361,12 @@ export function completeBfaTransfer(input: {
   })
   if (hex(witnessBundle.bundleId) !== data['bundleId'])
     throw new RgbServiceError('BFA WitnessBundle does not match the transition')
-  const terminals = data['recipientType'] === 'blind'
-    ? [{ bundleId: witnessBundle.bundleId, secretSeals: [parseHex32(data['recipientSecretSeal'], 'BFA recipient seal')] }]
-    : data['recipientType'] === 'witness' ? [] : undefined
-  if (!terminals) throw new RgbServiceError('BFA recipient type is invalid')
+  if (data['recipientType'] !== 'blind' && data['recipientType'] !== 'witness')
+    throw new RgbServiceError('BFA recipient type is invalid')
   const consignment = encodeBfaTransferConsignment({
     genesis: Uint8Array.from(Buffer.from(data['genesis'] || '', 'base64')),
     validatedWitnessBundles: historyBundles,
     witnessBundle: witnessBundle.strict,
-    terminals,
   })
   const changeVout = data['changeVout'] === '' ? undefined : Number(data['changeVout'])
   if (changeVout !== undefined && (!Number.isInteger(changeVout) || changeVout < 0))
@@ -442,7 +439,6 @@ export function completeBfaBurn(input: { pending: RgbPendingTransfer; signedPsbt
     genesis: Uint8Array.from(Buffer.from(data['genesis'] || '', 'base64')),
     validatedWitnessBundles: historyBundles,
     witnessBundle: witnessBundle.strict,
-    terminals: [],
   })
   const changeVout = data['changeVout'] === '' ? undefined : Number(data['changeVout'])
   if (changeVout !== undefined && (!Number.isInteger(changeVout) || changeVout < 0))

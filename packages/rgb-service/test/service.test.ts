@@ -1439,7 +1439,7 @@ describe('RgbService', () => {
     const service = new RgbService(dependencies)
     await service.open(wallet)
     const payload = Buffer.from(Uint8Array.from([
-      1, 1, 0, 0, 0, 0, ...Buffer.from(NIA_V1_SCHEMA_ID, 'hex'),
+      1, 1, 0, 0, ...Buffer.from(NIA_V1_SCHEMA_ID, 'hex'),
     ])).toString('base64')
     const receive = { recipientType: 'witness', witnessScriptPubKey: scriptPubKey }
     const item = { recipientId: 'recipient', payload }
@@ -1485,7 +1485,7 @@ describe('RgbService', () => {
       {
         recipientId: 'recipient',
         payload: Buffer.from(Uint8Array.from([
-          1, 1, 0, 0, 0, 0, ...Buffer.from(NIA_V1_SCHEMA_ID, 'hex'),
+          1, 1, 0, 0, ...Buffer.from(NIA_V1_SCHEMA_ID, 'hex'),
         ])).toString('base64'),
       },
       (reason: string) => reasons.push(reason)
@@ -1530,7 +1530,7 @@ describe('RgbService', () => {
     const item = {
       recipientId: 'recipient',
       payload: Buffer.from(Uint8Array.from([
-        1, 1, 0, 0, 0, 0, ...Buffer.from(NIA_V1_SCHEMA_ID, 'hex'),
+        1, 1, 0, 0, ...Buffer.from(NIA_V1_SCHEMA_ID, 'hex'),
       ])).toString('base64'),
     }
 
@@ -1583,7 +1583,7 @@ describe('RgbService', () => {
     const item = {
       recipientId: 'recipient',
       payload: Buffer.from(Uint8Array.from([
-        1, 1, 0, 0, 0, 0, ...Buffer.from(NIA_V1_SCHEMA_ID, 'hex'),
+        1, 1, 0, 0, ...Buffer.from(NIA_V1_SCHEMA_ID, 'hex'),
       ])).toString('base64'),
       proxySenderPublicKey: senderPublicKey,
     }
@@ -1639,7 +1639,7 @@ describe('RgbService', () => {
       {
         recipientId: 'recipient',
         payload: Buffer.from(Uint8Array.from([
-          1, 1, 0, 0, 0, 0, ...Buffer.from(NIA_V1_SCHEMA_ID, 'hex'),
+          1, 1, 0, 0, ...Buffer.from(NIA_V1_SCHEMA_ID, 'hex'),
         ])).toString('base64'),
       },
       (reason: string) => reasons.push(reason)
@@ -2644,9 +2644,6 @@ describe('RgbService', () => {
     })
     const consignment = encodeBfaTransferConsignment({
       genesis: genesis.strict, validatedWitnessBundles: [], witnessBundle: bundle.strict,
-      terminals: [{ bundleId: bundle.bundleId, secretSeals: [
-        invoice.seal.type === 'confidential' ? invoice.seal.secretSeal : new Uint8Array(32),
-      ] }],
     })
     const output = transaction.outs[prepared.changeVout!]!
     const target = recipient === 'blind'
@@ -4367,7 +4364,7 @@ describe('RgbService', () => {
     const assetId = encodeRgbContractId(genesis.assetId)
     const legacy = Buffer.from(encodeNiaContract(genesis).strict).toString('base64')
     const incoming = Buffer.from(encodeBfaTransferConsignment({
-      genesis: genesis.strict, validatedWitnessBundles: [], witnessBundle: Uint8Array.of(1), terminals: [],
+      genesis: genesis.strict, validatedWitnessBundles: [], witnessBundle: Uint8Array.of(1),
     })).toString('base64')
     ;(service as any).state.contracts = {
       [assetId]: { consignment: legacy, genesis: Buffer.from(genesis.strict).toString('base64'), createdAt: 1 },

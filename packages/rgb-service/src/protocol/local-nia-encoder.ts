@@ -14,6 +14,7 @@ import { verifyRevealedNiaAllocations } from './nia-allocation'
 import { decodeNiaConsignment } from './nia-consignment'
 import { encodeNiaTransferConsignment } from './nia-contract'
 import { mergeNiaConsignmentHistory } from './nia-history'
+import { convertNiaV0ConsignmentToV1 } from './nia-v0-migration'
 import { prepareNiaOpretTransfer } from './opret-transfer'
 import { deriveProxyV1SealBlinding } from './proxy-v1'
 import { witnessSealDustLimit } from './witness'
@@ -263,13 +264,13 @@ export const localNiaProtocolEncoder: RgbProtocolEncoder = {
           },
         ]
       : []
-    const consignment = encodeNiaTransferConsignment({
+    const legacyConsignment = encodeNiaTransferConsignment({
       genesis: { strict: genesis },
       priorWitnessBundles: parseWitnessBundles(data['historyWitnessBundles']),
       witnessBundle: witnessBundle.strict,
       terminals,
     })
-    const decoded = decodeNiaConsignment(consignment)
+    const decoded = decodeNiaConsignment(legacyConsignment)
     if (
       decoded.assetId !== assetId(input.pending.request.assetId) ||
       !decoded.transitions.some(transition => transition.opId === data['transitionId'])
@@ -299,6 +300,9 @@ export const localNiaProtocolEncoder: RgbProtocolEncoder = {
             )
     if (changeOutput && !changeAssignment)
       throw new RgbServiceError('RGB change allocation is missing from the local Transition')
+    // Legacy NIA history is still useful for constructing and checking the transition locally,
+    // but current RGB peers accept only ConsignmentVer::V1 on the wire.
+    const consignment = convertNiaV0ConsignmentToV1(legacyConsignment)
     return {
       txid: completed.txid,
       rawTx: completed.rawTx,

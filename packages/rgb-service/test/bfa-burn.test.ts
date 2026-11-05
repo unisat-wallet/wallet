@@ -83,11 +83,12 @@ describe('BFA burn encoding', () => {
     })).toThrow('burn reason')
     const genesis = Uint8Array.from([0, 0, ...Buffer.from(BFA_SCHEMA_ID, 'hex')])
     const proof = encodeBfaTransferConsignment({
-      genesis, validatedWitnessBundles: [], witnessBundle: Uint8Array.from([1]), terminals: [],
+      genesis, validatedWitnessBundles: [], witnessBundle: Uint8Array.from([1]),
     })
     expect(Buffer.from(proof.slice(0, 9)).toString('hex')).toBe('524742005446520101')
     expect(proof[9]).toBe(0)
     expect(proof[10]).toBe(0)
+    expect(Buffer.from(proof.slice(11, 43)).toString('hex')).toBe(BFA_SCHEMA_ID)
     expect(isBfaTransferConsignment(proof)).toBe(true)
   })
 })

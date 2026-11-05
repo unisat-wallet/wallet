@@ -2106,25 +2106,19 @@ export class RgbService {
       receive.proxyPrivateKey && item.proxySenderPublicKey
       ? deriveProxyV1SealBlinding(receive.proxyPrivateKey, item.proxySenderPublicKey)
       : undefined
-    const isDeclaredTerminal = (assignment: (typeof bfa.terminalAssignments)[number]) =>
-      bfa.terminals.some(terminal =>
-        terminal.bundleId === assignment.bundleId &&
-        terminal.secretSeals.includes(assignment.secretSeal)
-      )
     const matchesRecipient = (assignment: (typeof bfa.terminalAssignments)[number]) => {
       if (expectedTxid && assignment.txid !== expectedTxid) return false
       if (receive.recipientType === 'witness') {
-        // RGB transfer terminals contain concealed seals. A witness recipient
-        // instead uses a revealed WitnessTx seal, so it is identified by its
-        // output script and (for Proxy v1) the operation-key-derived blinding.
-        // Requiring a secret terminal here rejects valid witness consignments
-        // produced by both UniSat and the reference rgb-lib implementation.
+        // A witness recipient is identified by its output script and (for
+        // Proxy v1) the operation-key-derived blinding.
         // Matching all bundles also lets the destination check below reject a
         // malformed consignment which pays an out-of-band script more than once.
         if (!v1 && assignment.bundleId !== latestBundleId) return false
         return assignment.output?.scriptPubKey.toLowerCase() === receive.witnessScriptPubKey?.toLowerCase()
       }
-      return assignment.secretSeal === secret && isDeclaredTerminal(assignment)
+      // Current RGB V1 has no serialized terminals map. A blind recipient is
+      // identified directly by the concealed seal of an unspent assignment.
+      return assignment.secretSeal === secret
     }
     let candidates = bfa.terminalAssignments.filter(assignment =>
       matchesRecipient(assignment) &&
@@ -2673,10 +2667,9 @@ export class RgbService {
   }
 
   /**
-   * Merge a newly verified receive into a compact canonical Consignment. The
-   * resulting payload deliberately has no transport terminals: terminals are
-   * delivery metadata, while the genesis and WitnessBundle DAG are the state
-   * needed for an offline later spend.
+   * Merge a newly verified receive into a compact canonical Consignment. RGB
+   * V1 derives graph terminals from the unspent assignments in the Genesis and
+   * WitnessBundle DAG, so the canonical payload needs no delivery metadata.
    */
   private storeAcceptedHistory(input: {
     assetId: string

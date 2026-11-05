@@ -31,9 +31,5 @@ export function convertNiaV0ConsignmentToV1(payload: Uint8Array): Uint8Array {
     genesis: decoded.genesis.strict,
     validatedWitnessBundles: bundles.slice(0, -1),
     witnessBundle: last,
-    terminals: decoded.terminals.map(terminal => ({
-      bundleId: Uint8Array.from(Buffer.from(terminal.bundleId, 'hex')),
-      secretSeals: terminal.secretSeals.map(seal => Uint8Array.from(Buffer.from(seal, 'hex'))),
-    })),
   })
 }

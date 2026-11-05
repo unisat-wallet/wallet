@@ -9,7 +9,7 @@ function partialBfaConsignment(extraGlobal: number) {
   const bridge = new StrictWriter().writeU8(0).writeU64(1n).writeFixedBytes(new Uint8Array(20).fill(3), 20).toBytes()
   const rejectList = new StrictWriter().writeU8(1).writeU64(1n).writeFixedBytes(new Uint8Array(20).fill(4), 20).toBytes()
   const globals = [[2000, spec], [2001, new Uint8Array()], [3008, bridge], [extraGlobal, rejectList]] as const
-  const writer = new StrictWriter().writeU8(1).writeU8(1).writeU16(0)
+  const writer = new StrictWriter().writeU8(1).writeU8(1)
     .writeU16(0).writeFixedBytes(Buffer.from(BFA_SCHEMA_ID, 'hex'), 32).writeU64(1n)
     .writeConfinedString('ssi:anonymous', 4096).writeU8(0).writeU8(0).writeU8(0)
     .writeU8(globals.length)

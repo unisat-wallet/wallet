@@ -67,7 +67,7 @@ export interface CachedValidatedBfaHistory {
   bundles: Array<{ id: string; txid: string; operationIds: string[]; parentOpIds: string[] }>
 }
 
-export const BFA_VALIDATOR_VERSION = 'bfa-v1-2026-10-26'
+export const BFA_VALIDATOR_VERSION = 'bfa-v1-2026-11-05'
 
 export interface BfaValidationAttestationPayload {
   version: 1
@@ -656,33 +656,13 @@ function parseConsignment(value: Uint8Array, network: number, known = new Map<st
   const reader = new StrictReader(body)
   const patches: SealPatch[] = []
   if (reader.readU8() !== 1 || reader.readU8() !== 1) fail('expected a v1 transfer consignment')
-  const terminalCount = reader.readU16()
-  const terminals: Array<{ bundleId: string; secrets: string[] }> = []
-  for (let index = 0; index < terminalCount; index++) {
-    const bundleId = hex(reader.readFixedBytes(32))
-    const count = reader.readU16()
-    if (!count) fail('empty terminal')
-    const secrets = []
-    for (let seal = 0; seal < count; seal++) {
-      const terminalSeal = sealed(reader, false, new Map(), [])
-      if (!terminalSeal) fail('invalid terminal seal')
-      secrets.push(terminalSeal.secret)
-    }
-    terminals.push({ bundleId, secrets })
-  }
   const genesis = readGenesis(reader, network, known, patches)
   const count = reader.readU32()
   if (!count || count > 100000) fail('invalid witness bundle count')
   const bundles: Bundle[] = []
   for (let index = 0; index < count; index++) bundles.push(readBundle(reader, genesis.id, known, patches, genesis.metadata.schema === 'NIA'))
   if (reader.remaining) fail('consignment has trailing bytes')
-  for (const terminal of terminals) {
-    const bundle = bundles.find(candidate => candidate.id === terminal.bundleId)
-    if (!bundle) fail('terminal references an unknown bundle')
-    const known = new Set(bundle.operations.flatMap(op => op.assignments.map(item => item.seal!.secret)))
-    if (terminal.secrets.some(secret => !known.has(secret))) fail('terminal seal is not in its bundle')
-  }
-  return { genesis, bundles, terminals, body, patches }
+  return { genesis, bundles, body, patches }
 }
 
 /** Cheap local hint for repairing a previously validated wallet allocation. */
@@ -716,7 +696,7 @@ export function revealBfaConsignmentBlindSeals(value: Uint8Array, network: BfaVa
 function buildValidatedConsignment(
   parsed: ReturnType<typeof parseConsignment>, consumed: Set<string>
 ): ValidatedBfaConsignment {
-  const { genesis, bundles, terminals } = parsed
+  const { genesis, bundles } = parsed
   const nia = genesis.metadata.schema === 'NIA'
   const allocations: ValidatedBfaTransferHistory['allocations'] = []
   const terminalAssignments: ValidatedBfaConsignment['terminalAssignments'] = []
@@ -755,7 +735,7 @@ function buildValidatedConsignment(
     metadata: { ...genesis.metadata, issuedSupply: issuedSupply.toString() },
     witnessOutputScripts: bundles.at(-1)!.tx.outs.filter(output => output.script[0] !== 0x6a)
       .map(output => output.script.toString('hex')),
-    terminals: terminals.map(item => ({ bundleId: item.bundleId, secretSeals: item.secrets })),
+    terminals: [],
     terminalAssignments,
     bundles: bundles.map(bundle => ({
       id: bundle.id, txid: bundle.txid, strict: bundle.strict,
@@ -909,7 +889,7 @@ export async function validateBfaTransferConsignment(
 ): Promise<ValidatedBfaConsignment> {
   const disclosed = revealBfaConsignmentBlindSeals(value, options.network, options.knownBlindSeals || [])
   const parsed = parseConsignment(disclosed, options.network)
-  const { genesis, bundles, terminals } = parsed
+  const { genesis, bundles } = parsed
   const nia = genesis.metadata.schema === 'NIA'
   const pendingTxid = options.pendingWitnessTxid ??
     (options.allowPendingLastWitness ? bundles.at(-1)?.txid : undefined)
@@ -1017,12 +997,11 @@ export async function validateBfaTransferConsignment(
     const rpc = options.getEvmRpc?.(genesis.chainId) ?? options.evmRpc
     if (!rpc) throw new RgbBfaValidationUnavailableError('BFA reject list EVM RPC is not configured')
     const terminalSecrets = new Map<string, Set<string>>()
-    for (const terminal of terminals) {
-      const bundle = bundles.find(item => item.id === terminal.bundleId)!
-      for (const operation of bundle.operations) {
-        const secrets = new Set(terminal.secrets.filter(secret => operation.assignments.some(item => item.seal?.secret === secret)))
-        if (secrets.size) terminalSecrets.set(operation.id, secrets)
-      }
+    for (const { operation } of operations.values()) {
+      const secrets = new Set(operation.assignments
+        .filter(item => item.seal && !consumed.has(`${operation.id}:${item.type}:${item.index}`))
+        .map(item => item.seal!.secret))
+      if (secrets.size) terminalSecrets.set(operation.id, secrets)
     }
     await verifyBfaRejectList({
       chainId: genesis.chainId, address: genesis.rejectListAddress, rpc,
@@ -1082,6 +1061,6 @@ export function mergeBfaValidatedHistories(histories: ValidatedBfaConsignment[])
   }
   return encodeBfaTransferConsignment({
     genesis: first.genesis, validatedWitnessBundles: ordered.slice(0, -1),
-    witnessBundle: ordered.at(-1)!, terminals: [],
+    witnessBundle: ordered.at(-1)!,
   })
 }
