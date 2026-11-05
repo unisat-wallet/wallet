@@ -330,7 +330,7 @@ export interface RgbPendingReceive {
    */
   rejection?: {
     /** A proxy NACK is terminal; a donation reject is local and can be revalidated. */
-    kind: 'proxy_nack' | 'local_donation_reject'
+    kind: 'proxy_nack' | 'local_donation_reject' | 'local_validation_reject'
     rejectedAt: number
     reason: string
   }

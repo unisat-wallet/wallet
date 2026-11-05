@@ -1533,7 +1533,7 @@ export class RgbService {
     // Detect sender cancel for consignments already staged for manual accept.
     for (let index = pending.length - 1; index >= 0; index--) {
       const receive = pending[index]!
-      if (!receive.pendingAccept || receive.receivedConsignment) continue
+      if (receive.rejection || !receive.pendingAccept || receive.receivedConsignment) continue
       const canceled = await this.isReceiveCanceledBySender(receive)
       if (!canceled) continue
       this.recordReceiveOutcome(receive, 'canceled', receive.pendingAccept.txid)
@@ -1547,9 +1547,18 @@ export class RgbService {
       )
       if (receiveIndex < 0) continue
       const receive = pending[receiveIndex]!
-      // A successfully posted NACK is protocol-terminal. Keep its encrypted
-      // recovery tombstone, but never reprocess or reverse it automatically.
-      if (receive.rejection?.kind === 'proxy_nack') continue
+      // A proxy NACK and an explicit user rejection of a donation are
+      // terminal. Only a local rejection caused by an old validation failure
+      // may be reconsidered after a later wallet upgrade validates it.
+      const revalidatableLocalRejection =
+        receive.rejection?.kind === 'local_validation_reject' ||
+        // Migration compatibility: before the rejection kinds were split,
+        // validation rejects used local_donation_reject while retaining the
+        // pending validation failure that distinguishes them from a user's
+        // explicit rejection of an otherwise valid donation.
+        (receive.rejection?.kind === 'local_donation_reject' &&
+          !!receive.pendingValidationFailure)
+      if (receive.rejection && !revalidatableLocalRejection) continue
       let mismatchReason: string | undefined
       const stageValidationFailure = (reason: string) => {
         const previous = receive.pendingValidationFailure
@@ -1585,7 +1594,7 @@ export class RgbService {
           await refreshValidationReview(receive, receive.pendingValidationFailure!, item.payload)
           continue
         }
-        if (receive.rejection?.kind === 'local_donation_reject') {
+        if (revalidatableLocalRejection) {
           delete receive.rejection
           this.removeRejectedReceiveHistory(receive)
           changed = true
@@ -2040,7 +2049,9 @@ export class RgbService {
     }
     const rejectionKind = proxyNackPosted
       ? 'proxy_nack' as const
-      : 'local_donation_reject' as const
+      : validationFailure
+        ? 'local_validation_reject' as const
+        : 'local_donation_reject' as const
     const rejectionReason = validationFailure
       ? `${proxyNackPosted ? 'Rejected by you' : 'Discarded locally by you without notifying the sender'} after validation failed: ${validationFailure.reason}`
       : 'Rejected by you'
@@ -4378,7 +4389,10 @@ export class RgbService {
     const pending = (this.requireState().pendingReceives || [])
       .filter(
         receive =>
-          receive.rejection?.kind !== 'proxy_nack' &&
+          (!receive.rejection ||
+            receive.rejection.kind === 'local_validation_reject' ||
+            (receive.rejection.kind === 'local_donation_reject' &&
+              !!receive.pendingValidationFailure)) &&
           ((!receive.receivedConsignment?.accepted &&
             !receive.receivedConsignment?.acknowledgementPending) ||
           !receive.receivedConsignment?.payload)

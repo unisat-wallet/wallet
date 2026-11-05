@@ -2315,7 +2315,7 @@ describe('RgbService', () => {
     expect(service.getPendingReceives()).toEqual([
       expect.objectContaining({
         proxyPrivateKey: '44'.repeat(32),
-        rejection: expect.objectContaining({ kind: 'local_donation_reject' }),
+        rejection: expect.objectContaining({ kind: 'local_validation_reject' }),
       }),
     ])
     expect(service.getPendingReceiveHistory()).toEqual([
@@ -2381,7 +2381,7 @@ describe('RgbService', () => {
         endpoint: proxyEndpoint, reviewStatus: 'rejection_allowed',
       },
       rejection: {
-        kind: 'local_donation_reject', rejectedAt: 2,
+        kind: 'local_validation_reject', rejectedAt: 2,
         reason: 'Discarded locally by you after validation failed: Old validator mismatch',
       },
     }]
@@ -5929,6 +5929,9 @@ describe('RgbService', () => {
 
   it('allows rejecting a donation receive without a sender ACK operation', async () => {
     const dependencies = createDependencies()
+    dependencies.transport.getConsignment = vi.fn().mockResolvedValue({
+      recipientId: 'recipient', payload: 'consignment', endpoint: proxyEndpoint,
+    })
     dependencies.transport.acknowledgeConsignment = vi.fn().mockRejectedValue(
       new RgbProxyOperationNotFoundError()
     )
@@ -5947,6 +5950,11 @@ describe('RgbService', () => {
     }]
 
     await expect(service.rejectReceive('recipient')).resolves.toEqual({ rejected: true })
+    const validate = vi.spyOn(service as any, 'validateIncomingConsignment')
+    await service.processClaimedReceives({ includeClaimed: false })
+
+    expect(dependencies.transport.getConsignment).not.toHaveBeenCalled()
+    expect(validate).not.toHaveBeenCalled()
     expect(service.getPendingReceives()).toEqual([
       expect.objectContaining({
         proxyPrivateKey: '44'.repeat(32),
