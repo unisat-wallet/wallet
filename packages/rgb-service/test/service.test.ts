@@ -28,7 +28,12 @@ import {
   RgbService,
   RgbServiceError,
 } from '../src'
-import { encodeBfaTransferConsignment, isSupportedV1TransferConsignment, NIA_V1_SCHEMA_ID } from '../src/protocol/bfa-consignment'
+import {
+  encodeBfaContractConsignment,
+  encodeBfaTransferConsignment,
+  isSupportedV1TransferConsignment,
+  NIA_V1_SCHEMA_ID,
+} from '../src/protocol/bfa-consignment'
 import { serializeBfaOpretWitnessBundle } from '../src/protocol/consignment'
 import { validateBfaTransferConsignment } from '../src/protocol/bfa-validator'
 
@@ -1360,6 +1365,43 @@ describe('RgbService', () => {
     await service.markAssetMetadataSynced(assetId)
     expect(service.getPendingAssetMetadata()).toEqual([])
     expect(service.matchesRecoveryState(legacyRecovery)).toBe(true)
+  })
+
+  it('migrates Wallet 1.8.2 v1 contract history while restoring a checkpoint', async () => {
+    const dependencies = createDependencies()
+    const service = new RgbService(dependencies)
+    await service.open(wallet)
+    const genesis = encodeNiaGenesis({
+      ticker: 'V182', name: 'Legacy V1 asset', precision: 0,
+      timestamp: 1_713_261_744, network: 'mainnet',
+      allocations: [{ txid: 'ab'.repeat(32), vout: 0, blinding: 1n, amount: 100n }],
+    })
+    const assetId = encodeRgbContractId(genesis.assetId)
+    const canonical = encodeBfaContractConsignment(genesis.strict)
+    const legacy = Uint8Array.from([
+      canonical[0]!, canonical[1]!, 0, 0, ...canonical.slice(2),
+    ])
+    const legacyPayload = Buffer.from(legacy).toString('base64')
+    const canonicalPayload = Buffer.from(canonical).toString('base64')
+    const recovery = {
+      version: 1 as const,
+      wallet,
+      snapshot: { syncedAt: 1, utxos: [] },
+      pending: {},
+      contracts: {
+        [assetId]: {
+          consignment: legacyPayload,
+          createdAt: 1,
+          history: { payload: legacyPayload, opIds: [], updatedAt: 1 },
+        },
+      },
+    }
+
+    await expect(service.restoreRecoveryState(recovery)).resolves.toBe(true)
+    const exported = service.exportRecoveryState()
+    expect(exported.contracts?.[assetId]?.consignment).toBe(canonicalPayload)
+    expect(exported.contracts?.[assetId]?.history?.payload).toBe(canonicalPayload)
+    expect(recovery.contracts[assetId].consignment).toBe(legacyPayload)
   })
 
   it('clears a stale recovery conflict after an identical checkpoint is proven', async () => {

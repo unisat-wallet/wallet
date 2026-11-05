@@ -8,6 +8,7 @@ import {
   encodeBfaTransferConsignment,
   isSupportedV1ContractConsignment,
   isSupportedV1TransferConsignment,
+  normalizeLegacyV1Consignment,
   unwrapRgbContractConsignment,
 } from '../src/protocol/bfa-consignment'
 import { createBfaValidationAttestationPayload, mergeBfaValidatedHistories, refreshPersistedBfaValidation, restoreAttestedBfaHistory, restoreValidatedBfaHistory, selectBfaSpendHistory, validateBfaTransferConsignment } from '../src/protocol/bfa-validator'
@@ -92,6 +93,18 @@ describe('NIA v1 transfer', () => {
     expect(convertNiaV0ConsignmentToV1(root)).toEqual(encodeBfaContractConsignment(genesis.strict))
     const wrapped = Uint8Array.from([0x52, 0x47, 0x42, 0, 0x43, 0x4f, 0x4e, ...root])
     expect(convertNiaV0ConsignmentToV1(wrapped)).toEqual(encodeBfaContractConsignment(genesis.strict))
+  })
+
+  it('normalizes a Wallet 1.8.2 v1 contract with an empty terminals map', () => {
+    const { genesis } = fixture()
+    const legacy = Uint8Array.from([
+      ...new StrictWriter().writeU8(1).writeU8(0).writeU16(0).toBytes(),
+      ...genesis.strict,
+      ...new StrictWriter().writeU32(0).toBytes(),
+    ])
+    expect(normalizeLegacyV1Consignment(legacy)).toEqual(
+      encodeBfaContractConsignment(genesis.strict)
+    )
   })
   it('recognizes Rust NIA v1 contract files and exports their strict body', () => {
     const { genesis } = fixture()
@@ -202,7 +215,7 @@ describe('NIA v1 transfer', () => {
     expect(result.assetId).toBe(encodeRgbContractId(Uint8Array.from(Buffer.from(assetId.slice(4), 'hex'))))
   })
 
-  it('rejects the removed v1 terminals map layout', async () => {
+  it('normalizes the Wallet 1.8.2 terminals map layout before validation', async () => {
     const { genesis, bundle, prepared } = fixture()
     const terminal = new StrictWriter()
       .writeU8(1).writeU8(1).writeU16(1)
@@ -212,9 +225,23 @@ describe('NIA v1 transfer', () => {
     const payload = wrapRgbTransferConsignment(Uint8Array.from([
       ...terminal, ...genesis.strict, ...new StrictWriter().writeU32(1).toBytes(), ...bundle.strict,
     ]))
+    const canonical = encodeBfaTransferConsignment({
+      genesis: genesis.strict, validatedWitnessBundles: [], witnessBundle: bundle.strict,
+    })
+    expect(normalizeLegacyV1Consignment(payload)).toEqual(canonical)
     await expect(validateBfaTransferConsignment(payload, {
       network: 0, isBitcoinTxConfirmed: async () => true, allowPendingLastWitness: true,
-    })).rejects.toThrow('unsupported Genesis version')
+    })).resolves.toEqual(expect.objectContaining({ assetId: expect.any(String) }))
+  })
+
+  it('does not guess malformed legacy v1 terminal layouts', () => {
+    const { genesis, bundle } = fixture()
+    const malformed = wrapRgbTransferConsignment(Uint8Array.from([
+      ...new StrictWriter().writeU8(1).writeU8(1).writeU16(1)
+        .writeFixedBytes(bundle.bundleId, 32).writeU16(0).toBytes(),
+      ...genesis.strict, ...new StrictWriter().writeU32(1).toBytes(), ...bundle.strict,
+    ]))
+    expect(normalizeLegacyV1Consignment(malformed)).toBe(malformed)
   })
 
   it('uses validated v1 history when preparing a subsequent NIA send', async () => {

@@ -22,11 +22,78 @@ function concat(parts: Uint8Array[]) {
   return result
 }
 
+function hasPrefix(value: Uint8Array, prefix: readonly number[]) {
+  return value.length >= prefix.length && prefix.every((byte, index) => value[index] === byte)
+}
+
+const RGB_CONSIGNMENT_MAGIC = [0x52, 0x47, 0x42, 0x00] as const
+const RGB_TRANSFER_HEADER = [...RGB_CONSIGNMENT_MAGIC, 0x54, 0x46, 0x52] as const
+const RGB_CONTRACT_HEADER = [...RGB_CONSIGNMENT_MAGIC, 0x43, 0x4f, 0x4e] as const
+
+/**
+ * Convert the exact V1 layout emitted by Wallet 1.8.0-1.8.2 into current V1.
+ *
+ * The old layout inserted a Strict-encoded `terminals` map between the
+ * transfer flag and Genesis. Current RGB derives the same graph information
+ * from assignments and does not serialize the map. This reader is deliberately
+ * limited to supported BFA/NIA-V1 schemas and leaves current or unrelated
+ * payloads untouched.
+ */
+export function normalizeLegacyV1Consignment(value: Uint8Array): Uint8Array {
+  const wrappedTransfer = hasPrefix(value, RGB_TRANSFER_HEADER)
+  const wrappedContract = hasPrefix(value, RGB_CONTRACT_HEADER)
+  if (hasPrefix(value, RGB_CONSIGNMENT_MAGIC) && !wrappedTransfer && !wrappedContract) return value
+  const headerLength = wrappedTransfer || wrappedContract ? 7 : 0
+  const body = value.slice(headerLength)
+  if (body.length < 36 || body[0] !== 1 || (body[1] !== 0 && body[1] !== 1)) return value
+  const transfer = body[1] === 1
+  if ((wrappedTransfer && !transfer) || (wrappedContract && transfer)) return value
+
+  // Current layout: version, transfer flag, Genesis version, SchemaId.
+  if (body[2] === 0 && body[3] === 0 &&
+    SUPPORTED_V1_SCHEMAS.includes(hex(body.slice(4, 36)))) return value
+
+  try {
+    const reader = new StrictReader(body)
+    if (reader.readU8() !== 1 || reader.readU8() !== (transfer ? 1 : 0)) return value
+    const terminalCount = reader.readU16()
+    if (!transfer && terminalCount !== 0) return value
+    let previousBundleId: string | undefined
+    for (let terminalIndex = 0; terminalIndex < terminalCount; terminalIndex++) {
+      const bundleId = hex(reader.readFixedBytes(32))
+      if (previousBundleId !== undefined && bundleId <= previousBundleId) return value
+      previousBundleId = bundleId
+      const sealCount = reader.readU16()
+      if (!sealCount) return value
+      for (let sealIndex = 0; sealIndex < sealCount; sealIndex++) {
+        const kind = reader.readU8()
+        if (kind === 1) {
+          reader.readFixedBytes(32)
+        } else if (kind === 0) {
+          const txPtr = reader.readU8()
+          if (txPtr === 1) reader.readFixedBytes(32)
+          else if (txPtr !== 0) return value
+          reader.readU32()
+          reader.readU64()
+        } else return value
+      }
+    }
+    const genesisStart = reader.position
+    if (reader.readU16() !== 0) return value
+    if (!SUPPORTED_V1_SCHEMAS.includes(hex(reader.readFixedBytes(32)))) return value
+    const canonicalBody = concat([body.slice(0, 2), body.slice(genesisStart)])
+    return headerLength ? concat([value.slice(0, headerLength), canonicalBody]) : canonicalBody
+  } catch {
+    return value
+  }
+}
+
 /**
  * Read only the schema discriminator of a v1 transfer. Use
  * validateBfaTransferConsignment for local validation before accepting funds.
  */
 export function v1TransferSchemaId(value: Uint8Array): string | undefined {
+  value = normalizeLegacyV1Consignment(value)
   if (value.length >= 7 && value[0] === 0x52 && value[1] === 0x47 &&
     value[2] === 0x42 && value[3] === 0 && value[4] === 0x43 &&
     value[5] === 0x4f && value[6] === 0x4e) return undefined
@@ -46,6 +113,7 @@ export function isBfaTransferConsignment(value: Uint8Array): boolean {
 
 /** Recognize the v1 BFA Genesis-only contract container in imported history. */
 export function isBfaContractConsignment(value: Uint8Array): boolean {
+  value = normalizeLegacyV1Consignment(value)
   const reader = new StrictReader(unwrapRgbTransferConsignment(value))
   if (reader.readU8() !== 1 || reader.readU8() !== 0) return false
   if (reader.readU16() !== 0) return false
@@ -53,6 +121,7 @@ export function isBfaContractConsignment(value: Uint8Array): boolean {
 }
 
 export function isSupportedV1ContractConsignment(value: Uint8Array): boolean {
+  value = normalizeLegacyV1Consignment(value)
   if (value.length >= 7 && value[0] === 0x52 && value[1] === 0x47 &&
     value[2] === 0x42 && value[3] === 0 && value[4] === 0x54 &&
     value[5] === 0x46 && value[6] === 0x52) return false

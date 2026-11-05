@@ -23,6 +23,7 @@ import {
   encodeBfaContractConsignment,
   isSupportedV1ContractConsignment,
   isSupportedV1TransferConsignment,
+  normalizeLegacyV1Consignment,
   unwrapRgbContractConsignment,
 } from './protocol/bfa-consignment'
 import {
@@ -2074,11 +2075,14 @@ export class RgbService {
     // that absence as '', which must not constrain the witness in a NIA payload.
     const expectedTxid = item.txid || undefined
     const originalPayload = Uint8Array.from(Buffer.from(item.payload, 'base64'))
-    const v1 = isSupportedV1TransferConsignment(originalPayload)
+    // Proxy authentication applies to originalPayload. Only after transport
+    // verification/decryption do we canonicalize Wallet 1.8.0-1.8.2 V1 bytes.
+    const normalizedPayload = normalizeLegacyV1Consignment(originalPayload)
+    const v1 = isSupportedV1TransferConsignment(normalizedPayload)
     // Legacy NIA bytes are only parsed by the constrained migration layer.
     // Acceptance, allocation matching and persisted history all use the same
     // v1 validator as native v1 transfers.
-    const payload = v1 ? originalPayload : convertNiaV0ConsignmentToV1(originalPayload)
+    const payload = v1 ? normalizedPayload : convertNiaV0ConsignmentToV1(originalPayload)
     const validate = this.dependencies.validateBfaConsignment
     if (!validate) throw new RgbServiceError('RGB v1 receive validation is unavailable')
     const bfa = await validate({
@@ -2737,7 +2741,9 @@ export class RgbService {
     const existingPayload = existing?.history?.payload ?? existing?.consignment
     return [existingPayload, payload].some(item => {
       if (!item) return false
-      const bytes = Uint8Array.from(Buffer.from(item, 'base64'))
+      const bytes = normalizeLegacyV1Consignment(
+        Uint8Array.from(Buffer.from(item, 'base64'))
+      )
       return isSupportedV1TransferConsignment(bytes) || isSupportedV1ContractConsignment(bytes)
     })
   }
@@ -2746,15 +2752,18 @@ export class RgbService {
   private async preflightReceiveHistory(assetId: string, payload: string, pendingWitnessTxid?: string) {
     const existing = this.requireState().contracts?.[assetId]
     if (!existing) return
-    if (this.needsV1HistoryMerge(assetId, payload)) {
-      await this.prepareV1HistoryMerge(assetId, payload, pendingWitnessTxid)
+    const normalizedPayload = Buffer.from(normalizeLegacyV1Consignment(
+      Uint8Array.from(Buffer.from(payload, 'base64'))
+    )).toString('base64')
+    if (this.needsV1HistoryMerge(assetId, normalizedPayload)) {
+      await this.prepareV1HistoryMerge(assetId, normalizedPayload, pendingWitnessTxid)
       return
     }
     mergeNiaConsignmentHistory({
       assetId,
       consignments: [
         { opId: contractOperationId(assetId), payload: existing.history?.payload ?? existing.consignment },
-        { opId: contractOperationId(assetId), payload },
+        { opId: contractOperationId(assetId), payload: normalizedPayload },
       ],
       requiredOpIds: [],
       knownBlindSeals: this.getKnownBlindSeals(),
@@ -2777,7 +2786,9 @@ export class RgbService {
     const transfers: Uint8Array[] = []
     const rootGenesises: string[] = []
     for (const original of originals) {
-      const bytes = Uint8Array.from(Buffer.from(original, 'base64'))
+      const bytes = normalizeLegacyV1Consignment(
+        Uint8Array.from(Buffer.from(original, 'base64'))
+      )
       const isV1 = isSupportedV1TransferConsignment(bytes) || isSupportedV1ContractConsignment(bytes)
       if (!isV1) {
         const decoded = decodeNiaConsignment(unwrapNiaV0Contract(bytes))
@@ -5014,6 +5025,15 @@ function sameSnapshotContents(left: RgbWalletSnapshot, right: RgbWalletSnapshot)
   return JSON.stringify(left.utxos) === JSON.stringify(right.utxos)
 }
 
+function normalizeStoredV1Payload(payload: string) {
+  const original = Uint8Array.from(Buffer.from(payload, 'base64'))
+  const normalized = normalizeLegacyV1Consignment(original)
+  return normalized === original ||
+    (normalized.length === original.length && normalized.every((byte, index) => byte === original[index]))
+    ? payload
+    : Buffer.from(normalized).toString('base64')
+}
+
 function normalizeStateAssetIds(state: RgbServiceState): RgbServiceState {
   if (state.witnessBlindingPolicyVersion !== 1) {
     // Only invoices already present when strict matching is first deployed may
@@ -5056,6 +5076,12 @@ function normalizeStateAssetIds(state: RgbServiceState): RgbServiceState {
   state.pendingIssues?.forEach(item => (item.assetId = normalizeAssetId(item.assetId)))
   state.issueHistory?.forEach(item => (item.assetId = normalizeAssetId(item.assetId)))
   state.pendingAssetMetadata?.forEach(item => (item.assetId = normalizeAssetId(item.assetId)))
+  if (state.burnProofs) {
+    for (const proof of Object.values(state.burnProofs)) {
+      proof.assetId = normalizeAssetId(proof.assetId)
+      proof.payload = normalizeStoredV1Payload(proof.payload)
+    }
+  }
   if (state.contracts) {
     state.contracts = Object.fromEntries(
       Object.entries(state.contracts).map(([assetId, contract]) => [
@@ -5063,12 +5089,14 @@ function normalizeStateAssetIds(state: RgbServiceState): RgbServiceState {
         contract.history
           ? {
               ...contract,
+              consignment: normalizeStoredV1Payload(contract.consignment),
               history: {
                 ...contract.history,
+                payload: normalizeStoredV1Payload(contract.history.payload),
                 opIds: contract.history.opIds.map(opId => opId.toLowerCase()),
               },
             }
-          : contract,
+          : { ...contract, consignment: normalizeStoredV1Payload(contract.consignment) },
       ])
     )
   }

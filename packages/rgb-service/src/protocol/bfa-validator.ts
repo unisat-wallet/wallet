@@ -7,7 +7,12 @@ import {
 } from '../errors'
 import { verifyBfaRejectList } from './bfa-reject-list'
 import { transitionBundleId } from './bundle'
-import { BFA_SCHEMA_ID, NIA_V1_SCHEMA_ID, encodeBfaTransferConsignment } from './bfa-consignment'
+import {
+  BFA_SCHEMA_ID,
+  NIA_V1_SCHEMA_ID,
+  encodeBfaTransferConsignment,
+  normalizeLegacyV1Consignment,
+} from './bfa-consignment'
 import { unwrapRgbTransferConsignment, wrapRgbTransferConsignment } from './consignment'
 import { encodeRgbContractId, rgbContractIdHex } from './contract-id'
 import { verifyMpcMerkleProof } from './mpc'
@@ -652,6 +657,7 @@ function readBundle(reader: StrictReader, contractId: string, known: Map<string,
   return { strict: reader.slice(start), txid: tx.getId(), tx, id, operations }
 }
 function parseConsignment(value: Uint8Array, network: number, known = new Map<string, RgbBlindSeal>()) {
+  value = normalizeLegacyV1Consignment(value)
   const body = unwrapRgbTransferConsignment(value)
   const reader = new StrictReader(body)
   const patches: SealPatch[] = []
