@@ -87,6 +87,16 @@ describe('decodeRgbInvoice', () => {
     expect(invoice.seal.type === 'witness' && invoice.seal.pay2vout).toHaveLength(33)
   })
 
+  it('recognizes both current and legacy BFA schema invoices', () => {
+    const recipientId = 'bc:utxob:xDfmDF9g-yNOjriV-6Anbe6H-MLJ__g6-lo7Dd4f-dhWBW8S-XYGBm'
+    expect(decodeRgbInvoice(
+      `rgb:~/3I0xZVEQnQxYVk7vDnh5uNtQyUfsmThw6dX9n_Gvb5o/~/${recipientId}`
+    ).schema).toBe('BFA')
+    expect(decodeRgbInvoice(
+      `rgb:~/Ryl5eQZ3IHrU05e3AWdQZJR4FB5GvxZPy96cwhJiApc/~/${recipientId}`
+    ).schema).toBe('BFA')
+  })
+
   it('rejects unsupported assignment, schema and encryption semantics', () => {
     const recipientId = 'bc:utxob:xDfmDF9g-yNOjriV-6Anbe6H-MLJ__g6-lo7Dd4f-dhWBW8S-XYGBm'
     expect(() => decodeRgbInvoice(

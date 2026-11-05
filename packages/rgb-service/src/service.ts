@@ -25,6 +25,7 @@ import {
   isSupportedV1TransferConsignment,
   normalizeLegacyV1Consignment,
   unwrapRgbContractConsignment,
+  v1TransferSchemaId,
 } from './protocol/bfa-consignment'
 import {
   bfaConsignmentWitnessTxids,
@@ -2078,7 +2079,11 @@ export class RgbService {
     // Proxy authentication applies to originalPayload. Only after transport
     // verification/decryption do we canonicalize Wallet 1.8.0-1.8.2 V1 bytes.
     const normalizedPayload = normalizeLegacyV1Consignment(originalPayload)
+    const v1SchemaId = v1TransferSchemaId(normalizedPayload)
     const v1 = isSupportedV1TransferConsignment(normalizedPayload)
+    if (v1SchemaId && !v1) {
+      throw new RgbServiceError(`RGB v1 schema is unsupported: ${v1SchemaId}`)
+    }
     // Legacy NIA bytes are only parsed by the constrained migration layer.
     // Acceptance, allocation matching and persisted history all use the same
     // v1 validator as native v1 transfers.

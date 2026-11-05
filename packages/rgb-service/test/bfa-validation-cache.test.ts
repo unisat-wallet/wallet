@@ -1,6 +1,19 @@
 import { describe, expect, it, vi } from 'vitest'
 import { RgbMissingAncestorError } from '../src/errors'
-import { cacheBfaBitcoinStatus, cacheBfaEvmRpc, cacheConfirmedBfaWitnesses, pruneConfirmedBfaWitnesses, selectBfaSpendHistory } from '../src/protocol/bfa-validator'
+import { bfaMintLockId, cacheBfaBitcoinStatus, cacheBfaEvmRpc, cacheConfirmedBfaWitnesses, pruneConfirmedBfaWitnesses, selectBfaSpendHistory } from '../src/protocol/bfa-validator'
+
+describe('BFA mint lock ID', () => {
+  it('commits to the operation ID and internal-order witness txid like rgb-ops', () => {
+    expect(bfaMintLockId(
+      Array.from({ length: 32 }, (_, index) => index.toString(16).padStart(2, '0')).join(''),
+      Array.from({ length: 32 }, (_, index) => (63 - index).toString(16).padStart(2, '0')).join('')
+    )).toBe('1ce683c92fdfb3ef54e39c7b461e731dad02cd240b366441f34a2c2e849a9876')
+    expect(bfaMintLockId(
+      '6c2ace88bc04cce7d108f6cf1535a46564ba938db9e870325f11ebf8a8d23e27',
+      '00112233445566778899aabbccddeeff00112233445566778899aabbccddeeff'
+    )).toBe('a0f145a18cd58a42232653004cae6fe518a206a1459d0fbaa605def8c392c61b')
+  })
+})
 
 describe('BFA EVM validation RPC cache', () => {
   it('shares identical in-flight and completed reads within one operation', async () => {

@@ -2,11 +2,19 @@ import { RgbServiceError } from '../errors'
 import { unwrapRgbTransferConsignment, wrapRgbTransferConsignment } from './consignment'
 import { StrictReader, StrictWriter } from './strict'
 
-// rgb-schemas 0.11.2-rc.1, BridgedFungibleAsset::schema_id(). The byte order
-// here is the strict-encoded SchemaId in Genesis, not the baid64 display form.
-export const BFA_SCHEMA_ID = '472979790677207ad4d397b7016750649478141e46bf164fcbde9cc212620297'
+// Current rgb-schemas BridgedFungibleAsset::schema_id(). The byte order here
+// is the strict-encoded SchemaId in Genesis, not the baid64 display form.
+export const BFA_SCHEMA_ID = 'dc8d316551109d0c58564eef0e7879b8db50c947ec993870e9d5fd9fe1af6f9a'
+// rgb-schemas 0.11.2-rc.1. Assets issued with this schema remain valid and
+// must stay spendable after adding support for the current BFA profile.
+export const LEGACY_BFA_SCHEMA_ID = '472979790677207ad4d397b7016750649478141e46bf164fcbde9cc212620297'
 export const NIA_V1_SCHEMA_ID = '45687051f4cca6e3f665fc75fe3e27b30080346789ad83aa0dc29e95a315e335'
-const SUPPORTED_V1_SCHEMAS = [BFA_SCHEMA_ID, NIA_V1_SCHEMA_ID]
+export const BFA_SCHEMA_IDS = [BFA_SCHEMA_ID, LEGACY_BFA_SCHEMA_ID] as const
+const SUPPORTED_V1_SCHEMAS = [...BFA_SCHEMA_IDS, NIA_V1_SCHEMA_ID]
+
+export function isBfaSchemaId(schemaId: string) {
+  return BFA_SCHEMA_IDS.includes(schemaId as (typeof BFA_SCHEMA_IDS)[number])
+}
 
 function hex(bytes: Uint8Array) {
   return Buffer.from(bytes).toString('hex')
@@ -108,7 +116,8 @@ export function isSupportedV1TransferConsignment(value: Uint8Array): boolean {
 }
 
 export function isBfaTransferConsignment(value: Uint8Array): boolean {
-  return v1TransferSchemaId(value) === BFA_SCHEMA_ID
+  const schemaId = v1TransferSchemaId(value)
+  return schemaId !== undefined && isBfaSchemaId(schemaId)
 }
 
 /** Recognize the v1 BFA Genesis-only contract container in imported history. */
@@ -117,7 +126,7 @@ export function isBfaContractConsignment(value: Uint8Array): boolean {
   const reader = new StrictReader(unwrapRgbTransferConsignment(value))
   if (reader.readU8() !== 1 || reader.readU8() !== 0) return false
   if (reader.readU16() !== 0) return false
-  return hex(reader.readFixedBytes(32)) === BFA_SCHEMA_ID
+  return isBfaSchemaId(hex(reader.readFixedBytes(32)))
 }
 
 export function isSupportedV1ContractConsignment(value: Uint8Array): boolean {

@@ -8,9 +8,10 @@ import {
 import { verifyBfaRejectList } from './bfa-reject-list'
 import { transitionBundleId } from './bundle'
 import {
-  BFA_SCHEMA_ID,
+  LEGACY_BFA_SCHEMA_ID,
   NIA_V1_SCHEMA_ID,
   encodeBfaTransferConsignment,
+  isBfaSchemaId,
   normalizeLegacyV1Consignment,
 } from './bfa-consignment'
 import { unwrapRgbTransferConsignment, wrapRgbTransferConsignment } from './consignment'
@@ -25,12 +26,18 @@ const TAG_NODE = 'urn:ubideco:merkle:node#2024-01-31'
 const TAG_STRICT = 'urn:ubideco:strict-types:value-hash#2024-02-10'
 const TAG_SEAL = 'urn:lnp-bp:seals:secret#2024-02-03'
 const TAG_OPERATION = 'urn:lnp-bp:rgb:operation#2024-02-03'
-const FUNDS_IN_TOPIC = '0xf1a18caea297591892fc07ea412a5e617d8e51e1155912d8871793e1d4e70f87'
+const TAG_LOCK = 'urn:lnp-bp:rgb:lock#2026-11-04'
+const LEGACY_FUNDS_IN_TOPIC = '0xf1a18caea297591892fc07ea412a5e617d8e51e1155912d8871793e1d4e70f87'
+const FUNDS_IN_BLOCK_SELECTOR = '0x2ce06e2d'
 const VIRTUAL_LEAF = new Uint8Array(32).fill(0xff)
 const OS_ASSET = 4000
+const OS_LINK = 4012
 const OS_MINT = 4013
 const TS_MINT = 8013
 const TS_BURN = 8010
+const TS_LINK = 8012
+const TS_PROPAGATE = 8014
+const TS_TRANSFER_LINK = 8016
 const TS_TRANSFER = 10000
 
 type Seal = { txid: string | null; vout: number; secret: string; blinding?: bigint }
@@ -42,10 +49,11 @@ type Operation = {
   inputs: Input[]
   assignments: Assignment[]
   amount: bigint
-  afterBlock?: bigint
+  beforeBlock?: bigint
 }
 type Bundle = { strict: Uint8Array; txid: string; tx: Transaction; id: string; operations: Operation[] }
 type SealPatch = { start: number; end: number; replacement: Uint8Array }
+type SchemaProfile = 'nia' | 'bfa-legacy' | 'bfa-current'
 
 export interface ValidatedBfaConsignment extends ValidatedBfaTransferHistory {
   metadata: RgbContractMetadata
@@ -72,7 +80,7 @@ export interface CachedValidatedBfaHistory {
   bundles: Array<{ id: string; txid: string; operationIds: string[]; parentOpIds: string[] }>
 }
 
-export const BFA_VALIDATOR_VERSION = 'bfa-v1-2026-11-05'
+export const BFA_VALIDATOR_VERSION = 'bfa-v1-2026-11-05-current-schema'
 
 export interface BfaValidationAttestationPayload {
   version: 1
@@ -392,15 +400,28 @@ function sealed(reader: StrictReader, genesis: boolean, known: Map<string, RgbBl
   const blinding = reader.readU64()
   return { txid, vout, blinding, secret: hex(hash(TAG_SEAL, reader.slice(revealedStart))) }
 }
-function readAssignments(reader: StrictReader, genesis: boolean, known: Map<string, RgbBlindSeal>, patches: SealPatch[], schema = BFA_SCHEMA_ID): Assignment[] {
+function readAssignments(
+  reader: StrictReader,
+  genesis: boolean,
+  known: Map<string, RgbBlindSeal>,
+  patches: SealPatch[],
+  profile: SchemaProfile = 'bfa-current'
+): Assignment[] {
   const count = reader.readU16()
   const result: Assignment[] = []
   let previous = -1
   for (let group = 0; group < count; group++) {
     const type = reader.readU16()
-    if (type <= previous || (type !== OS_ASSET && type !== OS_MINT)) fail('unsupported or unordered assignment type')
-    if (genesis && type !== (schema === NIA_V1_SCHEMA_ID ? OS_ASSET : OS_MINT))
-      fail('Genesis contains an unsupported assignment')
+    if (type <= previous || (type !== OS_ASSET && type !== OS_LINK && type !== OS_MINT))
+      fail('unsupported or unordered assignment type')
+    if (genesis) {
+      const supported = profile === 'nia'
+        ? type === OS_ASSET
+        : profile === 'bfa-legacy'
+          ? type === OS_MINT
+          : type === OS_LINK || type === OS_MINT
+      if (!supported) fail('Genesis contains an unsupported assignment')
+    }
     previous = type
     const stateType = reader.readU8()
     if (stateType !== (type === OS_ASSET ? 1 : 0)) fail('invalid assignment state type')
@@ -466,13 +487,49 @@ function operationId(input: { nonce: bigint; kind: Uint8Array; metadata: Uint8Ar
   )
   return hex(hash(TAG_OPERATION, commitment))
 }
+
+function decodeUnicodeTicker(value: Uint8Array): string {
+  const reader = new StrictReader(value)
+  const count = reader.readU8()
+  if (!count || count > 8) fail('invalid BFA ticker')
+  const chars: string[] = []
+  for (let index = 0; index < count; index++) {
+    const first = reader.readU8()
+    const extra = first <= 0x7f ? 0 : first >= 0xc2 && first <= 0xdf ? 1
+      : first >= 0xe0 && first <= 0xef ? 2 : first >= 0xf0 && first <= 0xf4 ? 3 : -1
+    if (extra < 0) fail('invalid BFA ticker character')
+    const encoded = Uint8Array.from([first, ...reader.readFixedBytes(extra)])
+    let char: string
+    try {
+      char = new TextDecoder('utf-8', { fatal: true }).decode(encoded)
+    } catch {
+      fail('invalid BFA ticker character')
+    }
+    if ([...char].length !== 1) fail('invalid BFA ticker character')
+    chars.push(char)
+  }
+  if (reader.remaining) fail('invalid BFA ticker')
+  return chars.join('')
+}
+
+function decodeBfaName(value: Uint8Array): string {
+  const reader = new StrictReader(value)
+  const raw = reader.readConfinedBytes(40)
+  if (reader.remaining || !raw.length || raw.some(byte => byte < 0x20 || byte > 0x7e))
+    fail('invalid BFA name')
+  return new TextDecoder().decode(raw)
+}
+
 function readGenesis(reader: StrictReader, network: number, known: Map<string, RgbBlindSeal>, patches: SealPatch[]) {
   const start = reader.position
   if (reader.readU16() !== 0) fail('unsupported Genesis version')
   const schemaId = hex(reader.readFixedBytes(32))
-  if (schemaId !== BFA_SCHEMA_ID && schemaId !== NIA_V1_SCHEMA_ID) fail('unsupported Genesis schema')
+  if (!isBfaSchemaId(schemaId) && schemaId !== NIA_V1_SCHEMA_ID)
+    fail(`unsupported Genesis schema ${schemaId}`)
+  const profile: SchemaProfile = schemaId === NIA_V1_SCHEMA_ID
+    ? 'nia' : schemaId === LEGACY_BFA_SCHEMA_ID ? 'bfa-legacy' : 'bfa-current'
   const schema = bytes(schemaId)
-  const nia = schemaId === NIA_V1_SCHEMA_ID
+  const nia = profile === 'nia'
   const timestamp = reader.readU64()
   const issuerStart = reader.position
   const issuer = new TextDecoder().decode(reader.readConfinedBytes(4096))
@@ -484,13 +541,39 @@ function readGenesis(reader: StrictReader, network: number, known: Map<string, R
   const metadata = readMetadata(reader)
   if (metadata.values.size) fail('unsupported Genesis metadata')
   const globals = readGlobals(reader)
-  if ([...globals.states.keys()].some(type => type !== 2000 && type !== 2001 && type !== (nia ? 2010 : 3008) && (nia || type !== 3010)) ||
-    globals.states.get(2000)?.length !== 1 || globals.states.get(2001)?.length !== 1)
-    fail(`unsupported Genesis global state or external link rule (${[...globals.states.keys()].join(', ')})`)
   let chainId = 0n
   let address = ''
   let rejectListAddress: string | undefined
   let issuedSupply = 0n
+  let ticker: string
+  let name: string
+  let precision: number
+  if (profile === 'bfa-current') {
+    const allowed = new Set([2001, 2013, 3001, 3004, 3005, 3008, 3010, 3011])
+    if ([...globals.states.keys()].some(type => !allowed.has(type)))
+      fail(`unsupported Genesis global state (${[...globals.states.keys()].join(', ')})`)
+    for (const required of [2001, 3001, 3005, 3008, 3011]) {
+      if (globals.states.get(required)?.length !== 1) fail(`BFA Genesis global ${required} is missing or repeated`)
+    }
+    for (const optional of [2013, 3004, 3010]) {
+      if ((globals.states.get(optional)?.length || 0) > 1) fail(`BFA Genesis global ${optional} is repeated`)
+    }
+    ticker = decodeUnicodeTicker(globals.states.get(3011)![0]!)
+    name = decodeBfaName(globals.states.get(3001)![0]!)
+    const precisionValue = globals.states.get(3005)![0]!
+    if (precisionValue.length !== 1 || precisionValue[0]! > 18) fail('invalid BFA precision')
+    precision = precisionValue[0]!
+  } else {
+    if ([...globals.states.keys()].some(type => type !== 2000 && type !== 2001 && type !== (nia ? 2010 : 3008) && (nia || type !== 3010)) ||
+      globals.states.get(2000)?.length !== 1 || globals.states.get(2001)?.length !== 1)
+      fail(`unsupported Genesis global state or external link rule (${[...globals.states.keys()].join(', ')})`)
+    const spec = new StrictReader(globals.states.get(2000)![0]!)
+    ticker = new TextDecoder('utf-8', { fatal: true }).decode(spec.readConfinedBytes(8))
+    name = new TextDecoder('utf-8', { fatal: true }).decode(spec.readConfinedBytes(40))
+    if (spec.readU8() !== 0) fail('asset details profile is unsupported')
+    precision = spec.readU8()
+    if (!ticker || !name || precision > 18 || spec.remaining) fail('invalid asset specification')
+  }
   if (nia) {
     const supply = globals.states.get(2010)
     if (!supply || supply.length !== 1 || supply[0]!.length !== 8) fail('invalid NIA issued supply')
@@ -514,14 +597,12 @@ function readGenesis(reader: StrictReader, network: number, known: Map<string, R
       rejectListAddress = `0x${hex(location.readFixedBytes(20))}`
     }
   }
-  const spec = new StrictReader(globals.states.get(2000)![0]!)
-  const ticker = new TextDecoder('utf-8', { fatal: true }).decode(spec.readConfinedBytes(8))
-  const name = new TextDecoder('utf-8', { fatal: true }).decode(spec.readConfinedBytes(40))
-  if (spec.readU8() !== 0) fail('asset details profile is unsupported')
-  const precision = spec.readU8()
-  if (!ticker || !name || precision > 18 || spec.remaining) fail('invalid asset specification')
-  const assignments = readAssignments(reader, true, known, patches, schemaId)
+  const assignments = readAssignments(reader, true, known, patches, profile)
   if (!assignments.length) fail('Genesis has no assignments')
+  if (profile === 'bfa-current' &&
+    (assignments.filter(item => item.type === OS_MINT).length < 1 ||
+      assignments.filter(item => item.type === OS_LINK).length > 1))
+    fail('BFA Genesis assignment cardinality is invalid')
   if (nia && assignments.reduce((sum, item) => sum + item.amount, 0n) !== issuedSupply)
     fail('NIA Genesis allocations do not match issued supply')
   const kind = concat(Uint8Array.from([0]), schema, new StrictWriter().writeU64(timestamp).toBytes(), issuerHash, Uint8Array.from([chainNet, 0]))
@@ -532,33 +613,42 @@ function readGenesis(reader: StrictReader, network: number, known: Map<string, R
   const contractMetadata: RgbContractMetadata = {
     ticker, name, precision, schema: nia ? 'NIA' : 'BFA', issuedSupply: issuedSupply.toString(), timestamp: Number(timestamp),
   }
-  return { id, strict: reader.slice(start), assignments, chainId, address, rejectListAddress, metadata: contractMetadata }
+  return { id, strict: reader.slice(start), assignments, chainId, address, rejectListAddress, metadata: contractMetadata, schemaId, profile }
 }
-function readTransition(reader: StrictReader, contractId: string, known: Map<string, RgbBlindSeal>, patches: SealPatch[], nia: boolean): Operation {
+function readTransition(reader: StrictReader, contractId: string, known: Map<string, RgbBlindSeal>, patches: SealPatch[], profile: SchemaProfile): Operation {
   if (reader.readU16() !== 0 || hex(reader.readFixedBytes(32)) !== contractId) fail('transition contract mismatch')
   const nonce = reader.readU64()
   const type = reader.readU16()
-  if (type !== TS_TRANSFER && (nia || (type !== TS_MINT && type !== TS_BURN))) fail('unsupported transition type')
+  const nia = profile === 'nia'
+  const supportedTypes = profile === 'bfa-current'
+    ? [TS_TRANSFER, TS_MINT, TS_BURN, TS_LINK, TS_PROPAGATE, TS_TRANSFER_LINK]
+    : nia ? [TS_TRANSFER] : [TS_TRANSFER, TS_MINT, TS_BURN]
+  if (!supportedTypes.includes(type)) fail('unsupported transition type')
   const metadata = readMetadata(reader)
   const globals = readGlobals(reader)
-  const afterRaw = metadata.values.get(1003)
-  let afterBlock: bigint | undefined
+  const beforeRaw = metadata.values.get(1003)
+  let beforeBlock: bigint | undefined
   let amount = 0n
   if (type === TS_MINT) {
     const supply = globals.states.get(2010)
-    if (metadata.values.size !== 1 || !afterRaw || afterRaw.length !== 8 || globals.states.size !== 1 || !supply || supply.length !== 1 || supply[0]!.length !== 8)
+    if (metadata.values.size !== 1 || !beforeRaw || beforeRaw.length !== 8 || globals.states.size !== 1 || !supply || supply.length !== 1 || supply[0]!.length !== 8)
       fail('invalid mint metadata or issued supply')
-    afterBlock = new StrictReader(afterRaw).readU64()
+    beforeBlock = new StrictReader(beforeRaw).readU64()
     amount = new StrictReader(supply[0]!).readU64()
     if (!amount) fail('zero-value mint')
   } else if (type === TS_BURN) {
     const burned = globals.states.get(2015)
     const reason = globals.states.get(3009)
-    if (metadata.values.size || !burned || burned.length !== 1 || burned[0]!.length !== 8 ||
+    if (metadata.values.size || (profile !== 'bfa-current' && !burned) ||
+      (burned && (burned.length !== 1 || burned[0]!.length !== 8)) ||
       (reason && (reason.length !== 1 || reason[0]!.length !== 32)) ||
-      globals.states.size !== (reason ? 2 : 1)) fail('invalid BFA burn global state')
-    amount = new StrictReader(burned[0]!).readU64()
-    if (!amount) fail('zero-value BFA burn')
+      globals.states.size !== Number(Boolean(burned)) + Number(Boolean(reason))) fail('invalid BFA burn global state')
+    amount = burned ? new StrictReader(burned[0]!).readU64() : 0n
+    if (burned && !amount) fail('zero-value BFA burn')
+  } else if (type === TS_LINK) {
+    const linked = globals.states.get(2014)
+    if (metadata.values.size || globals.states.size !== 1 || linked?.length !== 1 || linked[0]!.length !== 32)
+      fail('invalid BFA link transition')
   } else if (metadata.values.size || globals.states.size) fail('transfer has unsupported metadata or global state')
   const inputCount = reader.readU16()
   if (!inputCount) fail('transition has no inputs')
@@ -574,13 +664,13 @@ function readTransition(reader: StrictReader, contractId: string, known: Map<str
     inputs.push({ opId: hex(input.readFixedBytes(32)), type: input.readU16(), index: input.readU16() })
     inputLeaves.push(hash(TAG_NODE, raw))
   }
-  const assignments = readAssignments(reader, false, known, patches)
+  const assignments = readAssignments(reader, false, known, patches, profile)
   if (reader.readU8() !== 0) fail('signed transition profile is unsupported')
   const id = operationId({
     nonce, kind: concat(Uint8Array.from([1]), bytes(contractId), new StrictWriter().writeU16(type).toBytes()),
     metadata: metadata.hash, globals: globals.root, inputs: merkle(inputLeaves), assignments: assignmentsRoot(assignments),
   })
-  return { id, type, inputs, assignments, amount, ...(afterBlock === undefined ? {} : { afterBlock }) }
+  return { id, type, inputs, assignments, amount, ...(beforeBlock === undefined ? {} : { beforeBlock }) }
 }
 function readBitcoinTx(reader: StrictReader): Transaction {
   const tx = new Transaction()
@@ -609,7 +699,7 @@ function readBitcoinTx(reader: StrictReader): Transaction {
   tx.locktime = reader.readU32()
   return tx
 }
-function readBundle(reader: StrictReader, contractId: string, known: Map<string, RgbBlindSeal>, patches: SealPatch[], nia: boolean): Bundle {
+function readBundle(reader: StrictReader, contractId: string, known: Map<string, RgbBlindSeal>, patches: SealPatch[], profile: SchemaProfile): Bundle {
   const start = reader.position
   const tx = readBitcoinTx(reader)
   const spvProof = reader.readU8()
@@ -639,7 +729,7 @@ function readBundle(reader: StrictReader, contractId: string, known: Map<string,
   const operations: Operation[] = []
   for (let index = 0; index < transitionCount; index++) {
     const claimedId = hex(reader.readFixedBytes(32))
-    const operation = readTransition(reader, contractId, known, patches, nia)
+    const operation = readTransition(reader, contractId, known, patches, profile)
     if (operation.id !== claimedId) fail('transition operation ID mismatch')
     operations.push(operation)
   }
@@ -666,7 +756,8 @@ function parseConsignment(value: Uint8Array, network: number, known = new Map<st
   const count = reader.readU32()
   if (!count || count > 100000) fail('invalid witness bundle count')
   const bundles: Bundle[] = []
-  for (let index = 0; index < count; index++) bundles.push(readBundle(reader, genesis.id, known, patches, genesis.metadata.schema === 'NIA'))
+  for (let index = 0; index < count; index++)
+    bundles.push(readBundle(reader, genesis.id, known, patches, genesis.profile))
   if (reader.remaining) fail('consignment has trailing bytes')
   return { genesis, bundles, body, patches }
 }
@@ -841,7 +932,58 @@ function hexQuantity(value: unknown, name: string): bigint {
   if (typeof value !== 'string' || !/^0x(?:0|[1-9a-f][0-9a-f]*)$/i.test(value)) fail(`invalid ${name}`)
   return BigInt(value)
 }
-async function verifyMintEvent(
+export function bfaMintLockId(operationId: string, witnessTxid: string) {
+  // rgb-ops LockId::with commits to the strict bytes of OpId and Txid. Bitcoin
+  // txids are displayed in reverse byte order, while strict Txid uses internal
+  // order. See rgb-ops `urn:lnp-bp:rgb:lock#2026-11-04`.
+  return hex(hash(TAG_LOCK, concat(
+    bytes(operationId),
+    Uint8Array.from(bytes(witnessTxid)).reverse()
+  )))
+}
+
+async function verifyCurrentMintLock(
+  operation: Operation,
+  witnessTxid: string,
+  chainId: bigint,
+  address: string,
+  options: BfaValidationOptions
+) {
+  const rpc = options.getEvmRpc?.(chainId) ?? options.evmRpc
+  if (!rpc) throw new RgbBfaValidationUnavailableError('BFA EVM RPC is not configured')
+  const rpcChain = hexQuantity(await rpc('eth_chainId', []), 'EVM chain ID')
+  if (rpcChain !== chainId) fail('EVM RPC is connected to another chain')
+  const finalized = await rpc('eth_getBlockByNumber', ['finalized', false]) as { number?: unknown } | null
+  if (!finalized) throw new RgbBfaValidationUnavailableError('BFA EVM RPC has no finalized head')
+  const finalizedBlock = hexQuantity(finalized.number, 'finalized block number')
+  const beforeBlock = operation.beforeBlock!
+  const lockId = bfaMintLockId(operation.id, witnessTxid)
+  const data = FUNDS_IN_BLOCK_SELECTOR + lockId + operation.amount.toString(16).padStart(64, '0')
+  const result = await rpc('eth_call', [
+    { to: address, data },
+    `0x${finalizedBlock.toString(16)}`,
+  ])
+  if (typeof result !== 'string' || !/^0x[0-9a-f]{64}$/i.test(result)) {
+    fail('invalid getFundsInBlock result')
+  }
+  const blockPlusOne = BigInt(result)
+  if (blockPlusOne > 0n) {
+    const recordedBlock = blockPlusOne - 1n
+    if (recordedBlock < beforeBlock) return
+    fail(`BFA FundsIn event was recorded after the mint deadline for ${operation.id}`)
+  }
+  // Once the finalized head reaches the exclusive beforeBlock bound, the
+  // required lock can no longer become valid. Before then this remains a
+  // retryable finality condition rather than an invalid consignment.
+  if (finalizedBlock + 1n < beforeBlock) {
+    throw new RgbBfaValidationUnavailableError(
+      `BFA FundsIn event is not finalized yet for mint ${operation.id}`
+    )
+  }
+  throw new RgbBfaValidationUnavailableError(`Finalized BFA FundsIn event is missing for mint ${operation.id}`)
+}
+
+async function verifyLegacyMintEvent(
   operation: Operation, chainId: bigint, address: string, options: BfaValidationOptions
 ) {
   const rpc = options.getEvmRpc?.(chainId) ?? options.evmRpc
@@ -851,7 +993,7 @@ async function verifyMintEvent(
   const finalized = await rpc('eth_getBlockByNumber', ['finalized', false]) as { number?: unknown } | null
   if (!finalized) throw new RgbBfaValidationUnavailableError('BFA EVM RPC has no finalized head')
   const end = hexQuantity(finalized.number, 'finalized block number')
-  const start = operation.afterBlock! + 1n
+  const start = operation.beforeBlock! + 1n
   let range = options.evmLogRange ?? 1000
   if (!Number.isSafeInteger(range) || range < 1 || range > 100000) fail('invalid EVM log range')
   for (let from = start; from <= end;) {
@@ -860,7 +1002,7 @@ async function verifyMintEvent(
     try {
       logs = await rpc('eth_getLogs', [{
         address, fromBlock: `0x${from.toString(16)}`, toBlock: `0x${to.toString(16)}`,
-        topics: [FUNDS_IN_TOPIC, null, `0x${operation.id}`],
+        topics: [LEGACY_FUNDS_IN_TOPIC, null, `0x${operation.id}`],
       }])
     } catch (error) {
       if (to > from && range > 1) { range = Math.max(1, Math.floor(range / 2)); continue }
@@ -872,14 +1014,13 @@ async function verifyMintEvent(
       const item = log as Record<string, unknown>
       if (typeof item['address'] !== 'string' || item['address'].toLowerCase() !== address.toLowerCase() ||
         !Array.isArray(item['topics']) || item['topics'].length !== 3 ||
-        typeof item['topics'][0] !== 'string' || item['topics'][0].toLowerCase() !== FUNDS_IN_TOPIC ||
+        typeof item['topics'][0] !== 'string' || item['topics'][0].toLowerCase() !== LEGACY_FUNDS_IN_TOPIC ||
         typeof item['topics'][1] !== 'string' || !/^0x[0-9a-f]{64}$/i.test(item['topics'][1]) ||
         typeof item['topics'][2] !== 'string' || item['topics'][2].toLowerCase() !== `0x${operation.id}` ||
         typeof item['data'] !== 'string' || !/^0x[0-9a-f]{64}$/i.test(item['data'])) fail('malformed FundsIn log')
       const block = hexQuantity(item['blockNumber'], 'FundsIn block')
       if (item['removed'] === true || block < from || block > to) fail('invalid FundsIn inclusion')
-      const encoded = BigInt(item['data'])
-      if (encoded === operation.amount) return
+      if (BigInt(item['data']) === operation.amount) return
     }
     from = to + 1n
   }
@@ -966,9 +1107,11 @@ export async function validateBfaTransferConsignment(
   }
   if (reachable !== operations.size) fail('transition history is cyclic')
   const consumed = new Set<string>()
+  const currentBfa = genesis.profile === 'bfa-current'
   for (const { operation, bundle } of operations.values()) {
     let inputAmount = 0n
     let mintInputs = 0
+    let linkInputs = 0
     let assetInputs = 0
     for (const input of operation.inputs) {
       const key = `${input.opId}:${input.type}:${input.index}`
@@ -983,18 +1126,40 @@ export async function validateBfaTransferConsignment(
       if (!txid || !bundle.tx.ins.some(txInput => Buffer.from(txInput.hash).reverse().toString('hex') === txid && txInput.index === assignment.seal!.vout))
         fail('witness does not spend the parent seal')
       if (input.type === OS_MINT) mintInputs++
+      else if (input.type === OS_LINK) linkInputs++
       else if (input.type === OS_ASSET) { assetInputs++; inputAmount += assignment.amount }
       else fail('unsupported input assignment')
     }
     const outputAmount = operation.assignments.filter(item => item.type === OS_ASSET).reduce((sum, item) => sum + item.amount, 0n)
     const outputMintRights = operation.assignments.filter(item => item.type === OS_MINT).length
-    if (operation.type === TS_MINT) {
-      if (mintInputs !== 1 || assetInputs || outputAmount !== operation.amount || outputMintRights > 1) fail('invalid mint conservation')
-      await verifyMintEvent(operation, genesis.chainId, genesis.address, options)
+    const outputLinkRights = operation.assignments.filter(item => item.type === OS_LINK).length
+    if (currentBfa) {
+      if (operation.type === TS_MINT) {
+        if (mintInputs !== 1 || linkInputs || assetInputs || outputAmount !== operation.amount ||
+          outputMintRights || outputLinkRights) fail('invalid mint conservation')
+        await verifyCurrentMintLock(operation, bundle.txid, genesis.chainId, genesis.address, options)
+      } else if (operation.type === TS_BURN) {
+        if (!operation.inputs.length || operation.assignments.length || operation.amount !== inputAmount)
+          fail('invalid burn conservation')
+      } else if (operation.type === TS_PROPAGATE) {
+        if (mintInputs !== 1 || assetInputs || linkInputs || outputMintRights < 1 ||
+          outputAmount || outputLinkRights) fail('invalid mint-right propagation')
+      } else if (operation.type === TS_TRANSFER_LINK) {
+        if (linkInputs !== 1 || assetInputs || mintInputs || outputLinkRights !== 1 ||
+          outputAmount || outputMintRights) fail('invalid link-right transfer')
+      } else if (operation.type === TS_LINK) {
+        if (linkInputs !== 1 || assetInputs || mintInputs || operation.assignments.length)
+          fail('invalid link transition')
+      } else if (mintInputs || linkInputs || outputMintRights || outputLinkRights ||
+        outputAmount !== inputAmount) fail('invalid transfer conservation')
+    } else if (operation.type === TS_MINT) {
+      if (mintInputs !== 1 || linkInputs || assetInputs || outputAmount !== operation.amount ||
+        outputMintRights > 1 || outputLinkRights) fail('invalid mint conservation')
+      await verifyLegacyMintEvent(operation, genesis.chainId, genesis.address, options)
     } else if (operation.type === TS_BURN) {
-      if (mintInputs || !assetInputs || outputMintRights || outputAmount + operation.amount !== inputAmount)
-        fail('invalid burn conservation')
-    } else if ((nia && (mintInputs !== 0 || outputMintRights !== 0)) ||
+      if (mintInputs || linkInputs || !assetInputs || outputMintRights || outputLinkRights ||
+        outputAmount + operation.amount !== inputAmount) fail('invalid burn conservation')
+    } else if ((nia && (mintInputs !== 0 || outputMintRights !== 0)) || linkInputs || outputLinkRights ||
       (mintInputs === 0 && outputMintRights !== 0) ||
       (mintInputs > 0 && outputMintRights < mintInputs) ||
       outputAmount !== inputAmount) fail('invalid transfer conservation')

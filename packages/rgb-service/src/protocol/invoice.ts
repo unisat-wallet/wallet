@@ -1,7 +1,7 @@
 import { sha256 } from '@noble/hashes/sha256'
 import { RgbServiceError } from '../errors'
 import type { RgbNetwork } from '../types'
-import { BFA_SCHEMA_ID, NIA_V1_SCHEMA_ID } from './bfa-consignment'
+import { NIA_V1_SCHEMA_ID, isBfaSchemaId } from './bfa-consignment'
 import { normalizeRgbAssetId } from './contract-id'
 import { decodeRgbInvoiceAmountState, encodeRgbInvoiceAmountState } from './invoice-amount'
 
@@ -97,7 +97,7 @@ function decodeInvoiceSchema(value: string): RgbInvoice['schema'] {
     throw new RgbServiceError('RGB invoice schema is invalid')
   }
   if (schemaId === NIA_V1_SCHEMA_ID) return 'NIA'
-  if (schemaId === BFA_SCHEMA_ID) return 'BFA'
+  if (isBfaSchemaId(schemaId)) return 'BFA'
   throw new RgbServiceError('RGB invoice schema is not supported')
 }
 

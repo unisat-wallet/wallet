@@ -11,7 +11,12 @@ import type {
   RgbUtxo,
   RgbWalletRef,
 } from '../types'
-import { encodeBfaTransferConsignment, BFA_SCHEMA_ID, NIA_V1_SCHEMA_ID } from './bfa-consignment'
+import {
+  BFA_SCHEMA_ID,
+  NIA_V1_SCHEMA_ID,
+  encodeBfaTransferConsignment,
+  isBfaSchemaId,
+} from './bfa-consignment'
 import { createRgbOpretPsbt } from './bitcoin'
 import { normalizeBfaBurnDestination } from './bfa-burn-destination'
 import { transitionBundleId } from './bundle'
@@ -110,7 +115,7 @@ export function prepareBfaTransfer(input: {
   swapPsbt?: string
 }): RgbPreparedTransfer {
   const schemaId = hex(input.history.genesis.slice(2, 34))
-  if (schemaId !== BFA_SCHEMA_ID && schemaId !== NIA_V1_SCHEMA_ID)
+  if (!isBfaSchemaId(schemaId) && schemaId !== NIA_V1_SCHEMA_ID)
     throw new RgbServiceError('RGB v1 transfer history has another schema')
   const schema = schemaId === NIA_V1_SCHEMA_ID ? 'NIA_V1' : 'BFA'
   const expectedAssetId = normalizeRgbAssetId(input.intent.assetId)
@@ -235,7 +240,8 @@ export function prepareBfaBurn(input: {
   feeRate: number
   feeFunding?: RgbFeeFunding
 }): RgbPreparedTransfer {
-  if (hex(input.history.genesis.slice(2, 34)) !== BFA_SCHEMA_ID)
+  const schemaId = hex(input.history.genesis.slice(2, 34))
+  if (!isBfaSchemaId(schemaId))
     throw new RgbServiceError('Only BFA assets support this burn operation')
   if (normalizeRgbAssetId(input.history.assetId) !== normalizeRgbAssetId(input.assetId))
     throw new RgbServiceError('BFA burn history belongs to another asset')
@@ -258,6 +264,8 @@ export function prepareBfaBurn(input: {
   const selectedAmount = allocations.reduce((total, item) => total + BigInt(item.allocation.amount), 0n)
   if (amount > selectedAmount) throw new RgbServiceError('BFA burn exceeds selected balance')
   const changeAmount = selectedAmount - amount
+  if (schemaId === BFA_SCHEMA_ID && changeAmount)
+    throw new RgbServiceError('Current BFA burns must consume the selected allocations in full')
   const nonce = randomU64()
   const entropy = randomU64()
   const bitcoin = createRgbOpretPsbt({
@@ -496,7 +504,7 @@ export function createLocalRgbProtocolEncoder(
         confirmedBitcoinWitnesses: input.validationHistory.confirmedBitcoinWitnesses,
         ...(pendingWitnessTxid ? { pendingWitnessTxid } : {}),
       })
-      if (hex(history.genesis.slice(2, 34)) !== BFA_SCHEMA_ID)
+      if (!isBfaSchemaId(hex(history.genesis.slice(2, 34))))
         throw new RgbServiceError('Only BFA assets can be burned')
       const spendHistory = selectBfaSpendHistory(history, input.selectedUtxos.flatMap(utxo =>
         utxo.allocations.map(allocation => allocation.opId || '')
