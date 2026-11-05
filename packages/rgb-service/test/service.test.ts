@@ -50,6 +50,15 @@ const proxyEndpoint = 'rpcs://proxy.example/json-rpc'
 const rgbInvoice = (amount = 60) =>
   `rgb:AQEBAQEB-AQEBAQE-BAQEBAQ-EBAQEBA-QEBAQEB-AQEBAQE/~/~/${blindRecipient}?amount=${amount}&endpoints=${encodeURIComponent(proxyEndpoint)}`
 
+function receiveAnchorTransaction(marker = 0, witnessMarker?: number) {
+  const transaction = new Transaction()
+  transaction.version = 2
+  transaction.addInput(Buffer.alloc(32, marker), 0)
+  transaction.addOutput(Buffer.from([0x6a, marker]), 0)
+  if (witnessMarker !== undefined) transaction.setWitness(0, [Buffer.from([witnessMarker])])
+  return { rawTx: transaction.toHex(), txid: transaction.getId() }
+}
+
 function swapPsbt(outpoints: Array<{ txid: string; vout: number }>) {
   const psbt = new Psbt()
   for (const outpoint of outpoints) {
@@ -4498,7 +4507,9 @@ describe('RgbService', () => {
   })
 
   it('broadcasts the signed witness when accepting a proxy v1 donation', async () => {
+    const anchor = receiveAnchorTransaction()
     const dependencies = createDependencies()
+    dependencies.broadcaster.broadcast = vi.fn().mockResolvedValue(anchor.txid)
     dependencies.transport.getAcknowledgement = vi.fn().mockResolvedValue(undefined)
     dependencies.transport.acknowledgeConsignment = vi.fn().mockRejectedValue(new RgbProxyOperationNotFoundError())
     dependencies.transport.markConsignmentRetrieved = vi.fn()
@@ -4513,10 +4524,10 @@ describe('RgbService', () => {
       seal: { txid: 'a'.repeat(64), vout: 0, blinding: 1n },
       pendingAccept: {
         payload: 'validated-consignment',
-        txid: 'c'.repeat(64),
+        txid: anchor.txid,
         endpoint: proxyEndpoint,
         proxyTransferId: 'd'.repeat(64),
-        signedRawTx: '020000000001',
+        signedRawTx: anchor.rawTx,
         assetId: 'rgb:AQEBAQEB-AQEBAQE-BAQEBAQ-EBAQEBA-QEBAQEB-AQEBAQE',
         amount: '60',
         discoveredAt: 1,
@@ -4527,7 +4538,7 @@ describe('RgbService', () => {
     expect((service as any).state.pendingReceives[0].receivedConsignment).toMatchObject({ accepted: true })
     expect((service as any).state.pendingReceives[0].receivedConsignment).not.toHaveProperty('acknowledgementPending')
     expect(dependencies.transport.acknowledgeConsignment).toHaveBeenCalledTimes(1)
-    expect(dependencies.broadcaster.broadcast).toHaveBeenCalledWith('020000000001')
+    expect(dependencies.broadcaster.broadcast).toHaveBeenCalledWith(anchor.rawTx)
     expect(dependencies.transport.markConsignmentRetrieved).toHaveBeenCalledWith({
       endpoint: proxyEndpoint,
       proxyTransferId: 'd'.repeat(64),
@@ -5201,10 +5212,12 @@ describe('RgbService', () => {
   })
 
   it('waits for a batched proxy v1 transaction release and broadcasts it on retry', async () => {
+    const anchor = receiveAnchorTransaction()
     const dependencies = createDependencies()
+    dependencies.broadcaster.broadcast = vi.fn().mockResolvedValue(anchor.txid)
     dependencies.transport.acknowledgeConsignment = vi.fn()
       .mockResolvedValueOnce({ releasePending: true })
-      .mockResolvedValueOnce({ signedRawTx: '01000000' })
+      .mockResolvedValueOnce({ signedRawTx: anchor.rawTx })
     const service = new RgbService(dependencies)
     await service.open(wallet)
     ;(service as any).state.pendingReceives = [
@@ -5218,12 +5231,13 @@ describe('RgbService', () => {
         createdAt: 1,
         pendingAccept: {
           payload: 'consignment',
-          txid: 'c'.repeat(64),
+          txid: anchor.txid,
           endpoint: proxyEndpoint,
           batch: true,
           assetId: 'rgb:AQEBAQEB-AQEBAQE-BAQEBAQ-EBAQEBA-QEBAQEB-AQEBAQE',
           amount: '60',
           discoveredAt: 1,
+          signedRawTx: anchor.rawTx,
         },
       },
     ]
@@ -5240,19 +5254,20 @@ describe('RgbService', () => {
       accepted: true,
       status: 'accepted',
     })
-    expect(dependencies.broadcaster.broadcast).toHaveBeenCalledWith('01000000')
+    expect(dependencies.broadcaster.broadcast).toHaveBeenCalledWith(anchor.rawTx)
     expect(service.getPendingReceives()[0]?.receivedConsignment).toMatchObject({
       accepted: true,
-      signedRawTx: '01000000',
+      signedRawTx: anchor.rawTx,
     })
   })
 
   it('retains a released proxy transaction and retries its receiver broadcast after restart', async () => {
+    const anchor = receiveAnchorTransaction()
     const dependencies = createDependencies()
     dependencies.transport.getConsignment = vi.fn().mockResolvedValue({
       recipientId: 'proxy-recipient',
       payload: 'consignment',
-      txid: 'c'.repeat(64),
+      txid: anchor.txid,
       endpoint: proxyEndpoint,
     })
     dependencies.stateSource.getTransactionStatus = vi.fn().mockResolvedValue({
@@ -5260,20 +5275,20 @@ describe('RgbService', () => {
     })
     dependencies.broadcaster.broadcast = vi.fn()
       .mockRejectedValueOnce(new Error('node unavailable'))
-      .mockResolvedValueOnce('c'.repeat(64))
+      .mockResolvedValueOnce(anchor.txid)
     const service = new RgbService(dependencies)
     await service.open(wallet)
     ;(service as any).state.pendingReceives = [{
       invoice: rgbInvoice(), recipientId: 'recipient', proxyRecipientId: 'proxy-recipient',
       proxyPrivateKey: '11'.repeat(32), createdAt: 1,
       receivedConsignment: {
-        txid: 'c'.repeat(64), receivedAt: 1, accepted: true,
-        payload: 'consignment', endpoint: proxyEndpoint, signedRawTx: '01000000',
+        txid: anchor.txid, receivedAt: 1, accepted: true,
+        payload: 'consignment', endpoint: proxyEndpoint, signedRawTx: anchor.rawTx,
       },
     }]
     ;(service as any).validateIncomingConsignment = vi.fn().mockReturnValue({
       assetId: 'rgb:AQEBAQEB-AQEBAQE-BAQEBAQ-EBAQEBA-QEBAQEB-AQEBAQE',
-      amount: '60', txid: 'c'.repeat(64),
+      amount: '60', txid: anchor.txid,
       decoded: { metadata: { ticker: 'TOK', name: 'Token', precision: 0, schema: 'NIA', issuedSupply: '60' } },
     })
     vi.spyOn(service as any, 'advanceAcceptedReceive').mockResolvedValue(false)
@@ -5282,13 +5297,14 @@ describe('RgbService', () => {
     await service.processClaimedReceives({ includeClaimed: false })
 
     expect(dependencies.broadcaster.broadcast).toHaveBeenCalledTimes(2)
-    expect(dependencies.broadcaster.broadcast).toHaveBeenLastCalledWith('01000000')
+    expect(dependencies.broadcaster.broadcast).toHaveBeenLastCalledWith(anchor.rawTx)
   })
 
   it('treats a sender-won duplicate broadcast race as receiver success', async () => {
+    const anchor = receiveAnchorTransaction()
     const dependencies = createDependencies()
     dependencies.transport.acknowledgeConsignment = vi.fn().mockResolvedValue({
-      signedRawTx: '01000000',
+      signedRawTx: anchor.rawTx,
     })
     dependencies.stateSource.getTransactionStatus = vi.fn()
       .mockResolvedValueOnce({ status: 'unknown', confirmations: 0 })
@@ -5300,11 +5316,11 @@ describe('RgbService', () => {
       invoice: rgbInvoice(), recipientId: 'recipient', proxyRecipientId: 'proxy-recipient',
       proxyPrivateKey: '11'.repeat(32), createdAt: 1,
       pendingAccept: {
-        payload: 'consignment', txid: 'c'.repeat(64), endpoint: proxyEndpoint,
+        payload: 'consignment', txid: anchor.txid, endpoint: proxyEndpoint,
         proxyTransferId: 'd'.repeat(64), proxySenderPublicKey: '22'.repeat(32),
         proxySenderEndpoint: proxyEndpoint, proxyConsignmentHash: '33'.repeat(32),
         assetId: 'rgb:AQEBAQEB-AQEBAQE-BAQEBAQ-EBAQEBA-QEBAQEB-AQEBAQE',
-        amount: '60', discoveredAt: 1,
+        amount: '60', discoveredAt: 1, signedRawTx: anchor.rawTx,
       },
     }]
 
@@ -5312,8 +5328,38 @@ describe('RgbService', () => {
       accepted: true, status: 'accepted',
     })
     expect(service.getPendingReceives()[0]?.receivedConsignment).toMatchObject({
-      accepted: true, signedRawTx: '01000000',
+      accepted: true, signedRawTx: anchor.rawTx,
     })
+  })
+
+  it('rejects proxy-released witness bytes that differ from the validated consignment', async () => {
+    const expected = receiveAnchorTransaction(7, 1)
+    const released = receiveAnchorTransaction(7, 2)
+    expect(released.txid).toBe(expected.txid)
+    expect(released.rawTx).not.toBe(expected.rawTx)
+    const dependencies = createDependencies()
+    dependencies.transport.acknowledgeConsignment = vi.fn().mockResolvedValue({
+      signedRawTx: released.rawTx,
+    })
+    const service = new RgbService(dependencies)
+    await service.open(wallet)
+    ;(service as any).state.pendingReceives = [{
+      invoice: rgbInvoice(), recipientId: 'recipient', proxyRecipientId: 'proxy-recipient',
+      proxyPrivateKey: '11'.repeat(32), createdAt: 1,
+      pendingAccept: {
+        payload: 'consignment', txid: expected.txid, endpoint: proxyEndpoint,
+        proxyTransferId: 'd'.repeat(64), proxySenderPublicKey: '22'.repeat(32),
+        proxySenderEndpoint: proxyEndpoint, proxyConsignmentHash: '33'.repeat(32),
+        assetId: 'rgb:AQEBAQEB-AQEBAQE-BAQEBAQ-EBAQEBA-QEBAQEB-AQEBAQE',
+        amount: '60', discoveredAt: 1, signedRawTx: expected.rawTx,
+      },
+    }]
+
+    await expect(service.acceptReceive('proxy-recipient')).rejects.toThrow(
+      'released a different signed transaction'
+    )
+    expect(dependencies.broadcaster.broadcast).not.toHaveBeenCalled()
+    expect(service.getPendingReceives()[0]?.receivedConsignment).not.toHaveProperty('signedRawTx')
   })
 
   it('does not reject or cancel a receive once ACK intent is durable', async () => {

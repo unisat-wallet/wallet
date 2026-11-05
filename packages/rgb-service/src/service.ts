@@ -1,3 +1,4 @@
+import { Transaction } from 'bitcoinjs-lib'
 import {
   RgbBfaValidationUnavailableError,
   RgbInvoiceUnavailableError,
@@ -1690,7 +1691,8 @@ export class RgbService {
                 await this.persistAndBroadcastReceiveAnchor(
                   receive,
                   match.txid,
-                  acknowledgementResult.signedRawTx
+                  acknowledgementResult.signedRawTx,
+                  match.signedRawTx || receive.pendingAccept?.signedRawTx
                 )
               }
             } catch (error) {
@@ -1995,7 +1997,8 @@ export class RgbService {
       await this.persistAndBroadcastReceiveAnchor(
         receive,
         item.txid,
-        acknowledgementResult.signedRawTx
+        acknowledgementResult.signedRawTx,
+        receive.pendingAccept.signedRawTx
       )
     }
     receive.receivedConsignment!.accepted = true
@@ -2530,15 +2533,17 @@ export class RgbService {
     signedRawTx?: string
   ) {
     if (!signedRawTx) return this.ensureReceiveAnchorBroadcast(txid)
-    return this.persistAndBroadcastReceiveAnchor(receive, txid, signedRawTx)
+    return this.persistAndBroadcastReceiveAnchor(receive, txid, signedRawTx, signedRawTx)
   }
 
   /** Persist a released witness before network I/O so a restart can retry the broadcast. */
   private async persistAndBroadcastReceiveAnchor(
     receive: import('./types').RgbPendingReceive,
     txid: string,
-    signedRawTx: string
+    signedRawTx: string,
+    expectedSignedRawTx?: string
   ) {
+    this.assertReceiveAnchorTransaction(txid, signedRawTx, expectedSignedRawTx)
     const receipt = receive.receivedConsignment
     if (!receipt) throw new RgbServiceError('RGB receive state is incomplete')
     if (receipt.txid !== txid) {
@@ -2554,14 +2559,54 @@ export class RgbService {
     return this.ensureReceiveAnchorBroadcast(txid, signedRawTx)
   }
 
+  /** Bind proxy-released bytes to the witness transaction validated from the consignment. */
+  private assertReceiveAnchorTransaction(
+    txid: string,
+    signedRawTx: string,
+    expectedSignedRawTx?: string
+  ) {
+    let transaction: Transaction
+    try {
+      transaction = Transaction.fromHex(signedRawTx)
+    } catch {
+      throw new RgbServiceError('RGB proxy released an invalid signed transaction')
+    }
+    if (transaction.getId().toLowerCase() !== txid.toLowerCase()) {
+      throw new RgbServiceError('Released transaction ID does not match the RGB receive')
+    }
+    if (!expectedSignedRawTx) {
+      throw new RgbServiceError('Validated RGB consignment is missing its signed transaction')
+    }
+    let expected: Transaction
+    try {
+      expected = Transaction.fromHex(expectedSignedRawTx)
+    } catch {
+      throw new RgbServiceError('Validated RGB consignment has an invalid signed transaction')
+    }
+    if (expected.getId().toLowerCase() !== txid.toLowerCase() ||
+      !Buffer.from(signedRawTx, 'hex').equals(Buffer.from(expectedSignedRawTx, 'hex'))) {
+      throw new RgbServiceError('RGB proxy released a different signed transaction')
+    }
+  }
+
   private async ensureReceiveAnchorBroadcast(txid: string, signedRawTx?: string) {
+    if (signedRawTx) {
+      let broadcastCandidate: Transaction
+      try {
+        broadcastCandidate = Transaction.fromHex(signedRawTx)
+      } catch {
+        throw new RgbServiceError('RGB receive signed transaction is invalid')
+      }
+      if (broadcastCandidate.getId().toLowerCase() !== txid.toLowerCase()) {
+        throw new RgbServiceError('Released transaction ID does not match the RGB receive')
+      }
+    }
     if (await this.isReceiveAnchorBroadcast(txid)) return true
     if (!signedRawTx) return false
     let broadcastTxid: string
     try {
       broadcastTxid = await this.dependencies.broadcaster.broadcast(signedRawTx)
     } catch (error) {
-      if (isDuplicateBitcoinBroadcastError(error)) return true
       // A sender and receiver can race to submit the same transaction. Treat
       // an already-visible transaction as success regardless of which side won.
       if (await this.isReceiveAnchorBroadcast(txid)) return true
