@@ -3478,7 +3478,7 @@
     "message": "トランザクション確認待ち"
   },
   "rgb_status_waiting_receive": {
-    "message": "送信者のトランザクション送信待ち"
+    "message": "トランザクション送信待ち"
   },
   "rgb_transfer_details": {
     "message": "送受信の詳細"

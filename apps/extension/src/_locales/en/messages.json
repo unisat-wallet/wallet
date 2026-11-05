@@ -3534,7 +3534,7 @@
     "message": "Awaiting confirmation"
   },
   "rgb_status_waiting_receive": {
-    "message": "Awaiting sender broadcast"
+    "message": "Awaiting transaction broadcast"
   },
   "rgb_status_pending_accept": {
     "message": "Awaiting your acceptance"

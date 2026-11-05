@@ -1607,7 +1607,8 @@ export class RgbService {
               const acknowledgementResult = await this.acknowledgeProxyConsignment(item, true)
               if (acknowledgementResult?.releasePending) continue
               if (acknowledgementResult?.signedRawTx) {
-                await this.ensureReceiveAnchorBroadcast(
+                await this.persistAndBroadcastReceiveAnchor(
+                  receive,
                   match.txid,
                   acknowledgementResult.signedRawTx
                 )
@@ -1615,7 +1616,7 @@ export class RgbService {
             } catch (error) {
               if (!(error instanceof RgbProxyOperationNotFoundError &&
                 await this.ensureDonationAnchorBroadcast(
-                  match.txid, match.signedRawTx || receive.pendingAccept?.signedRawTx
+                  receive, match.txid, match.signedRawTx || receive.pendingAccept?.signedRawTx
                 ))) {
                 if (isProxySignedTransactionCleared(error)) {
                   this.recordReceiveOutcome(receive, 'canceled', match.txid)
@@ -1659,6 +1660,15 @@ export class RgbService {
             pending.splice(receiveIndex, 1)
             changed = true
             continue
+          }
+          if (
+            receive.receivedConsignment.signedRawTx &&
+            !receive.receivedConsignment.broadcastDetectedAt
+          ) {
+            await this.ensureReceiveAnchorBroadcast(
+              match.txid,
+              receive.receivedConsignment.signedRawTx
+            )
           }
           const broadcastDetectedAt = receive.receivedConsignment.broadcastDetectedAt
           const settled = await this.advanceAcceptedReceive(
@@ -1865,7 +1875,9 @@ export class RgbService {
       acknowledgementResult = await this.acknowledgeProxyConsignment(item, true)
     } catch (error) {
       if (!(error instanceof RgbProxyOperationNotFoundError &&
-        await this.ensureDonationAnchorBroadcast(item.txid, receive.pendingAccept.signedRawTx))) {
+        await this.ensureDonationAnchorBroadcast(
+          receive, item.txid, receive.pendingAccept.signedRawTx
+        ))) {
         if (!isProxySignedTransactionCleared(error)) throw error
         this.recordReceiveOutcome(receive, 'canceled', receive.pendingAccept.txid)
         state.pendingReceives = pending.filter(item => item !== receive)
@@ -1877,7 +1889,11 @@ export class RgbService {
       return { accepted: false, status: 'pending' as const }
     }
     if (acknowledgementResult?.signedRawTx) {
-      await this.ensureReceiveAnchorBroadcast(item.txid, acknowledgementResult.signedRawTx)
+      await this.persistAndBroadcastReceiveAnchor(
+        receive,
+        item.txid,
+        acknowledgementResult.signedRawTx
+      )
     }
     receive.receivedConsignment!.accepted = true
     delete receive.receivedConsignment!.acknowledgementPending
@@ -1888,9 +1904,9 @@ export class RgbService {
       await this.persist({ waitForRecovery: true })
     }
 
-    // The sender cannot broadcast until this ACK returns, so settlement is
-    // deferred to the next receive refresh instead of fetching the same
-    // consignment and acknowledgement again immediately.
+    // Proxy v1 releases the same signed transaction to both parties after the
+    // ACK. The receiver normally broadcasts it here; the sender may safely
+    // broadcast the identical transaction as a liveness fallback.
     return { accepted: true, status: 'accepted' as const }
   }
 
@@ -2396,14 +2412,48 @@ export class RgbService {
   }
 
   /** A v1 donation has no sender ACK operation; broadcast its validated signed witness if needed. */
-  private async ensureDonationAnchorBroadcast(txid: string, signedRawTx?: string) {
+  private async ensureDonationAnchorBroadcast(
+    receive: import('./types').RgbPendingReceive,
+    txid: string,
+    signedRawTx?: string
+  ) {
+    if (!signedRawTx) return this.ensureReceiveAnchorBroadcast(txid)
+    return this.persistAndBroadcastReceiveAnchor(receive, txid, signedRawTx)
+  }
+
+  /** Persist a released witness before network I/O so a restart can retry the broadcast. */
+  private async persistAndBroadcastReceiveAnchor(
+    receive: import('./types').RgbPendingReceive,
+    txid: string,
+    signedRawTx: string
+  ) {
+    const receipt = receive.receivedConsignment
+    if (!receipt) throw new RgbServiceError('RGB receive state is incomplete')
+    if (receipt.txid !== txid) {
+      throw new RgbServiceError('Released transaction ID does not match the RGB receive')
+    }
+    if (receipt.signedRawTx && receipt.signedRawTx !== signedRawTx) {
+      throw new RgbServiceError('RGB proxy released a different signed transaction')
+    }
+    if (!receipt.signedRawTx) {
+      receipt.signedRawTx = signedRawTx
+      await this.persist({ waitForRecovery: true })
+    }
     return this.ensureReceiveAnchorBroadcast(txid, signedRawTx)
   }
 
   private async ensureReceiveAnchorBroadcast(txid: string, signedRawTx?: string) {
     if (await this.isReceiveAnchorBroadcast(txid)) return true
     if (!signedRawTx) return false
-    const broadcastTxid = await this.dependencies.broadcaster.broadcast(signedRawTx)
+    let broadcastTxid: string
+    try {
+      broadcastTxid = await this.dependencies.broadcaster.broadcast(signedRawTx)
+    } catch (error) {
+      // A sender and receiver can race to submit the same transaction. Treat
+      // an already-visible transaction as success regardless of which side won.
+      if (await this.isReceiveAnchorBroadcast(txid)) return true
+      throw error
+    }
     if (broadcastTxid !== txid) {
       throw new RgbServiceError('Broadcast transaction ID does not match the RGB receive')
     }
@@ -2491,8 +2541,8 @@ export class RgbService {
     if (index < 0) return { cancelled: false }
     const removed = receives[index]
     if (!removed) return { cancelled: false }
-    // Acceptance ACKs the consignment and allows the sender to broadcast. The
-    // local record is then the durable receipt needed to settle the allocation,
+    // Acceptance ACKs the consignment and lets either party broadcast the same
+    // signed transaction. The local record is then needed to settle the allocation,
     // so it cannot be released as an unused invoice.
     if (
       removed.receivedConsignment?.accepted ||

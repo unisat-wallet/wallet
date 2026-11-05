@@ -356,6 +356,8 @@ export interface RgbPendingReceive {
     proxySenderPublicKey?: string
     proxySenderEndpoint?: string
     proxyConsignmentHash?: string
+    /** Proxy v1 transaction released after every operation ACK; retained for crash-safe rebroadcast. */
+    signedRawTx?: string
     /** Set when the sender's Bitcoin transaction is visible in the chain source. */
     broadcastDetectedAt?: number
     counterpartyScriptPubKeys?: string[]

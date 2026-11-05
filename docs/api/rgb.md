@@ -224,7 +224,8 @@ const { list } = await rgb.getPendingReceives()
 
 Each item includes its invoice, recipient ID, optional asset/amount and a
 status. Relevant statuses are `WaitingConfirmations`, `WaitingCounterparty`,
-`PendingAccept`, `WaitingSenderBroadcast`, and
+`PendingAccept`, `WaitingSenderBroadcast` (a compatibility name meaning the
+released transaction is awaiting broadcast), and
 `WaitingSenderConfirmation`, and `ValidationFailed`. `canCancel` reports
 whether the local invoice can still be canceled safely.
 
@@ -237,9 +238,11 @@ await rgb.rejectReceive(recipientId)
 ```
 
 Only call `acceptReceive` after the wallet reports `PendingAccept`. Acceptance
-sends the receiver ACK after local consignment validation; the sender is then
-responsible for broadcasting its transaction. A receiver never broadcasts the
-sender transaction.
+sends the receiver ACK after local consignment validation. For Proxy v1, once
+all operations have ACKed, the proxy releases the same signed transaction to
+both sides. The receiver persists and normally broadcasts it immediately; the
+sender may submit the identical transaction as an idempotent liveness fallback.
+Legacy transfers keep their original sender-broadcast flow.
 
 ## Normal RGB payment
 

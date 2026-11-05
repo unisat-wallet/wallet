@@ -3469,7 +3469,7 @@
     "message": "Esperando confirmacion de la transaccion"
   },
   "rgb_status_waiting_receive": {
-    "message": "Esperando que el remitente transmita la transaccion"
+    "message": "Esperando la transmision de la transaccion"
   },
   "rgb_transfer_details": {
     "message": "Detalles de la transferencia"

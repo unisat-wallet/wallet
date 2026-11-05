@@ -3478,7 +3478,7 @@
     "message": "En attente de confirmation de la transaction"
   },
   "rgb_status_waiting_receive": {
-    "message": "En attente que l'expediteur diffuse la transaction"
+    "message": "En attente de diffusion de la transaction"
   },
   "rgb_transfer_details": {
     "message": "Details du transfert"
