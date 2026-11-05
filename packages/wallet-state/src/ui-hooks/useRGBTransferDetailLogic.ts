@@ -65,7 +65,7 @@ export function useRGBTransferDetailLogic() {
   const tools = useTools()
   const { t } = useI18n()
   const configuredUsdtAssetId = useWalletConfig().rgbUsdtAssetId?.trim() || ''
-  const { transferId, initialTransfer } = nav.getRouteState<'RGBTransferDetailScreen'>()
+  const { transferId, initialTransfer, source } = nav.getRouteState<'RGBTransferDetailScreen'>()
   const [transfer, setTransfer] = useState<RgbTransferItem | undefined>(() =>
     initialTransfer ? normalizeConfiguredRgbUsdt(initialTransfer, configuredUsdtAssetId) : undefined
   )
@@ -136,6 +136,7 @@ export function useRGBTransferDetailLogic() {
   }, [refresh, transfer])
 
   const canCancelSend =
+    source !== 'send_result' &&
     transfer?.type === 'send' &&
     ['waiting_ack', 'ready_for_dapp_finalize'].includes(
       String(transfer?.status || '').toLowerCase()

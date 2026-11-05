@@ -222,6 +222,8 @@ export type RouteParamList = {
   RGBTransferDetailScreen: {
     transferId: string
     initialTransfer?: RgbTransferItem
+    /** Distinguishes the immediate send result from a detail reopened through activity history. */
+    source?: 'send_result' | 'history'
   }
   // Babylon
   BabylonTxConfirmScreen: {

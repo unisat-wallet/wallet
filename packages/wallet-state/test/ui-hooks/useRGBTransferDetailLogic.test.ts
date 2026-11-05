@@ -27,6 +27,11 @@ const failedSend = {
   local: true,
 }
 
+const waitingSend = {
+  ...failedSend,
+  status: 'waiting_ack',
+}
+
 const externalBroadcastSend = {
   ...failedSend,
   txid: 'b'.repeat(64),
@@ -152,6 +157,35 @@ describe('useRGBTransferDetailLogic', () => {
 
     expect(wallet.retryRgbBroadcast).toHaveBeenCalledWith({ transferId: 'transfer-id' })
     expect(result.current.transfer?.status).toBe('broadcasted')
+  })
+
+  it('hides cancel on the immediate send result page', async () => {
+    const { wrapper } = createHookTestHarness({
+      routeState: {
+        transferId: 'transfer-id',
+        initialTransfer: waitingSend,
+        source: 'send_result',
+      },
+    })
+
+    const { result } = renderHook(() => useRGBTransferDetailLogic(), { wrapper })
+
+    await waitFor(() => expect(result.current.transfer).toBeDefined())
+    expect(result.current.canCancelSend).toBe(false)
+  })
+
+  it('shows cancel when a waiting send is reopened from transfer history', async () => {
+    const { wrapper } = createHookTestHarness({
+      routeState: {
+        transferId: 'transfer-id',
+        initialTransfer: waitingSend,
+        source: 'history',
+      },
+    })
+
+    const { result } = renderHook(() => useRGBTransferDetailLogic(), { wrapper })
+
+    await waitFor(() => expect(result.current.canCancelSend).toBe(true))
   })
 
   it('offers the acknowledged abort path for an external swap that was not broadcast', async () => {

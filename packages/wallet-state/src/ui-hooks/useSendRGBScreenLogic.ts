@@ -561,6 +561,7 @@ export function useSendRGBScreenLogic() {
       }
       nav.navigate('RGBTransferDetailScreen', {
         transferId,
+        source: 'send_result',
         initialTransfer: {
           id: `local-send:${transferId}`,
           transferId,
