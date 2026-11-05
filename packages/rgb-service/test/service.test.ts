@@ -3413,6 +3413,7 @@ describe('RgbService', () => {
     expect(service.getPendingReceives()).toHaveLength(1)
     expect(service.getAvailableReceiveUtxos()).toEqual([funding])
     expect(service.getAvailableIssueUtxos()).toEqual([funding])
+    expect(service.getUtxoInspection().invoiceReservations).toEqual([])
   })
 
   it('does not count hidden expired invoices against active receive capacity', async () => {

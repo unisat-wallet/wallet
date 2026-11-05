@@ -3118,16 +3118,21 @@ export class RgbService {
     return {
       snapshot: state.snapshot,
       assetMetadata,
-      invoiceReservations: this.getPendingReceives().map(receive => ({
-        invoice: receive.invoice,
-        recipientId: receive.recipientId,
-        ...(receive.proxyRecipientId ? { proxyRecipientId: receive.proxyRecipientId } : {}),
-        assetId: receive.assetId,
-        amount: receive.amount,
-        expirationTimestamp: receive.expirationTimestamp,
-        createdAt: receive.createdAt,
-        ...(receive.seal ? { txid: receive.seal.txid, vout: receive.seal.vout } : {}),
-      })),
+      invoiceReservations: this.getPendingReceives()
+        // Rejected receives are retained as recovery tombstones, but their
+        // blind seals have already been released and must not be presented as
+        // active UTXO reservations.
+        .filter(receive => !receive.rejection)
+        .map(receive => ({
+          invoice: receive.invoice,
+          recipientId: receive.recipientId,
+          ...(receive.proxyRecipientId ? { proxyRecipientId: receive.proxyRecipientId } : {}),
+          assetId: receive.assetId,
+          amount: receive.amount,
+          expirationTimestamp: receive.expirationTimestamp,
+          createdAt: receive.createdAt,
+          ...(receive.seal ? { txid: receive.seal.txid, vout: receive.seal.vout } : {}),
+        })),
     }
   }
 
