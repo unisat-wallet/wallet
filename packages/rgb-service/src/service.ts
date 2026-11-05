@@ -106,7 +106,7 @@ function describeReceiveMismatch(
         ? `Invoice asset ID does not match the consignment (offered: ${details['actualAssetId'] || 'unknown'})`
         : `Invoice amount does not match the consignment (offered: ${details['actualAmount'] || 'unknown'})`
     case 'v1_recipient_assignment':
-      return 'No recipient assignment was found in the latest RGB v1 witness bundle'
+      return 'No recipient assignment matched this RGB v1 invoice'
     case 'nia_witness_assignment':
       return 'No matching witness assignment was found in the latest NIA witness bundle'
     case 'nia_blind_assignment':
@@ -2114,11 +2114,14 @@ export class RgbService {
     const matchesRecipient = (assignment: (typeof bfa.terminalAssignments)[number]) => {
       if (expectedTxid && assignment.txid !== expectedTxid) return false
       if (receive.recipientType === 'witness') {
-        // Native v1 consignments must explicitly declare the payment terminal.
-        // The constrained NIA v0 migration format had no witness terminals, so
-        // keep its existing newest-bundle rule until those records are gone.
-        if (v1 ? !isDeclaredTerminal(assignment) : assignment.bundleId !== latestBundleId)
-          return false
+        // RGB transfer terminals contain concealed seals. A witness recipient
+        // instead uses a revealed WitnessTx seal, so it is identified by its
+        // output script and (for Proxy v1) the operation-key-derived blinding.
+        // Requiring a secret terminal here rejects valid witness consignments
+        // produced by both UniSat and the reference rgb-lib implementation.
+        // Matching all bundles also lets the destination check below reject a
+        // malformed consignment which pays an out-of-band script more than once.
+        if (!v1 && assignment.bundleId !== latestBundleId) return false
         return assignment.output?.scriptPubKey.toLowerCase() === receive.witnessScriptPubKey?.toLowerCase()
       }
       return assignment.secretSeal === secret && isDeclaredTerminal(assignment)

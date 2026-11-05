@@ -1411,7 +1411,7 @@ describe('RgbService', () => {
     expect(dependencies.stateSource.getClaimedConsignments).not.toHaveBeenCalled()
   })
 
-  it('matches a v1 witness receive only through its declared terminal', async () => {
+  it('matches a v1 witness receive in the newest bundle without a concealed terminal', async () => {
     const dependencies = createDependencies()
     const scriptPubKey = `5120${'11'.repeat(32)}`
     const oldTxid = 'a'.repeat(64)
@@ -1419,18 +1419,19 @@ describe('RgbService', () => {
     const oldAssignment = {
       opId: 'c'.repeat(64), assignmentIndex: 0, amount: '40',
       bundleId: 'old-bundle', txid: oldTxid, vout: 1, secretSeal: '',
-      output: { scriptPubKey, satoshis: 330 },
+      output: { scriptPubKey: `5120${'22'.repeat(32)}`, satoshis: 330 },
     }
     const newAssignment = {
       ...oldAssignment, opId: 'd'.repeat(64), amount: '10',
       bundleId: 'new-bundle', txid: newTxid, vout: 2,
+      output: { scriptPubKey, satoshis: 330 },
     }
     const validated = {
       assetId: 'rgb:AQEBAQEB-AQEBAQE-BAQEBAQ-EBAQEBA-QEBAQEB-AQEBAQE',
       genesis: new Uint8Array(),
       metadata: { schema: 'NIA', ticker: 'NIA', name: 'NIA', precision: 0, issuedSupply: '100' },
       witnessOutputScripts: [scriptPubKey],
-      terminals: [{ bundleId: 'old-bundle', secretSeals: [''] }],
+      terminals: [],
       bundles: [{ id: 'old-bundle' }, { id: 'new-bundle' }],
       terminalAssignments: [oldAssignment, newAssignment],
     }
@@ -1444,9 +1445,9 @@ describe('RgbService', () => {
     const item = { recipientId: 'recipient', payload }
 
     await expect((service as any).validateIncomingConsignment(receive, item))
-      .resolves.toMatchObject({ txid: oldTxid, amount: '40', opId: oldAssignment.opId })
+      .resolves.toMatchObject({ txid: newTxid, amount: '10', opId: newAssignment.opId })
     await expect((service as any).validateIncomingConsignment(receive, { ...item, txid: newTxid }))
-      .resolves.toBeUndefined()
+      .resolves.toMatchObject({ txid: newTxid, amount: '10', opId: newAssignment.opId })
     vi.mocked(dependencies.validateBfaConsignment!).mockResolvedValueOnce({
       ...validated, terminals: [], terminalAssignments: [oldAssignment],
     } as any)
@@ -1570,7 +1571,7 @@ describe('RgbService', () => {
       genesis: new Uint8Array(),
       metadata: { schema: 'NIA', ticker: 'NIA', name: 'NIA', precision: 0, issuedSupply: '100' },
       witnessOutputScripts: [scriptPubKey],
-      terminals: [{ bundleId: 'new-bundle', secretSeals: [''] }],
+      terminals: [],
       bundles: [{ id: 'new-bundle' }], terminalAssignments: [legacy, compliant],
     } as any)
     const service = new RgbService(dependencies)
