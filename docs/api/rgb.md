@@ -307,6 +307,9 @@ integers, and non-positive values are rejected.
 
 ## RGB/BTC atomic swap: buy RGB with BTC
 
+> This flow replaces `signBuySwapAndAcceptConsignment`. That combined method is
+> no longer exposed. Integrations must not keep a fallback to it.
+
 The buyer first creates an RGB invoice with `createReceiveInvoice`, marking it
 as a buy swap so its ACK cannot be sent through the generic receive API:
 
@@ -318,8 +321,9 @@ const receive = await rgb.createReceiveInvoice({
 })
 ```
 
-The maker/backend must create the unsigned swap transaction and publish its consignment to that
-invoice, and wait for the wallet to show the invoice as `PendingAccept`.
+The maker/backend must create the unsigned swap transaction, publish its
+consignment to that invoice, and wait for the wallet to show the invoice as
+`PendingAccept`.
 `signBuySwap` signs only the buyer's BTC inputs. After the backend validates the
 price and completes the maker signature, `acceptBuySwap` verifies its Proxy v1
 commitment and sends the ACK.
@@ -358,18 +362,53 @@ On approval the wallet signs its inputs and returns only the buyer-partial PSBT.
 It does not ACK. The dApp submits those bytes to the backend; the backend checks
 the quote and adds the maker signatures without returning the complete PSBT.
 
-The backend then signs this UTF-8 message with the Ed25519 Proxy v1 sender key
-bound to the consignment:
+The backend must verify the returned PSBT again before signing it. At minimum,
+compare the unsigned transaction with the quoted transaction, verify the buyer
+input signatures, price, fee and outputs, and reject any changed transaction.
+The fully signed PSBT and raw transaction are backend-only values.
+
+The backend then creates a commitment using the same Ed25519 sender key that it
+used for the Proxy v1 transfer. Build this ASCII/UTF-8 message exactly, with no
+newline:
 
 ```text
 rgb-buy-swap/commit/v1:<proxyTransferId>:<txid>:<sha256(buyerSignedPsbtBytes)>
 ```
 
+Where:
+
+- `proxyTransferId` is the Proxy v1 sender operation ID for this consignment;
+- `txid` is the unsigned transaction ID returned by `signBuySwap`;
+- `buyerSignedPsbtBytes` is the binary PSBT decoded from the returned hex, not
+  the UTF-8 bytes of the hex string;
+- all hashes and IDs are lowercase hex.
+
+The signature algorithm matches Proxy v1 signing: compute SHA-256 over the
+UTF-8 commitment message, sign that 32-byte digest with Ed25519, and encode the
+64-byte signature as lowercase hex. For example:
+
+```ts
+import { createHash } from 'node:crypto'
+import { ed25519 } from '@noble/curves/ed25519'
+
+const buyerSignedPsbtHash = createHash('sha256')
+  .update(Buffer.from(result.buyerSignedPsbt, 'hex'))
+  .digest('hex')
+const message =
+  `rgb-buy-swap/commit/v1:${proxyTransferId}:${result.txid}:${buyerSignedPsbtHash}`
+const digest = createHash('sha256').update(message, 'utf8').digest()
+const backendCommit = Buffer.from(ed25519.sign(digest, proxySenderPrivateKey))
+  .toString('hex')
+```
+
 Pass the hex signature to the second phase:
 
 ```ts
-await rgb.acceptBuySwap({ recipientId: receive.recipientId, backendCommit })
-// { recipientId, status: 'accepted' }
+const acknowledgement = await rgb.acceptBuySwap({
+  recipientId: receive.recipientId,
+  backendCommit,
+})
+// { recipientId, status: 'accepted' | 'canceled' }
 ```
 
 The wallet verifies the commitment, persists ACK intent, and posts the Proxy v1
@@ -377,7 +416,39 @@ ACK. It never returns or broadcasts the complete transaction. The backend
 observes ACK and broadcasts the final transaction it retained, while the wallet
 settles the receipt through normal chain synchronization.
 
-Do not call this method before the invoice is `PendingAccept`: a PSBT alone
+### Proxy v1 constraints
+
+Proxy v1 `ack.prepare` stores an immutable `signed_tx` before the receiver ACK.
+In this flow that value can only be the original unsigned or maker-partial
+transaction; it cannot be replaced with the backend's final transaction after
+the buyer signs. Consequently:
+
+- the wallet uses Proxy v1 only to post and recover the ACK;
+- a transaction returned by Proxy v1 is validated against the consignment but
+  is never broadcast by the wallet for a backend-committed buy swap;
+- `releasePending` is treated as a successful ACK handoff after a valid backend
+  commitment;
+- only the backend broadcasts the retained final raw transaction;
+- the backend must not broadcast until `acceptBuySwap` returns `accepted` or it
+  independently observes the positive Proxy v1 ACK;
+- `canceled` means the Proxy v1 ACK operation no longer exists; the backend
+  must not broadcast.
+
+### Migration from the combined method
+
+| Old integration | New integration |
+| --- | --- |
+| Create an ordinary receive invoice | Set `purpose: 'buy_swap'` |
+| Pass `makerSignedPsbt` to `signBuySwapAndAcceptConsignment` | Pass a PSBT without maker signatures to `signBuySwap` |
+| Wallet signs and ACKs in one request | Wallet signs first; a verified backend commitment authorizes ACK later |
+| Frontend receives a fully signed PSBT | Frontend receives only `buyerSignedPsbt` |
+| Frontend finalizes or broadcasts | Backend retains and broadcasts the final transaction |
+
+Do not pass `buyerSignedPsbt` back through a response after the backend adds the
+maker signatures. Do not expose the final raw transaction through polling,
+logs, error payloads, or websocket events.
+
+Do not call `signBuySwap` before the invoice is `PendingAccept`: a PSBT alone
 cannot prove the RGB amount being received.
 
 ## RGB/BTC atomic swap: sell RGB for BTC
@@ -421,6 +492,11 @@ The wallet enforces all of the following:
 This is the seller's first completion phase. It signs the seller-controlled
 inputs, publishes the RGB consignment, and returns the seller-signed PSBT to
 relay to the buyer. It never broadcasts at this point.
+
+This method describes the legacy wallet-to-wallet/P2P seller flow. A
+backend-controlled market implementing the buy flow above must not expose this
+seller-signed result to the buyer dApp. It should keep the maker signing key and
+final transaction inside the backend signing service.
 
 ```ts
 const published = await rgb.signSellSwapAndPublishConsignment(
