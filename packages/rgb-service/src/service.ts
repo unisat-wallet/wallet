@@ -376,6 +376,41 @@ export class RgbService {
     await this.dependencies.storage.set(this.storageKey(state.wallet), persistState(state))
   }
 
+  /**
+   * Adopt a generation returned by this installation's own checkpoint write.
+   * If that exact checkpoint contained an unsigned prepared transfer, the
+   * generation advance does not make its PSBT stale: it is the publication of
+   * the reservation itself. Rebase only those still-unsigned transfers. A
+   * generation learned from a remote read continues to use
+   * setRecoveryCheckpointGeneration and therefore still fences old PSBTs.
+   */
+  private async setPublishedRecoveryCheckpointGeneration(
+    generation: number | undefined,
+    publishedPending: RgbServiceState['pending']
+  ) {
+    if (generation === undefined) return
+    const state = this.requireState()
+    let changed = state.recoveryCheckpointGeneration !== generation
+    state.recoveryCheckpointGeneration = generation
+    for (const [transferId, published] of Object.entries(publishedPending)) {
+      const current = state.pending[transferId]
+      if (
+        !current ||
+        current.delivery ||
+        current.broadcast ||
+        published.delivery ||
+        published.broadcast ||
+        current.prepared.id !== published.prepared.id ||
+        current.preparedCheckpointGeneration === generation
+      ) continue
+      current.preparedCheckpointGeneration = generation
+      changed = true
+    }
+    if (changed) {
+      await this.dependencies.storage.set(this.storageKey(state.wallet), persistState(state))
+    }
+  }
+
   async setRecoveryCheckpointKind(kind: 'normal' | 'replacement' | undefined) {
     if (kind === undefined) return
     const state = this.requireState()
@@ -4932,13 +4967,14 @@ export class RgbService {
     const persisted = persistState(state)
     await this.dependencies.storage.set(this.storageKey(state.wallet), persisted)
     if (shouldQueueRecovery) {
+      const recoveryState = recoverySnapshot(persisted)
       const reason = !options.skipRecovery
         ? 'state_change'
         : state.recoveryCheckpoint?.dirty
           ? 'retry_dirty'
           : 'retry_unverified'
       const recovery = Promise.resolve(
-        this.dependencies.onStatePersisted(recoverySnapshot(persisted), {
+        this.dependencies.onStatePersisted(recoveryState, {
           reason,
           kind: options.recoveryCheckpointKind || 'normal',
         })
@@ -4955,8 +4991,9 @@ export class RgbService {
         await this.setRecoveryCheckpointRevision(
           result && typeof result === 'object' ? result.revision : undefined
         )
-        await this.setRecoveryCheckpointGeneration(
-          result && typeof result === 'object' ? result.generation : undefined
+        await this.setPublishedRecoveryCheckpointGeneration(
+          result && typeof result === 'object' ? result.generation : undefined,
+          recoveryState.pending
         )
         await this.setRecoveryCheckpointKind(
           result && typeof result === 'object' ? result.kind : undefined
@@ -4975,8 +5012,9 @@ export class RgbService {
             await this.setRecoveryCheckpointRevision(
               result && typeof result === 'object' ? result.revision : undefined
             )
-            await this.setRecoveryCheckpointGeneration(
-              result && typeof result === 'object' ? result.generation : undefined
+            await this.setPublishedRecoveryCheckpointGeneration(
+              result && typeof result === 'object' ? result.generation : undefined,
+              recoveryState.pending
             )
             await this.setRecoveryCheckpointKind(
               result && typeof result === 'object' ? result.kind : undefined

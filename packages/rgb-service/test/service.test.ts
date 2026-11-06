@@ -6568,12 +6568,80 @@ describe('RgbService', () => {
       invoice: rgbInvoice(),
       feeRate: 2,
     })
-    ;(service as any).state.recoveryCheckpointGeneration = 8
+    await service.setRecoveryCheckpointGeneration(8)
 
     await expect(service.completeSend('transfer-1', 'signed-psbt')).rejects.toThrow(
       'RGB wallet state changed; prepare the transfer again'
     )
     expect(dependencies.encoder.completeTransfer).not.toHaveBeenCalled()
+  })
+
+  it('keeps a prepared send valid when this installation publishes its reservation', async () => {
+    const dependencies = createDependencies()
+    type CheckpointResult = {
+      saved: boolean
+      revision: string
+      generation: number
+      verified: boolean
+    }
+    let finishEarlierCheckpoint: ((result: CheckpointResult) => void) | undefined
+    let finishPreparedCheckpoint: ((result: CheckpointResult) => void) | undefined
+    dependencies.onStatePersisted = vi
+      .fn()
+      .mockImplementationOnce(() => new Promise<CheckpointResult>(resolve => {
+        finishEarlierCheckpoint = resolve
+      }))
+      .mockImplementationOnce(() => new Promise<CheckpointResult>(resolve => {
+        finishPreparedCheckpoint = resolve
+      }))
+    const service = new RgbService(dependencies)
+    await service.open(wallet)
+    await service.sync()
+    ;(service as any).recoveryBackupEnabled = true
+    ;(service as any).state.recoveryRemoteStateKnown = true
+    ;(service as any).state.recoveryCheckpointGeneration = 7
+    ;(service as any).state.recoveryCheckpoint = { dirty: false, verified: true }
+
+    // Start an older asynchronous publication before the reservation exists.
+    await (service as any).persist()
+    const preparing = service.prepareSend({
+      assetId: 'rgb:AQEBAQEB-AQEBAQE-BAQEBAQ-EBAQEBA-QEBAQEB-AQEBAQE',
+      amount: '60',
+      invoice: rgbInvoice(),
+      feeRate: 2,
+    })
+    await vi.waitFor(() => expect(dependencies.onStatePersisted).toHaveBeenCalledTimes(2))
+
+    finishEarlierCheckpoint?.({
+      saved: true,
+      revision: 'a'.repeat(24),
+      generation: 8,
+      verified: true,
+    })
+    await vi.waitFor(() => {
+      expect((service as any).state.recoveryCheckpointGeneration).toBe(8)
+    })
+    // The older checkpoint did not contain this reservation and must not
+    // silently bless it with its generation.
+    expect(service.getPendingTransfers()).toEqual([
+      expect.objectContaining({ id: 'transfer-1', preparedCheckpointGeneration: 7 }),
+    ])
+
+    finishPreparedCheckpoint?.({
+      saved: true,
+      revision: 'b'.repeat(24),
+      generation: 9,
+      verified: true,
+    })
+    await preparing
+
+    expect(service.getPendingTransfers()).toEqual([
+      expect.objectContaining({ id: 'transfer-1', preparedCheckpointGeneration: 9 }),
+    ])
+    await expect(service.completeSend('transfer-1', 'signed-psbt')).resolves.toEqual(
+      expect.objectContaining({ txid: 'c'.repeat(64) })
+    )
+    expect(dependencies.encoder.completeTransfer).toHaveBeenCalledOnce()
   })
 
   it('completes a broadcast locally and retries backend indexing without rebroadcasting', async () => {
