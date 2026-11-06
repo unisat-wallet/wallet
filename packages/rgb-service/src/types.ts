@@ -305,6 +305,8 @@ export interface RgbPendingReceive {
     signedRawTx?: string
     assetId: string
     amount: string
+    /** Operations paying this invoice; used to scope mutable witness checks to this receive branch. */
+    operationIds?: string[]
     /** Contract precision decoded from the validated consignment. */
     precision?: number
     discoveredAt: number

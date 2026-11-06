@@ -1954,7 +1954,13 @@ describe('RgbService', () => {
 
       expect(service.getPendingReceives()).toEqual([
         expect.objectContaining({
-          pendingAccept: expect.objectContaining({ txid: witnessTxid, payload, assetId, amount: '60' }),
+          pendingAccept: expect.objectContaining({
+            txid: witnessTxid,
+            payload,
+            assetId,
+            amount: '60',
+            operationIds: [Buffer.from(prepared.transitionId).toString('hex')],
+          }),
         }),
       ])
       expect(service.getPendingReceiveHistory()).toEqual([])
@@ -4524,11 +4530,14 @@ describe('RgbService', () => {
       invoice: rgbInvoice(), recipientId: 'recipient', assetId, amount: '60', createdAt: 1,
       seal: { txid: 'a'.repeat(64), vout: 0, blinding: 1n },
       pendingAccept: { payload: incoming, txid: 'c'.repeat(64), endpoint: proxyEndpoint,
-        assetId, amount: '60', precision: 0, discoveredAt: 1 },
+        assetId, amount: '60', operationIds: ['d'.repeat(64)], precision: 0, discoveredAt: 1 },
     }]
 
     await expect(service.acceptReceive('recipient')).rejects.toThrow('history conflict')
-    expect(dependencies.validateBfaConsignment).toHaveBeenCalled()
+    expect(dependencies.validateBfaConsignment).toHaveBeenCalledWith(expect.objectContaining({
+      pendingWitnessTxid: 'c'.repeat(64),
+      requiredOperationIds: ['d'.repeat(64)],
+    }))
     expect(dependencies.transport.acknowledgeConsignment).not.toHaveBeenCalled()
     expect((service as any).state.pendingReceives[0].receivedConsignment).toBeUndefined()
   })
@@ -4947,7 +4956,10 @@ describe('RgbService', () => {
       chainStatus: 'mempool', confirmations: 0,
       allocations: [allocation],
     }]
-    vi.spyOn(service as any, 'storeAcceptedHistory').mockImplementation(() => undefined)
+    vi.spyOn(service as any, 'needsV1HistoryMerge').mockReturnValue(true)
+    const storeAcceptedBfaHistory = vi
+      .spyOn(service as any, 'storeAcceptedBfaHistory')
+      .mockResolvedValue(undefined)
     const receive = {
       invoice: rgbInvoice(), recipientId: 'recipient', recipientType: 'witness', createdAt: 1,
       receivedConsignment: { txid, receivedAt: 1, accepted: true, assetId, amount: '60', precision: 0 },
@@ -4966,6 +4978,13 @@ describe('RgbService', () => {
     )
 
     expect(result).toBe(true)
+    expect(storeAcceptedBfaHistory).toHaveBeenCalledWith(
+      assetId,
+      'consignment',
+      undefined,
+      [],
+      [allocation.opId]
+    )
     expect(service.getSnapshot().utxos[0]).toMatchObject({
       chainStatus: 'confirmed', confirmations: 1,
       allocations: [{ settled: true, spendable: true }],

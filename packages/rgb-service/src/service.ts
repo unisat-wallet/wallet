@@ -1812,10 +1812,14 @@ export class RgbService {
         }
 
         // Stage for explicit Accept/Reject — do not ACK yet.
+        const operationIds = [...new Set(
+          (match.assignments || [{ opId: match.opId }]).map(assignment => assignment.opId)
+        )]
         if (
           !receive.pendingAccept ||
           receive.pendingAccept.txid !== match.txid ||
           receive.pendingAccept.payload !== item.payload ||
+          receive.pendingAccept.operationIds?.join(',') !== operationIds.join(',') ||
           receive.pendingAccept.precision !== precision ||
           receive.pendingAccept.batch !== item.batch
         ) {
@@ -1831,6 +1835,7 @@ export class RgbService {
             signedRawTx: match.signedRawTx,
             assetId: match.assetId,
             amount: match.amount,
+            operationIds,
             precision,
             discoveredAt: receive.receivedConsignment?.receivedAt || this.now(),
             counterpartyScriptPubKeys: match.counterpartyScriptPubKeys,
@@ -1950,7 +1955,30 @@ export class RgbService {
     }
     const acknowledgementWasPending = receive.receivedConsignment?.acknowledgementPending === true
     if (!acknowledgementWasPending) {
-      await this.preflightReceiveHistory(receive.pendingAccept.assetId, item.payload, item.txid)
+      let requiredOperationIds = receive.pendingAccept.operationIds
+      if (
+        !requiredOperationIds?.length &&
+        this.requireState().contracts?.[receive.pendingAccept.assetId] &&
+        this.needsV1HistoryMerge(receive.pendingAccept.assetId, item.payload)
+      ) {
+        // Pending accepts restored from an older checkpoint predate operationIds.
+        // Revalidate the proposal against this invoice before using its branch
+        // to scope mutable Bitcoin witness checks.
+        const refreshed = await this.validateIncomingConsignment(receive, item)
+        if (!refreshed) {
+          throw new RgbServiceError('RGB receive no longer matches its invoice')
+        }
+        requiredOperationIds = [...new Set(
+          (refreshed.assignments || [{ opId: refreshed.opId }]).map(assignment => assignment.opId)
+        )]
+        receive.pendingAccept.operationIds = requiredOperationIds
+      }
+      await this.preflightReceiveHistory(
+        receive.pendingAccept.assetId,
+        item.payload,
+        item.txid,
+        requiredOperationIds
+      )
       // Persist the local receipt before ACK. If the extension stops after
       // the proxy accepts it, recovery can reconcile ACK=true without losing
       // the payload needed for settlement.
@@ -2358,7 +2386,11 @@ export class RgbService {
     const historyPayload = validated.historyPayload || item.payload
     if (this.needsV1HistoryMerge(assetId, historyPayload)) {
       await this.storeAcceptedBfaHistory(
-        assetId, historyPayload, undefined, validated.legacyPayload ? [validated.legacyPayload] : []
+        assetId,
+        historyPayload,
+        undefined,
+        validated.legacyPayload ? [validated.legacyPayload] : [],
+        [...new Set(receivedAssignments.map(assignment => assignment.opId))]
       )
     } else {
       this.storeAcceptedHistory({
@@ -2905,14 +2937,25 @@ export class RgbService {
   }
 
   /** Check the exact merge before ACK makes the receive irrevocable to the sender. */
-  private async preflightReceiveHistory(assetId: string, payload: string, pendingWitnessTxid?: string) {
+  private async preflightReceiveHistory(
+    assetId: string,
+    payload: string,
+    pendingWitnessTxid?: string,
+    requiredOperationIds?: string[]
+  ) {
     const existing = this.requireState().contracts?.[assetId]
     if (!existing) return
     const normalizedPayload = Buffer.from(normalizeLegacyV1Consignment(
       Uint8Array.from(Buffer.from(payload, 'base64'))
     )).toString('base64')
     if (this.needsV1HistoryMerge(assetId, normalizedPayload)) {
-      await this.prepareV1HistoryMerge(assetId, normalizedPayload, pendingWitnessTxid)
+      await this.prepareV1HistoryMerge(
+        assetId,
+        normalizedPayload,
+        pendingWitnessTxid,
+        [],
+        requiredOperationIds
+      )
       return
     }
     mergeNiaConsignmentHistory({
@@ -2927,7 +2970,11 @@ export class RgbService {
   }
 
   private async prepareV1HistoryMerge(
-    assetId: string, payload: string, pendingWitnessTxid?: string, additionalLegacyPayloads: string[] = []
+    assetId: string,
+    payload: string,
+    pendingWitnessTxid?: string,
+    additionalLegacyPayloads: string[] = [],
+    requiredOperationIds?: string[]
   ) {
     const validate = this.dependencies.validateBfaConsignment
     if (!validate) throw new RgbServiceError('RGB v1 receive validation is unavailable')
@@ -2966,13 +3013,25 @@ export class RgbService {
     const validated = await Promise.all(transfers.map(bytes => validate({
       wallet: state.wallet, payload: bytes,
       ...(pendingWitnessTxid ? { pendingWitnessTxid } : {}), knownBlindSeals, evmRpcCache, bitcoinStatusCache, confirmedBitcoinWitnesses,
+      ...(requiredOperationIds?.length ? { requiredOperationIds } : {}),
     })))
+    if (pendingWitnessTxid && requiredOperationIds?.length) {
+      const pendingOperations = new Set(validated.flatMap(item =>
+        item.terminalAssignments
+          .filter(assignment => assignment.txid === pendingWitnessTxid)
+          .map(assignment => assignment.opId)
+      ))
+      if (requiredOperationIds.some(opId => !pendingOperations.has(opId))) {
+        throw new RgbServiceError('RGB receive operations do not match the pending witness')
+      }
+    }
     if (validated.some(item => item.assetId !== assetId))
       throw new RgbServiceError('RGB v1 history asset ID mismatch')
     const canonical = mergeBfaValidatedHistories(validated)
     const complete = await validate({
       wallet: state.wallet, payload: canonical,
       ...(pendingWitnessTxid ? { pendingWitnessTxid } : {}), knownBlindSeals, evmRpcCache, bitcoinStatusCache, confirmedBitcoinWitnesses,
+      ...(requiredOperationIds?.length ? { requiredOperationIds } : {}),
     })
     if (complete.assetId !== assetId)
       throw new RgbServiceError('RGB v1 merged history asset ID mismatch')
@@ -2989,12 +3048,22 @@ export class RgbService {
   }
 
   private async storeAcceptedBfaHistory(
-    assetId: string, payload: string, pendingWitnessTxid?: string, additionalLegacyPayloads: string[] = []
+    assetId: string,
+    payload: string,
+    pendingWitnessTxid?: string,
+    additionalLegacyPayloads: string[] = [],
+    requiredOperationIds?: string[]
   ) {
     const state = this.requireState()
     const existing = state.contracts?.[assetId]
     const { canonicalPayload, complete, opIds, legacyPayloads } =
-      await this.prepareV1HistoryMerge(assetId, payload, pendingWitnessTxid, additionalLegacyPayloads)
+      await this.prepareV1HistoryMerge(
+        assetId,
+        payload,
+        pendingWitnessTxid,
+        additionalLegacyPayloads,
+        requiredOperationIds
+      )
     const contracts = state.contracts || (state.contracts = {})
     contracts[assetId] = {
       consignment: canonicalPayload,
