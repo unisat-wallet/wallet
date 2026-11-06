@@ -3688,7 +3688,7 @@
   "rgb_asset_abandon_title": { "message": "放棄 RGB 資產" },
   "rgb_asset_abandon_settings_description": { "message": "永久銷毀資產並回收 carrier sats" },
   "rgb_asset_abandon_description": { "message": "僅供開發者使用的破壞性操作。選擇資產後，錢包將在沒有 RGB transition 的情況下花費其專屬 carrier UTXO。" },
-  "rgb_asset_abandon_developer_only": { "message": "請先啟用開發者模式。" },
+  "rgb_asset_abandon_developer_only": { "message": "此功能僅限本地 development 版本，且必須啟用開發者模式。" },
   "rgb_asset_abandon_confirm_title": { "message": "永久放棄此資產？" },
   "rgb_asset_abandon_confirm_description": { "message": "所選 RGB allocation 將永久遺失。這不是 RGB Burn，且無法復原。" },
   "rgb_asset_abandon_action": { "message": "永久放棄" },

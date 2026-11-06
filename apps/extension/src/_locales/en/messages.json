@@ -3711,7 +3711,7 @@
   "rgb_asset_abandon_title": { "message": "Abandon RGB asset" },
   "rgb_asset_abandon_settings_description": { "message": "Permanently destroy an asset and recover its carrier sats" },
   "rgb_asset_abandon_description": { "message": "Developer-only destructive operation. Select an asset whose exclusive carrier UTXOs will be spent without an RGB transition." },
-  "rgb_asset_abandon_developer_only": { "message": "Enable Developer Mode to use this operation." },
+  "rgb_asset_abandon_developer_only": { "message": "This operation is available only in local development builds with Developer Mode enabled." },
   "rgb_asset_abandon_confirm_title": { "message": "Permanently abandon this asset?" },
   "rgb_asset_abandon_confirm_description": { "message": "All selected RGB allocations will be permanently lost. This is not an RGB burn and cannot be undone." },
   "rgb_asset_abandon_action": { "message": "Abandon permanently" },

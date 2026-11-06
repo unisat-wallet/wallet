@@ -6,6 +6,7 @@ import type { IconTypes } from '@/ui/components/Icon';
 import { Popover } from '@/ui/components/Popover';
 import type { ColorTypes } from '@/ui/theme/colors';
 import { fontSizes } from '@/ui/theme/font';
+import { IS_DEVELOPMENT } from '@/ui/utils';
 import { useDeveloperMode, useI18n, useTools, useWallet } from '@unisat/wallet-state';
 
 const actionStyle = {
@@ -128,7 +129,7 @@ export default function RgbSettingsScreen() {
               description={t('rgb_fee_pool_description')}
               onClick={() => navigate('/settings/rgb-fee-pool')}
             />
-            {developerMode ? (
+            {IS_DEVELOPMENT && developerMode ? (
               <SettingsAction
                 testId="rgb-settings-abandon-asset"
                 icon="warning"

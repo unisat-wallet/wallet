@@ -3,6 +3,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { Button, Column, Content, Header, InfiniteList, Layout, Row, Text } from '@/ui/components';
 import LoadingPage from '@/ui/components/LoadingPage';
 import RGBBalanceCard from '@/ui/components/RGBBalanceCard';
+import { IS_DEVELOPMENT } from '@/ui/utils';
 import type { SignedData, ToSignData } from '@unisat/wallet-shared';
 import {
   useDeveloperMode,
@@ -110,7 +111,7 @@ export default function RgbAssetAbandonScreen() {
     }
   };
 
-  if (!developerMode) {
+  if (!IS_DEVELOPMENT || !developerMode) {
     return (
       <Layout>
         <Header onBack={() => window.history.go(-1)} title={t('rgb_asset_abandon_title')} />

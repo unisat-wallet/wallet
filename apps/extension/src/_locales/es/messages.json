@@ -3594,7 +3594,7 @@
   "rgb_asset_abandon_title": { "message": "Abandonar activo RGB" },
   "rgb_asset_abandon_settings_description": { "message": "Destruir permanentemente un activo y recuperar sus sats portadores" },
   "rgb_asset_abandon_description": { "message": "Operación destructiva solo para desarrolladores. Los UTXO exclusivos del activo se gastarán sin una transición RGB." },
-  "rgb_asset_abandon_developer_only": { "message": "Activa el modo desarrollador para usar esta operación." },
+  "rgb_asset_abandon_developer_only": { "message": "Esta operación solo está disponible en compilaciones locales de desarrollo con el modo desarrollador activado." },
   "rgb_asset_abandon_confirm_title": { "message": "¿Abandonar permanentemente este activo?" },
   "rgb_asset_abandon_confirm_description": { "message": "Las asignaciones RGB seleccionadas se perderán para siempre. Esto no es una quema RGB y no se puede deshacer." },
   "rgb_asset_abandon_action": { "message": "Abandonar permanentemente" },

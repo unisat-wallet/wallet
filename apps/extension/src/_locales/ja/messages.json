@@ -3605,7 +3605,7 @@
   "rgb_asset_abandon_title": { "message": "RGB資産を放棄" },
   "rgb_asset_abandon_settings_description": { "message": "資産を永久に破棄し、キャリアUTXOのsatsを回収します" },
   "rgb_asset_abandon_description": { "message": "開発者専用の破壊的操作です。選択した資産専用のキャリアUTXOをRGBトランジションなしで使用します。" },
-  "rgb_asset_abandon_developer_only": { "message": "この操作を使用するには開発者モードを有効にしてください。" },
+  "rgb_asset_abandon_developer_only": { "message": "この操作は、開発者モードを有効にしたローカルdevelopmentビルドでのみ使用できます。" },
   "rgb_asset_abandon_confirm_title": { "message": "この資産を永久に放棄しますか？" },
   "rgb_asset_abandon_confirm_description": { "message": "選択したRGBアロケーションは永久に失われます。これはRGB Burnではなく、取り消せません。" },
   "rgb_asset_abandon_action": { "message": "永久に放棄" },

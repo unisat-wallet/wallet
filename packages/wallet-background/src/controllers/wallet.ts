@@ -5073,8 +5073,10 @@ export class WalletController extends BaseController {
   }
 
   private assertRgbAssetAbandonmentEnabled() {
-    if (!preferenceService.getDeveloperMode()) {
-      throw new Error('RGB asset abandonment is available only in developer mode')
+    const isLocalDevelopmentBuild =
+      (process.env as { NODE_ENV?: string }).NODE_ENV === 'development'
+    if (!isLocalDevelopmentBuild || !preferenceService.getDeveloperMode()) {
+      throw new Error('RGB asset abandonment is available only in local development builds')
     }
   }
 

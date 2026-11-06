@@ -3601,7 +3601,7 @@
   "rgb_asset_abandon_title": { "message": "Отказаться от RGB-актива" },
   "rgb_asset_abandon_settings_description": { "message": "Навсегда удалить актив и вернуть sats его UTXO-носителей" },
   "rgb_asset_abandon_description": { "message": "Разрушительная операция только для разработчиков. Эксклюзивные UTXO-носители актива будут потрачены без RGB-перехода." },
-  "rgb_asset_abandon_developer_only": { "message": "Включите режим разработчика для этой операции." },
+  "rgb_asset_abandon_developer_only": { "message": "Операция доступна только в локальных development-сборках с включённым режимом разработчика." },
   "rgb_asset_abandon_confirm_title": { "message": "Навсегда отказаться от этого актива?" },
   "rgb_asset_abandon_confirm_description": { "message": "Выбранные RGB-аллокации будут потеряны навсегда. Это не RGB Burn, и действие нельзя отменить." },
   "rgb_asset_abandon_action": { "message": "Отказаться навсегда" },
