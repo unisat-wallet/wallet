@@ -321,8 +321,9 @@ export class RgbTransferQuery {
       const acknowledgementPending =
         (receivedConsignment as { acknowledgementPending?: boolean } | undefined)
           ?.acknowledgementPending === true
-      // ACK intent is durable and cannot be rejected. A Proxy v1 batch may
-      // still be waiting for its other recipients before releasing the TX.
+      // ACK intent is durable and cannot be rejected. Only a Proxy v1 batch
+      // is waiting for other recipients; a non-batch receipt is finalizing
+      // recovery of its released transaction.
       if (receivedConsignment && acknowledgementPending) {
         return [
           {
@@ -335,7 +336,7 @@ export class RgbTransferQuery {
             batch: receivedConsignment.batch,
             txid: receivedConsignment.txid,
             timestamp: receivedConsignment.receivedAt,
-            status: 'waiting_batch_release',
+            status: receivedConsignment.batch ? 'waiting_batch_release' : 'confirming',
             local: true,
           },
         ]

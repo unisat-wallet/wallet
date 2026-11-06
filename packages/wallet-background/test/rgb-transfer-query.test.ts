@@ -4,6 +4,40 @@ import { toRgbDisplayAmount } from '@unisat/wallet-shared'
 import { RgbTransferQuery } from '../src/rgb/RgbTransferQuery'
 
 describe('RgbTransferQuery', () => {
+  it('does not label a non-batch ACK recovery as waiting for other recipients', async () => {
+    const service = {
+      getPendingTransfers: vi.fn().mockReturnValue([]),
+      getPendingSendHistory: vi.fn().mockReturnValue([]),
+      getIssueHistory: vi.fn().mockReturnValue([]),
+      getPendingReceiveHistory: vi.fn().mockReturnValue([]),
+      getPendingReceives: vi.fn().mockReturnValue([{
+        recipientId: 'recipient', proxyRecipientId: 'proxy-recipient', createdAt: 1,
+        receivedConsignment: {
+          txid: 'c'.repeat(64), receivedAt: 2, acknowledgementPending: true,
+          assetId: 'rgb:asset', amount: '1', precision: 0, batch: false,
+          payload: 'consignment',
+        },
+      }]),
+      getLocalAssetDetail: vi.fn().mockReturnValue({ name: 'Token', ticker: 'TKN' }),
+    }
+    const context = {
+      service,
+      wallet: { walletId: 'wallet', fundingAddress: 'funding', network: 'mainnet' },
+    }
+    const query = new RgbTransferQuery({
+      getContext: vi.fn().mockResolvedValue(context as never),
+      syncReceiveHistory: vi.fn(), syncPendingTransfers: vi.fn(),
+      syncReceivedAllocations: vi.fn().mockResolvedValue(context as never),
+      getRemoteActivity: vi.fn().mockResolvedValue({ total: 0, list: [] }), warn: vi.fn(),
+    })
+
+    const result = await query.getTransfers(1, 20, { skipSync: true })
+
+    expect(result.list).toEqual([
+      expect.objectContaining({ transferId: 'proxy-recipient', status: 'confirming' }),
+    ])
+  })
+
   it('reconciles and renders one indexed broadcast for a stale prepared send', async () => {
     let pending = [{
       id: 'transfer-1',

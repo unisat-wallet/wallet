@@ -1812,16 +1812,11 @@ export class RgbService {
         // missing proxy payload as sender cancellation.
         if (receive.receivedConsignment?.acknowledgementPending) {
           const acknowledgement = await this.getProxyAcknowledgement(receive, item.endpoint)
-          if (acknowledgement === true) {
-            receive.receivedConsignment.accepted = true
-            delete receive.receivedConsignment.acknowledgementPending
-            delete receive.pendingAccept
-            this.markProxyDataReleasePending(receive)
-            changed = true
-          } else if (acknowledgement === undefined) {
+          if (acknowledgement !== false) {
             // The durable intent makes ACK retries safe. A request failure is
-            // not evidence of sender cancellation, so leave the receipt for
-            // the next polling cycle without sending a compensating NACK.
+            // not evidence of sender cancellation. Even when ACK=true is
+            // already visible, repeat the idempotent ACK request to recover
+            // the signed transaction released by Proxy v1 before cleaning it.
             try {
               const acknowledgementResult = await this.acknowledgeProxyConsignment(item, true)
               if (acknowledgementResult?.releasePending) {
@@ -1838,6 +1833,12 @@ export class RgbService {
                     this.markProxyDataReleasePending(receive)
                     changed = true
                   }
+                  continue
+                }
+                if (acknowledgement === true) {
+                  // ACK is durable, but the released transaction is not
+                  // available yet. Keep the receipt recoverable rather than
+                  // misclassifying a single-recipient transfer as canceled.
                   continue
                 }
                 // A single-recipient operation releases its transaction on
@@ -1865,6 +1866,12 @@ export class RgbService {
                 }
               }
             } catch (error) {
+              if (acknowledgement === true) {
+                // The ACK cannot be rolled back. If the proxy temporarily
+                // cannot replay the released transaction, retain the durable
+                // receipt and retry instead of reporting cancellation.
+                continue
+              }
               if (!(error instanceof RgbProxyOperationNotFoundError &&
                 !receive.buySwapIntent?.backendCommittedAt &&
                 await this.ensureDonationAnchorBroadcast(
@@ -2212,19 +2219,10 @@ export class RgbService {
       }
       await this.persist({ waitForRecovery: true })
     }
+    let acknowledgementConfirmed = false
     if (acknowledgementWasPending) {
       const acknowledgement = await this.getProxyAcknowledgement(receive, item.endpoint)
-      if (acknowledgement === true) {
-        receive.receivedConsignment!.accepted = true
-        delete receive.receivedConsignment!.acknowledgementPending
-        delete receive.pendingAccept
-        this.markProxyDataReleasePending(receive)
-        await this.persist({ waitForRecovery: true })
-        if (await this.releaseHandledProxyData(receive)) {
-          await this.persist({ waitForRecovery: true })
-        }
-        return { accepted: true, status: 'accepted' as const }
-      }
+      acknowledgementConfirmed = acknowledgement === true
       if (acknowledgement === false) {
         this.recordReceiveOutcome(receive, 'canceled', receive.pendingAccept.txid)
         state.pendingReceives = pending.filter(item => item !== receive)
@@ -2236,6 +2234,11 @@ export class RgbService {
     try {
       acknowledgementResult = await this.acknowledgeProxyConsignment(item, true)
     } catch (error) {
+      if (acknowledgementConfirmed) {
+        // ACK=true is durable. Do not convert a temporary failure to replay
+        // the released transaction into sender cancellation.
+        return { accepted: false, status: 'pending' as const }
+      }
       if (error instanceof RgbProxyOperationNotFoundError) {
         if (receive.buySwapIntent?.backendCommittedAt) {
           // A backend-committed swap must never fall back to the donation
@@ -2268,6 +2271,11 @@ export class RgbService {
     }
     if (acknowledgementResult?.releasePending && !receive.buySwapIntent?.backendCommittedAt) {
       if (receive.pendingAccept.batch !== true) {
+        if (acknowledgementConfirmed) {
+          // A prior ACK succeeded, but its released transaction could not be
+          // replayed yet. Retain the receipt for the next recovery cycle.
+          return { accepted: false, status: 'pending' as const }
+        }
         // For a non-batch operation there are no other recipients to wait
         // for. Proxy 0.4 returns this same shape after ack.clean removed the
         // signed transaction, so surface the sender cancellation instead.
@@ -2874,9 +2882,12 @@ export class RgbService {
     if (transaction.getId().toLowerCase() !== txid.toLowerCase()) {
       throw new RgbServiceError('Released transaction ID does not match the RGB receive')
     }
-    if (!expectedSignedRawTx) {
-      throw new RgbServiceError('Validated RGB consignment is missing its signed transaction')
-    }
+    // In the ordinary Proxy v1 flow the pre-ACK consignment may contain an
+    // unsigned witness transaction. The authenticated signed transaction is
+    // released only by ack.post(true), so its txid is the available binding.
+    // When the consignment did carry signed bytes, retain the stronger exact
+    // comparison used by donation and fully signed bundle flows.
+    if (!expectedSignedRawTx) return
     let expected: Transaction
     try {
       expected = Transaction.fromHex(expectedSignedRawTx)
