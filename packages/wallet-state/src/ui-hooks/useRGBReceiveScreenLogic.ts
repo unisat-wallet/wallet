@@ -26,6 +26,7 @@ export type RgbPendingReceiveInvoice = {
   recipientId?: string
   assetId?: string | null
   amount?: number | string
+  precision?: number
   status?: string
   kind?: string
   transferKind?: string

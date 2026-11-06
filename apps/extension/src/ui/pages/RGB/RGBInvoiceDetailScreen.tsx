@@ -203,7 +203,7 @@ export default function RGBInvoiceDetailScreen() {
   const isAnyRgbAsset = !invoice?.assetId || getRgbAssetId(invoiceAsset) === ANY_RGB_ASSET_ID;
   const invoiceTicker = isAnyRgbAsset ? t('any_rgb_asset') : getRgbTokenTicker(invoiceAsset);
   const invoiceName = isAnyRgbAsset ? t('any_rgb_asset') : getRgbAssetName(invoiceAsset) || invoiceTicker;
-  const invoicePrecision = getRgbTokenPrecision(invoiceAsset);
+  const invoicePrecision = getRgbTokenPrecision({ ...invoiceAsset, tokenInfo: invoice });
   const invoiceAmount = invoice
     ? formatRgbPendingAmountTag(invoice.amount, t('any_amount'), invoicePrecision)
     : t('any_amount');

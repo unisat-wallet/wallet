@@ -23,13 +23,15 @@ describe('RGB pending invoice presentation', () => {
       recipientId: 'recipient-id',
       pendingAccept: {
         assetId: 'rgb:received-asset',
-        amount: '42',
+        amount: '11100000000',
+        precision: 8,
       },
     })
 
     expect(invoice).toMatchObject({
       assetId: 'rgb:received-asset',
-      amount: '42',
+      amount: '11100000000',
+      precision: 8,
       status: 'PendingAccept',
     })
   })
@@ -40,7 +42,8 @@ describe('RGB pending invoice presentation', () => {
       recipientId: 'recipient-id',
       receivedConsignment: {
         assetId: 'rgb:received-asset',
-        amount: '42',
+        amount: '11100000000',
+        precision: 8,
         accepted: true,
         broadcastDetectedAt: 1,
       },
@@ -48,7 +51,8 @@ describe('RGB pending invoice presentation', () => {
 
     expect(invoice).toMatchObject({
       assetId: 'rgb:received-asset',
-      amount: '42',
+      amount: '11100000000',
+      precision: 8,
       status: 'WaitingSenderConfirmation',
     })
   })

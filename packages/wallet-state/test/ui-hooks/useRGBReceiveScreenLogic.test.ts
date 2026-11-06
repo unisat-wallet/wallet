@@ -4,6 +4,7 @@ import { describe, expect, it } from 'vitest'
 import { uiActions } from '../../src/reducers/ui'
 import {
   ANY_RGB_ASSET,
+  formatRgbPendingAmountTag,
   isCancelableRgbPendingInvoice,
   isDeletableRgbWitnessInvoice,
   isInvoiceForAsset,
@@ -13,6 +14,10 @@ import {
 import { createHookTestHarness } from './testHelpers'
 
 describe('useRGBReceiveScreenLogic', () => {
+  it('formats an invoice atomic amount with the precision exposed by its receive proposal', () => {
+    expect(formatRgbPendingAmountTag('11100000000', 'Any Amount', 8)).toBe('111')
+  })
+
   it('disables invoice creation when the shared receive limit is reached', async () => {
     const { wrapper, wallet } = createHookTestHarness()
     wallet.getRgbPendingReceiveInvoices.mockResolvedValue({

@@ -5,6 +5,7 @@ export type RgbPendingReceiveInvoice = {
   recipientId?: string
   assetId?: string | null
   amount?: number | string
+  precision?: number
   status?: string
   kind?: string
   transferKind?: string
@@ -36,12 +37,14 @@ export function toPublicRgbPendingReceiveInvoice(
     pendingAccept?: {
       assetId?: string
       amount?: string
+      precision?: number
       [key: string]: unknown
     }
     pendingValidationFailure?: unknown
     receivedConsignment?: {
       assetId?: string
       amount?: string
+      precision?: number
       accepted?: boolean
       acknowledgementPending?: boolean
       broadcastDetectedAt?: number
@@ -56,11 +59,13 @@ export function toPublicRgbPendingReceiveInvoice(
   const awaitingSenderConfirmation = item.receivedConsignment?.broadcastDetectedAt !== undefined
   const assetId = item.receivedConsignment?.assetId ?? item.pendingAccept?.assetId ?? item.assetId
   const amount = item.receivedConsignment?.amount ?? item.pendingAccept?.amount ?? item.amount
+  const precision = item.receivedConsignment?.precision ?? item.pendingAccept?.precision
   return {
     invoice: item.invoice,
     recipientId: item.proxyRecipientId || item.recipientId,
     ...(assetId === undefined ? {} : { assetId }),
     ...(amount === undefined ? {} : { amount }),
+    ...(precision === undefined ? {} : { precision }),
     ...(item.expirationTimestamp === undefined
       ? {}
       : { expirationTimestamp: item.expirationTimestamp }),
