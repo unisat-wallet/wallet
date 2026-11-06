@@ -36,6 +36,13 @@ interface DeserializeOption {
   accountIndexDerivation?: boolean
 }
 
+interface RgbAccountMetadata {
+  address: string
+  publicKey: string
+  derivationPath: string
+  masterFingerprint: string
+}
+
 function normalizeHex(value: unknown): string | null {
   if (!value) return null
   if (typeof value === 'string') return value.toLowerCase()
@@ -81,6 +88,8 @@ export class HdKeyring extends SimpleKeyring {
   hdWallet?: any
   override wallets: ECPairInterface[] = []
   private _index2wallet: Record<number, [string, ECPairInterface]> = {}
+  /** Public account metadata only, scoped to the currently unlocked HD root. */
+  private rgbAccountCache = new WeakMap<object, Map<string, RgbAccountMetadata>>()
   activeIndexes: number[] = []
   page = 0
   perPage = 5
@@ -259,18 +268,38 @@ export class HdKeyring extends SimpleKeyring {
       throw new Error('RGB funding account index is invalid')
     }
 
+    const cacheKey = `${networkType}:${accountIndex}:${keychain}`
+    let accounts = this.rgbAccountCache.get(this.hdWallet)
+    const cached = accounts?.get(cacheKey)
+    if (cached) return { ...cached }
+
     const rgbCoinType =
       networkType === NetworkType.MAINNET ? RGB_MAINNET_COIN_TYPE : RGB_TESTNET_COIN_TYPE
     const derivationPath = `m/86'/${rgbCoinType}'/${accountIndex}'/${keychain}/0`
     const child = this.hdWallet.derive(derivationPath)
-    const publicKey = Buffer.from(child.publicKey).toString('hex')
-    const address = publicKeyToAddress(publicKey, AddressType.P2TR, networkType)
+    try {
+      const publicKey = Buffer.from(child.publicKey).toString('hex')
+      const address = publicKeyToAddress(publicKey, AddressType.P2TR, networkType)
 
-    if (!address) {
-      throw new Error('Unable to derive RGB funding address')
+      if (!address) {
+        throw new Error('Unable to derive RGB funding address')
+      }
+
+      const account = {
+        address,
+        publicKey,
+        derivationPath,
+        masterFingerprint: xpubFingerprint(this.hdWallet),
+      }
+      if (!accounts) {
+        accounts = new Map()
+        this.rgbAccountCache.set(this.hdWallet, accounts)
+      }
+      accounts.set(cacheKey, account)
+      return { ...account }
+    } finally {
+      child.wipePrivateData?.()
     }
-
-    return { address, publicKey, derivationPath, masterFingerprint: xpubFingerprint(this.hdWallet) }
   }
 
   override async signTransaction(psbt: bitcoin.Psbt, inputs: any[], opts?: any) {
@@ -495,6 +524,7 @@ export class HdKeyring extends SimpleKeyring {
 
     wipeHdNode(this.root)
     wipeHdNode(this.hdWallet)
+    this.rgbAccountCache = new WeakMap()
     this._index2wallet = {}
     this.activeIndexes = []
     this.root = null

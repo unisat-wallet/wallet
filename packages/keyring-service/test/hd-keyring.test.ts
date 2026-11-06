@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 
 import { bitcoin, toXOnly } from '@unisat/wallet-bitcoin'
 import { NetworkType } from '@unisat/wallet-types'
@@ -356,6 +356,27 @@ describe('bitcoin-hd-keyring', () => {
       expect(mainnetAccount1.address).not.toBe(mainnet.address)
       expect(mainnetFee.address).not.toBe(mainnet.address)
       expect(mainnetFee.derivationPath).toContain("/1/0")
+    })
+
+    it('caches public RGB account metadata by root, network, account and keychain', () => {
+      const keyring = new HdKeyring({ mnemonic: sampleMnemonic, activeIndexes: [0] })
+      const derive = vi.spyOn(keyring.hdWallet, 'derive')
+
+      const funding = keyring.getRgbFundingAccount(NetworkType.MAINNET)
+      const expectedFunding = { ...funding }
+      funding.address = 'caller-mutated'
+      expect(keyring.getRgbFundingAccount(NetworkType.MAINNET)).toEqual(expectedFunding)
+      expect(derive).toHaveBeenCalledTimes(1)
+      expect(derive.mock.results[0].value.privateKey).toBeNull()
+
+      keyring.getRgbFundingAccount(NetworkType.TESTNET)
+      keyring.getRgbFundingAccount(NetworkType.MAINNET, 1)
+      keyring.getRgbFeeAccount(NetworkType.MAINNET)
+      expect(derive).toHaveBeenCalledTimes(4)
+
+      const previousCache = (keyring as any).rgbAccountCache
+      keyring.clearSensitiveData()
+      expect((keyring as any).rgbAccountCache).not.toBe(previousCache)
     })
   })
 
