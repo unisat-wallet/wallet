@@ -589,6 +589,14 @@ export class RgbService {
     const snapshot = normalizeSnapshot(
       await this.dependencies.stateSource.getSnapshot(state.wallet)
     )
+    const discardedOutpoints = new Set(
+      Object.values(state.discardedAssets || {}).flatMap(item =>
+        item.outpoints.map(outpoint => `${outpoint.txid}:${outpoint.vout}`)
+      )
+    )
+    if (discardedOutpoints.size) {
+      snapshot.utxos = snapshot.utxos.filter(utxo => !discardedOutpoints.has(outpointKey(utxo)))
+    }
     // A receive or broadcast may have queued a newer local allocation while
     // the indexer request was in flight. Never apply that older response.
     if (this.hasPendingSnapshotProtection() ||
@@ -3186,6 +3194,93 @@ export class RgbService {
     return this.requireState().snapshot
   }
 
+  /** Inspect the exact single-asset carriers eligible for an irreversible BTC sweep. */
+  getAssetAbandonmentPlan(assetId: string) {
+    const state = this.requireState()
+    const normalized = normalizeAssetId(assetId)
+    if (state.discardedAssets?.[normalized]) {
+      throw new RgbServiceError('RGB asset has already been permanently abandoned')
+    }
+    if (Object.values(state.pending).some(item => item.request.assetId === normalized)) {
+      throw new RgbServiceError('RGB asset has an active transfer')
+    }
+    if ((state.pendingReceives || []).some(item =>
+      item.assetId === normalized ||
+      item.pendingAccept?.assetId === normalized ||
+      item.receivedConsignment?.assetId === normalized
+    )) throw new RgbServiceError('RGB asset has an active receive or invoice')
+    if ((state.pendingIssues || []).some(item => item.assetId === normalized) ||
+      Object.values(state.pendingBroadcastSyncs || {}).some(item => item.assetId === normalized)) {
+      throw new RgbServiceError('RGB asset still has pending synchronization work')
+    }
+
+    const carriers = state.snapshot.utxos.filter(utxo =>
+      utxo.chainStatus !== 'spent' &&
+      utxo.chainStatus !== 'replaced' &&
+      utxo.allocations.some(allocation => normalizeAssetId(allocation.assetId) === normalized)
+    )
+    if (!carriers.length) throw new RgbServiceError('RGB asset has no live carrier UTXOs')
+    if (carriers.some(utxo => utxo.allocations.some(allocation =>
+      normalizeAssetId(allocation.assetId) !== normalized
+    ))) throw new RgbServiceError('RGB carrier also contains another asset and cannot be abandoned')
+    if (carriers.some(utxo =>
+      utxo.chainStatus !== 'confirmed' ||
+      utxo.allocations.some(allocation => !allocation.settled || !allocation.spendable)
+    )) throw new RgbServiceError('RGB asset has an unconfirmed or unspendable allocation')
+
+    const metadata = this.getLocalAssetDetail(normalized)
+    return {
+      assetId: normalized,
+      name: metadata.name,
+      ticker: metadata.ticker,
+      precision: metadata.precision,
+      amount: carriers.flatMap(utxo => utxo.allocations)
+        .reduce((sum, allocation) => sum + BigInt(allocation.amount), 0n).toString(),
+      satoshis: carriers.reduce((sum, utxo) => sum + utxo.satoshis, 0),
+      utxos: carriers.map(utxo => ({
+        txid: utxo.outpoint.txid,
+        vout: utxo.outpoint.vout,
+        satoshis: utxo.satoshis,
+        scriptPubKey: utxo.scriptPubKey,
+        publicKey: utxo.publicKey,
+      })),
+    }
+  }
+
+  /** Compact an asset only after its exclusive carrier outpoints were broadcast as spent. */
+  async finalizeAssetAbandonment(assetId: string, txid: string, outpoints: RgbOutpoint[]) {
+    const state = this.requireState()
+    const normalized = normalizeAssetId(assetId)
+    const plan = this.getAssetAbandonmentPlan(normalized)
+    const expected = new Set(plan.utxos.map(item => `${item.txid}:${item.vout}`))
+    const actual = new Set(outpoints.map(item => `${item.txid}:${item.vout}`))
+    if (expected.size !== actual.size || [...expected].some(item => !actual.has(item))) {
+      throw new RgbServiceError('RGB abandonment transaction inputs do not match its carrier UTXOs')
+    }
+    if (!/^[0-9a-f]{64}$/i.test(txid)) throw new RgbServiceError('RGB abandonment txid is invalid')
+
+    const rollback = snapshotState(state)
+    ;(state.discardedAssets ||= {})[normalized] = {
+      txid: txid.toLowerCase(),
+      outpoints: outpoints.map(item => ({ ...item })),
+      discardedAt: this.now(),
+    }
+    state.snapshot.utxos = state.snapshot.utxos.filter(utxo => !actual.has(outpointKey(utxo)))
+    if (state.contracts) delete state.contracts[normalized]
+    if (state.validatedV1SendHistories) delete state.validatedV1SendHistories[normalized]
+    state.pendingAssetMetadata = state.pendingAssetMetadata?.filter(item => item.assetId !== normalized)
+    state.pendingSendHistory = state.pendingSendHistory?.filter(item => item.assetId !== normalized)
+    state.pendingReceiveHistory = state.pendingReceiveHistory?.filter(item => item.assetId !== normalized)
+    state.issueHistory = state.issueHistory?.filter(item => item.assetId !== normalized)
+    if (state.burnProofs) {
+      for (const [proofTxid, proof] of Object.entries(state.burnProofs)) {
+        if (proof.assetId === normalized) delete state.burnProofs[proofTxid]
+      }
+    }
+    await this.persistWithRecoveryRollback(rollback)
+    return { discarded: true, assetId: normalized, txid: txid.toLowerCase() }
+  }
+
   /** Keep polling a previously used wallet after a temporary empty snapshot. */
   hasKnownAssetHistory() {
     const state = this.requireState()
@@ -5306,6 +5401,23 @@ function validateRecoveredState(state: RgbServiceState, currentWallet: RgbWallet
   ) {
     throw new RgbServiceError('RGB recovery checkpoint contains invalid receive release records')
   }
+  for (const [assetId, discarded] of Object.entries(state.discardedAssets || {})) {
+    if (
+      normalizeAssetId(assetId) !== assetId ||
+      !discarded ||
+      !/^[0-9a-f]{64}$/i.test(discarded.txid) ||
+      !Number.isSafeInteger(discarded.discardedAt) ||
+      discarded.discardedAt < 0 ||
+      !Array.isArray(discarded.outpoints) ||
+      discarded.outpoints.length === 0 ||
+      discarded.outpoints.length > 65_535 ||
+      discarded.outpoints.some(outpoint =>
+        !/^[0-9a-f]{64}$/i.test(outpoint?.txid || '') ||
+        !Number.isInteger(outpoint?.vout) ||
+        outpoint.vout < 0
+      )
+    ) throw new RgbServiceError('RGB recovery checkpoint contains an invalid discarded asset')
+  }
   for (const utxo of state.snapshot.utxos) {
     if (
       !utxo ||
@@ -5525,6 +5637,21 @@ function normalizeStateAssetIds(state: RgbServiceState): RgbServiceState {
   state.pendingIssues?.forEach(item => (item.assetId = normalizeAssetId(item.assetId)))
   state.issueHistory?.forEach(item => (item.assetId = normalizeAssetId(item.assetId)))
   state.pendingAssetMetadata?.forEach(item => (item.assetId = normalizeAssetId(item.assetId)))
+  if (state.discardedAssets) {
+    state.discardedAssets = Object.fromEntries(
+      Object.entries(state.discardedAssets).map(([assetId, discarded]) => [
+        normalizeAssetId(assetId),
+        {
+          ...discarded,
+          txid: discarded.txid.toLowerCase(),
+          outpoints: discarded.outpoints.map(outpoint => ({
+            txid: outpoint.txid.toLowerCase(),
+            vout: outpoint.vout,
+          })),
+        },
+      ])
+    )
+  }
   if (state.burnProofs) {
     for (const proof of Object.values(state.burnProofs)) {
       proof.assetId = normalizeAssetId(proof.assetId)

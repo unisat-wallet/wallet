@@ -3684,5 +3684,13 @@
   "rgb_donation_send_ack": { "message": "我了解收款方拒絕不會阻止 Bitcoin 交易確認。" },
   "rgb_donation_send_enable": { "message": "啟用" },
   "signing_pubkey_not_in_script_risk_title": { "message": "無法驗證的簽名腳本" },
-  "signing_pubkey_not_in_script_risk_description": { "message": "一個或多個輸入腳本未包含簽名公鑰。特殊協議中這可能是正常情況，但錢包無法透過標準腳本檢查確認簽名權限。請僅在理解並信任此交易時繼續。" }
+  "signing_pubkey_not_in_script_risk_description": { "message": "一個或多個輸入腳本未包含簽名公鑰。特殊協議中這可能是正常情況，但錢包無法透過標準腳本檢查確認簽名權限。請僅在理解並信任此交易時繼續。" },
+  "rgb_asset_abandon_title": { "message": "放棄 RGB 資產" },
+  "rgb_asset_abandon_settings_description": { "message": "永久銷毀資產並回收 carrier sats" },
+  "rgb_asset_abandon_description": { "message": "僅供開發者使用的破壞性操作。選擇資產後，錢包將在沒有 RGB transition 的情況下花費其專屬 carrier UTXO。" },
+  "rgb_asset_abandon_developer_only": { "message": "請先啟用開發者模式。" },
+  "rgb_asset_abandon_confirm_title": { "message": "永久放棄此資產？" },
+  "rgb_asset_abandon_confirm_description": { "message": "所選 RGB allocation 將永久遺失。這不是 RGB Burn，且無法復原。" },
+  "rgb_asset_abandon_action": { "message": "永久放棄" },
+  "rgb_asset_abandon_cleanup_pending": { "message": "Carrier 交易已廣播，但本地歷史清理仍待完成。" }
 }

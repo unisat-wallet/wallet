@@ -822,6 +822,30 @@ export interface WalletController {
 
   getRgbFundingAddress(): Promise<{ address: string }>
 
+  getRgbAssetAbandonmentPlan(params: { assetId: string }): Promise<{
+    assetId: string
+    name?: string
+    ticker?: string
+    precision?: number
+    amount: string
+    satoshis: number
+    utxos: Array<{ txid: string; vout: number; satoshis: number }>
+  }>
+
+  createRgbAssetAbandonBegin(params: { assetId: string; feeRate?: number }): Promise<{
+    plan: { assetId: string; name?: string; ticker?: string; amount: string; satoshis: number; utxos: Array<{ txid: string; vout: number; satoshis: number }> }
+    amount: number
+    feeRate: number
+    toSignData: ToSignData
+  }>
+
+  createRgbAssetAbandonEnd(params: { signedPsbt: string }): Promise<{
+    txid: string
+    assetId: string
+    recoveredSatoshis: number
+    cleanupPending: boolean
+  }>
+
   createRgbIssueNia(params: {
     orderId?: string
     issuanceTxid?: string

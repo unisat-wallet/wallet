@@ -6,7 +6,7 @@ import type { IconTypes } from '@/ui/components/Icon';
 import { Popover } from '@/ui/components/Popover';
 import type { ColorTypes } from '@/ui/theme/colors';
 import { fontSizes } from '@/ui/theme/font';
-import { useI18n, useTools, useWallet } from '@unisat/wallet-state';
+import { useDeveloperMode, useI18n, useTools, useWallet } from '@unisat/wallet-state';
 
 const actionStyle = {
   width: '100%',
@@ -55,6 +55,7 @@ export default function RgbSettingsScreen() {
   const { t } = useI18n();
   const wallet = useWallet();
   const tools = useTools();
+  const developerMode = useDeveloperMode();
   const [confirmCloudRestore, setConfirmCloudRestore] = useState(false);
   const [restoring, setRestoring] = useState(false);
 
@@ -127,6 +128,16 @@ export default function RgbSettingsScreen() {
               description={t('rgb_fee_pool_description')}
               onClick={() => navigate('/settings/rgb-fee-pool')}
             />
+            {developerMode ? (
+              <SettingsAction
+                testId="rgb-settings-abandon-asset"
+                icon="warning"
+                iconColor="danger"
+                title={t('rgb_asset_abandon_title')}
+                description={t('rgb_asset_abandon_settings_description')}
+                onClick={() => navigate('/settings/rgb/abandon-asset')}
+              />
+            ) : null}
           </Column>
         </Column>
       </Content>

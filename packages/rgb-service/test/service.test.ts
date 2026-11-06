@@ -210,6 +210,60 @@ describe('RgbService', () => {
     })
   })
 
+  it('rejects carrier abandonment when an outpoint contains another RGB asset', async () => {
+    const service = new RgbService(createDependencies())
+    await service.open(wallet)
+    await service.sync()
+    const state = (service as any).state
+    const assetId = state.snapshot.utxos[0].allocations[0].assetId
+    state.snapshot.utxos[0].allocations.push({
+      ...state.snapshot.utxos[0].allocations[0],
+      assetId: 'rgb:AgICAgIC-AgICAgI-CAgICAg-ICAgICA-gICAgIC-AgICAgI',
+    })
+
+    expect(() => service.getAssetAbandonmentPlan(assetId)).toThrow(
+      'RGB carrier also contains another asset'
+    )
+  })
+
+  it('compacts an abandoned asset after all exclusive carriers are spent', async () => {
+    const service = new RgbService(createDependencies())
+    await service.open(wallet)
+    await service.sync()
+    const state = (service as any).state
+    const assetId = state.snapshot.utxos[0].allocations[0].assetId
+    state.snapshot.utxos.forEach((utxo: any) => { utxo.chainStatus = 'confirmed' })
+    state.contracts = {
+      [assetId]: {
+        consignment: Buffer.alloc(1024).toString('base64'),
+        metadata: { ticker: 'OLD', name: 'Old', precision: 0, schema: 'NIA', issuedSupply: '100' },
+        createdAt: 1,
+      },
+    }
+    state.validatedV1SendHistories = { [assetId]: { large: 'cache' } }
+    state.pendingSendHistory = [{
+      transferId: 'old-send', assetId, amount: '1', createdAt: 1, status: 'broadcasted',
+    }]
+    const plan = service.getAssetAbandonmentPlan(assetId)
+
+    await expect(service.finalizeAssetAbandonment(
+      assetId,
+      'e'.repeat(64),
+      plan.utxos.map(utxo => ({ txid: utxo.txid, vout: utxo.vout }))
+    )).resolves.toMatchObject({ discarded: true, assetId, txid: 'e'.repeat(64) })
+
+    expect(service.getLocalAssetBalance(assetId)).toBeUndefined()
+    expect(state.contracts[assetId]).toBeUndefined()
+    expect(state.validatedV1SendHistories[assetId]).toBeUndefined()
+    expect(state.pendingSendHistory).toEqual([])
+    expect(state.discardedAssets[assetId]).toMatchObject({ txid: 'e'.repeat(64) })
+
+    // The indexer can briefly return its pre-broadcast snapshot. The durable
+    // tombstone must prevent that stale carrier from restoring the asset.
+    await service.sync()
+    expect(service.getLocalAssetBalance(assetId)).toBeUndefined()
+  })
+
   it('recovers an indexed broadcast restored as a prepared reservation', async () => {
     const dependencies = createDependencies()
     dependencies.stateSource.getTransactionStatus = vi.fn().mockResolvedValue({

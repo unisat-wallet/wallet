@@ -3590,5 +3590,13 @@
   "rgb_donation_send_ack": { "message": "Entiendo que un rechazo no detendrá la transacción de Bitcoin." },
   "rgb_donation_send_enable": { "message": "Activar" },
   "signing_pubkey_not_in_script_risk_title": { "message": "Script de firma no verificado" },
-  "signing_pubkey_not_in_script_risk_description": { "message": "La clave pública de firma no aparece en uno o más scripts de entrada. Esto puede ser válido para protocolos especializados, pero la cartera no puede verificar la autorización de firma mediante las comprobaciones estándar. Continúa solo si entiendes y confías en esta transacción." }
+  "signing_pubkey_not_in_script_risk_description": { "message": "La clave pública de firma no aparece en uno o más scripts de entrada. Esto puede ser válido para protocolos especializados, pero la cartera no puede verificar la autorización de firma mediante las comprobaciones estándar. Continúa solo si entiendes y confías en esta transacción." },
+  "rgb_asset_abandon_title": { "message": "Abandonar activo RGB" },
+  "rgb_asset_abandon_settings_description": { "message": "Destruir permanentemente un activo y recuperar sus sats portadores" },
+  "rgb_asset_abandon_description": { "message": "Operación destructiva solo para desarrolladores. Los UTXO exclusivos del activo se gastarán sin una transición RGB." },
+  "rgb_asset_abandon_developer_only": { "message": "Activa el modo desarrollador para usar esta operación." },
+  "rgb_asset_abandon_confirm_title": { "message": "¿Abandonar permanentemente este activo?" },
+  "rgb_asset_abandon_confirm_description": { "message": "Las asignaciones RGB seleccionadas se perderán para siempre. Esto no es una quema RGB y no se puede deshacer." },
+  "rgb_asset_abandon_action": { "message": "Abandonar permanentemente" },
+  "rgb_asset_abandon_cleanup_pending": { "message": "La transacción portadora fue transmitida, pero la limpieza del historial local sigue pendiente." }
 }

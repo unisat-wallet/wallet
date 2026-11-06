@@ -83,6 +83,7 @@ import RgbFeePoolInspectionScreen from './Settings/RgbFeePoolInspectionScreen';
 import RgbBackupExportScreen from './Settings/RgbBackupExportScreen';
 import RgbBackupRestoreScreen from './Settings/RgbBackupRestoreScreen';
 import RgbSettingsScreen from './Settings/RgbSettingsScreen';
+import RgbAssetAbandonScreen from './Settings/RgbAssetAbandonScreen';
 import UpgradeNoticeScreen from './Settings/UpgradeNoticeScreen';
 import CosmosSignDemo from './Test/CosmosSignDemo';
 import TestScreen from './Test/TestScreen';
@@ -206,6 +207,10 @@ export const routes = {
   RgbSettingsScreen: {
     path: '/settings/rgb',
     element: <RgbSettingsScreen />
+  },
+  RgbAssetAbandonScreen: {
+    path: '/settings/rgb/abandon-asset',
+    element: <RgbAssetAbandonScreen />
   },
   RgbBackupExportScreen: {
     path: '/settings/rgb/backup/export',

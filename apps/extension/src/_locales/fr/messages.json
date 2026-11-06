@@ -3599,5 +3599,13 @@
   "rgb_donation_send_ack": { "message": "Je comprends qu’un refus n’arrêtera pas la transaction Bitcoin." },
   "rgb_donation_send_enable": { "message": "Activer" },
   "signing_pubkey_not_in_script_risk_title": { "message": "Script de signature non vérifié" },
-  "signing_pubkey_not_in_script_risk_description": { "message": "La clé publique de signature n’est pas référencée par un ou plusieurs scripts d’entrée. Cela peut être valide pour des protocoles spécialisés, mais le portefeuille ne peut pas vérifier l’autorisation de signature avec les contrôles de script standard. Continuez uniquement si vous comprenez cette transaction et lui faites confiance." }
+  "signing_pubkey_not_in_script_risk_description": { "message": "La clé publique de signature n’est pas référencée par un ou plusieurs scripts d’entrée. Cela peut être valide pour des protocoles spécialisés, mais le portefeuille ne peut pas vérifier l’autorisation de signature avec les contrôles de script standard. Continuez uniquement si vous comprenez cette transaction et lui faites confiance." },
+  "rgb_asset_abandon_title": { "message": "Abandonner l’actif RGB" },
+  "rgb_asset_abandon_settings_description": { "message": "Détruire définitivement un actif et récupérer ses sats porteurs" },
+  "rgb_asset_abandon_description": { "message": "Opération destructive réservée aux développeurs. Les UTXO exclusivement porteurs de l’actif seront dépensés sans transition RGB." },
+  "rgb_asset_abandon_developer_only": { "message": "Activez le mode développeur pour utiliser cette opération." },
+  "rgb_asset_abandon_confirm_title": { "message": "Abandonner définitivement cet actif ?" },
+  "rgb_asset_abandon_confirm_description": { "message": "Les allocations RGB sélectionnées seront définitivement perdues. Ce n’est pas un burn RGB et l’opération est irréversible." },
+  "rgb_asset_abandon_action": { "message": "Abandonner définitivement" },
+  "rgb_asset_abandon_cleanup_pending": { "message": "La transaction porteuse a été diffusée, mais le nettoyage de l’historique local reste en attente." }
 }

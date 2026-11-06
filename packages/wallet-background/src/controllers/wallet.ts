@@ -612,6 +612,11 @@ type RgbCreateUtxosEndRequest = {
   signedPsbt: string
 }
 
+type RgbAssetAbandonRequest = {
+  assetId: string
+  feeRate?: number
+}
+
 type RgbPendingVanillaTxsRequest = {
   wallet: RgbWalletRef
 }
@@ -1097,6 +1102,14 @@ export class WalletController extends BaseController {
   private readonly rgbRecoveryVerifiedFingerprints = new Map<string, string>()
   /** Wallet identity captured while building RGB-related Bitcoin signing requests. */
   private readonly rgbPendingBitcoinOperations = new Map<string, LocalRgbWallet>()
+  private rgbPendingAssetAbandonment: {
+    wallet: LocalRgbWallet
+    assetId: string
+    carrierOutpoints: Array<{ txid: string; vout: number }>
+    inputs: Array<{ txid: string; vout: number; scriptPk: string }>
+    destination: string
+    recoveredSatoshis: number
+  } | undefined
   /** User-approved third-party proxies remain approved only until wallet lock. */
   private readonly rgbApprovedProxyEndpoints = new Set<string>()
   private rgbProxyPolicyCache:
@@ -1210,6 +1223,7 @@ export class WalletController extends BaseController {
       this.rgbServiceRegistry.clear()
       this.rgbCoordinator.clear()
       this.rgbPendingBitcoinOperations.clear()
+      this.rgbPendingAssetAbandonment = undefined
       this.rgbRecoveryRestores.clear()
       this.rgbRecoveryBackups.clear()
       this.rgbHdBackupWallets.clear()
@@ -5056,6 +5070,169 @@ export class WalletController extends BaseController {
   getRgbFundingAddress = async () => {
     const { address } = await this.getCurrentRgbFundingAccount()
     return { address }
+  }
+
+  private assertRgbAssetAbandonmentEnabled() {
+    if (!preferenceService.getDeveloperMode()) {
+      throw new Error('RGB asset abandonment is available only in developer mode')
+    }
+  }
+
+  getRgbAssetAbandonmentPlan = async (params: { assetId: string }) => {
+    this.assertRgbAssetAbandonmentEnabled()
+    const { service } = await this.getLocalRgbReadService()
+    return service.getAssetAbandonmentPlan(params.assetId)
+  }
+
+  createRgbAssetAbandonBegin = async (params: RgbAssetAbandonRequest) => {
+    this.assertRgbAssetAbandonmentEnabled()
+    const account = preferenceService.getCurrentAccount()
+    if (!account) throw new Error('no current account')
+    assertCanCreateSigningRequest(account)
+    const context = await this.getLocalRgbService()
+    await this.ensureRgbWriteLease(context, { forceRenew: true })
+    // Recheck the complete carrier allocation set while holding the writer
+    // lease. A stale local snapshot must never hide another RGB asset sharing
+    // one of the UTXOs selected for this destructive operation.
+    await context.service.sync()
+    const [funding, feeAccount] = await Promise.all([
+      this.getCurrentRgbFundingAccount(),
+      this.getCurrentRgbFeeAccount(),
+    ])
+    const plan = context.service.getAssetAbandonmentPlan(params.assetId)
+    const [remote, remoteFeeUtxos] = await Promise.all([
+      walletApiService.bitcoin.getAllBTCUtxos(funding.address),
+      walletApiService.bitcoin.getAllBTCUtxos(feeAccount.address),
+    ])
+    const remoteByOutpoint = new Map(remote.map(utxo => [`${utxo.txid}:${utxo.vout}`, utxo]))
+    const carrierUtxos = plan.utxos.map(carrier => {
+      const utxo = remoteByOutpoint.get(`${carrier.txid}:${carrier.vout}`)
+      if (!utxo) throw new Error('An RGB carrier UTXO is no longer spendable')
+      if (!isSafeRgbFeePoolFundingUtxo(utxo)) {
+        throw new Error('An RGB carrier contains another protocol asset and cannot be abandoned')
+      }
+      return {
+        ...utxo,
+        pubkey: funding.publicKey,
+        addressType: AddressType.P2TR,
+      }
+    })
+    const feeRate = params.feeRate ?? (await this.getFeeSummary()).list[1]?.feeRate
+    if (!feeRate || feeRate <= 0) throw new Error('Invalid RGB abandonment fee rate')
+    const lockedFeeOutpoints = new Set(
+      context.service
+        .getPendingTransfers()
+        .flatMap(transfer => transfer.prepared.feeOutpoints || [])
+        .map(outpoint => `${outpoint.txid}:${outpoint.vout}`)
+    )
+    const feeCandidates = remoteFeeUtxos
+      .filter(utxo => !lockedFeeOutpoints.has(`${utxo.txid}:${utxo.vout}`))
+      .filter(isSafeRgbFeePoolFundingUtxo)
+      .sort((left, right) => right.satoshis - left.satoshis)
+      .map(utxo => ({
+        ...utxo,
+        pubkey: feeAccount.publicKey,
+        addressType: AddressType.P2TR,
+      }))
+    let selectedUtxos = carrierUtxos
+    let built: Awaited<ReturnType<typeof txHelpers.sendAllBTC>> | undefined
+    for (let feeInputCount = 0; feeInputCount <= feeCandidates.length; feeInputCount += 1) {
+      selectedUtxos = [...carrierUtxos, ...feeCandidates.slice(0, feeInputCount)]
+      try {
+        built = await txHelpers.sendAllBTC({
+          btcUtxos: selectedUtxos,
+          toAddress: account.address,
+          networkType: this.getNetworkType(),
+          feeRate,
+          enableRBF: true,
+        })
+        break
+      } catch (error) {
+        if ((error as { code?: unknown })?.code !== ErrorCodes.INSUFFICIENT_BTC_UTXO) throw error
+      }
+    }
+    if (!built) {
+      throw new Error('RGB carrier sats cannot cover the transaction fee; fund the RGB Fee Pool and retry')
+    }
+    const { psbt, toSignInputs } = built
+    const amount = psbt.txOutputs.reduce((sum, output) => sum + output.value, 0)
+    if (amount <= 0) throw new Error('RGB carrier sats are insufficient to pay the transaction fee')
+    const toSignData = await this.getRgbToSignData({
+      expectedWallet: context.wallet,
+      psbt: psbt.toHex(),
+      toSignInputs,
+      action: {
+        name: 'Permanently abandon RGB asset',
+        description: 'Spend its carrier UTXOs without an RGB transition',
+        details: [
+          { label: 'Asset', type: PsbtActionDetailType.TEXT, value: plan.ticker || plan.name || plan.assetId },
+          { label: 'Carrier UTXOs', type: PsbtActionDetailType.TEXT, value: String(plan.utxos.length) },
+          { label: 'Recovered', type: PsbtActionDetailType.TEXT, value: `${amount} sats` },
+          { label: 'To', type: PsbtActionDetailType.ADDRESS, value: account.address },
+        ],
+        type: PsbtActionType.CUSTOM,
+      },
+    })
+    await this.assertActiveRgbWallet(context.wallet)
+    this.rgbPendingAssetAbandonment = {
+      wallet: context.wallet,
+      assetId: plan.assetId,
+      carrierOutpoints: plan.utxos.map(utxo => ({ txid: utxo.txid, vout: utxo.vout })),
+      inputs: selectedUtxos.map(utxo => ({
+        txid: utxo.txid,
+        vout: utxo.vout,
+        scriptPk: utxo.scriptPk.toLowerCase(),
+      })),
+      destination: account.address,
+      recoveredSatoshis: amount,
+    }
+    return { plan, amount, feeRate, toSignData }
+  }
+
+  createRgbAssetAbandonEnd = async (params: { signedPsbt: string }) => {
+    this.assertRgbAssetAbandonmentEnabled()
+    const staged = this.rgbPendingAssetAbandonment
+    if (!staged) throw new Error('RGB asset abandonment is not prepared')
+    await this.assertActiveRgbWallet(staged.wallet)
+    const signedPsbt = psbtFromString(params.signedPsbt)
+    const transaction = signedPsbt.extractTransaction(true)
+    const outpoints = transaction.ins.map(input => ({
+      txid: Buffer.from(input.hash).reverse().toString('hex'),
+      vout: input.index,
+    }))
+    const expected = new Map(staged.inputs.map(item => [`${item.txid}:${item.vout}`, item]))
+    const actual = new Set(outpoints.map(item => `${item.txid}:${item.vout}`))
+    if (expected.size !== actual.size || [...expected.keys()].some(item => !actual.has(item))) {
+      throw new Error('RGB abandonment transaction inputs changed')
+    }
+    const inputScriptsMatch = outpoints.every((outpoint, index) => {
+      const expectedInput = expected.get(`${outpoint.txid}:${outpoint.vout}`)
+      return expectedInput &&
+        signedPsbt.data.inputs[index]?.witnessUtxo?.script.toString('hex').toLowerCase() ===
+          expectedInput.scriptPk
+    })
+    if (!inputScriptsMatch) throw new Error('RGB abandonment transaction input scripts changed')
+    const networkType = this.getNetworkType()
+    if (!transaction.outs.length || transaction.outs.some(output =>
+      scriptPkToAddress(output.script, networkType) !== staged.destination
+    )) throw new Error('RGB abandonment transaction destination changed')
+    const recoveredSatoshis = transaction.outs.reduce((sum, output) => sum + output.value, 0)
+    if (recoveredSatoshis !== staged.recoveredSatoshis) {
+      throw new Error('RGB abandonment transaction recovery amount changed')
+    }
+    const context = await this.getLocalRgbService()
+    if (!isSameRgbWallet(context.wallet, staged.wallet)) throw new RgbWalletContextChangedError()
+    await this.ensureRgbWriteLease(context, { forceRenew: true })
+    const txid = await this.pushTx(transaction.toHex())
+    this.rgbPendingAssetAbandonment = undefined
+    let cleanupPending = false
+    try {
+      await context.service.finalizeAssetAbandonment(staged.assetId, txid, staged.carrierOutpoints)
+    } catch (error) {
+      cleanupPending = true
+      log.error('RGB carrier sweep broadcast but asset compaction failed', error)
+    }
+    return { txid, assetId: staged.assetId, recoveredSatoshis, cleanupPending }
   }
 
   /**

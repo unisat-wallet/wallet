@@ -525,6 +525,16 @@ export interface RgbServiceState {
   issueHistory?: RgbIssueHistoryItem[]
   /** Asset metadata learned from received consignments, retained until settlement. */
   pendingAssetMetadata?: RgbPendingAssetMetadata[]
+  /**
+   * Developer-only irreversible carrier sweeps. The compact tombstone keeps
+   * stale indexer/checkpoint data from restoring an intentionally abandoned
+   * asset after its Bitcoin seals were spent without an RGB transition.
+   */
+  discardedAssets?: Record<string, {
+    txid: string
+    outpoints: RgbOutpoint[]
+    discardedAt: number
+  }>
   /** Unconfirmed fee-pool outputs retained until the address indexer exposes them. */
   pendingFeePoolUtxos?: RgbFeePoolUtxo[]
   /** Validated blind seals retained locally for later ownership proofs when spending received assets. */

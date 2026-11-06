@@ -3601,5 +3601,13 @@
   "rgb_donation_send_ack": { "message": "受取人が拒否してもBitcoin取引は停止されないことを理解しました。" },
   "rgb_donation_send_enable": { "message": "有効にする" },
   "signing_pubkey_not_in_script_risk_title": { "message": "署名スクリプトを検証できません" },
-  "signing_pubkey_not_in_script_risk_description": { "message": "1つ以上の入力スクリプトに署名公開鍵が含まれていません。特殊なプロトコルでは正当な場合がありますが、ウォレットは標準のスクリプト検査で署名権限を確認できません。この取引を理解し、信頼できる場合のみ続行してください。" }
+  "signing_pubkey_not_in_script_risk_description": { "message": "1つ以上の入力スクリプトに署名公開鍵が含まれていません。特殊なプロトコルでは正当な場合がありますが、ウォレットは標準のスクリプト検査で署名権限を確認できません。この取引を理解し、信頼できる場合のみ続行してください。" },
+  "rgb_asset_abandon_title": { "message": "RGB資産を放棄" },
+  "rgb_asset_abandon_settings_description": { "message": "資産を永久に破棄し、キャリアUTXOのsatsを回収します" },
+  "rgb_asset_abandon_description": { "message": "開発者専用の破壊的操作です。選択した資産専用のキャリアUTXOをRGBトランジションなしで使用します。" },
+  "rgb_asset_abandon_developer_only": { "message": "この操作を使用するには開発者モードを有効にしてください。" },
+  "rgb_asset_abandon_confirm_title": { "message": "この資産を永久に放棄しますか？" },
+  "rgb_asset_abandon_confirm_description": { "message": "選択したRGBアロケーションは永久に失われます。これはRGB Burnではなく、取り消せません。" },
+  "rgb_asset_abandon_action": { "message": "永久に放棄" },
+  "rgb_asset_abandon_cleanup_pending": { "message": "キャリアトランザクションはブロードキャストされましたが、ローカル履歴の整理は保留中です。" }
 }
