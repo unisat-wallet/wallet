@@ -313,7 +313,7 @@ const PROD_CHAINS_MAP: { [key: string]: TypeChain } = {
     supportsAssetOverview: false,
     supportsAddressHistory: false,
     enableMarket: false,
-    rgbProxyEndpoints: ['rpcs://wallet-api-testnet4.unisat.space/_/rgb/v1/json-rpc'],
+    rgbProxyEndpoints: ['rpcs://wallet-api-testnet4.unisat.space/_/rgb/v0_4_0/v1/json-rpc'],
     rgbValidationPublicKeys: ['02e3ecc2fc82e46b88c5e7e4489a5586571c047d87134095df1014e3848d0c28cd'],
     svg: 'bitcoin-testnet',
   },
@@ -338,7 +338,7 @@ const PROD_CHAINS_MAP: { [key: string]: TypeChain } = {
     supportsAddressHistory: false,
     enableMarket: false,
     enableBrc20Prog: true,
-    rgbProxyEndpoints: ['rpcs://wallet-api-signet.unisat.space/_/rgb/v1/json-rpc'],
+    rgbProxyEndpoints: ['rpcs://wallet-api-signet.unisat.space/_/rgb/v0_4_0/v1/json-rpc'],
     rgbValidationPublicKeys: ['02e3ecc2fc82e46b88c5e7e4489a5586571c047d87134095df1014e3848d0c28cd'],
     rgbEvmRpcUrls: {
       '42161': 'https://arb1.arbitrum.io/rpc',
