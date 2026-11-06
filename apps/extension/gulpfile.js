@@ -12,7 +12,7 @@ const path = require('path');
 
 //parse arguments
 var knownOptions = {
-  string: ['env', 'browser', 'manifest', 'channel', 'artifact-version'],
+  string: ['env', 'browser', 'manifest', 'channel', 'artifact-version', 'tag'],
   default: {
     env: 'dev',
     browser: 'chrome',
@@ -34,6 +34,7 @@ var options = {
 };
 options = minimist(process.argv.slice(2), knownOptions);
 var artifactVersion = options['artifact-version'] || version;
+var artifactTag = (options.tag || '').trim();
 var artifactGitHash =
   options.browser === 'chrome' && options.manifest === 'mv3'
     ? execFileSync('git', ['rev-parse', '--short=7', 'HEAD'], {
@@ -58,6 +59,16 @@ if (artifactVersion !== validVersion && !artifactVersion.startsWith(`${validVers
     `invalid artifact-version: [${artifactVersion}]. It should match ${validVersion} or start with ${validVersion}- .`
   );
   exit(1);
+}
+if (artifactTag && !/^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$/.test(artifactTag)) {
+  console.error(`invalid tag: [${artifactTag}]. Use 1-64 letters, numbers, dots, underscores, or hyphens.`);
+  exit(1);
+}
+
+function artifactSuffix() {
+  const gitHashSuffix = artifactGitHash ? `-${artifactGitHash}` : '';
+  const tagSuffix = artifactTag ? `-${artifactTag}` : '';
+  return `${gitHashSuffix}${tagSuffix}`;
 }
 
 //tasks...
@@ -111,13 +122,12 @@ function task_package(cb) {
     if (options.browser == 'firefox') {
       return gulp
         .src(`dist/${options.browser}/**/*`)
-        .pipe(zip(`${brandName}-${options.browser}-${options.manifest}-v${artifactVersion}.xpi`))
+        .pipe(zip(`${brandName}-${options.browser}-${options.manifest}-v${artifactVersion}${artifactSuffix()}.xpi`))
         .pipe(gulp.dest('./dist'));
     } else {
-      const gitHashSuffix = artifactGitHash ? `-${artifactGitHash}` : '';
       return gulp
         .src(`dist/${options.browser}/**/*`)
-        .pipe(zip(`${brandName}-${options.browser}-${options.manifest}-v${artifactVersion}${gitHashSuffix}.zip`))
+        .pipe(zip(`${brandName}-${options.browser}-${options.manifest}-v${artifactVersion}${artifactSuffix()}.zip`))
         .pipe(gulp.dest('./dist'));
     }
   }
@@ -127,8 +137,8 @@ function task_package(cb) {
 function task_print_output(cb) {
   if (options.env == 'pro') {
     const extension = options.browser == 'firefox' ? 'xpi' : 'zip';
-    const gitHashSuffix = artifactGitHash ? `-${artifactGitHash}` : '';
-    const artifactName = `${brandName}-${options.browser}-${options.manifest}-v${artifactVersion}${gitHashSuffix}.${extension}`;
+    const artifactName =
+      `${brandName}-${options.browser}-${options.manifest}-v${artifactVersion}` + `${artifactSuffix()}.${extension}`;
     console.log(`Build artifact: ${path.resolve(__dirname, 'dist', artifactName)}`);
   } else {
     console.log(`Build output: ${path.resolve(__dirname, 'dist', options.browser)}`);

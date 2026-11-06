@@ -65,6 +65,7 @@ function formatTimestamp(date) {
 }
 
 const artifactVersion = readArg('--artifact-version');
+const artifactTag = readArg('--tag').trim();
 
 if (!artifactVersion) {
   fail(`missing --artifact-version. expected ${manifestVersion} or ${manifestVersion}-beta.N`);
@@ -78,13 +79,18 @@ if (artifactVersion !== manifestVersion && !artifactVersion.startsWith(`${manife
 
 const trackedStatusBefore = getGitStatus(['status', '--short', '--untracked-files=no']);
 
-execFileSync('pnpm', ['build:chrome', `--artifact-version=${artifactVersion}`], {
+const buildArgs = ['build:chrome', `--artifact-version=${artifactVersion}`];
+if (artifactTag) {
+  buildArgs.push(`--tag=${artifactTag}`);
+}
+execFileSync('pnpm', buildArgs, {
   cwd: extensionDir,
   stdio: 'inherit'
 });
 
 const shortGitHash = getGitStatus(['rev-parse', '--short=7', 'HEAD']);
-const artifactName = `unisat-chrome-mv3-v${artifactVersion}-${shortGitHash}.zip`;
+const tagSuffix = artifactTag ? `-${artifactTag}` : '';
+const artifactName = `unisat-chrome-mv3-v${artifactVersion}-${shortGitHash}${tagSuffix}.zip`;
 const artifactPath = path.join(extensionDir, 'dist', artifactName);
 
 if (!fs.existsSync(artifactPath)) {
