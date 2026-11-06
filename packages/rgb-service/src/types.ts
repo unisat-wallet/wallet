@@ -219,6 +219,8 @@ export interface RgbPendingTransfer {
   /** The amount is resolved from the request or a fixed-amount invoice. */
   request: RgbTransferRequest & { amount: string }
   createdAt: number
+  /** Remote checkpoint generation used to prepare the reserved inputs. */
+  preparedCheckpointGeneration?: number
   /** Stable per-send Ed25519 key for idempotent proxy v1 retries. */
   proxySenderPrivateKey?: string
   /**
@@ -506,6 +508,14 @@ export interface RgbServiceState {
   releasedReceiveRecipientIds?: string[]
   pendingReceiveHistory?: RgbPendingReceiveHistory[]
   pendingSendHistory?: RgbPendingSendHistory[]
+  /** Payload-free backend indexing jobs. Bitcoin broadcast completion never waits for these. */
+  pendingBroadcastSyncs?: Record<string, {
+    completed: RgbCompletedTransfer
+    assetId: string
+    amount: string
+    createdAt: number
+    invoice: string
+  }>
   /** Portable BFA burn proofs, retained independently of transient activity rows. */
   burnProofs?: Record<string, { assetId: string; amount: string; payload: string; burnReason?: string; burnDestination?: import('./protocol/bfa-burn-destination').BfaBurnDestinationV1; createdAt: number }>
   pendingUtxoSync?: RgbPendingUtxoSync
@@ -567,7 +577,7 @@ export interface RgbStateSource {
     transferId: string,
     transfer: RgbCompletedTransfer,
     snapshot: RgbWalletSnapshot,
-    metadata: { amount: string; createdAt: number; invoice: string }
+    metadata: { assetId: string; amount: string; createdAt: number; invoice: string }
   ): Promise<void>
   claimConsignments?(wallet: RgbWalletRef, recipientId: string): Promise<number>
   getClaimedConsignments?(

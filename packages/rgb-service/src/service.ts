@@ -538,12 +538,18 @@ export class RgbService {
   private async syncSnapshot() {
     const state = this.requireState()
     if (this.pendingTransferSyncInFlight) await this.pendingTransferSyncInFlight
-    // Keep allocations that have not reached the indexer from being overwritten
-    // by a stale remote snapshot.
-    if (this.hasPendingSnapshotProtection()) return state.snapshot
+    // An unsigned PSBT is tied to the exact allocation snapshot used during
+    // preparation. Do not advance another transfer or replace that snapshot
+    // while an external signer/UI still holds it.
+    if (this.hasUnsignedPreparedTransfer()) return state.snapshot
     // A remote snapshot may still expose consumed outpoints. Finish durable
     // post-broadcast delivery first, or leave the locally updated snapshot intact.
     if (Object.keys(state.pending).length) await this.advancePendingTransfers()
+    if (state.pendingBroadcastSyncs) await this.flushBroadcastSyncOutbox()
+    // Keep allocations that have not reached the indexer from being overwritten
+    // by a stale snapshot. Prepared sends are instead pinned to their checkpoint
+    // generation and rejected before signing if another device advances it.
+    if (this.hasPendingSnapshotProtection()) return state.snapshot
     const localSnapshotBeforeRequest = JSON.stringify(state.snapshot.utxos)
     const snapshot = normalizeSnapshot(
       await this.dependencies.stateSource.getSnapshot(state.wallet)
@@ -556,7 +562,7 @@ export class RgbService {
     // allocations that this installation already spent in a broadcast tx.
     // Once those outpoints disappear from the remote snapshot, it is safe to
     // accept the remote state again, once it includes any local burn change.
-    if (this.hasStaleBroadcastedFundingOutpoints(snapshot)) return state.snapshot
+    if (await this.reconcileStaleBroadcastedFundingOutpoints(snapshot)) return state.snapshot
     if (await this.reconcileLocalBurnChange(snapshot)) return state.snapshot
     // A replica can briefly omit a validated allocation or return its old
     // pending state after local confirmation. Keep the settled observation
@@ -700,17 +706,34 @@ export class RgbService {
     return false
   }
 
-  private hasStaleBroadcastedFundingOutpoints(snapshot: RgbWalletSnapshot) {
+  private async reconcileStaleBroadcastedFundingOutpoints(snapshot: RgbWalletSnapshot) {
     const state = this.requireState()
-    const spentOutpoints = new Set(
-      (state.pendingSendHistory || [])
-        .filter(item => item.status === 'broadcasted')
-        .flatMap(item => item.spentOutpoints || [])
-        .map(outpoint => `${outpoint.txid}:${outpoint.vout}`)
+    const histories = (state.pendingSendHistory || []).filter(item =>
+      item.status === 'broadcasted' && item.txid && item.spentOutpoints?.some(outpoint =>
+        snapshot.utxos.some(utxo => outpointKey(utxo) === `${outpoint.txid}:${outpoint.vout}`)
+      )
     )
-    return (
-      spentOutpoints.size > 0 && snapshot.utxos.some(utxo => spentOutpoints.has(outpointKey(utxo)))
-    )
+    if (!histories.length) return false
+    const getTransactionStatus = this.dependencies.stateSource.getTransactionStatus
+    if (!getTransactionStatus) return true
+    for (const history of histories) {
+      try {
+        const chain = await getTransactionStatus(state.wallet, history.txid!)
+        if (chain.status !== 'mempool' && chain.status !== 'confirmed') return true
+      } catch {
+        return true
+      }
+      const spent = new Set((history.spentOutpoints || []).map(outpoint =>
+        `${outpoint.txid}:${outpoint.vout}`
+      ))
+      snapshot.utxos = snapshot.utxos.filter(utxo => !spent.has(outpointKey(utxo)))
+      const remoteOutpoints = new Set(snapshot.utxos.map(outpointKey))
+      for (const local of state.snapshot.utxos) {
+        if (local.outpoint.txid !== history.txid || remoteOutpoints.has(outpointKey(local))) continue
+        snapshot.utxos.push(local)
+      }
+    }
+    return false
   }
 
   /** Settle verified burn change locally while the indexer catches up with its RGB allocation. */
@@ -807,7 +830,10 @@ export class RgbService {
       return
     }
     if (this.pendingTransferSyncInFlight) return this.pendingTransferSyncInFlight
-    const sync = this.advancePendingTransfers()
+    const sync = (async () => {
+      await this.advancePendingTransfers()
+      await this.flushBroadcastSyncOutbox()
+    })()
     this.pendingTransferSyncInFlight = sync
     try {
       await sync
@@ -858,7 +884,9 @@ export class RgbService {
           ) {
             return
           }
-          throw error
+          // One malformed or temporarily unavailable transfer must not block
+          // ACK observation, broadcast reconciliation, or outbox delivery for others.
+          return
         }
       })
     }
@@ -3662,6 +3690,9 @@ export class RgbService {
       prepared,
       request: resolvedRequest,
       createdAt: this.now(),
+      ...(state.recoveryCheckpointGeneration === undefined
+        ? {}
+        : { preparedCheckpointGeneration: state.recoveryCheckpointGeneration }),
       ...(proxySenderPrivateKey ? { proxySenderPrivateKey } : {}),
       ...(options.providerOrigin ? { providerOrigin: options.providerOrigin } : {}),
     }
@@ -3688,6 +3719,7 @@ export class RgbService {
       const pending = state.pending[transferId]
       if (!pending) throw new RgbServiceError(`RGB transfer ${transferId} does not exist`)
       if (pending.broadcast) return this.syncBroadcastedTransfer(transferId, pending)
+      this.assertPreparedTransferGeneration(pending)
       if (!pending.delivery) {
         const completed = await this.dependencies.encoder.completeTransfer({
           wallet: state.wallet,
@@ -3730,6 +3762,7 @@ export class RgbService {
       const pending = state.pending[transferId]
       if (!pending) throw new RgbServiceError(`RGB transfer ${transferId} does not exist`)
       if (pending.broadcast) return this.syncBroadcastedTransfer(transferId, pending)
+      this.assertPreparedTransferGeneration(pending)
       const delivery = pending.delivery
       if (!delivery?.requiresCounterpartySignature) {
         throw new RgbServiceError('RGB transfer is not awaiting a buyer swap PSBT')
@@ -3767,6 +3800,7 @@ export class RgbService {
     const pending = state.pending[transferId]
     if (!pending) throw new RgbServiceError(`RGB transfer ${transferId} does not exist`)
     if (pending.broadcast) return this.syncBroadcastedTransfer(transferId, pending)
+    this.assertPreparedTransferGeneration(pending)
 
     if (pending.delivery?.requiresCounterpartySignature) {
       throw new RgbServiceError('RGB swap is awaiting the buyer finalized PSBT')
@@ -3918,6 +3952,10 @@ export class RgbService {
     // to be broadcast. It is no longer safe to signal cancellation, including
     // while the broadcast request itself is in flight.
     if (pending.broadcast) return { aborted: false, reason: 'already_broadcast' as const }
+    if (pending.delivery && await this.observePendingDeliveryBroadcast(pending)) {
+      await this.syncBroadcastedTransfer(transferId, pending)
+      return { aborted: false, reason: 'already_broadcast' as const }
+    }
     if (pending.delivery?.acknowledgedAt && !allowAcknowledged)
       return { aborted: false, reason: 'acknowledged_requires_agreement' as const }
     if (pending.request.donation && pending.delivery?.publishedAt)
@@ -4095,19 +4133,27 @@ export class RgbService {
         // Audit reporting must not turn an already-broadcast irreversible burn into a UI failure.
       }
     }
-    // Consignments were durably posted before this transaction was broadcast.
-    // Regular sends also waited for the recipient ACK.
-    if (!pending.request.burn) await this.dependencies.stateSource.syncBroadcast?.(
-      state.wallet,
-      transferId,
-      broadcast.completed,
-      state.snapshot,
-      {
+    // The transport already has the consignment. Queue only payload-free
+    // indexing metadata; backend availability cannot undo a Bitcoin broadcast.
+    if (!pending.request.burn) {
+      const completed = broadcast.completed
+      const payloadFreeCompleted: RgbCompletedTransfer = {
+        ...completed,
+        rawTx: '',
+        consignments: completed.consignments.map(consignment => ({ ...consignment, payload: '' })),
+        ...(completed.fundingUpdate
+          ? { fundingUpdate: { spentOutpoints: completed.fundingUpdate.spentOutpoints } }
+          : {}),
+      }
+      const outbox = state.pendingBroadcastSyncs ||= {}
+      outbox[transferId] = {
+        completed: payloadFreeCompleted,
+        assetId: pending.request.assetId,
         amount: pending.request.amount,
         createdAt: pending.createdAt,
         invoice: pending.request.invoice,
       }
-    )
+    }
     const sendHistory = state.pendingSendHistory || (state.pendingSendHistory = [])
     const existingHistory = sendHistory.find(item => item.transferId === transferId)
     const broadcastedHistory = {
@@ -4141,7 +4187,33 @@ export class RgbService {
     // The preceding broadcast checkpoint contains the complete transaction;
     // moving it into display history is local bookkeeping only.
     await this.persist({ skipRecovery: true })
+    void this.flushBroadcastSyncOutbox(transferId)
     return broadcast.completed
+  }
+
+  /** Deliver payload-free indexing metadata without holding transfer completion hostage. */
+  private async flushBroadcastSyncOutbox(onlyTransferId?: string) {
+    const state = this.requireState()
+    const syncBroadcast = this.dependencies.stateSource.syncBroadcast
+    if (!syncBroadcast || !state.pendingBroadcastSyncs) return
+    const entries = Object.entries(state.pendingBroadcastSyncs)
+      .filter(([transferId]) => !onlyTransferId || transferId === onlyTransferId)
+    for (const [transferId, item] of entries) {
+      try {
+        await syncBroadcast(state.wallet, transferId, item.completed, state.snapshot, {
+          assetId: item.assetId,
+          amount: item.amount,
+          createdAt: item.createdAt,
+          invoice: item.invoice,
+        })
+        delete state.pendingBroadcastSyncs[transferId]
+        if (Object.keys(state.pendingBroadcastSyncs).length === 0)
+          state.pendingBroadcastSyncs = undefined
+        await this.persist({ skipRecovery: true })
+      } catch {
+        // Retain the durable job for the next background sync.
+      }
+    }
   }
 
   /**
@@ -4683,10 +4755,26 @@ export class RgbService {
     return this.state
   }
 
+  private assertPreparedTransferGeneration(pending: RgbPendingTransfer) {
+    const prepared = pending.preparedCheckpointGeneration
+    const current = this.requireState().recoveryCheckpointGeneration
+    if (prepared !== undefined && prepared !== current) {
+      throw new RgbServiceError('RGB wallet state changed; prepare the transfer again')
+    }
+  }
+
   /** Only tasks that can be overwritten by a stale snapshot may block its refresh. */
   private hasPendingSnapshotProtection() {
     const state = this.requireState()
-    return Boolean(state.pendingUtxoSync || state.pendingIssues?.length)
+    return Boolean(
+      state.pendingUtxoSync || state.pendingIssues?.length || this.hasUnsignedPreparedTransfer()
+    )
+  }
+
+  private hasUnsignedPreparedTransfer() {
+    return Object.values(this.requireState().pending).some(
+      pending => !pending.delivery && !pending.broadcast
+    )
   }
 
   private async persist(
@@ -4921,6 +5009,7 @@ function recoverySnapshot(state: ReturnType<typeof persistState>) {
     validatedV1SendHistories: _validatedV1SendHistories,
     pending,
     pendingSendHistory,
+    pendingBroadcastSyncs: _pendingBroadcastSyncs,
     ...snapshot
   } = state
   return {
@@ -5235,6 +5324,11 @@ function normalizeStateAssetIds(state: RgbServiceState): RgbServiceState {
   state.snapshot = normalizeSnapshot(state.snapshot)
   for (const pending of Object.values(state.pending)) {
     pending.request.assetId = normalizeAssetId(pending.request.assetId)
+  }
+  if (state.pendingBroadcastSyncs) {
+    for (const item of Object.values(state.pendingBroadcastSyncs)) {
+      item.assetId = normalizeAssetId(item.assetId)
+    }
   }
   state.pendingReceives?.forEach(receive => {
     if (receive.assetId) receive.assetId = normalizeAssetId(receive.assetId)

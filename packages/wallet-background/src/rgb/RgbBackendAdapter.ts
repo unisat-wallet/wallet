@@ -52,12 +52,12 @@ export type RgbBackendApi = {
     lease?: RgbActiveWriteLease
     transferId: string
     txid: string
+    assetId: string
     amount: string
     createdAt: number
     spentOutpoints: Array<{ txid: string; vout: number }>
     consignments: Array<{
       recipientId: string
-      payload: string
       assetId: string
       opIds: string[]
       transportId?: string
@@ -171,11 +171,14 @@ export function createRgbBackendAdapter(
         ...(lease ? { lease } : {}),
         transferId,
         txid: transfer.txid,
+        assetId: transfer.consignments[0]?.assetId || metadata.assetId,
         amount: metadata.amount,
         createdAt: metadata.createdAt,
         spentOutpoints: transfer.fundingUpdate?.spentOutpoints ?? [],
         consignments: transfer.consignments.map((consignment, index) => ({
-          ...consignment,
+          recipientId: consignment.recipientId,
+          assetId: consignment.assetId,
+          opIds: consignment.opIds,
           transportId: `${transferId}:${index}`,
         })),
       })

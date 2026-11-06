@@ -2631,6 +2631,24 @@ describe('RgbService', () => {
     await expect(Promise.all(synchronizations)).resolves.toEqual([snapshot, snapshot, snapshot])
   })
 
+  it('does not replace the allocation snapshot while an unsigned transfer is pending', async () => {
+    const dependencies = createDependencies()
+    const service = new RgbService(dependencies)
+    await service.open(wallet)
+    await service.sync()
+    await service.prepareSend({
+      assetId: 'rgb:AQEBAQEB-AQEBAQE-BAQEBAQ-EBAQEBA-QEBAQEB-AQEBAQE',
+      amount: '60',
+      invoice: rgbInvoice(),
+      feeRate: 2,
+    })
+    vi.mocked(dependencies.stateSource.getSnapshot).mockClear()
+    const preparedSnapshot = service.getSnapshot()
+
+    await expect(service.sync()).resolves.toEqual(preparedSnapshot)
+    expect(dependencies.stateSource.getSnapshot).not.toHaveBeenCalled()
+  })
+
   it('keeps an allocation queued while an older snapshot request is in flight', async () => {
     const dependencies = createDependencies()
     const service = new RgbService(dependencies)
@@ -4325,9 +4343,18 @@ describe('RgbService', () => {
     expect(dependencies.stateSource.syncBroadcast).toHaveBeenCalledWith(
       wallet,
       'transfer-1',
-      completed,
+      expect.objectContaining({
+        txid: completed.txid,
+        rawTx: '',
+        consignments: [expect.objectContaining({ payload: '' })],
+      }),
       service.getSnapshot(),
-      { amount: '60', createdAt: expect.any(Number), invoice: rgbInvoice() }
+      {
+        assetId: 'rgb:AQEBAQEB-AQEBAQE-BAQEBAQ-EBAQEBA-QEBAQEB-AQEBAQE',
+        amount: '60',
+        createdAt: expect.any(Number),
+        invoice: rgbInvoice(),
+      }
     )
     expect(service.getPendingSendHistory()).toEqual([
       expect.objectContaining({
@@ -6428,7 +6455,56 @@ describe('RgbService', () => {
     expect(dependencies.broadcaster.broadcast).not.toHaveBeenCalled()
   })
 
-  it('retains a broadcast transfer and retries delivery without rebroadcasting', async () => {
+  it('refuses to cancel a delivery that another party already broadcast', async () => {
+    const dependencies = createDependencies()
+    dependencies.transport.cancelConsignment = vi.fn()
+    dependencies.stateSource.getTransactionStatus = vi.fn().mockResolvedValue({
+      status: 'mempool',
+      confirmations: 0,
+    })
+    const service = new RgbService(dependencies)
+    await service.open(wallet)
+    await service.sync()
+    await service.prepareSend({
+      assetId: 'rgb:AQEBAQEB-AQEBAQE-BAQEBAQ-EBAQEBA-QEBAQEB-AQEBAQE',
+      amount: '60',
+      invoice: rgbInvoice(),
+      feeRate: 2,
+    })
+    await service.completeSend('transfer-1', 'signed-psbt')
+
+    await expect(service.abortSend('transfer-1')).resolves.toEqual({
+      aborted: false,
+      reason: 'already_broadcast',
+    })
+    expect(service.getPendingTransfers()).toEqual([])
+    expect(service.getPendingSendHistory()).toEqual([
+      expect.objectContaining({ transferId: 'transfer-1', status: 'broadcasted' }),
+    ])
+    expect(dependencies.transport.cancelConsignment).not.toHaveBeenCalled()
+  })
+
+  it('rejects signing after the recovery checkpoint generation changes', async () => {
+    const dependencies = createDependencies()
+    const service = new RgbService(dependencies)
+    await service.open(wallet)
+    await service.sync()
+    ;(service as any).state.recoveryCheckpointGeneration = 7
+    await service.prepareSend({
+      assetId: 'rgb:AQEBAQEB-AQEBAQE-BAQEBAQ-EBAQEBA-QEBAQEB-AQEBAQE',
+      amount: '60',
+      invoice: rgbInvoice(),
+      feeRate: 2,
+    })
+    ;(service as any).state.recoveryCheckpointGeneration = 8
+
+    await expect(service.completeSend('transfer-1', 'signed-psbt')).rejects.toThrow(
+      'RGB wallet state changed; prepare the transfer again'
+    )
+    expect(dependencies.encoder.completeTransfer).not.toHaveBeenCalled()
+  })
+
+  it('completes a broadcast locally and retries backend indexing without rebroadcasting', async () => {
     const dependencies = createDependencies()
     vi.mocked(dependencies.stateSource.syncBroadcast)
       .mockRejectedValueOnce(new Error('indexer unavailable'))
@@ -6444,11 +6520,12 @@ describe('RgbService', () => {
     })
 
     await service.completeSend('transfer-1', 'signed-psbt')
-    await expect(service.broadcastPendingSend('transfer-1')).rejects.toThrow(
-      'indexer unavailable'
+    await expect(service.broadcastPendingSend('transfer-1')).resolves.toEqual(
+      expect.objectContaining({ txid: 'c'.repeat(64) })
     )
-    expect(service.getPendingTransfers()).toEqual([
-      expect.objectContaining({ id: 'transfer-1', broadcast: expect.any(Object) }),
+    expect(service.getPendingTransfers()).toEqual([])
+    expect(service.getPendingSendHistory()).toEqual([
+      expect.objectContaining({ transferId: 'transfer-1', status: 'broadcasted' }),
     ])
     await expect(service.abortSend('transfer-1')).resolves.toEqual({
       aborted: false,

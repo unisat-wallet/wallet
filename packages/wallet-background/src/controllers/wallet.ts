@@ -475,12 +475,12 @@ type RgbControllerApiService = {
     lease?: RgbControllerWriteLeaseCredential
     transferId: string
     txid: string
+    assetId: string
     amount: string
     createdAt: number
     spentOutpoints: Array<{ txid: string; vout: number }>
     consignments: Array<{
       recipientId: string
-      payload: string
       assetId: string
       opIds: string[]
       transportId?: string
@@ -5994,6 +5994,11 @@ export class WalletController extends BaseController {
           remoteCheckpointMissing &&
           localRevision !== undefined
         ) {
+          if (service.getPendingTransfers?.().length) {
+            throw new Error(
+              'RGB recovery checkpoint changed while a transfer is in progress; retry the transfer'
+            )
+          }
           // An explicitly empty remote response is not a newer checkpoint. It
           // can occur when recovery data was reset server-side. Re-establish
           // the backup from the complete local state, but only after holding
@@ -6539,11 +6544,19 @@ export class WalletController extends BaseController {
             remoteCheckpointMissing &&
             context.service.getRecoveryCheckpointRevision?.() !== undefined
           ) {
+            if (context.service.getPendingTransfers?.().length) {
+              throw new Error(
+                'RGB recovery checkpoint changed while a transfer is in progress; retry the transfer'
+              )
+            }
             this.rgbRecoveryVersions.delete(key)
             await context.service.requeueRecoveryCheckpointAfterRemoteReset()
             ignoreCheckpointRevision = true
           }
-        } catch {
+        } catch (checkpointError) {
+          if (String(checkpointError).includes('while a transfer is in progress')) {
+            throw checkpointError
+          }
           // A lease disappearance alone can result from expiry. Fall through
           // to a regular acquire when checkpoint inspection is unavailable.
         }

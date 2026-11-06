@@ -337,6 +337,8 @@ export interface RgbTransferSyncRequest {
   lease?: RgbWriteLeaseCredential
   transferId: string
   txid: string
+  /** Asset discriminator retained when consignment payloads are uploaded out of band. */
+  assetId: string
   /** Exact RGB amount resolved from the local invoice before signing. */
   amount: string
   /** Local creation time in milliseconds, retained for stable history ordering. */
@@ -345,7 +347,6 @@ export interface RgbTransferSyncRequest {
   spentOutpoints: Array<{ txid: string; vout: number }>
   consignments: Array<{
     recipientId: string
-    payload: string
     assetId: string
     opIds: string[]
     transportId?: string
