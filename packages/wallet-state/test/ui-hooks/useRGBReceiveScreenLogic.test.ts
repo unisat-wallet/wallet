@@ -160,6 +160,28 @@ describe('useRGBReceiveScreenLogic', () => {
       durationSeconds: 86_400,
       skipSync: true,
     })
+    expect(wallet.getRgbAllocationSummary).toHaveBeenCalledTimes(1)
+    expect(wallet.getRgbAllocationSummary).toHaveBeenCalledWith({ skipSync: true })
+  })
+
+  it('runs a full allocation refresh only when the local snapshot has no reusable UTXO', async () => {
+    const { wrapper, wallet } = createHookTestHarness()
+    wallet.getRgbAllocationSummary
+      .mockResolvedValueOnce({ available: false, pendingAllocationCount: 0 })
+      .mockResolvedValueOnce({ available: true, availableAllocationCount: 1 })
+    const { result } = renderHook(() => useRGBReceiveScreenLogic(), { wrapper })
+
+    await act(async () => {
+      await result.current.onCreateInvoice()
+    })
+
+    expect(wallet.getRgbAllocationSummary).toHaveBeenNthCalledWith(1, { skipSync: true })
+    expect(wallet.getRgbAllocationSummary).toHaveBeenNthCalledWith(2, { skipSync: false })
+    expect(wallet.createRgbBlindReceive).toHaveBeenCalledWith({
+      durationSeconds: 86_400,
+      skipSync: true,
+    })
+    expect(wallet.createRgbUtxosBegin).not.toHaveBeenCalled()
   })
 
   it('keeps fixed amounts unavailable for a configured token without precision metadata', () => {

@@ -612,10 +612,17 @@ export function useRGBReceiveScreenLogic(
 
   const ensureRgbAllocation = async () => {
     setLoadingText(t('rgb_checking_utxo'))
-    const summary = await rgbWallet.getRgbAllocationSummary({ skipSync: false })
-    if (hasReusableRgbAllocation(summary)) {
+    // Invoice creation only needs one allocation already known to be free in
+    // the encrypted local snapshot. A full refresh may repair unrelated BFA
+    // histories and wait on their EVM RPC, so use it only when the local view
+    // cannot provide a candidate.
+    const localSummary = await rgbWallet.getRgbAllocationSummary({ skipSync: true })
+    if (hasReusableRgbAllocation(localSummary)) {
       return true
     }
+
+    const refreshedSummary = await rgbWallet.getRgbAllocationSummary({ skipSync: false })
+    if (hasReusableRgbAllocation(refreshedSummary)) return true
 
     await startCreateRgbUtxoSign()
     return false
@@ -712,7 +719,9 @@ export function useRGBReceiveScreenLogic(
       setUtxoPendingVanillaTxid('')
 
       if (resumeCreateInvoiceAfterSign) {
-        await finishCreateInvoice()
+        // createRgbUtxosEnd has already registered the new funding output in
+        // local state. Do not immediately run an unrelated full BFA repair.
+        await finishCreateInvoice(true)
       }
     } catch (e: unknown) {
       await abortRgbVanillaTx(utxoPendingVanillaTxid)
