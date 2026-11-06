@@ -423,4 +423,36 @@ describe('useRGBTokenScreenLogic', () => {
     })
     expect(result.current.activityTotal).toBe(1)
   })
+
+  it('prefers an indexed broadcast over the same stale local signed transfer', async () => {
+    const { wrapper, wallet } = createHookTestHarness({ routeState: { assetId } })
+    wallet.getRGBAssetDetail.mockResolvedValue(detail)
+    wallet.getRGBAssetBalance.mockResolvedValue(fetchedBalance)
+    wallet.getRGBAssetActivity.mockResolvedValue({
+      total: 1,
+      list: [{
+        id: 'transfer-1', assetId, type: 'send', status: 'mempool', amount: '1',
+        txid: 'a'.repeat(64), timestamp: 2,
+      }],
+    })
+    wallet.getRgbTransfers.mockResolvedValue({
+      total: 2,
+      list: [{
+        id: 'local-send:transfer-1', transferId: 'transfer-1', assetId,
+        type: 'send', status: 'signed', amount: '1', lockedAmount: '1',
+        timestamp: 1, local: true,
+      }],
+    })
+
+    const { result } = renderHook(() => useRGBTokenScreenLogic(), { wrapper })
+
+    await waitFor(() => {
+      expect(result.current.activityItems).toEqual([
+        expect.objectContaining({
+          id: 'transfer-1', status: 'mempool', txid: 'a'.repeat(64),
+        }),
+      ])
+    })
+    expect(result.current.activityTotal).toBe(1)
+  })
 })

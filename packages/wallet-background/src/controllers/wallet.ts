@@ -1116,6 +1116,28 @@ export class WalletController extends BaseController {
     getContext: () => this.getLocalRgbReadService(),
     syncReceiveHistory: (service, context) => this.syncRgbReceiveHistory(service, context.wallet),
     syncPendingTransfers: (service, context) => this.syncRgbPendingTransfers(service, context),
+    reconcileIndexedBroadcasts: async (service, context, activity) => {
+      if (!(await this.tryEnsureRgbWriteLease(context, { forceRenew: true }))) return
+      let changed = false
+      for (const item of activity) {
+        const status = String(item.status ?? '').toLowerCase()
+        if (
+          item.type !== 'send' ||
+          !item.id ||
+          !item.txid ||
+          !['mempool', 'broadcasted', 'confirmed', 'settled'].includes(status)
+        ) continue
+        changed = await service.reconcileIndexedBroadcast({
+          transferId: item.id,
+          txid: item.txid,
+          ...(item.assetId === undefined ? {} : { assetId: item.assetId }),
+          ...(item.amount === undefined || item.amount === null
+            ? {}
+            : { amount: String(item.amount) }),
+        }) || changed
+      }
+      if (changed) await this.rgbCoordinator.syncListState()
+    },
     syncReceivedAllocations: () => this.syncRgbReceivedAllocations(),
     getRemoteActivity: async (address, currentPage, pageSize) => {
       const result = await this.getAddressRgbActivity(address, currentPage, pageSize)

@@ -842,6 +842,69 @@ export class RgbService {
     }
   }
 
+  /**
+   * Recover a send whose irreversible backend/chain effects survived while an
+   * older checkpoint restored only its prepared reservation. The wallet
+   * backend indexes sends with the local transfer ID, but do not trust that
+   * record alone: the exact Bitcoin transaction must also be observable.
+   */
+  async reconcileIndexedBroadcast(input: {
+    transferId: string
+    txid: string
+    assetId?: string
+    amount?: string
+  }): Promise<boolean> {
+    const state = this.requireState()
+    const pending = state.pending[input.transferId]
+    if (!pending || pending.delivery || pending.broadcast || pending.request.burn) return false
+    if (!/^[0-9a-f]{64}$/i.test(input.txid)) return false
+    if (input.assetId) {
+      try {
+        if (normalizeAssetId(input.assetId) !== normalizeAssetId(pending.request.assetId)) return false
+      } catch {
+        return false
+      }
+    }
+    if (input.amount !== undefined && input.amount !== pending.request.amount) return false
+
+    const getTransactionStatus = this.dependencies.stateSource.getTransactionStatus
+    if (!getTransactionStatus) return false
+    try {
+      const chain = await getTransactionStatus(state.wallet, input.txid)
+      if (chain.status !== 'mempool' && chain.status !== 'confirmed') return false
+    } catch {
+      return false
+    }
+
+    const rollback = snapshotState(state)
+    const history = state.pendingSendHistory || (state.pendingSendHistory = [])
+    const recovered = {
+      transferId: input.transferId,
+      assetId: pending.request.assetId,
+      amount: pending.request.amount,
+      ...(pending.request.precision === undefined ? {} : { precision: pending.request.precision }),
+      txid: input.txid.toLowerCase(),
+      invoice: pending.request.invoice,
+      ...(pending.request.donation ? { donation: true } : {}),
+      ...(pending.request.donation && !decodeRgbInvoice(pending.request.invoice).proxyInvoiceId
+        ? { recipientAckExpected: true }
+        : {}),
+      spentOutpoints: pending.prepared.lockedOutpoints,
+      createdAt: pending.createdAt,
+      status: 'broadcasted' as const,
+      ...(pending.providerOrigin ? { providerOrigin: pending.providerOrigin } : {}),
+      ...(pending.providerOrigin
+        ? { providerOriginExpiresAt: this.now() + PROVIDER_ORIGIN_HISTORY_TTL_MS }
+        : {}),
+    }
+    const existing = history.find(item => item.transferId === input.transferId)
+    if (existing) Object.assign(existing, recovered)
+    else history.push(recovered)
+    delete state.pending[input.transferId]
+    await this.persistWithRecoveryRollback(rollback)
+    return true
+  }
+
   private async advancePendingTransfers() {
     const state = this.requireState()
     for (const transferId of Object.keys(state.pending)) {

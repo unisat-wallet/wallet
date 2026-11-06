@@ -136,12 +136,34 @@ export function useRGBTokenScreenLogic() {
           txid: transfer.txid ?? '',
           timestamp: transfer.timestamp,
         }))
-      const localTxids = new Set(localItems.map(item => item.txid).filter(Boolean))
-      const localIds = new Set(localItems.map(item => item.id))
+      const normalizeTransferId = (item: Pick<RgbActivityItem, 'id' | 'transferId'>) =>
+        (item.transferId ?? item.id).replace(/^local-send:/, '')
+      const remoteSendIds = new Set(
+        activity.list
+          .filter(item =>
+            item.type === 'send' &&
+            ['mempool', 'broadcasted', 'confirmed', 'settled'].includes(
+              String(item.status ?? '').toLowerCase()
+            )
+          )
+          .map(item => normalizeTransferId(item))
+          .filter(Boolean)
+      )
+      // If the indexer already knows the same transfer, prefer its chain
+      // status over a prepared local row restored from an older checkpoint.
+      const visibleLocalItems = localItems.filter(item =>
+        item.type !== 'send' ||
+        !['signed', 'waiting_ack', 'broadcasting', 'ready_to_broadcast'].includes(
+          String(item.status ?? '').toLowerCase()
+        ) ||
+        !remoteSendIds.has(normalizeTransferId(item))
+      )
+      const localTxids = new Set(visibleLocalItems.map(item => item.txid).filter(Boolean))
+      const localIds = new Set(visibleLocalItems.flatMap(item => [item.id, normalizeTransferId(item)]))
       const remoteItems = activity.list.filter(
         item => !localIds.has(item.id) && (!item.txid || !localTxids.has(item.txid))
       )
-      const list = [...localItems, ...remoteItems].sort(
+      const list = [...visibleLocalItems, ...remoteItems].sort(
         (left, right) => right.timestamp - left.timestamp
       )
       return {
@@ -149,7 +171,7 @@ export function useRGBTokenScreenLogic() {
         total:
           activity.list.length >= activity.total
             ? list.length
-            : Math.max(activity.total + localItems.length, list.length),
+            : Math.max(activity.total + visibleLocalItems.length, list.length),
       }
     },
     dependencies: [assetId, activityType, isUnconfiguredUsdt],

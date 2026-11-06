@@ -30,6 +30,11 @@ type RgbTransferQueryDependencies = {
   getContext: () => Promise<LocalRgbServiceContext>
   syncReceiveHistory: (service: RgbService, context: LocalRgbServiceContext) => Promise<void>
   syncPendingTransfers: (service: RgbService, context: LocalRgbServiceContext) => Promise<void>
+  reconcileIndexedBroadcasts?: (
+    service: RgbService,
+    context: LocalRgbServiceContext,
+    activity: RgbRemoteActivity[]
+  ) => Promise<void>
   syncReceivedAllocations: () => Promise<LocalRgbServiceContext>
   getRemoteActivity: (
     address: string,
@@ -153,13 +158,21 @@ export class RgbTransferQuery {
       }
     }
 
-    const [activity, pendingTransfers] = await Promise.all([
+    const [activity, initialPendingTransfers] = await Promise.all([
       activityPromise || this.getRemoteActivity(
         wallet, currentPage, pageSize,
         receiveStateBeforeSync !== undefined && receiveStateBeforeSync !== this.receiveStateKey(service)
       ),
       Promise.resolve(service.getPendingTransfers()),
     ])
+    if (!options?.skipSync && initialPendingTransfers.some(transfer => !transfer.delivery && !transfer.broadcast)) {
+      try {
+        await this.dependencies.reconcileIndexedBroadcasts?.(service, context, activity.list)
+      } catch (error) {
+        this.dependencies.warn('Failed to reconcile an indexed RGB broadcast', error)
+      }
+    }
+    const pendingTransfers = service.getPendingTransfers()
     const snapshotUtxos = new Map(
       (service.getSnapshot?.()?.utxos || []).map(utxo => [
         `${utxo.outpoint.txid}:${utxo.outpoint.vout}`,
@@ -445,7 +458,17 @@ export class RgbTransferQuery {
       }
     }
     const includeLocalTransfers = currentPage === 1
-    const visibleLocalSends = includeLocalTransfers ? localSends : []
+    const indexedSendIds = new Set(activity.list
+      .filter(item =>
+        item.type === 'send' && item.id && item.txid &&
+        ['mempool', 'broadcasted', 'confirmed', 'settled'].includes(
+          String(item.status ?? '').toLowerCase()
+        )
+      )
+      .flatMap(item => item.id ? [item.id] : []))
+    const visibleLocalSends = includeLocalTransfers
+      ? localSends.filter(send => !indexedSendIds.has(send.transferId))
+      : []
     const visibleLocalIssues = includeLocalTransfers ? localIssues : []
     const visibleLocalReceiveHistory = includeLocalTransfers
       ? localReceiveHistory

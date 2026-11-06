@@ -210,6 +210,59 @@ describe('RgbService', () => {
     })
   })
 
+  it('recovers an indexed broadcast restored as a prepared reservation', async () => {
+    const dependencies = createDependencies()
+    dependencies.stateSource.getTransactionStatus = vi.fn().mockResolvedValue({
+      status: 'mempool',
+      confirmations: 0,
+    })
+    const service = new RgbService(dependencies)
+    await service.open(wallet)
+    await service.sync()
+    await service.prepareSend({
+      assetId: 'rgb:AQEBAQEB-AQEBAQE-BAQEBAQ-EBAQEBA-QEBAQEB-AQEBAQE',
+      amount: '60', invoice: rgbInvoice(), feeRate: 2,
+    })
+
+    await expect(service.reconcileIndexedBroadcast({
+      transferId: 'transfer-1',
+      txid: 'c'.repeat(64),
+      assetId: 'rgb:AQEBAQEB-AQEBAQE-BAQEBAQ-EBAQEBA-QEBAQEB-AQEBAQE',
+      amount: '60',
+    })).resolves.toBe(true)
+
+    expect(service.getPendingTransfers()).toEqual([])
+    expect(service.getPendingSendHistory()).toEqual([
+      expect.objectContaining({
+        transferId: 'transfer-1',
+        txid: 'c'.repeat(64),
+        status: 'broadcasted',
+        spentOutpoints: [{ txid: 'b'.repeat(64), vout: 1 }],
+      }),
+    ])
+  })
+
+  it('does not trust an indexed send whose transaction is absent from the chain source', async () => {
+    const dependencies = createDependencies()
+    dependencies.stateSource.getTransactionStatus = vi.fn().mockResolvedValue({
+      status: 'not_found',
+      confirmations: 0,
+    })
+    const service = new RgbService(dependencies)
+    await service.open(wallet)
+    await service.sync()
+    await service.prepareSend({
+      assetId: 'rgb:AQEBAQEB-AQEBAQE-BAQEBAQ-EBAQEBA-QEBAQEB-AQEBAQE',
+      amount: '60', invoice: rgbInvoice(), feeRate: 2,
+    })
+
+    await expect(service.reconcileIndexedBroadcast({
+      transferId: 'transfer-1', txid: 'c'.repeat(64), amount: '60',
+    })).resolves.toBe(false)
+    expect(service.getPendingTransfers()).toHaveLength(1)
+    expect(service.getPendingSendHistory()).toEqual([])
+  })
+
   it('does not count both sides of a self-transfer while its source UTXO is still active', async () => {
     const service = new RgbService(createDependencies())
     await service.open(wallet)

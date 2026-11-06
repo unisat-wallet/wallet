@@ -4,6 +4,50 @@ import { toRgbDisplayAmount } from '@unisat/wallet-shared'
 import { RgbTransferQuery } from '../src/rgb/RgbTransferQuery'
 
 describe('RgbTransferQuery', () => {
+  it('reconciles and renders one indexed broadcast for a stale prepared send', async () => {
+    let pending = [{
+      id: 'transfer-1',
+      request: { assetId: 'rgb:asset', amount: '1', precision: 0 },
+      prepared: { lockedOutpoints: [{ txid: 'b'.repeat(64), vout: 0 }] },
+      createdAt: 1,
+    }]
+    const service = {
+      getPendingTransfers: vi.fn().mockImplementation(() => pending),
+      getPendingSendHistory: vi.fn().mockReturnValue([]),
+      getIssueHistory: vi.fn().mockReturnValue([]),
+      getPendingReceiveHistory: vi.fn().mockReturnValue([]),
+      getPendingReceives: vi.fn().mockReturnValue([]),
+    }
+    const context = {
+      service,
+      wallet: { walletId: 'wallet', fundingAddress: 'funding', network: 'mainnet' },
+    }
+    const indexed = {
+      id: 'transfer-1', assetId: 'rgb:asset', type: 'send', amount: '1',
+      txid: 'c'.repeat(64), status: 'mempool', createdAt: 2,
+    }
+    const reconcileIndexedBroadcasts = vi.fn().mockImplementation(async () => {
+      pending = []
+    })
+    const query = new RgbTransferQuery({
+      getContext: vi.fn().mockResolvedValue(context as never),
+      syncReceiveHistory: vi.fn(),
+      syncPendingTransfers: vi.fn(),
+      reconcileIndexedBroadcasts,
+      syncReceivedAllocations: vi.fn().mockResolvedValue(context as never),
+      getRemoteActivity: vi.fn().mockResolvedValue({ total: 1, list: [indexed] }),
+      warn: vi.fn(),
+    })
+
+    const result = await query.getTransfers(1, 20)
+
+    expect(reconcileIndexedBroadcasts).toHaveBeenCalledWith(service, context, [indexed])
+    expect(result.list).toEqual([
+      expect.objectContaining({ id: 'transfer-1', status: 'mempool', txid: 'c'.repeat(64) }),
+    ])
+    expect(result.total).toBe(1)
+  })
+
   it('reuses a recent first-page activity read across repeated page mounts', async () => {
     const service = {
       getPendingTransfers: vi.fn().mockReturnValue([]),
