@@ -269,6 +269,19 @@ export interface RgbPendingReceive {
   minConfirmations?: number
   /** dApp origin that created this invoice; local-only and excluded from recovery checkpoints. */
   providerOrigin?: string
+  /** Prevent generic receive acceptance from bypassing a backend-controlled swap commit. */
+  acceptancePolicy?: 'buy_swap_backend_commit'
+  /**
+   * Buyer-side market swap authorization. The buyer-only PSBT may leave the
+   * wallet, but ACK remains blocked until the Proxy v1 sender proves that its
+   * backend committed the exact signed proposal.
+   */
+  buySwapIntent?: {
+    txid: string
+    buyerSignedPsbtHash: string
+    stagedAt: number
+    backendCommittedAt?: number
+  }
   /** RGB beneficiary; for witness invoices this is the stable wvout identifier. */
   recipientId: string
   /** Per-invoice proxy storage key. Defaults to recipientId for legacy blind invoices. */

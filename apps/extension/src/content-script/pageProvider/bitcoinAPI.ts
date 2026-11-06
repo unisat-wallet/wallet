@@ -285,7 +285,7 @@ export class BitcoinAPIMethods {
     return this.provider[requestMethodKey]({ method: 'issueRgbNia', params });
   };
 
-  createRgbReceiveInvoice = async (params: { assetId?: string; amount?: string; durationSeconds?: number; recipientType?: 'blind' | 'witness'; minConfirmations?: number }) => {
+  createRgbReceiveInvoice = async (params: { assetId?: string; amount?: string; durationSeconds?: number; recipientType?: 'blind' | 'witness'; minConfirmations?: number; purpose?: 'buy_swap' }) => {
     return this.provider[requestMethodKey]({ method: 'createRgbReceiveInvoice', params });
   };
 
@@ -345,8 +345,12 @@ export class BitcoinAPIMethods {
     return this.provider[requestMethodKey]({ method: 'getRgbSwapStatus', params: { transferId } });
   };
 
-  signRgbBuySwapAndAcceptConsignment = async (params: { recipientId: string; assetId: string; amount: string; maxBtcSpend: string; makerSignedPsbt: string }) => {
-    return this.provider[requestMethodKey]({ method: 'signRgbBuySwapAndAcceptConsignment', params });
+  signRgbBuySwap = async (params: { recipientId: string; assetId: string; amount: string; maxBtcSpend: string; swapPsbt: string }) => {
+    return this.provider[requestMethodKey]({ method: 'signRgbBuySwap', params });
+  };
+
+  acceptRgbBuySwap = async (params: { recipientId: string; backendCommit: string }) => {
+    return this.provider[requestMethodKey]({ method: 'acceptRgbBuySwap', params });
   };
 
 }

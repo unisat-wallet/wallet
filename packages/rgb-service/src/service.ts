@@ -1042,6 +1042,7 @@ export class RgbService {
     durationSeconds?: number
     minConfirmations?: number
     providerOrigin?: string
+    acceptancePolicy?: 'buy_swap_backend_commit'
     /** The caller will immediately claim the recipient and persist the combined state. */
     deferRecoveryCheckpoint?: boolean
   }) {
@@ -1054,6 +1055,7 @@ export class RgbService {
     durationSeconds?: number
     minConfirmations?: number
     providerOrigin?: string
+    acceptancePolicy?: 'buy_swap_backend_commit'
     deferRecoveryCheckpoint?: boolean
   }) {
     const state = this.requireState()
@@ -1118,6 +1120,7 @@ export class RgbService {
       } : {}),
       ...(input.minConfirmations === undefined ? {} : { minConfirmations: input.minConfirmations }),
       ...(input.providerOrigin ? { providerOrigin: input.providerOrigin } : {}),
+      ...(input.acceptancePolicy ? { acceptancePolicy: input.acceptancePolicy } : {}),
       assetId,
       amount: input.amount,
       expirationTimestamp: invoiceExpirationTimestamp,
@@ -1145,6 +1148,7 @@ export class RgbService {
     durationSeconds?: number
     minConfirmations?: number
     providerOrigin?: string
+    acceptancePolicy?: 'buy_swap_backend_commit'
     deferRecoveryCheckpoint?: boolean
   }) {
     return this.runPendingReceiveOperation(() => this.createWitnessReceiveOnce(input))
@@ -1158,6 +1162,7 @@ export class RgbService {
     durationSeconds?: number
     minConfirmations?: number
     providerOrigin?: string
+    acceptancePolicy?: 'buy_swap_backend_commit'
     deferRecoveryCheckpoint?: boolean
   }) {
     const state = this.requireState()
@@ -1216,6 +1221,7 @@ export class RgbService {
       } : {}),
       ...(input.minConfirmations === undefined ? {} : { minConfirmations: input.minConfirmations }),
       ...(input.providerOrigin ? { providerOrigin: input.providerOrigin } : {}),
+      ...(input.acceptancePolicy ? { acceptancePolicy: input.acceptancePolicy } : {}),
       proxyRecipientId: decoded.proxyRecipientId,
       recipientType: 'witness' as const,
       witnessScriptPubKey: input.scriptPubKey.toLowerCase(),
@@ -1819,7 +1825,19 @@ export class RgbService {
             try {
               const acknowledgementResult = await this.acknowledgeProxyConsignment(item, true)
               if (acknowledgementResult?.releasePending) {
-                if (item.batch || receive.pendingAccept?.batch || receive.receivedConsignment.batch) {
+                if (
+                  receive.buySwapIntent?.backendCommittedAt ||
+                  item.batch ||
+                  receive.pendingAccept?.batch ||
+                  receive.receivedConsignment.batch
+                ) {
+                  if (receive.buySwapIntent?.backendCommittedAt) {
+                    receive.receivedConsignment.accepted = true
+                    delete receive.receivedConsignment.acknowledgementPending
+                    delete receive.pendingAccept
+                    this.markProxyDataReleasePending(receive)
+                    changed = true
+                  }
                   continue
                 }
                 // A single-recipient operation releases its transaction on
@@ -1831,19 +1849,32 @@ export class RgbService {
                 continue
               }
               if (acknowledgementResult?.signedRawTx) {
-                await this.persistAndBroadcastReceiveAnchor(
-                  receive,
-                  match.txid,
-                  acknowledgementResult.signedRawTx,
-                  match.signedRawTx || receive.pendingAccept?.signedRawTx
-                )
+                if (receive.buySwapIntent?.backendCommittedAt) {
+                  this.assertReceiveAnchorTransaction(
+                    match.txid,
+                    acknowledgementResult.signedRawTx,
+                    match.signedRawTx || receive.pendingAccept?.signedRawTx
+                  )
+                } else {
+                  await this.persistAndBroadcastReceiveAnchor(
+                    receive,
+                    match.txid,
+                    acknowledgementResult.signedRawTx,
+                    match.signedRawTx || receive.pendingAccept?.signedRawTx
+                  )
+                }
               }
             } catch (error) {
               if (!(error instanceof RgbProxyOperationNotFoundError &&
+                !receive.buySwapIntent?.backendCommittedAt &&
                 await this.ensureDonationAnchorBroadcast(
                   receive, match.txid, match.signedRawTx || receive.pendingAccept?.signedRawTx
                 ))) {
-                if (isProxySignedTransactionCleared(error)) {
+                if (
+                  isProxySignedTransactionCleared(error) ||
+                  (error instanceof RgbProxyOperationNotFoundError &&
+                    !!receive.buySwapIntent?.backendCommittedAt)
+                ) {
                   this.recordReceiveOutcome(receive, 'canceled', match.txid)
                   pending.splice(receiveIndex, 1)
                   changed = true
@@ -2017,11 +2048,64 @@ export class RgbService {
     return { received: count, snapshotRequired }
   }
 
-  async acceptReceive(recipientId: string) {
-    return this.runPendingReceiveOperation(() => this.acceptReceiveOnce(recipientId))
+  /** Bind a buyer-only PSBT to the validated Proxy v1 consignment before exposing it. */
+  async stageBuySwapIntent(
+    recipientId: string,
+    input: { txid: string; buyerSignedPsbtHash: string }
+  ) {
+    return this.runPendingReceiveOperation(async () => {
+      const state = this.requireState()
+      const receive = (state.pendingReceives || []).find(
+        item => item.recipientId === recipientId || item.proxyRecipientId === recipientId
+      )
+      if (!receive?.pendingAccept) {
+        throw new RgbServiceError(`RGB receive ${recipientId} is not awaiting acceptance`)
+      }
+      if (
+        !receive.proxyPrivateKey ||
+        !receive.pendingAccept.proxyTransferId ||
+        !receive.pendingAccept.proxySenderPublicKey
+      ) {
+        throw new RgbServiceError('RGB buy swap requires a Proxy v1 sender operation')
+      }
+      if (receive.pendingAccept.txid.toLowerCase() !== input.txid.toLowerCase()) {
+        throw new RgbServiceError('RGB buy swap PSBT does not match the validated consignment')
+      }
+      if (!/^[0-9a-f]{64}$/i.test(input.buyerSignedPsbtHash)) {
+        throw new RgbServiceError('RGB buy swap signed PSBT hash is invalid')
+      }
+      const existing = receive.buySwapIntent
+      if (
+        existing &&
+        (existing.txid.toLowerCase() !== input.txid.toLowerCase() ||
+          existing.buyerSignedPsbtHash.toLowerCase() !== input.buyerSignedPsbtHash.toLowerCase())
+      ) {
+        throw new RgbServiceError('RGB buy swap already has a different signed proposal')
+      }
+      if (!existing) {
+        receive.acceptancePolicy = 'buy_swap_backend_commit'
+        receive.buySwapIntent = {
+          txid: input.txid.toLowerCase(),
+          buyerSignedPsbtHash: input.buyerSignedPsbtHash.toLowerCase(),
+          stagedAt: this.now(),
+        }
+        await this.persist({ waitForRecovery: true })
+      }
+      return receive.buySwapIntent
+    })
   }
 
-  private async acceptReceiveOnce(recipientId: string) {
+  async acceptReceive(
+    recipientId: string,
+    options: { buySwapBackendCommitted?: boolean } = {}
+  ) {
+    return this.runPendingReceiveOperation(() => this.acceptReceiveOnce(recipientId, options))
+  }
+
+  private async acceptReceiveOnce(
+    recipientId: string,
+    options: { buySwapBackendCommitted?: boolean }
+  ) {
     const state = this.requireState()
     const pending = state.pendingReceives || []
     const receive = pending.find(
@@ -2035,6 +2119,21 @@ export class RgbService {
     }
     if (!receive?.pendingAccept) {
       throw new RgbServiceError(`RGB receive ${recipientId} is not awaiting acceptance`)
+    }
+    if (
+      receive.acceptancePolicy === 'buy_swap_backend_commit' &&
+      options.buySwapBackendCommitted !== true
+    ) {
+      throw new RgbServiceError('RGB buy swap requires a verified backend commitment before ACK')
+    }
+    if (
+      options.buySwapBackendCommitted === true &&
+      (receive.acceptancePolicy !== 'buy_swap_backend_commit' || !receive.buySwapIntent)
+    ) {
+      throw new RgbServiceError('RGB receive is not a staged buy swap')
+    }
+    if (options.buySwapBackendCommitted === true && !receive.proxyPrivateKey) {
+      throw new RgbServiceError('RGB buy swap ACK requires Proxy v1')
     }
     if (receive.rejection) {
       throw new RgbServiceError(`RGB receive ${recipientId} was already rejected`)
@@ -2085,6 +2184,13 @@ export class RgbService {
         item.txid,
         requiredOperationIds
       )
+      if (
+        options.buySwapBackendCommitted === true &&
+        receive.buySwapIntent &&
+        !receive.buySwapIntent.backendCommittedAt
+      ) {
+        receive.buySwapIntent.backendCommittedAt = this.now()
+      }
       // Persist the local receipt before ACK. If the extension stops after
       // the proxy accepts it, recovery can reconcile ACK=true without losing
       // the payload needed for settlement.
@@ -2131,6 +2237,14 @@ export class RgbService {
       acknowledgementResult = await this.acknowledgeProxyConsignment(item, true)
     } catch (error) {
       if (error instanceof RgbProxyOperationNotFoundError) {
+        if (receive.buySwapIntent?.backendCommittedAt) {
+          // A backend-committed swap must never fall back to the donation
+          // broadcast path: Proxy v1 may only hold the maker-partial tx.
+          this.recordReceiveOutcome(receive, 'canceled', receive.pendingAccept.txid)
+          state.pendingReceives = pending.filter(item => item !== receive)
+          await this.persist()
+          return { accepted: false, status: 'canceled' as const }
+        }
         const alreadyBroadcast = await this.ensureDonationAnchorBroadcast(
           receive, item.txid, receive.pendingAccept.signedRawTx
         )
@@ -2152,7 +2266,7 @@ export class RgbService {
         return { accepted: false, status: 'canceled' as const }
       }
     }
-    if (acknowledgementResult?.releasePending) {
+    if (acknowledgementResult?.releasePending && !receive.buySwapIntent?.backendCommittedAt) {
       if (receive.pendingAccept.batch !== true) {
         // For a non-batch operation there are no other recipients to wait
         // for. Proxy 0.4 returns this same shape after ack.clean removed the
@@ -2165,12 +2279,23 @@ export class RgbService {
       return { accepted: false, status: 'pending' as const }
     }
     if (acknowledgementResult?.signedRawTx) {
-      await this.persistAndBroadcastReceiveAnchor(
-        receive,
-        item.txid,
-        acknowledgementResult.signedRawTx,
-        receive.pendingAccept.signedRawTx
-      )
+      if (receive.buySwapIntent?.backendCommittedAt) {
+        // Proxy v1 immutable ack.prepare may contain the maker's initial
+        // partial transaction. Bind it to the validated consignment, but leave
+        // the backend-held final transaction as the only broadcast candidate.
+        this.assertReceiveAnchorTransaction(
+          item.txid,
+          acknowledgementResult.signedRawTx,
+          receive.pendingAccept.signedRawTx
+        )
+      } else {
+        await this.persistAndBroadcastReceiveAnchor(
+          receive,
+          item.txid,
+          acknowledgementResult.signedRawTx,
+          receive.pendingAccept.signedRawTx
+        )
+      }
     }
     receive.receivedConsignment!.accepted = true
     delete receive.receivedConsignment!.acknowledgementPending
@@ -2181,9 +2306,9 @@ export class RgbService {
       await this.persist({ waitForRecovery: true })
     }
 
-    // Proxy v1 releases the same signed transaction to both parties after the
-    // ACK. The receiver normally broadcasts it here; the sender may safely
-    // broadcast the identical transaction as a liveness fallback.
+    // Ordinary Proxy v1 receives broadcast the released transaction above.
+    // A backend-committed buy swap intentionally leaves broadcast to its
+    // sender/backend and never exposes those final bytes through the provider.
     return { accepted: true, status: 'accepted' as const }
   }
 

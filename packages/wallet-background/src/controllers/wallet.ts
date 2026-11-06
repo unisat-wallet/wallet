@@ -553,6 +553,7 @@ type RgbReceiveInvoiceRequest = {
   minConfirmations?: number
   skipSync?: boolean
   providerOrigin?: string
+  acceptancePolicy?: 'buy_swap_backend_commit'
 }
 
 type RgbPendingReceiveInvoicesRequest = {
@@ -4508,6 +4509,7 @@ export class WalletController extends BaseController {
       ...(params.durationSeconds === undefined ? {} : { durationSeconds: params.durationSeconds }),
       ...(params.minConfirmations === undefined ? {} : { minConfirmations: params.minConfirmations }),
       ...(params.providerOrigin === undefined ? {} : { providerOrigin: params.providerOrigin }),
+      ...(params.acceptancePolicy === undefined ? {} : { acceptancePolicy: params.acceptancePolicy }),
       deferRecoveryCheckpoint: true,
     })
     await context.service.claimPendingReceives()
@@ -4548,6 +4550,10 @@ export class WalletController extends BaseController {
       txid: pending.txid,
       accepted: receive.receivedConsignment?.accepted === true,
       providerOrigin: receive.providerOrigin,
+      proxyTransferId: pending.proxyTransferId,
+      proxySenderPublicKey: pending.proxySenderPublicKey,
+      acceptancePolicy: receive.acceptancePolicy,
+      buySwapIntent: receive.buySwapIntent,
     }
   }
 
@@ -5766,6 +5772,15 @@ export class WalletController extends BaseController {
     await this.ensureRgbWriteLease(context, { forceRenew: true })
     return this.rgbReceiveOperations.acceptReceive(params.recipientId, context)
   }
+
+  stageRgbBuySwapIntent = async (params: {
+    recipientId: string
+    txid: string
+    buyerSignedPsbtHash: string
+  }) => this.rgbReceiveOperations.stageBuySwapIntent(params.recipientId, params)
+
+  acceptRgbBuySwap = async (params: { recipientId: string }) =>
+    this.rgbReceiveOperations.acceptBuySwap(params.recipientId)
 
   rejectRgbReceive = async (params: { recipientId: string }) => {
     const context = await this.getLocalRgbService()

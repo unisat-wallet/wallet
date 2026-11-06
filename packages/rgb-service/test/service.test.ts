@@ -5414,6 +5414,84 @@ describe('RgbService', () => {
     })
   })
 
+  it('requires a backend-committed buy swap ACK and leaves broadcast to the sender', async () => {
+    const anchor = receiveAnchorTransaction()
+    const dependencies = createDependencies()
+    dependencies.transport.acknowledgeConsignment = vi.fn().mockResolvedValue({
+      signedRawTx: anchor.rawTx,
+    })
+    const service = new RgbService(dependencies)
+    await service.open(wallet)
+    ;(service as any).state.pendingReceives = [{
+      invoice: rgbInvoice(), recipientId: 'recipient', proxyRecipientId: 'proxy-recipient',
+      proxyPrivateKey: '11'.repeat(32), createdAt: 1,
+      pendingAccept: {
+        payload: 'consignment', txid: anchor.txid, endpoint: proxyEndpoint,
+        proxyTransferId: 'd'.repeat(64), proxySenderPublicKey: '22'.repeat(32),
+        proxySenderEndpoint: proxyEndpoint, proxyConsignmentHash: '33'.repeat(32),
+        assetId: 'rgb:AQEBAQEB-AQEBAQE-BAQEBAQ-EBAQEBA-QEBAQEB-AQEBAQE',
+        amount: '60', discoveredAt: 1, signedRawTx: anchor.rawTx,
+      },
+    }]
+
+    await service.stageBuySwapIntent('proxy-recipient', {
+      txid: anchor.txid,
+      buyerSignedPsbtHash: '44'.repeat(32),
+    })
+    await expect(service.acceptReceive('proxy-recipient')).rejects.toThrow(
+      'requires a verified backend commitment'
+    )
+    await expect(service.acceptReceive('proxy-recipient', {
+      buySwapBackendCommitted: true,
+    })).resolves.toEqual({ accepted: true, status: 'accepted' })
+
+    expect(dependencies.broadcaster.broadcast).not.toHaveBeenCalled()
+    expect(service.getPendingReceives()[0]).toMatchObject({
+      buySwapIntent: { backendCommittedAt: expect.any(Number) },
+      receivedConsignment: { accepted: true },
+    })
+    expect(service.getPendingReceives()[0]?.receivedConsignment).not.toHaveProperty('signedRawTx')
+  })
+
+  it('accepts a backend-committed buy swap when Proxy v1 reports release pending', async () => {
+    const anchor = receiveAnchorTransaction()
+    const dependencies = createDependencies()
+    dependencies.transport.acknowledgeConsignment = vi.fn().mockResolvedValue({
+      releasePending: true,
+    })
+    const service = new RgbService(dependencies)
+    await service.open(wallet)
+    ;(service as any).state.pendingReceives = [{
+      invoice: rgbInvoice(), recipientId: 'recipient', proxyRecipientId: 'proxy-recipient',
+      proxyPrivateKey: '11'.repeat(32), createdAt: 1,
+      acceptancePolicy: 'buy_swap_backend_commit',
+      pendingAccept: {
+        payload: 'consignment', txid: anchor.txid, endpoint: proxyEndpoint,
+        proxyTransferId: 'd'.repeat(64), proxySenderPublicKey: '22'.repeat(32),
+        proxySenderEndpoint: proxyEndpoint, proxyConsignmentHash: '33'.repeat(32),
+        assetId: 'rgb:AQEBAQEB-AQEBAQE-BAQEBAQ-EBAQEBA-QEBAQEB-AQEBAQE',
+        amount: '60', discoveredAt: 1, signedRawTx: anchor.rawTx,
+      },
+    }]
+
+    await expect(service.acceptReceive('proxy-recipient')).rejects.toThrow(
+      'requires a verified backend commitment'
+    )
+    await service.stageBuySwapIntent('proxy-recipient', {
+      txid: anchor.txid,
+      buyerSignedPsbtHash: '44'.repeat(32),
+    })
+    await expect(service.acceptReceive('proxy-recipient', {
+      buySwapBackendCommitted: true,
+    })).resolves.toEqual({ accepted: true, status: 'accepted' })
+
+    expect(dependencies.broadcaster.broadcast).not.toHaveBeenCalled()
+    expect(service.getPendingReceives()[0]).toMatchObject({
+      buySwapIntent: { backendCommittedAt: expect.any(Number) },
+      receivedConsignment: { accepted: true },
+    })
+  })
+
   it('retains a released proxy transaction and retries its receiver broadcast after restart', async () => {
     const anchor = receiveAnchorTransaction()
     const dependencies = createDependencies()

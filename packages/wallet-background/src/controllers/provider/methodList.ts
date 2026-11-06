@@ -99,6 +99,7 @@ export type ProviderMethodList = {
     durationSeconds?: number
     recipientType?: 'blind' | 'witness'
     minConfirmations?: number
+    purpose?: 'buy_swap'
   }
   getRgbPendingReceives: undefined
   acceptRgbReceive: {
@@ -157,13 +158,18 @@ export type ProviderMethodList = {
   getRgbSwapStatus: {
     transferId: string
   }
-  /** Sign buyer BTC inputs and accept a validated BTC-for-RGB consignment. */
-  signRgbBuySwapAndAcceptConsignment: {
+  /** Sign only buyer BTC inputs; maker signatures and ACK remain server-controlled. */
+  signRgbBuySwap: {
     recipientId: string
     assetId: string
     amount: string
     maxBtcSpend: string
-    makerSignedPsbt: string
+    swapPsbt: string
+  }
+  /** ACK only after the Proxy v1 sender proves its backend committed this buyer PSBT. */
+  acceptRgbBuySwap: {
+    recipientId: string
+    backendCommit: string
   }
 }
 

@@ -59,7 +59,7 @@ rejected, signed, finalized, canceled, or aborted by another origin.
 | `confirmSellSwap`                          |       No | Verify the buyer's returned signed PSBT and ACK; the dApp finalizes and broadcasts it.       |
 | `applySellSwapAbort` / `applyBuySwapAbort` |      Yes | Apply a mutually signed, terminal swap-abort agreement to local seller/buyer RGB state.      |
 | `cancelSwap` / `getOperationStatus`        | Yes / No | Cancel or inspect a swap.                                                                    |
-| `signBuySwapAndAcceptConsignment`          |      Yes | Sign buyer BTC inputs and accept the RGB consignment.                                        |
+| `signBuySwap` / `acceptBuySwap`            |      Yes | Sign buyer BTC inputs, then ACK a backend-committed swap.                                     |
 
 ## Assets
 
@@ -307,10 +307,22 @@ integers, and non-positive values are rejected.
 
 ## RGB/BTC atomic swap: buy RGB with BTC
 
-The buyer first creates an RGB invoice with `createReceiveInvoice`. The maker
-must create and sign the swap transaction, publish its consignment to that
+The buyer first creates an RGB invoice with `createReceiveInvoice`, marking it
+as a buy swap so its ACK cannot be sent through the generic receive API:
+
+```ts
+const receive = await rgb.createReceiveInvoice({
+  assetId: 'rgb:...',
+  amount: '1000',
+  purpose: 'buy_swap',
+})
+```
+
+The maker/backend must create the unsigned swap transaction and publish its consignment to that
 invoice, and wait for the wallet to show the invoice as `PendingAccept`.
-`signBuySwapAndAcceptConsignment` then signs the buyer's BTC inputs and sends the ACK.
+`signBuySwap` signs only the buyer's BTC inputs. After the backend validates the
+price and completes the maker signature, `acceptBuySwap` verifies its Proxy v1
+commitment and sends the ACK.
 
 This supports both recipient forms:
 
@@ -319,34 +331,51 @@ This supports both recipient forms:
 - `witness`: the maker transaction must include the invoice's RGB receiver
   output.
 
-### `signBuySwapAndAcceptConsignment(params)`
+### `signBuySwap(params)`
 
 ```ts
 const { list } = await rgb.getPendingReceives()
 const receive = list.find(item => item.status === 'PendingAccept')
 
-const result = await rgb.signBuySwapAndAcceptConsignment({
+const result = await rgb.signBuySwap({
   recipientId: receive.recipientId,
   assetId: 'rgb:...',
   amount: '1000',
   maxBtcSpend: '251000', // all BTC leaving current account, including fee/carrier sats
-  makerSignedPsbt,
+  swapPsbt, // no maker signatures
 })
 
-// { recipientId, status: 'accepted', signedPsbt }
+// { recipientId, txid, status: 'buyer_signed', buyerSignedPsbt }
 ```
 
 Before approval, the wallet verifies that the receipt's validated asset,
-amount, and transaction ID match the supplied PSBT. It requires all
-maker-controlled inputs to be signed, identifies only current-account BTC
-inputs for user signing, requires `SIGHASH_ALL`, disables RBF/locktime, and
-rejects a net current-account spend above `maxBtcSpend`.
+amount, and transaction ID match the supplied PSBT. It rejects every signature
+on maker-controlled inputs, identifies only current-account BTC inputs for user
+signing, requires `SIGHASH_ALL`, disables RBF/locktime, and rejects a net
+current-account spend above `maxBtcSpend`.
 
-On approval the wallet signs its inputs, sends the RGB ACK, and returns the
-signed PSBT. Finalization and broadcast are intentionally delegated to the
-dApp; it must preserve the exact unsigned transaction and use the returned
-PSBT when constructing the final transaction. The wallet subsequently observes
-and settles the received RGB transfer through its normal receive sync.
+On approval the wallet signs its inputs and returns only the buyer-partial PSBT.
+It does not ACK. The dApp submits those bytes to the backend; the backend checks
+the quote and adds the maker signatures without returning the complete PSBT.
+
+The backend then signs this UTF-8 message with the Ed25519 Proxy v1 sender key
+bound to the consignment:
+
+```text
+rgb-buy-swap/commit/v1:<proxyTransferId>:<txid>:<sha256(buyerSignedPsbtBytes)>
+```
+
+Pass the hex signature to the second phase:
+
+```ts
+await rgb.acceptBuySwap({ recipientId: receive.recipientId, backendCommit })
+// { recipientId, status: 'accepted' }
+```
+
+The wallet verifies the commitment, persists ACK intent, and posts the Proxy v1
+ACK. It never returns or broadcasts the complete transaction. The backend
+observes ACK and broadcasts the final transaction it retained, while the wallet
+settles the receipt through normal chain synchronization.
 
 Do not call this method before the invoice is `PendingAccept`: a PSBT alone
 cannot prove the RGB amount being received.
@@ -401,17 +430,10 @@ const published = await rgb.signSellSwapAndPublishConsignment(
 // { transferId, txid, status: 'awaiting_buyer_signature', makerSignedPsbt }
 ```
 
-Once the buyer calls `signBuySwapAndAcceptConsignment`, relay its returned `signedPsbt` back to
-the seller and call `confirmSellSwap`. The wallet rechecks the committed unsigned
-transaction and verifies the buyer ACK. It does not finalize the PSBT; the
-dApp finalizes it and broadcasts the resulting transaction.
-
-```ts
-const confirmed = await rgb.confirmSellSwap(prepared.transferId, buyerResult.signedPsbt)
-// { transferId, txid, signedPsbt, status: 'ready_for_dapp_finalize' }
-const finalPsbt = finalizeAllInputsInDapp(confirmed.signedPsbt)
-await window.unisat.pushPsbt(finalPsbt)
-```
+For backend-controlled buys, submit `buyerSignedPsbt` directly to the backend.
+After validating the quote, the backend completes the maker signatures, creates
+the Proxy v1 commitment described above, waits for the buyer ACK, and broadcasts
+the final transaction without returning it to the dApp.
 
 ### `getOperationStatus(transferId)` and `cancelSwap(transferId)`
 

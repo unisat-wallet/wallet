@@ -22,6 +22,7 @@ export type RgbBlindReceiveParams = {
   durationSeconds?: number
   minConfirmations?: number
   providerOrigin?: string
+  acceptancePolicy?: 'buy_swap_backend_commit'
   skipSync?: boolean
 }
 
@@ -44,6 +45,9 @@ export class RgbReceiveOperations {
       ...(params.durationSeconds === undefined ? {} : { durationSeconds: params.durationSeconds }),
       ...(params.minConfirmations === undefined ? {} : { minConfirmations: params.minConfirmations }),
       ...(params.providerOrigin === undefined ? {} : { providerOrigin: params.providerOrigin }),
+      ...(params.acceptancePolicy === undefined
+        ? {}
+        : { acceptancePolicy: params.acceptancePolicy }),
       // The following claim updates this exact pending receive and performs
       // the durable checkpoint. Avoid uploading the intermediate, unclaimed
       // invoice state only to upload it again a few milliseconds later.
@@ -128,6 +132,25 @@ export class RgbReceiveOperations {
     await this.dependencies.ensureWriteLease?.(context)
     await this.dependencies.assertContext?.(context)
     return service.acceptReceive(recipientId)
+  }
+
+  async stageBuySwapIntent(
+    recipientId: string,
+    input: { txid: string; buyerSignedPsbtHash: string }
+  ) {
+    const context = await this.dependencies.getContext()
+    const { service } = context
+    await this.dependencies.ensureWriteLease?.(context)
+    await this.dependencies.assertContext?.(context)
+    return service.stageBuySwapIntent(recipientId, input)
+  }
+
+  async acceptBuySwap(recipientId: string) {
+    const context = await this.dependencies.getContext()
+    const { service } = context
+    await this.dependencies.ensureWriteLease?.(context)
+    await this.dependencies.assertContext?.(context)
+    return service.acceptReceive(recipientId, { buySwapBackendCommitted: true })
   }
 
   async rejectReceive(

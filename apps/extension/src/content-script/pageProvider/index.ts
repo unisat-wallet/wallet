@@ -22,7 +22,7 @@ export class UnisatProvider extends EventEmitter {
     getFeeUtxos: () => Promise<any>;
     getIssueAvailability: () => Promise<any>;
     issueNia: (params: { orderId: string; ticker: string; name: string; precision: number; amount: string; paymentTxid?: string }) => Promise<any>;
-    createReceiveInvoice: (params: { assetId?: string; amount?: string; durationSeconds?: number; recipientType?: 'blind' | 'witness'; minConfirmations?: number }) => Promise<any>;
+    createReceiveInvoice: (params: { assetId?: string; amount?: string; durationSeconds?: number; recipientType?: 'blind' | 'witness'; minConfirmations?: number; purpose?: 'buy_swap' }) => Promise<any>;
     getPendingReceives: () => Promise<any>;
     acceptReceive: (recipientId: string) => Promise<any>;
     rejectReceive: (recipientId: string) => Promise<any>;
@@ -30,7 +30,8 @@ export class UnisatProvider extends EventEmitter {
     signPayment: (transferId: string) => Promise<any>;
     cancelPayment: (transferId: string) => Promise<any>;
     getPaymentStatus: (transferId: string) => Promise<any>;
-    signBuySwapAndAcceptConsignment: (params: { recipientId: string; assetId: string; amount: string; maxBtcSpend: string; makerSignedPsbt: string }) => Promise<any>;
+    signBuySwap: (params: { recipientId: string; assetId: string; amount: string; maxBtcSpend: string; swapPsbt: string }) => Promise<any>;
+    acceptBuySwap: (params: { recipientId: string; backendCommit: string }) => Promise<any>;
     prepareSwap: (params: { invoice: string; assetId: string; amount: string; btcReceiveAmount: string; feeRate?: number; psbt: string }) => Promise<any>;
     signSellSwapAndPublishConsignment: (transferId: string, makerSignedPsbt: string) => Promise<any>;
     confirmSellSwap: (transferId: string, signedPsbt: string) => Promise<any>;
@@ -61,7 +62,8 @@ export class UnisatProvider extends EventEmitter {
       signPayment: transferId => this.bitcoinAPI.signRgbPayment(transferId),
       cancelPayment: transferId => this.bitcoinAPI.cancelRgbPayment(transferId),
       getPaymentStatus: transferId => this.bitcoinAPI.getRgbPaymentStatus(transferId),
-      signBuySwapAndAcceptConsignment: params => this.bitcoinAPI.signRgbBuySwapAndAcceptConsignment(params),
+      signBuySwap: params => this.bitcoinAPI.signRgbBuySwap(params),
+      acceptBuySwap: params => this.bitcoinAPI.acceptRgbBuySwap(params),
       prepareSwap: params => this.bitcoinAPI.prepareRgbSwap(params),
       signSellSwapAndPublishConsignment: (transferId, makerSignedPsbt) => this.bitcoinAPI.signRgbSellSwapAndPublishConsignment(transferId, makerSignedPsbt),
       confirmSellSwap: (transferId, signedPsbt) => this.bitcoinAPI.confirmRgbSellSwap(transferId, signedPsbt),

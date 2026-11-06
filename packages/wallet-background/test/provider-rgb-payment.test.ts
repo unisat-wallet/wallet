@@ -22,6 +22,8 @@ vi.mock('../src/controllers/wallet', () => ({
     abortRgbAcknowledgedSwap: vi.fn(),
     abortRgbVanillaTx: vi.fn(),
     getRgbBuySwapReceive: vi.fn(),
+    stageRgbBuySwapIntent: vi.fn(),
+    acceptRgbBuySwap: vi.fn(),
     getRgbPendingReceiveInvoices: vi.fn(),
     abandonRgbAcceptedReceive: vi.fn(),
     getRgbProxyApprovalRequirement: vi.fn(),
@@ -30,12 +32,18 @@ vi.mock('../src/controllers/wallet', () => ({
     exportRgbBurnConsignment: vi.fn(),
     getRgbFeatureStatus: vi.fn(),
     getChainType: vi.fn(),
+    getCurrentAccount: vi.fn(),
+    getNetworkType: vi.fn(),
+    getToSignData: vi.fn(),
   },
 }))
 
 import providerController from '../src/controllers/provider/controller'
 import wallet from '../src/controllers/wallet'
 import { MAX_FEE_RATE } from '@unisat/base-utils'
+import { proxyV1PublicKey, proxyV1Sign } from '../src/adapters/rgb-proxy-v1'
+import { NetworkType } from '@unisat/wallet-types'
+import * as bitcoin from 'bitcoinjs-lib'
 
 describe('provider RGB payment ownership', () => {
   beforeEach(() => {
@@ -217,6 +225,22 @@ describe('provider RGB payment ownership', () => {
     expect(wallet.createRgbBlindReceive).toHaveBeenCalledWith({
       assetId: 'rgb:asset',
       amount: '1',
+      providerOrigin: 'https://dapp.example',
+    })
+  })
+
+  it('marks buy-swap invoices as backend-committed ACK only', async () => {
+    vi.mocked(wallet.createRgbBlindReceive).mockResolvedValue({ recipientId: 'recipient-1' } as any)
+
+    await providerController.createRgbReceiveInvoice({
+      data: { params: { assetId: 'rgb:asset', amount: '1', purpose: 'buy_swap' } },
+      session: { origin: 'https://dapp.example' },
+    })
+
+    expect(wallet.createRgbBlindReceive).toHaveBeenCalledWith({
+      assetId: 'rgb:asset',
+      amount: '1',
+      acceptancePolicy: 'buy_swap_backend_commit',
       providerOrigin: 'https://dapp.example',
     })
   })
@@ -414,5 +438,92 @@ describe('provider RGB payment ownership', () => {
     expect(wallet.getRgbPendingReceiveInvoices).toHaveBeenCalledWith({
       providerOrigin: 'https://dapp.example',
     })
+  })
+
+  it('rejects maker signatures before opening buy-swap signing approval', async () => {
+    const buyer = bitcoin.payments.p2wpkh({
+      pubkey: Buffer.from('0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798', 'hex'),
+      network: bitcoin.networks.bitcoin,
+    })
+    const maker = bitcoin.payments.p2wpkh({
+      pubkey: Buffer.from('0379be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798', 'hex'),
+      network: bitcoin.networks.bitcoin,
+    })
+    const psbt = new bitcoin.Psbt({ network: bitcoin.networks.bitcoin })
+      .addInput({
+        hash: '11'.repeat(32), index: 0,
+        witnessUtxo: { script: buyer.output!, value: 20_000 },
+      })
+      .addInput({
+        hash: '22'.repeat(32), index: 0,
+        witnessUtxo: { script: maker.output!, value: 10_000 },
+      })
+      .addOutput({ script: buyer.output!, value: 5_000 })
+    psbt.updateInput(1, { finalScriptWitness: Buffer.from([0]) })
+    const unsignedTx = (psbt.data.globalMap.unsignedTx as any).tx || psbt.data.globalMap.unsignedTx
+    vi.mocked(wallet.getRgbBuySwapReceive).mockResolvedValue({
+      providerOrigin: 'https://dapp.example',
+      assetId: 'rgb:asset', amount: '1', txid: unsignedTx.getId(), accepted: false,
+    } as any)
+    vi.mocked(wallet.getCurrentAccount).mockResolvedValue({ address: buyer.address } as any)
+    vi.mocked(wallet.getNetworkType).mockReturnValue(NetworkType.MAINNET)
+    const approval = Reflect.getMetadata('APPROVAL', providerController, 'signRgbBuySwap')
+
+    await expect(approval[1]({
+      data: { params: {
+        recipientId: 'recipient-1', assetId: 'rgb:asset', amount: '1',
+        maxBtcSpend: '20000', swapPsbt: psbt.toHex(),
+      } },
+      session: { origin: 'https://dapp.example' },
+    })).rejects.toThrow('must not expose maker signatures')
+    expect(wallet.getToSignData).not.toHaveBeenCalled()
+  })
+
+  it('accepts a buy swap only with the bound Proxy v1 sender commitment', async () => {
+    const senderPrivateKey = '11'.repeat(32)
+    const receive = {
+      providerOrigin: 'https://dapp.example',
+      proxyTransferId: '22'.repeat(32),
+      proxySenderPublicKey: proxyV1PublicKey(senderPrivateKey),
+      buySwapIntent: {
+        txid: '33'.repeat(32),
+        buyerSignedPsbtHash: '44'.repeat(32),
+      },
+    }
+    vi.mocked(wallet.getRgbBuySwapReceive).mockResolvedValue(receive as any)
+    vi.mocked(wallet.acceptRgbBuySwap).mockResolvedValue({
+      accepted: true,
+      status: 'accepted',
+    } as any)
+    const message = `rgb-buy-swap/commit/v1:${receive.proxyTransferId}:${receive.buySwapIntent.txid}:${receive.buySwapIntent.buyerSignedPsbtHash}`
+
+    await expect(providerController.acceptRgbBuySwap({
+      data: {
+        params: {
+          recipientId: 'recipient-1',
+          backendCommit: proxyV1Sign(senderPrivateKey, message),
+        },
+      },
+      session: { origin: 'https://dapp.example' },
+    })).resolves.toEqual({ recipientId: 'recipient-1', status: 'accepted' })
+    expect(wallet.acceptRgbBuySwap).toHaveBeenCalledWith({ recipientId: 'recipient-1' })
+  })
+
+  it('rejects a forged buy swap backend commitment before ACK', async () => {
+    vi.mocked(wallet.getRgbBuySwapReceive).mockResolvedValue({
+      providerOrigin: 'https://dapp.example',
+      proxyTransferId: '22'.repeat(32),
+      proxySenderPublicKey: proxyV1PublicKey('11'.repeat(32)),
+      buySwapIntent: {
+        txid: '33'.repeat(32),
+        buyerSignedPsbtHash: '44'.repeat(32),
+      },
+    } as any)
+
+    await expect(providerController.acceptRgbBuySwap({
+      data: { params: { recipientId: 'recipient-1', backendCommit: '55'.repeat(64) } },
+      session: { origin: 'https://dapp.example' },
+    })).rejects.toThrow('backend commitment is invalid')
+    expect(wallet.acceptRgbBuySwap).not.toHaveBeenCalled()
   })
 })
