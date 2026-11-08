@@ -200,6 +200,7 @@ export interface RgbWriteLeaseAcquireRequest {
   deviceId: string
   checkpointRevision?: string
   takeover?: boolean
+  supportedCheckpointFormat?: number
 }
 
 export interface RgbWriteLeaseRenewRequest {
@@ -433,6 +434,7 @@ export interface RgbRecoveryCheckpointSaveRequest {
   expectedRevision?: string
   /** Normal writer progression vs an explicit user-approved replacement. */
   kind?: 'normal' | 'replacement'
+  checkpointFormat?: number
   updatedAt: number
 }
 
@@ -451,6 +453,7 @@ export interface RgbRecoveryCheckpointUploadStartRequest {
   expectedUpdatedAt?: number
   expectedRevision?: string
   kind?: 'normal' | 'replacement'
+  checkpointFormat?: number
   updatedAt: number
   partCount: number
   totalLength: number
@@ -488,6 +491,7 @@ export interface RgbRecoveryCheckpointUploadStatusResult extends RgbRecoveryChec
 
 export interface RgbRecoveryCheckpointReadRequest {
   wallet: RgbWalletRef
+  supportedCheckpointFormat?: number
 }
 
 export interface RgbRecoveryCheckpointReadResult {
@@ -496,6 +500,7 @@ export interface RgbRecoveryCheckpointReadResult {
   revision?: string
   generation?: number
   kind?: 'normal' | 'replacement'
+  checkpointFormat?: number
 }
 
 export interface RgbRecoveryCheckpointMetadataResult {
@@ -504,6 +509,7 @@ export interface RgbRecoveryCheckpointMetadataResult {
   revision?: string
   generation?: number
   kind?: 'normal' | 'replacement'
+  checkpointFormat?: number
 }
 
 export interface RgbReceiveInvoiceRequest {

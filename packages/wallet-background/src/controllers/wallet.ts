@@ -222,6 +222,7 @@ type RgbControllerApiService = {
     expectedUpdatedAt?: number
     expectedRevision?: string
     kind?: 'normal' | 'replacement'
+    checkpointFormat?: number
     updatedAt: number
   }) => Promise<{
     saved: boolean
@@ -236,6 +237,7 @@ type RgbControllerApiService = {
     expectedUpdatedAt?: number
     expectedRevision?: string
     kind?: 'normal' | 'replacement'
+    checkpointFormat?: number
     updatedAt: number
     partCount: number
     totalLength: number
@@ -271,19 +273,21 @@ type RgbControllerApiService = {
     kind?: 'normal' | 'replacement'
     receivedIndexes?: number[]
   }>
-  getRgbRecoveryCheckpoint: (params: { wallet: RgbWalletRef }) => Promise<{
+  getRgbRecoveryCheckpoint: (params: { wallet: RgbWalletRef; supportedCheckpointFormat?: number }) => Promise<{
     payload?: string
     updatedAt?: number
     revision?: string
     generation?: number
     kind?: 'normal' | 'replacement'
+    checkpointFormat?: number
   }>
-  getRgbRecoveryCheckpointMetadata: (params: { wallet: RgbWalletRef }) => Promise<{
+  getRgbRecoveryCheckpointMetadata: (params: { wallet: RgbWalletRef; supportedCheckpointFormat?: number }) => Promise<{
     exists: boolean
     updatedAt?: number
     revision?: string
     generation?: number
     kind?: 'normal' | 'replacement'
+    checkpointFormat?: number
   }>
   getRgbAssetDetail: (assetId: string) => Promise<unknown>
   getRgbAssetActivity: (
@@ -407,6 +411,7 @@ type RgbControllerApiService = {
     deviceId: string
     checkpointRevision?: string
     takeover?: boolean
+    supportedCheckpointFormat?: number
   }) => Promise<{ leaseId: string; fencingToken: number; expiresAt: number }>
   renewRgbWriteLease: (params: {
     wallet: RgbWalletRef & { network: string }
@@ -695,6 +700,7 @@ type RgbSignPsbtRequest = {
 }
 
 const RGB_ENCRYPTED_STORAGE_NAMESPACE = 'rgb-service-v1'
+const RGB_RECOVERY_CHECKPOINT_FORMAT = 2
 // Keep each JSON request safely below the common 1 MB reverse-proxy default.
 const RGB_RECOVERY_PAYLOAD_PART_SIZE = 900_000
 
@@ -4175,7 +4181,10 @@ export class WalletController extends BaseController {
       // metadata endpoint only tells the activation UI whether this wallet
       // already has an encrypted recovery checkpoint on the backend.
       try {
-        const recovery = await getRgbApiService().getRgbRecoveryCheckpointMetadata({ wallet })
+        const recovery = await getRgbApiService().getRgbRecoveryCheckpointMetadata({
+          wallet,
+          supportedCheckpointFormat: RGB_RECOVERY_CHECKPOINT_FORMAT,
+        })
         return {
           enabled: false,
           supported: true,
@@ -4592,7 +4601,10 @@ export class WalletController extends BaseController {
     }
 
     const key = `${wallet.network}:${wallet.fundingAddress}`
-    const checkpoint = await getRgbApiService().getRgbRecoveryCheckpoint({ wallet })
+    const checkpoint = await getRgbApiService().getRgbRecoveryCheckpoint({
+      wallet,
+      supportedCheckpointFormat: RGB_RECOVERY_CHECKPOINT_FORMAT,
+    })
     if (!checkpoint.payload || !checkpoint.revision) {
       throw new Error('Latest RGB cloud checkpoint is unavailable')
     }
@@ -4633,7 +4645,10 @@ export class WalletController extends BaseController {
     context: LocalRgbServiceContext
   ) => {
     const key = `${context.wallet.network}:${context.wallet.fundingAddress}`
-    const checkpoint = await getRgbApiService().getRgbRecoveryCheckpoint({ wallet: context.wallet })
+    const checkpoint = await getRgbApiService().getRgbRecoveryCheckpoint({
+      wallet: context.wallet,
+      supportedCheckpointFormat: RGB_RECOVERY_CHECKPOINT_FORMAT,
+    })
     if (!checkpoint.payload || !checkpoint.revision) {
       throw new Error('No RGB recovery checkpoint is available')
     }
@@ -6141,7 +6156,10 @@ export class WalletController extends BaseController {
     if (typeof api.getRgbRecoveryCheckpointMetadata === 'function') {
       try {
         return {
-          metadata: await api.getRgbRecoveryCheckpointMetadata({ wallet }),
+          metadata: await api.getRgbRecoveryCheckpointMetadata({
+            wallet,
+            supportedCheckpointFormat: RGB_RECOVERY_CHECKPOINT_FORMAT,
+          }),
         }
       } catch (error) {
         if (!this.isRgbRecoveryMetadataUnsupported(error)) throw error
@@ -6153,7 +6171,10 @@ export class WalletController extends BaseController {
         })
       }
     }
-    const checkpoint = await api.getRgbRecoveryCheckpoint({ wallet })
+    const checkpoint = await api.getRgbRecoveryCheckpoint({
+      wallet,
+      supportedCheckpointFormat: RGB_RECOVERY_CHECKPOINT_FORMAT,
+    })
     return {
       metadata: {
         exists:
@@ -6195,7 +6216,10 @@ export class WalletController extends BaseController {
           kind?: 'normal' | 'replacement'
         } = control.checkpoint ?? metadata
         if (!control.checkpoint && metadata.exists && (needsRestore || revisionChanged)) {
-          checkpoint = await getRgbApiService().getRgbRecoveryCheckpoint({ wallet })
+          checkpoint = await getRgbApiService().getRgbRecoveryCheckpoint({
+            wallet,
+            supportedCheckpointFormat: RGB_RECOVERY_CHECKPOINT_FORMAT,
+          })
         }
         log.debug('RGB recovery: checkpoint control received', {
           wallet: rgbRecoveryWalletTag(wallet),
@@ -6495,6 +6519,7 @@ export class WalletController extends BaseController {
             ...(expected?.updatedAt === undefined ? {} : { expectedUpdatedAt: expected.updatedAt }),
             ...(expected?.revision === undefined ? {} : { expectedRevision: expected.revision }),
             kind: context.kind,
+            checkpointFormat: RGB_RECOVERY_CHECKPOINT_FORMAT,
             updatedAt,
           })
         } else {
@@ -6508,6 +6533,7 @@ export class WalletController extends BaseController {
             ...(expected?.updatedAt === undefined ? {} : { expectedUpdatedAt: expected.updatedAt }),
             ...(expected?.revision === undefined ? {} : { expectedRevision: expected.revision }),
             kind: context.kind,
+            checkpointFormat: RGB_RECOVERY_CHECKPOINT_FORMAT,
             updatedAt,
           })
           let receivedIndexes = new Set<number>()
@@ -6787,6 +6813,7 @@ export class WalletController extends BaseController {
           ? { checkpointRevision: context.service.getRecoveryCheckpointRevision?.() }
           : {}),
         ...(options.takeover ? { takeover: true } : {}),
+        supportedCheckpointFormat: RGB_RECOVERY_CHECKPOINT_FORMAT,
       })
     } catch (error) {
       // A newer device may have committed after this device's restore read.

@@ -1215,7 +1215,10 @@ describe('RGB wallet references', () => {
         supported: true,
         remoteRecoveryAvailable: true,
       })
-      expect(getRgbRecoveryCheckpointMetadata).toHaveBeenCalledWith({ wallet: walletRef })
+      expect(getRgbRecoveryCheckpointMetadata).toHaveBeenCalledWith({
+        wallet: walletRef,
+        supportedCheckpointFormat: 2,
+      })
       expect(openReadService).not.toHaveBeenCalled()
     } finally {
       ;(walletApiService as any).rgb = originalRgb
@@ -1269,7 +1272,10 @@ describe('RGB wallet references', () => {
 
     await (wallet as any).restoreRgbRecoveryIfNeeded({ service, wallet: walletRef })
 
-    expect(getRgbRecoveryCheckpointMetadata).toHaveBeenCalledWith({ wallet: walletRef })
+    expect(getRgbRecoveryCheckpointMetadata).toHaveBeenCalledWith({
+      wallet: walletRef,
+      supportedCheckpointFormat: 2,
+    })
     expect(getRgbRecoveryCheckpoint).not.toHaveBeenCalled()
     expect(service.setRecoveryCheckpointRevision).toHaveBeenCalledWith(revision)
     expect(service.enableRecoveryBackup).toHaveBeenCalledTimes(1)
@@ -1310,7 +1316,10 @@ describe('RGB wallet references', () => {
     await (wallet as any).restoreRgbRecoveryIfNeeded({ service, wallet: walletRef })
 
     expect(getRgbRecoveryCheckpointMetadata).toHaveBeenCalledTimes(1)
-    expect(getRgbRecoveryCheckpoint).toHaveBeenCalledWith({ wallet: walletRef })
+    expect(getRgbRecoveryCheckpoint).toHaveBeenCalledWith({
+      wallet: walletRef,
+      supportedCheckpointFormat: 2,
+    })
     expect(service.setRecoveryCheckpointRevision).toHaveBeenCalledWith(revision)
   })
 
@@ -1535,6 +1544,9 @@ describe('RGB wallet references', () => {
       'normal',
       'replacement',
     ])
+    expect(
+      saveRgbRecoveryCheckpoint.mock.calls.map(([input]: any[]) => input.checkpointFormat)
+    ).toEqual([2, 2])
   })
 
   it('refreshes the current cloud version before publishing a replacement', async () => {
@@ -2635,6 +2647,7 @@ describe('RGB wallet references', () => {
     expect(acquireRgbWriteLease).toHaveBeenCalledWith({
       wallet: walletRef,
       deviceId: 'device_abcdefghijklmnop',
+      supportedCheckpointFormat: 2,
     })
   })
 
