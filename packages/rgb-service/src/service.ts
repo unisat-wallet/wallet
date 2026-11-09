@@ -3132,11 +3132,22 @@ export class RgbService {
   private getLocalValidationHistory(assetId: string) {
     const normalized = normalizeAssetId(assetId)
     const contract = this.requireState().contracts?.[normalized]
-    if (!contract) return []
-    if (contract.history) {
-      return [{ opId: contractOperationId(normalized), payload: contract.history.payload }]
+    const histories: Array<{ opId: string; payload: string }> = []
+    if (contract?.history) {
+      histories.push({ opId: contractOperationId(normalized), payload: contract.history.payload })
+    } else if (contract) {
+      histories.push({ opId: contractOperationId(normalized), payload: contract.consignment })
     }
-    return [{ opId: contractOperationId(normalized), payload: contract.consignment }]
+    // Burn proofs are self-contained portable histories. Keep them available
+    // as a recovery supplement because an address indexer can expose the
+    // surviving split change before it has merged the split/Burn DAG.
+    for (const proof of Object.values(this.requireState().burnProofs || {})) {
+      if (normalizeAssetId(proof.assetId) === normalized &&
+        !histories.some(item => item.payload === proof.payload)) {
+        histories.push({ opId: contractOperationId(normalized), payload: proof.payload })
+      }
+    }
+    return histories
   }
 
   private localHistoryCoversAllocations(assetId: string, opIds: string[]) {
@@ -4048,6 +4059,11 @@ export class RgbService {
         allocations,
       })
     const enrichValidationHistory = (history: RgbValidationHistory) => {
+      for (const local of localHistory) {
+        if (!history.consignments.some(item => item.payload === local.payload)) {
+          history.consignments.push(local)
+        }
+      }
       const localContract = this.getContractConsignment(requestedAssetId)
       const localGenesis = this.getContractGenesis(requestedAssetId)
       if (localContract && !history.consignments.some(item => item.payload === localContract)) {

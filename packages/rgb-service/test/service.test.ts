@@ -4473,6 +4473,45 @@ describe('RgbService', () => {
     expect(dependencies.encoder.prepareTransfer).toHaveBeenCalledTimes(2)
   })
 
+  it('supplements stale backend history with retained burn proofs', async () => {
+    const dependencies = createDependencies()
+    const service = new RgbService(dependencies)
+    const assetId = 'rgb:AQEBAQEB-AQEBAQE-BAQEBAQ-EBAQEBA-QEBAQEB-AQEBAQE'
+    await service.open(wallet)
+    await service.sync()
+    ;(service as any).state.contracts = {
+      [assetId]: {
+        consignment: 'bG9jYWwtY2Fub25pY2Fs', createdAt: 1,
+        history: { payload: 'bG9jYWwtY2Fub25pY2Fs', opIds: ['c'.repeat(64)], updatedAt: 1 },
+      },
+    }
+    ;(service as any).state.burnProofs = {
+      ['e'.repeat(64)]: {
+        assetId, amount: '5', payload: 'YnVybi1wcm9vZi13aXRoLXNwbGl0LWFuY2VzdHJ5', createdAt: 2,
+      },
+    }
+    vi.mocked(dependencies.stateSource.getValidationHistory).mockResolvedValueOnce({
+      assetId,
+      consignments: [{ opId: 'd'.repeat(64), payload: 'c3RhbGUtYmFja2VuZC1oaXN0b3J5' }],
+    })
+
+    await service.prepareSend({
+      assetId, amount: '60', invoice: rgbInvoice(), feeRate: 2,
+    })
+
+    expect(dependencies.encoder.prepareTransfer).toHaveBeenCalledWith(
+      expect.objectContaining({
+        validationHistory: expect.objectContaining({
+          consignments: expect.arrayContaining([
+            expect.objectContaining({ payload: 'c3RhbGUtYmFja2VuZC1oaXN0b3J5' }),
+            expect.objectContaining({ payload: 'bG9jYWwtY2Fub25pY2Fs' }),
+            expect.objectContaining({ payload: 'YnVybi1wcm9vZi13aXRoLXNwbGl0LWFuY2VzdHJ5' }),
+          ]),
+        }),
+      })
+    )
+  })
+
   it('waits for the sender to broadcast after recipient acknowledgement', async () => {
     const dependencies = createDependencies()
     const service = new RgbService(dependencies)
