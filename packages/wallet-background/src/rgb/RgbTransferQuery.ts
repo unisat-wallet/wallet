@@ -39,7 +39,8 @@ type RgbTransferQueryDependencies = {
   getRemoteActivity: (
     address: string,
     currentPage: number,
-    pageSize: number
+    pageSize: number,
+    scope?: { assetId?: string; type?: string }
   ) => Promise<{ total: number; list: RgbRemoteActivity[] }>
   warn: (message: string, error: unknown) => void
 }
@@ -54,15 +55,30 @@ export class RgbTransferQuery {
 
   constructor(private readonly dependencies: RgbTransferQueryDependencies) {}
 
-  private getRemoteActivity(wallet: LocalRgbServiceContext['wallet'], currentPage: number, pageSize: number, refresh: boolean) {
-    const key = JSON.stringify([wallet.network, wallet.walletId, wallet.fundingAddress, currentPage, pageSize])
-    if (currentPage !== 1) return this.dependencies.getRemoteActivity(wallet.fundingAddress, currentPage, pageSize)
+  private getRemoteActivity(
+    wallet: LocalRgbServiceContext['wallet'],
+    currentPage: number,
+    pageSize: number,
+    refresh: boolean,
+    scope?: { assetId?: string; type?: string }
+  ) {
+    const key = JSON.stringify([
+      wallet.network, wallet.walletId, wallet.fundingAddress, currentPage, pageSize,
+      scope?.assetId, scope?.type,
+    ])
+    if (currentPage !== 1) {
+      return this.dependencies.getRemoteActivity(
+        wallet.fundingAddress, currentPage, pageSize, scope
+      )
+    }
     if (refresh) this.recentActivity.delete(key)
     const cached = this.recentActivity.get(key)
     if (cached && cached.expiresAt > Date.now()) return cached.promise
 
     const entry = {
-      promise: this.dependencies.getRemoteActivity(wallet.fundingAddress, currentPage, pageSize),
+      promise: this.dependencies.getRemoteActivity(
+        wallet.fundingAddress, currentPage, pageSize, scope
+      ),
       expiresAt: Number.POSITIVE_INFINITY,
     }
     this.recentActivity.delete(key)
@@ -96,9 +112,19 @@ export class RgbTransferQuery {
   }
 
   // eslint-disable-next-line @typescript-eslint/explicit-function-return-type -- preserve the precise merged activity response.
-  async getTransfers(currentPage: number, pageSize: number, options?: { skipSync?: boolean }) {
+  async getTransfers(
+    currentPage: number,
+    pageSize: number,
+    options?: { skipSync?: boolean; assetId?: string; type?: string }
+  ) {
     let context = await this.dependencies.getContext()
     let { service, wallet } = context
+    const scope = options?.assetId || options?.type
+      ? {
+          ...(options.assetId ? { assetId: options.assetId } : {}),
+          ...(options.type ? { type: options.type } : {}),
+        }
+      : undefined
     // A pending receive can settle or be rejected during the sync below.
     // Fetch its remote history afterwards so this request does not render an
     // old confirmed row immediately after publishing the newer outcome.
@@ -107,7 +133,7 @@ export class RgbTransferQuery {
     const receiveStateBeforeSync = receiveMayChange ? this.receiveStateKey(service) : undefined
     const activityPromise = receiveMayChange
       ? undefined
-      : this.getRemoteActivity(wallet, currentPage, pageSize, false)
+      : this.getRemoteActivity(wallet, currentPage, pageSize, false, scope)
     if (!options?.skipSync) {
       try {
         await this.dependencies.syncReceiveHistory(service, context)
@@ -161,7 +187,8 @@ export class RgbTransferQuery {
     const [activity, initialPendingTransfers] = await Promise.all([
       activityPromise || this.getRemoteActivity(
         wallet, currentPage, pageSize,
-        receiveStateBeforeSync !== undefined && receiveStateBeforeSync !== this.receiveStateKey(service)
+        receiveStateBeforeSync !== undefined && receiveStateBeforeSync !== this.receiveStateKey(service),
+        scope
       ),
       Promise.resolve(service.getPendingTransfers()),
     ])
@@ -207,8 +234,18 @@ export class RgbTransferQuery {
         return { name: undefined, ticker: undefined }
       }
     }
+    const matchesScope = (value: unknown) => {
+      const item = value as { assetId?: string; type?: string }
+      return (!options?.assetId || item.assetId === options.assetId) &&
+        (!options?.type || item.type === options.type)
+    }
+    // Treat the server-side scope as an optimization, not as a trust boundary.
+    // Older/indexer replicas may ignore the asset query briefly; never merge
+    // those rows into a token detail screen.
+    const remoteActivity = activity.list.filter(matchesScope)
+    const remoteScopeWasIgnored = remoteActivity.length !== activity.list.length
     const confirmedActivityTxids = new Set(
-      activity.list
+      remoteActivity
         .filter(item => ['confirmed', 'settled'].includes(String(item.status ?? '').toLowerCase()))
         .map(item => item.txid)
         .filter((txid): txid is string => !!txid)
@@ -258,7 +295,7 @@ export class RgbTransferQuery {
                   ? 'broadcasted'
                   : 'signed',
       local: true,
-    }))
+    })).filter(matchesScope)
     const localSendHistory = (service.getPendingSendHistory?.() || []).map(send => ({
       id: `local-send:${send.transferId}`,
       transferId: send.transferId,
@@ -283,7 +320,7 @@ export class RgbTransferQuery {
       awaitingRecipientAck: send.status === 'broadcasted' && send.recipientAckExpected && send.recipientAck === undefined,
       recipientRejected: send.recipientAck === false,
       local: true,
-    }))
+    })).filter(matchesScope)
     const issueHistory = service.getIssueHistory?.() || []
     const issuanceTxidByAssetId = new Map(
       issueHistory.flatMap(issue =>
@@ -302,7 +339,7 @@ export class RgbTransferQuery {
       ticker: issue.asset.ticker,
       name: issue.asset.name,
       precision: issue.asset.precision,
-    }))
+    })).filter(matchesScope)
     const localReceives = service.getPendingReceives().flatMap(receive => {
       // Rejected receives remain encrypted recovery tombstones. Their
       // display-only history row is the public activity; never expose the
@@ -418,7 +455,7 @@ export class RgbTransferQuery {
           local: true,
         },
       ]
-    })
+    }).filter(matchesScope)
     const localReceiveHistory = (service.getPendingReceiveHistory?.() || []).map(receive => ({
       id: receive.transferId,
       transferId: receive.transferId,
@@ -432,7 +469,7 @@ export class RgbTransferQuery {
       status: receive.status ?? 'settled',
       rejectionReason: receive.rejectionReason,
       local: receive.status === 'canceled' || receive.status === 'rejected',
-    }))
+    })).filter(matchesScope)
     const visibleLocalSendHistory = localSendHistory.filter(
       send =>
         send.burn ||
@@ -459,7 +496,7 @@ export class RgbTransferQuery {
       }
     }
     const includeLocalTransfers = currentPage === 1
-    const indexedSendIds = new Set(activity.list
+    const indexedSendIds = new Set(remoteActivity
       .filter(item =>
         item.type === 'send' && item.id && item.txid &&
         ['mempool', 'broadcasted', 'confirmed', 'settled'].includes(
@@ -499,7 +536,7 @@ export class RgbTransferQuery {
     const pendingAcceptCount = visibleLocalReceives.filter(
       item => item.status === 'pending_accept'
     ).length
-    const remotePendingAcceptCount = activity.list.filter(
+    const remotePendingAcceptCount = remoteActivity.filter(
       item =>
         item.type === 'receive' &&
         String(item.status ?? '').toLowerCase() === 'pending_accept'
@@ -510,7 +547,7 @@ export class RgbTransferQuery {
         localPendingAcceptCount: pendingAcceptCount,
       })
     }
-    const remoteItems = activity.list
+    const remoteItems = remoteActivity
       .filter(item => {
         if (item.type === 'receive' && item.id &&
           localReceiveIds.has(item.id.replace(/^local-receive:|^receive:/, ''))) return false
@@ -571,7 +608,9 @@ export class RgbTransferQuery {
       // When the first remote page contains every remote record, `list` is the
       // complete deduplicated history. Adding local records to the remote total
       // would count transfers present in both sources twice.
-      total: currentPage === 1 && activity.list.length >= activity.total
+      total: remoteScopeWasIgnored
+        ? list.length
+        : currentPage === 1 && activity.list.length >= activity.total
         ? list.length
         : Math.max(activity.total + localOnlyTransferKeys.size, list.length),
       list,

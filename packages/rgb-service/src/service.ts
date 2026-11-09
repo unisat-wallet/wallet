@@ -35,6 +35,7 @@ import {
   mergeBfaValidatedHistories,
   pruneConfirmedBfaWitnesses,
 } from './protocol/bfa-validator'
+import type { ValidatedBfaConsignment } from './protocol/bfa-validator'
 import { convertNiaV0ConsignmentToV1, unwrapNiaV0Contract } from './protocol/nia-v0-migration'
 import { encodeNiaContract, encodeNiaTransferConsignment } from './protocol/nia-contract'
 import {
@@ -67,6 +68,12 @@ import type {
   RgbWalletRef,
   RgbWalletSnapshot,
 } from './types'
+
+type ReceiveValidationCaches = {
+  evmRpcCache: Map<string, Promise<unknown>>
+  bitcoinStatusCache: Map<string, Promise<boolean>>
+  consignments: Map<string, Promise<ValidatedBfaConsignment>>
+}
 
 const STORAGE_PREFIX = 'rgb-service:v1:'
 const MAX_RGB_AMOUNT = 0xffff_ffff_ffff_ffffn
@@ -620,10 +627,8 @@ export class RgbService {
   private async syncSnapshot() {
     const state = this.requireState()
     if (this.pendingTransferSyncInFlight) await this.pendingTransferSyncInFlight
-    // An unsigned PSBT is tied to the exact allocation snapshot used during
-    // preparation. Do not advance another transfer or replace that snapshot
-    // while an external signer/UI still holds it.
-    if (this.hasUnsignedPreparedTransfer()) return state.snapshot
+    // An unsigned PSBT protects only the exact RGB outpoints it spends. Other
+    // assets and change outputs must keep receiving chain-state updates.
     // A remote snapshot may still expose consumed outpoints. Finish durable
     // post-broadcast delivery first, or leave the locally updated snapshot intact.
     if (Object.keys(state.pending).length) await this.advancePendingTransfers()
@@ -631,8 +636,9 @@ export class RgbService {
     // Keep allocations that have not reached the indexer from being overwritten
     // by a stale snapshot. Prepared sends are instead pinned to their checkpoint
     // generation and rejected before signing if another device advances it.
-    if (this.hasPendingSnapshotProtection()) return state.snapshot
+    if (this.hasBlockingSnapshotProtection()) return state.snapshot
     const localSnapshotBeforeRequest = JSON.stringify(state.snapshot.utxos)
+    const pendingUtxoSyncBeforeRequest = state.pendingUtxoSync
     const snapshot = normalizeSnapshot(
       await this.dependencies.stateSource.getSnapshot(state.wallet)
     )
@@ -646,8 +652,11 @@ export class RgbService {
     }
     // A receive or broadcast may have queued a newer local allocation while
     // the indexer request was in flight. Never apply that older response.
-    if (this.hasPendingSnapshotProtection() ||
+    if (this.hasBlockingSnapshotProtection() ||
+      state.pendingUtxoSync !== pendingUtxoSyncBeforeRequest ||
       JSON.stringify(state.snapshot.utxos) !== localSnapshotBeforeRequest) return state.snapshot
+    this.mergePendingUtxoSync(snapshot)
+    this.mergeUnsignedPreparedTransferProtection(snapshot)
     // Keep the local funding update while the indexer still returns the RGB
     // allocations that this installation already spent in a broadcast tx.
     // Once those outpoints disappear from the remote snapshot, it is safe to
@@ -705,7 +714,12 @@ export class RgbService {
     // do not turn polling into a full encrypted checkpoint upload.
     const checkpointSnapshotChanged = !sameSnapshotContents(state.snapshot, snapshot)
     state.snapshot = snapshot
-    await this.persist({ skipRecovery: !checkpointSnapshotChanged })
+    // Updating unrelated outpoints must not advance the recovery generation
+    // bound to an externally held unsigned PSBT. Its locked outpoints were
+    // preserved above; upload the refreshed snapshot after signing/canceling.
+    await this.persist({
+      skipRecovery: !checkpointSnapshotChanged || this.hasUnsignedPreparedTransfer(),
+    })
     return state.snapshot
   }
 
@@ -765,7 +779,7 @@ export class RgbService {
       } catch {
         continue
       }
-      if (this.hasPendingSnapshotProtection() ||
+      if (this.hasBlockingSnapshotProtection() ||
         JSON.stringify(state.snapshot.utxos) !== localSnapshotBeforeRequest) return true
       const confirmed = new Set(verified.filter(item => item.status === 'confirmed')
         .map(item => `${item.outpoint.txid}:${item.outpoint.vout}`))
@@ -824,6 +838,56 @@ export class RgbService {
       }
     }
     return false
+  }
+
+  /** Preserve only the locally queued transaction outputs while refreshing unrelated assets. */
+  private mergePendingUtxoSync(snapshot: RgbWalletSnapshot) {
+    const pending = this.requireState().pendingUtxoSync
+    if (!pending) return
+    const remoteByOutpoint = new Map(snapshot.utxos.map(utxo => [outpointKey(utxo), utxo]))
+    for (const local of pending.outpoints) {
+      if (local.outpoint.txid !== pending.txid) continue
+      const key = outpointKey(local)
+      const remote = remoteByOutpoint.get(key)
+      if (remote?.chainStatus === 'spent' || remote?.chainStatus === 'replaced') continue
+      const remoteCoversLocal = remote && local.allocations.every(allocation =>
+        remote.allocations.some(candidate =>
+          candidate.assetId === allocation.assetId &&
+          candidate.amount === allocation.amount &&
+          candidate.opId === allocation.opId &&
+          candidate.assignmentIndex === allocation.assignmentIndex &&
+          (!allocation.settled || candidate.settled) &&
+          (!allocation.spendable || candidate.spendable)
+        )
+      )
+      if (remoteCoversLocal) continue
+      if (remote) {
+        snapshot.utxos[snapshot.utxos.indexOf(remote)] = local
+      } else {
+        snapshot.utxos.push(local)
+      }
+    }
+  }
+
+  /** Keep unsigned PSBT inputs stable while refreshing every unrelated outpoint. */
+  private mergeUnsignedPreparedTransferProtection(snapshot: RgbWalletSnapshot) {
+    const state = this.requireState()
+    const protectedOutpoints = new Set(
+      Object.values(state.pending)
+        .filter(pending => !pending.delivery && !pending.broadcast)
+        .flatMap(pending => pending.prepared.lockedOutpoints.map(
+          outpoint => `${outpoint.txid}:${outpoint.vout}`
+        ))
+    )
+    if (!protectedOutpoints.size) return
+    const remoteByOutpoint = new Map(snapshot.utxos.map(utxo => [outpointKey(utxo), utxo]))
+    for (const local of state.snapshot.utxos) {
+      const key = outpointKey(local)
+      if (!protectedOutpoints.has(key)) continue
+      const remote = remoteByOutpoint.get(key)
+      if (remote) snapshot.utxos[snapshot.utxos.indexOf(remote)] = local
+      else snapshot.utxos.push(local)
+    }
   }
 
   /** Settle verified burn change locally while the indexer catches up with its RGB allocation. */
@@ -1743,6 +1807,16 @@ export class RgbService {
       [...receivedItems, ...localReceipts].map(item => [item.recipientId, item])
     )
     const itemsToProcess = [...receivedByRecipient.values()]
+    // A sender creates one consignment per asset and delivers the same history
+    // to every recipient in a batch. Share immutable chain reads for this
+    // polling pass so ten recipients do not repeat the same EVM and Bitcoin
+    // validation requests ten times. The caches intentionally expire at the
+    // end of this operation so a later poll observes fresh chain state.
+    const receiveValidationCaches = {
+      evmRpcCache: new Map<string, Promise<unknown>>(),
+      bitcoinStatusCache: new Map<string, Promise<boolean>>(),
+      consignments: new Map<string, Promise<ValidatedBfaConsignment>>(),
+    }
     let count = 0
     let snapshotRequired = false
 
@@ -1810,9 +1884,14 @@ export class RgbService {
         }
       }
       try {
-        const match = await this.validateIncomingConsignment(receive, item, (reason, details) => {
-          mismatchReason = describeReceiveMismatch(reason, details, receive)
-        })
+        const match = await this.validateIncomingConsignment(
+          receive,
+          item,
+          (reason, details) => {
+            mismatchReason = describeReceiveMismatch(reason, details, receive)
+          },
+          receiveValidationCaches
+        )
         if (!match) {
           const reason = mismatchReason || 'Consignment does not match this invoice'
           stageValidationFailure(reason)
@@ -2157,9 +2236,76 @@ export class RgbService {
     return this.runPendingReceiveOperation(() => this.acceptReceiveOnce(recipientId, options))
   }
 
+  async acceptReceives(recipientIds: string[]) {
+    return this.runPendingReceiveOperation(async () => {
+      const caches: ReceiveValidationCaches = {
+        evmRpcCache: new Map<string, Promise<unknown>>(),
+        bitcoinStatusCache: new Map<string, Promise<boolean>>(),
+        consignments: new Map<string, Promise<ValidatedBfaConsignment>>(),
+      }
+      const results: Array<{
+        recipientId: string
+        accepted: boolean
+        status: 'accepted' | 'pending' | 'canceled' | 'failed'
+        error?: string
+      }> = []
+      const staged: string[] = []
+      for (const recipientId of [...new Set(recipientIds)]) {
+        try {
+          const result = await this.acceptReceiveOnce(recipientId, {}, caches, { stageOnly: true })
+          if (result.status === 'staged') staged.push(recipientId)
+          else results.push({ recipientId, ...result })
+        } catch (error) {
+          results.push({
+            recipientId,
+            accepted: false,
+            status: 'failed',
+            error: error instanceof Error ? error.message : String(error),
+          })
+        }
+      }
+      // Persist every local receipt before the first irreversible ACK. A crash
+      // after any later ACK can then recover the whole batch from the durable
+      // acknowledgementPending records.
+      if (staged.length) await this.persist({ waitForRecovery: true })
+      for (const recipientId of staged) {
+        try {
+          const result = await this.acceptReceiveOnce(recipientId, {}, caches, {
+            deferFinalPersist: true,
+            deferProxyRelease: true,
+          })
+          if (result.status === 'staged') {
+            throw new RgbServiceError('RGB batch receive remained in staging')
+          }
+          results.push({ recipientId, ...result })
+        } catch (error) {
+          results.push({
+            recipientId,
+            accepted: false,
+            status: 'failed',
+            error: error instanceof Error ? error.message : String(error),
+          })
+        }
+      }
+      if (staged.length) {
+        await this.persist({ waitForRecovery: true })
+        if (await this.releaseHandledProxyData()) {
+          await this.persist({ waitForRecovery: true })
+        }
+      }
+      return results
+    })
+  }
+
   private async acceptReceiveOnce(
     recipientId: string,
-    options: { buySwapBackendCommitted?: boolean }
+    options: { buySwapBackendCommitted?: boolean },
+    caches?: ReceiveValidationCaches,
+    control: {
+      stageOnly?: boolean
+      deferFinalPersist?: boolean
+      deferProxyRelease?: boolean
+    } = {}
   ) {
     const state = this.requireState()
     const pending = state.pendingReceives || []
@@ -2224,7 +2370,7 @@ export class RgbService {
         // Pending accepts restored from an older checkpoint predate operationIds.
         // Revalidate the proposal against this invoice before using its branch
         // to scope mutable Bitcoin witness checks.
-        const refreshed = await this.validateIncomingConsignment(receive, item)
+        const refreshed = await this.validateIncomingConsignment(receive, item, undefined, caches)
         if (!refreshed) {
           throw new RgbServiceError('RGB receive no longer matches its invoice')
         }
@@ -2237,7 +2383,8 @@ export class RgbService {
         receive.pendingAccept.assetId,
         item.payload,
         item.txid,
-        requiredOperationIds
+        requiredOperationIds,
+        caches
       )
       if (
         options.buySwapBackendCommitted === true &&
@@ -2265,8 +2412,9 @@ export class RgbService {
         batch: receive.pendingAccept.batch,
         counterpartyScriptPubKeys: receive.pendingAccept.counterpartyScriptPubKeys,
       }
-      await this.persist({ waitForRecovery: true })
+      if (!control.stageOnly) await this.persist({ waitForRecovery: true })
     }
+    if (control.stageOnly) return { accepted: false, status: 'staged' as const }
     let acknowledgementConfirmed = false
     if (acknowledgementWasPending) {
       const acknowledgement = await this.getProxyAcknowledgement(receive, item.endpoint)
@@ -2357,8 +2505,8 @@ export class RgbService {
     delete receive.receivedConsignment!.acknowledgementPending
     delete receive.pendingAccept
     this.markProxyDataReleasePending(receive)
-    await this.persist({ waitForRecovery: true })
-    if (await this.releaseHandledProxyData(receive)) {
+    if (!control.deferFinalPersist) await this.persist({ waitForRecovery: true })
+    if (!control.deferProxyRelease && await this.releaseHandledProxyData(receive)) {
       await this.persist({ waitForRecovery: true })
     }
 
@@ -2490,7 +2638,8 @@ export class RgbService {
       proxyTransferId?: string
       proxySenderPublicKey?: string
     },
-    onMismatch?: (reason: string, details: Record<string, unknown>) => void
+    onMismatch?: (reason: string, details: Record<string, unknown>) => void,
+    caches?: ReceiveValidationCaches
   ) {
     const mismatch = (reason: string, details: Record<string, unknown> = {}): undefined => {
       onMismatch?.(reason, details)
@@ -2514,12 +2663,22 @@ export class RgbService {
     const payload = v1 ? normalizedPayload : convertNiaV0ConsignmentToV1(originalPayload)
     const validate = this.dependencies.validateBfaConsignment
     if (!validate) throw new RgbServiceError('RGB v1 receive validation is unavailable')
-    const bfa = await validate({
-      wallet: this.requireState().wallet, payload,
-      ...(expectedTxid ? { pendingWitnessTxid: expectedTxid } : { allowPendingLastWitness: true }),
-      knownBlindSeals: this.getKnownBlindSeals(),
-      confirmedBitcoinWitnesses: this.requireState().confirmedBitcoinWitnesses ||= {},
-    })
+    const validationKey = `${expectedTxid || 'pending-last'}:${Buffer.from(payload).toString('base64')}`
+    let validation = caches?.consignments.get(validationKey)
+    if (!validation) {
+      validation = validate({
+        wallet: this.requireState().wallet, payload,
+        ...(expectedTxid ? { pendingWitnessTxid: expectedTxid } : { allowPendingLastWitness: true }),
+        knownBlindSeals: this.getKnownBlindSeals(),
+        ...(caches ? {
+          evmRpcCache: caches.evmRpcCache,
+          bitcoinStatusCache: caches.bitcoinStatusCache,
+        } : {}),
+        confirmedBitcoinWitnesses: this.requireState().confirmedBitcoinWitnesses ||= {},
+      })
+      caches?.consignments.set(validationKey, validation)
+    }
+    const bfa = await validation
     if (receive.recipientType === 'witness' && !receive.witnessScriptPubKey)
       return mismatch('missing_witness_script')
     if (receive.recipientType !== 'witness' && !receive.seal)
@@ -2615,13 +2774,14 @@ export class RgbService {
       throw new RgbServiceError('RGB receive chain verification is unavailable')
     }
     const chain = await getTransactionStatus(state.wallet, validated.txid)
+    const expectedConfirmations = receive.minConfirmations || 1
     if (
       (chain.status === 'mempool' || chain.status === 'confirmed') &&
       !receive.receivedConsignment.broadcastDetectedAt
     ) {
       receive.receivedConsignment.broadcastDetectedAt = this.now()
     }
-    if (chain.status !== 'confirmed' || chain.confirmations < (receive.minConfirmations || 1)) return false
+    if (chain.status !== 'confirmed' || chain.confirmations < expectedConfirmations) return false
 
     let utxo = state.snapshot.utxos.find(candidate =>
       receive.recipientType === 'witness'
@@ -2650,7 +2810,13 @@ export class RgbService {
       }
     }
     if (!utxo) return false
-    if (deferConfirmedSettlement) return 'snapshot_required' as const
+    // A witness output is derived from the already validated Bitcoin
+    // transaction above. Settle the output and its RGB allocation atomically;
+    // publishing an empty witness UTXO first creates a window where a fresh
+    // replica snapshot can erase it and leave the receive permanently pending.
+    // Blind receives still refresh their pre-existing seal from the snapshot.
+    if (deferConfirmedSettlement && receive.recipientType !== 'witness')
+      return 'snapshot_required' as const
     const assetId = normalizeAssetId(validated.assetId)
     const receivedAssignments = validated.assignments || [{
       opId: validated.opId,
@@ -3147,6 +3313,18 @@ export class RgbService {
         histories.push({ opId: contractOperationId(normalized), payload: proof.payload })
       }
     }
+    // A newly accepted mempool receive can become spendable before its
+    // canonical DAG merge/checkpoint finishes. Its payload was already fully
+    // validated, so make it available to a chained send during that window.
+    for (const receive of this.requireState().pendingReceives || []) {
+      const candidates = [receive.receivedConsignment, receive.pendingAccept]
+      for (const candidate of candidates) {
+        if (candidate?.assetId && normalizeAssetId(candidate.assetId) === normalized &&
+          candidate.payload && !histories.some(item => item.payload === candidate.payload)) {
+          histories.push({ opId: contractOperationId(normalized), payload: candidate.payload })
+        }
+      }
+    }
     return histories
   }
 
@@ -3242,7 +3420,8 @@ export class RgbService {
     assetId: string,
     payload: string,
     pendingWitnessTxid?: string,
-    requiredOperationIds?: string[]
+    requiredOperationIds?: string[],
+    caches?: ReceiveValidationCaches
   ) {
     const existing = this.requireState().contracts?.[assetId]
     if (!existing) return
@@ -3255,7 +3434,8 @@ export class RgbService {
         normalizedPayload,
         pendingWitnessTxid,
         [],
-        requiredOperationIds
+        requiredOperationIds,
+        caches
       )
       return
     }
@@ -3275,7 +3455,8 @@ export class RgbService {
     payload: string,
     pendingWitnessTxid?: string,
     additionalLegacyPayloads: string[] = [],
-    requiredOperationIds?: string[]
+    requiredOperationIds?: string[],
+    caches?: ReceiveValidationCaches
   ) {
     const validate = this.dependencies.validateBfaConsignment
     if (!validate) throw new RgbServiceError('RGB v1 receive validation is unavailable')
@@ -3308,8 +3489,8 @@ export class RgbService {
     }
     if (!transfers.length) throw new RgbServiceError('RGB v1 history has no transfer')
     const knownBlindSeals = this.getKnownBlindSeals()
-    const evmRpcCache = new Map<string, Promise<unknown>>()
-    const bitcoinStatusCache = new Map<string, Promise<boolean>>()
+    const evmRpcCache = caches?.evmRpcCache ?? new Map<string, Promise<unknown>>()
+    const bitcoinStatusCache = caches?.bitcoinStatusCache ?? new Map<string, Promise<boolean>>()
     const confirmedBitcoinWitnesses = state.confirmedBitcoinWitnesses ||= {}
     const validated = await Promise.all(transfers.map(bytes => validate({
       wallet: state.wallet, payload: bytes,
@@ -4146,7 +4327,11 @@ export class RgbService {
       // payload no longer reveals that assignment. Do not trust that index
       // blindly: obtain the authoritative history once and retry before
       // failing the send.
-      if (!usingLocalHistory || !isIncompleteLocalHistoryError(error)) throw error
+      if (!isIncompleteLocalHistoryError(error)) throw error
+      // The address indexer may expose a newly received allocation one poll
+      // before its validation-history endpoint catches up. Refetch once even
+      // when the first attempt already used remote history; retries stay
+      // bounded and all returned DAGs are validated by the encoder.
       validationHistory = enrichValidationHistory(await getRemoteHistory())
       prepared = burn && !burnSplitRequired
         ? await this.requireBurnEncoder()(encoderInput())
@@ -5341,11 +5526,9 @@ export class RgbService {
   }
 
   /** Only tasks that can be overwritten by a stale snapshot may block its refresh. */
-  private hasPendingSnapshotProtection() {
+  private hasBlockingSnapshotProtection() {
     const state = this.requireState()
-    return Boolean(
-      state.pendingUtxoSync || state.pendingIssues?.length || this.hasUnsignedPreparedTransfer()
-    )
+    return Boolean(state.pendingIssues?.length)
   }
 
   private hasUnsignedPreparedTransfer() {

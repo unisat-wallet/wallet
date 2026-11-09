@@ -676,7 +676,7 @@ export interface WalletController {
   getRgbTransfers(
     currentPage: number,
     pageSize: number,
-    options?: { skipSync?: boolean }
+    options?: { skipSync?: boolean; assetId?: string; type?: RgbActivityType }
   ): Promise<{ currentPage: number; pageSize: number; total: number; list: RgbTransferItem[] }>
 
   createRgbBlindReceive(params: {
@@ -897,6 +897,13 @@ export interface WalletController {
     status: 'accepted' | 'pending' | 'canceled'
     [key: string]: any
   }>
+
+  acceptRgbReceives(params: { recipientIds: string[] }): Promise<Array<{
+    recipientId: string
+    accepted: boolean
+    status: 'accepted' | 'pending' | 'canceled' | 'failed'
+    error?: string
+  }>>
 
   rejectRgbReceive(params: { recipientId: string }): Promise<{
     rejected: boolean

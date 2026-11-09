@@ -4,6 +4,51 @@ import { toRgbDisplayAmount } from '@unisat/wallet-shared'
 import { RgbTransferQuery } from '../src/rgb/RgbTransferQuery'
 
 describe('RgbTransferQuery', () => {
+  it('scopes remote and local activity to one token', async () => {
+    const service = {
+      getPendingTransfers: vi.fn().mockReturnValue([
+        { id: 'selected', request: { assetId: 'rgb:selected', amount: '1' },
+          prepared: { lockedOutpoints: [] }, createdAt: 2 },
+        { id: 'other', request: { assetId: 'rgb:other', amount: '1' },
+          prepared: { lockedOutpoints: [] }, createdAt: 3 },
+      ]),
+      getPendingSendHistory: vi.fn().mockReturnValue([]),
+      getIssueHistory: vi.fn().mockReturnValue([]),
+      getPendingReceiveHistory: vi.fn().mockReturnValue([]),
+      getPendingReceives: vi.fn().mockReturnValue([]),
+      getSnapshot: vi.fn().mockReturnValue({ utxos: [] }),
+      getLocalAssetDetail: vi.fn().mockReturnValue({}),
+    }
+    const context = {
+      service,
+      wallet: { walletId: 'wallet', fundingAddress: 'funding', network: 'mainnet' },
+    }
+    const getRemoteActivity = vi.fn().mockResolvedValue({
+      // Defend against an older replica ignoring the scoped endpoint/query.
+      total: 2,
+      list: [
+        { id: 'remote', assetId: 'rgb:selected', type: 'send', status: 'confirmed' },
+        { id: 'remote-other', assetId: 'rgb:other', type: 'send', status: 'confirmed' },
+      ],
+    })
+    const query = new RgbTransferQuery({
+      getContext: vi.fn().mockResolvedValue(context as never),
+      syncReceiveHistory: vi.fn(), syncPendingTransfers: vi.fn(),
+      syncReceivedAllocations: vi.fn().mockResolvedValue(context as never),
+      getRemoteActivity, warn: vi.fn(),
+    })
+
+    const result = await query.getTransfers(1, 20, {
+      skipSync: true, assetId: 'rgb:selected', type: 'send',
+    })
+
+    expect(getRemoteActivity).toHaveBeenCalledWith(
+      'funding', 1, 20, { assetId: 'rgb:selected', type: 'send' }
+    )
+    expect(result.list.map(item => item.id)).toEqual(['local-send:selected', 'remote'])
+    expect(result.total).toBe(2)
+  })
+
   it('does not label a non-batch ACK recovery as waiting for other recipients', async () => {
     const service = {
       getPendingTransfers: vi.fn().mockReturnValue([]),

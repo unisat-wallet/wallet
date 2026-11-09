@@ -97,81 +97,35 @@ export function useRGBTokenScreenLogic() {
       if (assetId === '' || isUnconfiguredUsdt) {
         return { list: [], total: 0 }
       }
-
-      if (page !== 1) {
-        return wallet.getRGBAssetActivity('', assetId, page, pageSize, activityType)
-      }
-
-      // Use the same local transfer rows as the full RGB history. Some states
-      // (including ready_to_broadcast and canceled) never reach the indexer.
-      // This also advances pending receive consignments while the token page
-      // is open; the full RGB history page need not be mounted for progress.
-      const [activity, transfers] = await Promise.all([
-        wallet.getRGBAssetActivity('', assetId, page, pageSize, activityType),
-        wallet.getRgbTransfers(1, 50, { skipSync: false }),
-      ])
-      const localItems: RgbActivityItem[] = transfers.list
-        .filter(
-          transfer =>
-            transfer.local &&
-            isSameRgbAssetId(transfer.assetId, assetId) &&
-            (!activityType || transfer.type === activityType)
-        )
-        .map(transfer => ({
-          id: transfer.id,
-          transferId: transfer.transferId,
-          local: transfer.local,
-          burn: transfer.burn,
-          assetId: transfer.assetId ?? assetId,
-          ticker: transfer.ticker,
-          name: transfer.name,
-          precision: transfer.precision,
-          type: transfer.type,
-          status: transfer.status,
-          rejectionReason: transfer.rejectionReason,
-          canReject: transfer.canReject,
-          rejectLocally: transfer.rejectLocally,
-          amount: transfer.amount ?? '',
-          lockedAmount: transfer.lockedAmount,
-          txid: transfer.txid ?? '',
-          timestamp: transfer.timestamp,
-        }))
-      const normalizeTransferId = (item: Pick<RgbActivityItem, 'id' | 'transferId'>) =>
-        (item.transferId ?? item.id).replace(/^local-send:/, '')
-      const remoteSendIds = new Set(
-        activity.list
-          .filter(item =>
-            item.type === 'send' &&
-            ['mempool', 'broadcasted', 'confirmed', 'settled'].includes(
-              String(item.status ?? '').toLowerCase()
-            )
-          )
-          .map(item => normalizeTransferId(item))
-          .filter(Boolean)
-      )
-      // If the indexer already knows the same transfer, prefer its chain
-      // status over a prepared local row restored from an older checkpoint.
-      const visibleLocalItems = localItems.filter(item =>
-        item.type !== 'send' ||
-        !['signed', 'waiting_ack', 'broadcasting', 'ready_to_broadcast'].includes(
-          String(item.status ?? '').toLowerCase()
-        ) ||
-        !remoteSendIds.has(normalizeTransferId(item))
-      )
-      const localTxids = new Set(visibleLocalItems.map(item => item.txid).filter(Boolean))
-      const localIds = new Set(visibleLocalItems.flatMap(item => [item.id, normalizeTransferId(item)]))
-      const remoteItems = activity.list.filter(
-        item => !localIds.has(item.id) && (!item.txid || !localTxids.has(item.txid))
-      )
-      const list = [...visibleLocalItems, ...remoteItems].sort(
-        (left, right) => right.timestamp - left.timestamp
-      )
+      // The scoped transfer query fetches this asset's remote activity and
+      // merges durable local-only rows in one request.
+      const transfers = await wallet.getRgbTransfers(page, pageSize, {
+        skipSync: false,
+        assetId,
+        ...(activityType ? { type: activityType } : {}),
+      })
+      const list: RgbActivityItem[] = transfers.list.map(transfer => ({
+        id: transfer.id,
+        transferId: transfer.transferId,
+        local: transfer.local,
+        burn: transfer.burn,
+        assetId: transfer.assetId ?? assetId,
+        ticker: transfer.ticker,
+        name: transfer.name,
+        precision: transfer.precision,
+        type: transfer.type,
+        status: transfer.status,
+        rejectionReason: transfer.rejectionReason,
+        canReject: transfer.canReject,
+        rejectLocally: transfer.rejectLocally,
+        amount: transfer.amount ?? '',
+        lockedAmount: transfer.lockedAmount,
+        txid: transfer.txid ?? '',
+        timestamp: transfer.timestamp,
+      }))
       return {
         list,
-        total:
-          activity.list.length >= activity.total
-            ? list.length
-            : Math.max(activity.total + visibleLocalItems.length, list.length),
+        total: transfers.total,
       }
     },
     dependencies: [assetId, activityType, isUnconfiguredUsdt],

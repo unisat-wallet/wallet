@@ -29,7 +29,7 @@ describe('useRGBTokenScreenLogic', () => {
       ...fetchedBalance,
       tokenInfo: { name: 'Tether USD', ticker: 'USDT0' },
     })
-    wallet.getRGBAssetActivity.mockResolvedValue({
+    wallet.getRgbTransfers.mockResolvedValue({
       list: [{
         id: 'usdt-history',
         assetId,
@@ -131,7 +131,7 @@ describe('useRGBTokenScreenLogic', () => {
       })
       expect(result.current.tokenBalance).toMatchObject({ spendable: '998', pending: '0' })
       expect(wallet.getRGBAssetBalance).toHaveBeenCalledTimes(2)
-      expect(wallet.getRGBAssetActivity).toHaveBeenCalledTimes(2)
+      expect(wallet.getRgbTransfers).toHaveBeenCalledTimes(2)
       await act(async () => {
         await vi.advanceTimersByTimeAsync(10_000)
       })
@@ -265,20 +265,6 @@ describe('useRGBTokenScreenLogic', () => {
     const { wrapper, wallet } = createHookTestHarness({ routeState: { assetId } })
     wallet.getRGBAssetDetail.mockResolvedValue(detail)
     wallet.getRGBAssetBalance.mockResolvedValue(fetchedBalance)
-    wallet.getRGBAssetActivity.mockResolvedValue({
-      total: 1,
-      list: [
-        {
-          id: 'indexed-transfer',
-          assetId,
-          type: 'send',
-          status: 'confirmed',
-          amount: '5',
-          txid: 'indexed-txid',
-          timestamp: 1,
-        },
-      ],
-    })
     wallet.getRgbTransfers.mockResolvedValue({
       total: 2,
       list: [
@@ -293,13 +279,13 @@ describe('useRGBTokenScreenLogic', () => {
           local: true,
         },
         {
-          id: 'local-send:other-asset',
-          assetId: 'rgb:other-asset',
+          id: 'indexed-transfer',
+          assetId,
           type: 'send',
-          status: 'waiting_ack',
-          amount: '9',
-          timestamp: 3,
-          local: true,
+          status: 'confirmed',
+          amount: '5',
+          txid: 'indexed-txid',
+          timestamp: 1,
         },
       ],
     })
@@ -313,7 +299,9 @@ describe('useRGBTokenScreenLogic', () => {
       ])
     })
     expect(result.current.activityTotal).toBe(2)
-    expect(wallet.getRgbTransfers).toHaveBeenCalledWith(1, 50, { skipSync: false })
+    expect(wallet.getRgbTransfers).toHaveBeenCalledWith(1, 20, {
+      skipSync: false, assetId,
+    })
   })
 
   it('includes a ready-to-broadcast transfer from the full RGB history', async () => {
@@ -428,19 +416,11 @@ describe('useRGBTokenScreenLogic', () => {
     const { wrapper, wallet } = createHookTestHarness({ routeState: { assetId } })
     wallet.getRGBAssetDetail.mockResolvedValue(detail)
     wallet.getRGBAssetBalance.mockResolvedValue(fetchedBalance)
-    wallet.getRGBAssetActivity.mockResolvedValue({
+    wallet.getRgbTransfers.mockResolvedValue({
       total: 1,
       list: [{
         id: 'transfer-1', assetId, type: 'send', status: 'mempool', amount: '1',
         txid: 'a'.repeat(64), timestamp: 2,
-      }],
-    })
-    wallet.getRgbTransfers.mockResolvedValue({
-      total: 2,
-      list: [{
-        id: 'local-send:transfer-1', transferId: 'transfer-1', assetId,
-        type: 'send', status: 'signed', amount: '1', lockedAmount: '1',
-        timestamp: 1, local: true,
       }],
     })
 

@@ -1159,8 +1159,22 @@ export class WalletController extends BaseController {
       if (changed) await this.rgbCoordinator.syncListState()
     },
     syncReceivedAllocations: () => this.syncRgbReceivedAllocations(),
-    getRemoteActivity: async (address, currentPage, pageSize) => {
-      const result = await this.getAddressRgbActivity(address, currentPage, pageSize)
+    getRemoteActivity: async (address, currentPage, pageSize, scope) => {
+      const result = scope?.assetId
+        ? await this.getRgbAssetActivity(
+            scope.assetId,
+            currentPage,
+            pageSize,
+            address,
+            scope.type as RgbActivityType | undefined
+          )
+        : await this.getAddressRgbActivity(
+            address,
+            currentPage,
+            pageSize,
+            undefined,
+            scope?.type as RgbActivityType | undefined
+          )
       return { total: result.total, list: result.list as RgbRemoteActivity[] }
     },
     warn: (message, error) => log.warn(message, error),
@@ -3916,14 +3930,20 @@ export class WalletController extends BaseController {
 
   getRGBAssetBalance = async (_address: string, assetId: string) => {
     const { address } = await this.getRgbFundingAddress()
-    const balance = await this.getRgbAssetBalance(address, assetId)
+    let balance = await this.getRgbAssetBalance(address, assetId)
     // A token detail screen may be open without the RGB asset list. Keep its
     // pending allocation moving while a receive or change output confirms.
     if (Number(balance?.pending || 0) > 0 || Number(balance?.lockedAmount || 0) > 0) {
-      void this.syncRgbListState().catch(error => {
-        if (isRgbWalletLockCancellation(error)) return
-        log.warn('Failed to refresh RGB indexer snapshot while loading asset balance', error)
-      })
+      try {
+        // This RPC is the only lifecycle owner when the token detail screen is
+        // open. Await the refresh: an extension background worker may suspend
+        // an unobserved promise as soon as the balance response is returned.
+        await this.syncRgbListState()
+        balance = await this.getRgbAssetBalance(address, assetId)
+      } catch (error) {
+        if (!isRgbWalletLockCancellation(error))
+          log.warn('Failed to refresh RGB indexer snapshot while loading asset balance', error)
+      }
     }
     return balance
       ? this.applyRgbPendingLock(balance, await this.getRgbPendingLockedAmounts())
@@ -4160,7 +4180,7 @@ export class WalletController extends BaseController {
   getRgbTransfers = async (
     currentPage: number,
     pageSize: number,
-    options?: { skipSync?: boolean }
+    options?: { skipSync?: boolean; assetId?: string; type?: RgbActivityType }
   ) => {
     await this.assertRgbEnabled()
     return this.rgbTransferQuery.getTransfers(currentPage, pageSize, options)
@@ -5786,6 +5806,12 @@ export class WalletController extends BaseController {
     const context = await this.getLocalRgbService()
     await this.ensureRgbWriteLease(context, { forceRenew: true })
     return this.rgbReceiveOperations.acceptReceive(params.recipientId, context)
+  }
+
+  acceptRgbReceives = async (params: { recipientIds: string[] }) => {
+    const context = await this.getLocalRgbService()
+    await this.ensureRgbWriteLease(context, { forceRenew: true })
+    return this.rgbReceiveOperations.acceptReceives(params.recipientIds, context)
   }
 
   stageRgbBuySwapIntent = async (params: {

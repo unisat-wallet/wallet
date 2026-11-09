@@ -98,13 +98,11 @@ export class RgbWalletCoordinator {
   }
 
   async syncListState(): Promise<void> {
-    // This is initiated by a list render. Recovery may still be restoring or
-    // intentionally read-only after a conflict, neither of which should turn
-    // into a user-visible indexer error. Use local read state first and only
-    // escalate to a writer after recovery has established a safe baseline.
+    // This is initiated by a list render. Use local read state first and only
+    // escalate to a writer for applying a refreshed snapshot. Snapshot
+    // freshness is required even when optional recovery backup is disabled.
     const context = await (this.dependencies.getReadContext?.() ?? this.dependencies.getContext())
     const { service, wallet } = context
-    if (!service.isRecoveryBackupEnabled()) return
     const snapshot = service.getSnapshot()
     if (
       !snapshot.utxos.some(utxo => utxo.allocations.length > 0) &&
@@ -122,9 +120,7 @@ export class RgbWalletCoordinator {
     if (
       this.snapshotSyncing.has(key) ||
       (this.snapshotSyncAt.get(key) ?? 0) + minInterval > Date.now()
-    ) {
-      return
-    }
+    ) return
     // Snapshot refresh can persist changed local state and enqueue a recovery
     // checkpoint. Acquire or renew before it runs; after a background restart
     // there is no in-memory lease to attach to that checkpoint.
@@ -210,10 +206,11 @@ export class RgbWalletCoordinator {
     await this.dependencies.assertContext?.(context)
     // Invoice availability depends on its funding UTXO being confirmed. This
     // operation is already rate-limited by RECEIVE_POLL_INTERVAL, so force a
-    // fresh snapshot for unresolved invoices instead of leaving their local
-    // chainStatus at mempool forever.
+    // recent snapshot for unresolved invoices instead of leaving their local
+    // chainStatus at mempool forever. Reuse a refresh just triggered by the
+    // token balance read rather than issuing a duplicate request.
     if (this.hasUnconfirmedInvoiceFunding(service)) {
-      await this.syncSnapshot(service, wallet, 0)
+      await this.syncSnapshot(service, wallet, ACTIVE_SNAPSHOT_SYNC_INTERVAL)
       await this.dependencies.assertContext?.(context)
     }
     let processed = await service.processClaimedReceives({

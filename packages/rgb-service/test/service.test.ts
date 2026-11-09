@@ -1422,11 +1422,14 @@ describe('RgbService', () => {
       outpoints: expect.arrayContaining([expect.objectContaining(fundingUtxo)]),
     })
     await restoredService.sync()
-    expect(dependencies.stateSource.getSnapshot).toHaveBeenCalledTimes(1)
+    expect(dependencies.stateSource.getSnapshot).toHaveBeenCalledTimes(2)
+    expect(restoredService.getSnapshot().utxos).toContainEqual(
+      expect.objectContaining({ ...fundingUtxo, chainStatus: 'mempool' })
+    )
 
     await restoredService.markUtxoSyncCompleted(fundingUtxo.outpoint.txid)
     await restoredService.sync()
-    expect(dependencies.stateSource.getSnapshot).toHaveBeenCalledTimes(2)
+    expect(dependencies.stateSource.getSnapshot).toHaveBeenCalledTimes(3)
   })
 
   it('refreshes the wallet snapshot while received asset metadata is waiting to be indexed', async () => {
@@ -2013,7 +2016,7 @@ describe('RgbService', () => {
         accepted: true, assetId: match.assetId, amount: match.amount,
         txid: match.txid, receivedAt: 1,
       },
-    }, item, match, false)).resolves.toBe(true)
+    }, item, match, true)).resolves.toBe(true)
     const stored = (service as any).state.contracts[match.assetId]
     expect(isSupportedV1TransferConsignment(
       Uint8Array.from(Buffer.from(stored.history.payload, 'base64'))
@@ -2149,6 +2152,42 @@ describe('RgbService', () => {
       { recipientId: 'recipient', endpoints: [proxyEndpoint], encryption: 'required' },
     ])
     expect(dependencies.transport.getConsignment).not.toHaveBeenCalled()
+  })
+
+  it('shares chain validation caches across receives discovered in one polling pass', async () => {
+    const dependencies = createDependencies()
+    dependencies.transport.getConsignments = vi.fn().mockResolvedValue([
+      { recipientId: 'recipient-1', payload: 'same-batch-consignment', txid: 'c'.repeat(64) },
+      { recipientId: 'recipient-2', payload: 'same-batch-consignment', txid: 'c'.repeat(64) },
+    ])
+    const service = new RgbService(dependencies)
+    await service.open(wallet)
+    ;(service as any).state.pendingReceives = [1, 2].map(index => ({
+      invoice: rgbInvoice(),
+      recipientId: `recipient-${index}`,
+      proxyRecipientId: `recipient-${index}`,
+      createdAt: index,
+      seal: { txid: `${index}`.repeat(64), vout: 0, blinding: BigInt(index) },
+    }))
+    const validateIncoming = vi.fn().mockImplementation((_receive, item) => ({
+      decoded: { metadata: { ticker: 'TOK', name: 'Token', precision: 0, schema: 'BFA' } },
+      assetId: 'rgb:AQEBAQEB-AQEBAQE-BAQEBAQ-EBAQEBA-QEBAQEB-AQEBAQE',
+      amount: '1',
+      txid: item.txid,
+      opId: 'd'.repeat(64),
+      assignmentIndex: 0,
+    }))
+    ;(service as any).validateIncomingConsignment = validateIncoming
+
+    await service.processClaimedReceives({ includeClaimed: false })
+
+    expect(validateIncoming).toHaveBeenCalledTimes(2)
+    const firstCaches = validateIncoming.mock.calls[0]![3]
+    const secondCaches = validateIncoming.mock.calls[1]![3]
+    expect(firstCaches).toBe(secondCaches)
+    expect(firstCaches.evmRpcCache).toBeInstanceOf(Map)
+    expect(firstCaches.bitcoinStatusCache).toBeInstanceOf(Map)
+    expect(firstCaches.consignments).toBeInstanceOf(Map)
   })
 
   it('claims each pending invoice only once after the recovery service accepts it', async () => {
@@ -2796,7 +2835,7 @@ describe('RgbService', () => {
     await expect(Promise.all(synchronizations)).resolves.toEqual([snapshot, snapshot, snapshot])
   })
 
-  it('does not replace the allocation snapshot while an unsigned transfer is pending', async () => {
+  it('refreshes unrelated outpoints while protecting an unsigned transfer input', async () => {
     const dependencies = createDependencies()
     const service = new RgbService(dependencies)
     await service.open(wallet)
@@ -2807,11 +2846,48 @@ describe('RgbService', () => {
       invoice: rgbInvoice(),
       feeRate: 2,
     })
-    vi.mocked(dependencies.stateSource.getSnapshot).mockClear()
-    const preparedSnapshot = service.getSnapshot()
+    const pending = service.getPendingTransfers()[0]!
+    const protectedKeys = new Set(pending.prepared.lockedOutpoints.map(
+      outpoint => `${outpoint.txid}:${outpoint.vout}`
+    ))
+    const preparedSnapshot = structuredClone(service.getSnapshot())
+    const protectedUtxos = preparedSnapshot.utxos.filter(utxo =>
+      protectedKeys.has(`${utxo.outpoint.txid}:${utxo.outpoint.vout}`)
+    )
+    const unrelated = preparedSnapshot.utxos.find(utxo =>
+      !protectedKeys.has(`${utxo.outpoint.txid}:${utxo.outpoint.vout}`)
+    )!
+    vi.mocked(dependencies.stateSource.getSnapshot).mockResolvedValueOnce({
+      syncedAt: 2,
+      utxos: preparedSnapshot.utxos.map(utxo =>
+        protectedKeys.has(`${utxo.outpoint.txid}:${utxo.outpoint.vout}`)
+          ? { ...utxo, allocations: [] }
+          : {
+              ...utxo,
+              chainStatus: 'confirmed', confirmations: 2,
+              allocations: utxo.allocations.map(allocation => ({
+                ...allocation, settled: true, spendable: true,
+              })),
+            }
+      ),
+    })
 
-    await expect(service.sync()).resolves.toEqual(preparedSnapshot)
-    expect(dependencies.stateSource.getSnapshot).not.toHaveBeenCalled()
+    await service.sync()
+
+    expect(dependencies.stateSource.getSnapshot).toHaveBeenCalled()
+    for (const protectedUtxo of protectedUtxos) {
+      expect(service.getSnapshot().utxos.find(utxo =>
+        utxo.outpoint.txid === protectedUtxo.outpoint.txid &&
+        utxo.outpoint.vout === protectedUtxo.outpoint.vout
+      )).toEqual(protectedUtxo)
+    }
+    expect(service.getSnapshot().utxos.find(utxo =>
+      utxo.outpoint.txid === unrelated.outpoint.txid &&
+      utxo.outpoint.vout === unrelated.outpoint.vout
+    )).toMatchObject({
+      chainStatus: 'confirmed', confirmations: 2,
+      allocations: [expect.objectContaining({ settled: true, spendable: true })],
+    })
   })
 
   it('keeps an allocation queued while an older snapshot request is in flight', async () => {
@@ -2857,6 +2933,52 @@ describe('RgbService', () => {
     const current = service.getPendingUtxoSync()!
     await service.markUtxoSyncCompleted(local.outpoint.txid, current)
     expect(service.getPendingUtxoSync()).toBeUndefined()
+  })
+
+  it('refreshes unrelated assets while preserving a queued local output', async () => {
+    const dependencies = createDependencies()
+    const service = new RgbService(dependencies)
+    await service.open(wallet)
+    await service.sync()
+    const protectedUtxo = service.getSnapshot().utxos[0]!
+    const unrelated = service.getSnapshot().utxos[1]!
+    unrelated.chainStatus = 'mempool'
+    unrelated.confirmations = 0
+    unrelated.allocations = unrelated.allocations.map(allocation => ({
+      ...allocation, settled: false, spendable: false,
+    }))
+    await service.queueUtxoSync({
+      txid: protectedUtxo.outpoint.txid,
+      outpoints: service.getSnapshot().utxos,
+    })
+    vi.mocked(dependencies.stateSource.getSnapshot).mockResolvedValueOnce({
+      syncedAt: 2,
+      utxos: [
+        { ...protectedUtxo, allocations: [] },
+        {
+          ...unrelated,
+          chainStatus: 'confirmed', confirmations: 2,
+          allocations: unrelated.allocations.map(allocation => ({
+            ...allocation, settled: true, spendable: true,
+          })),
+        },
+      ],
+    })
+
+    await service.sync()
+
+    expect(service.getSnapshot().utxos.find(utxo =>
+      utxo.outpoint.txid === protectedUtxo.outpoint.txid &&
+      utxo.outpoint.vout === protectedUtxo.outpoint.vout
+    )?.allocations).toEqual(protectedUtxo.allocations)
+    expect(service.getSnapshot().utxos.find(utxo =>
+      utxo.outpoint.txid === unrelated.outpoint.txid &&
+      utxo.outpoint.vout === unrelated.outpoint.vout
+    )).toMatchObject({
+      chainStatus: 'confirmed', confirmations: 2,
+      allocations: [expect.objectContaining({ settled: true, spendable: true })],
+    })
+    expect(service.getPendingUtxoSync()?.txid).toBe(protectedUtxo.outpoint.txid)
   })
 
   it('replays locally settled allocations when the indexer omits them on a live outpoint', async () => {
@@ -4512,6 +4634,52 @@ describe('RgbService', () => {
     )
   })
 
+  it('uses a validated pending receive history for an immediate chained send', async () => {
+    const dependencies = createDependencies()
+    const service = new RgbService(dependencies)
+    const assetId = 'rgb:AQEBAQEB-AQEBAQE-BAQEBAQ-EBAQEBA-QEBAQEB-AQEBAQE'
+    await service.open(wallet)
+    await service.sync()
+    ;(service as any).state.contracts = {
+      [assetId]: {
+        consignment: 'b2xkLWNhbm9uaWNhbA==', createdAt: 1,
+        history: { payload: 'b2xkLWNhbm9uaWNhbA==', opIds: ['c'.repeat(64)], updatedAt: 1 },
+      },
+    }
+    ;(service as any).state.pendingReceives = [{
+      invoice: rgbInvoice(), recipientId: 'new-receive', createdAt: 1,
+      receivedConsignment: {
+        txid: 'b'.repeat(64), receivedAt: 2, accepted: true,
+        assetId, amount: '60', payload: 'dmFsaWRhdGVkLXBlbmRpbmctcmVjZWl2ZQ==',
+      },
+    }]
+    vi.mocked(dependencies.stateSource.getValidationHistory).mockResolvedValue({
+      assetId,
+      consignments: [{ opId: 'c'.repeat(64), payload: 'c3RhbGUtYmFja2VuZA==' }],
+    })
+    vi.mocked(dependencies.encoder.prepareTransfer)
+      .mockRejectedValueOnce(new RgbMissingAncestorError())
+      .mockResolvedValueOnce({
+        id: 'chained-send', psbt: 'cHNidP8=', toSignInputs: [],
+        lockedOutpoints: [{ txid: 'b'.repeat(64), vout: 1 }],
+      })
+
+    await service.prepareSend({
+      assetId, amount: '60', invoice: rgbInvoice(), feeRate: 2,
+    })
+
+    expect(dependencies.encoder.prepareTransfer).toHaveBeenCalledWith(
+      expect.objectContaining({
+        validationHistory: expect.objectContaining({
+          consignments: expect.arrayContaining([
+            expect.objectContaining({ payload: 'dmFsaWRhdGVkLXBlbmRpbmctcmVjZWl2ZQ==' }),
+          ]),
+        }),
+      })
+    )
+    expect(dependencies.stateSource.getValidationHistory).toHaveBeenCalledTimes(2)
+  })
+
   it('waits for the sender to broadcast after recipient acknowledgement', async () => {
     const dependencies = createDependencies()
     const service = new RgbService(dependencies)
@@ -4655,6 +4823,31 @@ describe('RgbService', () => {
     expect(service.getPendingSendHistory()).toEqual([
       expect.objectContaining({ transferId: 'transfer-1', status: 'canceled', txid: completed.txid }),
     ])
+  })
+
+  it('accepts a receive batch in one operation with shared validation caches', async () => {
+    const service = new RgbService(createDependencies())
+    await service.open(wallet)
+    const acceptOnce = vi.spyOn(service as any, 'acceptReceiveOnce')
+      .mockImplementation(async (_recipientId, _options, _caches, control: any) =>
+        control?.stageOnly
+          ? { accepted: false, status: 'staged' }
+          : { accepted: true, status: 'accepted' }
+      )
+
+    await expect(service.acceptReceives(['recipient-1', 'recipient-2', 'recipient-1']))
+      .resolves.toEqual([
+        { recipientId: 'recipient-1', accepted: true, status: 'accepted' },
+        { recipientId: 'recipient-2', accepted: true, status: 'accepted' },
+      ])
+
+    expect(acceptOnce).toHaveBeenCalledTimes(4)
+    const firstCaches = acceptOnce.mock.calls[0]![2] as any
+    const secondCaches = acceptOnce.mock.calls[1]![2] as any
+    expect(firstCaches).toBe(secondCaches)
+    expect(firstCaches.evmRpcCache).toBeInstanceOf(Map)
+    expect(firstCaches.bitcoinStatusCache).toBeInstanceOf(Map)
+    expect(firstCaches.consignments).toBeInstanceOf(Map)
   })
 
   it('does not re-fetch a consignment immediately after accepting it', async () => {

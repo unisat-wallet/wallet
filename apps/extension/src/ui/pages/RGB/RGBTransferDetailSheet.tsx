@@ -198,6 +198,10 @@ export type RGBTransferDetailSheetProps = {
   onCanceled?: () => void;
   onAccepted?: () => void;
   remainingBroadcastCount?: number;
+  /** Pending receives from the same Proxy batch and Bitcoin transaction. */
+  batchTransfers?: RgbTransferItem[];
+  onReceiveActionStart?: () => void;
+  onReceiveActionFailed?: () => void;
 };
 
 export function RGBTransferDetailSheet({
@@ -208,7 +212,10 @@ export function RGBTransferDetailSheet({
   onClickExploreTx,
   onCanceled,
   onAccepted,
-  remainingBroadcastCount = 0
+  remainingBroadcastCount = 0,
+  batchTransfers = [],
+  onReceiveActionStart,
+  onReceiveActionFailed
 }: RGBTransferDetailSheetProps) {
   const { t } = useI18n();
   const chain = useChain();
@@ -222,6 +229,12 @@ export function RGBTransferDetailSheet({
   const [actionLoading, setActionLoading] = useState(false);
   const [broadcastRetryLoading, setBroadcastRetryLoading] = useState(false);
   const [senderCanceledVisible, setSenderCanceledVisible] = useState(false);
+  const receiveTargets = batchTransfers.length > 1
+    ? batchTransfers
+    : transfer
+      ? [transfer]
+      : [];
+  const groupedReceiveCount = receiveTargets.length;
 
   const status = transfer?.status || 'pending';
   const ticker = transfer?.ticker || transfer?.name || 'RGB';
@@ -295,26 +308,45 @@ export function RGBTransferDetailSheet({
   };
 
   const onAcceptReceive = async () => {
-    const recipientId = resolveReceiveRecipientId(transfer, transferId);
-    if (!recipientId || actionLoading) return;
+    const targets = receiveTargets
+      .map((item) => resolveReceiveRecipientId(item, item.transferId || item.id))
+      .filter((recipientId): recipientId is string => !!recipientId);
+    if (!targets.length || actionLoading) return;
+    onReceiveActionStart?.();
     setActionLoading(true);
+    let accepted = 0;
+    let pending = 0;
+    let canceled = 0;
+    let failed = 0;
     try {
-      const result = await wallet.acceptRgbReceive({ recipientId });
-      if (result?.status === 'canceled') {
+      const results = targets.length > 1
+        ? await wallet.acceptRgbReceives({ recipientIds: targets })
+        : [await wallet.acceptRgbReceive({ recipientId: targets[0] })];
+      for (const result of results) {
+        if (result?.status === 'canceled') canceled++;
+        else if (result?.status === 'pending') pending++;
+        else if (result?.status === 'failed' || !result?.accepted) failed++;
+        else accepted++;
+      }
+      if (canceled === targets.length) {
         setSenderCanceledVisible(true);
         return;
-      } else if (result?.status === 'pending') {
+      }
+      if (failed > 0) {
+        onReceiveActionFailed?.();
+        tools.toastError(`${t('rgb_accept_transfer_failed')} (${failed}/${targets.length})`);
+        onCanceled?.();
+        return;
+      } else if (pending > 0) {
         tools.toastSuccess(t('rgb_status_waiting_batch_release'));
-        onAccepted?.();
-      } else if (!result?.accepted) {
-        throw new Error(t('rgb_accept_transfer_failed'));
       } else {
         tools.toastSuccess(t('rgb_accept_transfer_success'));
-        onAccepted?.();
       }
+      if (accepted > 0 || pending > 0) onAccepted?.();
       onClose();
       onCanceled?.();
     } catch (e: unknown) {
+      onReceiveActionFailed?.();
       const message = getTransferActionErrorMessage(e, t('rgb_accept_transfer_failed'));
       tools.toastError(message);
     } finally {
@@ -323,15 +355,33 @@ export function RGBTransferDetailSheet({
   };
 
   const onRejectReceive = async () => {
-    const recipientId = resolveReceiveRecipientId(transfer, transferId);
-    if (!recipientId || actionLoading) return;
+    const targets = receiveTargets
+      .map((item) => resolveReceiveRecipientId(item, item.transferId || item.id))
+      .filter((recipientId): recipientId is string => !!recipientId);
+    if (!targets.length || actionLoading) return;
+    onReceiveActionStart?.();
     setActionLoading(true);
     try {
-      await wallet.rejectRgbReceive({ recipientId });
+      let failed = 0;
+      // Keep state/lease mutations ordered while rejecting a Proxy batch.
+      for (const recipientId of targets) {
+        try {
+          await wallet.rejectRgbReceive({ recipientId });
+        } catch {
+          failed++;
+        }
+      }
+      if (failed) {
+        onReceiveActionFailed?.();
+        tools.toastError(`${t('rgb_reject_transfer_failed')} (${failed}/${targets.length})`);
+        onCanceled?.();
+        return;
+      }
       tools.toastSuccess(t('rgb_reject_transfer_success'));
       onClose();
       onCanceled?.();
     } catch (e: unknown) {
+      onReceiveActionFailed?.();
       const message = getTransferActionErrorMessage(e, t('rgb_reject_transfer_failed'));
       tools.toastError(message);
     } finally {
@@ -494,6 +544,9 @@ export function RGBTransferDetailSheet({
             <Column fullX style={{ gap: 12 }}>
               <DetailRow label={t('date')} value={formatDate(transfer?.timestamp || 0)} />
               {transfer?.batch ? <DetailRow label={t('type')} value={t('rgb_batch_transfer')} /> : null}
+              {groupedReceiveCount > 1 ? (
+                <DetailRow label={t('total')} value={String(groupedReceiveCount)} />
+              ) : null}
               <Row fullX justifyBetween itemsCenter style={{ minHeight: 32 }}>
                 <Text text={t('status')} style={{ fontSize: 14, fontWeight: 500, color: 'rgba(255,255,255,0.45)' }} />
                 <Row itemsCenter gap="xs">
@@ -575,7 +628,7 @@ export function RGBTransferDetailSheet({
             {canAcceptReceive ? (
               <Row gap="md" fullX>
                 <Button
-                  text={t('rgb_reject_transfer')}
+                  text={`${t('rgb_reject_transfer')}${groupedReceiveCount > 1 ? ` (${groupedReceiveCount})` : ''}`}
                   preset="default"
                   disabled={actionLoading}
                   onClick={() => setRejectConfirmVisible(true)}
@@ -590,7 +643,7 @@ export function RGBTransferDetailSheet({
                   textStyle={{ color: colors.white, fontWeight: 'normal' }}
                 />
                 <Button
-                  text={t('rgb_accept_transfer')}
+                  text={`${t('rgb_accept_transfer')}${groupedReceiveCount > 1 ? ` (${groupedReceiveCount})` : ''}`}
                   preset="primary"
                   disabled={actionLoading}
                   data-testid="rgb-transfer-accept-button"
@@ -660,7 +713,11 @@ export function RGBTransferDetailSheet({
       <RGBRejectReceiveConfirmModal
         visible={rejectConfirmVisible}
         loading={actionLoading}
-        description={hasValidationFailure && transfer?.rejectLocally ? t('rgb_reject_receive_local_only_description') : undefined}
+        description={groupedReceiveCount > 1
+          ? `${t('rgb_reject_receive_confirm_description')} (${groupedReceiveCount})`
+          : hasValidationFailure && transfer?.rejectLocally
+            ? t('rgb_reject_receive_local_only_description')
+            : undefined}
         onClose={() => setRejectConfirmVisible(false)}
         onConfirm={() => {
           setRejectConfirmVisible(false);

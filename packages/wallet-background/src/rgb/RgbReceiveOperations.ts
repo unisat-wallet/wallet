@@ -134,6 +134,17 @@ export class RgbReceiveOperations {
     return service.acceptReceive(recipientId)
   }
 
+  async acceptReceives(
+    recipientIds: string[],
+    boundContext?: LocalRgbServiceContext
+  ): Promise<Awaited<ReturnType<RgbService['acceptReceives']>>> {
+    const context = boundContext ?? (await this.dependencies.getContext())
+    const { service } = context
+    await this.dependencies.ensureWriteLease?.(context)
+    await this.dependencies.assertContext?.(context)
+    return service.acceptReceives(recipientIds)
+  }
+
   async stageBuySwapIntent(
     recipientId: string,
     input: { txid: string; buyerSignedPsbtHash: string }

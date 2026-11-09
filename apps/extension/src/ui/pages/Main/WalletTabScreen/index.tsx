@@ -37,7 +37,8 @@ import {
   useVersionInfo,
   useWallTabFocusRefresh,
   useWallet,
-  useWalletConfig
+  useWalletConfig,
+  type RgbTransferItem
 } from '@unisat/wallet-state';
 
 import { useNavigate } from '../../MainRoute';
@@ -395,6 +396,10 @@ export default function WalletTabScreen({
     activeId?: string;
     dismissedIdsByContext: Map<string, Set<string>>;
   }>(() => ({ contextKey: rgbContextKey, dismissedIdsByContext: new Map(dismissedRgbAcceptanceIdsByContext) }));
+  const [acceptanceActionBatch, setAcceptanceActionBatch] = useState<{
+    contextKey: string;
+    items: RgbTransferItem[];
+  }>({ contextKey: rgbContextKey, items: [] });
   const dismissedBroadcastIds =
     broadcastQueue.contextKey === rgbContextKey
       ? getDismissedIdsForContext(
@@ -417,10 +422,22 @@ export default function WalletTabScreen({
         )
       : new Set<string>();
   const pendingAcceptances = getPendingRgbAcceptances(rgbTransfers.items, dismissedAcceptanceIds);
-  const pendingAcceptance =
+  const lockedAcceptanceBatch =
+    acceptanceActionBatch.contextKey === rgbContextKey ? acceptanceActionBatch.items : [];
+  const pendingAcceptance = lockedAcceptanceBatch[0] ?? (
     acceptanceQueue.contextKey === rgbContextKey
       ? pendingAcceptances.find((item) => (item.transferId || item.id) === acceptanceQueue.activeId)
-      : undefined;
+      : undefined
+  );
+  const pendingAcceptanceBatch = lockedAcceptanceBatch.length > 0
+    ? lockedAcceptanceBatch
+    : pendingAcceptance
+    ? pendingAcceptance.batch && pendingAcceptance.txid
+      ? pendingAcceptances.filter(
+          (item) => item.batch === true && item.txid === pendingAcceptance.txid
+        )
+      : [pendingAcceptance]
+    : [];
 
   useEffect(() => {
     setBroadcastQueue((current) => {
@@ -486,14 +503,19 @@ export default function WalletTabScreen({
 
   const dismissPendingAcceptance = () => {
     if (!pendingAcceptance) return;
-    const transferId = pendingAcceptance.transferId || pendingAcceptance.id;
-    rememberDismissedId(dismissedRgbAcceptanceIdsByContext, rgbContextKey, transferId);
+    const transferIds = pendingAcceptanceBatch.map((item) => item.transferId || item.id);
+    for (const transferId of transferIds) {
+      rememberDismissedId(dismissedRgbAcceptanceIdsByContext, rgbContextKey, transferId);
+    }
     setAcceptanceQueue((current) => {
       if (current.contextKey !== rgbContextKey) return current;
       const dismissedIdsByContext = new Map(current.dismissedIdsByContext);
-      rememberDismissedId(dismissedIdsByContext, rgbContextKey, transferId);
+      for (const transferId of transferIds) {
+        rememberDismissedId(dismissedIdsByContext, rgbContextKey, transferId);
+      }
       return { ...current, activeId: undefined, dismissedIdsByContext };
     });
+    setAcceptanceActionBatch({ contextKey: rgbContextKey, items: [] });
   };
 
   const onEnableRgb = useCallback(async () => {
@@ -850,6 +872,13 @@ export default function WalletTabScreen({
             key={pendingAcceptance.transferId || pendingAcceptance.id}
             transfer={pendingAcceptance}
             transferId={pendingAcceptance.transferId || pendingAcceptance.id}
+            batchTransfers={pendingAcceptanceBatch}
+            onReceiveActionStart={() => {
+              setAcceptanceActionBatch({ contextKey: rgbContextKey, items: pendingAcceptanceBatch });
+            }}
+            onReceiveActionFailed={() => {
+              setAcceptanceActionBatch({ contextKey: rgbContextKey, items: [] });
+            }}
             onClose={dismissPendingAcceptance}
             onCanceled={() => void rgbTransfers.onRefresh({ showLoading: false })}
           />
