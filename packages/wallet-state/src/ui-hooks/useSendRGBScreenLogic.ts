@@ -185,6 +185,7 @@ export function useSendRGBScreenLogic() {
   const [proxyApprovalEndpoints, setProxyApprovalEndpoints] = useState<string[]>([])
   const [proxyApprovalAccepted, setProxyApprovalAccepted] = useState(false)
   const [proxyApprovalError, setProxyApprovalError] = useState('')
+  const [, setInvoiceExpiryTick] = useState(0)
   const feePoolTransitionStarted = useRef(false)
   const invoiceInputVersion = useRef(0)
   const prepareRgbSendRef = useRef<() => Promise<void>>(async () => undefined)
@@ -209,16 +210,28 @@ export function useSendRGBScreenLogic() {
     invoice.trim().length > 0 &&
     !(typeof invoiceProxyPublicKey === 'string' && /^[0-9a-f]{64}$/.test(invoiceProxyPublicKey))
   const hasTransportEndpoint = decodedInvoice.transportEndpoints.length > 0
+  const invoiceExpired = !burn &&
+    decodedInvoice.expirationTimestamp !== undefined &&
+    decodedInvoice.expirationTimestamp <= Math.floor(Date.now() / 1000)
+  useEffect(() => {
+    if (burn || decodedInvoice.expirationTimestamp === undefined || invoiceExpired) return undefined
+    const delay = decodedInvoice.expirationTimestamp * 1000 - Date.now() + 50
+    const timer = setTimeout(() => setInvoiceExpiryTick(value => value + 1), delay)
+    return () => clearTimeout(timer)
+  }, [burn, decodedInvoice.expirationTimestamp, invoiceExpired])
   const invoiceInvalid = !burn &&
     invoice.trim().length > 0 && (!decodedInvoice.valid || !hasTransportEndpoint)
   const invoiceReadyForAmount = burn || (
     invoice.trim().length > 0 &&
     decodedInvoice.valid &&
     hasTransportEndpoint &&
+    !invoiceExpired &&
     !invoiceAssetMismatch &&
     !bfaInvoiceUnsupported)
   const invoiceValidationMessage = burn ? '' : invoiceInvalid
     ? t('invalid_rgb_invoice')
+    : invoiceExpired
+      ? t('rgb_invoice_expired')
     : invoiceAssetMismatch
       ? t('invoice_asset_mismatch')
       : bfaInvoiceUnsupported
@@ -272,6 +285,7 @@ export function useSendRGBScreenLogic() {
       burn ||
       !decodedInvoice.valid ||
       !hasTransportEndpoint ||
+      invoiceExpired ||
       invoiceAssetMismatch ||
       bfaInvoiceUnsupported
     ) {
@@ -309,6 +323,7 @@ export function useSendRGBScreenLogic() {
     decodedInvoice.submissionInvoice,
     decodedInvoice.valid,
     hasTransportEndpoint,
+    invoiceExpired,
     invoiceAssetMismatch,
     t,
     wallet,
@@ -338,6 +353,7 @@ export function useSendRGBScreenLogic() {
     if (
       !decodedInvoice.valid ||
       !hasTransportEndpoint ||
+      invoiceExpired ||
       invoiceAssetMismatch ||
       bfaInvoiceUnsupported ||
       !proxyApprovalReady
@@ -375,6 +391,7 @@ export function useSendRGBScreenLogic() {
     decodedInvoice.submissionInvoice,
     decodedInvoice.valid,
     hasTransportEndpoint,
+    invoiceExpired,
     invoiceAssetMismatch,
     bfaInvoiceUnsupported,
     proxyApprovalReady,
@@ -473,6 +490,13 @@ export function useSendRGBScreenLogic() {
     try {
       if (!burn && (!decodedInvoice.valid || !hasTransportEndpoint || invoiceAssetMismatch || bfaInvoiceUnsupported)) {
         throw new Error(invoiceValidationMessage || t('invalid_rgb_invoice'))
+      }
+      if (
+        !burn &&
+        decodedInvoice.expirationTimestamp !== undefined &&
+        decodedInvoice.expirationTimestamp <= Math.floor(Date.now() / 1000)
+      ) {
+        throw new Error(t('rgb_invoice_expired'))
       }
       if (!burn) {
         const requirement = await wallet.getRgbProxyApprovalRequirement({
@@ -688,6 +712,7 @@ export function useSendRGBScreenLogic() {
     invoiceAssetId,
     invoiceAssetMismatch,
     invoiceInvalid,
+    invoiceExpired,
     invoiceReadyForAmount,
     invoiceValidationMessage,
     invoiceAvailability,

@@ -274,6 +274,37 @@ describe('useSendRGBScreenLogic', () => {
     expect(wallet.createRgbSendBegin).toHaveBeenCalled()
   })
 
+  it('rejects an expired invoice before checking or requesting proxy approval', async () => {
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date('2026-11-09T08:00:00Z'))
+    const assetId = 'rgb:test-asset'
+    const expiry = Math.floor(Date.now() / 1000) - 1
+    const invoice = `rgb:test-asset/~/~/bc:utxob:test?amount=1&expiry=${expiry}&endpoints=rpcs://evil.example`
+    const { wrapper, wallet } = createHookTestHarness({
+      routeState: {
+        assetId,
+        tokenBalance: { assetId, ticker: 'RGB', precision: 8, spendable: '150000000' },
+      },
+    })
+    const { result, unmount } = renderHook(() => useSendRGBScreenLogic(), { wrapper })
+
+    act(() => result.current.onInvoiceChange(invoice))
+    await act(async () => {
+      await Promise.resolve()
+    })
+
+    expect(result.current.invoiceExpired).toBe(true)
+    expect(result.current.invoiceValidationMessage).toBe('rgb_invoice_expired')
+    expect(result.current.invoiceReadyForAmount).toBe(false)
+    expect(result.current.proxyApprovalEndpoints).toEqual([])
+    expect(result.current.disabled).toBe(true)
+    expect(wallet.getRgbProxyApprovalRequirement).not.toHaveBeenCalled()
+    expect(wallet.checkRgbInvoiceAvailability).not.toHaveBeenCalled()
+
+    unmount()
+    vi.useRealTimers()
+  })
+
   it('renders a serialized proxy error message instead of object text', async () => {
     const assetId = 'rgb:test-asset'
     const invoice = 'rgb:test-asset/~/~/bc:utxob:test?amount=1&endpoints=rpcs://evil.example'
