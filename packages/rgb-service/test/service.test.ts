@@ -682,7 +682,10 @@ describe('RgbService', () => {
     // The address indexer may lag the successful parent broadcast. Its absent
     // response must not prevent the immediately chained terminal burn.
     current.dependencies.stateSource.verifyUtxos = vi.fn(async () => [])
-    await expect(current.service.prepareBurn(request)).resolves.toMatchObject({ id: 'burn-selection' })
+    await expect(current.service.prepareBurn(request)).resolves.toMatchObject({
+      id: 'burn-selection',
+      metadata: { pendingParentWitnessTxid: 'c'.repeat(64) },
+    })
     expect(vi.mocked(current.dependencies.encoder.prepareBurn!).mock.calls.at(-1)?.[0].selectedUtxos)
       .toHaveLength(1)
 

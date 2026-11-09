@@ -894,10 +894,14 @@ export async function refreshPersistedBfaValidation(
     value, options.network, options.knownBlindSeals || [], snapshot, Date.now(), true
   )
   if (!history) return undefined
-  const pendingTxid = options.pendingWitnessTxid ??
-    (options.allowPendingLastWitness ? history.bundles.at(-1)?.txid : undefined)
+  const pendingTxids = new Set<string>()
+  if (options.pendingWitnessTxid) pendingTxids.add(options.pendingWitnessTxid)
+  if (options.allowPendingLastWitness) {
+    const last = history.bundles.at(-1)?.txid
+    if (last) pendingTxids.add(last)
+  }
   for (const txid of new Set(history.bundles.map(bundle => bundle.txid))) {
-    if (txid !== pendingTxid) {
+    if (!pendingTxids.has(txid)) {
       await requireConfirmedBitcoinWitness(
         history.metadata.schema === 'NIA' ? 'NIA' : 'BFA',
         txid,
@@ -1062,8 +1066,12 @@ export async function validateBfaTransferConsignment(
   const parsed = parseConsignment(disclosed, options.network)
   const { genesis, bundles } = parsed
   const nia = genesis.metadata.schema === 'NIA'
-  const pendingTxid = options.pendingWitnessTxid ??
-    (options.allowPendingLastWitness ? bundles.at(-1)?.txid : undefined)
+  const pendingTxids = new Set<string>()
+  if (options.pendingWitnessTxid) pendingTxids.add(options.pendingWitnessTxid)
+  if (options.allowPendingLastWitness) {
+    const last = bundles.at(-1)?.txid
+    if (last) pendingTxids.add(last)
+  }
   const operations = new Map<string, { operation: Operation; bundle: Bundle }>()
   for (const bundle of bundles) {
     for (const operation of bundle.operations) {
@@ -1093,7 +1101,7 @@ export async function validateBfaTransferConsignment(
     for (const opId of options.requiredOperationIds) include(opId)
   }
   for (const bundle of bundles) {
-    if ((!requiredBundles || requiredBundles.has(bundle)) && bundle.txid !== pendingTxid) {
+    if ((!requiredBundles || requiredBundles.has(bundle)) && !pendingTxids.has(bundle.txid)) {
       await requireConfirmedBitcoinWitness(
         nia ? 'NIA' : 'BFA',
         bundle.txid,

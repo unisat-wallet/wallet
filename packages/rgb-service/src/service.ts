@@ -4139,6 +4139,19 @@ export class RgbService {
     if (burnSplitRequired) {
       prepared.metadata = { ...prepared.metadata, burnSplit: 'true' }
     }
+    if (burn) {
+      const pendingParentTxids = new Set(
+        selectedUtxos
+          .filter(utxo => utxo.chainStatus === 'mempool')
+          .map(utxo => utxo.outpoint.txid.toLowerCase())
+      )
+      if (pendingParentTxids.size > 1)
+        throw new RgbServiceError('BFA burn cannot spend multiple unconfirmed witnesses')
+      const pendingParentWitnessTxid = pendingParentTxids.values().next().value
+      if (pendingParentWitnessTxid) {
+        prepared.metadata = { ...prepared.metadata, pendingParentWitnessTxid }
+      }
+    }
 
     const selectedOutpoints = new Set(selectedUtxos.map(outpointKey))
     const lockedOutpoints = new Set(
@@ -4286,10 +4299,12 @@ export class RgbService {
         const validate = this.dependencies.validateBfaConsignment
         const proof = completed.consignments[0]
         if (!validate || !proof) throw new RgbServiceError('BFA burn validation is unavailable')
+        const pendingParentWitnessTxid = pending.prepared.metadata?.['pendingParentWitnessTxid']
         const checked = await validate({
           wallet: state.wallet,
           payload: Uint8Array.from(Buffer.from(proof.payload, 'base64')),
-          pendingWitnessTxid: completed.txid,
+          pendingWitnessTxid: pendingParentWitnessTxid || completed.txid,
+          ...(pendingParentWitnessTxid ? { allowPendingLastWitness: true } : {}),
           knownBlindSeals: this.getKnownBlindSeals(),
           evmRpcCache: new Map(),
           bitcoinStatusCache: new Map(),

@@ -329,6 +329,18 @@ describe('NIA v1 transfer', () => {
     })
     expect(next.metadata.schema).toBe('NIA')
     expect(next.terminalAssignments).toContainEqual(expect.objectContaining({ amount: '10' }))
+
+    // A chained transaction may have both a locally verified mempool parent
+    // and its own not-yet-broadcast final witness.
+    await expect(validateBfaTransferConsignment(
+      Uint8Array.from(Buffer.from(completed.consignments[0]!.payload, 'base64')),
+      {
+        network: 0,
+        isBitcoinTxConfirmed: async () => false,
+        pendingWitnessTxid: transaction.getId(),
+        allowPendingLastWitness: true,
+      }
+    )).resolves.toMatchObject({ metadata: { schema: 'NIA' } })
   })
 
   it('allows the exact selected mempool witness when preparing a chained send', async () => {
