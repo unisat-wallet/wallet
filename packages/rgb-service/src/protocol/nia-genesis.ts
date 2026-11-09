@@ -38,6 +38,42 @@ export interface EncodedNiaGenesis {
   allocationIndexes: number[]
 }
 
+export type NiaAssetSpecIssue = 'invalid_ticker' | 'invalid_name' | 'invalid_precision'
+
+/** RGB NIA metadata constraints defined by rgb-std's AssetSpec. */
+export function getNiaAssetSpecIssue(input: {
+  ticker?: string
+  name?: string
+  precision?: number
+}): NiaAssetSpecIssue | undefined {
+  if (!/^[A-Za-z][A-Za-z0-9]{0,7}$/.test(input.ticker || '')) return 'invalid_ticker'
+  if (!input.name || input.name.length > 40 || [...input.name].some(character => {
+    const code = character.codePointAt(0)!
+    return code < 0x20 || code > 0x7e
+  })) return 'invalid_name'
+  if (!Number.isInteger(input.precision) || input.precision! < 0 || input.precision! > 18)
+    return 'invalid_precision'
+  return undefined
+}
+
+export function isStandardNiaAssetSpec(input: {
+  ticker?: string
+  name?: string
+  precision?: number
+}) {
+  return getNiaAssetSpecIssue(input) === undefined
+}
+
+function assertStandardNiaAssetSpec(input: NiaGenesis) {
+  const issue = getNiaAssetSpecIssue(input)
+  if (issue === 'invalid_ticker')
+    throw new RgbServiceError('NIA ticker must start with an ASCII letter and contain only ASCII letters or digits (1-8 characters)')
+  if (issue === 'invalid_name')
+    throw new RgbServiceError('NIA name must contain 1-40 printable ASCII characters')
+  if (issue === 'invalid_precision')
+    throw new RgbServiceError('NIA precision must be between 0 and 18')
+}
+
 function concat(...parts: Uint8Array[]) {
   const result = new Uint8Array(parts.reduce((sum, part) => sum + part.length, 0))
   let offset = 0
@@ -148,11 +184,9 @@ function secretSeal(allocation: NiaGenesisAllocation) {
 }
 
 function serializeAssetSpec(input: NiaGenesis) {
+  assertStandardNiaAssetSpec(input)
   const ticker = utf8(input.ticker, 8, 'NIA ticker')
   const name = utf8(input.name, 40, 'NIA name')
-  if (!Number.isInteger(input.precision) || input.precision < 0 || input.precision > 18) {
-    throw new RgbServiceError('NIA precision must be between 0 and 18')
-  }
   return new StrictWriter()
     .writeConfinedBytes(ticker, 8)
     .writeConfinedBytes(name, 40)

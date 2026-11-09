@@ -1,10 +1,23 @@
 import { describe, expect, it } from 'vitest'
-import { encodeNiaGenesis } from '../src'
+import { encodeNiaGenesis, getNiaAssetSpecIssue, isStandardNiaAssetSpec } from '../src'
 
 const toHex = (value: Uint8Array) =>
   [...value].map(byte => byte.toString(16).padStart(2, '0')).join('')
 
 describe('encodeNiaGenesis', () => {
+  it('enforces the rgb-std NIA AssetSpec constraints', () => {
+    expect(isStandardNiaAssetSpec({ ticker: 'USDT1', name: 'USD Test', precision: 8 })).toBe(true)
+    expect(getNiaAssetSpecIssue({ ticker: '&', name: 'Test', precision: 0 })).toBe('invalid_ticker')
+    expect(getNiaAssetSpecIssue({ ticker: '1TEST', name: 'Test', precision: 0 })).toBe('invalid_ticker')
+    expect(getNiaAssetSpecIssue({ ticker: 'TEST', name: '测试', precision: 0 })).toBe('invalid_name')
+    expect(getNiaAssetSpecIssue({ ticker: 'TEST', name: 'Line\nBreak', precision: 0 })).toBe('invalid_name')
+    expect(getNiaAssetSpecIssue({ ticker: 'TEST', name: 'Test', precision: 19 })).toBe('invalid_precision')
+    expect(() => encodeNiaGenesis({
+      ticker: '&', name: 'Test', precision: 0, timestamp: 1, network: 'signet',
+      allocations: [{ txid: '11'.repeat(32), vout: 0, blinding: 1n, amount: 1n }],
+    })).toThrow(/NIA ticker must start/)
+  })
+
   it('matches the rgb-lib NIA Genesis and contract ID vector', () => {
     const encoded = encodeNiaGenesis({
       ticker: 'TEST',

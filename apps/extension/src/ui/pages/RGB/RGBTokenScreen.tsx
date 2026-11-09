@@ -41,6 +41,7 @@ export default function RGBTokenScreen() {
   const { requestWrite, writeLeaseModal } = useRgbWriteLeaseGuard();
   const [receiveSelectorOpen, setReceiveSelectorOpen] = useState(false);
   const [actionMenuVisible, setActionMenuVisible] = useState(false);
+  const [nonStandardSendWarningVisible, setNonStandardSendWarningVisible] = useState(false);
   const {
     assetId: routeAssetId,
     tokenSummary,
@@ -103,6 +104,9 @@ export default function RGBTokenScreen() {
       : undefined;
   const balanceSize = totalBalance.length > 24 ? 'lg' : totalBalance.length > 16 ? 'xl' : 'xxl';
   const isBfa = String(tokenInfo?.schema || tokenBalance?.schema || '').toUpperCase() === 'BFA';
+  const isNonStandardNia =
+    String(tokenInfo?.schema || tokenBalance?.schema || '').toUpperCase() === 'NIA' &&
+    (tokenInfo?.isStandard === false || tokenBalance?.isStandard === false);
   const showUsdtPrice = chain.showPrice && isConfiguredRgbUsdt(assetId, configuredUsdtAssetId) && totalBalance !== '--';
 
   const renderTabChildren = useMemo(() => {
@@ -117,6 +121,7 @@ export default function RGBTokenScreen() {
           reservedSendAmount={showSendBreakdown ? reservedSendAtomic.toString() : undefined}
           estimatedBalance={estimatedBalanceAtomic?.toString()}
           otherLockedAmount={remainingLockedAtomic.toString()}
+          isNonStandardNia={isNonStandardNia}
         />
       );
     }
@@ -153,7 +158,8 @@ export default function RGBTokenScreen() {
     remainingLockedAtomic,
     ticker,
     tokenBalance,
-    tokenInfo
+    tokenInfo,
+    isNonStandardNia
   ]);
 
   if (loading) {
@@ -204,6 +210,15 @@ export default function RGBTokenScreen() {
                 ellipsis
                 style={{ width: '100%' }}
               />
+              {isNonStandardNia ? (
+                <Row
+                  itemsCenter
+                  gap="xs"
+                  style={{ marginTop: 4, padding: '5px 9px', borderRadius: 8, background: 'rgba(244,182,44,0.12)' }}>
+                  <Icon icon="warning" color="gold" size={14} />
+                  <Text text={t('rgb_non_standard_nia')} size="xs" color="gold" />
+                </Row>
+              ) : null}
             </Column>
             <Column itemsCenter fullX justifyCenter>
               <Text
@@ -312,7 +327,10 @@ export default function RGBTokenScreen() {
               text={t('send')}
               preset="brc20-action"
               icon="send"
-              onClick={() => onClickSend()}
+              onClick={() => {
+                if (isNonStandardNia) setNonStandardSendWarningVisible(true);
+                else onClickSend();
+              }}
               disabled={!enableTransfer}
               full
               textStyle={{ fontSize: 14 }}
@@ -355,6 +373,30 @@ export default function RGBTokenScreen() {
           }}
         />
       )}
+      {nonStandardSendWarningVisible ? (
+        <BottomModal onClose={() => setNonStandardSendWarningVisible(false)}>
+          <Column gap="lg">
+            <Row itemsCenter gap="sm">
+              <Icon icon="warning" color="gold" size={20} />
+              <Text text={t('rgb_non_standard_send_title')} color="white" size="md" wrap />
+            </Row>
+            <Text text={t('rgb_non_standard_send_description')} color="white_muted2" size="sm" wrap />
+            <Row gap="sm" fullX>
+              <Button text={t('cancel')} preset="default" full onClick={() => setNonStandardSendWarningVisible(false)} />
+              <Button
+                text={t('continue')}
+                preset="primary"
+                full
+                data-testid="rgb-non-standard-send-confirm"
+                onClick={() => {
+                  setNonStandardSendWarningVisible(false);
+                  onClickSend();
+                }}
+              />
+            </Row>
+          </Column>
+        </BottomModal>
+      ) : null}
       {writeLeaseModal}
     </Layout>
   );

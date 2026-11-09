@@ -3692,5 +3692,9 @@
   "rgb_asset_abandon_confirm_title": { "message": "永久放棄此資產？" },
   "rgb_asset_abandon_confirm_description": { "message": "所選 RGB allocation 將永久遺失。這不是 RGB Burn，且無法復原。" },
   "rgb_asset_abandon_action": { "message": "永久放棄" },
-  "rgb_asset_abandon_cleanup_pending": { "message": "Carrier 交易已廣播，但本地歷史清理仍待完成。" }
+  "rgb_asset_abandon_cleanup_pending": { "message": "Carrier 交易已廣播，但本地歷史清理仍待完成。" },
+  "rgb_asset_standard": { "message": "資產標準" },
+  "rgb_non_standard_nia": { "message": "非標準 NIA" },
+  "rgb_non_standard_send_title": { "message": "要發送非標準 NIA 資產嗎？" },
+  "rgb_non_standard_send_description": { "message": "此資產的 ticker、名稱或精度不符合 RGB NIA 標準，嚴格驗證的 RGB 錢包可能拒絕接收。Genesis 不可變更，因此無法修復原資產，建議重新發行符合標準的資產。" }
 }

@@ -20,6 +20,7 @@ import type { RgbInvoice, RgbInvoiceSeal, RgbWitnessAddressType } from './protoc
 import { normalizeRgbAssetId, rgbContractIdHex } from './protocol/contract-id'
 import { hashBfaBurnDestinationV1, normalizeBfaBurnDestination } from './protocol/bfa-burn-destination'
 import { decodeNiaConsignment } from './protocol/nia-consignment'
+import { getNiaAssetSpecIssue } from './protocol/nia-genesis'
 import { mergeNiaConsignmentHistory } from './protocol/nia-history'
 import {
   BFA_SCHEMA_ID,
@@ -3857,6 +3858,9 @@ export class RgbService {
       }
     }
     const metadata = knownMetadata || receiptMetadata
+    const niaSpecIssue = metadata?.schema?.toUpperCase() === 'NIA'
+      ? getNiaAssetSpecIssue(metadata)
+      : undefined
     return {
       assetId,
       balance: amount.settled.toString(),
@@ -3872,6 +3876,12 @@ export class RgbService {
             precision: metadata.precision,
             schema: metadata.schema,
             issuedSupply: metadata.issuedSupply,
+            ...(metadata.schema.toUpperCase() === 'NIA'
+              ? {
+                  isStandard: niaSpecIssue === undefined,
+                  ...(niaSpecIssue ? { nonStandardReason: niaSpecIssue } : {}),
+                }
+              : {}),
             ...(metadata.timestamp === undefined ? {} : { timestamp: metadata.timestamp }),
           }
         : {}),

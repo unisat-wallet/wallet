@@ -81,6 +81,9 @@ export interface RgbLocalAssetBalance {
   schema?: string
   issuedSupply?: string
   timestamp?: number
+  /** False when locally known NIA metadata violates rgb-std AssetSpec constraints. */
+  isStandard?: boolean
+  nonStandardReason?: import('./protocol/nia-genesis').NiaAssetSpecIssue
 }
 
 /** Local contract metadata together with the wallet's locally derived balance. */

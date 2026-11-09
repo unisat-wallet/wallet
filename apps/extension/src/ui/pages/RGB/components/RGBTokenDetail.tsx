@@ -18,9 +18,10 @@ export function RGBTokenDetail(props: {
   reservedSendAmount?: string;
   estimatedBalance?: string;
   otherLockedAmount?: string;
+  isNonStandardNia?: boolean;
 }) {
   const { t } = useI18n();
-  const { assetId, name, ticker, tokenInfo, tokenBalance, reservedSendAmount, estimatedBalance, otherLockedAmount } = props;
+  const { assetId, name, ticker, tokenInfo, tokenBalance, reservedSendAmount, estimatedBalance, otherLockedAmount, isNonStandardNia } = props;
   const precision = getRgbTokenPrecision(tokenBalance) || getRgbTokenPrecision(tokenInfo);
   const formatValue = (value: unknown) => {
     return value === undefined || value === null || value === '' ? '--' : value.toString();
@@ -45,6 +46,12 @@ export function RGBTokenDetail(props: {
         borderRadius: 15
       }}
     >
+      {isNonStandardNia ? (
+        <>
+          <Section title={t('rgb_asset_standard')} value={t('rgb_non_standard_nia')} />
+          <Line />
+        </>
+      ) : null}
       <Tooltip title={assetId} block>
         <Section title={t('asset_id')} value={assetId} showCopyIcon />
       </Tooltip>

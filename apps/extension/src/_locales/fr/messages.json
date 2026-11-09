@@ -3607,5 +3607,9 @@
   "rgb_asset_abandon_confirm_title": { "message": "Abandonner définitivement cet actif ?" },
   "rgb_asset_abandon_confirm_description": { "message": "Les allocations RGB sélectionnées seront définitivement perdues. Ce n’est pas un burn RGB et l’opération est irréversible." },
   "rgb_asset_abandon_action": { "message": "Abandonner définitivement" },
-  "rgb_asset_abandon_cleanup_pending": { "message": "La transaction porteuse a été diffusée, mais le nettoyage de l’historique local reste en attente." }
+  "rgb_asset_abandon_cleanup_pending": { "message": "La transaction porteuse a été diffusée, mais le nettoyage de l’historique local reste en attente." },
+  "rgb_asset_standard": { "message": "Asset standard" },
+  "rgb_non_standard_nia": { "message": "Non-standard NIA" },
+  "rgb_non_standard_send_title": { "message": "Send a non-standard NIA asset?" },
+  "rgb_non_standard_send_description": { "message": "This asset does not meet the RGB NIA metadata standard. Strict RGB wallets may reject the transfer. Reissuing a standard asset is recommended." }
 }

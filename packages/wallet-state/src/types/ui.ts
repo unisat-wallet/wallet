@@ -50,6 +50,8 @@ export interface RgbBalance {
   pending?: string
   incomingPending?: string
   lockedAmount?: string
+  isStandard?: boolean
+  nonStandardReason?: 'invalid_ticker' | 'invalid_name' | 'invalid_precision'
   [key: string]: any
 }
 
@@ -65,6 +67,8 @@ export interface RgbAssetDetail {
   txCount?: number
   volume24h?: string
   balance?: RgbBalance
+  isStandard?: boolean
+  nonStandardReason?: 'invalid_ticker' | 'invalid_name' | 'invalid_precision'
   [key: string]: any
 }
 

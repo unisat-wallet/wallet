@@ -16,6 +16,8 @@ export interface RgbBalance {
   spendable?: string
   schema?: string
   issuedSupply?: string
+  isStandard?: boolean
+  nonStandardReason?: 'invalid_ticker' | 'invalid_name' | 'invalid_precision'
 }
 
 export interface RgbAssetInfo {
@@ -26,6 +28,8 @@ export interface RgbAssetInfo {
   schema?: string
   issuedSupply?: string
   timestamp?: number
+  isStandard?: boolean
+  nonStandardReason?: 'invalid_ticker' | 'invalid_name' | 'invalid_precision'
   holderSummary?: RgbHolderSummary
 }
 
