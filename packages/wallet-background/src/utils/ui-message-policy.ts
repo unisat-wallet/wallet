@@ -8,6 +8,7 @@ const UI_CONTROLLER_METHODS = new Set([
   'abortRgbAcknowledgedSwap',
   'abortRgbVanillaTx',
   'acceptRgbReceive',
+  'acceptRgbReceives',
   'activateRgbWriteLease',
   'addAddressFlag',
   'analyzeLocalPsbts',
