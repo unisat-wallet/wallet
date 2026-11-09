@@ -108,15 +108,18 @@ export function RGBTransferListItem({
   const showStatus = item.type !== 'issue' && (pending || ['canceled', 'cancelled', 'rejected'].includes(status));
   const isReceive = item.type === 'receive';
   const isCanceledReceive = isReceive && ['canceled', 'cancelled'].includes(status);
+  const isRejectedUnbroadcastSend = item.type === 'send' && status === 'rejected' && !item.broadcasted;
   // A user-rejected receive has already passed consignment validation, so its
   // durable history amount is safe to display. Only validation failures may
   // contain untrusted metadata/amounts and must remain hidden.
   const hideReceiveAmount = isReceive && status === 'validation_failed';
   const secondaryAssetLabel = assetName || (isCanceledReceive ? assetSymbol : '');
-  const amountColor = isReceive || item.type === 'issue'
-    ? 'rgba(124, 219, 152, 0.85)'
-    : 'rgba(255, 255, 255, 0.85)';
-  const sign = item.type === 'issue' ? '' : isReceive ? '+' : '-';
+  const amountColor = isRejectedUnbroadcastSend
+    ? colors.textDim
+    : isReceive || item.type === 'issue'
+      ? 'rgba(124, 219, 152, 0.85)'
+      : 'rgba(255, 255, 255, 0.85)';
+  const sign = item.type === 'issue' || isRejectedUnbroadcastSend ? '' : isReceive ? '+' : '-';
   const transferTime = formatTransferTime(item.timestamp);
   const date = getRgbTransferDateKey(item.timestamp);
   const displayAmount = item.amount ? toRgbDisplayAmount(item.amount, getRgbTokenPrecision(item)) : '--';
