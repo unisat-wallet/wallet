@@ -4753,7 +4753,7 @@ export class RgbService {
       options.discardUnsigned === true &&
       !pending.delivery &&
       !pending.broadcast &&
-      (!pending.providerOrigin || Boolean(pending.burnSplit))
+      (!pending.providerOrigin || pending.request.burn || Boolean(pending.burnSplit))
     if (!discardUnsigned && !pending.burnSplit) {
       const sendHistory = state.pendingSendHistory || (state.pendingSendHistory = [])
       if (!sendHistory.some(item => item.transferId === transferId)) {

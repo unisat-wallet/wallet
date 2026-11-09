@@ -288,9 +288,13 @@ export function RGBTransferDetailSheet({
 
     setCancelLoading(true);
     try {
+      const discardUnsigned = String(transfer?.status || '').toLowerCase() === 'signed';
       const result = requiresAcknowledgedAbort
         ? await wallet.abortRgbAcknowledgedSwap({ txid: abortId })
-        : await wallet.abortRgbVanillaTx({ txid: abortId });
+        : await wallet.abortRgbVanillaTx({
+            txid: abortId,
+            ...(discardUnsigned ? { discardUnsigned: true } : {})
+          });
       if (!result?.aborted) {
         throw new Error(result?.['reason'] || t('rgb_cancel_send_failed'));
       }

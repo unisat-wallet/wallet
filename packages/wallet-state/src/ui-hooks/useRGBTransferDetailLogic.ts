@@ -140,7 +140,7 @@ export function useRGBTransferDetailLogic() {
   const canCancelSend =
     source !== 'send_result' &&
     transfer?.type === 'send' &&
-    ['waiting_ack', 'ready_for_dapp_finalize'].includes(
+    ['signed', 'waiting_ack', 'ready_for_dapp_finalize'].includes(
       String(transfer?.status || '').toLowerCase()
     )
   const canAcceptReceive =
@@ -172,9 +172,13 @@ export function useRGBTransferDetailLogic() {
     try {
       const requiresAcknowledgedAbort =
         String(transfer?.status || '').toLowerCase() === 'ready_for_dapp_finalize'
+      const discardUnsigned = String(transfer?.status || '').toLowerCase() === 'signed'
       const result = requiresAcknowledgedAbort
         ? await wallet.abortRgbAcknowledgedSwap({ txid: abortId })
-        : await wallet.abortRgbVanillaTx({ txid: abortId })
+        : await wallet.abortRgbVanillaTx({
+            txid: abortId,
+            ...(discardUnsigned ? { discardUnsigned: true } : {}),
+          })
       if (!result?.aborted) {
         throw new Error(result?.['reason'] || t('rgb_cancel_send_failed'))
       }

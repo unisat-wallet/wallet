@@ -224,6 +224,35 @@ describe('useRGBTransferDetailLogic', () => {
     await waitFor(() => expect(result.current.canCancelSend).toBe(true))
   })
 
+  it('discards a signed burn without retaining canceled history', async () => {
+    const signedBurn = {
+      ...waitingSend,
+      burn: true,
+      status: 'signed',
+      transferId: 'signed-burn',
+    }
+    const { wrapper, wallet } = createHookTestHarness({
+      routeState: {
+        transferId: 'signed-burn',
+        initialTransfer: signedBurn,
+        source: 'history',
+      },
+    })
+    wallet.abortRgbVanillaTx.mockResolvedValue({ aborted: true, status: 'discarded' })
+
+    const { result } = renderHook(() => useRGBTransferDetailLogic(), { wrapper })
+
+    await waitFor(() => expect(result.current.canCancelSend).toBe(true))
+    await act(async () => {
+      await result.current.onCancelSend()
+    })
+
+    expect(wallet.abortRgbVanillaTx).toHaveBeenCalledWith({
+      txid: 'signed-burn',
+      discardUnsigned: true,
+    })
+  })
+
   it('offers the acknowledged abort path for an external swap that was not broadcast', async () => {
     const { wrapper, wallet } = createHookTestHarness({
       routeState: { transferId: 'transfer-id', initialTransfer: externalBroadcastSend },
