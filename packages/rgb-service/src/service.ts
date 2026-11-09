@@ -762,6 +762,7 @@ export class RgbService {
       try {
         validated = await validate({
           wallet: state.wallet, payload,
+          evmLogRequestLimit: 4,
           knownBlindSeals: this.getKnownBlindSeals(),
           confirmedBitcoinWitnesses: state.confirmedBitcoinWitnesses ||= {},
         })

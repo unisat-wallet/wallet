@@ -223,6 +223,8 @@ export interface BfaValidationOptions {
   getEvmRpc?: (chainId: bigint) => (method: string, params: unknown[]) => Promise<unknown>
   /** Bound the number of finalized EVM blocks scanned per RPC call. */
   evmLogRange?: number
+  /** Bound legacy event queries for best-effort background repair only. */
+  evmLogRequestLimit?: number
   /** The sender witness is not broadcast until the receiver ACKs it. */
   pendingWitnessTxid?: string
   allowPendingLastWitness?: boolean
@@ -1012,7 +1014,11 @@ async function verifyCurrentMintLock(
 }
 
 async function verifyLegacyMintEvent(
-  operation: Operation, chainId: bigint, address: string, options: BfaValidationOptions
+  operation: Operation,
+  chainId: bigint,
+  address: string,
+  options: BfaValidationOptions,
+  requestBudget: { remaining: number }
 ) {
   const rpc = options.getEvmRpc?.(chainId) ?? options.evmRpc
   if (!rpc) throw new RgbBfaValidationUnavailableError('BFA EVM RPC is not configured')
@@ -1025,9 +1031,15 @@ async function verifyLegacyMintEvent(
   let range = options.evmLogRange ?? 1000
   if (!Number.isSafeInteger(range) || range < 1 || range > 100000) fail('invalid EVM log range')
   for (let from = start; from <= end;) {
+    if (requestBudget.remaining <= 0) {
+      throw new RgbBfaValidationUnavailableError(
+        `BFA legacy mint event scan exceeded the background request limit for ${operation.id}`
+      )
+    }
     const to = from + BigInt(range - 1) < end ? from + BigInt(range - 1) : end
     let logs: unknown
     try {
+      requestBudget.remaining--
       logs = await rpc('eth_getLogs', [{
         address, fromBlock: `0x${from.toString(16)}`, toBlock: `0x${to.toString(16)}`,
         topics: [LEGACY_FUNDS_IN_TOPIC, null, `0x${operation.id}`],
@@ -1140,6 +1152,11 @@ export async function validateBfaTransferConsignment(
   if (reachable !== operations.size) fail('transition history is cyclic')
   const consumed = new Set<string>()
   const currentBfa = genesis.profile === 'bfa-current'
+  const evmLogRequestLimit = options.evmLogRequestLimit ?? Number.POSITIVE_INFINITY
+  if (evmLogRequestLimit !== Number.POSITIVE_INFINITY &&
+    (!Number.isSafeInteger(evmLogRequestLimit) || evmLogRequestLimit < 1))
+    fail('invalid EVM log request limit')
+  const legacyEvmLogRequestBudget = { remaining: evmLogRequestLimit }
   for (const { operation, bundle } of operations.values()) {
     let inputAmount = 0n
     let mintInputs = 0
@@ -1190,7 +1207,13 @@ export async function validateBfaTransferConsignment(
     } else if (operation.type === TS_MINT) {
       if (mintInputs !== 1 || linkInputs || assetInputs || outputAmount !== operation.amount ||
         outputMintRights > 1 || outputLinkRights) fail('invalid mint conservation')
-      await verifyLegacyMintEvent(operation, genesis.chainId, genesis.address, options)
+      await verifyLegacyMintEvent(
+        operation,
+        genesis.chainId,
+        genesis.address,
+        options,
+        legacyEvmLogRequestBudget
+      )
     } else if (operation.type === TS_BURN) {
       if (mintInputs || linkInputs || !assetInputs || outputMintRights || outputLinkRights ||
         outputAmount + operation.amount !== inputAmount) fail('invalid burn conservation')

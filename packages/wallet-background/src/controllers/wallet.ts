@@ -7004,6 +7004,9 @@ export class WalletController extends BaseController {
         ...(input.pendingWitnessTxid ? { pendingWitnessTxid: input.pendingWitnessTxid } : {}),
         ...(input.allowPendingLastWitness ? { allowPendingLastWitness: true } : {}),
         ...(requiredOperationIds ? { requiredOperationIds } : {}),
+        ...(input.evmLogRequestLimit === undefined
+          ? {}
+          : { evmLogRequestLimit: input.evmLogRequestLimit }),
         knownBlindSeals: input.knownBlindSeals,
         isBitcoinTxConfirmed: cacheBfaBitcoinStatus(cacheConfirmedBfaWitnesses(
           txid => getRgbApiService().getRgbTransactionStatus(txid, { wallet: input.wallet }),

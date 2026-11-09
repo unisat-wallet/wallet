@@ -769,6 +769,8 @@ export interface RgbServiceDependencies {
   validateBfaConsignment?: (input: {
     wallet: RgbWalletRef
     payload: Uint8Array
+    /** Optional background-work budget; interactive validation remains unbounded. */
+    evmLogRequestLimit?: number
     pendingWitnessTxid?: string
     allowPendingLastWitness?: boolean
     /** Limit mutable Bitcoin witness checks to the ancestors of these selected allocations. */
