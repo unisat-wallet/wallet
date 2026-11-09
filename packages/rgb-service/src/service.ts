@@ -1860,6 +1860,11 @@ export class RgbService {
         (receive.rejection?.kind === 'local_donation_reject' &&
           !!receive.pendingValidationFailure)
       if (receive.rejection && !revalidatableLocalRejection) continue
+      const acceptedBeforeValidation = receive.receivedConsignment?.accepted === true
+      let acceptedChain: {
+        status: 'mempool' | 'confirmed' | 'pending_spend' | 'spent' | 'replaced' | 'unknown'
+        confirmations: number
+      } | undefined
       let mismatchReason: string | undefined
       const stageValidationFailure = (reason: string) => {
         const previous = receive.pendingValidationFailure
@@ -1886,6 +1891,50 @@ export class RgbService {
         }
       }
       try {
+        // ACK-time validation already authenticated the immutable consignment.
+        // While its Bitcoin witness remains in the mempool, poll only chain
+        // status instead of repeating expensive dynamic BFA/EVM validation on
+        // every receive synchronization pass. Revalidate once after the
+        // configured confirmation floor is reached, immediately before the
+        // allocation becomes settled and spendable.
+        if (acceptedBeforeValidation) {
+          if (await this.isAcceptedReceiveTerminallyCanceled(receive)) {
+            this.recordReceiveOutcome(receive, 'canceled', receive.receivedConsignment!.txid)
+            pending.splice(receiveIndex, 1)
+            changed = true
+            continue
+          }
+          if (
+            receive.receivedConsignment!.signedRawTx &&
+            !receive.receivedConsignment!.broadcastDetectedAt
+          ) {
+            await this.ensureReceiveAnchorBroadcast(
+              receive.receivedConsignment!.txid,
+              receive.receivedConsignment!.signedRawTx
+            )
+          }
+          const getTransactionStatus = this.dependencies.stateSource.getTransactionStatus
+          if (!getTransactionStatus) {
+            throw new RgbServiceError('RGB receive chain verification is unavailable')
+          }
+          acceptedChain = await getTransactionStatus(
+            state.wallet,
+            receive.receivedConsignment!.txid
+          )
+          if (
+            (acceptedChain.status === 'mempool' || acceptedChain.status === 'confirmed') &&
+            !receive.receivedConsignment!.broadcastDetectedAt
+          ) {
+            receive.receivedConsignment!.broadcastDetectedAt = this.now()
+            changed = true
+          }
+          if (
+            acceptedChain.status !== 'confirmed' ||
+            acceptedChain.confirmations < (receive.minConfirmations || 1)
+          ) {
+            continue
+          }
+        }
         const match = await this.validateIncomingConsignment(
           receive,
           item,
@@ -2047,27 +2096,36 @@ export class RgbService {
 
         // Already accepted by the user: advance chain confirmation / settlement.
         if (receive.receivedConsignment?.accepted) {
-          if (await this.isAcceptedReceiveTerminallyCanceled(receive)) {
-            this.recordReceiveOutcome(receive, 'canceled', match.txid)
-            pending.splice(receiveIndex, 1)
-            changed = true
-            continue
+          if (acceptedChain &&
+            match.txid.toLowerCase() !== receive.receivedConsignment.txid.toLowerCase()) {
+            throw new RgbServiceError('RGB accepted receive transaction changed before settlement')
           }
-          if (
-            receive.receivedConsignment.signedRawTx &&
-            !receive.receivedConsignment.broadcastDetectedAt
-          ) {
-            await this.ensureReceiveAnchorBroadcast(
-              match.txid,
-              receive.receivedConsignment.signedRawTx
-            )
+          // A receipt may become accepted earlier in this same pass while an
+          // ACK retry is reconciled. It has not gone through the early gate.
+          if (!acceptedBeforeValidation) {
+            if (await this.isAcceptedReceiveTerminallyCanceled(receive)) {
+              this.recordReceiveOutcome(receive, 'canceled', match.txid)
+              pending.splice(receiveIndex, 1)
+              changed = true
+              continue
+            }
+            if (
+              receive.receivedConsignment.signedRawTx &&
+              !receive.receivedConsignment.broadcastDetectedAt
+            ) {
+              await this.ensureReceiveAnchorBroadcast(
+                match.txid,
+                receive.receivedConsignment.signedRawTx
+              )
+            }
           }
           const broadcastDetectedAt = receive.receivedConsignment.broadcastDetectedAt
           const settled = await this.advanceAcceptedReceive(
             receive,
             item,
             match,
-            deferConfirmedSettlement
+            deferConfirmedSettlement,
+            acceptedChain
           )
           if (settled === 'snapshot_required') {
             snapshotRequired = true
@@ -2767,7 +2825,11 @@ export class RgbService {
     receive: import('./types').RgbPendingReceive,
     item: { recipientId: string; payload: string; txid?: string; endpoint?: string },
     validated: NonNullable<Awaited<ReturnType<RgbService['validateIncomingConsignment']>>>,
-    deferConfirmedSettlement: boolean
+    deferConfirmedSettlement: boolean,
+    knownChain?: {
+      status: 'mempool' | 'confirmed' | 'pending_spend' | 'spent' | 'replaced' | 'unknown'
+      confirmations: number
+    }
   ) {
     const state = this.requireState()
     if (!receive.receivedConsignment) return false
@@ -2775,7 +2837,7 @@ export class RgbService {
     if (!getTransactionStatus) {
       throw new RgbServiceError('RGB receive chain verification is unavailable')
     }
-    const chain = await getTransactionStatus(state.wallet, validated.txid)
+    const chain = knownChain || await getTransactionStatus(state.wallet, validated.txid)
     const expectedConfirmations = receive.minConfirmations || 1
     if (
       (chain.status === 'mempool' || chain.status === 'confirmed') &&

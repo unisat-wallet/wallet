@@ -5260,6 +5260,9 @@ describe('RgbService', () => {
   it('settles an accepted receive from its persisted consignment when the proxy is unavailable', async () => {
     const dependencies = createDependencies()
     dependencies.transport.getConsignment = vi.fn()
+    dependencies.stateSource.getTransactionStatus = vi.fn().mockResolvedValue({
+      status: 'confirmed', confirmations: 1,
+    })
     const service = new RgbService(dependencies)
     await service.open(wallet)
     ;(service as any).state.pendingReceives = [
@@ -5304,7 +5307,8 @@ describe('RgbService', () => {
       expect.anything(),
       expect.objectContaining({ payload: 'consignment' }),
       expect.anything(),
-      false
+      false,
+      { status: 'confirmed', confirmations: 1 }
     )
   })
 
@@ -5962,6 +5966,9 @@ describe('RgbService', () => {
   it('keeps an accepted receive available after its invoice expires so it can settle', async () => {
     const dependencies = createDependencies()
     dependencies.now = () => 2_000
+    dependencies.stateSource.getTransactionStatus = vi.fn().mockResolvedValue({
+      status: 'confirmed', confirmations: 1,
+    })
     dependencies.transport.getConsignment = vi.fn().mockResolvedValue({
       recipientId: 'recipient',
       payload: 'consignment',
@@ -6020,6 +6027,9 @@ describe('RgbService', () => {
   it('does not checkpoint an accepted mempool receive again after recording its broadcast', async () => {
     const dependencies = createDependencies()
     dependencies.onStatePersisted = vi.fn().mockResolvedValue({ verified: true })
+    dependencies.stateSource.getTransactionStatus = vi.fn().mockResolvedValue({
+      status: 'mempool', confirmations: 0,
+    })
     const service = new RgbService(dependencies)
     await service.open(wallet)
     await service.enableRecoveryBackup()
@@ -6040,24 +6050,27 @@ describe('RgbService', () => {
         },
       },
     ]
-    ;(service as any).validateIncomingConsignment = vi.fn().mockReturnValue({
-      assetId: 'rgb:AQEBAQEB-AQEBAQE-BAQEBAQ-EBAQEBA-QEBAQEB-AQEBAQE',
-      amount: '60',
-      txid: 'c'.repeat(64),
-      decoded: {
-        metadata: { ticker: 'TOK', name: 'Token', precision: 0, schema: 'NIA', issuedSupply: '60' },
-      },
-    })
-    vi.spyOn(service as any, 'advanceAcceptedReceive').mockImplementation(async (receive: any) => {
-      receive.receivedConsignment.broadcastDetectedAt ||= 2
-      return false
-    })
+    const validateIncomingConsignment = vi
+      .spyOn(service as any, 'validateIncomingConsignment')
+      .mockReturnValue({
+        assetId: 'rgb:AQEBAQEB-AQEBAQE-BAQEBAQ-EBAQEBA-QEBAQEB-AQEBAQE',
+        amount: '60',
+        txid: 'c'.repeat(64),
+        decoded: {
+          metadata: { ticker: 'TOK', name: 'Token', precision: 0, schema: 'NIA', issuedSupply: '60' },
+        },
+      })
+    const advanceAcceptedReceive = vi.spyOn(service as any, 'advanceAcceptedReceive')
 
     await service.processClaimedReceives({ includeClaimed: false })
     expect(dependencies.onStatePersisted).toHaveBeenCalledTimes(2)
+    expect(validateIncomingConsignment).not.toHaveBeenCalled()
+    expect(advanceAcceptedReceive).not.toHaveBeenCalled()
 
     await service.processClaimedReceives({ includeClaimed: false })
     expect(dependencies.onStatePersisted).toHaveBeenCalledTimes(2)
+    expect(validateIncomingConsignment).not.toHaveBeenCalled()
+    expect(dependencies.stateSource.getTransactionStatus).toHaveBeenCalledTimes(2)
   })
 
   it('does not cancel an accepted receive awaiting Bitcoin confirmation', async () => {
