@@ -553,6 +553,13 @@ export function useSendRGBScreenLogic() {
         signedPsbt,
         transferId: transferData.current.pendingVanillaTxid,
       })
+      if (endResult?.status === 'burn_split_complete') {
+        // The first transaction created an exact wallet-owned allocation.
+        // Prepare the terminal Burn immediately and show the second signer.
+        transferData.current = {}
+        await prepareRgbSend()
+        return
+      }
       const txid =
         endResult?.txid || endResult?.bitcoinTxid || endResult?.txId || endResult?.id || ''
       const transferId = endResult?.transferId || transferData.current.pendingVanillaTxid

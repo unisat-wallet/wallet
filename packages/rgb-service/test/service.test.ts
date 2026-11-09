@@ -604,13 +604,18 @@ describe('RgbService', () => {
     expect(selected.flatMap(utxo => utxo.allocations.map(item => item.amount))).toEqual(['3', '4'])
   })
 
-  it('reports an exact-selection error only for current-schema BFA burns', async () => {
+  it('prepares an internal split only when a current-schema BFA burn is not exact', async () => {
     const assetId = 'rgb:AQEBAQEB-AQEBAQE-BAQEBAQ-EBAQEBA-QEBAQEB-AQEBAQE'
     const setup = async (schemaId: string) => {
       const dependencies = createDependencies()
       dependencies.encoder.prepareBurn = vi.fn(async input => ({
         id: 'burn-selection', psbt: 'cHNidP8=', toSignInputs: [],
         lockedOutpoints: input.selectedUtxos.map(utxo => utxo.outpoint),
+      }))
+      dependencies.encoder.prepareTransfer = vi.fn(async input => ({
+        id: 'burn-split', psbt: 'cHNidP8=', toSignInputs: [],
+        lockedOutpoints: input.selectedUtxos.map(utxo => utxo.outpoint),
+        metadata: { schema: 'BFA' },
       }))
       const service = new RgbService(dependencies)
       await service.open(wallet)
@@ -632,10 +637,54 @@ describe('RgbService', () => {
       burnReason: '0xf39fd6e51aad88f6f4ce6ab8827279cfffb92266' }
 
     const current = await setup(BFA_SCHEMA_ID)
-    await expect(current.service.prepareBurn(request)).rejects.toThrow(
-      'cannot be formed exactly from spendable allocations'
-    )
+    await expect(current.service.prepareBurn(request)).resolves.toMatchObject({
+      id: 'burn-split', metadata: { burnSplit: 'true' },
+    })
     expect(current.dependencies.encoder.prepareBurn).not.toHaveBeenCalled()
+    expect(current.dependencies.encoder.prepareTransfer).toHaveBeenCalledOnce()
+    expect(current.service.getPendingTransfers()[0]).toMatchObject({
+      burnSplit: { request: { burn: true, amount: '5' } },
+      request: { amount: '5' },
+    })
+    expect(current.service.getPendingTransfers()[0]?.request.burn).toBeUndefined()
+    vi.mocked(current.dependencies.encoder.completeTransfer).mockResolvedValueOnce({
+      txid: 'c'.repeat(64), rawTx: '02000000000000000000',
+      consignments: [{ recipientId: 'internal', payload: 'consignment', assetId, opIds: ['a'.repeat(64)] }],
+      fundingUpdate: {
+        spentOutpoints: [
+          { txid: '1'.repeat(64), vout: 0 },
+          { txid: '2'.repeat(64), vout: 1 },
+        ],
+        createdUtxos: [
+          { outpoint: { txid: 'c'.repeat(64), vout: 1 }, satoshis: 330,
+            scriptPubKey: `5120${'1'.repeat(64)}`, publicKey: `02${'1'.repeat(64)}`,
+            allocations: [{ assetId, amount: '5', settled: true, spendable: true,
+              opId: 'a'.repeat(64), assignmentIndex: 0, assignmentType: 4000 }] },
+          { outpoint: { txid: 'c'.repeat(64), vout: 2 }, satoshis: 330,
+            scriptPubKey: `5120${'1'.repeat(64)}`, publicKey: `02${'1'.repeat(64)}`,
+            allocations: [{ assetId, amount: '1', settled: true, spendable: true,
+              opId: 'a'.repeat(64), assignmentIndex: 1, assignmentType: 4000 }] },
+        ],
+      },
+    })
+    await current.service.completeSend('burn-split', 'signed-psbt')
+    expect(current.dependencies.broadcaster.broadcast).toHaveBeenCalledWith('02000000000000000000')
+    expect(current.service.getPendingTransfers()).toEqual([])
+    expect(current.service.getSnapshot().utxos.map(utxo => ({
+      amount: utxo.allocations[0]?.amount,
+      spendable: utxo.allocations[0]?.spendable,
+      chainStatus: utxo.chainStatus,
+    }))).toEqual([
+      { amount: '5', spendable: true, chainStatus: 'mempool' },
+      { amount: '1', spendable: true, chainStatus: 'mempool' },
+    ])
+
+    // The address indexer may lag the successful parent broadcast. Its absent
+    // response must not prevent the immediately chained terminal burn.
+    current.dependencies.stateSource.verifyUtxos = vi.fn(async () => [])
+    await expect(current.service.prepareBurn(request)).resolves.toMatchObject({ id: 'burn-selection' })
+    expect(vi.mocked(current.dependencies.encoder.prepareBurn!).mock.calls.at(-1)?.[0].selectedUtxos)
+      .toHaveLength(1)
 
     const legacy = await setup(LEGACY_BFA_SCHEMA_ID)
     await expect(legacy.service.prepareBurn(request)).resolves.toMatchObject({ id: 'burn-selection' })

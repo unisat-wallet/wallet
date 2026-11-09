@@ -185,6 +185,33 @@ describe('WebRGB provider', () => {
     }));
   });
 
+  it('signs an internal allocation split before signing the terminal BFA burn', async () => {
+    let prepareCalls = 0;
+    let signCalls = 0;
+    const { provider, rpc } = createProvider({
+      webRgbPrepareBurn: () => ({
+        id: ++prepareCalls === 1 ? 'burn-split' : 'burn-final',
+        minConfirmations: 3
+      }),
+      signRgbPayment: () => ++signCalls === 1
+        ? { transferId: 'burn-split', txid: '11'.repeat(32), status: 'burn_split_complete' }
+        : { transferId: 'burn-final', txid: '22'.repeat(32), status: 'broadcasted' }
+    });
+    await provider.enable();
+
+    await expect(provider.burnAsset({
+      network: 'T0', assetId: 'rgb:bfa', amount: '5',
+      burnRecipient: { chainId: 'eip155:42161', address: `0x${'11'.repeat(20)}` }
+    })).resolves.toMatchObject({
+      transferId: 'burn-final',
+      txid: '22'.repeat(32),
+      status: 'WaitingConfirmations'
+    });
+    expect(rpc.mock.calls.filter(([method]) => method === 'webRgbPrepareBurn')).toHaveLength(2);
+    expect(rpc).toHaveBeenCalledWith('signRgbPayment', { transferId: 'burn-split' });
+    expect(rpc).toHaveBeenCalledWith('signRgbPayment', { transferId: 'burn-final' });
+  });
+
   it('rejects an out-of-range burn before reserving funds', async () => {
     const { provider, rpc } = createProvider();
     await provider.enable();

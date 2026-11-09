@@ -168,6 +168,8 @@ export interface RgbCompletedTransfer {
   fundingUpdate?: {
     spentOutpoints: RgbOutpoint[]
     createdUtxo?: RgbUtxo
+    /** Multiple wallet-owned outputs produced by an internal allocation split. */
+    createdUtxos?: RgbUtxo[]
   }
 }
 
@@ -228,6 +230,10 @@ export interface RgbPendingTransfer {
    * state only and is deliberately omitted from recovery checkpoints.
    */
   providerOrigin?: string
+  /** Internal self-transfer that creates an exact allocation for a terminal BFA burn. */
+  burnSplit?: {
+    request: RgbTransferRequest & { amount: string; burn: true }
+  }
   /** A signed transfer posted to transport, awaiting recipient acknowledgement. */
   delivery?: {
     completed: RgbCompletedTransfer

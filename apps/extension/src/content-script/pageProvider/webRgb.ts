@@ -289,12 +289,18 @@ export class WebRgbProvider {
         (!Number.isSafeInteger(args.minConfirmations) || args.minConfirmations < 0))
       throw providerError('INVALID_PARAMS', 'minConfirmations must be a nonnegative integer');
 
-    const prepared = await this.#call('webRgbPrepareBurn', args as unknown as Record<string, unknown>);
-    const transferId = prepared.id || prepared.transferId;
+    let prepared = await this.#call('webRgbPrepareBurn', args as unknown as Record<string, unknown>);
+    let transferId = prepared.id || prepared.transferId;
     if (!transferId) throw providerError('INTERNAL_ERROR', 'RGB burn transfer ID is missing');
     let result: any;
     try {
       result = await this.#call('signRgbPayment', { transferId });
+      if (result?.status === 'burn_split_complete') {
+        prepared = await this.#call('webRgbPrepareBurn', args as unknown as Record<string, unknown>);
+        transferId = prepared.id || prepared.transferId;
+        if (!transferId) throw providerError('INTERNAL_ERROR', 'RGB burn transfer ID is missing after allocation split');
+        result = await this.#call('signRgbPayment', { transferId });
+      }
     } catch (error) {
       if ((error as { code?: string }).code === 'USER_REJECTED') {
         try { await this.#call('webRgbReleasePreparedPayment', { transferId }); } catch { /* Preserve the approval result. */ }

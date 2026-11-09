@@ -16,6 +16,7 @@ import {
   encodeWitnessRgbInvoice,
   witnessRgbInvoiceRecipientId,
 } from './protocol/invoice'
+import type { RgbInvoice, RgbInvoiceSeal, RgbWitnessAddressType } from './protocol/invoice'
 import { normalizeRgbAssetId, rgbContractIdHex } from './protocol/contract-id'
 import { hashBfaBurnDestinationV1, normalizeBfaBurnDestination } from './protocol/bfa-burn-destination'
 import { decodeNiaConsignment } from './protocol/nia-consignment'
@@ -77,6 +78,52 @@ const PROVIDER_ORIGIN_HISTORY_TTL_MS = 24 * 60 * 60 * 1000
 const MAX_RECOVERY_HISTORY_PAYLOAD_LENGTH = 48_000_000
 const MAX_RECOVERY_HISTORY_OPERATION_IDS = 65_535
 const MAX_EXACT_BURN_SELECTION_STATES = 100_000
+
+class RgbExactBurnSelectionError extends RgbServiceError {}
+
+function burnSplitInvoice(
+  wallet: RgbWalletRef,
+  utxo: RgbUtxo,
+  assetId: string,
+  amount: string
+): RgbInvoice {
+  const script = utxo.scriptPubKey.toLowerCase()
+  let addressType: RgbWitnessAddressType
+  let payload: Buffer
+  if (/^5120[0-9a-f]{64}$/.test(script)) {
+    addressType = 'p2tr'
+    payload = Buffer.from(script.slice(4), 'hex')
+  } else if (/^0014[0-9a-f]{40}$/.test(script)) {
+    addressType = 'p2wpkh'
+    payload = Buffer.from(script.slice(4), 'hex')
+  } else if (/^0020[0-9a-f]{64}$/.test(script)) {
+    addressType = 'p2wsh'
+    payload = Buffer.from(script.slice(4), 'hex')
+  } else if (/^76a914[0-9a-f]{40}88ac$/.test(script)) {
+    addressType = 'p2pkh'
+    payload = Buffer.from(script.slice(6, -4), 'hex')
+  } else if (/^a914[0-9a-f]{40}87$/.test(script)) {
+    addressType = 'p2sh'
+    payload = Buffer.from(script.slice(4, -2), 'hex')
+  } else {
+    throw new RgbServiceError('BFA burn allocation split requires a standard wallet funding script')
+  }
+  const tags: Record<RgbWitnessAddressType, number> = {
+    p2pkh: 1, p2sh: 2, p2wpkh: 3, p2wsh: 4, p2tr: 5,
+  }
+  const seal: RgbInvoiceSeal = {
+    type: 'witness',
+    pay2vout: Uint8Array.from([tags[addressType], ...payload]),
+    addressType,
+    addressPayload: Uint8Array.from(payload),
+  }
+  const recipientId = witnessRgbInvoiceRecipientId(wallet.network, script)
+  return {
+    raw: '', assetId, amount, schema: 'BFA', assignmentName: 'assetOwner',
+    encryption: 'unsupported', recipientId, proxyRecipientId: recipientId,
+    recipientType: 'witness', seal, network: wallet.network, transportEndpoints: [],
+  }
+}
 
 /** Node responses which unambiguously mean these exact transaction bytes were already accepted. */
 function isDuplicateBitcoinBroadcastError(error: unknown) {
@@ -958,12 +1005,13 @@ export class RgbService {
           if (pending.broadcast) await this.syncBroadcastedTransfer(transferId, pending)
           else if (pending.delivery?.externalBroadcast)
             await this.syncExternallyBroadcastTransfer(transferId, pending)
-          else if ((pending.request.donation || pending.request.burn) && pending.delivery?.broadcastError)
+          else if ((pending.request.donation || pending.request.burn || pending.burnSplit) && pending.delivery?.broadcastError)
             // A failed donation needs an explicit sender retry. Do not let an
             // unavailable broadcaster interrupt synchronization of other sends.
             return
-          else if (pending.request.burn && pending.delivery)
-            // Burn has no recipient. Only an explicit user action may retry its broadcast.
+          else if ((pending.request.burn || pending.burnSplit) && pending.delivery)
+            // Burn and its internal split have no recipient. Only an explicit
+            // user action may retry their broadcast.
             return
           else if (pending.delivery?.publishError)
             // An untrusted endpoint exhausted a local resource budget. Only an
@@ -3952,9 +4000,19 @@ export class RgbService {
       : undefined
     const requireExactSelection = burn &&
       this.getStoredV1SchemaId(requestedAssetId) === BFA_SCHEMA_ID
-    const selectedUtxos = this.selectUtxos(
-      requestedAssetId, amount, swapInputOutpoints, requireExactSelection
-    )
+    let burnSplitRequired = false
+    let selectedUtxos: RgbUtxo[]
+    try {
+      selectedUtxos = this.selectUtxos(
+        requestedAssetId, amount, swapInputOutpoints, requireExactSelection
+      )
+    } catch (error) {
+      if (!(error instanceof RgbExactBurnSelectionError) || !requireExactSelection) throw error
+      // Current BFA burns are terminal and cannot contain change. First create
+      // an exact wallet-owned allocation with an ordinary Transfer transition.
+      selectedUtxos = this.selectUtxos(requestedAssetId, amount, swapInputOutpoints)
+      burnSplitRequired = true
+    }
     await this.verifySelectedUtxos(state.wallet, selectedUtxos)
     const allocations = selectedUtxos.flatMap(utxo =>
       utxo.allocations
@@ -4027,25 +4085,35 @@ export class RgbService {
     // Proxy v1 binds a witness seal to both operation keys. Generate the
     // sender key before encoding so the exact same key is persisted for
     // transport publication and used for the seal blinding derivation.
-    const proxySenderPrivateKey = invoice?.proxyPublicKey
+    const splitInvoice = burnSplitRequired
+      ? burnSplitInvoice(state.wallet, selectedUtxos[0]!, requestedAssetId, amount)
+      : undefined
+    const effectiveInvoice = invoice || splitInvoice
+    const proxySenderPrivateKey = effectiveInvoice?.proxyPublicKey
       ? Buffer.from(randomBytes(32)).toString('hex')
       : undefined
-    const intent = invoice ? {
+    const intent = effectiveInvoice ? {
       assetId: requestedAssetId,
       amount,
-      invoice,
+      invoice: effectiveInvoice,
       ...(proxySenderPrivateKey ? { proxySenderPrivateKey } : {}),
       transition: planFungibleTransition({
         assetId: requestedAssetId,
         amount,
-        recipientId: invoice.recipientId,
+        recipientId: effectiveInvoice.recipientId,
         selectedUtxos,
       }),
     } : undefined
+    const splitRequest = burnSplitRequired
+      ? (() => {
+          const { burn: _burn, burnReason: _burnReason, burnDestination: _burnDestination, ...rest } = resolvedRequest
+          return { ...rest, invoice: '' }
+        })()
+      : resolvedRequest
     const encoderInput = () => ({
       wallet: state.wallet,
       snapshot: state.snapshot,
-      request: resolvedRequest,
+      request: splitRequest,
       intent: intent!,
       selectedUtxos,
       ...(availableFeeFunding === undefined ? {} : { feeFunding: availableFeeFunding }),
@@ -4053,7 +4121,7 @@ export class RgbService {
     })
     let prepared: RgbPreparedTransfer
     try {
-      prepared = burn
+      prepared = burn && !burnSplitRequired
         ? await this.requireBurnEncoder()(encoderInput())
         : await this.dependencies.encoder.prepareTransfer(encoderInput())
     } catch (error) {
@@ -4064,9 +4132,12 @@ export class RgbService {
       // failing the send.
       if (!usingLocalHistory || !isIncompleteLocalHistoryError(error)) throw error
       validationHistory = enrichValidationHistory(await getRemoteHistory())
-      prepared = burn
+      prepared = burn && !burnSplitRequired
         ? await this.requireBurnEncoder()(encoderInput())
         : await this.dependencies.encoder.prepareTransfer(encoderInput())
+    }
+    if (burnSplitRequired) {
+      prepared.metadata = { ...prepared.metadata, burnSplit: 'true' }
     }
 
     const selectedOutpoints = new Set(selectedUtxos.map(outpointKey))
@@ -4086,13 +4157,14 @@ export class RgbService {
     const rollback = snapshotState(state)
     state.pending[prepared.id] = {
       prepared,
-      request: resolvedRequest,
+      request: splitRequest,
       createdAt: this.now(),
       ...(state.recoveryCheckpointGeneration === undefined
         ? {}
         : { preparedCheckpointGeneration: state.recoveryCheckpointGeneration }),
       ...(proxySenderPrivateKey ? { proxySenderPrivateKey } : {}),
       ...(options.providerOrigin ? { providerOrigin: options.providerOrigin } : {}),
+      ...(burnSplitRequired ? { burnSplit: { request: resolvedRequest as RgbTransferRequest & { amount: string; burn: true } } } : {}),
     }
     // The unsigned reservation is locally durable and can be rebuilt after a
     // restart. Do not upload a full checkpoint before signing produces an
@@ -4228,15 +4300,78 @@ export class RgbService {
           !checked.bundles.at(-1)?.operationIds.includes(pending.prepared.metadata?.['transitionId'] || ''))
           throw new RgbServiceError('BFA burn proof does not match the prepared operation')
       }
-      const endpoints = pending.request.burn ? [] : decodeRgbInvoice(pending.request.invoice).transportEndpoints
-      if (!pending.request.burn && !endpoints.length)
+      const endpoints = pending.request.burn || pending.burnSplit
+        ? []
+        : decodeRgbInvoice(pending.request.invoice).transportEndpoints
+      if (!pending.request.burn && !pending.burnSplit && !endpoints.length)
         throw new RgbServiceError('RGB invoice has no proxy transport endpoint')
       const rollback = snapshotState(state)
       pending.delivery = { completed, endpoints }
       await this.persistWithRecoveryRollback(rollback)
     }
+    if (pending.burnSplit) return this.advanceBurnSplitDelivery(transferId, pending)
     if (pending.request.burn) return this.advanceBurnDelivery(transferId, pending)
     return this.advancePendingDelivery(transferId, pending)
+  }
+
+  /** Broadcast an internal self-transfer and expose both exact split allocations locally. */
+  private async advanceBurnSplitDelivery(
+    transferId: string,
+    pending: RgbPendingTransfer
+  ): Promise<RgbCompletedTransfer> {
+    const delivery = pending.delivery
+    if (!delivery || !pending.burnSplit)
+      throw new RgbServiceError('BFA burn allocation split is not signed')
+    delete delivery.broadcastError
+    let broadcastTxid: string
+    try {
+      broadcastTxid = await this.dependencies.broadcaster.broadcast(delivery.completed.rawTx)
+    } catch (error) {
+      if (!isDuplicateBitcoinBroadcastError(error)) {
+        delivery.broadcastError = error instanceof Error ? error.message : String(error)
+        await this.persist({ waitForRecovery: true })
+        throw error
+      }
+      broadcastTxid = delivery.completed.txid
+    }
+    if (broadcastTxid !== delivery.completed.txid)
+      throw new RgbServiceError('Broadcast transaction ID does not match the BFA burn split')
+    return this.finalizeBurnSplit(transferId, pending)
+  }
+
+  private async finalizeBurnSplit(
+    transferId: string,
+    pending: RgbPendingTransfer
+  ): Promise<RgbCompletedTransfer> {
+    const state = this.requireState()
+    const completed = pending.delivery?.completed
+    if (!completed || !pending.burnSplit)
+      throw new RgbServiceError('BFA burn allocation split is not signed')
+    this.applyFundingUpdate(completed, { createdSpendable: true })
+    await this.retainCompletedLocalHistory(completed)
+    state.pendingUtxoSync = {
+      txid: completed.txid,
+      outpoints: state.snapshot.utxos,
+    }
+    delete state.pending[transferId]
+    await this.persist({ waitForRecovery: true })
+    return completed
+  }
+
+  private async observeBurnSplitBroadcast(transferId: string, pending: RgbPendingTransfer) {
+    const completed = pending.delivery?.completed
+    const getTransactionStatus = this.dependencies.stateSource.getTransactionStatus
+    if (!completed || !pending.burnSplit || !getTransactionStatus) return false
+    let chain: Awaited<ReturnType<NonNullable<typeof getTransactionStatus>>>
+    try {
+      chain = await getTransactionStatus(this.requireState().wallet, completed.txid)
+    } catch {
+      return false
+    }
+    if (chain.status !== 'mempool' && chain.status !== 'confirmed') return false
+    // Do not swallow checkpoint failures after the transaction was observed.
+    await this.finalizeBurnSplit(transferId, pending)
+    return true
   }
 
   /** Broadcast a receiver-accepted wallet send only after the sender requests it. */
@@ -4244,12 +4379,13 @@ export class RgbService {
     return this.runPendingTransferOperation(transferId, async () => {
       const pending = this.requireState().pending[transferId]
       if (
-        !(pending?.delivery?.acknowledgedAt || pending?.delivery?.donationReadyAt || pending?.request.burn) ||
+        !(pending?.delivery?.acknowledgedAt || pending?.delivery?.donationReadyAt || pending?.request.burn || pending?.burnSplit) ||
         pending.delivery.externalBroadcast ||
         pending.delivery.requiresCounterpartySignature
       ) {
         throw new RgbServiceError('RGB transfer is not ready for sender broadcast')
       }
+      if (pending.burnSplit) return this.advanceBurnSplitDelivery(transferId, pending)
       if (pending.request.burn) return this.advanceBurnDelivery(transferId, pending)
       if (await this.observePendingDeliveryBroadcast(pending)) {
         return this.syncBroadcastedTransfer(transferId, pending)
@@ -4277,7 +4413,7 @@ export class RgbService {
     const state = this.requireState()
     let canceled = 0
     for (const [transferId, pending] of Object.entries(state.pending)) {
-      if (!pending.delivery?.broadcastError || pending.broadcast || pending.request.burn) continue
+      if (!pending.delivery?.broadcastError || pending.broadcast || pending.request.burn || pending.burnSplit) continue
       if (!pending.delivery.failureReportedAt) {
         try { await this.reportPendingBroadcastFailure(transferId, pending) } catch { /* Retry on next poll. */ }
       }
@@ -4298,7 +4434,7 @@ export class RgbService {
   private async reportPendingBroadcastFailure(transferId: string, pending: RgbPendingTransfer) {
     const delivery = pending.delivery
     const report = this.dependencies.stateSource.reportBroadcastFailure
-    if (!delivery?.broadcastError || !report || pending.request.burn) return
+    if (!delivery?.broadcastError || !report || pending.request.burn || pending.burnSplit) return
     await report(this.requireState().wallet, {
       transferId,
       recipientId: decodeRgbInvoice(pending.request.invoice).proxyRecipientId,
@@ -4350,7 +4486,10 @@ export class RgbService {
     // to be broadcast. It is no longer safe to signal cancellation, including
     // while the broadcast request itself is in flight.
     if (pending.broadcast) return { aborted: false, reason: 'already_broadcast' as const }
-    if (pending.delivery && await this.observePendingDeliveryBroadcast(pending)) {
+    if (pending.burnSplit && await this.observeBurnSplitBroadcast(transferId, pending)) {
+      return { aborted: false, reason: 'already_broadcast' as const }
+    }
+    if (!pending.burnSplit && pending.delivery && await this.observePendingDeliveryBroadcast(pending)) {
       await this.syncBroadcastedTransfer(transferId, pending)
       return { aborted: false, reason: 'already_broadcast' as const }
     }
@@ -4363,7 +4502,8 @@ export class RgbService {
 
     // V1 must clear the unreleased signed transaction before its local inputs
     // can be reused. Legacy transport retains its best-effort cancel signal.
-    if (!pending.request.burn && !pending.delivery?.acknowledgedAt && pending.delivery) {
+    if (!pending.request.burn && !pending.burnSplit &&
+      !pending.delivery?.acknowledgedAt && pending.delivery) {
       const invoice = decodeRgbInvoice(pending.request.invoice)
       if (invoice.proxyInvoiceId) {
         if (!pending.proxySenderPrivateKey || !this.dependencies.transport.cancelConsignment) {
@@ -4397,8 +4537,8 @@ export class RgbService {
       options.discardUnsigned === true &&
       !pending.delivery &&
       !pending.broadcast &&
-      !pending.providerOrigin
-    if (!discardUnsigned) {
+      (!pending.providerOrigin || Boolean(pending.burnSplit))
+    if (!discardUnsigned && !pending.burnSplit) {
       const sendHistory = state.pendingSendHistory || (state.pendingSendHistory = [])
       if (!sendHistory.some(item => item.transferId === transferId)) {
         sendHistory.push({
@@ -4423,7 +4563,10 @@ export class RgbService {
     return { aborted: true, status: discardUnsigned ? ('discarded' as const) : ('canceled' as const) }
   }
 
-  private applyFundingUpdate(completed: RgbCompletedTransfer) {
+  private applyFundingUpdate(
+    completed: RgbCompletedTransfer,
+    options: { createdSpendable?: boolean } = {}
+  ) {
     const update = completed.fundingUpdate
     if (!update) return
     const state = this.requireState()
@@ -4431,21 +4574,20 @@ export class RgbService {
       update.spentOutpoints.map(outpoint => `${outpoint.txid}:${outpoint.vout}`)
     )
     state.snapshot.utxos = state.snapshot.utxos.filter(utxo => !spent.has(outpointKey(utxo)))
-    if (
-      update.createdUtxo &&
-      !state.snapshot.utxos.some(utxo => outpointKey(utxo) === outpointKey(update.createdUtxo!))
-    ) {
+    const createdUtxos = update.createdUtxos || (update.createdUtxo ? [update.createdUtxo] : [])
+    for (const createdUtxo of createdUtxos) {
+      if (state.snapshot.utxos.some(utxo => outpointKey(utxo) === outpointKey(createdUtxo))) continue
       // The change output is known locally after broadcast, but Bitcoin has
       // not confirmed it yet. Keep it visible as pending until the backend
       // snapshot verifies the output on-chain.
       state.snapshot.utxos.push({
-        ...update.createdUtxo,
+        ...createdUtxo,
         chainStatus: 'mempool',
         confirmations: 0,
-        allocations: update.createdUtxo.allocations.map(allocation => ({
+        allocations: createdUtxo.allocations.map(allocation => ({
           ...allocation,
-          settled: false,
-          spendable: false,
+          settled: options.createdSpendable === true,
+          spendable: options.createdSpendable === true,
         })),
       })
     }
@@ -5117,7 +5259,7 @@ export class RgbService {
       if (total < required) throw new RgbInsufficientBalanceError(assetId, amount)
       const selected = selectExactBurnUtxos(candidates, required)
       if (selected) return selected
-      throw new RgbServiceError(
+      throw new RgbExactBurnSelectionError(
         'Current BFA burn amount cannot be formed exactly from spendable allocations'
       )
     }
@@ -5139,8 +5281,14 @@ export class RgbService {
     const statuses = new Map(
       verified.map(item => [`${item.outpoint.txid}:${item.outpoint.vout}`, item.status])
     )
+    const pendingLocalTxid = this.requireState().pendingUtxoSync?.txid
     const unavailable = selectedUtxos.find(utxo => {
       const status = statuses.get(outpointKey(utxo))
+      // A successfully broadcast burn-split output is immediately usable by
+      // its child burn. The address indexer may not expose that mempool output
+      // yet, but an explicit spent/replaced response must still fail closed.
+      if (utxo.chainStatus === 'mempool' && utxo.outpoint.txid === pendingLocalTxid &&
+        status !== 'spent' && status !== 'replaced') return false
       return status !== 'confirmed' && status !== 'mempool'
     })
     if (unavailable) {

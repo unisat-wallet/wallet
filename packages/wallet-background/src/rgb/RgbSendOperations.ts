@@ -113,7 +113,9 @@ export class RgbSendOperations {
       psbt: prepared.psbt,
       toSignInputs: prepared.toSignInputs,
       amountDisplay: getAmountDisplay(params),
-      actionName: params.burn
+      actionName: prepared.metadata?.['burnSplit'] === 'true'
+        ? `Split ${getAssetLabel(params)} for burn`
+        : params.burn
         ? `Burn ${getAssetLabel(params)}`
         : params.donation
         ? `Send ${getAssetLabel(params)} without recipient acceptance`
@@ -123,6 +125,7 @@ export class RgbSendOperations {
     return {
       ...prepared,
       txid: prepared.id,
+      ...(prepared.metadata?.['burnSplit'] === 'true' ? { burnSplitRequired: true } : {}),
       psbtHex: toSignData.psbtHex,
       toSignData,
     }
@@ -144,12 +147,20 @@ export class RgbSendOperations {
         'No uniquely identified locally prepared RGB transfer is awaiting a signature'
       )
     }
+    const burnSplit = pending.find(transfer => transfer.id === transferId)?.burnSplit
     this.dependencies.setActiveTransferId(wallet.fundingAddress, transferId)
     try {
       const completed = await service.completeSend(
         transferId,
         psbtFromString(params.signedPsbt).toBase64()
       )
+      if (burnSplit) {
+        return {
+          transferId,
+          txid: completed.txid,
+          status: 'burn_split_complete' as const,
+        }
+      }
       const latest = service.getPendingTransfers().find(item => item.id === transferId)
       return latest?.delivery?.acknowledgedAt
         ? { transferId, txid: completed.txid, status: 'ready_to_broadcast' as const }
@@ -222,7 +233,7 @@ export class RgbSendOperations {
     // the same authoritative lease check as signed completion.
     await this.dependencies.ensureWriteLease?.({ service, wallet }, { forceRenew: true })
     const transfer = service.getPendingTransfers().find(item => item.id === transferId)
-    if (!(transfer?.delivery?.acknowledgedAt || transfer?.delivery?.donationReadyAt || transfer?.request.burn) ||
+    if (!(transfer?.delivery?.acknowledgedAt || transfer?.delivery?.donationReadyAt || transfer?.request.burn || transfer?.burnSplit) ||
       transfer?.delivery?.externalBroadcast) {
       return { broadcast: false, status: 'not_retryable' as const }
     }

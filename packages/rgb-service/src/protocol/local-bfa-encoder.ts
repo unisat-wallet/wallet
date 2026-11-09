@@ -213,6 +213,8 @@ export function prepareBfaTransfer(input: {
       historyWitnessBundles: JSON.stringify(input.history.witnessBundles.map(bundle => Buffer.from(bundle).toString('base64'))),
       recipientId: input.intent.invoice.recipientId,
       recipientType: input.intent.invoice.recipientType,
+      recipientVout: prepared.recipientVout === undefined ? '' : String(prepared.recipientVout),
+      recipientAmount: input.intent.amount,
       ...(input.intent.invoice.seal.type === 'confidential'
         ? { recipientSecretSeal: hex(input.intent.invoice.seal.secretSeal) }
         : {}),
@@ -385,6 +387,45 @@ export function completeBfaTransfer(input: {
     throw new RgbServiceError('BFA change output is missing from the signed transaction')
   if (change && change.script.toString('hex') !== data['fundingScript'])
     throw new RgbServiceError('BFA change script does not match the funding address')
+  const recipientVout = data['recipientVout'] === '' ? undefined : Number(data['recipientVout'])
+  const recipient = recipientVout === undefined ? undefined : tx.outs[recipientVout]
+  if (data['burnSplit'] === 'true') {
+    if (recipientVout === undefined || !Number.isInteger(recipientVout) || recipientVout < 0 || !recipient)
+      throw new RgbServiceError('BFA burn split recipient output is missing')
+    if (recipient.script.toString('hex') !== data['fundingScript'])
+      throw new RgbServiceError('BFA burn split output does not belong to the wallet')
+  }
+  const splitUtxos = data['burnSplit'] === 'true' && recipient && recipientVout !== undefined
+    ? [{
+        outpoint: { txid: completed.txid, vout: recipientVout },
+        satoshis: recipient.value,
+        scriptPubKey: data['fundingScript'] || '',
+        publicKey: data['fundingPublicKey'] || '',
+        allocations: [{
+          assetId: input.pending.request.assetId,
+          amount: data['recipientAmount'] || '',
+          settled: true,
+          spendable: true,
+          opId: data['transitionId'],
+          assignmentIndex: 0,
+          assignmentType: 4000,
+        }],
+      }, ...(change && changeVout !== undefined ? [{
+        outpoint: { txid: completed.txid, vout: changeVout },
+        satoshis: change.value,
+        scriptPubKey: data['fundingScript'] || '',
+        publicKey: data['fundingPublicKey'] || '',
+        allocations: [{
+          assetId: input.pending.request.assetId,
+          amount: data['changeAmount'] || '',
+          settled: true,
+          spendable: true,
+          opId: data['transitionId'],
+          assignmentIndex: 1,
+          assignmentType: 4000,
+        }],
+      }] : [])]
+    : undefined
   return {
     txid: completed.txid,
     rawTx: completed.rawTx,
@@ -396,7 +437,7 @@ export function completeBfaTransfer(input: {
     }],
     fundingUpdate: {
       spentOutpoints: input.pending.prepared.lockedOutpoints,
-      ...(change && changeVout !== undefined ? { createdUtxo: {
+      ...(splitUtxos ? { createdUtxos: splitUtxos } : change && changeVout !== undefined ? { createdUtxo: {
         outpoint: { txid: completed.txid, vout: changeVout },
         satoshis: change.value,
         scriptPubKey: data['fundingScript'] || '',

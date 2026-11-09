@@ -89,6 +89,15 @@ an `RGB\0TFR` `.rgb` file from transfer details. Broadcast failures require an
 explicit retry; ordinary synchronization never rebroadcasts a burn. Burning
 does not submit a redemption request to an EVM bridge.
 
+The current BFA schema defines Burn as a terminal transition without output
+assignments, so it cannot carry RGB change. When the requested amount is not
+already represented by an exact set of spendable allocations, the wallet
+first prepares an ordinary wallet-owned Transfer that creates the exact burn
+allocation plus change. After that transaction is signed and broadcast, the
+wallet prepares the terminal Burn against its mempool output. This may require
+two confirmations in the signer and pays Bitcoin fees for two transactions;
+the internal split never uses Proxy or sends an ACK.
+
 For Arbitrum One, the wallet keeps the legacy direct-route format: a 20-byte
 EVM address is left-padded with 12 zero bytes in `burnReason`. For Ethereum,
 Polygon PoS, Plasma, and Tron, it constructs the V1 destination record and

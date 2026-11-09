@@ -86,6 +86,53 @@ describe('useSendRGBScreenLogic', () => {
     )
   })
 
+  it('signs an automatic allocation split before the terminal BFA burn', async () => {
+    const assetId = 'rgb:bfa'
+    const { wrapper, wallet, navigation } = createHookTestHarness({
+      routeState: { assetId, burn: true,
+        tokenBalance: { assetId, ticker: 'USDT', precision: 0, spendable: '100' } },
+    })
+    wallet.createRgbSendBegin = vi.fn()
+      .mockResolvedValueOnce({
+        txid: 'split-transfer', burnSplitRequired: true,
+        toSignData: { psbtHex: 'unsigned-split' },
+      })
+      .mockResolvedValueOnce({
+        txid: 'burn-transfer', toSignData: { psbtHex: 'unsigned-burn' },
+      })
+    wallet.createRgbSendEnd = vi.fn()
+      .mockResolvedValueOnce({
+        transferId: 'split-transfer', txid: 'split-txid', status: 'burn_split_complete',
+      })
+      .mockResolvedValueOnce({
+        transferId: 'burn-transfer', txid: 'burn-txid', status: 'broadcasted',
+      })
+    const { result } = renderHook(() => useSendRGBScreenLogic(), { wrapper })
+    act(() => {
+      result.current.setBurnReason('0xf39fd6e51aad88f6f4ce6ab8827279cfffb92266')
+      result.current.onAmountChange('30')
+    })
+    await act(async () => result.current.onClickNext())
+    expect(result.current.signPsbtParams.data.toSignDatas[0]?.psbtHex).toBe('unsigned-split')
+
+    await act(async () => {
+      await result.current.onSignPsbtHandleConfirm([{ psbtHex: 'signed-split' }] as any)
+    })
+    expect(wallet.createRgbSendBegin).toHaveBeenCalledTimes(2)
+    expect(result.current.signPsbtParams.data.toSignDatas[0]?.psbtHex).toBe('unsigned-burn')
+    expect(navigation.navigate).not.toHaveBeenCalledWith(
+      'RGBTransferDetailScreen', expect.anything()
+    )
+
+    await act(async () => {
+      await result.current.onSignPsbtHandleConfirm([{ psbtHex: 'signed-burn' }] as any)
+    })
+    expect(navigation.navigate).toHaveBeenCalledWith(
+      'RGBTransferDetailScreen',
+      expect.objectContaining({ initialTransfer: expect.objectContaining({ burn: true }) })
+    )
+  })
+
   it('requires at least one whole token before preparing a BFA burn', async () => {
     const assetId = 'rgb:bfa'
     const { wrapper, wallet } = createHookTestHarness({

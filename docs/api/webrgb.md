@@ -337,6 +337,14 @@ families. UniSat currently returns `['eip155', 'tron']`; the concrete chain
 must also be one of the wallet's configured BFA bridge routes. A signing
 rejection releases the unsigned RGB allocation reservation.
 
+Current-schema BFA Burn transitions cannot contain a change assignment. If
+the wallet does not already have an exact combination of allocations for the
+requested amount, `burnAsset` automatically performs a wallet-owned split
+transaction and then prepares the terminal Burn. The user sees two signing
+confirmations and pays both Bitcoin transaction fees. The provider resolves
+only after the second transaction is broadcast; the intermediate PSBT and
+transfer ID are not returned to the dApp.
+
 ### `getConsignment({ assetId, txid })`
 
 This method exports the exact saved transfer consignment for a completed BFA
