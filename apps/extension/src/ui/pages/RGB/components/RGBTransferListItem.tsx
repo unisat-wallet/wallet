@@ -108,7 +108,10 @@ export function RGBTransferListItem({
   const showStatus = item.type !== 'issue' && (pending || ['canceled', 'cancelled', 'rejected'].includes(status));
   const isReceive = item.type === 'receive';
   const isCanceledReceive = isReceive && ['canceled', 'cancelled'].includes(status);
-  const hideReceiveAmount = isReceive && ['validation_failed', 'rejected'].includes(status);
+  // A user-rejected receive has already passed consignment validation, so its
+  // durable history amount is safe to display. Only validation failures may
+  // contain untrusted metadata/amounts and must remain hidden.
+  const hideReceiveAmount = isReceive && status === 'validation_failed';
   const secondaryAssetLabel = assetName || (isCanceledReceive ? assetSymbol : '');
   const amountColor = isReceive || item.type === 'issue'
     ? 'rgba(124, 219, 152, 0.85)'
