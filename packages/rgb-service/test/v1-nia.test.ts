@@ -19,6 +19,7 @@ import { encodeNiaTransferConsignment } from '../src/protocol/nia-contract'
 import { encodeNiaContract } from '../src/protocol/nia-contract'
 import { convertNiaV0ConsignmentToV1 } from '../src/protocol/nia-v0-migration'
 import { serializeStrictBitcoinTransaction } from '../src/protocol/fascia'
+import { commitMpc } from '../src/protocol/mpc'
 import { StrictWriter } from '../src/protocol/strict'
 import { wrapRgbTransferConsignment } from '../src/protocol/consignment'
 import { RgbBfaValidationUnavailableError } from '../src/errors'
@@ -123,6 +124,39 @@ describe('NIA v1 transfer', () => {
     })
     expect(result.assetId).toBe(encodeRgbContractId(Uint8Array.from(Buffer.from(assetId.slice(4), 'hex'))))
     expect(result.metadata).toMatchObject({ schema: 'NIA', issuedSupply: '100' })
+    expect(result.terminalAssignments).toContainEqual(expect.objectContaining({
+      amount: '60', opId: Buffer.from(prepared.transitionId).toString('hex'),
+    }))
+  })
+
+  it('accepts committed bundle inputs whose transitions are not disclosed to this recipient', async () => {
+    const { assetId, genesis, prepared, transaction } = fixture()
+    const inputs = [
+      { opId: assetId.slice(4), assignmentType: 4000, assignmentIndex: 0 },
+      { opId: 'ff'.repeat(32), assignmentType: 4000, assignmentIndex: 1 },
+    ]
+    const draft = serializeBfaOpretWitnessBundle({
+      witnessTx: transaction.toBuffer(), contractId: assetId,
+      transitionId: prepared.transitionId, transition: prepared.transition,
+      inputs, entropy: 2n,
+    })
+    const commitment = commitMpc([{
+      protocolId: Uint8Array.from(Buffer.from(assetId.slice(4), 'hex')),
+      message: draft.bundleId,
+    }], 2n).commitment
+    transaction.outs[0]!.script = Buffer.from([0x6a, 0x20, ...commitment])
+    const bundle = serializeBfaOpretWitnessBundle({
+      witnessTx: transaction.toBuffer(), contractId: assetId,
+      transitionId: prepared.transitionId, transition: prepared.transition,
+      inputs, entropy: 2n,
+    })
+    const payload = encodeBfaTransferConsignment({
+      genesis: genesis.strict, validatedWitnessBundles: [], witnessBundle: bundle.strict,
+    })
+
+    const result = await validateBfaTransferConsignment(payload, {
+      network: 0, isBitcoinTxConfirmed: async () => true, allowPendingLastWitness: true,
+    })
     expect(result.terminalAssignments).toContainEqual(expect.objectContaining({
       amount: '60', opId: Buffer.from(prepared.transitionId).toString('hex'),
     }))

@@ -750,8 +750,10 @@ function readBundle(reader: StrictReader, contractId: string, known: Map<string,
         fail('bundle input map omits a transition input')
     }
   }
-  if (bundleInputs.length !== operations.reduce((sum, operation) => sum + operation.inputs.length, 0))
-    fail('bundle input map contains an extra entry')
+  // A transfer consignment may disclose only the transition relevant to this
+  // recipient while the committed input map also contains transitions for
+  // other assets moved by the same anchor. Validate every disclosed input,
+  // but retain undisclosed entries because they are part of the bundle ID.
   const id = hex(transitionBundleId(bundleInputs))
   const commitment = verifyMpcMerkleProof({ protocolId: bytes(contractId), message: bytes(id), proof })
   if (!tx.outs[0]?.script.equals(Buffer.from([0x6a, 0x20, ...commitment]))) fail('witness OP_RETURN commitment mismatch')
