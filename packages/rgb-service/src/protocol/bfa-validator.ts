@@ -177,11 +177,10 @@ export function restoreValidatedBfaHistory(
   }
 }
 
-/** Carry only the ancestors of the allocations being spent to the next recipient. */
-export function selectBfaSpendHistory(
+function selectedBfaBundleIndexes(
   history: ValidatedBfaTransferHistory & { bundles: ValidatedBfaConsignment['bundles'] },
   selectedOpIds: string[]
-): ValidatedBfaTransferHistory {
+): Set<number> {
   if (history.bundles.length !== history.witnessBundles.length)
     fail('validated history bundle count mismatch')
   const byOperation = new Map<string, number>()
@@ -190,7 +189,7 @@ export function selectBfaSpendHistory(
   })
   const needed = new Set<number>()
   const visiting = new Set<number>()
-  const rootId = rgbContractIdHex(history.assetId)
+  const rootId = rgbContractIdHex(history.assetId).toLowerCase()
   const include = (opId: string): void => {
     if (opId.toLowerCase() === rootId) return
     const index = byOperation.get(opId.toLowerCase())
@@ -205,6 +204,15 @@ export function selectBfaSpendHistory(
     needed.add(index)
   }
   for (const opId of selectedOpIds) include(opId)
+  return needed
+}
+
+/** Carry only the ancestors of the allocations being spent to the next recipient. */
+export function selectBfaSpendHistory(
+  history: ValidatedBfaTransferHistory & { bundles: ValidatedBfaConsignment['bundles'] },
+  selectedOpIds: string[]
+): ValidatedBfaTransferHistory {
+  const needed = selectedBfaBundleIndexes(history, selectedOpIds)
   return {
     assetId: history.assetId,
     genesis: history.genesis,
@@ -1244,15 +1252,46 @@ export async function validateBfaTransferConsignment(
   return buildValidatedConsignment(parsed, consumed)
 }
 
-/** Combine independently validated branches into one portable local history. */
-export function mergeBfaValidatedHistories(histories: ValidatedBfaConsignment[]): Uint8Array {
+/**
+ * Combine independently validated branches into one portable local history.
+ * When allocations are selected for spending, discard unrelated branches before
+ * merging so a stale conflicting branch cannot invalidate the selected history.
+ */
+export function mergeBfaValidatedHistories(
+  histories: ValidatedBfaConsignment[], selectedOpIds?: string[]
+): Uint8Array {
   if (!histories.length) fail('no histories to merge')
+  const reference = histories[0]!
+  const referenceGenesis = hex(reference.genesis)
+  for (const history of histories) {
+    if (history.assetId !== reference.assetId || hex(history.genesis) !== referenceGenesis)
+      fail('histories disagree on Genesis')
+  }
+  if (selectedOpIds) {
+    const selectedByHistory = histories.map(() => [] as string[])
+    const rootId = rgbContractIdHex(histories[0]!.assetId).toLowerCase()
+    for (const opId of new Set(selectedOpIds.map(id => id.toLowerCase()))) {
+      if (opId === rootId) continue
+      const index = histories.findIndex(history => history.bundles.some(bundle =>
+        bundle.operationIds.some(id => id.toLowerCase() === opId)
+      ))
+      if (index === -1) throw new RgbMissingAncestorError()
+      selectedByHistory[index]!.push(opId)
+    }
+    histories = histories.flatMap((history, index) => {
+      if (!selectedByHistory[index]!.length) return []
+      const needed = selectedBfaBundleIndexes(history, selectedByHistory[index]!)
+      return [{
+        ...history,
+        witnessBundles: history.witnessBundles.filter((_, bundleIndex) => needed.has(bundleIndex)),
+        bundles: history.bundles.filter((_, bundleIndex) => needed.has(bundleIndex)),
+      }]
+    })
+    if (!histories.length) fail('selected history has no witness bundles')
+  }
   const first = histories[0]!
-  const genesisHex = hex(first.genesis)
   const bundles = new Map<string, ValidatedBfaConsignment['bundles'][number]>()
   for (const history of histories) {
-    if (history.assetId !== first.assetId || hex(history.genesis) !== genesisHex)
-      fail('histories disagree on Genesis')
     for (const bundle of history.bundles) {
       const existing = bundles.get(bundle.id)
       if (existing && (existing.operationIds.join(',') !== bundle.operationIds.join(',') ||

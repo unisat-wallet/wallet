@@ -430,7 +430,7 @@ describe('NIA v1 transfer', () => {
     const invoice = decodeRgbInvoice(
       `rgb:${assetId.slice(4)}/~/~/bc:utxob:xDfmDF9g-yNOjriV-6Anbe6H-MLJ__g6-lo7Dd4f-dhWBW8S-XYGBm?amount=60`
     )
-    const makeBranch = (vout: number) => {
+    const makeBranch = (vout: number, variant = 0) => {
       const assignmentIndex = genesis.allocationIndexes.indexOf(vout)
       const prepared = prepareNiaOpretTransfer({
         network: 'mainnet', assetId, amount: '60',
@@ -445,7 +445,8 @@ describe('NIA v1 transfer', () => {
           outpoint: { txid: (vout ? 'dd' : 'cc').repeat(32), vout: 1 }, satoshis: 10_000,
           scriptPubKey: `5120${'11'.repeat(32)}`, publicKey: `02${'22'.repeat(32)}`,
         }], changeScriptPubKey: `5120${'11'.repeat(32)}`, changeDustLimit: 330 },
-        nonce: BigInt(vout + 1), entropy: BigInt(vout + 2), recipientBlinding: 3n, changeBlinding: 4n,
+        nonce: BigInt(vout + variant + 1), entropy: BigInt(vout + variant + 2),
+        recipientBlinding: 3n, changeBlinding: 4n,
       })
       const psbt = Psbt.fromHex(prepared.psbtHex)
       const tx = ((psbt.data.globalMap.unsignedTx as any).tx || psbt.data.globalMap.unsignedTx).toBuffer()
@@ -453,7 +454,7 @@ describe('NIA v1 transfer', () => {
         witnessTx: tx, contractId: assetId, transitionId: prepared.transitionId,
         transition: prepared.transition,
         inputs: [{ opId: assetId.slice(4), assignmentType: 4000, assignmentIndex }],
-        entropy: BigInt(vout + 2),
+        entropy: BigInt(vout + variant + 2),
       })
       return { ...bundle, transitionId: prepared.transitionId, txid: Transaction.fromBuffer(tx).getId() }
     }
@@ -465,6 +466,18 @@ describe('NIA v1 transfer', () => {
       }), { network: 0, isBitcoinTxConfirmed: async () => true }
     )
     const leftOpId = Buffer.from(left.transitionId).toString('hex')
+    const conflicting = makeBranch(0, 10)
+    const conflictingHistory = await Promise.all([validate(left), validate(conflicting)])
+    const unscopedConflict = mergeBfaValidatedHistories(conflictingHistory)
+    await expect(validateBfaTransferConsignment(unscopedConflict, {
+      network: 0, isBitcoinTxConfirmed: async () => true,
+    })).rejects.toThrow('assignment spent more than once')
+    const scopedConflict = mergeBfaValidatedHistories(conflictingHistory, [leftOpId])
+    const scopedHistory = await validateBfaTransferConsignment(scopedConflict, {
+      network: 0, isBitcoinTxConfirmed: async () => true,
+    })
+    expect(scopedHistory.bundles).toHaveLength(1)
+    expect(scopedHistory.bundles[0]?.operationIds).toContain(leftOpId)
     const merged = mergeBfaValidatedHistories(await Promise.all([validate(left), validate(right)]))
     await expect(validateBfaTransferConsignment(merged, {
       network: 0,

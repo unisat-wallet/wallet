@@ -532,24 +532,27 @@ export function createLocalRgbProtocolEncoder(
       }
       const knownBlindSeals = input.validationHistory.knownBlindSeals || []
       const pendingWitnessTxid = selectedPendingWitnessTxid(input.selectedUtxos)
+      const requiredOperationIds = input.selectedUtxos.flatMap(utxo =>
+        utxo.allocations.map(allocation => allocation.opId || '')
+      )
       const evmRpcCache = new Map<string, Promise<unknown>>()
       const bitcoinStatusCache = new Map<string, Promise<boolean>>()
       const histories = await Promise.all(transfers.map(payload => validateBfa({
         wallet: input.wallet, payload, knownBlindSeals, evmRpcCache, bitcoinStatusCache,
         confirmedBitcoinWitnesses: input.validationHistory.confirmedBitcoinWitnesses,
+        requiredOperationIds,
         ...(pendingWitnessTxid ? { pendingWitnessTxid } : {}),
       })))
-      const merged = mergeBfaValidatedHistories(histories)
+      const merged = mergeBfaValidatedHistories(histories, requiredOperationIds)
       const history = await validateBfa({
         wallet: input.wallet, payload: merged, knownBlindSeals, evmRpcCache, bitcoinStatusCache,
         confirmedBitcoinWitnesses: input.validationHistory.confirmedBitcoinWitnesses,
+        requiredOperationIds,
         ...(pendingWitnessTxid ? { pendingWitnessTxid } : {}),
       })
       if (!isBfaSchemaId(hex(history.genesis.slice(2, 34))))
         throw new RgbServiceError('Only BFA assets can be burned')
-      const spendHistory = selectBfaSpendHistory(history, input.selectedUtxos.flatMap(utxo =>
-        utxo.allocations.map(allocation => allocation.opId || '')
-      ))
+      const spendHistory = selectBfaSpendHistory(history, requiredOperationIds)
       return prepareBfaBurn({
         wallet: input.wallet, assetId: input.request.assetId, amount: input.request.amount,
         ...(input.request.burnReason ? { burnReason: input.request.burnReason } : {}),
@@ -595,7 +598,7 @@ export function createLocalRgbProtocolEncoder(
           requiredOperationIds,
           ...(pendingWitnessTxid ? { pendingWitnessTxid } : {}),
         })))
-        const merged = mergeBfaValidatedHistories(checked)
+        const merged = mergeBfaValidatedHistories(checked, requiredOperationIds)
         const validated = await validateBfa({
           wallet: input.wallet, payload: merged, knownBlindSeals, evmRpcCache, bitcoinStatusCache, confirmedBitcoinWitnesses,
           requiredOperationIds,
