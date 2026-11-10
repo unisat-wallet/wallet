@@ -11,7 +11,7 @@ import {
   normalizeLegacyV1Consignment,
   unwrapRgbContractConsignment,
 } from '../src/protocol/bfa-consignment'
-import { createBfaValidationAttestationPayload, mergeBfaValidatedHistories, refreshPersistedBfaValidation, restoreAttestedBfaHistory, restoreValidatedBfaHistory, selectBfaSpendHistory, validateBfaTransferConsignment } from '../src/protocol/bfa-validator'
+import { bfaConsignmentAllocationOutpointHints, createBfaValidationAttestationPayload, mergeBfaValidatedHistories, refreshPersistedBfaValidation, restoreAttestedBfaHistory, restoreValidatedBfaHistory, selectBfaSpendHistory, validateBfaTransferConsignment } from '../src/protocol/bfa-validator'
 import { decodeRgbInvoice } from '../src/protocol/invoice'
 import { encodeRgbContractId } from '../src/protocol/contract-id'
 import { createLocalRgbProtocolEncoder } from '../src/protocol/local-bfa-encoder'
@@ -75,6 +75,14 @@ function fixture() {
 }
 
 describe('NIA v1 transfer', () => {
+  it('hints only exact terminal asset outpoints for snapshot repair', () => {
+    const { consignment, prepared, transaction } = fixture()
+
+    expect(bfaConsignmentAllocationOutpointHints(consignment, 0)).toEqual([
+      `${transaction.getId()}:${prepared.changeVout}`,
+    ])
+  })
+
   it('migrates a v0 NIA transfer without changing its asset, operation, or recipient', async () => {
     const { v0Consignment, consignment, prepared } = fixture()
     const migrated = convertNiaV0ConsignmentToV1(v0Consignment)

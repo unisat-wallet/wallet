@@ -32,7 +32,7 @@ import {
   v1TransferSchemaId,
 } from './protocol/bfa-consignment'
 import {
-  bfaConsignmentWitnessTxids,
+  bfaConsignmentAllocationOutpointHints,
   mergeBfaValidatedHistories,
   pruneConfirmedBfaWitnesses,
 } from './protocol/bfa-validator'
@@ -738,19 +738,20 @@ export class RgbService {
       ? 0 : state.wallet.network === 'testnet' ? 1 : state.wallet.network === 'testnet4' ? 2 : 3
     const live = snapshot.utxos.filter(utxo => utxo.chainStatus === 'confirmed')
     if (!live.length) return false
-    const receivedBlindOutpoints = new Set((state.receivedBlindSeals || [])
-      .map(seal => `${seal.txid}:${seal.vout}`))
+    const knownBlindSeals = this.getKnownBlindSeals()
     for (const [assetId, contract] of Object.entries(state.contracts || {})) {
       const payload = Uint8Array.from(Buffer.from(contract.history?.payload || contract.consignment, 'base64'))
-      let witnessTxids: Set<string>
+      let allocationOutpoints: Set<string>
       try {
         if (!isSupportedV1TransferConsignment(payload)) continue
-        witnessTxids = new Set(bfaConsignmentWitnessTxids(payload, network))
+        allocationOutpoints = new Set(
+          bfaConsignmentAllocationOutpointHints(payload, network, knownBlindSeals)
+        )
       } catch {
         continue
       }
       const candidates = live.filter(utxo =>
-        (witnessTxids.has(utxo.outpoint.txid) || receivedBlindOutpoints.has(outpointKey(utxo))) &&
+        allocationOutpoints.has(outpointKey(utxo)) &&
         !utxo.allocations.some(allocation => allocation.assetId === assetId)
       )
       if (!candidates.length) continue
@@ -763,7 +764,7 @@ export class RgbService {
         validated = await validate({
           wallet: state.wallet, payload,
           evmLogRequestLimit: 4,
-          knownBlindSeals: this.getKnownBlindSeals(),
+          knownBlindSeals,
           confirmedBitcoinWitnesses: state.confirmedBitcoinWitnesses ||= {},
         })
       } catch {

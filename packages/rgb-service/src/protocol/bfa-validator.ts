@@ -782,6 +782,39 @@ export function bfaConsignmentWitnessTxids(
 ): string[] {
   return parseConsignment(value, network).bundles.map(bundle => bundle.txid)
 }
+
+/**
+ * Cheap, non-authoritative terminal asset outpoint hints used only to avoid
+ * unnecessary repair validation. A positive match must still pass complete
+ * RGB, Bitcoin and EVM validation before the wallet grants an allocation.
+ */
+export function bfaConsignmentAllocationOutpointHints(
+  value: Uint8Array,
+  network: BfaValidationOptions['network'],
+  knownBlindSeals: RgbBlindSeal[] = []
+): string[] {
+  const disclosed = revealBfaConsignmentBlindSeals(value, network, knownBlindSeals)
+  const { genesis, bundles } = parseConsignment(disclosed, network)
+  const consumed = new Set(bundles.flatMap(bundle => bundle.operations)
+    .flatMap(operation => operation.inputs.map(input =>
+      `${input.opId}:${input.type}:${input.index}`
+    )))
+  const outpoints = new Set<string>()
+  for (const item of genesis.assignments) {
+    if (item.type !== OS_ASSET || consumed.has(`${genesis.id}:${item.type}:${item.index}`) ||
+      !item.seal?.txid || item.seal.vout < 0) continue
+    outpoints.add(`${item.seal.txid}:${item.seal.vout}`)
+  }
+  for (const bundle of bundles) for (const operation of bundle.operations) {
+    for (const item of operation.assignments) {
+      if (item.type !== OS_ASSET ||
+        consumed.has(`${operation.id}:${item.type}:${item.index}`) ||
+        !item.seal || item.seal.vout < 0) continue
+      outpoints.add(`${item.seal.txid ?? bundle.txid}:${item.seal.vout}`)
+    }
+  }
+  return [...outpoints]
+}
 function applyPatches(body: Uint8Array, patches: SealPatch[]): Uint8Array {
   if (!patches.length) return body
   const parts: Uint8Array[] = []
