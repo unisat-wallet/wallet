@@ -208,15 +208,6 @@ function allocationKey(
   ].join(':')
 }
 
-function getSpendableAmount(utxo: RgbUtxo, assetId: string) {
-  return utxo.allocations
-    .filter(
-      allocation => allocation.assetId === assetId && allocation.settled && allocation.spendable &&
-        allocation.historyAvailable !== false
-    )
-    .reduce((total, allocation) => total + BigInt(allocation.amount), 0n)
-}
-
 /** Deterministic bounded subset-sum selection for current-schema terminal burns. */
 function selectExactBurnUtxos(
   candidates: Array<{ utxo: RgbUtxo; amount: bigint }>,
@@ -2322,11 +2313,31 @@ export class RgbService {
         const operationIds = [...new Set(
           (match.assignments || [{ opId: match.opId }]).map(assignment => assignment.opId)
         )]
+        const recipientAllocations = (match.assignments || [{
+          opId: match.opId,
+          assignmentIndex: match.assignmentIndex,
+          txid: match.txid,
+          vout: match.vout,
+        }]).flatMap(assignment => {
+          const txid = assignment.txid || match.txid
+          const vout = assignment.vout ?? match.vout
+          const assignmentIndex = assignment.assignmentIndex ?? match.assignmentIndex
+          return typeof txid === 'string' && Number.isInteger(vout) &&
+            typeof assignment.opId === 'string' && Number.isInteger(assignmentIndex)
+            ? [{
+                outpoint: { txid: txid.toLowerCase(), vout },
+                opId: assignment.opId.toLowerCase(),
+                assignmentIndex,
+              }]
+            : []
+        })
         if (
           !receive.pendingAccept ||
           receive.pendingAccept.txid !== match.txid ||
           receive.pendingAccept.payload !== item.payload ||
           receive.pendingAccept.operationIds?.join(',') !== operationIds.join(',') ||
+          stableRecoveryJson(receive.pendingAccept.recipientAllocations || []) !==
+            stableRecoveryJson(recipientAllocations) ||
           receive.pendingAccept.precision !== precision ||
           receive.pendingAccept.batch !== item.batch
         ) {
@@ -2343,6 +2354,7 @@ export class RgbService {
             assetId: match.assetId,
             amount: match.amount,
             operationIds,
+            ...(recipientAllocations.length ? { recipientAllocations } : {}),
             precision,
             discoveredAt: receive.receivedConsignment?.receivedAt || this.now(),
             counterpartyScriptPubKeys: match.counterpartyScriptPubKeys,
@@ -2665,6 +2677,27 @@ export class RgbService {
           (refreshed.assignments || [{ opId: refreshed.opId }]).map(assignment => assignment.opId)
         )]
         receive.pendingAccept.operationIds = requiredOperationIds
+        const recipientAllocations = (refreshed.assignments || [{
+          opId: refreshed.opId,
+          assignmentIndex: refreshed.assignmentIndex,
+          txid: refreshed.txid,
+          vout: refreshed.vout,
+        }]).flatMap(assignment => {
+          const txid = assignment.txid || refreshed.txid
+          const vout = assignment.vout ?? refreshed.vout
+          const assignmentIndex = assignment.assignmentIndex ?? refreshed.assignmentIndex
+          return typeof txid === 'string' && Number.isInteger(vout) &&
+            typeof assignment.opId === 'string' && Number.isInteger(assignmentIndex)
+            ? [{
+                outpoint: { txid: txid.toLowerCase(), vout },
+                opId: assignment.opId.toLowerCase(),
+                assignmentIndex,
+              }]
+            : []
+        })
+        if (recipientAllocations.length) {
+          receive.pendingAccept.recipientAllocations = recipientAllocations
+        }
       }
       await this.preflightReceiveHistory(
         receive.pendingAccept.assetId,
@@ -3047,6 +3080,8 @@ export class RgbService {
         opId: assignment.opId,
         assignmentIndex: assignment.assignmentIndex,
         amount: assignment.amount,
+        txid: assignment.txid,
+        vout: assignment.vout,
       })),
       signedRawTx: bfa.bundles.find(bundle => bundle.id === candidate.bundleId)?.signedRawTx,
       counterpartyScriptPubKeys: bfa.witnessOutputScripts,
@@ -4067,6 +4102,9 @@ export class RgbService {
     const amounts = new Map<string, { settled: bigint; spendable: bigint; pending: bigint; incomingPending: bigint; locked: bigint }>()
     for (const utxo of activeUtxos) {
       for (const allocation of utxo.allocations) {
+        // A rejected Donation assignment is not wallet balance. Match the
+        // exact recipient assignment so a self-transfer's change remains.
+        if (this.isRejectedAllocation(utxo.outpoint, allocation)) continue
         // The sender's old allocation and the self-transfer outputs may both
         // appear in an asynchronously refreshed snapshot. Count only one side.
         if (selfTransferOutputsStillInSource.has(`${normalizeAssetId(allocation.assetId)}:${utxo.outpoint.txid}`)) continue
@@ -4227,10 +4265,10 @@ export class RgbService {
               ...allocation,
               localHistoryAvailable: Boolean(allocation.opId) &&
                 this.localHistoryCoversAllocations(allocation.assetId, [allocation.opId!]),
-              discardable: this.isRejectedAllocation(allocation) ||
+              discardable: this.isRejectedAllocation(utxo.outpoint, allocation) ||
                 !allocation.opId ||
                 !this.localHistoryCoversAllocations(allocation.assetId, [allocation.opId]),
-              rejected: this.isRejectedAllocation(allocation),
+              rejected: this.isRejectedAllocation(utxo.outpoint, allocation),
             })),
         })),
       },
@@ -4253,15 +4291,43 @@ export class RgbService {
     }
   }
 
-  private isRejectedAllocation(allocation: import('./types').RgbAllocation) {
-    if (!allocation.opId) return false
+  private isRejectedAllocation(
+    outpoint: RgbOutpoint,
+    allocation: import('./types').RgbAllocation
+  ) {
+    if (!allocation.opId || allocation.assignmentIndex === undefined) return false
+    const state = this.requireState()
     const assetId = normalizeAssetId(allocation.assetId)
     const opId = allocation.opId.toLowerCase()
-    return (this.requireState().pendingReceives || []).some(receive => {
-      const rejectedAssetId = receive.pendingAccept?.assetId || receive.assetId
-      return !!receive.rejection && !!rejectedAssetId &&
-        normalizeAssetId(rejectedAssetId) === assetId &&
-        receive.pendingAccept?.operationIds?.some(operationId => operationId.toLowerCase() === opId)
+    const outpointId = `${outpoint.txid.toLowerCase()}:${outpoint.vout}`
+    const carrier = state.snapshot.utxos.find(utxo =>
+      outpointKey(utxo).toLowerCase() === outpointId
+    )
+    return (state.pendingReceives || []).some(receive => {
+      const pending = receive.pendingAccept
+      const rejectedAssetId = pending?.assetId || receive.assetId
+      if (!receive.rejection || !pending || !rejectedAssetId ||
+        normalizeAssetId(rejectedAssetId) !== assetId) return false
+      if (pending.recipientAllocations?.length) {
+        return pending.recipientAllocations.some(recipient =>
+          `${recipient.outpoint.txid.toLowerCase()}:${recipient.outpoint.vout}` === outpointId &&
+          recipient.opId.toLowerCase() === opId &&
+          recipient.assignmentIndex === allocation.assignmentIndex
+        )
+      }
+      // Older checkpoints only retained operation IDs. Recover the exact
+      // destination from the invoice seal/script; never fall back to matching
+      // every assignment in the transition because that includes self-change.
+      if (!pending.operationIds?.some(operationId => operationId.toLowerCase() === opId)) {
+        return false
+      }
+      if (receive.seal) {
+        return `${receive.seal.txid.toLowerCase()}:${receive.seal.vout}` === outpointId
+      }
+      return receive.recipientType === 'witness' &&
+        pending.txid.toLowerCase() === outpoint.txid.toLowerCase() &&
+        !!receive.witnessScriptPubKey &&
+        carrier?.scriptPubKey.toLowerCase() === receive.witnessScriptPubKey.toLowerCase()
     })
   }
 
@@ -4329,13 +4395,14 @@ export class RgbService {
     const allocation = matches[0]!
     const localHistoryAvailable = Boolean(allocation.opId) &&
       this.localHistoryCoversAllocations(allocation.assetId, [allocation.opId!])
-    if (!this.isRejectedAllocation(allocation) && localHistoryAvailable) {
+    const rejected = this.isRejectedAllocation(utxo.outpoint, allocation)
+    if (!rejected && localHistoryAvailable) {
       throw new RgbServiceError('A valid RGB allocation cannot be removed from the UTXO view')
     }
     const result = await this.discardAllocations([{
       outpoint: utxo.outpoint,
       allocation,
-      reason: 'manual',
+      reason: rejected ? 'rejected_receive' : 'manual',
     }])
     return {
       ...result,
@@ -5897,11 +5964,15 @@ export class RgbService {
       .map(utxo => {
         const assetAllocations = utxo.allocations.filter(allocation =>
           allocation.assetId === assetId && allocation.settled && allocation.spendable &&
-            allocation.historyAvailable !== false
+            allocation.historyAvailable !== false &&
+            !this.isRejectedAllocation(utxo.outpoint, allocation)
         )
         return {
           utxo,
-          amount: getSpendableAmount(utxo, assetId),
+          amount: assetAllocations.reduce(
+            (total, allocation) => total + BigInt(allocation.amount),
+            0n
+          ),
           // Prefer carriers already covered by the encrypted canonical DAG.
           // A replica can retain an old allocation after its receive history
           // was lost; spending a different proved carrier is safe, while
@@ -5965,7 +6036,7 @@ export class RgbService {
     const candidates = selectedUtxos.flatMap(utxo => utxo.allocations
       .filter(allocation =>
         normalizeAssetId(allocation.assetId) !== normalizedTarget &&
-        this.isRejectedAllocation(allocation)
+        this.isRejectedAllocation(utxo.outpoint, allocation)
       )
       .map(allocation => ({
         outpoint: utxo.outpoint,

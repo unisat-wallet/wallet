@@ -356,6 +356,12 @@ export interface RgbPendingReceive {
     amount: string
     /** Operations paying this invoice; used to scope mutable witness checks to this receive branch. */
     operationIds?: string[]
+    /** Exact assignments paying this invoice; distinguishes them from sender change in self-transfers. */
+    recipientAllocations?: Array<{
+      outpoint: RgbOutpoint
+      opId: string
+      assignmentIndex: number
+    }>
     /** Contract precision decoded from the validated consignment. */
     precision?: number
     discoveredAt: number
