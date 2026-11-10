@@ -3543,6 +3543,11 @@
   "rgb_accept_transfer": {
     "message": "接受"
   },
+  "rgb_proxy": { "message": "代理服務" },
+  "rgb_proxy_id": { "message": "代理 ID" },
+  "rgb_proxy_protocol_version": { "message": "代理協議版本" },
+  "rgb_proxy_server_version": { "message": "代理服務端版本" },
+  "rgb_proxy_endpoint": { "message": "代理端點" },
   "rgb_pending_acceptances": { "message": "待接受轉帳" },
   "rgb_pending_acceptance_summary": { "message": "有轉帳正在等待你的處理" },
   "rgb_view_all_pending": { "message": "查看全部" },

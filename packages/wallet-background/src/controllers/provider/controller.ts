@@ -942,6 +942,17 @@ class ProviderController extends BaseController {
   webRgbGetInfo = async () => {
     const feature = await wallet.getRgbFeatureStatus()
     const ready = feature.enabled && feature.supported
+    const proxyConfig = ready ? await wallet.getRgbReceiveProxyConfig() : undefined
+    const proxyProfiles = (proxyConfig?.profiles || [])
+      .filter(profile => profile.selectable !== false)
+      .map(profile => ({
+        id: profile.id,
+        name: profile.name,
+        endpoint: profile.endpoint,
+        ...(profile.protocolVersion ? { protocolVersion: profile.protocolVersion } : {}),
+        ...(profile.serverVersion ? { serverVersion: profile.serverVersion } : {}),
+        recommended: profile.id === proxyConfig?.defaultProxyId,
+      }))
     return {
       ready,
       network: ready ? (await wallet.getCurrentRgbWalletRef()).network : wallet.getChainType(),
@@ -951,7 +962,11 @@ class ProviderController extends BaseController {
           'getAssetBalance', 'sendAsset', 'burnAsset', 'getConsignment', 'listTransfers', 'getTransferStatus',
           'decodeRgbInvoice', 'on', 'off']
         : ['enable', 'getInfo'],
-      ...(ready ? { burnRecipientNamespaces: ['eip155', 'tron'] } : {}),
+      ...(ready ? {
+        burnRecipientNamespaces: ['eip155', 'tron'],
+        proxyProfiles,
+        ...(proxyConfig?.defaultProxyId ? { defaultProxyId: proxyConfig.defaultProxyId } : {}),
+      } : {}),
     }
   }
 
@@ -1194,12 +1209,32 @@ class ProviderController extends BaseController {
     }
   }
 
-  @Reflect.metadata('APPROVAL', ['RgbReceive'])
+  @Reflect.metadata('APPROVAL', ['RgbReceive', async req => {
+    const params = req.data.params as {
+      proxyId?: string
+      proxyProfile?: unknown
+    }
+    delete params.proxyProfile
+    const config = await wallet.getRgbReceiveProxyConfig()
+    const selectedId = params.proxyId || config.defaultProxyId
+    if (!selectedId) return
+    const profile = config.profiles.find(item => item.id === selectedId && item.selectable !== false)
+    if (!profile) webRgbInvalid('proxyId is invalid')
+    params.proxyId = profile.id
+    params.proxyProfile = {
+      id: profile.id,
+      name: profile.name,
+      endpoint: profile.endpoint,
+      ...(profile.protocolVersion ? { protocolVersion: profile.protocolVersion } : {}),
+      ...(profile.serverVersion ? { serverVersion: profile.serverVersion } : {}),
+      recommended: profile.id === config.defaultProxyId,
+    }
+  }])
   createRgbReceiveInvoice = async ({
     data: { params },
     session: { origin },
   }: {
-    data: { params: { assetId?: string; amount?: string; durationSeconds?: number; recipientType?: 'blind' | 'witness'; minConfirmations?: number; purpose?: 'buy_swap' } }
+    data: { params: { assetId?: string; amount?: string; durationSeconds?: number; recipientType?: 'blind' | 'witness'; minConfirmations?: number; purpose?: 'buy_swap'; proxyId?: string } }
     session: { origin: string }
   }) => {
     const receiveParams = {
@@ -1207,6 +1242,7 @@ class ProviderController extends BaseController {
       ...(params.amount === undefined ? {} : { amount: params.amount }),
       ...(params.durationSeconds === undefined ? {} : { durationSeconds: params.durationSeconds }),
       ...(params.minConfirmations === undefined ? {} : { minConfirmations: params.minConfirmations }),
+      ...(params.proxyId === undefined ? {} : { proxyId: params.proxyId }),
       ...(params.purpose === 'buy_swap' ? { acceptancePolicy: 'buy_swap_backend_commit' as const } : {}),
       providerOrigin: origin,
     }

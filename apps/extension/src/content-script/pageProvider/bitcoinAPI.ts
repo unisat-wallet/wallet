@@ -285,7 +285,7 @@ export class BitcoinAPIMethods {
     return this.provider[requestMethodKey]({ method: 'issueRgbNia', params });
   };
 
-  createRgbReceiveInvoice = async (params: { assetId?: string; amount?: string; durationSeconds?: number; recipientType?: 'blind' | 'witness'; minConfirmations?: number; purpose?: 'buy_swap' }) => {
+  createRgbReceiveInvoice = async (params: { assetId?: string; amount?: string; durationSeconds?: number; recipientType?: 'blind' | 'witness'; minConfirmations?: number; purpose?: 'buy_swap'; proxyId?: string }) => {
     return this.provider[requestMethodKey]({ method: 'createRgbReceiveInvoice', params });
   };
 

@@ -14,6 +14,25 @@ type RgbBurnAssetArgs = {
   minConfirmations?: number;
 };
 
+export type WebRgbProxyProfile = {
+  id: string;
+  name: string;
+  endpoint: string;
+  protocolVersion?: string;
+  serverVersion?: string;
+  recommended: boolean;
+};
+
+export type WebRgbInfo = {
+  ready: boolean;
+  network: string;
+  protocol: string | null;
+  methods: string[];
+  burnRecipientNamespaces?: string[];
+  proxyProfiles?: WebRgbProxyProfile[];
+  defaultProxyId?: string;
+};
+
 const MAX_U64_DECIMAL = '18446744073709551615';
 
 function isPositiveU64Decimal(value: unknown): value is string {
@@ -94,12 +113,12 @@ export class WebRgbProvider {
     catch (error) { throw normalizeError(error); }
   }
 
-  async #requireEnabled() {
+  async #requireEnabled(): Promise<WebRgbInfo> {
     if (!this.#connected) throw providerError('NOT_ENABLED', 'Call enable() before using WebRGB');
     try {
       const info = await this.#call('webRgbGetInfo');
       this.#capabilities = new Set(info.methods || []);
-      return info;
+      return info as WebRgbInfo;
     } catch (error) {
       if ((error as { code?: WebRgbCode }).code === 'NOT_ENABLED') {
         this.#connected = false;
@@ -116,7 +135,7 @@ export class WebRgbProvider {
     this.#capabilities = new Set(info.methods || []);
   };
 
-  getInfo = async () => {
+  getInfo = async (): Promise<WebRgbInfo> => {
     return this.#requireEnabled();
   };
 
@@ -133,6 +152,7 @@ export class WebRgbProvider {
 
   #receive = async (kind: 'blind' | 'witness', args: {
     assetId?: string; amount?: number; durationSeconds?: number; minConfirmations?: number;
+    proxyId?: string;
   } = {}) => {
     await this.#requireCapability(kind === 'blind' ? 'blindReceive' : 'witnessReceive');
     if (!args || typeof args !== 'object' || Array.isArray(args))
@@ -147,10 +167,14 @@ export class WebRgbProvider {
       throw providerError('INVALID_PARAMS', 'durationSeconds must be a positive integer');
     if (args.minConfirmations !== undefined && (!Number.isSafeInteger(args.minConfirmations) || args.minConfirmations < 0))
       throw providerError('INVALID_PARAMS', 'minConfirmations must be a nonnegative integer');
+    if (args.proxyId !== undefined &&
+        (typeof args.proxyId !== 'string' || !/^[a-zA-Z0-9][a-zA-Z0-9._-]{0,63}$/.test(args.proxyId)))
+      throw providerError('INVALID_PARAMS', 'proxyId is invalid');
     const result = await this.#call('createRgbReceiveInvoice', {
       ...(args.assetId ? { assetId: args.assetId } : {}),
       ...(args.amount === undefined ? {} : { amount: String(args.amount) }),
       ...(args.durationSeconds === undefined ? {} : { durationSeconds: args.durationSeconds }),
+      ...(args.proxyId === undefined ? {} : { proxyId: args.proxyId }),
       recipientType: kind,
       minConfirmations: Math.max(3, args.minConfirmations || 0)
     });
@@ -162,10 +186,10 @@ export class WebRgbProvider {
     };
   };
 
-  blindReceive = (args?: { assetId?: string; amount?: number; durationSeconds?: number; minConfirmations?: number }) =>
+  blindReceive = (args?: { assetId?: string; amount?: number; durationSeconds?: number; minConfirmations?: number; proxyId?: string }) =>
     this.#receive('blind', args);
 
-  witnessReceive = (args?: { assetId?: string; amount?: number; durationSeconds?: number; minConfirmations?: number }) =>
+  witnessReceive = (args?: { assetId?: string; amount?: number; durationSeconds?: number; minConfirmations?: number; proxyId?: string }) =>
     this.#receive('witness', args);
 
   listAssets = async () => {

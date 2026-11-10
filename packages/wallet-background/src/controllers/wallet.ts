@@ -4712,6 +4712,7 @@ export class WalletController extends BaseController {
     // a cached pre-approval lease create durable receive state after handoff.
     await this.ensureRgbWriteLease(context, { forceRenew: true })
     const { proxyId, ...request } = params
+    if (proxyId) await this.getRgbReceiveProxyConfig()
     const transportEndpoints = this.resolveRgbReceiveProxyEndpoints(proxyId)
     return this.rgbReceiveOperations.createBlindReceive({
       ...request,
@@ -4726,6 +4727,7 @@ export class WalletController extends BaseController {
     const funding = await this.getCurrentRgbFundingAccount()
     await this.assertActiveRgbWallet(context.wallet)
     const networkType = this.getNetworkType()
+    if (params.proxyId) await this.getRgbReceiveProxyConfig()
     const transportEndpoints = this.resolveRgbReceiveProxyEndpoints(params.proxyId)
     const scriptPubKey = bitcoin.address
       .toOutputScript(funding.address, toPsbtNetwork(networkType))

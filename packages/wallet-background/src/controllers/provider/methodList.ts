@@ -100,6 +100,7 @@ export type ProviderMethodList = {
     recipientType?: 'blind' | 'witness'
     minConfirmations?: number
     purpose?: 'buy_swap'
+    proxyId?: string
   }
   getRgbPendingReceives: undefined
   acceptRgbReceive: {

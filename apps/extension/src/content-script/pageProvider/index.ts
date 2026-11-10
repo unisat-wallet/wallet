@@ -22,7 +22,7 @@ export class UnisatProvider extends EventEmitter {
     getFeeUtxos: () => Promise<any>;
     getIssueAvailability: () => Promise<any>;
     issueNia: (params: { orderId: string; ticker: string; name: string; precision: number; amount: string; paymentTxid?: string }) => Promise<any>;
-    createReceiveInvoice: (params: { assetId?: string; amount?: string; durationSeconds?: number; recipientType?: 'blind' | 'witness'; minConfirmations?: number; purpose?: 'buy_swap' }) => Promise<any>;
+    createReceiveInvoice: (params: { assetId?: string; amount?: string; durationSeconds?: number; recipientType?: 'blind' | 'witness'; minConfirmations?: number; purpose?: 'buy_swap'; proxyId?: string }) => Promise<any>;
     getPendingReceives: () => Promise<any>;
     acceptReceive: (recipientId: string) => Promise<any>;
     rejectReceive: (recipientId: string) => Promise<any>;

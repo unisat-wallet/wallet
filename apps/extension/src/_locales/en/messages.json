@@ -3566,6 +3566,11 @@
   "rgb_accept_transfer": {
     "message": "Accept"
   },
+  "rgb_proxy": { "message": "Proxy" },
+  "rgb_proxy_id": { "message": "Proxy ID" },
+  "rgb_proxy_protocol_version": { "message": "Proxy protocol" },
+  "rgb_proxy_server_version": { "message": "Proxy server version" },
+  "rgb_proxy_endpoint": { "message": "Proxy endpoint" },
   "rgb_pending_acceptances": { "message": "Pending Acceptance" },
   "rgb_pending_acceptance_summary": { "message": "Transfers waiting for your review" },
   "rgb_view_all_pending": { "message": "View all" },

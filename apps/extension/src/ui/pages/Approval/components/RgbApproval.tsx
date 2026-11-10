@@ -34,6 +34,15 @@ interface Props {
       durationSeconds?: number;
       minConfirmations?: number;
       recipientType?: 'blind' | 'witness';
+      proxyId?: string;
+      proxyProfile?: {
+        id: string;
+        name: string;
+        endpoint: string;
+        protocolVersion?: string;
+        serverVersion?: string;
+        recommended?: boolean;
+      };
       ticker?: string;
       name?: string;
       precision?: number;
@@ -301,6 +310,28 @@ function RgbReceiveApproval({ data, session }: { data: Props['params']['data']; 
                 <RgbReceiveDetail label={t('rgb_approval_expiry')} value={expiry} />
                 {data.minConfirmations !== undefined ? (
                   <RgbReceiveDetail label={t('history_confirmations')} value={`≥ ${data.minConfirmations}`} />
+                ) : null}
+                {data.proxyProfile ? (
+                  <>
+                    <RgbReceiveDetail label={t('rgb_proxy')} value={data.proxyProfile.name} />
+                    <RgbReceiveDetail label={t('rgb_proxy_id')} value={data.proxyProfile.id} />
+                    {data.proxyProfile.protocolVersion ? (
+                      <RgbReceiveDetail
+                        label={t('rgb_proxy_protocol_version')}
+                        value={data.proxyProfile.protocolVersion}
+                      />
+                    ) : null}
+                    {data.proxyProfile.serverVersion ? (
+                      <RgbReceiveDetail
+                        label={t('rgb_proxy_server_version')}
+                        value={data.proxyProfile.serverVersion}
+                      />
+                    ) : null}
+                    <RgbReceiveDetail
+                      label={t('rgb_proxy_endpoint')}
+                      value={data.proxyProfile.endpoint}
+                    />
+                  </>
                 ) : null}
               </Column>
             </RgbApprovalAccordion>

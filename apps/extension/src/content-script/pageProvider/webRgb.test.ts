@@ -17,7 +17,12 @@ function createProvider(overrides: Record<string, any> = {}) {
       case 'getAccounts': return ['bc1qtest'];
       case 'webRgbGetInfo': return {
         ready: true, network: 'T0', protocol: 'RGB_L1', methods,
-        burnRecipientNamespaces: ['eip155', 'tron']
+        burnRecipientNamespaces: ['eip155', 'tron'],
+        proxyProfiles: [{
+          id: 'current', name: 'Proxy 0.4', endpoint: 'rpcs://proxy.example/v1',
+          protocolVersion: '1.0', serverVersion: '0.4.0', recommended: true
+        }],
+        defaultProxyId: 'current'
       };
       case 'webRgbGetAssetBalance': return { assetId: params?.assetId, balance: 20, raw: {} };
       default: throw new Error(`Unexpected method: ${method}`);
@@ -41,6 +46,10 @@ describe('WebRGB provider', () => {
     const info = await provider.getInfo();
     expect(info.methods).toEqual(expect.arrayContaining(['sendAsset', 'burnAsset', 'getConsignment']));
     expect(info.burnRecipientNamespaces).toEqual(['eip155', 'tron']);
+    expect(info.proxyProfiles).toEqual([expect.objectContaining({
+      id: 'current', protocolVersion: '1.0', serverVersion: '0.4.0', recommended: true
+    })]);
+    expect(info.defaultProxyId).toBe('current');
   });
 
   it('maps numeric wallet RPC codes to stable WebRGB codes', async () => {
@@ -87,11 +96,23 @@ describe('WebRGB provider', () => {
       createRgbReceiveInvoice: { invoice: 'rgb:invoice', recipientId: 'recipient' }
     });
     await provider.enable();
-    expect(await provider.blindReceive({ assetId: 'rgb:asset', amount: 5, minConfirmations: 1 }))
+    expect(await provider.blindReceive({
+      assetId: 'rgb:asset', amount: 5, minConfirmations: 1, proxyId: 'legacy'
+    }))
       .toMatchObject({ invoice: 'rgb:invoice', minConfirmations: 3 });
     expect(rpc).toHaveBeenCalledWith('createRgbReceiveInvoice', expect.objectContaining({
-      assetId: 'rgb:asset', amount: '5', minConfirmations: 3, recipientType: 'blind'
+      assetId: 'rgb:asset', amount: '5', minConfirmations: 3,
+      recipientType: 'blind', proxyId: 'legacy'
     }));
+  });
+
+  it('rejects an invalid receive proxy profile ID', async () => {
+    const { provider, rpc } = createProvider();
+    await provider.enable();
+
+    await expect(provider.witnessReceive({ proxyId: 'https://proxy.example' }))
+      .rejects.toMatchObject({ code: 'INVALID_PARAMS' });
+    expect(rpc).not.toHaveBeenCalledWith('createRgbReceiveInvoice', expect.anything());
   });
 
   it('does not sign an any-amount invoice without a supplied amount', async () => {

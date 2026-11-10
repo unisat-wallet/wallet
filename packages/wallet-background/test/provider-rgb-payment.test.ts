@@ -31,6 +31,7 @@ vi.mock('../src/controllers/wallet', () => ({
     getCurrentRgbWalletRef: vi.fn(),
     exportRgbBurnConsignment: vi.fn(),
     getRgbFeatureStatus: vi.fn(),
+    getRgbReceiveProxyConfig: vi.fn(),
     getChainType: vi.fn(),
     getCurrentAccount: vi.fn(),
     getNetworkType: vi.fn(),
@@ -48,6 +49,9 @@ import * as bitcoin from 'bitcoinjs-lib'
 describe('provider RGB payment ownership', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    vi.mocked(wallet.getRgbReceiveProxyConfig).mockResolvedValue({
+      profiles: [],
+    } as any)
   })
 
   it('requires wallet unlock for every account-bound RGB method', () => {
@@ -85,6 +89,25 @@ describe('provider RGB payment ownership', () => {
   it('advertises the WebRGB burn and proof routes with supported namespaces', async () => {
     vi.mocked(wallet.getRgbFeatureStatus).mockResolvedValue({ enabled: true, supported: true } as any)
     vi.mocked(wallet.getCurrentRgbWalletRef).mockResolvedValue({ network: 'T0' } as any)
+    vi.mocked(wallet.getRgbReceiveProxyConfig).mockResolvedValue({
+      profiles: [
+        {
+          id: 'legacy',
+          name: 'Proxy 0.3',
+          endpoint: 'rpcs://proxy.example/v1',
+          protocolVersion: '1.0',
+          serverVersion: '0.3.0',
+        },
+        {
+          id: 'current',
+          name: 'Proxy 0.4',
+          endpoint: 'rpcs://proxy.example/v0_4_0/v1',
+          protocolVersion: '1.0',
+          serverVersion: '0.4.0',
+        },
+      ],
+      defaultProxyId: 'current',
+    } as any)
 
     await expect(providerController.webRgbGetInfo()).resolves.toMatchObject({
       ready: true,
@@ -92,6 +115,15 @@ describe('provider RGB payment ownership', () => {
       protocol: 'RGB_L1',
       methods: expect.arrayContaining(['burnAsset', 'getConsignment']),
       burnRecipientNamespaces: ['eip155', 'tron'],
+      defaultProxyId: 'current',
+      proxyProfiles: [
+        expect.objectContaining({
+          id: 'legacy', protocolVersion: '1.0', serverVersion: '0.3.0', recommended: false,
+        }),
+        expect.objectContaining({
+          id: 'current', protocolVersion: '1.0', serverVersion: '0.4.0', recommended: true,
+        }),
+      ],
     })
   })
 
@@ -108,6 +140,75 @@ describe('provider RGB payment ownership', () => {
       assetId: 'rgb:asset',
       providerOrigin: 'https://dapp.example',
     })
+  })
+
+  it('resolves the trusted receive proxy profile before opening approval', async () => {
+    vi.mocked(wallet.getRgbReceiveProxyConfig).mockResolvedValue({
+      profiles: [
+        {
+          id: 'legacy',
+          name: 'Proxy 0.3',
+          endpoint: 'rpcs://proxy.example/v1',
+          protocolVersion: '1.0',
+          serverVersion: '0.3.0',
+        },
+        {
+          id: 'current',
+          name: 'Proxy 0.4',
+          endpoint: 'rpcs://proxy.example/v0_4_0/v1',
+          protocolVersion: '1.0',
+          serverVersion: '0.4.0',
+        },
+      ],
+      defaultProxyId: 'current',
+    } as any)
+    const approval = Reflect.getMetadata('APPROVAL', providerController, 'createRgbReceiveInvoice')
+    const request = {
+      data: {
+        params: {
+          proxyId: 'legacy',
+          proxyProfile: { id: 'forged', endpoint: 'rpcs://evil.example' },
+        },
+      },
+      session: { origin: 'https://dapp.example' },
+    }
+
+    await approval[1](request)
+
+    expect(request.data.params.proxyProfile).toEqual({
+      id: 'legacy',
+      name: 'Proxy 0.3',
+      endpoint: 'rpcs://proxy.example/v1',
+      protocolVersion: '1.0',
+      serverVersion: '0.3.0',
+      recommended: false,
+    })
+  })
+
+  it('pins the configured default proxy before opening receive approval', async () => {
+    vi.mocked(wallet.getRgbReceiveProxyConfig).mockResolvedValue({
+      profiles: [{
+        id: 'current',
+        name: 'Proxy 0.4',
+        endpoint: 'rpcs://proxy.example/v0_4_0/v1',
+        protocolVersion: '1.0',
+        serverVersion: '0.4.0',
+      }],
+      defaultProxyId: 'current',
+    } as any)
+    const approval = Reflect.getMetadata('APPROVAL', providerController, 'createRgbReceiveInvoice')
+    const request = {
+      data: { params: {} as Record<string, any> },
+      session: { origin: 'https://dapp.example' },
+    }
+
+    await approval[1](request)
+
+    expect(request.data.params.proxyId).toBe('current')
+    expect(request.data.params.proxyProfile).toEqual(expect.objectContaining({
+      id: 'current',
+      recommended: true,
+    }))
   })
 
   it('normalizes a numeric payment amount before approval and preparation', async () => {
@@ -218,13 +319,14 @@ describe('provider RGB payment ownership', () => {
     vi.mocked(wallet.createRgbBlindReceive).mockResolvedValue({ recipientId: 'recipient-1' } as any)
 
     await providerController.createRgbReceiveInvoice({
-      data: { params: { assetId: 'rgb:asset', amount: '1' } },
+      data: { params: { assetId: 'rgb:asset', amount: '1', proxyId: 'legacy' } },
       session: { origin: 'https://dapp.example' },
     })
 
     expect(wallet.createRgbBlindReceive).toHaveBeenCalledWith({
       assetId: 'rgb:asset',
       amount: '1',
+      proxyId: 'legacy',
       providerOrigin: 'https://dapp.example',
     })
   })
