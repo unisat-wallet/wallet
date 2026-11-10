@@ -166,6 +166,35 @@ function createDependencies(): RgbServiceDependencies {
 }
 
 describe('RgbService', () => {
+  it('uploads canonical history once and persists the content-addressed delivery cursor', async () => {
+    const dependencies = createDependencies()
+    dependencies.stateSource.storeValidationHistory = vi.fn(async (_wallet, fragment) => ({
+      stored: true as const,
+      payloadHash: fragment.payloadHash,
+    }))
+    const service = new RgbService(dependencies)
+    await service.open(wallet)
+    const state = (service as any).state
+    const assetId = 'rgb:AQEBAQEB-AQEBAQE-BAQEBAQ-EBAQEBA-QEBAQEB-AQEBAQE'
+    state.contracts = {}
+    state.contracts[assetId] = {
+      consignment: 'Y29udHJhY3Q=',
+      history: { payload: 'aGlzdG9yeQ==', opIds: ['a'.repeat(64)] },
+      createdAt: 1,
+    }
+
+    expect(service.getPendingHistoryFragments()).toEqual([
+      expect.objectContaining({ assetId, payload: 'aGlzdG9yeQ==', opIds: ['a'.repeat(64)] }),
+    ])
+    await expect(service.syncPendingHistoryFragments()).resolves.toBe(true)
+    await expect(service.syncPendingHistoryFragments()).resolves.toBe(false)
+    expect(dependencies.stateSource.storeValidationHistory).toHaveBeenCalledTimes(1)
+
+    const reopened = new RgbService(dependencies)
+    await reopened.open(wallet)
+    expect(reopened.getPendingHistoryFragments()).toEqual([])
+  })
+
   it('grants legacy witness blinding fallback only to proxy invoices migrated from old state', async () => {
     const dependencies = createDependencies()
     await dependencies.storage.set(

@@ -422,6 +422,21 @@ export interface RgbConsignmentPublishRequest {
   transportId?: string
 }
 
+/** Canonical wallet history uploaded once and deduplicated by its content hash. */
+export interface RgbHistoryFragmentStoreRequest {
+  wallet: RgbWalletRef
+  lease?: RgbWriteLeaseCredential
+  assetId: string
+  opIds: string[]
+  payloadHash: string
+  payload: string
+}
+
+export interface RgbHistoryFragmentStoreResult {
+  stored: true
+  payloadHash: string
+}
+
 /** Claim opaque consignments addressed to a locally generated recipient ID. */
 export interface RgbConsignmentClaimRequest {
   wallet: RgbWalletRef

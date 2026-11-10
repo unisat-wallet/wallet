@@ -469,6 +469,14 @@ type RgbControllerApiService = {
     assetId: string
     consignments: Array<{ opId: string; payload: string }>
   }>
+  storeRgbHistoryFragment: (params: {
+    wallet: RgbWalletRef
+    lease?: RgbControllerWriteLeaseCredential
+    assetId: string
+    opIds: string[]
+    payloadHash: string
+    payload: string
+  }) => Promise<{ stored: true; payloadHash: string }>
   publishRgbConsignment: (params: {
     wallet: RgbWalletRef
     lease?: RgbControllerWriteLeaseCredential

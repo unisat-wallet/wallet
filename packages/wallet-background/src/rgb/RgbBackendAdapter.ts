@@ -53,6 +53,14 @@ export type RgbBackendApi = {
       assignmentType: number
     }>
   }) => Promise<RgbValidationHistory>
+  storeRgbHistoryFragment?: (params: {
+    wallet: RgbWalletRef
+    lease?: RgbActiveWriteLease
+    assetId: string
+    opIds: string[]
+    payloadHash: string
+    payload: string
+  }) => Promise<{ stored: true; payloadHash: string }>
   syncRgbTransfer: (params: {
     wallet: RgbWalletRef
     lease?: RgbActiveWriteLease
@@ -187,6 +195,23 @@ export function createRgbBackendAdapter(
           assignmentType: allocation.assignmentType,
         })),
       }),
+    ...(api.storeRgbHistoryFragment
+      ? {
+          storeValidationHistory: async (wallet: RgbWalletRef, fragment: {
+            assetId: string
+            opIds: string[]
+            payloadHash: string
+            payload: string
+          }) => {
+            const lease = dependencies.getActiveWriteLease(wallet)
+            return api.storeRgbHistoryFragment!({
+              wallet,
+              ...(lease ? { lease } : {}),
+              ...fragment,
+            })
+          },
+        }
+      : {}),
     syncBroadcast: async (wallet, transferId, transfer, snapshot, metadata) => {
       const lease = dependencies.getActiveWriteLease(wallet)
       await api.syncRgbTransfer({

@@ -5,6 +5,28 @@ import { normalizeRgbAssetId, normalizeRgbAssetRecord } from '../src/services/rg
 import { ApiClientError } from '../src/utils/errors'
 
 describe('RgbService', () => {
+  it('stores a content-addressed RGB history fragment through the authenticated endpoint', async () => {
+    const response = { stored: true, payloadHash: 'a'.repeat(64) }
+    const httpClient = { post: vi.fn().mockResolvedValue(response), get: vi.fn() }
+    const service = new RgbService(httpClient as any)
+    service.setRequestAuthenticator(vi.fn().mockResolvedValue({
+      fundingAddress: 'bc1p-funding', nonce: 'b'.repeat(32), expiresAt: 1, signature: 'signature',
+    }))
+    const params = {
+      wallet: { fundingAddress: 'bc1p-funding', network: 'mainnet' as const },
+      assetId: 'rgb:asset',
+      opIds: ['c'.repeat(64)],
+      payloadHash: 'a'.repeat(64),
+      payload: 'aGlzdG9yeQ==',
+    }
+
+    await expect(service.storeRgbHistoryFragment(params)).resolves.toEqual(response)
+    expect(httpClient.post).toHaveBeenCalledWith('/v5/rgb/history/fragments', {
+      ...params,
+      auth: expect.objectContaining({ fundingAddress: params.wallet.fundingAddress }),
+    })
+  })
+
   it('reports and polls RGB receive validation review through authenticated endpoints', async () => {
     const httpClient = { post: vi.fn()
       .mockResolvedValueOnce({ caseId: 'c'.repeat(64), status: 'under_review' })

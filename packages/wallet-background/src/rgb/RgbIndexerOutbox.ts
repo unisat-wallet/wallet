@@ -41,6 +41,12 @@ export class RgbIndexerOutbox {
 
   private async syncOnce(service: RgbService, wallet: LocalRgbWallet): Promise<boolean> {
     let synced = true
+    try {
+      await service.syncPendingHistoryFragments?.()
+    } catch (error) {
+      synced = false
+      this.dependencies.warn('Failed to sync canonical RGB history', error)
+    }
     for (const item of service.getPendingAssetMetadata?.() || []) {
       try {
         await this.dependencies.syncAssetMetadata(item, wallet)

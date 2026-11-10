@@ -528,6 +528,8 @@ export interface RgbServiceState {
   confirmedBitcoinWitnesses?: Record<string, { checkedAt: number; confirmations: number }>
   /** Local-only send summaries; remote recovery always validates again. */
   validatedV1SendHistories?: Record<string, import('./protocol/bfa-validator').CachedValidatedBfaHistory>
+  /** Local delivery cursors for content-addressed canonical history uploads. */
+  syncedHistoryFragments?: Record<string, string>
   pending: Record<string, RgbPendingTransfer>
   pendingReceives?: RgbPendingReceive[]
   /**
@@ -615,6 +617,10 @@ export interface RgbStateSource {
       }>
     }
   ): Promise<RgbValidationHistory>
+  storeValidationHistory?(
+    wallet: RgbWalletRef,
+    fragment: { assetId: string; opIds: string[]; payloadHash: string; payload: string }
+  ): Promise<{ stored: true; payloadHash: string }>
   syncBroadcast?(
     wallet: RgbWalletRef,
     transferId: string,

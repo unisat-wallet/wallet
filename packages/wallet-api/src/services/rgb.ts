@@ -24,6 +24,8 @@ import type {
   RgbClaimedConsignmentsResult,
   RgbConsignmentHistoryRequest,
   RgbConsignmentHistoryResult,
+  RgbHistoryFragmentStoreRequest,
+  RgbHistoryFragmentStoreResult,
   RgbConsignmentValidationRequest,
   RgbConsignmentValidationResult,
   RgbReceiveValidationFailureReportRequest,
@@ -370,6 +372,12 @@ export class RgbService {
       ...params,
       assetId: normalizeRgbAssetId(params.assetId),
     })
+  }
+
+  async storeRgbHistoryFragment(
+    params: RgbHistoryFragmentStoreRequest
+  ): Promise<RgbHistoryFragmentStoreResult> {
+    return this.privatePost('/v5/rgb/history/fragments', params)
   }
 
   /** Associate an opaque transport payload with a local RGB funding address. */

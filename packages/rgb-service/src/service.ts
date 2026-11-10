@@ -1,4 +1,4 @@
-import { Transaction } from 'bitcoinjs-lib'
+import { crypto as bitcoinCrypto, Transaction } from 'bitcoinjs-lib'
 import {
   RgbBfaValidationUnavailableError,
   RgbInvoiceUnavailableError,
@@ -86,6 +86,10 @@ const PROVIDER_ORIGIN_HISTORY_TTL_MS = 24 * 60 * 60 * 1000
 const MAX_RECOVERY_HISTORY_PAYLOAD_LENGTH = 48_000_000
 const MAX_RECOVERY_HISTORY_OPERATION_IDS = 65_535
 const MAX_EXACT_BURN_SELECTION_STATES = 100_000
+
+function canonicalHistoryHash(payload: string) {
+  return bitcoinCrypto.sha256(Buffer.from(payload, 'base64')).toString('hex')
+}
 
 class RgbExactBurnSelectionError extends RgbServiceError {}
 
@@ -1428,6 +1432,36 @@ export class RgbService {
 
   getPendingUtxoSync() {
     return this.requireState().pendingUtxoSync
+  }
+
+  getPendingHistoryFragments() {
+    const state = this.requireState()
+    const synced = state.syncedHistoryFragments || {}
+    return Object.entries(state.contracts || {}).flatMap(([assetId, contract]) => {
+      const history = contract.history
+      if (!history?.payload || !history.opIds.length) return []
+      const payloadHash = canonicalHistoryHash(history.payload)
+      if (synced[assetId] === payloadHash) return []
+      return [{ assetId, opIds: history.opIds, payloadHash, payload: history.payload }]
+    })
+  }
+
+  async syncPendingHistoryFragments() {
+    const store = this.dependencies.stateSource.storeValidationHistory
+    if (!store) return false
+    const state = this.requireState()
+    let changed = false
+    for (const fragment of this.getPendingHistoryFragments()) {
+      const result = await store(state.wallet, fragment)
+      if (result.payloadHash !== fragment.payloadHash) {
+        throw new RgbServiceError('RGB history fragment hash was not acknowledged')
+      }
+      const synced = state.syncedHistoryFragments ||= {}
+      synced[fragment.assetId] = fragment.payloadHash
+      changed = true
+    }
+    if (changed) await this.persist({ skipRecovery: true })
+    return changed
   }
 
   getPendingIssues() {
@@ -5056,6 +5090,7 @@ export class RgbService {
       .filter(([transferId]) => !onlyTransferId || transferId === onlyTransferId)
     for (const [transferId, item] of entries) {
       try {
+        await this.syncPendingHistoryFragments()
         await syncBroadcast(state.wallet, transferId, item.completed, state.snapshot, {
           assetId: item.assetId,
           amount: item.amount,
@@ -5894,6 +5929,7 @@ function recoverySnapshot(state: ReturnType<typeof persistState>) {
     recoveryConflict: _recoveryConflict,
     confirmedBitcoinWitnesses: _confirmedBitcoinWitnesses,
     validatedV1SendHistories: _validatedV1SendHistories,
+    syncedHistoryFragments: _syncedHistoryFragments,
     pending,
     pendingSendHistory,
     pendingBroadcastSyncs: _pendingBroadcastSyncs,
