@@ -2661,7 +2661,7 @@ export class RgbService {
       reason: rejectionReason,
     }
     await this.persistWithRecoveryRollback(rollback)
-    return { rejected: true }
+    return { rejected: true, rejectionReason }
   }
 
   /**

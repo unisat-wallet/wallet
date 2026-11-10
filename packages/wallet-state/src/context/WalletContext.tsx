@@ -907,6 +907,7 @@ export interface WalletController {
 
   rejectRgbReceive(params: { recipientId: string }): Promise<{
     rejected: boolean
+    rejectionReason?: string
     [key: string]: any
   }>
 

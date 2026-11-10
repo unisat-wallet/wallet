@@ -165,7 +165,10 @@ describe('useRGBTransferDetailLogic', () => {
     const { wrapper, wallet } = createHookTestHarness({
       routeState: { transferId: 'recipient-id', initialTransfer: pendingReceive },
     })
-    wallet.rejectRgbReceive.mockResolvedValue({ rejected: true })
+    wallet.rejectRgbReceive.mockResolvedValue({
+      rejected: true,
+      rejectionReason: 'Rejected by you',
+    })
 
     const { result } = renderHook(() => useRGBTransferDetailLogic(), { wrapper })
 
@@ -176,6 +179,7 @@ describe('useRGBTransferDetailLogic', () => {
 
     expect(wallet.rejectRgbReceive).toHaveBeenCalledWith({ recipientId: 'recipient-id' })
     expect(result.current.transfer?.status).toBe('rejected')
+    expect(result.current.transfer?.rejectionReason).toBe('Rejected by you')
   })
 
   it('retries a failed send broadcast using the persisted transfer ID', async () => {

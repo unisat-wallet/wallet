@@ -251,7 +251,12 @@ export function useRGBTransferDetailLogic() {
       const result = await wallet.rejectRgbReceive({ recipientId })
       if (!result?.rejected) throw new Error(t('rgb_reject_transfer_failed'))
       tools.toastSuccess(t('rgb_reject_transfer_success'))
-      setTransfer(current => (current ? { ...current, status: 'rejected', local: true } : current))
+      setTransfer(current => (current ? {
+        ...current,
+        status: 'rejected',
+        local: true,
+        ...(result.rejectionReason ? { rejectionReason: result.rejectionReason } : {}),
+      } : current))
       return true
     } catch (e: unknown) {
       const message = getTransferActionErrorMessage(e, t('rgb_reject_transfer_failed'))

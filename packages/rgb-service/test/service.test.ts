@@ -2594,7 +2594,10 @@ describe('RgbService', () => {
       },
     }]
 
-    await expect(service.rejectReceive('recipient')).resolves.toEqual({ rejected: true })
+    await expect(service.rejectReceive('recipient')).resolves.toEqual({
+      rejected: true,
+      rejectionReason: 'Discarded locally by you without notifying the sender after validation failed: No matching blind assignment was found',
+    })
 
     expect(dependencies.transport.acknowledgeConsignment).not.toHaveBeenCalled()
     expect(service.getPendingReceives()).toEqual([
@@ -6326,7 +6329,10 @@ describe('RgbService', () => {
       },
     ]
 
-    await expect(service.rejectReceive('recipient')).resolves.toEqual({ rejected: true })
+    await expect(service.rejectReceive('recipient')).resolves.toEqual({
+      rejected: true,
+      rejectionReason: 'Rejected by you',
+    })
 
     expect(dependencies.transport.acknowledgeConsignment).toHaveBeenCalledWith(expect.objectContaining({
       recipientId: 'recipient',
@@ -6660,7 +6666,10 @@ describe('RgbService', () => {
       },
     }]
 
-    await expect(service.rejectReceive('recipient')).resolves.toEqual({ rejected: true })
+    await expect(service.rejectReceive('recipient')).resolves.toEqual({
+      rejected: true,
+      rejectionReason: 'Rejected by you',
+    })
     const validate = vi.spyOn(service as any, 'validateIncomingConsignment')
     await service.processClaimedReceives({ includeClaimed: false })
 
