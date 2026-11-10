@@ -1563,7 +1563,9 @@ describe('RgbService', () => {
 
     await expect(service.restoreRecoveryState(recovery)).resolves.toBe(true)
     await service.setRecoveryCheckpointRevision('a'.repeat(24))
+    ;(service as any).state.snapshot.revision = 7
     expect(service.matchesRecoveryState(recovery)).toBe(true)
+    expect(service.exportRecoveryState().snapshot).not.toHaveProperty('revision')
     expect(
       service.matchesRecoveryState({
         ...recovery,

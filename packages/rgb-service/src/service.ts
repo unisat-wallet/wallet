@@ -5861,8 +5861,14 @@ function recoverySnapshot(state: ReturnType<typeof persistState>) {
     pendingBroadcastSyncs: _pendingBroadcastSyncs,
     ...snapshot
   } = state
+  const {
+    revision: _snapshotRevision,
+    unchanged: _snapshotUnchanged,
+    ...recoverableWalletSnapshot
+  } = snapshot.snapshot
   return {
     ...snapshot,
+    snapshot: recoverableWalletSnapshot,
     ...(snapshot.pendingReceives
       ? {
           pendingReceives: snapshot.pendingReceives.map(receive => {
@@ -5912,15 +5918,20 @@ function stableRecoveryJson(value: unknown): string {
     .join(',')}}`
 }
 
-/** Snapshot polling timestamps are local freshness metadata, not wallet state. */
+/** Snapshot polling cursors are local freshness metadata, not wallet state. */
 function comparableRecoveryState(value: unknown) {
   if (!value || typeof value !== 'object') return value
   const state = value as Record<string, unknown>
   const snapshot = state['snapshot']
   if (!snapshot || typeof snapshot !== 'object') return value
+  const {
+    revision: _revision,
+    unchanged: _unchanged,
+    ...comparableSnapshot
+  } = snapshot as Record<string, unknown>
   return {
     ...state,
-    snapshot: { ...(snapshot as Record<string, unknown>), syncedAt: 0 },
+    snapshot: { ...comparableSnapshot, syncedAt: 0 },
   }
 }
 
