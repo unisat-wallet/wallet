@@ -724,6 +724,9 @@ export class RgbService {
         remote.chainStatus !== 'pending_spend' &&
         local.scriptPubKey === remote.scriptPubKey && local.satoshis === remote.satoshis &&
         local.allocations.some(allocation => {
+          // A user-confirmed discard is an intentional local deletion, not an
+          // eventually-consistent indexer omission that should be restored.
+          if (discardedAllocations.has(allocationKey(local.outpoint, allocation))) return false
           const candidate = remote.allocations.find(candidate =>
             candidate.opId === allocation.opId &&
             candidate.assignmentIndex === allocation.assignmentIndex &&
@@ -901,10 +904,22 @@ export class RgbService {
 
   /** Preserve only the locally queued transaction outputs while refreshing unrelated assets. */
   private mergePendingUtxoSync(snapshot: RgbWalletSnapshot) {
-    const pending = this.requireState().pendingUtxoSync
+    const state = this.requireState()
+    const pending = state.pendingUtxoSync
     if (!pending) return
+    const discardedAllocations = new Set(
+      (state.discardedAllocations || []).map(item => allocationKey(item.outpoint, item))
+    )
     const remoteByOutpoint = new Map(snapshot.utxos.map(utxo => [outpointKey(utxo), utxo]))
-    for (const local of pending.outpoints) {
+    for (const pendingLocal of pending.outpoints) {
+      const local = discardedAllocations.size
+        ? {
+            ...pendingLocal,
+            allocations: pendingLocal.allocations.filter(allocation =>
+              !discardedAllocations.has(allocationKey(pendingLocal.outpoint, allocation))
+            ),
+          }
+        : pendingLocal
       if (local.outpoint.txid !== pending.txid) continue
       const key = outpointKey(local)
       const remote = remoteByOutpoint.get(key)
@@ -4177,6 +4192,9 @@ export class RgbService {
    */
   getUtxoInspection() {
     const state = this.requireState()
+    const discardedAllocations = new Set(
+      (state.discardedAllocations || []).map(item => allocationKey(item.outpoint, item))
+    )
     const assetMetadata = Object.fromEntries(
       [
         ...new Set(
@@ -4201,15 +4219,19 @@ export class RgbService {
         ...state.snapshot,
         utxos: state.snapshot.utxos.map(utxo => ({
           ...utxo,
-          allocations: utxo.allocations.map(allocation => ({
-            ...allocation,
-            localHistoryAvailable: Boolean(allocation.opId) &&
-              this.localHistoryCoversAllocations(allocation.assetId, [allocation.opId!]),
-            discardable: this.isRejectedAllocation(allocation) ||
-              !allocation.opId ||
-              !this.localHistoryCoversAllocations(allocation.assetId, [allocation.opId]),
-            rejected: this.isRejectedAllocation(allocation),
-          })),
+          allocations: utxo.allocations
+            .filter(allocation =>
+              !discardedAllocations.has(allocationKey(utxo.outpoint, allocation))
+            )
+            .map(allocation => ({
+              ...allocation,
+              localHistoryAvailable: Boolean(allocation.opId) &&
+                this.localHistoryCoversAllocations(allocation.assetId, [allocation.opId!]),
+              discardable: this.isRejectedAllocation(allocation) ||
+                !allocation.opId ||
+                !this.localHistoryCoversAllocations(allocation.assetId, [allocation.opId]),
+              rejected: this.isRejectedAllocation(allocation),
+            })),
         })),
       },
       assetMetadata,
@@ -6647,6 +6669,21 @@ function normalizeStateAssetIds(state: RgbServiceState): RgbServiceState {
       outpoint: { ...item.outpoint, txid: item.outpoint.txid.toLowerCase() },
       ...(item.opId ? { opId: item.opId.toLowerCase() } : {}),
     }))
+    const discardedAllocations = new Set(
+      state.discardedAllocations.map(item => allocationKey(item.outpoint, item))
+    )
+    const removeDiscarded = (utxos: RgbUtxo[]) => utxos.map(utxo => ({
+      ...utxo,
+      allocations: utxo.allocations.filter(allocation =>
+        !discardedAllocations.has(allocationKey(utxo.outpoint, allocation))
+      ),
+    }))
+    // Recovery checkpoints and an older pending indexer outbox may still
+    // contain the pre-discard snapshot. Tombstones are authoritative.
+    state.snapshot.utxos = removeDiscarded(state.snapshot.utxos)
+    if (state.pendingUtxoSync) {
+      state.pendingUtxoSync.outpoints = removeDiscarded(state.pendingUtxoSync.outpoints)
+    }
   }
   if (state.burnProofs) {
     for (const proof of Object.values(state.burnProofs)) {

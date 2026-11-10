@@ -4013,6 +4013,43 @@ describe('RgbService', () => {
     expect(state.snapshot.utxos[0].allocations).toEqual([])
   })
 
+  it('does not display or restore a tombstoned allocation from a stale local snapshot', async () => {
+    const dependencies = createDependencies()
+    const assetId = 'rgb:AQEBAQEB-AQEBAQE-BAQEBAQ-EBAQEBA-QEBAQEB-AQEBAQE'
+    const allocation = { assetId, amount: '10', settled: true, spendable: true,
+      opId: '1'.repeat(64), assignmentIndex: 0, assignmentType: 4000 }
+    const utxo = {
+      outpoint: { txid: 'a'.repeat(64), vout: 0 },
+      satoshis: 1_000,
+      scriptPubKey: `5120${'11'.repeat(32)}`,
+      publicKey: `02${'22'.repeat(32)}`,
+      chainStatus: 'confirmed' as const,
+      confirmations: 1,
+      allocations: [allocation],
+    }
+    vi.mocked(dependencies.stateSource.getSnapshot).mockResolvedValue({
+      syncedAt: 2,
+      utxos: [{ ...utxo, allocations: [] }],
+    })
+    const service = new RgbService(dependencies)
+    await service.open(wallet)
+    const state = (service as any).state
+    state.snapshot = { syncedAt: 1, utxos: [utxo] }
+    state.discardedAllocations = [{
+      outpoint: utxo.outpoint,
+      assetId,
+      opId: allocation.opId,
+      assignmentIndex: allocation.assignmentIndex,
+      discardedAt: 1,
+      reason: 'manual',
+    }]
+
+    expect(service.getUtxoInspection().snapshot.utxos[0].allocations).toEqual([])
+    await service.sync()
+    expect(state.snapshot.utxos[0].allocations).toEqual([])
+    expect(state.pendingUtxoSync).toBeUndefined()
+  })
+
   it('does not count hidden expired invoices against active receive capacity', async () => {
     const dependencies = createDependencies()
     dependencies.now = () => 2_000_000
