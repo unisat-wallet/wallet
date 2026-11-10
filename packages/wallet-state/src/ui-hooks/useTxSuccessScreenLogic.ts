@@ -2,7 +2,7 @@ import { useI18n, useNavigation, useTools } from 'src/context'
 
 export function useTxSuccessScreenLogic() {
   const nav = useNavigation()
-  const { txid } = nav.getRouteState<'TxSuccessScreen'>()
+  const { txid, returnTo } = nav.getRouteState<'TxSuccessScreen'>()
   const { t } = useI18n()
   const tools = useTools()
 
@@ -11,7 +11,7 @@ export function useTxSuccessScreenLogic() {
   }
 
   const onClickDone = () => {
-    nav.navigate('MainScreen')
+    nav.navigate(returnTo === 'assets' ? 'AssetsTabScreen' : 'MainScreen')
   }
 
   const onClickCopy = () => {

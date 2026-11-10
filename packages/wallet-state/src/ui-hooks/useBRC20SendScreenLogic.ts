@@ -209,7 +209,7 @@ export function useBRC20SendScreenLogicStep2({
           outputValue: getAddressUtxoDust(contextData.receiver),
           enableRBF: contextData.enableRBF,
         })
-        nav.navigate('TxConfirmScreen', { toSignData })
+        nav.navigate('TxConfirmScreen', { toSignData, successReturnTo: 'assets' })
       } else {
         const toSignData = await prepareSendOrdinalsInscriptions({
           toAddressInfo: { address: contextData.receiver, domain: '' },
@@ -217,7 +217,7 @@ export function useBRC20SendScreenLogicStep2({
           feeRate: feeRateBar.feeRate,
           enableRBF: contextData.enableRBF,
         })
-        nav.navigate('TxConfirmScreen', { toSignData })
+        nav.navigate('TxConfirmScreen', { toSignData, successReturnTo: 'assets' })
       }
 
       // updateContextData({ tabKey: TabKey.STEP3, rawTxInfo: txInfo });
@@ -267,7 +267,7 @@ export function useBRC20SendScreenLogicStep3({
 
       const { success, txid, error } = await pushOrdinalsTx(txData)
       if (success) {
-        nav.navigate('TxSuccessScreen', { txid })
+        nav.navigate('TxSuccessScreen', { txid, returnTo: 'assets' })
       } else {
         throw new Error(error)
       }

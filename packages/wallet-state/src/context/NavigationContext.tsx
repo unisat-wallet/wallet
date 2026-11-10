@@ -236,9 +236,11 @@ export type RouteParamList = {
   // TX
   TxConfirmScreen: {
     toSignData: ToSignData
+    successReturnTo?: 'home' | 'assets'
   }
   TxSuccessScreen: {
     txid: string
+    returnTo?: 'home' | 'assets'
   }
   TxFailScreen: {
     error: string

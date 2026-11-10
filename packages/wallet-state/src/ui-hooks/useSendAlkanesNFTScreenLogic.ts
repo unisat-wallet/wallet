@@ -110,7 +110,7 @@ export function useSendAlkanesNFTScreenLogic() {
     try {
       const { success, txid, error } = await pushBitcoinTx(signedDatas[0].psbtHex)
       if (success) {
-        nav.navigate('TxSuccessScreen', { txid })
+        nav.navigate('TxSuccessScreen', { txid, returnTo: 'assets' })
       } else {
         throw new Error(error)
       }

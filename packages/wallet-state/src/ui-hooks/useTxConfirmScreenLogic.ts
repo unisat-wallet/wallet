@@ -5,7 +5,7 @@ import { usePushBitcoinTxCallback } from 'src/hooks'
 export function useTxConfirmScreenLogic() {
   const { t } = useI18n()
   const nav = useNavigation()
-  const { toSignData } = nav.getRouteState<'TxConfirmScreen'>()
+  const { toSignData, successReturnTo } = nav.getRouteState<'TxConfirmScreen'>()
   const pushBitcoinTx = usePushBitcoinTxCallback()
 
   const signPsbtParams: SignPsbtParams = {
@@ -26,7 +26,7 @@ export function useTxConfirmScreenLogic() {
     try {
       const { success, txid, error } = await pushBitcoinTx(signedDatas[0].psbtHex)
       if (success) {
-        nav.navigate('TxSuccessScreen', { txid })
+        nav.navigate('TxSuccessScreen', { txid, returnTo: successReturnTo })
       } else {
         throw new Error(error)
       }

@@ -87,7 +87,7 @@ export function useSplitOrdinalsInscriptionScreenLogic() {
 
     createSplitTx({ inscriptionId: inscription.inscriptionId, feeRate, outputValue, enableRBF })
       .then(toSignData => {
-        nav.navigate('TxConfirmScreen', { toSignData })
+        nav.navigate('TxConfirmScreen', { toSignData, successReturnTo: 'assets' })
       })
       .catch(e => {
         console.log(e)

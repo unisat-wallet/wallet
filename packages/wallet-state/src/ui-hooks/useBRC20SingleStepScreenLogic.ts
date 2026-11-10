@@ -170,7 +170,7 @@ export function useBRC20SingleStepScreenLogic() {
         orderId: transferData.current.id,
         revealTx: signPsbtResult[0].psbtHex,
       })
-      nav.navigate('TxSuccessScreen', { txid: step3.txid })
+      nav.navigate('TxSuccessScreen', { txid: step3.txid, returnTo: 'assets' })
     } catch (e) {
       nav.navigate('TxFailScreen', { error: (e as any).message })
     } finally {
