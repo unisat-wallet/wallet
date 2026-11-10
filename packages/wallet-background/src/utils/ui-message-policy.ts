@@ -155,6 +155,7 @@ const UI_CONTROLLER_METHODS = new Set([
   'getRgbProxyApprovalRequirement',
   'getRgbRecoveryCheckpointStatus',
   'getRgbTransfers',
+  'getRgbActivityPollingState',
   'getRgbUtxoInspection',
   'getRgbWriteLeaseStatus',
   'getRunesList',

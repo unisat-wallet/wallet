@@ -83,6 +83,28 @@ export interface RgbAddressActivityQuery extends RgbPageQuery {
   type?: RgbActivityType
 }
 
+export interface RgbActivityStatusRequest {
+  wallet: RgbWalletRef
+  activities: Array<{ id?: string; txid?: string }>
+}
+
+export interface RgbActivityStatusItem {
+  id: string
+  assetId?: string
+  type: RgbActivityType
+  txid?: string
+  amount?: string
+  createdAt?: number
+  status?: string
+  confirmations?: number
+  confirmationHeight?: number
+  rejectionReason?: string
+}
+
+export interface RgbActivityStatusResult {
+  list: RgbActivityStatusItem[]
+}
+
 export interface RgbWalletRef {
   walletId?: string
   /**

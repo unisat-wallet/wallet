@@ -12,6 +12,17 @@ import { normalizeConfiguredRgbUsdt } from '../utils/rgb-usdt'
 
 const rgbAssetDetailCache = new Map<string, RgbAssetDetail>()
 const rgbTransferListCache = new Map<string, { list: RgbTransferItem[]; total: number }>()
+const FAST_POLL_DURATION = 60_000
+const MEDIUM_POLL_DURATION = 5 * 60_000
+const FAST_POLL_INTERVAL = 10_000
+const MEDIUM_POLL_INTERVAL = 30_000
+const SLOW_POLL_INTERVAL = 60_000
+
+function getPollingInterval(elapsed: number): number {
+  if (elapsed < FAST_POLL_DURATION) return FAST_POLL_INTERVAL
+  if (elapsed < MEDIUM_POLL_DURATION) return MEDIUM_POLL_INTERVAL
+  return SLOW_POLL_INTERVAL
+}
 
 function isInProgress(item: RgbTransferItem) {
   if (
@@ -33,7 +44,14 @@ export function useRGBTransfersLogic({
   enabled = true,
   initialFullSync = false,
   pollingEnabled = true,
-}: { enabled?: boolean; initialFullSync?: boolean; pollingEnabled?: boolean } = {}) {
+  foreground = true,
+}: {
+  enabled?: boolean
+  initialFullSync?: boolean
+  pollingEnabled?: boolean
+  /** A visible activity surface always loads history; hidden global queues first inspect local state. */
+  foreground?: boolean
+} = {}) {
   const wallet = useWallet()
   const currentKeyring = useCurrentKeyring()
   const currentAccount = useCurrentAccount()
@@ -44,13 +62,25 @@ export function useRGBTransfersLogic({
   const [pendingReceivePoll, setPendingReceivePoll] = useState<{ key: string; pending: boolean }>()
   const skipSyncRef = useRef(!initialFullSync)
   const requestFullSyncRef = useRef(false)
+  const pollingStartedAtRef = useRef<number>()
 
   const fetchTransfers = useCallback(
     async (page: number, pageSize: number) => {
       if (!enabled) return Promise.resolve({ currentPage: page, pageSize, total: 0, list: [] })
+      if (!foreground) {
+        const { hasPendingActivity } = await wallet.getRgbActivityPollingState()
+        if (!hasPendingActivity) {
+          setPendingReceivePoll({ key: cacheKey, pending: false })
+          if (page === 1) setLoadedCacheKey(cacheKey)
+          return { currentPage: page, pageSize, total: 0, list: [] }
+        }
+      }
       const skipSync = skipSyncRef.current
       skipSyncRef.current = true
-      const result = await wallet.getRgbTransfers(page, pageSize, { skipSync })
+      const result = await wallet.getRgbTransfers(page, pageSize, {
+        skipSync,
+        ...(foreground ? {} : { statusOnly: true }),
+      })
       if (skipSync && page === 1) requestFullSyncRef.current = true
       if (page === 1) {
         // An invoice has no transfer row until its consignment is discovered.
@@ -100,7 +130,7 @@ export function useRGBTransfersLogic({
         }),
       }
     },
-    [cacheKey, configuredUsdtAssetId, enabled, wallet]
+    [cacheKey, configuredUsdtAssetId, enabled, foreground, wallet]
   )
   const {
     data: items,
@@ -117,6 +147,7 @@ export function useRGBTransfersLogic({
       currentAccount?.key,
       currentAccount?.address,
       enabled,
+      foreground,
     ],
   })
   const cached = rgbTransferListCache.get(cacheKey)
@@ -143,12 +174,23 @@ export function useRGBTransfersLogic({
   }, [enabled, items, loading, onRefresh])
 
   useEffect(() => {
-    if (!pollingEnabled || (!hasInProgressTransfer && !hasPendingReceiveInvoice)) return undefined
-    const intervalId = setInterval(() => {
-      skipSyncRef.current = false
-      onRefresh()
-    }, 10_000)
-    return () => clearInterval(intervalId)
+    if (!pollingEnabled || (!hasInProgressTransfer && !hasPendingReceiveInvoice)) {
+      pollingStartedAtRef.current = undefined
+      return undefined
+    }
+    const startedAt = pollingStartedAtRef.current ?? Date.now()
+    pollingStartedAtRef.current = startedAt
+    let timeoutId: ReturnType<typeof setTimeout>
+    const schedulePoll = () => {
+      const delay = getPollingInterval(Date.now() - startedAt)
+      timeoutId = setTimeout(() => {
+        skipSyncRef.current = false
+        onRefresh()
+        schedulePoll()
+      }, delay)
+    }
+    schedulePoll()
+    return () => clearTimeout(timeoutId)
   }, [hasInProgressTransfer, hasPendingReceiveInvoice, onRefresh, pollingEnabled])
 
   return {

@@ -57,7 +57,7 @@ describe('useRGBTransfersLogic', () => {
         list: [{ ...confirmingReceive, status: 'pending_accept' }],
         total: 1,
       })
-    const intervalSpy = vi.spyOn(globalThis, 'setInterval')
+    const timeoutSpy = vi.spyOn(globalThis, 'setTimeout')
 
     try {
       const { result, unmount } = renderHook(
@@ -66,15 +66,15 @@ describe('useRGBTransfersLogic', () => {
       )
       await waitFor(() => expect(result.current.isCurrentAccountLoaded).toBe(true))
       await waitFor(() => expect(result.current.loading).toBe(false))
-      await waitFor(() => expect(intervalSpy).toHaveBeenCalledWith(expect.any(Function), 10_000))
+      await waitFor(() => expect(timeoutSpy).toHaveBeenCalledWith(expect.any(Function), 10_000))
 
-      const poll = intervalSpy.mock.calls.find(([, interval]) => interval === 10_000)?.[0]
+      const poll = timeoutSpy.mock.calls.find(([, interval]) => interval === 10_000)?.[0]
       expect(poll).toBeTypeOf('function')
       act(() => (poll as () => void)())
       await waitFor(() => expect(result.current.items[0]?.status).toBe('pending_accept'))
       unmount()
     } finally {
-      intervalSpy.mockRestore()
+      timeoutSpy.mockRestore()
     }
   })
 
@@ -102,7 +102,7 @@ describe('useRGBTransfersLogic', () => {
       list: [{ ...confirmingReceive, assetId: 'rgb:history-no-poll' }],
       total: 1,
     })
-    const intervalSpy = vi.spyOn(globalThis, 'setInterval')
+    const timeoutSpy = vi.spyOn(globalThis, 'setTimeout')
 
     try {
       const { result } = renderHook(
@@ -114,10 +114,45 @@ describe('useRGBTransfersLogic', () => {
       await waitFor(() => expect(result.current.loading).toBe(false))
       expect(wallet.getRgbTransfers).toHaveBeenCalledTimes(1)
       expect(wallet.getRgbTransfers).toHaveBeenCalledWith(1, 20, { skipSync: false })
-      expect(intervalSpy).not.toHaveBeenCalledWith(expect.any(Function), 10_000)
+      expect(timeoutSpy).not.toHaveBeenCalledWith(expect.any(Function), 10_000)
     } finally {
-      intervalSpy.mockRestore()
+      timeoutSpy.mockRestore()
     }
+  })
+
+  it('skips remote address activity for a hidden global queue with no local pending work', async () => {
+    const { wrapper, wallet } = createHookTestHarness()
+
+    const { result } = renderHook(
+      () => useRGBTransfersLogic({ foreground: false }),
+      { wrapper }
+    )
+
+    await waitFor(() => expect(result.current.isCurrentAccountLoaded).toBe(true))
+    expect(wallet.getRgbActivityPollingState).toHaveBeenCalledTimes(1)
+    expect(wallet.getRgbTransfers).not.toHaveBeenCalled()
+  })
+
+  it('loads remote activity for a hidden global queue when local work is pending', async () => {
+    const { wrapper, wallet } = createHookTestHarness()
+    wallet.getRgbActivityPollingState.mockResolvedValue({ hasPendingActivity: true })
+    wallet.getRgbTransfers.mockResolvedValue({ list: [confirmingReceive], total: 1 })
+
+    const { result } = renderHook(
+      () => useRGBTransfersLogic({
+        foreground: false,
+        initialFullSync: true,
+        pollingEnabled: false,
+      }),
+      { wrapper }
+    )
+
+    await waitFor(() => expect(result.current.items).toHaveLength(1))
+    expect(wallet.getRgbTransfers).toHaveBeenCalledTimes(1)
+    expect(wallet.getRgbTransfers).toHaveBeenCalledWith(1, 20, {
+      skipSync: false,
+      statusOnly: true,
+    })
   })
 
   it('attaches the asset precision needed to display atomic transfer amounts', async () => {

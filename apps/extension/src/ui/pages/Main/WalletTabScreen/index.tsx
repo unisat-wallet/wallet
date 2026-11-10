@@ -385,7 +385,11 @@ export default function WalletTabScreen({
   // particular, a sender can press Done before its self-transfer consignment
   // reaches the proxy; the assets screen must then take over polling from the
   // transfer-detail screen without waiting for another navigation or focus.
-  const rgbTransfers = useRGBTransfersLogic({ enabled: isRgbActive, initialFullSync: true });
+  const rgbTransfers = useRGBTransfersLogic({
+    enabled: isRgbActive,
+    initialFullSync: true,
+    foreground: screen === 'assets'
+  });
   const [broadcastQueue, setBroadcastQueue] = useState<{
     contextKey: string;
     activeId?: string;

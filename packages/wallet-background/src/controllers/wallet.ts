@@ -308,6 +308,10 @@ type RgbControllerApiService = {
       type?: RgbActivityType
     }
   ) => Promise<RgbControllerPageResponse>
+  getRgbActivityStatuses: (params: {
+    wallet: RgbWalletRef
+    activities: Array<{ id?: string; txid?: string }>
+  }) => Promise<{ list: RgbRemoteActivity[] }>
   createBlindReceiveInvoice: (params: RgbReceiveInvoiceRequest) => Promise<unknown>
   createWitnessReceiveInvoice: (params: RgbReceiveInvoiceRequest) => Promise<unknown>
   getPendingReceiveInvoices: (
@@ -1176,6 +1180,27 @@ export class WalletController extends BaseController {
             scope?.type as RgbActivityType | undefined
           )
       return { total: result.total, list: result.list as RgbRemoteActivity[] }
+    },
+    getRemoteActivityStatuses: async (wallet, references) => {
+      if (!references.length) return { total: 0, list: [] }
+      try {
+        const result = await getRgbApiService().getRgbActivityStatuses({
+          wallet,
+          activities: references,
+        })
+        return { total: result.list.length, list: result.list }
+      } catch (error) {
+        // During a rolling deployment, retain the old page query only when
+        // the new endpoint is not available. Network/auth errors must not
+        // trigger a second large request.
+        if (!this.isRgbActivityStatusUnsupported(error)) throw error
+        const result = await this.getAddressRgbActivity(
+          wallet.fundingAddress,
+          1,
+          20
+        )
+        return { total: result.total, list: result.list as RgbRemoteActivity[] }
+      }
     },
     warn: (message, error) => log.warn(message, error),
   })
@@ -4116,12 +4141,7 @@ export class WalletController extends BaseController {
     if (params.address !== wallet.fundingAddress) return page
 
     const issueHistory = service.getIssueHistory?.() || []
-    // Activity is not currently persisted for local issuance. Read the UTXO
-    // replica directly so this display follows the latest genesis chain state
-    // without synchronizing or mutating the encrypted local RGB snapshot.
-    const latestSnapshot = await getRgbApiService()
-      .getRgbWalletUtxoSnapshot({ wallet, forceSync: true })
-      .catch(() => undefined)
+    if (!issueHistory.length) return page
     const issueByAssetId = new Map(issueHistory.map(issue => [issue.assetId, issue]))
     const pageList = page.list.map(item => {
       const remote = item as { assetId?: string; type?: string; txid?: string }
@@ -4132,11 +4152,6 @@ export class WalletController extends BaseController {
     const localIssues = issueHistory
       .filter(issue => !params.assetId || issue.assetId === params.assetId)
       .map(issue => {
-        const latestChainStatus = latestSnapshot?.utxos.find(
-          utxo =>
-            utxo.txid === issue.txid &&
-            utxo.allocations.some(allocation => allocation.assetId === issue.assetId)
-        )?.chainStatus
         return {
           id: `local-issue:${issue.assetId}`,
           assetId: issue.assetId,
@@ -4144,7 +4159,10 @@ export class WalletController extends BaseController {
           amount: issue.amount,
           txid: issue.issuanceTxid ?? issue.txid,
           timestamp: issue.createdAt,
-          status: rgbIssueActivityStatus(latestChainStatus ?? issue.chainStatus),
+          // RgbService.getIssueHistory derives this status from its locally
+          // synchronized snapshot. Activity reads must not bypass the wallet
+          // coordinator and force another full backend snapshot request.
+          status: rgbIssueActivityStatus(issue.chainStatus),
           ticker: issue.asset.ticker,
           name: issue.asset.name,
           precision: issue.asset.precision,
@@ -4180,10 +4198,38 @@ export class WalletController extends BaseController {
   getRgbTransfers = async (
     currentPage: number,
     pageSize: number,
-    options?: { skipSync?: boolean; assetId?: string; type?: RgbActivityType }
+    options?: {
+      skipSync?: boolean
+      assetId?: string
+      type?: RgbActivityType
+      statusOnly?: boolean
+    }
   ) => {
     await this.assertRgbEnabled()
     return this.rgbTransferQuery.getTransfers(currentPage, pageSize, options)
+  }
+
+  /** Cheap local preflight used to avoid downloading address activity while no work is pending. */
+  getRgbActivityPollingState = async () => {
+    await this.assertRgbEnabled()
+    await this.assertRgbFeatureEnabled()
+    const { service } = await this.getLocalRgbReadService()
+    const terminalStatuses = new Set([
+      'settled',
+      'confirmed',
+      'failed',
+      'rejected',
+      'canceled',
+      'cancelled',
+    ])
+    const isPending = (status: unknown) =>
+      !terminalStatuses.has(String(status || '').toLowerCase())
+    const hasPendingActivity =
+      service.getPendingTransfers().length > 0 ||
+      service.getPendingReceives().some(receive => !receive.rejection) ||
+      (service.getPendingSendHistory?.() || []).some(item => isPending(item.status)) ||
+      (service.getPendingReceiveHistory?.() || []).some(item => isPending(item.status))
+    return { hasPendingActivity }
   }
 
   /** RGB activation is local to this installation and scoped to the HD wallet and network. */
@@ -6148,6 +6194,19 @@ export class WalletController extends BaseController {
 
   /** Prefer the lightweight control record while retaining old-backend compatibility. */
   private isRgbRecoveryMetadataUnsupported(error: unknown) {
+    const candidate = error as {
+      status?: unknown
+      details?: { status?: unknown }
+    }
+    const status = candidate?.status ?? candidate?.details?.status
+    return (
+      status === 404 ||
+      status === 405 ||
+      /(?:http\s*)?(?:404|405)|not found|method not allowed/i.test(String(error))
+    )
+  }
+
+  private isRgbActivityStatusUnsupported(error: unknown) {
     const candidate = error as {
       status?: unknown
       details?: { status?: unknown }

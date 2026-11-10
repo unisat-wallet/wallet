@@ -55,6 +55,27 @@ describe('RgbService', () => {
     )
   })
 
+  it('fetches exact RGB activity statuses through the authenticated endpoint', async () => {
+    const response = {
+      list: [{ id: 'transfer-1', txid: 'b'.repeat(64), type: 'send', status: 'confirmed' }],
+    }
+    const httpClient = { post: vi.fn().mockResolvedValue(response), get: vi.fn() }
+    const service = new RgbService(httpClient as any)
+    service.setRequestAuthenticator(vi.fn().mockResolvedValue({
+      fundingAddress: 'bc1p-funding', nonce: 'a'.repeat(32), expiresAt: 1, signature: 'signature',
+    }))
+    const params = {
+      wallet: { fundingAddress: 'bc1p-funding', network: 'mainnet' as const },
+      activities: [{ id: 'transfer-1', txid: 'b'.repeat(64) }],
+    }
+
+    await expect(service.getRgbActivityStatuses(params)).resolves.toEqual(response)
+    expect(httpClient.post).toHaveBeenCalledWith('/v5/rgb/activity/status', {
+      ...params,
+      auth: expect.objectContaining({ fundingAddress: 'bc1p-funding' }),
+    })
+  })
+
   it('reports a broadcast RGB burn through the authenticated API', async () => {
     const httpClient = { post: vi.fn().mockResolvedValue({ recorded: true, txid: 'b'.repeat(64) }), get: vi.fn() }
     const service = new RgbService(httpClient as any)

@@ -3110,7 +3110,7 @@ describe('RGB wallet references', () => {
     ])
   })
 
-  it('uses the latest genesis UTXO state when merging local issuance into activity', async () => {
+  it('uses the locally synchronized genesis state without fetching another snapshot', async () => {
     const wallet = new WalletController()
     vi.spyOn(wallet as any, 'assertRgbEnabled').mockImplementation(() => undefined)
     const walletRef = { fundingAddress: 'bc1p-rgb-funding', network: 'mainnet', walletId: 'rgb-wallet' }
@@ -3124,7 +3124,7 @@ describe('RGB wallet references', () => {
           txid: 'd'.repeat(64),
           createdAt: 100,
           asset: { ticker: 'ISS', name: 'Issued', precision: 0, schema: 'NIA', issuedSupply: '42' },
-          chainStatus: 'mempool',
+          chainStatus: 'confirmed',
         },
       ]),
     }
@@ -3154,6 +3154,7 @@ describe('RGB wallet references', () => {
       total: 1,
       list: [{ id: 'local-issue:rgb:issued', type: 'issue', amount: '42', txid: 'e'.repeat(64), status: 'confirmed' }],
     })
+    expect((walletApiService as any).rgb.getRgbWalletUtxoSnapshot).not.toHaveBeenCalled()
   })
 
   it('does not advance pending RGB transfers when this device cannot renew the writer lease', async () => {
@@ -3171,6 +3172,29 @@ describe('RGB wallet references', () => {
 
     expect(ensureLease).toHaveBeenCalledWith(context, { forceRenew: true })
     expect(service.syncPendingTransfers).not.toHaveBeenCalled()
+  })
+
+  it('checks local RGB state before polling remote activity', async () => {
+    const wallet = new WalletController()
+    const pendingTransfers: unknown[] = []
+    const service = {
+      getPendingTransfers: vi.fn(() => pendingTransfers),
+      getPendingReceives: vi.fn(() => []),
+      getPendingSendHistory: vi.fn(() => []),
+      getPendingReceiveHistory: vi.fn(() => []),
+    }
+    vi.spyOn(wallet as any, 'assertRgbEnabled').mockImplementation(() => undefined)
+    vi.spyOn(wallet as any, 'assertRgbFeatureEnabled').mockResolvedValue(undefined)
+    vi.spyOn(wallet as any, 'getLocalRgbReadService').mockResolvedValue({ service })
+
+    await expect(wallet.getRgbActivityPollingState()).resolves.toEqual({
+      hasPendingActivity: false,
+    })
+
+    pendingTransfers.push({ id: 'pending-transfer' })
+    await expect(wallet.getRgbActivityPollingState()).resolves.toEqual({
+      hasPendingActivity: true,
+    })
   })
 
   it('can list RGB transfers without waiting for pending-transfer sync', async () => {

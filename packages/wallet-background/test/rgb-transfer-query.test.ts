@@ -49,6 +49,50 @@ describe('RgbTransferQuery', () => {
     expect(result.total).toBe(2)
   })
 
+  it('polls exact pending activity statuses without downloading an address page', async () => {
+    const txid = 'c'.repeat(64)
+    const service = {
+      getPendingTransfers: vi.fn().mockReturnValue([{
+        id: 'transfer-1',
+        request: { assetId: 'rgb:asset', amount: '1', precision: 0 },
+        prepared: { lockedOutpoints: [] },
+        delivery: { completed: { txid } },
+        createdAt: 1,
+      }]),
+      getPendingSendHistory: vi.fn().mockReturnValue([]),
+      getIssueHistory: vi.fn().mockReturnValue([]),
+      getPendingReceiveHistory: vi.fn().mockReturnValue([]),
+      getPendingReceives: vi.fn().mockReturnValue([]),
+      getSnapshot: vi.fn().mockReturnValue({ utxos: [] }),
+      getLocalAssetDetail: vi.fn().mockReturnValue({}),
+    }
+    const context = {
+      service,
+      wallet: { walletId: 'wallet', fundingAddress: 'funding', network: 'mainnet' },
+    }
+    const getRemoteActivity = vi.fn()
+    const getRemoteActivityStatuses = vi.fn().mockResolvedValue({
+      total: 1,
+      list: [{
+        id: 'transfer-1', assetId: 'rgb:asset', type: 'send', amount: '1',
+        txid, status: 'confirmed', createdAt: 1,
+      }],
+    })
+    const query = new RgbTransferQuery({
+      getContext: vi.fn().mockResolvedValue(context as never),
+      syncReceiveHistory: vi.fn(), syncPendingTransfers: vi.fn(),
+      syncReceivedAllocations: vi.fn().mockResolvedValue(context as never),
+      getRemoteActivity, getRemoteActivityStatuses, warn: vi.fn(),
+    })
+
+    await query.getTransfers(1, 20, { skipSync: true, statusOnly: true })
+
+    expect(getRemoteActivity).not.toHaveBeenCalled()
+    expect(getRemoteActivityStatuses).toHaveBeenCalledWith(context.wallet, [
+      { id: 'transfer-1', txid },
+    ])
+  })
+
   it('does not label a non-batch ACK recovery as waiting for other recipients', async () => {
     const service = {
       getPendingTransfers: vi.fn().mockReturnValue([]),

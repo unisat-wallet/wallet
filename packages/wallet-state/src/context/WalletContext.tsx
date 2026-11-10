@@ -676,8 +676,15 @@ export interface WalletController {
   getRgbTransfers(
     currentPage: number,
     pageSize: number,
-    options?: { skipSync?: boolean; assetId?: string; type?: RgbActivityType }
+    options?: {
+      skipSync?: boolean
+      assetId?: string
+      type?: RgbActivityType
+      statusOnly?: boolean
+    }
   ): Promise<{ currentPage: number; pageSize: number; total: number; list: RgbTransferItem[] }>
+
+  getRgbActivityPollingState(): Promise<{ hasPendingActivity: boolean }>
 
   createRgbBlindReceive(params: {
     assetId?: string

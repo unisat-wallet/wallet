@@ -42,6 +42,10 @@ type RgbTransferQueryDependencies = {
     pageSize: number,
     scope?: { assetId?: string; type?: string }
   ) => Promise<{ total: number; list: RgbRemoteActivity[] }>
+  getRemoteActivityStatuses?: (
+    wallet: LocalRgbServiceContext['wallet'],
+    references: Array<{ id?: string; txid?: string }>
+  ) => Promise<{ total: number; list: RgbRemoteActivity[] }>
   warn: (message: string, error: unknown) => void
 }
 
@@ -111,11 +115,46 @@ export class RgbTransferQuery {
     })
   }
 
+  private pendingActivityReferences(service: RgbService) {
+    const references = new Map<string, { id?: string; txid?: string }>()
+    const add = (id?: string, txid?: string) => {
+      if (!id && !txid) return
+      const key = `${id || ''}:${txid || ''}`
+      if (!references.has(key)) references.set(key, {
+        ...(id ? { id } : {}),
+        ...(txid ? { txid } : {}),
+      })
+    }
+    const isPending = (status: unknown) =>
+      !['settled', 'confirmed', 'failed', 'rejected', 'canceled', 'cancelled'].includes(
+        String(status || '').toLowerCase()
+      )
+    for (const transfer of service.getPendingTransfers()) {
+      add(
+        transfer.id,
+        transfer.delivery?.completed.txid ?? transfer.broadcast?.completed.txid
+      )
+    }
+    for (const send of service.getPendingSendHistory?.() || []) {
+      if (isPending(send.status)) add(send.transferId, send.txid)
+    }
+    for (const receive of service.getPendingReceiveHistory?.() || []) {
+      if (isPending(receive.status)) add(receive.transferId, receive.txid)
+    }
+    for (const receive of service.getPendingReceives()) {
+      add(
+        receive.proxyRecipientId || receive.recipientId,
+        receive.receivedConsignment?.txid ?? receive.pendingAccept?.txid
+      )
+    }
+    return [...references.values()].slice(0, 50)
+  }
+
   // eslint-disable-next-line @typescript-eslint/explicit-function-return-type -- preserve the precise merged activity response.
   async getTransfers(
     currentPage: number,
     pageSize: number,
-    options?: { skipSync?: boolean; assetId?: string; type?: string }
+    options?: { skipSync?: boolean; assetId?: string; type?: string; statusOnly?: boolean }
   ) {
     let context = await this.dependencies.getContext()
     let { service, wallet } = context
@@ -131,7 +170,7 @@ export class RgbTransferQuery {
     const receiveMayChange = !options?.skipSync &&
       ((service.getPendingReceiveHistory?.().length || 0) > 0 || service.getPendingReceives().length > 0)
     const receiveStateBeforeSync = receiveMayChange ? this.receiveStateKey(service) : undefined
-    const activityPromise = receiveMayChange
+    const activityPromise = receiveMayChange || options?.statusOnly
       ? undefined
       : this.getRemoteActivity(wallet, currentPage, pageSize, false, scope)
     if (!options?.skipSync) {
@@ -184,12 +223,20 @@ export class RgbTransferQuery {
       }
     }
 
+    const remoteActivityRequest = options?.statusOnly && this.dependencies.getRemoteActivityStatuses
+      ? this.dependencies.getRemoteActivityStatuses(
+          wallet,
+          this.pendingActivityReferences(service)
+        )
+      : activityPromise || this.getRemoteActivity(
+          wallet,
+          currentPage,
+          pageSize,
+          receiveStateBeforeSync !== undefined && receiveStateBeforeSync !== this.receiveStateKey(service),
+          scope
+        )
     const [activity, initialPendingTransfers] = await Promise.all([
-      activityPromise || this.getRemoteActivity(
-        wallet, currentPage, pageSize,
-        receiveStateBeforeSync !== undefined && receiveStateBeforeSync !== this.receiveStateKey(service),
-        scope
-      ),
+      remoteActivityRequest,
       Promise.resolve(service.getPendingTransfers()),
     ])
     if (!options?.skipSync && initialPendingTransfers.some(transfer => !transfer.delivery && !transfer.broadcast)) {

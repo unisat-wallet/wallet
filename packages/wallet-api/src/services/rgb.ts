@@ -7,6 +7,8 @@ import { ApiClientError } from '../utils/errors'
 import { normalizeRgbAssetId, normalizeRgbAssetRecord } from './rgb-contract-id'
 import type {
   RgbActivityItem,
+  RgbActivityStatusRequest,
+  RgbActivityStatusResult,
   RgbAddressActivityQuery,
   RgbAssetActivityQuery,
   RgbAssetDetail,
@@ -236,6 +238,12 @@ export class RgbService {
     )
 
     return this.normalizeListResponse<RgbActivityItem>(response)
+  }
+
+  async getRgbActivityStatuses(
+    params: RgbActivityStatusRequest
+  ): Promise<RgbActivityStatusResult> {
+    return this.privatePost('/v5/rgb/activity/status', params)
   }
 
   /**
