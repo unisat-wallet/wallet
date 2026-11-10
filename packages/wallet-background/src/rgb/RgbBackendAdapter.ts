@@ -22,6 +22,8 @@ type RgbIndexedUtxo = {
     opId?: string
     assignmentIndex?: number
     assignmentType?: number
+    historyRef?: string
+    historyAvailable?: boolean
   }>
 }
 
@@ -82,6 +84,7 @@ export type RgbBackendApi = {
     wallet?: RgbWalletRef & { network: string }
     lease?: RgbActiveWriteLease
     txid: string
+    historyRefsVersion?: 1
     outpoints: RgbIndexedUtxo[]
   }) => Promise<void>
   claimRgbConsignments: (params: {
@@ -195,7 +198,7 @@ export function createRgbBackendAdapter(
           assignmentType: allocation.assignmentType,
         })),
       }),
-    ...(api.storeRgbHistoryFragment
+    ...(api?.storeRgbHistoryFragment
       ? {
           storeValidationHistory: async (wallet: RgbWalletRef, fragment: {
             assetId: string
@@ -235,6 +238,7 @@ export function createRgbBackendAdapter(
         ...(wallet.network ? { wallet: wallet as RgbWalletRef & { network: string } } : {}),
         ...(lease ? { lease } : {}),
         txid: transfer.txid,
+        historyRefsVersion: 1,
         outpoints: snapshot.utxos.map(toIndexedUtxo),
       })
     },

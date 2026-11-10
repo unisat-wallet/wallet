@@ -186,6 +186,21 @@ describe('RgbService', () => {
     expect(service.getPendingHistoryFragments()).toEqual([
       expect.objectContaining({ assetId, payload: 'aGlzdG9yeQ==', opIds: ['a'.repeat(64)] }),
     ])
+    const [{ payloadHash }] = service.getPendingHistoryFragments()
+    state.pendingUtxoSync = {
+      txid: 'b'.repeat(64),
+      outpoints: [{
+        outpoint: { txid: 'b'.repeat(64), vout: 0 },
+        satoshis: 330,
+        scriptPubKey: '5120' + '11'.repeat(32),
+        publicKey: '02' + '11'.repeat(32),
+        allocations: [{
+          assetId, amount: '1', settled: true, spendable: true,
+          opId: 'a'.repeat(64), assignmentIndex: 0, assignmentType: 4000,
+        }],
+      }],
+    }
+    expect(service.getPendingUtxoSync()?.outpoints[0].allocations[0].historyRef).toBe(payloadHash)
     await expect(service.syncPendingHistoryFragments()).resolves.toBe(true)
     await expect(service.syncPendingHistoryFragments()).resolves.toBe(false)
     expect(dependencies.stateSource.storeValidationHistory).toHaveBeenCalledTimes(1)

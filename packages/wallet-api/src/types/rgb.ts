@@ -157,6 +157,8 @@ export interface RgbUtxoSyncRequest {
   wallet?: RgbWalletRef & { network: string }
   lease?: RgbWriteLeaseCredential
   txid: string
+  /** Enables server enforcement that every allocation references stored canonical history. */
+  historyRefsVersion?: 1
   outpoints: Array<{
     txid: string
     vout: number
@@ -191,6 +193,8 @@ export interface RgbWalletUtxoAllocation {
   opId?: string
   assignmentIndex?: number
   assignmentType?: number
+  historyRef?: string
+  historyAvailable?: boolean
 }
 
 export interface RgbWalletUtxo {

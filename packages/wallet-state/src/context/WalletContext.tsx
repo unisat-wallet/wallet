@@ -809,6 +809,7 @@ export interface WalletController {
           settled: boolean
           spendable: boolean
           localHistoryAvailable?: boolean
+          historyAvailable?: boolean
         }>
       }>
     }

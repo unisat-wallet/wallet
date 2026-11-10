@@ -20,6 +20,10 @@ export interface RgbAllocation {
   opId?: string
   assignmentIndex?: number
   assignmentType?: number
+  /** Content hash of the canonical history fragment proving this operation. */
+  historyRef?: string
+  /** Backend-verified availability of historyRef; false allocations are not spendable. */
+  historyAvailable?: boolean
   /** Diagnostic only: this installation can prove the allocation from its canonical DAG. */
   localHistoryAvailable?: boolean
 }

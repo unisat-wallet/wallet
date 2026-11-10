@@ -191,7 +191,8 @@ function outpointKey(utxo: RgbUtxo) {
 function getSpendableAmount(utxo: RgbUtxo, assetId: string) {
   return utxo.allocations
     .filter(
-      allocation => allocation.assetId === assetId && allocation.settled && allocation.spendable
+      allocation => allocation.assetId === assetId && allocation.settled && allocation.spendable &&
+        allocation.historyAvailable !== false
     )
     .reduce((total, allocation) => total + BigInt(allocation.amount), 0n)
 }
@@ -1431,7 +1432,37 @@ export class RgbService {
   }
 
   getPendingUtxoSync() {
-    return this.requireState().pendingUtxoSync
+    const pending = this.requireState().pendingUtxoSync
+    if (pending) {
+      pending.outpoints = this.withCanonicalHistoryRefs({ syncedAt: 0, utxos: pending.outpoints }).utxos
+    }
+    return pending
+  }
+
+  private withCanonicalHistoryRefs(snapshot: RgbWalletSnapshot): RgbWalletSnapshot {
+    const state = this.requireState()
+    const refs = new Map<string, string>()
+    for (const [assetId, contract] of Object.entries(state.contracts || {})) {
+      const history = contract.history
+      if (!history?.payload) continue
+      const historyRef = canonicalHistoryHash(history.payload)
+      for (const opId of history.opIds) refs.set(`${assetId}:${opId}`, historyRef)
+    }
+    return {
+      ...snapshot,
+      utxos: snapshot.utxos.map(utxo => ({
+        ...utxo,
+        allocations: utxo.allocations.map(allocation => {
+          const derived = allocation.opId
+            ? refs.get(`${allocation.assetId}:${allocation.opId.replace(/^rgb:/, '').toLowerCase()}`)
+            : undefined
+          const retained = /^[0-9a-f]{64}$/i.test(allocation.historyRef || '')
+            ? allocation.historyRef!.toLowerCase()
+            : undefined
+          return { ...allocation, ...((derived || retained) ? { historyRef: derived || retained } : {}) }
+        }),
+      })),
+    }
   }
 
   getPendingHistoryFragments() {
@@ -3898,7 +3929,7 @@ export class RgbService {
         if (allocation.settled) current.settled += amount
         else if (burnChangeTxids.has(utxo.outpoint.txid)) current.locked += amount
         else current.pending += amount
-        if (allocation.settled && allocation.spendable) {
+        if (allocation.settled && allocation.spendable && allocation.historyAvailable !== false) {
           if (locked.has(outpointKey(utxo))) current.locked += amount
           else current.spendable += amount
         }
@@ -5091,12 +5122,18 @@ export class RgbService {
     for (const [transferId, item] of entries) {
       try {
         await this.syncPendingHistoryFragments()
-        await syncBroadcast(state.wallet, transferId, item.completed, state.snapshot, {
-          assetId: item.assetId,
-          amount: item.amount,
-          createdAt: item.createdAt,
-          invoice: item.invoice,
-        })
+        await syncBroadcast(
+          state.wallet,
+          transferId,
+          item.completed,
+          this.withCanonicalHistoryRefs(state.snapshot),
+          {
+            assetId: item.assetId,
+            amount: item.amount,
+            createdAt: item.createdAt,
+            invoice: item.invoice,
+          }
+        )
         delete state.pendingBroadcastSyncs[transferId]
         if (Object.keys(state.pendingBroadcastSyncs).length === 0)
           state.pendingBroadcastSyncs = undefined
@@ -5589,7 +5626,8 @@ export class RgbService {
       )
       .map(utxo => {
         const assetAllocations = utxo.allocations.filter(allocation =>
-          allocation.assetId === assetId && allocation.settled && allocation.spendable
+          allocation.assetId === assetId && allocation.settled && allocation.spendable &&
+            allocation.historyAvailable !== false
         )
         return {
           utxo,

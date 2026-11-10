@@ -348,6 +348,8 @@ type RgbControllerApiService = {
         opId?: string
         assignmentIndex?: number
         assignmentType?: number
+        historyRef?: string
+        historyAvailable?: boolean
       }>
     }>
   }) => Promise<void>
@@ -356,6 +358,7 @@ type RgbControllerApiService = {
     wallet?: RgbWalletRef & { network: string }
     lease?: RgbControllerWriteLeaseCredential
     txid: string
+    historyRefsVersion?: 1
     outpoints: Array<{
       txid: string
       vout: number
@@ -373,6 +376,8 @@ type RgbControllerApiService = {
         opId?: string
         assignmentIndex?: number
         assignmentType?: number
+        historyRef?: string
+        historyAvailable?: boolean
       }>
     }>
   }) => Promise<void>
@@ -401,6 +406,8 @@ type RgbControllerApiService = {
         opId?: string
         assignmentIndex?: number
         assignmentType?: number
+        historyRef?: string
+        historyAvailable?: boolean
       }>
     }>
     syncedAt: number
@@ -6098,6 +6105,7 @@ export class WalletController extends BaseController {
       wallet,
       ...(lease ? { lease } : {}),
       txid: sync.txid,
+      historyRefsVersion: 1,
       outpoints: toRgbIndexedUtxos(sync.outpoints),
     })
   }

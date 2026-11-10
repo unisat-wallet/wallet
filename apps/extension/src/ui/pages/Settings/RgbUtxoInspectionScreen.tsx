@@ -245,7 +245,8 @@ export default function RgbUtxoInspectionScreen() {
                           isSameRgbAssetId(allocation.assetId, configuredUsdtAssetId);
                         const name = isUsdt ? 'USDT' : asset?.name || asset?.ticker || shortTxid(allocation.assetId);
                         const amount = toRgbDisplayAmount(allocation.amount, asset?.precision || 0);
-                        const historyMissing = allocation.localHistoryAvailable === false;
+                        const historyMissing = allocation.historyAvailable === false ||
+                          allocation.localHistoryAvailable === false;
                         return (
                           <Row
                             key={`${allocation.assetId}:${index}`}
