@@ -17,6 +17,7 @@ import {
 
 import { RGBRejectReceiveConfirmModal } from './components/RGBRejectReceiveConfirmModal';
 import { RGBTransferReasonTooltip } from './components/RGBTransferReasonTooltip';
+import { RGBAcceptProgress } from './components/RGBAcceptProgress';
 import { getRgbBurnNetworkName } from './rgbBurnNetworks';
 
 function getStatusLabel(status: string, t: (key: string) => string, type?: RgbTransferItem['type']) {
@@ -103,6 +104,7 @@ export default function RGBTransferDetailScreen() {
     transferId,
     loading,
     receiveActionLoading,
+    acceptProgress,
     broadcastRetryLoading,
     cancelLoading,
     canCancelSend,
@@ -260,6 +262,9 @@ export default function RGBTransferDetailScreen() {
       </Content>
       <Footer>
         <Column gap="sm">
+          {receiveActionLoading && acceptProgress ? (
+            <RGBAcceptProgress progress={acceptProgress} />
+          ) : null}
           {transfer?.burn && transfer.txid ? (
             <Button
               full

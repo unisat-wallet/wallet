@@ -14,12 +14,14 @@ import {
   useI18n,
   useTools,
   useWallet,
+  useRgbAcceptProgress,
   type RgbTransferItem
 } from '@unisat/wallet-state';
 
 import { useRgbWriteLeaseGuard } from './components/useRgbWriteLeaseGuard';
 import { RGBRejectReceiveConfirmModal } from './components/RGBRejectReceiveConfirmModal';
 import { RGBTransferReasonTooltip } from './components/RGBTransferReasonTooltip';
+import { RGBAcceptProgress } from './components/RGBAcceptProgress';
 
 function getStatusLabel(status: string, t: (key: string) => string, type?: RgbTransferItem['type']) {
   switch (status.toLowerCase()) {
@@ -229,6 +231,11 @@ export function RGBTransferDetailSheet({
   const [actionLoading, setActionLoading] = useState(false);
   const [broadcastRetryLoading, setBroadcastRetryLoading] = useState(false);
   const [senderCanceledVisible, setSenderCanceledVisible] = useState(false);
+  const {
+    progress: acceptProgress,
+    start: startAcceptProgress,
+    stop: stopAcceptProgress
+  } = useRgbAcceptProgress();
   const receiveTargets = batchTransfers.length > 1
     ? batchTransfers
     : transfer
@@ -317,6 +324,7 @@ export function RGBTransferDetailSheet({
       .filter((recipientId): recipientId is string => !!recipientId);
     if (!targets.length || actionLoading) return;
     onReceiveActionStart?.();
+    const progressId = startAcceptProgress(targets.length);
     setActionLoading(true);
     let accepted = 0;
     let pending = 0;
@@ -324,8 +332,8 @@ export function RGBTransferDetailSheet({
     let failed = 0;
     try {
       const results = targets.length > 1
-        ? await wallet.acceptRgbReceives({ recipientIds: targets })
-        : [await wallet.acceptRgbReceive({ recipientId: targets[0] })];
+        ? await wallet.acceptRgbReceives({ recipientIds: targets, progressId })
+        : [await wallet.acceptRgbReceive({ recipientId: targets[0], progressId })];
       for (const result of results) {
         if (result?.status === 'canceled') canceled++;
         else if (result?.status === 'pending') pending++;
@@ -355,6 +363,7 @@ export function RGBTransferDetailSheet({
       tools.toastError(message);
     } finally {
       setActionLoading(false);
+      stopAcceptProgress();
     }
   };
 
@@ -629,6 +638,11 @@ export function RGBTransferDetailSheet({
               boxSizing: 'border-box'
             }}
           >
+            {actionLoading && acceptProgress ? (
+              <Column fullX mb="md">
+                <RGBAcceptProgress progress={acceptProgress} />
+              </Column>
+            ) : null}
             {canAcceptReceive ? (
               <Row gap="md" fullX>
                 <Button

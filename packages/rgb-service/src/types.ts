@@ -1,5 +1,22 @@
 export type RgbNetwork = 'mainnet' | 'testnet' | 'testnet4' | 'signet' | 'fractal-mainnet' | 'fractal-test'
 
+export type RgbAcceptProgressPhase =
+  | 'checking'
+  | 'validating'
+  | 'persisting'
+  | 'acknowledging'
+  | 'broadcasting'
+  | 'finalizing'
+
+export interface RgbAcceptProgress {
+  phase: RgbAcceptProgressPhase
+  recipientId?: string
+  completed?: number
+  total?: number
+}
+
+export type RgbAcceptProgressReporter = (progress: RgbAcceptProgress) => void
+
 export interface RgbWalletRef {
   walletId: string
   fundingAddress: string

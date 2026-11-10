@@ -5,6 +5,7 @@ import { useWalletConfig } from '../hooks/settings'
 import type { RgbTransferItem } from '../types'
 import { mergeRgbTransferAssetMetadata } from '../utils/rgb-transfer-metadata'
 import { normalizeConfiguredRgbUsdt } from '../utils/rgb-usdt'
+import { useRgbAcceptProgress } from './useRgbAcceptProgress'
 
 function isInProgress(transfer?: RgbTransferItem) {
   if (transfer?.awaitingRecipientAck) return true
@@ -75,6 +76,11 @@ export function useRGBTransferDetailLogic() {
   const [receiveActionLoading, setReceiveActionLoading] = useState(false)
   const [broadcastRetryLoading, setBroadcastRetryLoading] = useState(false)
   const [senderCanceledVisible, setSenderCanceledVisible] = useState(false)
+  const {
+    progress: acceptProgress,
+    start: startAcceptProgress,
+    stop: stopAcceptProgress,
+  } = useRgbAcceptProgress()
 
   const refresh = useCallback(async () => {
     setLoading(true)
@@ -210,9 +216,10 @@ export function useRGBTransferDetailLogic() {
     const recipientId = resolveReceiveRecipientId(transfer, transferId)
     if (!recipientId || receiveActionLoading) return false
 
+    const progressId = startAcceptProgress(1)
     setReceiveActionLoading(true)
     try {
-      const result = await wallet.acceptRgbReceive({ recipientId })
+      const result = await wallet.acceptRgbReceive({ recipientId, progressId })
       if (result?.status === 'canceled') {
         setTransfer(current =>
           current ? { ...current, status: 'canceled', local: true } : current
@@ -239,6 +246,7 @@ export function useRGBTransferDetailLogic() {
       return false
     } finally {
       setReceiveActionLoading(false)
+      stopAcceptProgress()
     }
   }
 
@@ -299,6 +307,7 @@ export function useRGBTransferDetailLogic() {
     loading,
     cancelLoading,
     receiveActionLoading,
+    acceptProgress,
     broadcastRetryLoading,
     canCancelSend,
     canAcceptReceive,

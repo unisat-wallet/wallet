@@ -127,24 +127,30 @@ export class RgbReceiveOperations {
 
   async acceptReceive(
     recipientId: string,
-    boundContext?: LocalRgbServiceContext
+    boundContext?: LocalRgbServiceContext,
+    onProgress?: import('@unisat/rgb-service').RgbAcceptProgressReporter
   ): Promise<Awaited<ReturnType<RgbService['acceptReceive']>>> {
     const context = boundContext ?? (await this.dependencies.getContext())
     const { service } = context
     await this.dependencies.ensureWriteLease?.(context)
     await this.dependencies.assertContext?.(context)
-    return service.acceptReceive(recipientId)
+    return onProgress
+      ? service.acceptReceive(recipientId, { onProgress })
+      : service.acceptReceive(recipientId)
   }
 
   async acceptReceives(
     recipientIds: string[],
-    boundContext?: LocalRgbServiceContext
+    boundContext?: LocalRgbServiceContext,
+    onProgress?: import('@unisat/rgb-service').RgbAcceptProgressReporter
   ): Promise<Awaited<ReturnType<RgbService['acceptReceives']>>> {
     const context = boundContext ?? (await this.dependencies.getContext())
     const { service } = context
     await this.dependencies.ensureWriteLease?.(context)
     await this.dependencies.assertContext?.(context)
-    return service.acceptReceives(recipientIds)
+    return onProgress
+      ? service.acceptReceives(recipientIds, { onProgress })
+      : service.acceptReceives(recipientIds)
   }
 
   async stageBuySwapIntent(

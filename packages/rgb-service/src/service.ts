@@ -2403,12 +2403,18 @@ export class RgbService {
 
   async acceptReceive(
     recipientId: string,
-    options: { buySwapBackendCommitted?: boolean } = {}
+    options: {
+      buySwapBackendCommitted?: boolean
+      onProgress?: import('./types').RgbAcceptProgressReporter
+    } = {}
   ) {
     return this.runPendingReceiveOperation(() => this.acceptReceiveOnce(recipientId, options))
   }
 
-  async acceptReceives(recipientIds: string[]) {
+  async acceptReceives(
+    recipientIds: string[],
+    options: { onProgress?: import('./types').RgbAcceptProgressReporter } = {}
+  ) {
     return this.runPendingReceiveOperation(async () => {
       const caches: ReceiveValidationCaches = {
         evmRpcCache: new Map<string, Promise<unknown>>(),
@@ -2422,9 +2428,30 @@ export class RgbService {
         error?: string
       }> = []
       const staged: string[] = []
-      for (const recipientId of [...new Set(recipientIds)]) {
+      const uniqueRecipientIds = [...new Set(recipientIds)]
+      const total = uniqueRecipientIds.length
+      const reportStaging = (recipientId: string) =>
+        (progress: import('./types').RgbAcceptProgress) => options.onProgress?.({
+          ...progress,
+          recipientId,
+          completed: 0,
+          total,
+        })
+      const reportFor = (recipientId: string, completed: number) =>
+        (progress: import('./types').RgbAcceptProgress) => options.onProgress?.({
+          ...progress,
+          recipientId,
+          completed,
+          total,
+        })
+      for (const recipientId of uniqueRecipientIds) {
         try {
-          const result = await this.acceptReceiveOnce(recipientId, {}, caches, { stageOnly: true })
+          const result = await this.acceptReceiveOnce(
+            recipientId,
+            { onProgress: reportStaging(recipientId) },
+            caches,
+            { stageOnly: true }
+          )
           if (result.status === 'staged') staged.push(recipientId)
           else results.push({ recipientId, ...result })
         } catch (error) {
@@ -2439,10 +2466,16 @@ export class RgbService {
       // Persist every local receipt before the first irreversible ACK. A crash
       // after any later ACK can then recover the whole batch from the durable
       // acknowledgementPending records.
-      if (staged.length) await this.persist({ waitForRecovery: true })
+      if (staged.length) {
+        options.onProgress?.({ phase: 'persisting', completed: 0, total })
+        await this.persist({ waitForRecovery: true })
+      }
       for (const recipientId of staged) {
         try {
-          const result = await this.acceptReceiveOnce(recipientId, {}, caches, {
+          const index = uniqueRecipientIds.indexOf(recipientId)
+          const result = await this.acceptReceiveOnce(recipientId, {
+            onProgress: reportFor(recipientId, Math.max(0, index)),
+          }, caches, {
             deferFinalPersist: true,
             deferProxyRelease: true,
           })
@@ -2471,7 +2504,10 @@ export class RgbService {
 
   private async acceptReceiveOnce(
     recipientId: string,
-    options: { buySwapBackendCommitted?: boolean },
+    options: {
+      buySwapBackendCommitted?: boolean
+      onProgress?: import('./types').RgbAcceptProgressReporter
+    },
     caches?: ReceiveValidationCaches,
     control: {
       stageOnly?: boolean
@@ -2511,6 +2547,7 @@ export class RgbService {
     if (receive.rejection) {
       throw new RgbServiceError(`RGB receive ${recipientId} was already rejected`)
     }
+    options.onProgress?.({ phase: 'checking', recipientId })
     if (
       !receive.receivedConsignment?.acknowledgementPending &&
       (await this.isReceiveCanceledBySender(receive))
@@ -2533,6 +2570,7 @@ export class RgbService {
     }
     const acknowledgementWasPending = receive.receivedConsignment?.acknowledgementPending === true
     if (!acknowledgementWasPending) {
+      options.onProgress?.({ phase: 'validating', recipientId })
       let requiredOperationIds = receive.pendingAccept.operationIds
       if (
         !requiredOperationIds?.length &&
@@ -2584,10 +2622,14 @@ export class RgbService {
         batch: receive.pendingAccept.batch,
         counterpartyScriptPubKeys: receive.pendingAccept.counterpartyScriptPubKeys,
       }
-      if (!control.stageOnly) await this.persist({ waitForRecovery: true })
+      if (!control.stageOnly) {
+        options.onProgress?.({ phase: 'persisting', recipientId })
+        await this.persist({ waitForRecovery: true })
+      }
     }
     if (control.stageOnly) return { accepted: false, status: 'staged' as const }
     let acknowledgementConfirmed = false
+    options.onProgress?.({ phase: 'acknowledging', recipientId })
     if (acknowledgementWasPending) {
       const acknowledgement = await this.getProxyAcknowledgement(receive, item.endpoint)
       acknowledgementConfirmed = acknowledgement === true
@@ -2616,6 +2658,7 @@ export class RgbService {
           await this.persist()
           return { accepted: false, status: 'canceled' as const }
         }
+        options.onProgress?.({ phase: 'broadcasting', recipientId })
         const alreadyBroadcast = await this.ensureDonationAnchorBroadcast(
           receive, item.txid, receive.pendingAccept.signedRawTx
         )
@@ -2665,6 +2708,7 @@ export class RgbService {
           receive.pendingAccept.signedRawTx
         )
       } else {
+        options.onProgress?.({ phase: 'broadcasting', recipientId })
         await this.persistAndBroadcastReceiveAnchor(
           receive,
           item.txid,
@@ -2677,6 +2721,7 @@ export class RgbService {
     delete receive.receivedConsignment!.acknowledgementPending
     delete receive.pendingAccept
     this.markProxyDataReleasePending(receive)
+    options.onProgress?.({ phase: 'finalizing', recipientId })
     if (!control.deferFinalPersist) await this.persist({ waitForRecovery: true })
     if (!control.deferProxyRelease && await this.releaseHandledProxyData(receive)) {
       await this.persist({ waitForRecovery: true })

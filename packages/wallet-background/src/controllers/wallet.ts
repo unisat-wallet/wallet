@@ -6003,16 +6003,69 @@ export class WalletController extends BaseController {
     return this.rgbSendOperations.abortAcknowledgedSwap(params.txid, context)
   }
 
-  acceptRgbReceive = async (params: { recipientId: string }) => {
-    const context = await this.getLocalRgbService()
-    await this.ensureRgbWriteLease(context, { forceRenew: true })
-    return this.rgbReceiveOperations.acceptReceive(params.recipientId, context)
+  private reportRgbAcceptProgress = (
+    progressId: string | undefined,
+    progress: {
+      phase: 'preparing' | import('@unisat/rgb-service').RgbAcceptProgressPhase | 'complete'
+      recipientId?: string
+      completed?: number
+      total?: number
+    }
+  ) => {
+    if (!progressId || progressId.length > 128) return
+    bgEventBus.emit(BUS_EVENTS.broadcastToUI, {
+      method: BUS_METHODS.RGB_ACCEPT_PROGRESS,
+      params: { progressId, ...progress },
+    })
   }
 
-  acceptRgbReceives = async (params: { recipientIds: string[] }) => {
+  acceptRgbReceive = async (params: { recipientId: string; progressId?: string }) => {
+    this.reportRgbAcceptProgress(params.progressId, {
+      phase: 'preparing',
+      recipientId: params.recipientId,
+      completed: 0,
+      total: 1,
+    })
     const context = await this.getLocalRgbService()
     await this.ensureRgbWriteLease(context, { forceRenew: true })
-    return this.rgbReceiveOperations.acceptReceives(params.recipientIds, context)
+    const result = await this.rgbReceiveOperations.acceptReceive(
+      params.recipientId,
+      context,
+      params.progressId
+        ? progress => this.reportRgbAcceptProgress(params.progressId, progress)
+        : undefined
+    )
+    this.reportRgbAcceptProgress(params.progressId, {
+      phase: 'complete',
+      recipientId: params.recipientId,
+      completed: 1,
+      total: 1,
+    })
+    return result
+  }
+
+  acceptRgbReceives = async (params: { recipientIds: string[]; progressId?: string }) => {
+    const total = new Set(params.recipientIds).size
+    this.reportRgbAcceptProgress(params.progressId, {
+      phase: 'preparing',
+      completed: 0,
+      total,
+    })
+    const context = await this.getLocalRgbService()
+    await this.ensureRgbWriteLease(context, { forceRenew: true })
+    const result = await this.rgbReceiveOperations.acceptReceives(
+      params.recipientIds,
+      context,
+      params.progressId
+        ? progress => this.reportRgbAcceptProgress(params.progressId, progress)
+        : undefined
+    )
+    this.reportRgbAcceptProgress(params.progressId, {
+      phase: 'complete',
+      completed: total,
+      total,
+    })
+    return result
   }
 
   stageRgbBuySwapIntent = async (params: {

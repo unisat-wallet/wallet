@@ -46,6 +46,11 @@ export { UNCONFIGURED_RGB_USDT_ASSET_ID, useRGBListLogic } from './useRGBListLog
 export { useRGBTransfersLogic } from './useRGBTransfersLogic'
 export { useRGBTransferDetailLogic } from './useRGBTransferDetailLogic'
 export {
+  useRgbAcceptProgress,
+  type RgbAcceptProgressPhase,
+  type RgbAcceptUiProgress,
+} from './useRgbAcceptProgress'
+export {
   ANY_RGB_ASSET,
   ANY_RGB_ASSET_ID,
   formatRgbPendingAmount,

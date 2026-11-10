@@ -547,6 +547,7 @@ export const BUS_METHODS = {
   LOCALE_CHANGED: 'localeChanged',
   RGB_ASSETS_CHANGED: 'rgbAssetsChanged',
   RGB_BACKUP_RESTORE_PROGRESS: 'rgbBackupRestoreProgress',
+  RGB_ACCEPT_PROGRESS: 'rgbAcceptProgress',
 
   USER_UI_INTERACT: 'USER_UI_INTERACT', // used to notify background script that user has interacted with the UI
 }

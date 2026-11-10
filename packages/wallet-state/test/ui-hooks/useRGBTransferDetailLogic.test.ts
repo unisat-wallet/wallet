@@ -1,8 +1,11 @@
 import { act, renderHook, waitFor } from '@testing-library/react'
 import { describe, expect, it } from 'vitest'
 
+import { BUS_METHODS } from '@unisat/wallet-shared'
+
 import { useRGBTransferDetailLogic } from '../../src/ui-hooks/useRGBTransferDetailLogic'
 import { settingsActions } from '../../src/reducers/settings'
+import { uiEventBus } from '../../src/utils/eventBus'
 import { createHookTestHarness } from './testHelpers'
 
 const pendingReceive = {
@@ -90,8 +93,55 @@ describe('useRGBTransferDetailLogic', () => {
       await result.current.onAcceptReceive()
     })
 
-    expect(wallet.acceptRgbReceive).toHaveBeenCalledWith({ recipientId: 'recipient-id' })
+    expect(wallet.acceptRgbReceive).toHaveBeenCalledWith({
+      recipientId: 'recipient-id',
+      progressId: expect.stringMatching(/^rgb-accept-/),
+    })
     expect(result.current.transfer?.status).toBe('waiting_receive')
+  })
+
+  it('reports real acceptance phases while validation is running', async () => {
+    const { wrapper, wallet } = createHookTestHarness({
+      routeState: { transferId: 'recipient-id', initialTransfer: pendingReceive },
+    })
+    let resolveAccept!: (value: { accepted: true; status: 'accepted' }) => void
+    wallet.acceptRgbReceive.mockReturnValue(
+      new Promise(resolve => {
+        resolveAccept = resolve
+      })
+    )
+
+    const { result } = renderHook(() => useRGBTransferDetailLogic(), { wrapper })
+    await waitFor(() => expect(result.current.canAcceptReceive).toBe(true))
+
+    let operation!: Promise<boolean>
+    act(() => {
+      operation = result.current.onAcceptReceive()
+    })
+    const progressId = wallet.acceptRgbReceive.mock.calls[0]![0].progressId
+
+    act(() => {
+      uiEventBus.emit(BUS_METHODS.RGB_ACCEPT_PROGRESS, {
+        progressId,
+        phase: 'validating',
+        recipientId: 'recipient-id',
+        completed: 0,
+        total: 1,
+      })
+    })
+
+    expect(result.current.acceptProgress).toMatchObject({
+      progressId,
+      phase: 'validating',
+      completed: 0,
+      total: 1,
+    })
+
+    resolveAccept({ accepted: true, status: 'accepted' })
+    await act(async () => {
+      await operation
+    })
+    expect(result.current.acceptProgress).toBeUndefined()
   })
 
   it('shows a successful batch wait after ACK is accepted but the transaction is not released', async () => {

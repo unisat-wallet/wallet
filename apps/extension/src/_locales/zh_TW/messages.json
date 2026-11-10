@@ -3543,6 +3543,16 @@
   "rgb_accept_transfer": {
     "message": "接受"
   },
+  "rgb_accept_progress_preparing": { "message": "正在準備接收" },
+  "rgb_accept_progress_checking": { "message": "正在檢查轉帳狀態" },
+  "rgb_accept_progress_validating": { "message": "正在驗證 RGB 歷史" },
+  "rgb_accept_progress_persisting": { "message": "正在儲存已驗證轉帳" },
+  "rgb_accept_progress_acknowledging": { "message": "正在向發送方確認" },
+  "rgb_accept_progress_broadcasting": { "message": "正在廣播交易" },
+  "rgb_accept_progress_finalizing": { "message": "正在完成接收" },
+  "rgb_accept_progress_complete": { "message": "接收完成" },
+  "rgb_accept_progress_elapsed": { "message": "已用時" },
+  "rgb_accept_progress_slow": { "message": "網路驗證時間比平常更長，請保持錢包開啟。" },
   "rgb_reject_transfer": {
     "message": "拒絕"
   },

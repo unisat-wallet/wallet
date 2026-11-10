@@ -3566,6 +3566,16 @@
   "rgb_accept_transfer": {
     "message": "Accept"
   },
+  "rgb_accept_progress_preparing": { "message": "Preparing acceptance" },
+  "rgb_accept_progress_checking": { "message": "Checking transfer status" },
+  "rgb_accept_progress_validating": { "message": "Validating RGB history" },
+  "rgb_accept_progress_persisting": { "message": "Saving validated transfer" },
+  "rgb_accept_progress_acknowledging": { "message": "Confirming with the sender" },
+  "rgb_accept_progress_broadcasting": { "message": "Broadcasting transaction" },
+  "rgb_accept_progress_finalizing": { "message": "Finalizing acceptance" },
+  "rgb_accept_progress_complete": { "message": "Acceptance complete" },
+  "rgb_accept_progress_elapsed": { "message": "Elapsed" },
+  "rgb_accept_progress_slow": { "message": "Network validation is taking longer than usual. Keep the wallet open." },
   "rgb_reject_transfer": {
     "message": "Reject"
   },

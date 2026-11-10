@@ -908,13 +908,13 @@ export interface WalletController {
     error?: string
   }>
 
-  acceptRgbReceive(params: { recipientId: string }): Promise<{
+  acceptRgbReceive(params: { recipientId: string; progressId?: string }): Promise<{
     accepted: boolean
     status: 'accepted' | 'pending' | 'canceled'
     [key: string]: any
   }>
 
-  acceptRgbReceives(params: { recipientIds: string[] }): Promise<Array<{
+  acceptRgbReceives(params: { recipientIds: string[]; progressId?: string }): Promise<Array<{
     recipientId: string
     accepted: boolean
     status: 'accepted' | 'pending' | 'canceled' | 'failed'
