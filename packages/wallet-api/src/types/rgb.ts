@@ -184,6 +184,18 @@ export interface RgbUtxoSyncRequest {
   }>
 }
 
+export interface RgbAllocationDiscardRequest {
+  address: string
+  wallet?: RgbWalletRef & { network: string }
+  lease?: RgbWriteLeaseCredential
+  txid: string
+  vout: number
+  assetId: string
+  opId: string
+  assignmentIndex: number
+  reason: 'user_confirmed_rejected_or_unverifiable'
+}
+
 /** Public metadata sync for a locally issued or locally validated asset. */
 export interface RgbAssetMetadataSyncRequest {
   asset: RgbAssetMetadata

@@ -195,6 +195,19 @@ function outpointKey(utxo: RgbUtxo) {
   return `${utxo.outpoint.txid}:${utxo.outpoint.vout}`
 }
 
+function allocationKey(
+  outpoint: RgbOutpoint,
+  allocation: Pick<import('./types').RgbAllocation, 'assetId' | 'opId' | 'assignmentIndex'>
+) {
+  return [
+    outpoint.txid.toLowerCase(),
+    outpoint.vout,
+    normalizeAssetId(allocation.assetId),
+    allocation.opId?.toLowerCase() || '',
+    allocation.assignmentIndex ?? -1,
+  ].join(':')
+}
+
 function getSpendableAmount(utxo: RgbUtxo, assetId: string) {
   return utxo.allocations
     .filter(
@@ -675,6 +688,17 @@ export class RgbService {
     if (discardedOutpoints.size) {
       snapshot.utxos = snapshot.utxos.filter(utxo => !discardedOutpoints.has(outpointKey(utxo)))
     }
+    const discardedAllocations = new Set(
+      (state.discardedAllocations || []).map(item => allocationKey(item.outpoint, item))
+    )
+    if (discardedAllocations.size) {
+      snapshot.utxos = snapshot.utxos.map(utxo => ({
+        ...utxo,
+        allocations: utxo.allocations.filter(allocation =>
+          !discardedAllocations.has(allocationKey(utxo.outpoint, allocation))
+        ),
+      }))
+    }
     // A receive or broadcast may have queued a newer local allocation while
     // the indexer request was in flight. Never apply that older response.
     if (this.hasBlockingSnapshotProtection() ||
@@ -763,6 +787,9 @@ export class RgbService {
     const live = snapshot.utxos.filter(utxo => utxo.chainStatus === 'confirmed')
     if (!live.length) return false
     const knownBlindSeals = this.getKnownBlindSeals()
+    const discardedAllocations = new Set(
+      (state.discardedAllocations || []).map(item => allocationKey(item.outpoint, item))
+    )
     for (const [assetId, contract] of Object.entries(state.contracts || {})) {
       const payload = Uint8Array.from(Buffer.from(contract.history?.payload || contract.consignment, 'base64'))
       let allocationOutpoints: Set<string>
@@ -816,6 +843,11 @@ export class RgbService {
         for (const allocation of validated.allocations) {
           if (allocation.txid !== utxo.outpoint.txid || allocation.vout !== utxo.outpoint.vout ||
             (allocation.scriptPubKey && allocation.scriptPubKey !== utxo.scriptPubKey)) continue
+          if (discardedAllocations.has(allocationKey(utxo.outpoint, {
+            assetId,
+            opId: allocation.opId,
+            assignmentIndex: allocation.assignmentIndex,
+          }))) continue
           if (utxo.allocations.some(item =>
             item.opId === allocation.opId && item.assignmentIndex === allocation.assignmentIndex
           )) continue
@@ -4173,6 +4205,10 @@ export class RgbService {
             ...allocation,
             localHistoryAvailable: Boolean(allocation.opId) &&
               this.localHistoryCoversAllocations(allocation.assetId, [allocation.opId!]),
+            discardable: this.isRejectedAllocation(allocation) ||
+              !allocation.opId ||
+              !this.localHistoryCoversAllocations(allocation.assetId, [allocation.opId]),
+            rejected: this.isRejectedAllocation(allocation),
           })),
         })),
       },
@@ -4192,6 +4228,101 @@ export class RgbService {
           createdAt: receive.createdAt,
           ...(receive.seal ? { txid: receive.seal.txid, vout: receive.seal.vout } : {}),
         })),
+    }
+  }
+
+  private isRejectedAllocation(allocation: import('./types').RgbAllocation) {
+    if (!allocation.opId) return false
+    const assetId = normalizeAssetId(allocation.assetId)
+    const opId = allocation.opId.toLowerCase()
+    return (this.requireState().pendingReceives || []).some(receive => {
+      const rejectedAssetId = receive.pendingAccept?.assetId || receive.assetId
+      return !!receive.rejection && !!rejectedAssetId &&
+        normalizeAssetId(rejectedAssetId) === assetId &&
+        receive.pendingAccept?.operationIds?.some(operationId => operationId.toLowerCase() === opId)
+    })
+  }
+
+  private async discardAllocations(
+    candidates: Array<{
+      outpoint: RgbOutpoint
+      allocation: import('./types').RgbAllocation
+      reason: 'rejected_receive' | 'manual'
+    }>
+  ) {
+    if (!candidates.length) return { discarded: 0 }
+    const state = this.requireState()
+    const keys = new Set(candidates.map(item => allocationKey(item.outpoint, item.allocation)))
+    const existing = new Set(
+      (state.discardedAllocations || []).map(item => allocationKey(item.outpoint, item))
+    )
+    let discarded = 0
+    for (const candidate of candidates) {
+      const key = allocationKey(candidate.outpoint, candidate.allocation)
+      if (existing.has(key)) continue
+      ;(state.discardedAllocations ||= []).push({
+        outpoint: { ...candidate.outpoint },
+        assetId: normalizeAssetId(candidate.allocation.assetId),
+        ...(candidate.allocation.opId ? { opId: candidate.allocation.opId.toLowerCase() } : {}),
+        ...(candidate.allocation.assignmentIndex === undefined
+          ? {}
+          : { assignmentIndex: candidate.allocation.assignmentIndex }),
+        discardedAt: this.now(),
+        reason: candidate.reason,
+      })
+      existing.add(key)
+      discarded += 1
+    }
+    if (!discarded) return { discarded: 0 }
+    state.snapshot.utxos = state.snapshot.utxos.map(utxo => ({
+      ...utxo,
+      allocations: utxo.allocations.filter(allocation =>
+        !keys.has(allocationKey(utxo.outpoint, allocation))
+      ),
+    }))
+    const marker = candidates[0]!.outpoint.txid.toLowerCase()
+    state.pendingUtxoSync = { txid: marker, outpoints: state.snapshot.utxos }
+    await this.persist({ waitForRecovery: true })
+    return { discarded }
+  }
+
+  /** Permanently ignore one rejected or locally unverifiable allocation. */
+  async discardUtxoAllocation(input: {
+    outpoint: RgbOutpoint
+    assetId: string
+    opId?: string
+    assignmentIndex?: number
+  }) {
+    const state = this.requireState()
+    const utxo = state.snapshot.utxos.find(item => outpointKey(item).toLowerCase() ===
+      `${input.outpoint.txid.toLowerCase()}:${input.outpoint.vout}`)
+    if (!utxo) throw new RgbServiceError('RGB carrier UTXO was not found')
+    const normalized = normalizeAssetId(input.assetId)
+    const matches = utxo.allocations.filter(allocation =>
+      normalizeAssetId(allocation.assetId) === normalized &&
+      (input.opId === undefined || allocation.opId?.toLowerCase() === input.opId.toLowerCase()) &&
+      (input.assignmentIndex === undefined || allocation.assignmentIndex === input.assignmentIndex)
+    )
+    if (matches.length !== 1) throw new RgbServiceError('RGB allocation is missing or ambiguous')
+    const allocation = matches[0]!
+    const localHistoryAvailable = Boolean(allocation.opId) &&
+      this.localHistoryCoversAllocations(allocation.assetId, [allocation.opId!])
+    if (!this.isRejectedAllocation(allocation) && localHistoryAvailable) {
+      throw new RgbServiceError('A valid RGB allocation cannot be removed from the UTXO view')
+    }
+    const result = await this.discardAllocations([{
+      outpoint: utxo.outpoint,
+      allocation,
+      reason: 'manual',
+    }])
+    return {
+      ...result,
+      outpoint: { ...utxo.outpoint },
+      assetId: normalized,
+      ...(allocation.opId ? { opId: allocation.opId.toLowerCase() } : {}),
+      ...(allocation.assignmentIndex === undefined
+        ? {}
+        : { assignmentIndex: allocation.assignmentIndex }),
     }
   }
 
@@ -4474,6 +4605,18 @@ export class RgbService {
       // an exact wallet-owned allocation with an ordinary Transfer transition.
       selectedUtxos = this.selectUtxos(requestedAssetId, amount, swapInputOutpoints)
       burnSplitRequired = true
+    }
+    const discardedRejectedAllocations = await this.discardRejectedCompanionAllocations(
+      selectedUtxos,
+      requestedAssetId
+    )
+    if (discardedRejectedAllocations > 0) {
+      selectedUtxos = this.selectUtxos(
+        requestedAssetId,
+        amount,
+        swapInputOutpoints,
+        requireExactSelection && !burnSplitRequired
+      )
     }
     await this.verifySelectedUtxos(state.wallet, selectedUtxos)
     const allocations = selectedUtxos.flatMap(utxo =>
@@ -5792,6 +5935,24 @@ export class RgbService {
     throw new RgbInsufficientBalanceError(assetId, amount)
   }
 
+  private async discardRejectedCompanionAllocations(
+    selectedUtxos: RgbUtxo[],
+    targetAssetId: string
+  ) {
+    const normalizedTarget = normalizeAssetId(targetAssetId)
+    const candidates = selectedUtxos.flatMap(utxo => utxo.allocations
+      .filter(allocation =>
+        normalizeAssetId(allocation.assetId) !== normalizedTarget &&
+        this.isRejectedAllocation(allocation)
+      )
+      .map(allocation => ({
+        outpoint: utxo.outpoint,
+        allocation,
+        reason: 'rejected_receive' as const,
+      })))
+    return (await this.discardAllocations(candidates)).discarded
+  }
+
   private async verifySelectedUtxos(wallet: RgbWalletRef, selectedUtxos: RgbUtxo[]) {
     const verifyUtxos = this.dependencies.stateSource.verifyUtxos
     if (!verifyUtxos) return
@@ -6230,6 +6391,21 @@ function validateRecoveredState(state: RgbServiceState, currentWallet: RgbWallet
       )
     ) throw new RgbServiceError('RGB recovery checkpoint contains an invalid discarded asset')
   }
+  for (const discarded of state.discardedAllocations || []) {
+    if (
+      !discarded ||
+      normalizeAssetId(discarded.assetId) !== discarded.assetId ||
+      !/^[0-9a-f]{64}$/i.test(discarded.outpoint?.txid || '') ||
+      !Number.isInteger(discarded.outpoint?.vout) ||
+      discarded.outpoint.vout < 0 ||
+      (discarded.opId !== undefined && !/^[0-9a-f]{64}$/i.test(discarded.opId)) ||
+      (discarded.assignmentIndex !== undefined &&
+        (!Number.isInteger(discarded.assignmentIndex) || discarded.assignmentIndex < 0)) ||
+      !Number.isSafeInteger(discarded.discardedAt) ||
+      discarded.discardedAt < 0 ||
+      !['rejected_receive', 'manual'].includes(discarded.reason)
+    ) throw new RgbServiceError('RGB recovery checkpoint contains an invalid discarded allocation')
+  }
   for (const utxo of state.snapshot.utxos) {
     if (
       !utxo ||
@@ -6463,6 +6639,14 @@ function normalizeStateAssetIds(state: RgbServiceState): RgbServiceState {
         },
       ])
     )
+  }
+  if (state.discardedAllocations) {
+    state.discardedAllocations = state.discardedAllocations.map(item => ({
+      ...item,
+      assetId: normalizeAssetId(item.assetId),
+      outpoint: { ...item.outpoint, txid: item.outpoint.txid.toLowerCase() },
+      ...(item.opId ? { opId: item.opId.toLowerCase() } : {}),
+    }))
   }
   if (state.burnProofs) {
     for (const proof of Object.values(state.burnProofs)) {

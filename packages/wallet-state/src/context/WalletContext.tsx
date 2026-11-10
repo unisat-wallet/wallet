@@ -813,8 +813,12 @@ export interface WalletController {
           amount: string
           settled: boolean
           spendable: boolean
+          opId?: string
+          assignmentIndex?: number
           localHistoryAvailable?: boolean
           historyAvailable?: boolean
+          discardable?: boolean
+          rejected?: boolean
         }>
       }>
     }
@@ -829,6 +833,20 @@ export interface WalletController {
       txid: string
       vout: number
     }>
+  }>
+
+  discardRgbUtxoAllocation(params: {
+    txid: string
+    vout: number
+    assetId: string
+    opId?: string
+    assignmentIndex?: number
+  }): Promise<{
+    discarded: number
+    assetId: string
+    outpoint: { txid: string; vout: number }
+    opId?: string
+    assignmentIndex?: number
   }>
 
   cancelRgbReceiveInvoice(params: { batchTransferIdx: number; skipSync?: boolean }): Promise<{

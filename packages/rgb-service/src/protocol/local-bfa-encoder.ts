@@ -536,7 +536,9 @@ export function createLocalRgbProtocolEncoder(
       const knownBlindSeals = input.validationHistory.knownBlindSeals || []
       const pendingWitnessTxid = selectedPendingWitnessTxid(input.selectedUtxos)
       const requiredOperationIds = input.selectedUtxos.flatMap(utxo =>
-        utxo.allocations.map(allocation => allocation.opId || '')
+        utxo.allocations
+          .filter(allocation => normalizeRgbAssetId(allocation.assetId) === normalizeRgbAssetId(input.request.assetId))
+          .map(allocation => allocation.opId || '')
       )
       const evmRpcCache = new Map<string, Promise<unknown>>()
       const bitcoinStatusCache = new Map<string, Promise<boolean>>()
@@ -582,7 +584,9 @@ export function createLocalRgbProtocolEncoder(
       const transferPayloads = compatiblePayloads.filter(isSupportedV1TransferConsignment)
       if (!transferPayloads.length) throw new RgbServiceError('RGB v1 history has no transfer')
       const requiredOperationIds = input.selectedUtxos.flatMap(utxo =>
-        utxo.allocations.map(allocation => allocation.opId || '')
+        utxo.allocations
+          .filter(allocation => normalizeRgbAssetId(allocation.assetId) === normalizeRgbAssetId(input.intent.assetId))
+          .map(allocation => allocation.opId || '')
       )
       const singlePayload = transferPayloads.length === 1 ? transferPayloads[0] : undefined
       const confirmedBitcoinWitnesses = input.validationHistory.confirmedBitcoinWitnesses

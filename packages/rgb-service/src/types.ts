@@ -593,6 +593,18 @@ export interface RgbServiceState {
     outpoints: RgbOutpoint[]
     discardedAt: number
   }>
+  /**
+   * User-confirmed allocation-level abandonment. These tombstones prevent a
+   * stale indexer snapshot from restoring rejected RGB state to a live carrier.
+   */
+  discardedAllocations?: Array<{
+    outpoint: RgbOutpoint
+    assetId: string
+    opId?: string
+    assignmentIndex?: number
+    discardedAt: number
+    reason: 'rejected_receive' | 'manual'
+  }>
   /** Unconfirmed fee-pool outputs retained until the address indexer exposes them. */
   pendingFeePoolUtxos?: RgbFeePoolUtxo[]
   /** Validated blind seals retained locally for later ownership proofs when spending received assets. */

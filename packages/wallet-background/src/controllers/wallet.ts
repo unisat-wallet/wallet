@@ -383,6 +383,17 @@ type RgbControllerApiService = {
       }>
     }>
   }) => Promise<void>
+  discardRgbAllocation: (params: {
+    address: string
+    wallet?: RgbWalletRef & { network: string }
+    lease?: RgbControllerWriteLeaseCredential
+    txid: string
+    vout: number
+    assetId: string
+    opId: string
+    assignmentIndex: number
+    reason: 'user_confirmed_rejected_or_unverifiable'
+  }) => Promise<void>
   getRgbWalletUtxoSnapshot: (params: {
     wallet: RgbWalletRef
     forceSync?: boolean
@@ -5303,6 +5314,40 @@ export class WalletController extends BaseController {
       address: fundingAccount.address,
       derivationPath: fundingAccount.derivationPath,
     }
+  }
+
+  discardRgbUtxoAllocation = async (params: {
+    txid: string
+    vout: number
+    assetId: string
+    opId?: string
+    assignmentIndex?: number
+  }) => {
+    const context = await this.getLocalRgbService()
+    await this.ensureRgbWriteLease(context, { forceRenew: true })
+    await context.service.sync()
+    const result = await context.service.discardUtxoAllocation({
+      outpoint: { txid: params.txid, vout: params.vout },
+      assetId: params.assetId,
+      ...(params.opId ? { opId: params.opId } : {}),
+      ...(params.assignmentIndex === undefined ? {} : { assignmentIndex: params.assignmentIndex }),
+    })
+    const lease = this.getRgbActiveWriteLease(context.wallet)
+    if (result.opId !== undefined && result.assignmentIndex !== undefined) {
+      await getRgbApiService().discardRgbAllocation({
+        address: context.wallet.fundingAddress,
+        wallet: context.wallet,
+        ...(lease ? { lease } : {}),
+        txid: result.outpoint.txid,
+        vout: result.outpoint.vout,
+        assetId: result.assetId,
+        opId: result.opId,
+        assignmentIndex: result.assignmentIndex,
+        reason: 'user_confirmed_rejected_or_unverifiable',
+      })
+    }
+    await this.rgbIndexerOutbox.sync(context.service, context.wallet)
+    return result
   }
 
   cancelRgbReceiveInvoice = async (params: Omit<RgbCancelReceiveInvoiceRequest, 'wallet'>) => {

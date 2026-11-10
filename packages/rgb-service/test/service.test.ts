@@ -3937,6 +3937,82 @@ describe('RgbService', () => {
     expect(service.getUtxoInspection().invoiceReservations).toEqual([])
   })
 
+  it('abandons a rejected companion allocation without removing the valid target allocation', async () => {
+    const service = new RgbService(createDependencies())
+    await service.open(wallet)
+    const targetAssetId = 'rgb:AQEBAQEB-AQEBAQE-BAQEBAQ-EBAQEBA-QEBAQEB-AQEBAQE'
+    const rejectedAssetId = 'rgb:AgICAgIC-AgICAgI-CAgICAg-ICAgICA-gICAgIC-AgICAgI'
+    const utxo = {
+      outpoint: { txid: 'a'.repeat(64), vout: 0 },
+      satoshis: 1_000,
+      scriptPubKey: `5120${'11'.repeat(32)}`,
+      publicKey: `02${'22'.repeat(32)}`,
+      chainStatus: 'confirmed' as const,
+      allocations: [
+        { assetId: targetAssetId, amount: '10', settled: true, spendable: true,
+          opId: '1'.repeat(64), assignmentIndex: 0, assignmentType: 4000 },
+        { assetId: rejectedAssetId, amount: '20', settled: true, spendable: true,
+          opId: '2'.repeat(64), assignmentIndex: 0, assignmentType: 4000 },
+      ],
+    }
+    const state = (service as any).state
+    state.snapshot = { syncedAt: 1, utxos: [utxo] }
+    state.pendingReceives = [{
+      invoice: rgbInvoice(), recipientId: 'rejected', createdAt: 1,
+      pendingAccept: {
+        payload: 'payload', txid: 'b'.repeat(64), assetId: rejectedAssetId,
+        amount: '20', operationIds: ['2'.repeat(64)], discoveredAt: 1,
+      },
+      rejection: { kind: 'local_donation_reject', rejectedAt: 2, reason: 'Rejected by you' },
+    }]
+
+    await expect((service as any).discardRejectedCompanionAllocations([utxo], targetAssetId))
+      .resolves.toBe(1)
+
+    expect(state.snapshot.utxos[0].allocations).toEqual([
+      expect.objectContaining({ assetId: targetAssetId, opId: '1'.repeat(64) }),
+    ])
+    expect(state.discardedAllocations).toEqual([
+      expect.objectContaining({
+        assetId: rejectedAssetId,
+        opId: '2'.repeat(64),
+        reason: 'rejected_receive',
+      }),
+    ])
+    expect(state.pendingUtxoSync.outpoints[0].allocations).toHaveLength(1)
+  })
+
+  it('only allows manual removal of rejected or locally unverifiable allocations', async () => {
+    const service = new RgbService(createDependencies())
+    await service.open(wallet)
+    const state = (service as any).state
+    const assetId = 'rgb:AQEBAQEB-AQEBAQE-BAQEBAQ-EBAQEBA-QEBAQEB-AQEBAQE'
+    const utxo = {
+      outpoint: { txid: 'a'.repeat(64), vout: 0 },
+      satoshis: 1_000,
+      scriptPubKey: `5120${'11'.repeat(32)}`,
+      publicKey: `02${'22'.repeat(32)}`,
+      chainStatus: 'confirmed' as const,
+      allocations: [{ assetId, amount: '10', settled: true, spendable: true,
+        opId: '1'.repeat(64), assignmentIndex: 0, assignmentType: 4000 }],
+    }
+    state.snapshot = { syncedAt: 1, utxos: [utxo] }
+    state.contracts = { [assetId]: {
+      consignment: 'payload', createdAt: 1,
+      history: { payload: 'payload', opIds: ['1'.repeat(64)], updatedAt: 1 },
+    } }
+
+    await expect(service.discardUtxoAllocation({
+      outpoint: utxo.outpoint, assetId, opId: '1'.repeat(64), assignmentIndex: 0,
+    })).rejects.toThrow('valid RGB allocation cannot be removed')
+
+    delete state.contracts[assetId]
+    await expect(service.discardUtxoAllocation({
+      outpoint: utxo.outpoint, assetId, opId: '1'.repeat(64), assignmentIndex: 0,
+    })).resolves.toMatchObject({ discarded: 1, assetId })
+    expect(state.snapshot.utxos[0].allocations).toEqual([])
+  })
+
   it('does not count hidden expired invoices against active receive capacity', async () => {
     const dependencies = createDependencies()
     dependencies.now = () => 2_000_000

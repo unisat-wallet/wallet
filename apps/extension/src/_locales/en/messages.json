@@ -2871,6 +2871,11 @@
   "rgb_utxo_history_missing": {
     "message": "History missing"
   },
+  "rgb_utxo_rejected_allocation": { "message": "Rejected allocation" },
+  "rgb_utxo_remove_allocation": { "message": "Remove from wallet state" },
+  "rgb_utxo_remove_allocation_title": { "message": "Permanently remove this allocation?" },
+  "rgb_utxo_remove_allocation_description": { "message": "This allocation was rejected or cannot be verified locally. Removing it permanently abandons the RGB asset state on this carrier. This cannot be undone." },
+  "rgb_utxo_remove_allocation_confirm": { "message": "Remove permanently" },
   "rgb_utxo_chain_status": {
     "message": "{status} · {confirmations} confirmations · {sats} sats"
   },

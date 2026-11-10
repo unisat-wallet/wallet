@@ -7,6 +7,7 @@ import { isSameRgbAssetId, toRgbDisplayAmount, useI18n, useNavigation, useTools,
 
 type UtxoInspection = Awaited<ReturnType<ReturnType<typeof useWallet>['getRgbUtxoInspection']>>;
 type InspectedUtxo = NonNullable<UtxoInspection>['snapshot']['utxos'][number];
+type InspectedAllocation = InspectedUtxo['allocations'][number];
 
 const shortTxid = (txid: string) => (txid.length > 18 ? `${txid.slice(0, 10)}…${txid.slice(-6)}` : txid);
 
@@ -96,7 +97,12 @@ export default function RgbUtxoInspectionScreen() {
   const configuredUsdtAssetId = useWalletConfig().rgbUsdtAssetId?.trim();
   const [inspection, setInspection] = useState<UtxoInspection>();
   const [selectedUtxo, setSelectedUtxo] = useState<InspectedUtxo>();
+  const [selectedAllocation, setSelectedAllocation] = useState<{
+    utxo: InspectedUtxo;
+    allocation: InspectedAllocation;
+  }>();
   const [refreshing, setRefreshing] = useState(false);
+  const [discarding, setDiscarding] = useState(false);
 
   const refresh = useCallback(
     async (showSuccess = false) => {
@@ -139,6 +145,28 @@ export default function RgbUtxoInspectionScreen() {
     : selectedUtxo?.allocations.length
       ? t('rgb_utxo_has_assets')
       : t('rgb_utxo_available');
+  const discardSelectedAllocation = async () => {
+    if (!selectedAllocation) return;
+    setDiscarding(true);
+    try {
+      await wallet.discardRgbUtxoAllocation({
+        txid: selectedAllocation.utxo.outpoint.txid,
+        vout: selectedAllocation.utxo.outpoint.vout,
+        assetId: selectedAllocation.allocation.assetId,
+        ...(selectedAllocation.allocation.opId ? { opId: selectedAllocation.allocation.opId } : {}),
+        ...(selectedAllocation.allocation.assignmentIndex === undefined
+          ? {}
+          : { assignmentIndex: selectedAllocation.allocation.assignmentIndex })
+      });
+      setSelectedAllocation(undefined);
+      await refresh();
+      tools.toastSuccess(t('success'));
+    } catch (error) {
+      tools.toastError(error instanceof Error ? error.message : String(error));
+    } finally {
+      setDiscarding(false);
+    }
+  };
   return (
     <Layout>
       <Header onBack={() => window.history.go(-1)} title={t('rgb_asset_address')} />
@@ -256,8 +284,17 @@ export default function RgbUtxoInspectionScreen() {
                             gap="sm"
                             style={{
                               ...assetAllocationCardStyle,
-                              ...(historyMissing ? { border: '1px solid rgba(255,82,82,0.55)' } : {})
-                            }}>
+                              ...(historyMissing || allocation.rejected
+                                ? { border: '1px solid rgba(255,82,82,0.55)' }
+                                : {}),
+                              ...(allocation.discardable ? { cursor: 'pointer' } : {})
+                            }}
+                            onClick={allocation.discardable
+                              ? () => {
+                                  setSelectedUtxo(undefined);
+                                  setSelectedAllocation({ utxo, allocation });
+                                }
+                              : undefined}>
                             <Row itemsCenter gap="sm" style={{ flex: 1, minWidth: 0, overflow: 'hidden' }}>
                               <RGBAssetIcon
                                 assetId={allocation.assetId}
@@ -279,6 +316,12 @@ export default function RgbUtxoInspectionScreen() {
                               <HistoryAmount amount={amount} color="white" />
                               {historyMissing ? (
                                 <Text text={t('rgb_utxo_history_missing')} color="red" size="xxs" />
+                              ) : null}
+                              {allocation.rejected ? (
+                                <Text text={t('rgb_utxo_rejected_allocation')} color="red" size="xxs" />
+                              ) : null}
+                              {allocation.discardable ? (
+                                <Text text={t('rgb_utxo_remove_allocation')} color="red" size="xxs" />
                               ) : null}
                             </Column>
                           </Row>
@@ -346,6 +389,40 @@ export default function RgbUtxoInspectionScreen() {
                 setSelectedUtxo(undefined);
                 nav.navToExplorerTx(txid);
               }}
+            />
+          </Column>
+        </BottomModal>
+      ) : null}
+      {selectedAllocation ? (
+        <BottomModal onClose={() => !discarding && setSelectedAllocation(undefined)}>
+          <Column gap="lg">
+            <Text text={t('rgb_utxo_remove_allocation_title')} color="white" size="lg" textCenter />
+            <Text
+              text={t('rgb_utxo_remove_allocation_description')}
+              color="textDim"
+              size="sm"
+              textCenter
+              wrap
+            />
+            <Column gap="sm" fullX style={{ padding: 14, borderRadius: 12, background: 'rgba(255,255,255,0.06)' }}>
+              <CopyableAddress
+                address={selectedAllocation.allocation.assetId}
+                copyPosition="after"
+                len={8}
+                color="ticker_color2"
+              />
+              <Text
+                text={`${shortTxid(selectedAllocation.utxo.outpoint.txid)}:${selectedAllocation.utxo.outpoint.vout}`}
+                color="textDim"
+                size="xs"
+                disableTranslate
+              />
+            </Column>
+            <Button
+              preset="danger"
+              text={t('rgb_utxo_remove_allocation_confirm')}
+              disabled={discarding}
+              onClick={() => void discardSelectedAllocation()}
             />
           </Column>
         </BottomModal>

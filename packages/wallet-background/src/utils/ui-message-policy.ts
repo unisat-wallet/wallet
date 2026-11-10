@@ -64,6 +64,7 @@ const UI_CONTROLLER_METHODS = new Set([
   'createTmpKeyringWithPublicKey',
   'decodePsbt',
   'deleteNotification',
+  'discardRgbUtxoAllocation',
   'deriveAccountsFromXpub',
   'deriveNewAccountFromMnemonic',
   'enableRgbFeature',

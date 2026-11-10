@@ -2862,6 +2862,11 @@
   "rgb_utxo_history_missing": {
     "message": "缺少歷史資料"
   },
+  "rgb_utxo_rejected_allocation": { "message": "已拒絕的 allocation" },
+  "rgb_utxo_remove_allocation": { "message": "從錢包狀態移除" },
+  "rgb_utxo_remove_allocation_title": { "message": "永久移除此 allocation？" },
+  "rgb_utxo_remove_allocation_description": { "message": "此 allocation 已被拒絕或無法在本機驗證。移除後將永久放棄此載體上的 RGB 資產狀態，且無法復原。" },
+  "rgb_utxo_remove_allocation_confirm": { "message": "永久移除" },
   "rgb_utxo_chain_status": {
     "message": "{status} · {confirmations} 個確認 · {sats} sats"
   },

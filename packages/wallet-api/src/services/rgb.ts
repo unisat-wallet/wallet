@@ -32,6 +32,7 @@ import type {
   RgbReceiveValidationFailureStatusRequest,
   RgbReceiveValidationFailureStatusResult,
   RgbTransferSyncRequest,
+  RgbAllocationDiscardRequest,
   RgbUtxoSyncRequest,
   RgbWalletUtxoSnapshotRequest,
   RgbWalletUtxoSnapshotResult,
@@ -258,6 +259,10 @@ export class RgbService {
 
   async replaceRgbUtxos(params: RgbUtxoSyncRequest): Promise<void> {
     await this.privatePost('/v5/rgb/utxos/replace', normalizeUtxoSyncRequest(params))
+  }
+
+  async discardRgbAllocation(params: RgbAllocationDiscardRequest): Promise<void> {
+    await this.privatePost('/v5/rgb/utxos/allocations/discard', params)
   }
 
   async acquireRgbWriteLease(params: RgbWriteLeaseAcquireRequest): Promise<RgbWriteLease> {
