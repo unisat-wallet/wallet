@@ -362,6 +362,13 @@ export interface RgbPendingReceive {
     reviewReason?: string
     reviewPayloadReported?: boolean
   }
+  /** Persistent backoff for retriable chain/EVM validation failures of one immutable payload. */
+  validationRetry?: {
+    payloadHash: string
+    attempts: number
+    nextRetryAt: number
+    reason: string
+  }
   /**
    * Durable rejection tombstone. The receive itself remains in encrypted
    * storage so its one-time Proxy v1 key and validation context are not lost.

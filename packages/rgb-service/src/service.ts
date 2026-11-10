@@ -86,6 +86,13 @@ const PROVIDER_ORIGIN_HISTORY_TTL_MS = 24 * 60 * 60 * 1000
 const MAX_RECOVERY_HISTORY_PAYLOAD_LENGTH = 48_000_000
 const MAX_RECOVERY_HISTORY_OPERATION_IDS = 65_535
 const MAX_EXACT_BURN_SELECTION_STATES = 100_000
+const RECEIVE_VALIDATION_RETRY_DELAYS_MS = [
+  5 * 60_000,
+  30 * 60_000,
+  2 * 60 * 60_000,
+  12 * 60 * 60_000,
+  24 * 60 * 60_000,
+]
 
 function canonicalHistoryHash(payload: string) {
   return bitcoinCrypto.sha256(Buffer.from(payload, 'base64')).toString('hex')
@@ -1930,6 +1937,11 @@ export class RgbService {
       )
       if (receiveIndex < 0) continue
       const receive = pending[receiveIndex]!
+      const validationPayloadHash = canonicalHistoryHash(item.payload)
+      if (receive.validationRetry && receive.validationRetry.payloadHash !== validationPayloadHash) {
+        delete receive.validationRetry
+        changed = true
+      }
       // A proxy NACK and an explicit user rejection of a donation are
       // terminal. Only a local rejection caused by an old validation failure
       // may be reconsidered after a later wallet upgrade validates it.
@@ -2017,6 +2029,7 @@ export class RgbService {
             continue
           }
         }
+        if (receive.validationRetry && receive.validationRetry.nextRetryAt > this.now()) continue
         const match = await this.validateIncomingConsignment(
           receive,
           item,
@@ -2025,6 +2038,10 @@ export class RgbService {
           },
           receiveValidationCaches
         )
+        if (receive.validationRetry) {
+          delete receive.validationRetry
+          changed = true
+        }
         if (!match) {
           const reason = mismatchReason || 'Consignment does not match this invoice'
           stageValidationFailure(reason)
@@ -2263,20 +2280,33 @@ export class RgbService {
           changed = true
         }
       } catch (error) {
+        if (error instanceof RgbBfaValidationUnavailableError) {
+          // Dynamic Bitcoin/EVM data may become available later. Persist a
+          // payload-scoped backoff so frequent asset-screen polling does not
+          // repeat the same expensive validation pass. A changed payload
+          // bypasses this delay above and is checked immediately.
+          const previous = receive.validationRetry
+          const attempts = previous?.payloadHash === validationPayloadHash
+            ? previous.attempts + 1
+            : 1
+          const delay = RECEIVE_VALIDATION_RETRY_DELAYS_MS[
+            Math.min(attempts - 1, RECEIVE_VALIDATION_RETRY_DELAYS_MS.length - 1)
+          ]!
+          receive.validationRetry = {
+            payloadHash: validationPayloadHash,
+            attempts,
+            nextRetryAt: this.now() + delay,
+            reason: error.message.slice(0, 300),
+          }
+          changed = true
+          if (receive.pendingValidationFailure) delete receive.pendingValidationFailure
+          continue
+        }
         if (receive.receivedConsignment?.accepted) {
           // ACK is immutable once accepted. A local settlement failure (for
           // example, while merging recovered history) is retriable and must
           // never turn a successfully acknowledged transfer into a NACK or a
           // user-visible rejected receive.
-          continue
-        }
-        if (error instanceof RgbBfaValidationUnavailableError) {
-          // Missing chain finality, RPC data, or another transient validation
-          // dependency must remain retriable and must never invite a NACK.
-          if (receive.pendingValidationFailure) {
-            delete receive.pendingValidationFailure
-            changed = true
-          }
           continue
         }
         const message = error instanceof Error ? error.message : String(error)

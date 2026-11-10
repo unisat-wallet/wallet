@@ -2746,6 +2746,8 @@ describe('RgbService', () => {
 
   it('keeps a receive pending while EVM mint finality is unavailable and retries it', async () => {
     const dependencies = createDependencies()
+    let now = 1_000
+    dependencies.now = () => now
     dependencies.transport.getConsignment = vi.fn().mockResolvedValue({
       recipientId: 'recipient', payload: 'consignment', endpoint: proxyEndpoint,
     })
@@ -2770,14 +2772,66 @@ describe('RgbService', () => {
 
     expect(service.getPendingReceives()[0]).not.toHaveProperty('pendingValidationFailure')
     expect(service.getPendingReceives()[0]).not.toHaveProperty('pendingAccept')
+    expect(service.getPendingReceives()[0]?.validationRetry).toMatchObject({
+      attempts: 1,
+      nextRetryAt: now + 5 * 60_000,
+    })
+    const reopened = new RgbService(dependencies)
+    await reopened.open(wallet)
+    expect(reopened.getPendingReceives()[0]?.validationRetry).toMatchObject({
+      attempts: 1,
+      nextRetryAt: now + 5 * 60_000,
+    })
     expect(dependencies.transport.acknowledgeConsignment).not.toHaveBeenCalled()
 
+    await service.processClaimedReceives({ includeClaimed: false })
+    expect((service as any).validateIncomingConsignment).toHaveBeenCalledTimes(1)
+    expect(service.getPendingReceives()[0]).not.toHaveProperty('pendingAccept')
+
+    now += 5 * 60_000
     await service.processClaimedReceives({ includeClaimed: false })
 
     expect(service.getPendingReceives()[0]?.pendingAccept).toMatchObject({
       txid: 'c'.repeat(64), amount: '60',
     })
+    expect(service.getPendingReceives()[0]).not.toHaveProperty('validationRetry')
     expect(dependencies.transport.acknowledgeConsignment).not.toHaveBeenCalled()
+  })
+
+  it('bypasses receive validation backoff when the proxy payload changes', async () => {
+    const dependencies = createDependencies()
+    dependencies.now = () => 1_000
+    dependencies.transport.getConsignment = vi.fn()
+      .mockResolvedValueOnce({
+        recipientId: 'recipient', payload: 'first-consignment', endpoint: proxyEndpoint,
+      })
+      .mockResolvedValue({
+        recipientId: 'recipient', payload: 'replacement-consignment', endpoint: proxyEndpoint,
+      })
+    const service = new RgbService(dependencies)
+    await service.open(wallet)
+    ;(service as any).state.pendingReceives = [{
+      invoice: rgbInvoice(), recipientId: 'recipient', createdAt: 1,
+      seal: { txid: 'a'.repeat(64), vout: 0, blinding: 1n },
+    }]
+    ;(service as any).validateIncomingConsignment = vi.fn()
+      .mockRejectedValueOnce(new RgbBfaValidationUnavailableError('EVM data unavailable'))
+      .mockReturnValue({
+        assetId: 'rgb:AQEBAQEB-AQEBAQE-BAQEBAQ-EBAQEBA-QEBAQEB-AQEBAQE',
+        amount: '60', txid: 'c'.repeat(64),
+        decoded: { metadata: {
+          ticker: 'TOK', name: 'Token', precision: 0, schema: 'BFA', issuedSupply: '60',
+        } },
+      })
+
+    await service.processClaimedReceives({ includeClaimed: false })
+    await service.processClaimedReceives({ includeClaimed: false })
+
+    expect((service as any).validateIncomingConsignment).toHaveBeenCalledTimes(2)
+    expect(service.getPendingReceives()[0]).not.toHaveProperty('validationRetry')
+    expect(service.getPendingReceives()[0]?.pendingAccept).toMatchObject({
+      txid: 'c'.repeat(64), amount: '60',
+    })
   })
 
   it('keeps an acknowledged receive pending when local settlement fails', async () => {
