@@ -3566,6 +3566,10 @@
   "rgb_accept_transfer": {
     "message": "Accept"
   },
+  "rgb_pending_acceptances": { "message": "Pending Acceptance" },
+  "rgb_pending_acceptance_summary": { "message": "Transfers waiting for your review" },
+  "rgb_view_all_pending": { "message": "View all" },
+  "rgb_no_pending_acceptance": { "message": "No transfers are waiting for acceptance" },
   "rgb_accept_progress_preparing": { "message": "Preparing acceptance" },
   "rgb_accept_progress_checking": { "message": "Checking transfer status" },
   "rgb_accept_progress_validating": { "message": "Validating RGB history" },

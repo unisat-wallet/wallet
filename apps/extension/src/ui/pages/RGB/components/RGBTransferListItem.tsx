@@ -90,6 +90,7 @@ export function RGBTransferListItem({
   showAssetLabel,
   showDate,
   showDirectionIcon,
+  batchCount,
   onClick
 }: {
   item: RgbTransferItem;
@@ -97,6 +98,7 @@ export function RGBTransferListItem({
   showAssetLabel?: boolean;
   showDate?: boolean;
   showDirectionIcon?: boolean;
+  batchCount?: number;
   onClick?: () => void;
 }) {
   const { t } = useI18n();
@@ -158,7 +160,13 @@ export function RGBTransferListItem({
           <Column gap="xs" style={{ minWidth: 0, overflow: 'hidden' }}>
             <Row style={{ minWidth: 0, flexDirection: 'column', alignItems: 'flex-start', gap: 4 }}>
               <Text text={item.burn ? t('rgb_burn') : getTransferTitle(item.type, t)} style={{ flexShrink: 0, lineHeight: '20px' }} />
-              {item.batch ? <Text text={t('rgb_batch_transfer')} color="textDim" size="xs" /> : null}
+              {item.batch ? (
+                <Text
+                  text={`${t('rgb_batch_transfer')}${batchCount && batchCount > 1 ? ` (${batchCount})` : ''}`}
+                  color="textDim"
+                  size="xs"
+                />
+              ) : null}
               {showStatus ? (
                 <Row
                   style={{

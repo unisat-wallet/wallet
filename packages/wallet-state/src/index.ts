@@ -54,6 +54,11 @@ export { uiEventBus } from './utils/eventBus'
 export { getReadyRgbBroadcasts, selectReadyRgbBroadcastId } from './utils/rgb-broadcast-queue'
 export { isSameRgbAssetId, normalizeConfiguredRgbUsdt } from './utils/rgb-usdt'
 export {
+  groupRgbPendingAcceptances,
+  isRgbPendingAcceptance,
+  type RgbPendingTransferGroup,
+} from './utils/rgb-pending-transfer-groups'
+export {
   decodeRgbInvoice,
   decodeRgbInvoiceAmountState,
   getRgbInvoiceAmount,

@@ -1,13 +1,21 @@
 import { useState } from 'react';
 
 import { InfiniteList } from '@/ui/components';
-import { useI18n, useNavigation, useRGBTransfersLogic, type RgbTransferItem } from '@unisat/wallet-state';
+import {
+  groupRgbPendingAcceptances,
+  useI18n,
+  useNavigation,
+  useRGBTransfersLogic,
+  type RgbPendingTransferGroup,
+  type RgbTransferItem
+} from '@unisat/wallet-state';
 
 import { RGBTransferDetailSheet } from '../../RGB/RGBTransferDetailSheet';
 import { getRgbTransferDateKey, RGBTransferListItem } from '../../RGB/components/RGBTransferListItem';
 
 type RGBTransfersListProps = {
   transfers: ReturnType<typeof useRGBTransfersLogic>;
+  pendingOnly?: boolean;
 };
 
 const RGB_TRANSFERS_PAGE_SIZE = 10;
@@ -16,7 +24,71 @@ function getTransferId(transfer: RgbTransferItem) {
   return transfer.transferId || transfer.id;
 }
 
-export function RGBTransfersList({ transfers }: RGBTransfersListProps) {
+function RGBPendingTransfersList({ transfers }: { transfers: ReturnType<typeof useRGBTransfersLogic> }) {
+  const { t } = useI18n();
+  const nav = useNavigation();
+  const { items, loading, hasMore, onRefresh, onLoadMore } = transfers;
+  const [selectedGroup, setSelectedGroup] = useState<RgbPendingTransferGroup>();
+  const [acceptedTransferIds, setAcceptedTransferIds] = useState<Set<string>>(() => new Set());
+  const groups = groupRgbPendingAcceptances(
+    items.filter((item) => !acceptedTransferIds.has(getTransferId(item)))
+  );
+  const latestSelectedGroup = selectedGroup
+    ? groups.find((group) => group.key === selectedGroup.key) || selectedGroup
+    : undefined;
+
+  return (
+    <>
+      <InfiniteList
+        data={groups}
+        total={groups.length + (hasMore ? 1 : 0)}
+        keyExtractor={(group) => group.key}
+        hasMore={hasMore}
+        loading={loading}
+        onRefresh={onRefresh}
+        onLoadMore={onLoadMore}
+        emptyText={t('rgb_no_pending_acceptance')}
+        emptyPreset="simple"
+        rowGap={0}
+        pageSize={RGB_TRANSFERS_PAGE_SIZE}
+        preservePageOnTotalChange
+        renderItem={({ item: group }) => (
+          <RGBTransferListItem
+            item={group.representative}
+            batchCount={group.items.length}
+            showAssetLabel
+            showDirectionIcon
+            onClick={() => setSelectedGroup(group)}
+          />
+        )}
+      />
+
+      {latestSelectedGroup ? (
+        <RGBTransferDetailSheet
+          transfer={latestSelectedGroup.representative}
+          transferId={getTransferId(latestSelectedGroup.representative)}
+          batchTransfers={latestSelectedGroup.items}
+          onClose={() => setSelectedGroup(undefined)}
+          onAccepted={() => {
+            setAcceptedTransferIds((current) => {
+              const next = new Set(current);
+              latestSelectedGroup.items.forEach((item) => next.add(getTransferId(item)));
+              return next;
+            });
+          }}
+          onCanceled={() => void transfers.onRefresh({ showLoading: false })}
+          onClickExploreTx={
+            latestSelectedGroup.representative.txid
+              ? () => nav.navToExplorerTx(latestSelectedGroup.representative.txid || '')
+              : undefined
+          }
+        />
+      ) : null}
+    </>
+  );
+}
+
+export function RGBTransfersList({ transfers, pendingOnly = false }: RGBTransfersListProps) {
   const { t } = useI18n();
   const nav = useNavigation();
   const { items, total, loading, hasMore, onRefresh, onLoadMore } = transfers;
@@ -25,6 +97,8 @@ export function RGBTransfersList({ transfers }: RGBTransfersListProps) {
   const latestSelectedTransfer = selectedTransfer
     ? items.find((item) => getTransferId(item) === getTransferId(selectedTransfer)) || selectedTransfer
     : undefined;
+
+  if (pendingOnly) return <RGBPendingTransfersList transfers={transfers} />;
 
   return (
     <>

@@ -3543,6 +3543,10 @@
   "rgb_accept_transfer": {
     "message": "接受"
   },
+  "rgb_pending_acceptances": { "message": "待接受轉帳" },
+  "rgb_pending_acceptance_summary": { "message": "有轉帳正在等待你的處理" },
+  "rgb_view_all_pending": { "message": "查看全部" },
+  "rgb_no_pending_acceptance": { "message": "目前沒有待接受轉帳" },
   "rgb_accept_progress_preparing": { "message": "正在準備接收" },
   "rgb_accept_progress_checking": { "message": "正在檢查轉帳狀態" },
   "rgb_accept_progress_validating": { "message": "正在驗證 RGB 歷史" },

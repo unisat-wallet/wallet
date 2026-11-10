@@ -4,6 +4,7 @@ import { BottomSheetHeader, Button, Card, Column, Icon, Row, Text } from '@/ui/c
 import { BottomModal } from '@/ui/components/BottomModal';
 import {
   useI18n,
+  isRgbPendingAcceptance,
   useCurrentAccountCapabilities,
   useNavigation,
   useUnisatWebsite,
@@ -43,10 +44,7 @@ export function RGBHomeTabs({ transfers, list }: RGBHomeTabsProps) {
   };
 
   const pendingReceives = transfers.items.filter(
-    (item) =>
-      item.type === 'receive' &&
-      item.status.toLowerCase() === 'pending_accept' &&
-      !handledTransferIds.has(item.transferId || item.id)
+    (item) => isRgbPendingAcceptance(item) && !handledTransferIds.has(item.transferId || item.id)
   );
   const pendingBroadcasts = transfers.items.filter(
     (item) =>
@@ -93,9 +91,10 @@ export function RGBHomeTabs({ transfers, list }: RGBHomeTabsProps) {
         </Column>
       )}
       {pendingReceives.length > 0 && (
-        <Column
+        <Row
           fullX
-          gap="zero"
+          justifyBetween
+          itemsCenter
           data-testid="rgb-pending-actions"
           style={{
             padding: '12px 16px',
@@ -105,20 +104,22 @@ export function RGBHomeTabs({ transfers, list }: RGBHomeTabsProps) {
             boxSizing: 'border-box'
           }}
         >
-          <Text text={`${t('rgb_approval_pending_acceptance')} (${pendingReceives.length})`} color="gold" size="sm" />
-          {pendingReceives.map((item) => (
-            <Column key={item.transferId || item.id} gap="zero">
-              <RGBTransferListItem item={item} onClick={() => setSelectedPendingTransfer(item)} />
-              <Text
-                text={t('view_transfer')}
-                color="gold"
-                size="xs"
-                onClick={() => setSelectedPendingTransfer(item)}
-                style={{ alignSelf: 'flex-end', paddingTop: 6, paddingBottom: 8, cursor: 'pointer' }}
-              />
-            </Column>
-          ))}
-        </Column>
+          <Column gap="xs" style={{ minWidth: 0 }}>
+            <Text
+              text={`${t('rgb_approval_pending_acceptance')} (${pendingReceives.length})`}
+              color="gold"
+              size="sm"
+            />
+            <Text text={t('rgb_pending_acceptance_summary')} color="textDim" size="xs" />
+          </Column>
+          <Text
+            text={t('rgb_view_all_pending')}
+            color="gold"
+            size="sm"
+            onClick={() => nav.navigate('RGBTransfersScreen', { filter: 'pending' })}
+            style={{ flexShrink: 0, cursor: 'pointer', paddingLeft: 12 }}
+          />
+        </Row>
       )}
       <Column style={{ gap: 13 }}>
         <Row fullX itemsCenter style={{ gap: 8 }}>

@@ -190,7 +190,7 @@ export type RouteParamList = {
   }
 
   // RGB
-  RGBTransfersScreen: undefined
+  RGBTransfersScreen: { filter?: 'pending' } | undefined
   RGBReceiveScreen: {
     assetId?: string
     tokenBalance?: RgbBalance
