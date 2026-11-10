@@ -35,7 +35,13 @@ export type RgbBackendApi = {
   getRgbWalletUtxoSnapshot: (params: {
     wallet: RgbWalletRef
     forceSync?: boolean
-  }) => Promise<{ syncedAt: number; utxos: RgbIndexedUtxo[] }>
+    knownRevision?: number
+  }) => Promise<{
+    changed?: boolean
+    revision?: number
+    syncedAt: number
+    utxos?: RgbIndexedUtxo[]
+  }>
   getRgbConsignmentHistory: (params: {
     wallet: RgbWalletRef
     assetId: string
@@ -145,11 +151,28 @@ export function createRgbBackendAdapter(
 ): RgbStateSource {
   const { api } = dependencies
   return {
-    getSnapshot: async wallet => {
-      const snapshot = await api.getRgbWalletUtxoSnapshot({ wallet, forceSync: true })
+    getSnapshot: async (wallet, options) => {
+      const snapshot = await api.getRgbWalletUtxoSnapshot({
+        wallet,
+        forceSync: true,
+        ...(options?.knownRevision === undefined
+          ? {}
+          : { knownRevision: options.knownRevision }),
+      })
+      if (snapshot.changed === false) {
+        return {
+          unchanged: true as const,
+          utxos: [],
+          syncedAt: snapshot.syncedAt,
+          ...(snapshot.revision === undefined
+            ? (options?.knownRevision === undefined ? {} : { revision: options.knownRevision })
+            : { revision: snapshot.revision }),
+        }
+      }
       return {
         syncedAt: snapshot.syncedAt,
-        utxos: snapshot.utxos.map(toRgbUtxo),
+        ...(snapshot.revision === undefined ? {} : { revision: snapshot.revision }),
+        utxos: (snapshot.utxos || []).map(toRgbUtxo),
       }
     },
     getValidationHistory: (wallet, request) =>

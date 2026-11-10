@@ -76,6 +76,24 @@ describe('RgbService', () => {
     })
   })
 
+  it('sends the known snapshot revision and preserves a lightweight unchanged response', async () => {
+    const response = { changed: false, revision: 12, syncedAt: 1_234 }
+    const httpClient = { post: vi.fn().mockResolvedValue(response), get: vi.fn() }
+    const service = new RgbService(httpClient as any)
+    service.setRequestAuthenticator(vi.fn().mockResolvedValue({
+      fundingAddress: 'bc1p-funding', nonce: 'a'.repeat(32), expiresAt: 1, signature: 'signature',
+    }))
+    const wallet = { fundingAddress: 'bc1p-funding', network: 'mainnet' as const }
+
+    await expect(service.getRgbWalletUtxoSnapshot({ wallet, knownRevision: 12 }))
+      .resolves.toEqual(response)
+    expect(httpClient.post).toHaveBeenCalledWith('/v5/rgb/utxos/snapshot', {
+      wallet,
+      knownRevision: 12,
+      auth: expect.objectContaining({ fundingAddress: wallet.fundingAddress }),
+    })
+  })
+
   it('reports a broadcast RGB burn through the authenticated API', async () => {
     const httpClient = { post: vi.fn().mockResolvedValue({ recorded: true, txid: 'b'.repeat(64) }), get: vi.fn() }
     const service = new RgbService(httpClient as any)

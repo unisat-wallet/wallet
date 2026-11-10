@@ -640,9 +640,21 @@ export class RgbService {
     if (this.hasBlockingSnapshotProtection()) return state.snapshot
     const localSnapshotBeforeRequest = JSON.stringify(state.snapshot.utxos)
     const pendingUtxoSyncBeforeRequest = state.pendingUtxoSync
-    const snapshot = normalizeSnapshot(
-      await this.dependencies.stateSource.getSnapshot(state.wallet)
-    )
+    const remoteSnapshot = state.snapshot.revision === undefined
+      ? await this.dependencies.stateSource.getSnapshot(state.wallet)
+      : await this.dependencies.stateSource.getSnapshot(state.wallet, {
+          knownRevision: state.snapshot.revision,
+        })
+    if (remoteSnapshot.unchanged) {
+      state.snapshot = {
+        ...state.snapshot,
+        syncedAt: remoteSnapshot.syncedAt,
+        revision: remoteSnapshot.revision ?? state.snapshot.revision,
+      }
+      await this.persist({ skipRecovery: true })
+      return state.snapshot
+    }
+    const snapshot = normalizeSnapshot(remoteSnapshot)
     const discardedOutpoints = new Set(
       Object.values(state.discardedAssets || {}).flatMap(item =>
         item.outpoints.map(outpoint => `${outpoint.txid}:${outpoint.vout}`)

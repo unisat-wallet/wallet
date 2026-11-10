@@ -179,6 +179,7 @@ export interface RgbAssetMetadataSyncRequest {
 export interface RgbWalletUtxoSnapshotRequest {
   wallet: RgbWalletRef
   forceSync?: boolean
+  knownRevision?: number
 }
 
 export interface RgbWalletUtxoAllocation {
@@ -205,7 +206,10 @@ export interface RgbWalletUtxo {
 }
 
 export interface RgbWalletUtxoSnapshotResult {
-  utxos: RgbWalletUtxo[]
+  changed?: boolean
+  revision?: number
+  activeUtxoCount?: number
+  utxos?: RgbWalletUtxo[]
   syncedAt: number
 }
 

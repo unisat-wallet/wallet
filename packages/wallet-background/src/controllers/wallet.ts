@@ -376,8 +376,15 @@ type RgbControllerApiService = {
       }>
     }>
   }) => Promise<void>
-  getRgbWalletUtxoSnapshot: (params: { wallet: RgbWalletRef; forceSync?: boolean }) => Promise<{
-    utxos: Array<{
+  getRgbWalletUtxoSnapshot: (params: {
+    wallet: RgbWalletRef
+    forceSync?: boolean
+    knownRevision?: number
+  }) => Promise<{
+    changed?: boolean
+    revision?: number
+    activeUtxoCount?: number
+    utxos?: Array<{
       txid: string
       vout: number
       satoshis: number

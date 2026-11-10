@@ -286,9 +286,11 @@ export class RgbService {
     params: RgbWalletUtxoSnapshotRequest
   ): Promise<RgbWalletUtxoSnapshotResult> {
     const response = await this.privatePost<RgbWalletUtxoSnapshotResult>('/v5/rgb/utxos/snapshot', params)
+    if (response.changed === false) return response
     return {
       ...response,
-      utxos: response.utxos.map(utxo => ({
+      changed: true,
+      utxos: (response.utxos || []).map(utxo => ({
         ...utxo,
         allocations: utxo.allocations.map(allocation => ({
           ...allocation,

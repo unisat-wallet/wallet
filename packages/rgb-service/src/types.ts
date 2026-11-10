@@ -57,6 +57,10 @@ export interface RgbFeeFunding {
 export interface RgbWalletSnapshot {
   utxos: RgbUtxo[]
   syncedAt: number
+  /** Monotonic version of the backend's address-scoped active UTXO set. */
+  revision?: number
+  /** The backend confirmed that `utxos` should remain the locally persisted set. */
+  unchanged?: boolean
 }
 
 /**
@@ -593,7 +597,10 @@ export interface RgbStorage {
 
 /** Remote dependency limited to address-scoped state, opaque transport history and post-broadcast indexing. */
 export interface RgbStateSource {
-  getSnapshot(wallet: RgbWalletRef): Promise<RgbWalletSnapshot>
+  getSnapshot(
+    wallet: RgbWalletRef,
+    options?: { knownRevision?: number }
+  ): Promise<RgbWalletSnapshot>
   getValidationHistory(
     wallet: RgbWalletRef,
     request: {

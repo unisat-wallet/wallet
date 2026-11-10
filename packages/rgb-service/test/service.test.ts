@@ -3160,6 +3160,38 @@ describe('RgbService', () => {
     expect(checkpoint).toHaveBeenCalledTimes(1)
   })
 
+  it('reuses the persisted snapshot when the backend revision is unchanged', async () => {
+    const dependencies = createDependencies()
+    const firstSnapshot = {
+      ...(await vi.mocked(dependencies.stateSource.getSnapshot)(wallet)),
+      revision: 12,
+    }
+    vi.mocked(dependencies.stateSource.getSnapshot)
+      .mockReset()
+      .mockResolvedValueOnce(firstSnapshot)
+      .mockResolvedValueOnce({
+        unchanged: true,
+        revision: 12,
+        syncedAt: 2,
+        utxos: [],
+      })
+    const service = new RgbService(dependencies)
+    await service.open(wallet)
+    await service.sync()
+    const originalUtxos = structuredClone(service.getSnapshot().utxos)
+
+    await service.sync()
+
+    expect(dependencies.stateSource.getSnapshot).toHaveBeenNthCalledWith(2, wallet, {
+      knownRevision: 12,
+    })
+    expect(service.getSnapshot()).toMatchObject({
+      revision: 12,
+      syncedAt: 2,
+      utxos: originalUtxos,
+    })
+  })
+
   it('clears local allocations for an empty snapshot after every local UTXO is confirmed terminal', async () => {
     const dependencies = createDependencies()
     dependencies.stateSource.getTransactionStatus = vi.fn().mockResolvedValue({
