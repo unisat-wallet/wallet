@@ -1921,9 +1921,15 @@ export class RgbService {
     }
 
     // Detect sender cancel for consignments already staged for manual accept.
+    // A consignment returned by this successful polling pass is still live;
+    // avoid a second per-recipient ack.get + consignment.get round trip. Only
+    // fall back to the explicit cancellation probe when the batched fetch no
+    // longer returns the staged recipient.
     for (let index = pending.length - 1; index >= 0; index--) {
       const receive = pending[index]!
       if (receive.rejection || !receive.pendingAccept || receive.receivedConsignment) continue
+      const recipientId = receive.proxyRecipientId || receive.recipientId
+      if (receivedByRecipient.has(recipientId)) continue
       const canceled = await this.isReceiveCanceledBySender(receive)
       if (!canceled) continue
       this.recordReceiveOutcome(receive, 'canceled', receive.pendingAccept.txid)
@@ -1955,6 +1961,30 @@ export class RgbService {
           !!receive.pendingValidationFailure)
       if (receive.rejection && !revalidatableLocalRejection) continue
       const acceptedBeforeValidation = receive.receivedConsignment?.accepted === true
+      const staged = receive.pendingAccept
+      const sameStagedPayload =
+        !!staged && canonicalHistoryHash(staged.payload) === validationPayloadHash
+      const sameStagedTxid =
+        !item.txid || !staged?.txid || item.txid.toLowerCase() === staged.txid.toLowerCase()
+      // pendingAccept is durable evidence that this exact immutable payload
+      // already passed invoice, schema and history validation. Keep polling
+      // transport state, but defer the next full Bitcoin/EVM validation to the
+      // explicit Accept action. A changed payload or txid still takes the full
+      // path below.
+      if (
+        staged &&
+        !receive.receivedConsignment &&
+        !receive.pendingValidationFailure &&
+        !revalidatableLocalRejection &&
+        sameStagedPayload &&
+        sameStagedTxid
+      ) {
+        if (item.batch === true && staged.batch !== true) {
+          staged.batch = true
+          changed = true
+        }
+        continue
+      }
       let acceptedChain: {
         status: 'mempool' | 'confirmed' | 'pending_spend' | 'spent' | 'replaced' | 'unknown'
         confirmations: number

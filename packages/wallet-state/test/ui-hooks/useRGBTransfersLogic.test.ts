@@ -155,6 +155,42 @@ describe('useRGBTransfersLogic', () => {
     })
   })
 
+  it('renders local pending activity before the hidden queue full sync completes', async () => {
+    const { wrapper, wallet } = createHookTestHarness()
+    const pendingAccept = { ...confirmingReceive, status: 'pending_accept' }
+    wallet.getRgbActivityPollingState.mockResolvedValue({ hasPendingActivity: true })
+    let finishFullSync!: (value: { list: Array<typeof pendingAccept>; total: number }) => void
+    wallet.getRgbTransfers
+      .mockResolvedValueOnce({ list: [pendingAccept], total: 1 })
+      .mockReturnValueOnce(new Promise(resolve => {
+        finishFullSync = resolve
+      }))
+
+    const { result } = renderHook(
+      () => useRGBTransfersLogic({
+        foreground: false,
+        initialFullSync: false,
+        pollingEnabled: false,
+      }),
+      { wrapper }
+    )
+
+    await waitFor(() => expect(result.current.items[0]?.status).toBe('pending_accept'))
+    expect(wallet.getRgbTransfers.mock.calls[0]).toEqual([1, 20, {
+      skipSync: true,
+      statusOnly: true,
+    }])
+    await waitFor(() => expect(wallet.getRgbTransfers).toHaveBeenCalledTimes(2))
+    expect(wallet.getRgbTransfers.mock.calls[1]).toEqual([1, 20, {
+      skipSync: false,
+      statusOnly: true,
+    }])
+    expect(result.current.items[0]?.status).toBe('pending_accept')
+
+    finishFullSync({ list: [pendingAccept], total: 1 })
+    await waitFor(() => expect(result.current.loading).toBe(false))
+  })
+
   it('attaches the asset precision needed to display atomic transfer amounts', async () => {
     const { wrapper, wallet } = createHookTestHarness()
     wallet.getRgbTransfers.mockResolvedValue({ list: [confirmingReceive], total: 1 })

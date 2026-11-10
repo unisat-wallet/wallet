@@ -380,14 +380,13 @@ export default function WalletTabScreen({
     enabled: isRgbActive && isRgbAssetTab,
     focused: isRgbAssetTab
   });
-  // This list drives the global Accept/Reject sheet, so its first request must
-  // advance receive state instead of only rendering cached activity. In
-  // particular, a sender can press Done before its self-transfer consignment
-  // reaches the proxy; the assets screen must then take over polling from the
-  // transfer-detail screen without waiting for another navigation or focus.
+  // Render durable local pending actions first. The hook immediately follows
+  // this cheap read with a full background sync, so newly delivered/self-send
+  // consignments are still discovered without blocking an already staged
+  // Pending Acceptance sheet on proxy and chain requests.
   const rgbTransfers = useRGBTransfersLogic({
     enabled: isRgbActive,
-    initialFullSync: true,
+    initialFullSync: false,
     // This hook drives global pending action sheets, not a history view.
     // Exact local/status polling is sufficient even while Assets is visible.
     foreground: false

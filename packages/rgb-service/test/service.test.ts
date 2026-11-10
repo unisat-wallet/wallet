@@ -5105,6 +5105,52 @@ describe('RgbService', () => {
     })
   })
 
+  it('does not revalidate an unchanged staged receive during background polling', async () => {
+    const dependencies = createDependencies()
+    dependencies.transport.getConsignment = vi.fn()
+    dependencies.transport.getConsignments = vi.fn().mockResolvedValue([{
+      recipientId: 'recipient',
+      payload: 'consignment',
+      txid: 'c'.repeat(64),
+      endpoint: proxyEndpoint,
+      batch: true,
+    }])
+    dependencies.transport.getAcknowledgement = vi.fn()
+    const service = new RgbService(dependencies)
+    await service.open(wallet)
+    ;(service as any).state.pendingReceives = [{
+      invoice: rgbInvoice(),
+      recipientId: 'recipient',
+      assetId: 'rgb:AQEBAQEB-AQEBAQE-BAQEBAQ-EBAQEBA-QEBAQEB-AQEBAQE',
+      amount: '60',
+      createdAt: 1,
+      seal: { txid: 'a'.repeat(64), vout: 0, blinding: 1n },
+      pendingAccept: {
+        payload: 'consignment',
+        txid: 'c'.repeat(64),
+        endpoint: proxyEndpoint,
+        assetId: 'rgb:AQEBAQEB-AQEBAQE-BAQEBAQ-EBAQEBA-QEBAQEB-AQEBAQE',
+        amount: '60',
+        precision: 2,
+        discoveredAt: 1,
+      },
+    }]
+    const validateIncomingConsignment = vi.spyOn(service as any, 'validateIncomingConsignment')
+
+    await expect(service.processClaimedReceives({ includeClaimed: false })).resolves.toMatchObject({
+      received: 0,
+    })
+
+    expect(dependencies.transport.getConsignments).toHaveBeenCalledTimes(1)
+    expect(dependencies.transport.getConsignment).not.toHaveBeenCalled()
+    expect(dependencies.transport.getAcknowledgement).not.toHaveBeenCalled()
+    expect(validateIncomingConsignment).not.toHaveBeenCalled()
+    expect(service.getPendingReceives()[0]?.pendingAccept).toMatchObject({
+      payload: 'consignment',
+      batch: true,
+    })
+  })
+
   it('checks a v0 and v1 history merge before sending ACK', async () => {
     const dependencies = createDependencies()
     dependencies.transport.acknowledgeConsignment = vi.fn()
