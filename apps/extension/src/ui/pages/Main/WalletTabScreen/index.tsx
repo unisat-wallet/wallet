@@ -388,7 +388,9 @@ export default function WalletTabScreen({
   const rgbTransfers = useRGBTransfersLogic({
     enabled: isRgbActive,
     initialFullSync: true,
-    foreground: screen === 'assets'
+    // This hook drives global pending action sheets, not a history view.
+    // Exact local/status polling is sufficient even while Assets is visible.
+    foreground: false
   });
   const [broadcastQueue, setBroadcastQueue] = useState<{
     contextKey: string;

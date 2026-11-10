@@ -223,10 +223,13 @@ export class RgbTransferQuery {
       }
     }
 
+    const statusReferences = options?.statusOnly
+      ? this.pendingActivityReferences(service)
+      : []
     const remoteActivityRequest = options?.statusOnly && this.dependencies.getRemoteActivityStatuses
       ? this.dependencies.getRemoteActivityStatuses(
           wallet,
-          this.pendingActivityReferences(service)
+          statusReferences
         )
       : activityPromise || this.getRemoteActivity(
           wallet,
@@ -636,6 +639,21 @@ export class RgbTransferQuery {
       ...visibleLocalReceiveHistory,
       ...remoteItems,
     ].sort((left, right) => right.timestamp - left.timestamp)
+    if (options?.statusOnly) {
+      const ids = new Set(statusReferences.flatMap(reference => reference.id ? [reference.id] : []))
+      const txids = new Set(statusReferences.flatMap(reference => reference.txid ? [reference.txid] : []))
+      const statusList = list.filter(item =>
+        ('transferId' in item && item.transferId && ids.has(item.transferId)) ||
+        (item.id && ids.has(item.id.replace(/^local-send:|^local-receive:|^receive:/, ''))) ||
+        (item.txid && txids.has(item.txid))
+      )
+      return {
+        currentPage,
+        pageSize,
+        total: statusList.length,
+        list: statusList,
+      }
+    }
     // Local records appear on page one, but every page must report the same total.
     const localOnlyTransferKeys = new Set(
       [

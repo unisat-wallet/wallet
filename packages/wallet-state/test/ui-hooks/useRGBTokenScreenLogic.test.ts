@@ -132,10 +132,58 @@ describe('useRGBTokenScreenLogic', () => {
       expect(result.current.tokenBalance).toMatchObject({ spendable: '998', pending: '0' })
       expect(wallet.getRGBAssetBalance).toHaveBeenCalledTimes(2)
       expect(wallet.getRgbTransfers).toHaveBeenCalledTimes(2)
+      expect(wallet.getRgbTransfers).toHaveBeenNthCalledWith(2, 1, 20, {
+        skipSync: false,
+        assetId,
+        statusOnly: true,
+      })
       await act(async () => {
         await vi.advanceTimersByTimeAsync(10_000)
       })
       expect(wallet.getRGBAssetBalance).toHaveBeenCalledTimes(2)
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('refreshes full token history only after a pending status changes', async () => {
+    vi.useFakeTimers()
+    const { wrapper, wallet } = createHookTestHarness({ routeState: { assetId } })
+    wallet.getRGBAssetDetail.mockResolvedValue(detail)
+    wallet.getRGBAssetBalance.mockResolvedValue(fetchedBalance)
+    const transfer = {
+      id: 'local-send:transfer-1',
+      transferId: 'transfer-1',
+      assetId,
+      type: 'send',
+      amount: '7',
+      txid: 'a'.repeat(64),
+      timestamp: 1,
+      local: true,
+    }
+    wallet.getRgbTransfers
+      .mockResolvedValueOnce({ list: [{ ...transfer, status: 'broadcasted' }], total: 1 })
+      .mockResolvedValueOnce({ list: [{ ...transfer, status: 'confirmed' }], total: 1 })
+      .mockResolvedValue({ list: [{ ...transfer, status: 'confirmed' }], total: 1 })
+
+    try {
+      const { result } = renderHook(() => useRGBTokenScreenLogic(), { wrapper })
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(0)
+      })
+      expect(result.current.activityItems[0]?.status).toBe('broadcasted')
+
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(10_000)
+      })
+
+      expect(wallet.getRgbTransfers).toHaveBeenNthCalledWith(2, 1, 20, {
+        skipSync: false,
+        assetId,
+        statusOnly: true,
+      })
+      expect(wallet.getRgbTransfers).toHaveBeenCalledTimes(3)
+      expect(result.current.activityItems[0]?.status).toBe('confirmed')
     } finally {
       vi.useRealTimers()
     }

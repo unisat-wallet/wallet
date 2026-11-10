@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
 import type { RgbActivityItem, RgbActivityType, RgbAssetDetail, RgbBalance } from '..'
 import { useI18n, useNavigation, useWallet, useWalletConfig } from '..'
@@ -130,6 +130,42 @@ export function useRGBTokenScreenLogic() {
     },
     dependencies: [assetId, activityType, isUnconfiguredUsdt],
   })
+  const activityRef = useRef<RgbActivityItem[]>([])
+  useEffect(() => {
+    activityRef.current = activity
+  }, [activity])
+
+  const activityStatusPollingRef = useRef(false)
+  const pollActivityStatus = useCallback(async () => {
+    if (assetId === '' || isUnconfiguredUsdt || activityStatusPollingRef.current) return
+    activityStatusPollingRef.current = true
+    try {
+      const transfers = await wallet.getRgbTransfers(1, 20, {
+        skipSync: false,
+        assetId,
+        ...(activityType ? { type: activityType } : {}),
+        statusOnly: true,
+      })
+      const current = activityRef.current
+      const changed = transfers.list.some(transfer => {
+        const identities = new Set(
+          [transfer.transferId, transfer.id, transfer.txid].filter(Boolean)
+        )
+        const previous = current.find(item =>
+          [item.transferId, item.id, item.txid].some(identity => identity && identities.has(identity))
+        )
+        return !previous ||
+          previous.status !== transfer.status ||
+          previous.txid !== (transfer.txid ?? '') ||
+          previous.rejectionReason !== transfer.rejectionReason
+      })
+      if (changed) onRefreshActivity({ showLoading: false })
+    } catch {
+      // Keep the currently rendered history and retry on the next poll.
+    } finally {
+      activityStatusPollingRef.current = false
+    }
+  }, [activityType, assetId, isUnconfiguredUsdt, onRefreshActivity, wallet])
 
   const onRefresh = useCallback(() => {
     loadDetail()
@@ -153,10 +189,10 @@ export function useRGBTokenScreenLogic() {
     if (!hasActiveActivity && !hasPendingBalance && !hasLockedBalance) return undefined
     const intervalId = setInterval(() => {
       void loadBalance(false)
-      onRefreshActivity()
+      void pollActivityStatus()
     }, 10_000)
     return () => clearInterval(intervalId)
-  }, [hasActiveActivity, hasPendingBalance, hasLockedBalance, loadBalance, onRefreshActivity])
+  }, [hasActiveActivity, hasPendingBalance, hasLockedBalance, loadBalance, pollActivityStatus])
 
   const latestTokenBalance = fetchedTokenBalance || tokenBalance || detail?.balance
   const resolvedPrecision =
