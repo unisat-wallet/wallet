@@ -21,6 +21,7 @@ export type RgbBlindReceiveParams = {
   amount?: number | string
   durationSeconds?: number
   minConfirmations?: number
+  transportEndpoints?: string[]
   providerOrigin?: string
   acceptancePolicy?: 'buy_swap_backend_commit'
   skipSync?: boolean
@@ -44,6 +45,7 @@ export class RgbReceiveOperations {
       ...(params.amount === undefined ? {} : { amount: String(params.amount) }),
       ...(params.durationSeconds === undefined ? {} : { durationSeconds: params.durationSeconds }),
       ...(params.minConfirmations === undefined ? {} : { minConfirmations: params.minConfirmations }),
+      ...(params.transportEndpoints === undefined ? {} : { transportEndpoints: params.transportEndpoints }),
       ...(params.providerOrigin === undefined ? {} : { providerOrigin: params.providerOrigin }),
       ...(params.acceptancePolicy === undefined
         ? {}

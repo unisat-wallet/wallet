@@ -1168,6 +1168,7 @@ export class RgbService {
     amount?: string
     durationSeconds?: number
     minConfirmations?: number
+    transportEndpoints?: string[]
     providerOrigin?: string
     acceptancePolicy?: 'buy_swap_backend_commit'
     /** The caller will immediately claim the recipient and persist the combined state. */
@@ -1181,6 +1182,7 @@ export class RgbService {
     amount?: string
     durationSeconds?: number
     minConfirmations?: number
+    transportEndpoints?: string[]
     providerOrigin?: string
     acceptancePolicy?: 'buy_swap_backend_commit'
     deferRecoveryCheckpoint?: boolean
@@ -1201,7 +1203,7 @@ export class RgbService {
     }
     this.assertReceiveInvoiceCapacity()
     const receives = state.pendingReceives || (state.pendingReceives = [])
-    const transportEndpoints = this.dependencies.transport.getEndpoints?.() || []
+    const transportEndpoints = input.transportEndpoints ?? this.dependencies.transport.getEndpoints?.() ?? []
     if (!transportEndpoints.length) {
       throw new RgbServiceError('RGB proxy endpoint is not configured')
     }
@@ -1274,6 +1276,7 @@ export class RgbService {
     amount?: string
     durationSeconds?: number
     minConfirmations?: number
+    transportEndpoints?: string[]
     providerOrigin?: string
     acceptancePolicy?: 'buy_swap_backend_commit'
     deferRecoveryCheckpoint?: boolean
@@ -1288,6 +1291,7 @@ export class RgbService {
     amount?: string
     durationSeconds?: number
     minConfirmations?: number
+    transportEndpoints?: string[]
     providerOrigin?: string
     acceptancePolicy?: 'buy_swap_backend_commit'
     deferRecoveryCheckpoint?: boolean
@@ -1304,7 +1308,7 @@ export class RgbService {
       throw new RgbServiceError('RGB receive duration must be positive')
     }
     this.assertReceiveInvoiceCapacity()
-    const endpoints = this.dependencies.transport.getEndpoints?.() || []
+    const endpoints = input.transportEndpoints ?? this.dependencies.transport.getEndpoints?.() ?? []
     if (!endpoints.length) throw new RgbServiceError('RGB proxy endpoint is not configured')
     const nonce = randomBytes(16)
     const transportEndpoints = endpoints.map(endpoint =>

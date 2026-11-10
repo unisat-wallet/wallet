@@ -568,6 +568,7 @@ type RgbReceiveInvoiceRequest = {
   durationSeconds?: number
   minConfirmations?: number
   skipSync?: boolean
+  proxyId?: string
   providerOrigin?: string
   acceptancePolicy?: 'buy_swap_backend_commit'
 }
@@ -1289,7 +1290,11 @@ export class WalletController extends BaseController {
 
   private getTrustedRgbProxyEndpoints = async () => {
     const chainType = this.getChainType()
-    const trusted = new Set((CHAINS_MAP[chainType]?.rgbProxyEndpoints || []).map(toHttpEndpoint))
+    const chain = CHAINS_MAP[chainType]
+    const trusted = new Set([
+      ...(chain?.rgbProxyEndpoints || []),
+      ...(chain?.rgbProxyProfiles || []).map(profile => profile.endpoint),
+    ].map(toHttpEndpoint))
     const now = Math.floor(Date.now() / 1000)
     if (
       !this.rgbProxyPolicyCache ||
@@ -4565,12 +4570,26 @@ export class WalletController extends BaseController {
     return keyring.getRgbFeeAccount(this.getNetworkType(), account.index)
   }
 
+  private resolveRgbReceiveProxyEndpoints = (proxyId?: string) => {
+    if (!proxyId) return undefined
+    const profile = CHAINS_MAP[this.getChainType()]?.rgbProxyProfiles?.find(
+      item => item.id === proxyId && item.selectable !== false
+    )
+    if (!profile) throw new Error('RGB proxy selection is invalid')
+    return [profile.endpoint]
+  }
+
   createRgbBlindReceive = async (params: Omit<RgbReceiveInvoiceRequest, 'wallet'>) => {
     const context = await this.getLocalRgbService()
     // This may run only after a dApp approval has been held open. Do not let
     // a cached pre-approval lease create durable receive state after handoff.
     await this.ensureRgbWriteLease(context, { forceRenew: true })
-    return this.rgbReceiveOperations.createBlindReceive(params, context)
+    const { proxyId, ...request } = params
+    const transportEndpoints = this.resolveRgbReceiveProxyEndpoints(proxyId)
+    return this.rgbReceiveOperations.createBlindReceive({
+      ...request,
+      ...(transportEndpoints ? { transportEndpoints } : {}),
+    }, context)
   }
 
   createRgbWitnessReceive = async (params: Omit<RgbReceiveInvoiceRequest, 'wallet'>) => {
@@ -4580,6 +4599,7 @@ export class WalletController extends BaseController {
     const funding = await this.getCurrentRgbFundingAccount()
     await this.assertActiveRgbWallet(context.wallet)
     const networkType = this.getNetworkType()
+    const transportEndpoints = this.resolveRgbReceiveProxyEndpoints(params.proxyId)
     const scriptPubKey = bitcoin.address
       .toOutputScript(funding.address, toPsbtNetwork(networkType))
       .toString('hex')
@@ -4590,6 +4610,7 @@ export class WalletController extends BaseController {
       ...(params.amount === undefined ? {} : { amount: String(params.amount) }),
       ...(params.durationSeconds === undefined ? {} : { durationSeconds: params.durationSeconds }),
       ...(params.minConfirmations === undefined ? {} : { minConfirmations: params.minConfirmations }),
+      ...(transportEndpoints ? { transportEndpoints } : {}),
       ...(params.providerOrigin === undefined ? {} : { providerOrigin: params.providerOrigin }),
       ...(params.acceptancePolicy === undefined ? {} : { acceptancePolicy: params.acceptancePolicy }),
       deferRecoveryCheckpoint: true,

@@ -691,6 +691,7 @@ export interface WalletController {
     amount?: number | string
     durationSeconds?: number
     skipSync?: boolean
+    proxyId?: string
   }): Promise<any>
 
   createRgbWitnessReceive(params: {
@@ -698,6 +699,7 @@ export interface WalletController {
     amount?: number | string
     durationSeconds?: number
     skipSync?: boolean
+    proxyId?: string
   }): Promise<any>
 
   checkRgbInvoiceAvailability(params: { invoice: string }): Promise<{ available: true }>

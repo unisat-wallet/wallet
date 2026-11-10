@@ -3455,6 +3455,11 @@
     "message": "Обработка"
   },
 "rgb_burn": { "message": "Сжечь" },
+  "rgb_burn_mode": { "message": "Формат сжигания" },
+  "rgb_burn_mode_v1": { "message": "Сжигание V1 (рекомендуется)" },
+  "rgb_burn_mode_v1_description": { "message": "Несколько сетей · Экспорт JSON-пакета" },
+  "rgb_burn_mode_legacy": { "message": "Устаревшее сжигание" },
+  "rgb_burn_mode_legacy_description": { "message": "Только Arbitrum One · Экспорт .rgb consignment" },
   "rgb_burn_network": { "message": "Сеть назначения" },
   "rgb_burn_recipient_address": { "message": "Адрес получателя" },
   "rgb_burn_tron_placeholder": { "message": "Введите адрес Tron" },

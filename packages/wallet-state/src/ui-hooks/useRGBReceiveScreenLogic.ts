@@ -2,7 +2,7 @@ import { ErrorCodes } from '@unisat/wallet-shared'
 import type { SignPsbtParams, SignedData, ToSignData } from '@unisat/wallet-shared'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useI18n, useNavigation, useTools, useWallet } from 'src/context'
-import { useFeeRateBar } from 'src/hooks'
+import { useChain, useFeeRateBar } from 'src/hooks'
 import {
   formatMaxRgbDisplayAmount,
   getRgbIconShortName,
@@ -67,12 +67,14 @@ type RgbReceiveWallet = {
     amount?: number | string
     durationSeconds?: number
     skipSync?: boolean
+    proxyId?: string
   }): Promise<unknown>
   createRgbWitnessReceive(params: {
     assetId?: string
     amount?: number | string
     durationSeconds?: number
     skipSync?: boolean
+    proxyId?: string
   }): Promise<unknown>
   getRgbPendingReceiveInvoices(params?: {
     skipSync?: boolean
@@ -347,6 +349,7 @@ export function useRGBReceiveScreenLogic(
 ) {
   const nav = useNavigation()
   const wallet = useWallet()
+  const chain = useChain()
   const tools = useTools()
   const { t } = useI18n()
   const { feeRate } = useFeeRateBar()
@@ -366,6 +369,10 @@ export function useRGBReceiveScreenLogic(
   )
   const [mode, setModeState] = useState<RGBReceiveMode>('any')
   const [recipientType, setRecipientType] = useState<RGBInvoiceRecipientType>('blind')
+  const proxyProfiles = (chain.rgbProxyProfiles || []).filter(profile => profile.selectable !== false)
+  const [selectedProxyId, setSelectedProxyId] = useState(
+    () => proxyProfiles.find(profile => profile.recommended)?.id || proxyProfiles[0]?.id || ''
+  )
   const [invoiceExpirySeconds, setInvoiceExpirySecondsState] = useState(24 * 60 * 60)
   const invoiceExpiryChanged = useRef(false)
   const setInvoiceExpirySeconds = (value: number) => {
@@ -461,6 +468,7 @@ export function useRGBReceiveScreenLogic(
     const params: {
       assetId?: string
       amount?: string
+      proxyId?: string
     } = {}
 
     if (assetId) {
@@ -469,6 +477,10 @@ export function useRGBReceiveScreenLogic(
 
     if (isFixedMode && assetId) {
       params.amount = normalizedAmount
+    }
+
+    if (selectedProxyId) {
+      params.proxyId = selectedProxyId
     }
 
     const request = {
@@ -890,6 +902,9 @@ export function useRGBReceiveScreenLogic(
     setMode,
     recipientType,
     setRecipientType,
+    proxyProfiles,
+    selectedProxyId,
+    setSelectedProxyId,
     invoiceExpirySeconds,
     setInvoiceExpirySeconds,
     amount,

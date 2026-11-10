@@ -1,4 +1,6 @@
 import { act, renderHook, waitFor } from '@testing-library/react'
+import { CHAINS_MAP } from '@unisat/wallet-shared'
+import { ChainType } from '@unisat/wallet-types'
 import { describe, expect, it } from 'vitest'
 
 import { uiActions } from '../../src/reducers/ui'
@@ -14,6 +16,46 @@ import {
 import { createHookTestHarness } from './testHelpers'
 
 describe('useRGBReceiveScreenLogic', () => {
+  it('uses the selected trusted proxy profile when creating an invoice', async () => {
+    const chain = CHAINS_MAP[ChainType.BITCOIN_MAINNET]!
+    const previousProfiles = chain.rgbProxyProfiles
+    chain.rgbProxyProfiles = [
+      {
+        id: 'v04',
+        name: 'Proxy 0.4',
+        endpoint: 'rpcs://proxy.example/v0_4_0/v1/json-rpc',
+        protocolVersion: '1.0',
+        serverVersion: '0.4.0',
+        recommended: true,
+      },
+      {
+        id: 'v03',
+        name: 'Legacy Proxy 0.3',
+        endpoint: 'rpcs://proxy.example/v1/json-rpc',
+        protocolVersion: '1.0',
+        serverVersion: '0.3.0',
+      },
+    ]
+    try {
+      const { wrapper, wallet } = createHookTestHarness()
+      const { result } = renderHook(() => useRGBReceiveScreenLogic(), { wrapper })
+
+      expect(result.current.selectedProxyId).toBe('v04')
+      act(() => result.current.setSelectedProxyId('v03'))
+      await act(async () => {
+        await result.current.onCreateInvoice()
+      })
+
+      expect(wallet.createRgbBlindReceive).toHaveBeenCalledWith({
+        durationSeconds: 86_400,
+        proxyId: 'v03',
+        skipSync: true,
+      })
+    } finally {
+      chain.rgbProxyProfiles = previousProfiles
+    }
+  })
+
   it('formats an invoice atomic amount with the precision exposed by its receive proposal', () => {
     expect(formatRgbPendingAmountTag('11100000000', 'Any Amount', 8)).toBe('111')
   })

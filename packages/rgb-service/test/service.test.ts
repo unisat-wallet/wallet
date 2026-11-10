@@ -4073,6 +4073,7 @@ describe('RgbService', () => {
     })
     const publicKey = 'ab'.repeat(32)
     const privateKey = 'cd'.repeat(32)
+    const selectedEndpoint = 'rpcs://legacy-proxy.example/v1/json-rpc'
     const expiresAt = Math.floor(Date.now() / 1000) + 3600
     dependencies.transport.prepareInvoice = vi.fn(async ({ recipientId }) => ({
       publicKey,
@@ -4083,8 +4084,17 @@ describe('RgbService', () => {
     const service = new RgbService(dependencies)
     await service.open(wallet)
     await service.sync()
-    const receive = await service.createBlindReceive({ durationSeconds: 3600 })
+    const receive = await service.createBlindReceive({
+      durationSeconds: 3600,
+      transportEndpoints: [selectedEndpoint],
+    })
     const invoice = decodeRgbInvoice(receive.invoice)
+    expect(invoice.transportEndpoints).toEqual([selectedEndpoint])
+    expect(dependencies.transport.prepareInvoice).toHaveBeenCalledWith(
+      expect.objectContaining({
+        endpoints: [selectedEndpoint],
+      })
+    )
     expect(invoice.proxyPublicKey).toBe(publicKey)
     expect(invoice.proxyRecipientId).toBe(receive.proxyRecipientId)
     expect(receive).toMatchObject({

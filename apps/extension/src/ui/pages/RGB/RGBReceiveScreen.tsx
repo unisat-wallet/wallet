@@ -204,6 +204,7 @@ export default function RGBReceiveScreen({ initialStep = 'create_invoice' }: { i
   const amountInputRef = useRef<HTMLInputElement>(null);
   const [invoiceExpirySelectorOpen, setInvoiceExpirySelectorOpen] = useState(false);
   const [invoiceTypeSelectorOpen, setInvoiceTypeSelectorOpen] = useState(false);
+  const [proxySelectorOpen, setProxySelectorOpen] = useState(false);
   const {
     step,
     rgbItems,
@@ -218,6 +219,9 @@ export default function RGBReceiveScreen({ initialStep = 'create_invoice' }: { i
     setMode,
     recipientType,
     setRecipientType,
+    proxyProfiles,
+    selectedProxyId,
+    setSelectedProxyId,
     invoiceExpirySeconds,
     setInvoiceExpirySeconds,
     amount,
@@ -679,6 +683,33 @@ export default function RGBReceiveScreen({ initialStep = 'create_invoice' }: { i
     );
   };
 
+  const renderProxySelector = () => {
+    if (!proxySelectorOpen) return null;
+
+    return (
+      <BottomModal onClose={() => setProxySelectorOpen(false)} bodyStyle={{ padding: 0 }}>
+        <Column fullX gap="zero">
+          <BottomSheetHeader title="RGB Proxy" onClose={() => setProxySelectorOpen(false)} />
+          <Column gap="lg" fullX style={{ padding: '0 20px 24px', boxSizing: 'border-box' }}>
+            {proxyProfiles.map((profile) =>
+              renderSelectorOption(
+                `${profile.name}${profile.recommended ? ' (Recommended)' : ''}`,
+                selectedProxyId === profile.id,
+                () => {
+                  setSelectedProxyId(profile.id);
+                  setProxySelectorOpen(false);
+                },
+                `${profile.protocolVersion ? `Protocol ${profile.protocolVersion} · ` : ''}${
+                  profile.serverVersion ? `Server ${profile.serverVersion} · ` : ''
+                }${profile.endpoint}`
+              )
+            )}
+          </Column>
+        </Column>
+      </BottomModal>
+    );
+  };
+
   if (step === 'sign_rgb_utxo') {
     return (
       <SignPsbt
@@ -854,6 +885,29 @@ export default function RGBReceiveScreen({ initialStep = 'create_invoice' }: { i
             </Row>
           </Column>
 
+          {proxyProfiles.length > 1 ? (
+            <Column gap="sm" fullX>
+              <Row
+                fullX
+                itemsCenter
+                justifyBetween
+                onClick={() => setProxySelectorOpen(true)}
+                style={selectorRowStyle}
+              >
+                <Column style={labelValueGapStyle}>
+                  <Text text="RGB Proxy" size="xs" color="textDim" disableTranslate />
+                  <Text
+                    text={proxyProfiles.find((profile) => profile.id === selectedProxyId)?.name || 'Proxy'}
+                    size="sm"
+                    color="white"
+                    disableTranslate
+                  />
+                </Column>
+                {renderSelectorChevron()}
+              </Row>
+            </Column>
+          ) : null}
+
           {canSetFixedAmount ? (
             <Column fullX gap="md" style={amountSectionCardStyle}>
               <Text text={t('amount')} size="xs" style={{ color: '#898989' }} />
@@ -963,6 +1017,7 @@ export default function RGBReceiveScreen({ initialStep = 'create_invoice' }: { i
       </Footer>
       {renderInvoiceTypeSelector()}
       {renderInvoiceExpirySelector()}
+      {renderProxySelector()}
       {writeLeaseModal}
     </Layout>
   );
