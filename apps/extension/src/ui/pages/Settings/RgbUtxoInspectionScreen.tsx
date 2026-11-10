@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useState } from 'react';
 
-import { Button, Card, Column, Content, CopyableAddress, Header, Icon, Layout, Row, Text, Tooltip } from '@/ui/components';
+import { Button, Card, Column, Content, CopyableAddress, Header, Icon, Layout, RGBAssetIcon, Row, Text, Tooltip } from '@/ui/components';
 import { HistoryAmount } from '@/ui/components/HistoryAmount';
-import { toRgbDisplayAmount, useI18n, useNavigation, useTools, useWallet } from '@unisat/wallet-state';
+import { isSameRgbAssetId, toRgbDisplayAmount, useI18n, useNavigation, useTools, useWallet, useWalletConfig } from '@unisat/wallet-state';
 
 type UtxoInspection = Awaited<ReturnType<ReturnType<typeof useWallet>['getRgbUtxoInspection']>>;
 
@@ -91,6 +91,7 @@ export default function RgbUtxoInspectionScreen() {
   const nav = useNavigation();
   const tools = useTools();
   const { t } = useI18n();
+  const configuredUsdtAssetId = useWalletConfig().rgbUsdtAssetId?.trim();
   const [inspection, setInspection] = useState<UtxoInspection>();
   const [refreshing, setRefreshing] = useState(false);
 
@@ -229,7 +230,9 @@ export default function RgbUtxoInspectionScreen() {
                     <Column fullX gap="xs">
                       {utxo.allocations.map((allocation, index) => {
                         const asset = inspection?.assetMetadata[allocation.assetId];
-                        const name = asset?.name || shortTxid(allocation.assetId);
+                        const isUsdt = configuredUsdtAssetId !== '-' &&
+                          isSameRgbAssetId(allocation.assetId, configuredUsdtAssetId);
+                        const name = isUsdt ? 'USDT' : asset?.name || asset?.ticker || shortTxid(allocation.assetId);
                         const amount = toRgbDisplayAmount(allocation.amount, asset?.precision || 0);
                         return (
                           <Row
@@ -240,7 +243,12 @@ export default function RgbUtxoInspectionScreen() {
                             gap="sm"
                             style={assetAllocationCardStyle}>
                             <Row itemsCenter gap="sm" style={{ flex: 1, minWidth: 0, overflow: 'hidden' }}>
-                              <Icon icon="rgb" color="ticker_color2" size={20} />
+                              <RGBAssetIcon
+                                assetId={allocation.assetId}
+                                ticker={isUsdt ? 'USDT' : asset?.ticker}
+                                name={name}
+                                size={20}
+                              />
                               <Column gap="xs" style={{ minWidth: 0, flex: 1, overflow: 'hidden' }}>
                                 <Text text={name} color="white" size="xs" ellipsis style={{ width: '100%' }} />
                                 <CopyableAddress
