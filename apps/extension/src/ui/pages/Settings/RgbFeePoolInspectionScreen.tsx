@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 
 import { Button, Card, Column, Content, CopyableAddress, Header, Icon, Layout, Row, Text, Tooltip } from '@/ui/components';
+import { BottomModal } from '@/ui/components/BottomModal';
 import { Tabs } from '@/ui/components/Tabs';
 import LoadingPage from '@/ui/components/LoadingPage';
 import { LoadingOutlined } from '@ant-design/icons';
@@ -12,6 +13,9 @@ import { useRgbWriteLeaseGuard } from '../RGB/components/useRgbWriteLeaseGuard';
 
 type FeePoolInspection = Awaited<ReturnType<ReturnType<typeof useWallet>['getRgbFeePoolInspection']>>;
 type FeePoolTabKey = 'utxos' | 'withdrawals';
+type FeePoolSelection =
+  | { kind: 'utxo'; item: NonNullable<FeePoolInspection>['utxos'][number] }
+  | { kind: 'withdrawal'; item: NonNullable<FeePoolInspection>['withdrawals'][number] };
 
 const shortValue = (value: string) => (value.length > 18 ? `${value.slice(0, 10)}…${value.slice(-6)}` : value);
 
@@ -80,6 +84,7 @@ export default function RgbFeePoolInspectionScreen() {
   const [withdrawSubmitting, setWithdrawSubmitting] = useState(false);
   const [withdrawToSignData, setWithdrawToSignData] = useState<ToSignData>();
   const [activeTab, setActiveTab] = useState<FeePoolTabKey>('utxos');
+  const [selection, setSelection] = useState<FeePoolSelection>();
 
   const refresh = useCallback(
     async (showSuccess = false) => {
@@ -216,7 +221,7 @@ export default function RgbFeePoolInspectionScreen() {
                         itemsCenter
                         gap="md"
                         style={feeUtxoCardStyle}
-                        onClick={() => nav.navToExplorerTx(utxo.txid)}>
+                        onClick={() => setSelection({ kind: 'utxo', item: utxo })}>
                         <Text text={index + 1} color="textDim" size="sm" style={feeUtxoSequenceStyle} />
                         <Column fullX gap="xs" style={{ minWidth: 0 }}>
                           <Row full justifyBetween itemsCenter gap="sm">
@@ -267,7 +272,7 @@ export default function RgbFeePoolInspectionScreen() {
                       justifyBetween
                       gap="md"
                       style={feeUtxoCardStyle}
-                      onClick={() => nav.navToExplorerTx(withdrawal.txid)}>
+                      onClick={() => setSelection({ kind: 'withdrawal', item: withdrawal })}>
                       <Column gap="xs" style={{ minWidth: 0 }}>
                         <Text text={t('rgb_fee_pool_transferred_to_wallet')} color="white" preset="bold" size="sm" />
                         <Text text={shortValue(withdrawal.txid)} color="textDim" size="xs" />
@@ -320,6 +325,78 @@ export default function RgbFeePoolInspectionScreen() {
         />
       )}
       {writeLeaseModal}
+      {selection ? (
+        <BottomModal onClose={() => setSelection(undefined)}>
+          <Column gap="lg">
+            <Text
+              text={selection.kind === 'utxo' ? 'UTXO' : t('rgb_fee_pool_transferred_to_wallet')}
+              color="white"
+              size="lg"
+              textCenter
+              disableTranslate={selection.kind === 'utxo'}
+            />
+            <Column
+              gap="md"
+              fullX
+              style={{ padding: 14, borderRadius: 12, background: 'rgba(255,255,255,0.06)' }}>
+              <Row justifyBetween itemsCenter fullX gap="md">
+                <Text text={t('transaction_id')} color="textDim" size="sm" />
+                <CopyableAddress
+                  address={selection.item.txid}
+                  copyPosition="after"
+                  len={8}
+                  color="ticker_color2"
+                />
+              </Row>
+              {selection.kind === 'utxo' ? (
+                <Row justifyBetween itemsCenter fullX gap="md">
+                  <Text text="Vout" color="textDim" size="sm" disableTranslate />
+                  <Text text={selection.item.vout} color="white" size="sm" disableTranslate />
+                </Row>
+              ) : null}
+              <Row justifyBetween itemsCenter fullX gap="md">
+                <Text text={t('amount')} color="textDim" size="sm" />
+                <Text
+                  text={`${(selection.kind === 'utxo'
+                    ? selection.item.satoshis
+                    : selection.item.amount).toLocaleString()} sats`}
+                  color="white"
+                  size="sm"
+                  disableTranslate
+                />
+              </Row>
+              {selection.kind === 'utxo' ? (
+                <Row justifyBetween itemsCenter fullX gap="md">
+                  <Text text={t('status')} color="textDim" size="sm" />
+                  <Text
+                    text={selection.item.locked
+                      ? t('rgb_fee_pool_locked')
+                      : selection.item.pending
+                        ? t('pending')
+                        : t('available')}
+                    color="white"
+                    size="sm"
+                  />
+                </Row>
+              ) : (
+                <Row justifyBetween itemsCenter fullX gap="md">
+                  <Text text={t('date')} color="textDim" size="sm" />
+                  <Text text={new Date(selection.item.createdAt).toLocaleString()} color="white" size="sm" />
+                </Row>
+              )}
+            </Column>
+            <Button
+              preset="primary"
+              text={t('view_on_uniscan')}
+              onClick={() => {
+                const txid = selection.item.txid;
+                setSelection(undefined);
+                nav.navToExplorerTx(txid);
+              }}
+            />
+          </Column>
+        </BottomModal>
+      ) : null}
     </Layout>
   );
 }

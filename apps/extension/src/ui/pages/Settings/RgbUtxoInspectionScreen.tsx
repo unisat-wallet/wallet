@@ -1,10 +1,12 @@
 import { useCallback, useEffect, useState } from 'react';
 
 import { Button, Card, Column, Content, CopyableAddress, Header, Icon, Layout, RGBAssetIcon, Row, Text, Tooltip } from '@/ui/components';
+import { BottomModal } from '@/ui/components/BottomModal';
 import { HistoryAmount } from '@/ui/components/HistoryAmount';
 import { isSameRgbAssetId, toRgbDisplayAmount, useI18n, useNavigation, useTools, useWallet, useWalletConfig } from '@unisat/wallet-state';
 
 type UtxoInspection = Awaited<ReturnType<ReturnType<typeof useWallet>['getRgbUtxoInspection']>>;
+type InspectedUtxo = NonNullable<UtxoInspection>['snapshot']['utxos'][number];
 
 const shortTxid = (txid: string) => (txid.length > 18 ? `${txid.slice(0, 10)}…${txid.slice(-6)}` : txid);
 
@@ -93,6 +95,7 @@ export default function RgbUtxoInspectionScreen() {
   const { t } = useI18n();
   const configuredUsdtAssetId = useWalletConfig().rgbUsdtAssetId?.trim();
   const [inspection, setInspection] = useState<UtxoInspection>();
+  const [selectedUtxo, setSelectedUtxo] = useState<InspectedUtxo>();
   const [refreshing, setRefreshing] = useState(false);
 
   const refresh = useCallback(
@@ -128,6 +131,14 @@ export default function RgbUtxoInspectionScreen() {
     if (priorityDifference) return priorityDifference;
     return left.outpoint.txid.localeCompare(right.outpoint.txid) || left.outpoint.vout - right.outpoint.vout;
   });
+  const selectedUtxoReservation = selectedUtxo
+    ? invoiceReservations.get(`${selectedUtxo.outpoint.txid}:${selectedUtxo.outpoint.vout}`)
+    : undefined;
+  const selectedUtxoUsage = selectedUtxoReservation
+    ? t('rgb_utxo_invoice_reserved')
+    : selectedUtxo?.allocations.length
+      ? t('rgb_utxo_has_assets')
+      : t('rgb_utxo_available');
   return (
     <Layout>
       <Header onBack={() => window.history.go(-1)} title={t('rgb_asset_address')} />
@@ -178,7 +189,7 @@ export default function RgbUtxoInspectionScreen() {
                 itemsCenter
                 gap="md"
                 style={hasDetails ? utxoCardWithDetailsStyle : utxoCardStyle}
-                onClick={() => nav.navToExplorerTx(utxo.outpoint.txid)}>
+                onClick={() => setSelectedUtxo(utxo)}>
                 <Text text={index + 1} color="textDim" size="sm" style={utxoSequenceStyle} />
                 <Column fullX gap="xs" style={{ minWidth: 0 }}>
                   <Row full justifyBetween itemsCenter gap="sm">
@@ -289,6 +300,48 @@ export default function RgbUtxoInspectionScreen() {
           style={{ flex: 1 }}
         />
       </Row>
+      {selectedUtxo ? (
+        <BottomModal onClose={() => setSelectedUtxo(undefined)}>
+          <Column gap="lg">
+            <Text text="UTXO" color="white" size="lg" textCenter disableTranslate />
+            <Column
+              gap="md"
+              fullX
+              style={{ padding: 14, borderRadius: 12, background: 'rgba(255,255,255,0.06)' }}>
+              <Row justifyBetween itemsCenter fullX gap="md">
+                <Text text={t('transaction_id')} color="textDim" size="sm" />
+                <CopyableAddress
+                  address={selectedUtxo.outpoint.txid}
+                  copyPosition="after"
+                  len={8}
+                  color="ticker_color2"
+                />
+              </Row>
+              <Row justifyBetween itemsCenter fullX gap="md">
+                <Text text="Vout" color="textDim" size="sm" disableTranslate />
+                <Text text={selectedUtxo.outpoint.vout} color="white" size="sm" disableTranslate />
+              </Row>
+              <Row justifyBetween itemsCenter fullX gap="md">
+                <Text text={t('amount')} color="textDim" size="sm" />
+                <Text text={`${selectedUtxo.satoshis.toLocaleString()} sats`} color="white" size="sm" disableTranslate />
+              </Row>
+              <Row justifyBetween itemsCenter fullX gap="md">
+                <Text text={t('status')} color="textDim" size="sm" />
+                <Text text={selectedUtxoUsage} color="white" size="sm" />
+              </Row>
+            </Column>
+            <Button
+              preset="primary"
+              text={t('view_on_uniscan')}
+              onClick={() => {
+                const txid = selectedUtxo.outpoint.txid;
+                setSelectedUtxo(undefined);
+                nav.navToExplorerTx(txid);
+              }}
+            />
+          </Column>
+        </BottomModal>
+      ) : null}
     </Layout>
   );
 }
