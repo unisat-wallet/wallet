@@ -143,19 +143,11 @@ export default function RGBTransferDetailScreen() {
   const downloadBurn = async () => {
     if (!transfer?.txid) return;
     try {
-      const legacy = transfer.burnDestinationChainId === undefined;
-      const burn = legacy
-        ? await wallet.exportRgbBurnConsignment(transfer.txid)
-        : await wallet.exportRgbBurn(transfer.txid);
-      const blob = legacy
-        ? new Blob([Uint8Array.from(atob(burn as string), (char) => char.charCodeAt(0))], {
-            type: 'application/octet-stream'
-          })
-        : new Blob([JSON.stringify(burn, null, 2)], { type: 'application/json' });
-      const url = URL.createObjectURL(blob);
+      const burn = await wallet.exportRgbBurn(transfer.txid);
+      const url = URL.createObjectURL(new Blob([JSON.stringify(burn, null, 2)], { type: 'application/json' }));
       const anchor = document.createElement('a');
       anchor.href = url;
-      anchor.download = `bfa-burn-${transfer.txid}.${legacy ? 'rgb' : 'json'}`;
+      anchor.download = `bfa-burn-${transfer.txid}.json`;
       anchor.click();
       setTimeout(() => URL.revokeObjectURL(url), 0);
     } catch (error) {
@@ -271,7 +263,7 @@ export default function RGBTransferDetailScreen() {
           {transfer?.burn && transfer.txid ? (
             <Button
               full
-              text={t(transfer.burnDestinationChainId === undefined ? 'rgb_download_burn_proof' : 'rgb_download_burn')}
+              text={t('rgb_download_burn')}
               preset="primary"
               style={{ height: 50, minHeight: 50, borderRadius: 12 }}
               onClick={() => void downloadBurn()}
