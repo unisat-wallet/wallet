@@ -19,7 +19,7 @@ const phaseTranslationKey: Record<RgbAcceptProgressPhase, string> = {
   validating: 'rgb_accept_progress_validating',
   persisting: 'rgb_accept_progress_persisting',
   acknowledging: 'rgb_accept_progress_acknowledging',
-  broadcasting: 'rgb_accept_progress_broadcasting',
+  broadcasting: 'rgb_accept_progress_processing_transaction',
   finalizing: 'rgb_accept_progress_finalizing',
   complete: 'rgb_accept_progress_complete'
 };

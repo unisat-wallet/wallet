@@ -3552,7 +3552,7 @@
   "rgb_accept_progress_validating": { "message": "正在驗證 RGB 歷史" },
   "rgb_accept_progress_persisting": { "message": "正在儲存已驗證轉帳" },
   "rgb_accept_progress_acknowledging": { "message": "正在向發送方確認" },
-  "rgb_accept_progress_broadcasting": { "message": "正在廣播交易" },
+  "rgb_accept_progress_processing_transaction": { "message": "正在處理 Bitcoin 交易" },
   "rgb_accept_progress_finalizing": { "message": "正在完成接收" },
   "rgb_accept_progress_complete": { "message": "接收完成" },
   "rgb_accept_progress_elapsed": { "message": "已用時" },

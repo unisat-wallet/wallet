@@ -3533,7 +3533,7 @@
   "rgb_accept_progress_validating": { "message": "RGB 履歴を検証中" },
   "rgb_accept_progress_persisting": { "message": "検証済み転送を保存中" },
   "rgb_accept_progress_acknowledging": { "message": "送信者に確認中" },
-  "rgb_accept_progress_broadcasting": { "message": "トランザクションを配信中" },
+  "rgb_accept_progress_processing_transaction": { "message": "Bitcoin トランザクションを処理中" },
   "rgb_accept_progress_finalizing": { "message": "受け取りを完了中" },
   "rgb_accept_progress_complete": { "message": "受け取り完了" },
   "rgb_accept_progress_elapsed": { "message": "経過時間" },

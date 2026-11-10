@@ -3531,7 +3531,7 @@
   "rgb_accept_progress_validating": { "message": "Проверка истории RGB" },
   "rgb_accept_progress_persisting": { "message": "Сохранение перевода" },
   "rgb_accept_progress_acknowledging": { "message": "Подтверждение с отправителем" },
-  "rgb_accept_progress_broadcasting": { "message": "Отправка транзакции" },
+  "rgb_accept_progress_processing_transaction": { "message": "Обработка Bitcoin-транзакции" },
   "rgb_accept_progress_finalizing": { "message": "Завершение приёма" },
   "rgb_accept_progress_complete": { "message": "Приём завершён" },
   "rgb_accept_progress_elapsed": { "message": "Прошло" },

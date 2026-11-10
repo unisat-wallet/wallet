@@ -3533,7 +3533,7 @@
   "rgb_accept_progress_validating": { "message": "Validation de l'historique RGB" },
   "rgb_accept_progress_persisting": { "message": "Enregistrement du transfert" },
   "rgb_accept_progress_acknowledging": { "message": "Confirmation avec l'expéditeur" },
-  "rgb_accept_progress_broadcasting": { "message": "Diffusion de la transaction" },
+  "rgb_accept_progress_processing_transaction": { "message": "Traitement de la transaction Bitcoin" },
   "rgb_accept_progress_finalizing": { "message": "Finalisation de l'acceptation" },
   "rgb_accept_progress_complete": { "message": "Acceptation terminée" },
   "rgb_accept_progress_elapsed": { "message": "Temps écoulé" },
