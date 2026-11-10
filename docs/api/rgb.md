@@ -191,6 +191,7 @@ const receive = await rgb.createReceiveInvoice({
   durationSeconds: 900,
   minConfirmations: 3,
   recipientType: 'blind', // 'blind' (default) | 'witness'
+  proxyId: 'signet-v04', // optional trusted profile ID
 })
 
 // {
@@ -215,6 +216,32 @@ created by the sender transaction.
 an invoice with a 24-hour expiry. `minConfirmations`, when supplied to this
 native API, must be a positive integer; settlement waits for that many Bitcoin
 confirmations. WebRGB applies a separate minimum floor of three confirmations.
+
+`proxyId` selects one of the trusted Proxy profiles configured by the wallet.
+It is an identifier, not a URL: a dApp cannot provide an arbitrary endpoint or
+override the profile's name and version metadata. Omit it to use the wallet's
+configured default. The wallet resolves and pins the effective profile before
+showing approval; the approval's Invoice Details show its name, ID, protocol
+version, server version, and endpoint.
+
+Proxy profiles and the effective `defaultProxyId` are advertised by the
+WebRGB provider's [`getInfo()`](./webrgb.md#getinfo). A dApp that offers a
+selector should pass back only an advertised profile's `id`:
+
+```ts
+await window.rgb.enable()
+const { proxyProfiles, defaultProxyId } = await window.rgb.getInfo()
+
+const selectedProxyId = proxyProfiles?.find(profile => profile.id === defaultProxyId)?.id
+const receive = await window.unisat.rgb.createReceiveInvoice({
+  recipientType: 'blind',
+  proxyId: selectedProxyId,
+})
+```
+
+The `protocolVersion` and `serverVersion` fields describe different layers.
+For example, Proxy protocol `1.0` may be served by server implementation
+`0.3.0` or `0.4.0`; do not infer one from the other.
 
 ### `getPendingReceives()`
 

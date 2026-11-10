@@ -74,6 +74,15 @@ type RgbInfo = {
   protocol: 'RGB_L1' | null
   methods: string[]
   burnRecipientNamespaces?: string[]
+  proxyProfiles?: Array<{
+    id: string
+    name: string
+    endpoint: string
+    protocolVersion?: string
+    serverVersion?: string
+    recommended: boolean
+  }>
+  defaultProxyId?: string
 }
 ```
 
@@ -146,7 +155,34 @@ explicitly allows them.
 ### `getInfo()`
 
 Returns the readiness object described above and refreshes the capability list
-for the current wallet context.
+for the current wallet context. When `ready` is `true`, it also returns the
+wallet's selectable, trusted `proxyProfiles` and the effective
+`defaultProxyId`.
+
+```ts
+const info = await rgb.getInfo()
+
+for (const profile of info.proxyProfiles ?? []) {
+  console.log(
+    profile.id,
+    profile.name,
+    profile.protocolVersion,
+    profile.serverVersion,
+    profile.recommended
+  )
+}
+```
+
+`protocolVersion` is the Proxy JSON-RPC protocol version; `serverVersion` is
+the Proxy server implementation version. They are independent—for example,
+protocol `1.0` can be exposed by server `0.3.0` or `0.4.0`. These fields help a
+dApp present compatibility choices, while the wallet still verifies the Proxy
+at runtime. Profiles that are not selectable are not returned.
+
+Do not construct a profile or derive a `proxyId` from an endpoint. Pass back
+only an `id` returned by the current wallet context. Profile availability can
+change with the selected account, chain, or wallet configuration, so refresh
+`getInfo()` before presenting a long-lived Proxy selector.
 
 ### `getAddress()`
 
@@ -167,6 +203,7 @@ const receive = await rgb.blindReceive({
   amount: 1000, // omit for any amount
   durationSeconds: 900,
   minConfirmations: 3,
+  proxyId: 'signet-v04', // optional ID from getInfo().proxyProfiles
 })
 
 // {
@@ -187,11 +224,16 @@ Rules:
   hours when it is omitted.
 - `minConfirmations` must be a nonnegative integer. UniSat raises it to a
   minimum of three and returns the effective value.
+- `proxyId`, when supplied, must be the ID of a selectable profile advertised
+  by `getInfo().proxyProfiles`. Omit it to use `defaultProxyId`.
 
 Use `blindReceive` when an available RGB funding UTXO can be reserved. Use
 `witnessReceive` when the sender transaction should create the receiver output.
 Both calls persist receiver state before returning the invoice and open the
-wallet's receive approval screen.
+wallet's receive approval screen. Before approval, UniSat resolves the trusted
+profile and pins the default when `proxyId` was omitted. Invoice Details show
+the selected Proxy name, ID, protocol version, server version, and endpoint;
+page-supplied profile metadata is ignored.
 
 ## Assets
 
