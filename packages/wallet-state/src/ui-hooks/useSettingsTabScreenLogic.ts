@@ -47,7 +47,7 @@ export function useSettingsTabScreenLogic() {
 
   useEffect(() => {
     let active = true
-    const rgbSupported = Boolean(chain.rgbProxyEndpoints?.some(endpoint => endpoint.trim()))
+    const rgbSupported = chain.supportsRgb === true
     if (!rgbSupported || currentKeyring.type !== KeyringType.HdKeyring) {
       setRgbFeatureStatus({ contextKey: rgbContextKey, enabled: false })
       return () => {
@@ -73,7 +73,14 @@ export function useSettingsTabScreenLogic() {
     return () => {
       active = false
     }
-  }, [rgbContextKey, chain.rgbProxyEndpoints, currentKeyring.type, isUnlocked, walletTabFocusRefresh, wallet])
+  }, [
+    rgbContextKey,
+    chain.supportsRgb,
+    currentKeyring.type,
+    isUnlocked,
+    walletTabFocusRefresh,
+    wallet,
+  ])
 
   const { isExtensionInExpandView } = useDevice()
 
@@ -165,7 +172,7 @@ export function useSettingsTabScreenLogic() {
   }, [t])
 
   const settings_rgbSettings: SettingsItemType | null = useMemo(() => {
-    const rgbEnabled = Boolean(chain.rgbProxyEndpoints?.some(endpoint => endpoint.trim()))
+    const rgbEnabled = chain.supportsRgb === true
     if (!rgbEnabled || rgbFeatureStatus.contextKey !== rgbContextKey || !rgbFeatureStatus.enabled ||
         currentKeyring.type !== KeyringType.HdKeyring) return null
     return {
@@ -179,7 +186,7 @@ export function useSettingsTabScreenLogic() {
         nav.navigate('RgbSettingsScreen')
       },
     }
-  }, [chain.rgbProxyEndpoints, currentKeyring.type, nav, rgbFeatureStatus, rgbContextKey, t])
+  }, [chain.supportsRgb, currentKeyring.type, nav, rgbFeatureStatus, rgbContextKey, t])
 
   const settings_feedback = useMemo(() => {
     return {

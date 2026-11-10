@@ -17,24 +17,24 @@ describe('getSupportedAssets', () => {
 
   beforeEach(() => {
     const mainnet = CHAINS_MAP[ChainType.BITCOIN_MAINNET]!
-    CHAINS_MAP[ChainType.BITCOIN_MAINNET] = { ...mainnet, rgbProxyEndpoints: undefined }
+    CHAINS_MAP[ChainType.BITCOIN_MAINNET] = { ...mainnet, supportsRgb: false }
     CHAINS_MAP[ChainType.BITCOIN_TESTNET] = {
       ...mainnet,
       enum: ChainType.BITCOIN_TESTNET,
       networkType: NetworkType.TESTNET,
-      rgbProxyEndpoints: undefined,
+      supportsRgb: false,
     }
     CHAINS_MAP[ChainType.BITCOIN_TESTNET4] = {
       ...mainnet,
       enum: ChainType.BITCOIN_TESTNET4,
       networkType: NetworkType.TESTNET,
-      rgbProxyEndpoints: ['rpcs://rgb-test.example/json-rpc'],
+      supportsRgb: true,
     }
     CHAINS_MAP[ChainType.BITCOIN_SIGNET] = {
       ...mainnet,
       enum: ChainType.BITCOIN_SIGNET,
       networkType: NetworkType.TESTNET,
-      rgbProxyEndpoints: undefined,
+      supportsRgb: false,
     }
   })
 

@@ -12,6 +12,8 @@ import {
   NETWORK_TYPES,
   SUPPORTED_LOCALES,
   getAutoLockTimes,
+  getDefaultRgbProxyEndpoints,
+  getDefaultRgbProxyProfile,
   getLockTimeInfo,
   isSupportedChainType,
 } from '../src/constants/common'
@@ -46,6 +48,32 @@ describe('common constants', () => {
     )
     expect(groupedChains.every(chain => chain && CHAINS.includes(chain))).toBe(true)
     expect(CHAIN_GROUPS.length).toBeGreaterThan(0)
+  })
+
+  it('uses the recommended RGB proxy profile as the operational default', () => {
+    const chain = {
+      ...CHAINS_MAP[ChainType.BITCOIN_TESTNET4]!,
+      rgbProxyProfiles: [
+        { id: 'legacy', name: 'Legacy', endpoint: 'rpcs://legacy.example/json-rpc' },
+        {
+          id: 'current',
+          name: 'Current',
+          endpoint: 'rpcs://current.example/json-rpc',
+          recommended: true,
+        },
+      ],
+    }
+
+    expect(getDefaultRgbProxyProfile(chain)?.id).toBe('current')
+    expect(getDefaultRgbProxyEndpoints(chain)).toEqual(['rpcs://current.example/json-rpc'])
+  })
+
+  it('gives every RGB-enabled built-in chain a proxy profile', () => {
+    for (const chain of Object.values(CHAINS_MAP)) {
+      if (!chain.supportsRgb) continue
+      expect(chain.rgbProxyProfiles?.length, chain.label).toBeGreaterThan(0)
+      expect(getDefaultRgbProxyEndpoints(chain)[0], chain.label).toMatch(/^rpcs:\/\//)
+    }
   })
 
   it.each(['constructor', 'toString', 'valueOf', '__proto__'])(

@@ -206,6 +206,17 @@ export const NETWORK_TYPES = [
   { value: NetworkType.TESTNET, label: 'TESTNET', name: 'testnet', validNames: ['testnet'] },
 ]
 
+export type RgbProxyProfile = {
+  id: string
+  name: string
+  endpoint: string
+  /** Display hints only; the transport verifies server.info at runtime. */
+  protocolVersion?: string
+  serverVersion?: string
+  recommended?: boolean
+  selectable?: boolean
+}
+
 export type TypeChain = {
   enum: ChainType
   label: string
@@ -214,8 +225,10 @@ export type TypeChain = {
   unit: string
   networkType: NetworkType
   endpoints: string[]
-  /** Enables RGB on this chain when it contains at least one proxy endpoint. */
-  rgbProxyEndpoints?: string[]
+  /** Whether this network exposes RGB wallet functionality. */
+  supportsRgb: boolean
+  /** Named proxy choices. The recommended (or first) profile is the operational default. */
+  rgbProxyProfiles?: RgbProxyProfile[]
   /** EVM JSON-RPC endpoints used to validate BFA mint anchors, keyed by EIP-155 chain ID. */
   rgbEvmRpcUrls?: Record<number, string>
   /** Pinned Ed25519 keys allowed to attest server-side RGB validation. */
@@ -244,6 +257,17 @@ export type TypeChain = {
   enableLowFeeMode?: boolean
 }
 
+export function getDefaultRgbProxyProfile(chain?: TypeChain): RgbProxyProfile | undefined {
+  return (
+    chain?.rgbProxyProfiles?.find(profile => profile.recommended) ?? chain?.rgbProxyProfiles?.[0]
+  )
+}
+
+export function getDefaultRgbProxyEndpoints(chain?: TypeChain): string[] {
+  const profile = getDefaultRgbProxyProfile(chain)
+  return profile ? [profile.endpoint] : []
+}
+
 const PROD_CHAINS_MAP: { [key: string]: TypeChain } = {
   [ChainType.BITCOIN_MAINNET]: {
     enum: ChainType.BITCOIN_MAINNET,
@@ -252,6 +276,7 @@ const PROD_CHAINS_MAP: { [key: string]: TypeChain } = {
     icon: 'bitcoinMainnet',
     unit: 'BTC',
     networkType: NetworkType.MAINNET,
+    supportsRgb: false,
     endpoints: ['https://wallet-api.unisat.space', 'https://wallet-api.unisat.io'],
     mempoolSpaceUrl: 'https://mempool.space',
     unisatUrl: 'https://link.unisat.space/btc',
@@ -264,7 +289,6 @@ const PROD_CHAINS_MAP: { [key: string]: TypeChain } = {
     enableBrc20Prog: true,
     iconBaseUrl: 'https://static.unisat.space/icon',
     enableLowFeeMode: true,
-    rgbProxyEndpoints: [],
     rgbEvmRpcUrls: {},
     svg: 'bitcoin-mainnet',
   },
@@ -275,6 +299,7 @@ const PROD_CHAINS_MAP: { [key: string]: TypeChain } = {
     icon: 'bitcoinTestnet',
     unit: 'tBTC',
     networkType: NetworkType.TESTNET,
+    supportsRgb: false,
     endpoints: ['https://wallet-api-testnet.unisat.io'],
     mempoolSpaceUrl: 'https://mempool.space/testnet',
     unisatUrl: 'https://link.unisat.space/testnet',
@@ -313,7 +338,17 @@ const PROD_CHAINS_MAP: { [key: string]: TypeChain } = {
     supportsAssetOverview: false,
     supportsAddressHistory: false,
     enableMarket: false,
-    rgbProxyEndpoints: ['rpcs://wallet-api-testnet4.unisat.space/_/rgb/v0_4_0/v1/json-rpc'],
+    supportsRgb: true,
+    rgbProxyProfiles: [
+      {
+        id: 'testnet4-v04',
+        name: 'Proxy 0.4',
+        endpoint: 'rpcs://wallet-api-testnet4.unisat.space/_/rgb/v0_4_0/v1/json-rpc',
+        protocolVersion: '1.0',
+        serverVersion: '0.4.0',
+        recommended: true,
+      },
+    ],
     rgbValidationPublicKeys: ['02e3ecc2fc82e46b88c5e7e4489a5586571c047d87134095df1014e3848d0c28cd'],
     svg: 'bitcoin-testnet',
   },
@@ -338,7 +373,17 @@ const PROD_CHAINS_MAP: { [key: string]: TypeChain } = {
     supportsAddressHistory: false,
     enableMarket: false,
     enableBrc20Prog: true,
-    rgbProxyEndpoints: ['rpcs://wallet-api-signet.unisat.space/_/rgb/v0_4_0/v1/json-rpc'],
+    supportsRgb: true,
+    rgbProxyProfiles: [
+      {
+        id: 'signet-v04',
+        name: 'Proxy 0.4',
+        endpoint: 'rpcs://wallet-api-signet.unisat.space/_/rgb/v0_4_0/v1/json-rpc',
+        protocolVersion: '1.0',
+        serverVersion: '0.4.0',
+        recommended: true,
+      },
+    ],
     rgbValidationPublicKeys: ['02e3ecc2fc82e46b88c5e7e4489a5586571c047d87134095df1014e3848d0c28cd'],
     rgbEvmRpcUrls: {
       '42161': 'https://arb1.arbitrum.io/rpc',
@@ -353,6 +398,7 @@ const PROD_CHAINS_MAP: { [key: string]: TypeChain } = {
 
     unit: 'FB',
     networkType: NetworkType.MAINNET,
+    supportsRgb: false,
     endpoints: ['https://wallet-api-fractal.unisat.space'],
     mempoolSpaceUrl: 'https://mempool.fractalbitcoin.io',
     unisatUrl: 'https://link.unisat.space/fractal',
@@ -376,6 +422,7 @@ const PROD_CHAINS_MAP: { [key: string]: TypeChain } = {
     icon: 'fractalTestnet',
     unit: 'tFB',
     networkType: NetworkType.MAINNET,
+    supportsRgb: false,
     endpoints: [
       'https://wallet-api-fractal-testnet.unisat.io',
       'https://wallet-api-fractal-testnet.unisat.space',

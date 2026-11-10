@@ -23,10 +23,10 @@ sync colored UTXOs -> prepare local RGB PSBT -> HD keyring signs
 ## RGB proxy transport
 
 The extension uses the RGB HTTP JSON-RPC proxy protocol for consignment
-transport. Configure public endpoints with `rgbProxyEndpoints` in the current
-chain entry of `@unisat/wallet-shared` so they are embedded in locally created
-blind invoices. `rpcs://` is sent over HTTPS; `rpc://` is supported only for
-local development.
+transport. Configure named `rgbProxyProfiles` in the current chain entry of
+`@unisat/wallet-shared`; the recommended (or first) profile is the operational
+default and is embedded in locally created blind invoices. `rpcs://` is sent
+over HTTPS; `rpc://` is supported only for local development.
 After signing, the wallet posts the consignment, waits for `ack.get` to return
 `true`, and only then broadcasts the Bitcoin transaction. The signed transfer
 remains in encrypted local storage while the acknowledgement is pending and is

@@ -81,6 +81,7 @@ import {
   WalletKeyring,
   bgI18n,
   getAccountCapabilities,
+  getDefaultRgbProxyEndpoints,
   getLockTimeInfo,
   hasOwn,
   isChangeAddressHdPath,
@@ -835,7 +836,7 @@ export function planRgbFeePoolTopUp(input: {
 }
 
 export const chainTypeToRgbNetwork = (chainType: ChainType): RgbNetwork => {
-  const enabled = CHAINS_MAP[chainType]?.rgbProxyEndpoints?.some(endpoint => endpoint.trim())
+  const enabled = CHAINS_MAP[chainType]?.supportsRgb === true
   if (!enabled) throw new Error(`RGB is not enabled for wallet chain "${chainType}"`)
 
   switch (chainType) {
@@ -1317,7 +1318,6 @@ export class WalletController extends BaseController {
     const chainType = this.getChainType()
     const chain = CHAINS_MAP[chainType]
     const trusted = new Set([
-      ...(chain?.rgbProxyEndpoints || []),
       ...(chain?.rgbProxyProfiles || []).map(profile => profile.endpoint),
     ].map(toHttpEndpoint))
     const now = Math.floor(Date.now() / 1000)
@@ -7286,7 +7286,7 @@ export class WalletController extends BaseController {
       },
       encoder: createLocalRgbProtocolEncoder(validateBfaConsignment),
       validateBfaConsignment,
-      transport: createRgbProxyTransport(CHAINS_MAP[chainType]?.rgbProxyEndpoints || [], {
+      transport: createRgbProxyTransport(getDefaultRgbProxyEndpoints(CHAINS_MAP[chainType]), {
         authorizeRequest: this.authorizeRgbProxyRequest,
       }),
       broadcaster: {

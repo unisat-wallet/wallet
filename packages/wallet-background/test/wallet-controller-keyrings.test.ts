@@ -5,7 +5,14 @@ import { KeyringType } from '@unisat/keyring-service/types'
 import { RgbTransferAwaitingAckError, RgbTransferRejectedError } from '@unisat/rgb-service'
 import * as txHelpers from '@unisat/tx-helpers'
 import { bitcoin } from '@unisat/wallet-bitcoin'
-import { BUS_EVENTS, BUS_METHODS, CHAINS_MAP, ErrorCodes, toRgbDisplayAmount } from '@unisat/wallet-shared'
+import {
+  BUS_EVENTS,
+  BUS_METHODS,
+  CHAINS_MAP,
+  ErrorCodes,
+  toRgbDisplayAmount,
+  type RgbProxyProfile,
+} from '@unisat/wallet-shared'
 import { AddressType, ChainType, NetworkType } from '@unisat/wallet-types'
 import log from 'loglevel'
 import {
@@ -804,14 +811,14 @@ describe('RGB HD backup orchestration', () => {
 })
 
 describe('chainTypeToRgbNetwork', () => {
-  const withRgbProxyEndpoints = (
+  const withRgbSupport = (
     chainType: ChainType,
-    endpoints: string[] | undefined,
+    supportsRgb: boolean,
     assertion: () => void
   ) => {
-    const chains = CHAINS_MAP as Record<string, { rgbProxyEndpoints?: string[] }>
+    const chains = CHAINS_MAP as Record<string, { supportsRgb: boolean }>
     const previousChain = chains[chainType]
-    chains[chainType] = { ...previousChain, rgbProxyEndpoints: endpoints }
+    chains[chainType] = { ...previousChain, supportsRgb }
     try {
       assertion()
     } finally {
@@ -821,7 +828,7 @@ describe('chainTypeToRgbNetwork', () => {
   }
 
   it('rejects Bitcoin mainnet while its RGB proxy is disabled', () => {
-    withRgbProxyEndpoints(ChainType.BITCOIN_MAINNET, undefined, () => {
+    withRgbSupport(ChainType.BITCOIN_MAINNET, false, () => {
       expect(() => chainTypeToRgbNetwork(ChainType.BITCOIN_MAINNET)).toThrow(
         'RGB is not enabled for wallet chain'
       )
@@ -834,25 +841,25 @@ describe('chainTypeToRgbNetwork', () => {
     ChainType.FRACTAL_BITCOIN_MAINNET,
     ChainType.FRACTAL_BITCOIN_TESTNET,
   ])('rejects disabled chain %s', chainType => {
-    withRgbProxyEndpoints(chainType, undefined, () => {
+    withRgbSupport(chainType, false, () => {
       expect(() => chainTypeToRgbNetwork(chainType)).toThrow('RGB is not enabled for wallet chain')
     })
   })
 
   it('maps Bitcoin Testnet4', () => {
-    withRgbProxyEndpoints(ChainType.BITCOIN_TESTNET4, ['rpcs://rgb-testnet4.example/json-rpc'], () => {
+    withRgbSupport(ChainType.BITCOIN_TESTNET4, true, () => {
       expect(chainTypeToRgbNetwork(ChainType.BITCOIN_TESTNET4)).toBe('testnet4')
     })
   })
 
-  it('enables a supported test chain when its RGB proxy endpoint is configured', () => {
-    withRgbProxyEndpoints(ChainType.BITCOIN_TESTNET, ['rpcs://rgb-testnet.example/json-rpc'], () => {
+  it('enables a supported test chain when RGB is configured', () => {
+    withRgbSupport(ChainType.BITCOIN_TESTNET, true, () => {
       expect(chainTypeToRgbNetwork(ChainType.BITCOIN_TESTNET)).toBe('testnet')
     })
   })
 
-  it('maps Bitcoin mainnet when its RGB proxy endpoint is configured', () => {
-    withRgbProxyEndpoints(ChainType.BITCOIN_MAINNET, ['rpcs://rgb-mainnet.example/json-rpc'], () => {
+  it('maps Bitcoin mainnet when RGB is configured', () => {
+    withRgbSupport(ChainType.BITCOIN_MAINNET, true, () => {
       expect(chainTypeToRgbNetwork(ChainType.BITCOIN_MAINNET)).toBe('mainnet')
     })
   })
@@ -861,7 +868,7 @@ describe('chainTypeToRgbNetwork', () => {
     [ChainType.FRACTAL_BITCOIN_MAINNET, 'fractal-mainnet'],
     [ChainType.FRACTAL_BITCOIN_TESTNET, 'fractal-test'],
   ] as const)('maps supported Fractal chain %s to %s', (chainType, expected) => {
-    withRgbProxyEndpoints(chainType, ['rpcs://rgb-fractal.example/json-rpc'], () => {
+    withRgbSupport(chainType, true, () => {
       expect(chainTypeToRgbNetwork(chainType)).toBe(expected)
     })
   })
@@ -950,15 +957,25 @@ describe('RGB fee-pool inspection', () => {
 })
 
 describe('RGB wallet references', () => {
-  let previousMainnetRgbProxyEndpoints: string[] | undefined
+  let previousMainnetSupportsRgb: boolean
+  let previousMainnetRgbProxyProfiles: RgbProxyProfile[] | undefined
   const rgbConsent = { enabled: true, agreementVersion: 'rgb-terms-v1', acceptedAt: 1 }
 
   // These tests cover RGB wallet behavior independently from the production
   // feature flag. Production mainnet remains disabled and is covered above.
   beforeEach(() => {
     const chain = CHAINS_MAP[ChainType.BITCOIN_MAINNET]!
-    previousMainnetRgbProxyEndpoints = chain.rgbProxyEndpoints
-    chain.rgbProxyEndpoints = ['rpcs://rgb-mainnet.example/json-rpc']
+    previousMainnetSupportsRgb = chain.supportsRgb
+    previousMainnetRgbProxyProfiles = chain.rgbProxyProfiles
+    chain.supportsRgb = true
+    chain.rgbProxyProfiles = [
+      {
+        id: 'mainnet-test',
+        name: 'Test Proxy',
+        endpoint: 'rpcs://rgb-mainnet.example/json-rpc',
+        recommended: true,
+      },
+    ]
     ;(keyringService as any).getEncryptedStorageItem = vi.fn(
       (_namespace: string, key: string) => Promise.resolve(key.startsWith('rgb-feature-enabled:') ? rgbConsent : undefined)
     )
@@ -986,7 +1003,9 @@ describe('RGB wallet references', () => {
   })
 
   afterEach(() => {
-    CHAINS_MAP[ChainType.BITCOIN_MAINNET]!.rgbProxyEndpoints = previousMainnetRgbProxyEndpoints
+    const chain = CHAINS_MAP[ChainType.BITCOIN_MAINNET]!
+    chain.supportsRgb = previousMainnetSupportsRgb
+    chain.rgbProxyProfiles = previousMainnetRgbProxyProfiles
   })
 
   it('shares one local RGB service initialization for concurrent first requests', async () => {

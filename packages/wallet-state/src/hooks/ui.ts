@@ -228,7 +228,7 @@ export function getSupportedAssets(
     assetTabKeys.push(AssetTabKey.ALKANES)
   }
 
-  const isRgbNetwork = Boolean(chain.rgbProxyEndpoints?.some(endpoint => endpoint.trim()))
+  const isRgbNetwork = chain.supportsRgb === true
 
   if (isRgbNetwork && opts?.keyringType === KeyringType.HdKeyring) {
     assets.rgb = true

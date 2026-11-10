@@ -41,6 +41,7 @@ import {
   ToSignMessage,
   WalletError,
   getAccountCapabilities,
+  getDefaultRgbProxyEndpoints,
   hasOwn,
   isSupportedChainType,
 } from '@unisat/wallet-shared'
@@ -1064,7 +1065,8 @@ class ProviderController extends BaseController {
     if (typeof params?.assetId !== 'string' || !params.assetId) webRgbInvalid('assetId is required')
     if (!Number.isSafeInteger(params.amount) || params.amount <= 0) webRgbInvalid('amount must be a positive safe integer')
     if (typeof params.recipientId !== 'string' || !params.recipientId) webRgbInvalid('recipientId is required')
-    const endpoints = params.transportEndpoints ?? CHAINS_MAP[wallet.getChainType()]?.rgbProxyEndpoints
+    const endpoints =
+      params.transportEndpoints ?? getDefaultRgbProxyEndpoints(CHAINS_MAP[wallet.getChainType()])
     if (!Array.isArray(endpoints) || !endpoints.length || endpoints.some(item => typeof item !== 'string' || !item))
       webRgbInvalid('transportEndpoints are unavailable')
     const query = new URLSearchParams({ amount: String(params.amount), endpoints: endpoints.join(',') })
