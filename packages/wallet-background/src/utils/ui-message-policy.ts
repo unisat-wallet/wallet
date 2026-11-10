@@ -33,6 +33,7 @@ const UI_CONTROLLER_METHODS = new Set([
   'createKeyringWithPrivateKey',
   'createKeyringWithPublicKey',
   'createRgbBlindReceive',
+  'getRgbReceiveProxyConfig',
   'createRgbFeePoolTopUpBegin',
   'createRgbFeePoolTopUpEnd',
   'createRgbFeePoolWithdrawBegin',

@@ -12,6 +12,7 @@ import type {
   TickPriceItem,
   PaginationParams,
   RgbProxyPolicy,
+  RgbProxyConfig,
 } from '../types'
 
 export class ConfigService {
@@ -26,6 +27,10 @@ export class ConfigService {
 
   async getRgbProxyPolicy(): Promise<RgbProxyPolicy> {
     return this.httpClient.get('/v5/rgb/proxy-policy', { retries: 0 })
+  }
+
+  async getRgbProxyConfig(): Promise<RgbProxyConfig> {
+    return this.httpClient.get('/v5/rgb/proxy-config', { retries: 0 })
   }
 
   /**

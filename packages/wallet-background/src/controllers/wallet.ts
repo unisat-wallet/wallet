@@ -88,6 +88,7 @@ import {
   isKeystoneAccountHdPath,
   t,
   toRgbDisplayAmount,
+  type RgbProxyProfile,
 } from '@unisat/wallet-shared'
 import { verifyRgbValidationAttestation } from '../rgb/RgbValidationAttestation'
 import { AddressType, ChainType, NetworkType } from '@unisat/wallet-types'
@@ -1149,6 +1150,14 @@ export class WalletController extends BaseController {
   private rgbProxyPolicyCache:
     | { chainType: ChainType; expiresAt: number; endpoints: Set<string> }
     | undefined
+  private rgbProxyConfigCache:
+    | {
+        chainType: ChainType
+        expiresAt: number
+        defaultProxyId?: string
+        profiles: RgbProxyProfile[]
+      }
+    | undefined
   private readonly rgbCoordinator = new RgbWalletCoordinator({
     getContext: () => this.getLocalRgbService(),
     getReadContext: () => this.getLocalRgbReadService(),
@@ -1300,6 +1309,7 @@ export class WalletController extends BaseController {
       this.rgbWriteLeases.clear()
       this.rgbApprovedProxyEndpoints.clear()
       this.rgbProxyPolicyCache = undefined
+      this.rgbProxyConfigCache = undefined
     })
   }
 
@@ -1340,7 +1350,102 @@ export class WalletController extends BaseController {
       }
     }
     this.rgbProxyPolicyCache.endpoints.forEach(endpoint => trusted.add(endpoint))
+    if (this.rgbProxyConfigCache?.chainType === chainType) {
+      this.rgbProxyConfigCache.profiles.forEach(profile =>
+        trusted.add(toHttpEndpoint(profile.endpoint))
+      )
+    }
     return trusted
+  }
+
+  getRgbReceiveProxyConfig = async (): Promise<{
+    profiles: RgbProxyProfile[]
+    defaultProxyId?: string
+  }> => {
+    const chainType = this.getChainType()
+    const localProfiles = (CHAINS_MAP[chainType]?.rgbProxyProfiles || []).filter(
+      profile => profile.selectable !== false
+    )
+    const localDefaultProxyId =
+      localProfiles.find(profile => profile.recommended)?.id || localProfiles[0]?.id
+    const localResult = {
+      profiles: localProfiles,
+      ...(localDefaultProxyId ? { defaultProxyId: localDefaultProxyId } : {}),
+    }
+    const now = Math.floor(Date.now() / 1000)
+    const cacheLocalFallback = () => {
+      this.rgbProxyConfigCache = {
+        chainType,
+        expiresAt: now + 5 * 60,
+        profiles: localProfiles,
+        ...(localDefaultProxyId ? { defaultProxyId: localDefaultProxyId } : {}),
+      }
+      return localResult
+    }
+    if (
+      this.rgbProxyConfigCache?.chainType === chainType &&
+      this.rgbProxyConfigCache.expiresAt > now
+    ) {
+      return {
+        profiles: this.rgbProxyConfigCache.profiles,
+        ...(this.rgbProxyConfigCache.defaultProxyId
+          ? { defaultProxyId: this.rgbProxyConfigCache.defaultProxyId }
+          : {}),
+      }
+    }
+    try {
+      const config = await walletApiService.config.getRgbProxyConfig()
+      const ids = new Set<string>()
+      const profiles = (Array.isArray(config.profiles) ? config.profiles : []).map(profile => {
+        const id = typeof profile.id === 'string' ? profile.id.trim() : ''
+        const name = typeof profile.name === 'string' ? profile.name.trim() : ''
+        if (!/^[a-zA-Z0-9][a-zA-Z0-9._-]{0,63}$/.test(id) || ids.has(id)) {
+          throw new Error('RGB proxy profile id is invalid')
+        }
+        if (
+          !name ||
+          name.length > 80 ||
+          typeof profile.endpoint !== 'string' ||
+          !profile.endpoint.startsWith('rpcs://') ||
+          profile.endpoint.includes('?') ||
+          profile.endpoint.includes('#')
+        ) {
+          throw new Error('RGB proxy profile is invalid')
+        }
+        toHttpEndpoint(profile.endpoint)
+        ids.add(id)
+        return {
+          id,
+          name,
+          endpoint: profile.endpoint,
+          ...(typeof profile.protocolVersion === 'string'
+            ? { protocolVersion: profile.protocolVersion }
+            : {}),
+          ...(typeof profile.serverVersion === 'string'
+            ? { serverVersion: profile.serverVersion }
+            : {}),
+        }
+      })
+      const fallbackProfile = profiles[0]
+      if (!fallbackProfile || profiles.length > 20) return cacheLocalFallback()
+      const requestedDefault =
+        typeof config.defaultProxyId === 'string' ? config.defaultProxyId : undefined
+      const defaultProxyId =
+        profiles.find(profile => profile.id === requestedDefault)?.id || fallbackProfile.id
+      const expiresAt = Number(config.expiresAt)
+      this.rgbProxyConfigCache = {
+        chainType,
+        expiresAt:
+          Number.isSafeInteger(expiresAt) && expiresAt > now
+            ? Math.min(expiresAt, now + 6 * 60 * 60)
+            : now + 5 * 60,
+        defaultProxyId,
+        profiles,
+      }
+      return { profiles, defaultProxyId }
+    } catch {
+      return cacheLocalFallback()
+    }
   }
 
   private authorizeRgbProxyRequest = async ({
@@ -2550,6 +2655,7 @@ export class WalletController extends BaseController {
     preferenceService.setChainType(chainType)
     await walletApiService.setEndpoint(CHAINS_MAP[chainType]!.endpoints[0]!)
     this.rgbProxyPolicyCache = undefined
+    this.rgbProxyConfigCache = undefined
 
     const currentAccount = await this.getCurrentAccount()
     const keyring = await this.getCurrentKeyring()
@@ -4587,9 +4693,14 @@ export class WalletController extends BaseController {
 
   private resolveRgbReceiveProxyEndpoints = (proxyId?: string) => {
     if (!proxyId) return undefined
-    const profile = CHAINS_MAP[this.getChainType()]?.rgbProxyProfiles?.find(
-      item => item.id === proxyId && item.selectable !== false
-    )
+    const chainType = this.getChainType()
+    const profile =
+      (this.rgbProxyConfigCache?.chainType === chainType
+        ? this.rgbProxyConfigCache.profiles.find(item => item.id === proxyId)
+        : undefined) ||
+      CHAINS_MAP[chainType]?.rgbProxyProfiles?.find(
+        item => item.id === proxyId && item.selectable !== false
+      )
     if (!profile) throw new Error('RGB proxy selection is invalid')
     return [profile.endpoint]
   }

@@ -16,6 +16,41 @@ import {
 import { createHookTestHarness } from './testHelpers'
 
 describe('useRGBReceiveScreenLogic', () => {
+  it('prefers the backend receive proxy configuration', async () => {
+    const { wrapper, wallet } = createHookTestHarness()
+    wallet.getRgbReceiveProxyConfig.mockResolvedValue({
+      defaultProxyId: 'remote-v03',
+      profiles: [
+        {
+          id: 'remote-v04',
+          name: 'Proxy 0.4',
+          endpoint: 'rpcs://proxy.example/v0_4_0/v1/json-rpc',
+        },
+        {
+          id: 'remote-v03',
+          name: 'Legacy Proxy 0.3',
+          endpoint: 'rpcs://proxy.example/v1/json-rpc',
+        },
+      ],
+    })
+
+    const { result } = renderHook(() => useRGBReceiveScreenLogic(), { wrapper })
+
+    await waitFor(() => expect(result.current.selectedProxyId).toBe('remote-v03'))
+    expect(result.current.proxyProfiles.map(profile => profile.id)).toEqual([
+      'remote-v04',
+      'remote-v03',
+    ])
+    await act(async () => {
+      await result.current.onCreateInvoice()
+    })
+    expect(wallet.createRgbBlindReceive).toHaveBeenCalledWith({
+      durationSeconds: 86_400,
+      proxyId: 'remote-v03',
+      skipSync: true,
+    })
+  })
+
   it('uses the selected trusted proxy profile when creating an invoice', async () => {
     const chain = CHAINS_MAP[ChainType.BITCOIN_MAINNET]!
     const previousProfiles = chain.rgbProxyProfiles

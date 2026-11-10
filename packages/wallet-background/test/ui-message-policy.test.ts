@@ -33,6 +33,7 @@ describe('UI message policy', () => {
       'abortRgbAcknowledgedSwap',
       'createBuyCoinPaymentUrl',
       'createRgbBlindReceive',
+      'getRgbReceiveProxyConfig',
       'createRgbWitnessReceive',
       'approveRgbProxyEndpoints',
       'getBlockActiveInfo',

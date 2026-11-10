@@ -1,5 +1,5 @@
 import { ErrorCodes } from '@unisat/wallet-shared'
-import type { SignPsbtParams, SignedData, ToSignData } from '@unisat/wallet-shared'
+import type { RgbProxyProfile, SignPsbtParams, SignedData, ToSignData } from '@unisat/wallet-shared'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useI18n, useNavigation, useTools, useWallet } from 'src/context'
 import { useChain, useFeeRateBar } from 'src/hooks'
@@ -62,6 +62,10 @@ type RgbAllocationWallet = {
 }
 
 type RgbReceiveWallet = {
+  getRgbReceiveProxyConfig(): Promise<{
+    profiles: RgbProxyProfile[]
+    defaultProxyId?: string
+  }>
   createRgbBlindReceive(params: {
     assetId?: string
     amount?: number | string
@@ -369,10 +373,19 @@ export function useRGBReceiveScreenLogic(
   )
   const [mode, setModeState] = useState<RGBReceiveMode>('any')
   const [recipientType, setRecipientType] = useState<RGBInvoiceRecipientType>('blind')
-  const proxyProfiles = (chain.rgbProxyProfiles || []).filter(profile => profile.selectable !== false)
-  const [selectedProxyId, setSelectedProxyId] = useState(
-    () => proxyProfiles.find(profile => profile.recommended)?.id || proxyProfiles[0]?.id || ''
+  const localProxyProfiles = (chain.rgbProxyProfiles || []).filter(
+    profile => profile.selectable !== false
   )
+  const [proxyProfiles, setProxyProfiles] = useState<RgbProxyProfile[]>(localProxyProfiles)
+  const proxySelectionChanged = useRef(false)
+  const [selectedProxyId, setSelectedProxyId] = useState(
+    () =>
+      localProxyProfiles.find(profile => profile.recommended)?.id || localProxyProfiles[0]?.id || ''
+  )
+  const selectProxy = (proxyId: string) => {
+    proxySelectionChanged.current = true
+    setSelectedProxyId(proxyId)
+  }
   const [invoiceExpirySeconds, setInvoiceExpirySecondsState] = useState(24 * 60 * 60)
   const invoiceExpiryChanged = useRef(false)
   const setInvoiceExpirySeconds = (value: number) => {
@@ -399,6 +412,23 @@ export function useRGBReceiveScreenLogic(
   const [utxoPendingVanillaTxid, setUtxoPendingVanillaTxid] = useState('')
   const [resumeCreateInvoiceAfterSign, setResumeCreateInvoiceAfterSign] = useState(false)
   const [insufficientBtcForInvoice, setInsufficientBtcForInvoice] = useState(false)
+
+  useEffect(() => {
+    let active = true
+    void rgbWallet
+      .getRgbReceiveProxyConfig()
+      .then(config => {
+        if (!active || !config.profiles.length) return
+        setProxyProfiles(config.profiles)
+        if (!proxySelectionChanged.current) {
+          setSelectedProxyId(config.defaultProxyId || config.profiles[0]?.id || '')
+        }
+      })
+      .catch(() => undefined)
+    return () => {
+      active = false
+    }
+  }, [rgbWallet])
 
   useEffect(() => {
     let active = true
@@ -904,7 +934,7 @@ export function useRGBReceiveScreenLogic(
     setRecipientType,
     proxyProfiles,
     selectedProxyId,
-    setSelectedProxyId,
+    setSelectedProxyId: selectProxy,
     invoiceExpirySeconds,
     setInvoiceExpirySeconds,
     amount,

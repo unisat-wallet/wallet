@@ -138,6 +138,21 @@ export interface RgbProxyPolicy {
   endpoints: string[]
 }
 
+export interface RgbProxyConfigProfile {
+  id: string
+  name: string
+  endpoint: string
+  protocolVersion?: string
+  serverVersion?: string
+}
+
+export interface RgbProxyConfig {
+  version: number
+  expiresAt: number
+  defaultProxyId?: string
+  profiles: RgbProxyConfigProfile[]
+}
+
 export interface RgbProxyRelayRequest {
   endpoint: string
   operation: string

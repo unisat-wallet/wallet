@@ -694,6 +694,11 @@ export interface WalletController {
     proxyId?: string
   }): Promise<any>
 
+  getRgbReceiveProxyConfig(): Promise<{
+    profiles: import('@unisat/wallet-shared').RgbProxyProfile[]
+    defaultProxyId?: string
+  }>
+
   createRgbWitnessReceive(params: {
     assetId?: string
     amount?: number | string
