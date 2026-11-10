@@ -555,6 +555,7 @@ const RGB_FEATURE_STORAGE_KEY_PREFIX = 'rgb-feature-enabled:v1'
 const RGB_FEATURE_TERMS_VERSION = 'rgb-terms-v1'
 const RGB_LOCAL_HISTORY_STORAGE_NAMESPACE = 'rgb-local-history-v1'
 const RGB_FEE_POOL_WITHDRAWAL_HISTORY_LIMIT = 20
+const RGB_PROXY_CONFIG_CACHE_SECONDS = 3 * 60
 const UTXO_ASSET_LOOKUP_BATCH_SIZE = 100
 
 type RgbFeePoolWithdrawalHistoryItem = {
@@ -1376,7 +1377,7 @@ export class WalletController extends BaseController {
     const cacheLocalFallback = () => {
       this.rgbProxyConfigCache = {
         chainType,
-        expiresAt: now + 5 * 60,
+        expiresAt: now + RGB_PROXY_CONFIG_CACHE_SECONDS,
         profiles: localProfiles,
         ...(localDefaultProxyId ? { defaultProxyId: localDefaultProxyId } : {}),
       }
@@ -1437,8 +1438,8 @@ export class WalletController extends BaseController {
         chainType,
         expiresAt:
           Number.isSafeInteger(expiresAt) && expiresAt > now
-            ? Math.min(expiresAt, now + 6 * 60 * 60)
-            : now + 5 * 60,
+            ? Math.min(expiresAt, now + RGB_PROXY_CONFIG_CACHE_SECONDS)
+            : now + RGB_PROXY_CONFIG_CACHE_SECONDS,
         defaultProxyId,
         profiles,
       }
