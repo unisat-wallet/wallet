@@ -3461,11 +3461,6 @@
     "message": "處理中"
   },
 "rgb_burn": { "message": "銷毀" },
-  "rgb_burn_mode": { "message": "銷毀格式" },
-  "rgb_burn_mode_v1": { "message": "V1 銷毀（推薦）" },
-  "rgb_burn_mode_v1_description": { "message": "支援多網路 · 匯出 JSON 銷毀套件" },
-  "rgb_burn_mode_legacy": { "message": "舊版銷毀" },
-  "rgb_burn_mode_legacy_description": { "message": "僅限 Arbitrum One · 匯出舊版 JSON 銷毀證明" },
   "rgb_burn_network": { "message": "目標網路" },
   "rgb_burn_recipient_address": { "message": "收款地址" },
   "rgb_burn_tron_placeholder": { "message": "輸入 Tron 地址" },

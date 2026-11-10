@@ -1,5 +1,9 @@
 import { RgbServiceError } from '../errors'
-import { unwrapRgbTransferConsignment, wrapRgbTransferConsignment } from './consignment'
+import {
+  unwrapRgbTransferConsignment,
+  wrapRgbTransferConsignment,
+  type RgbTransferTerminal,
+} from './consignment'
 import { StrictReader, StrictWriter } from './strict'
 
 // Current rgb-schemas BridgedFungibleAsset::schema_id(). The byte order here
@@ -28,6 +32,36 @@ function concat(parts: Uint8Array[]) {
     offset += part.length
   }
   return result
+}
+
+function compare(left: Uint8Array, right: Uint8Array) {
+  for (let index = 0; index < Math.min(left.length, right.length); index++) {
+    if (left[index] !== right[index]) return left[index]! - right[index]!
+  }
+  return left.length - right.length
+}
+
+/** Exact transfer header emitted by wallet 1.8.2, including its terminals map. */
+function encodeLegacyTerminals(terminals: RgbTransferTerminal[]): Uint8Array {
+  if (terminals.length > 0xffff) throw new RgbServiceError('BFA has too many terminal bundles')
+  const ordered = terminals.map(terminal => {
+    if (terminal.bundleId.length !== 32 || !terminal.secretSeals.length ||
+      terminal.secretSeals.length > 0xffff)
+      throw new RgbServiceError('BFA terminal is invalid')
+    const seals = [...terminal.secretSeals].sort(compare)
+    if (seals.some(seal => seal.length !== 32))
+      throw new RgbServiceError('BFA terminal seal must be 32 bytes')
+    return { bundleId: terminal.bundleId, seals }
+  }).sort((left, right) => compare(left.bundleId, right.bundleId))
+  if (ordered.some((item, index) => index > 0 &&
+    compare(item.bundleId, ordered[index - 1]!.bundleId) === 0))
+    throw new RgbServiceError('BFA transfer has duplicate terminal bundles')
+  const writer = new StrictWriter().writeU8(1).writeU8(1).writeU16(ordered.length)
+  for (const terminal of ordered) {
+    writer.writeFixedBytes(terminal.bundleId, 32).writeU16(terminal.seals.length)
+    for (const seal of terminal.seals) writer.writeU8(1).writeFixedBytes(seal, 32)
+  }
+  return writer.toBytes()
 }
 
 function hasPrefix(value: Uint8Array, prefix: readonly number[]) {
@@ -159,6 +193,8 @@ export function encodeBfaTransferConsignment(input: {
   genesis: Uint8Array
   validatedWitnessBundles: Uint8Array[]
   witnessBundle: Uint8Array
+  /** Emits the exact 1.8.2 V1 container when present. Burn proofs pass an empty map. */
+  legacyTerminals?: RgbTransferTerminal[]
 }): Uint8Array {
   if (input.genesis.length < 34 || !SUPPORTED_V1_SCHEMAS.includes(hex(input.genesis.slice(2, 34))))
     throw new RgbServiceError('RGB v1 transfer requires a supported Genesis')
@@ -168,9 +204,10 @@ export function encodeBfaTransferConsignment(input: {
   if (!input.witnessBundle.length || bundles.some(bundle => !bundle.length) || bundles.length > 0xffff_ffff)
     throw new RgbServiceError('BFA transfer has invalid witness history')
   const body = concat([
-    // ConsignmentVer::V1 and transfer=true. Current RGB V1 derives graph terminals from
-    // unspent assignments and therefore has no serialized terminals map.
-    new StrictWriter().writeU8(1).writeU8(1).toBytes(),
+    input.legacyTerminals
+      ? encodeLegacyTerminals(input.legacyTerminals)
+      // Current RGB V1 derives graph terminals from unspent assignments.
+      : new StrictWriter().writeU8(1).writeU8(1).toBytes(),
     input.genesis,
     new StrictWriter().writeU32(bundles.length).toBytes(),
     ...bundles,

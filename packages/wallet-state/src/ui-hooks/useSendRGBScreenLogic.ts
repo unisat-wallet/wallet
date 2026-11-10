@@ -174,7 +174,6 @@ export function useSendRGBScreenLogic() {
   const [amount, setAmount] = useState('')
   const [burnReason, setBurnReason] = useState('')
   const [burnDestinationChainId, setBurnDestinationChainId] = useState(42161)
-  const [burnMode, setBurnModeState] = useState<'v1' | 'legacy'>('v1')
   const [donation, setDonation] = useState(false)
   const [error, setError] = useState('')
   const [feePoolRequirement, setFeePoolRequirement] = useState<RgbFeePoolRequirement>()
@@ -455,7 +454,7 @@ export function useSendRGBScreenLogic() {
       donation,
       burn,
       ...(burnReason.trim() ? { burnReason: burnReason.trim() } : {}),
-      ...(burn && burnMode === 'v1' ? { burnDestinationChainId } : {}),
+      ...(burn ? { burnDestinationChainId } : {}),
     })
     const toSignData = beginResult?.toSignData
     if (!toSignData) {
@@ -618,12 +617,7 @@ export function useSendRGBScreenLogic() {
                     ? 'canceled'
                     : 'broadcasted',
           local: true,
-          ...(burn
-            ? {
-                burn: true,
-                ...(burnMode === 'v1' ? { burnDestinationChainId } : {}),
-              }
-            : {}),
+          ...(burn ? { burn: true, burnDestinationChainId } : {}),
         },
       })
       transferData.current = {}
@@ -689,11 +683,6 @@ export function useSendRGBScreenLogic() {
     burn,
     burnReason,
     setBurnReason,
-    burnMode,
-    setBurnMode: (mode: 'v1' | 'legacy') => {
-      setBurnModeState(mode)
-      if (mode === 'legacy') setBurnDestinationChainId(42161)
-    },
     burnDestinationChainId,
     setBurnDestinationChainId: (chainId: number) => {
       setBurnDestinationChainId(chainId)

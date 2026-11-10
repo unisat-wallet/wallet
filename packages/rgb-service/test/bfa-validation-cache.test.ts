@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
 import { RgbBfaValidationUnavailableError, RgbMissingAncestorError } from '../src/errors'
-import { bfaMintLockId, cacheBfaBitcoinStatus, cacheBfaEvmRpc, cacheConfirmedBfaWitnesses, pruneConfirmedBfaWitnesses, selectBfaSpendHistory, validateCurrentBfaBurnConservation, validateCurrentBfaMintLockRecord } from '../src/protocol/bfa-validator'
+import { bfaMintLockId, cacheBfaBitcoinStatus, cacheBfaEvmRpc, cacheConfirmedBfaWitnesses, pruneConfirmedBfaWitnesses, selectBfaSpendHistory, validateBfaBridgeContractCode, validateCurrentBfaBurnConservation, validateCurrentBfaMintLockRecord } from '../src/protocol/bfa-validator'
 
 describe('BFA mint lock ID', () => {
   it('commits to the operation ID and internal-order witness txid like rgb-ops', () => {
@@ -37,6 +37,17 @@ describe('current BFA mint lock deadline', () => {
       .not.toThrow()
     expect(() => validateCurrentBfaMintLockRecord(operationId, 100n, 100n, 101n))
       .toThrow(`BFA FundsIn event was recorded after the mint deadline for ${operationId}`)
+  })
+})
+
+describe('BFA bridge chain reset detection', () => {
+  const address = `0x${'12'.repeat(20)}`
+
+  it('accepts deployed bytecode and rejects an absent finalized contract', () => {
+    expect(() => validateBfaBridgeContractCode(address, '0x60016000')).not.toThrow()
+    expect(() => validateBfaBridgeContractCode(address, '0x'))
+      .toThrow(`BFA bridge contract ${address} is unavailable on the connected EVM chain`)
+    expect(() => validateBfaBridgeContractCode(address, 'invalid')).toThrow('invalid bridge contract code')
   })
 })
 

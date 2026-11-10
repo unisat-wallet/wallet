@@ -3458,11 +3458,6 @@
     "message": "En cours"
   },
 "rgb_burn": { "message": "Brûler" },
-  "rgb_burn_mode": { "message": "Format de burn" },
-  "rgb_burn_mode_v1": { "message": "Burn V1 (recommandé)" },
-  "rgb_burn_mode_v1_description": { "message": "Multi-réseau · Exporte un paquet JSON" },
-  "rgb_burn_mode_legacy": { "message": "Burn historique" },
-  "rgb_burn_mode_legacy_description": { "message": "Arbitrum One uniquement · Exporte une preuve JSON historique" },
   "rgb_burn_network": { "message": "Réseau de destination" },
   "rgb_burn_recipient_address": { "message": "Adresse du destinataire" },
   "rgb_burn_tron_placeholder": { "message": "Saisir une adresse Tron" },

@@ -4287,6 +4287,7 @@ export class RgbService {
     const requestedAssetSchema = requestedAsset.schema?.toUpperCase()
     if (burn && requestedAssetSchema !== 'BFA')
       throw new RgbServiceError('Only BFA assets can be burned')
+    const storedBurnSchemaId = burn ? this.getStoredV1SchemaId(requestedAssetId) : undefined
     if (invoice?.assetId && invoice.assetId !== requestedAssetId) {
       throw new RgbServiceError('RGB invoice asset does not match the requested asset')
     }
@@ -4355,8 +4356,7 @@ export class RgbService {
     const swapInputOutpoints = request.swapPsbt
       ? getSwapPsbtInputOutpoints(request.swapPsbt)
       : undefined
-    const requireExactSelection = burn &&
-      this.getStoredV1SchemaId(requestedAssetId) === BFA_SCHEMA_ID
+    const requireExactSelection = burn && storedBurnSchemaId === BFA_SCHEMA_ID
     let burnSplitRequired = false
     let selectedUtxos: RgbUtxo[]
     try {

@@ -51,47 +51,6 @@ describe('useSendRGBScreenLogic', () => {
     }))
   })
 
-  it('prepares a legacy Arbitrum burn without a V1 destination record', async () => {
-    const assetId = 'rgb:bfa'
-    const { wrapper, wallet, navigation } = createHookTestHarness({
-      routeState: { assetId, burn: true,
-        tokenBalance: { assetId, ticker: 'BFA', precision: 0, spendable: '100' } },
-    })
-    wallet.createRgbSendBegin = vi.fn().mockResolvedValue({
-      txid: 'legacy-burn', toSignData: { psbtHex: 'unsigned-psbt' },
-    })
-    wallet.createRgbSendEnd = vi.fn().mockResolvedValue({
-      transferId: 'legacy-burn', txid: 'legacy-burn-txid', status: 'broadcasted',
-    })
-    const { result } = renderHook(() => useSendRGBScreenLogic(), { wrapper })
-
-    act(() => {
-      result.current.setBurnDestinationChainId(1)
-      result.current.setBurnMode('legacy')
-      result.current.setBurnReason('0xf39fd6e51aad88f6f4ce6ab8827279cfffb92266')
-      result.current.onAmountChange('1')
-    })
-    expect(result.current.burnDestinationChainId).toBe(42161)
-    await act(async () => result.current.onClickNext())
-
-    const request = vi.mocked(wallet.createRgbSendBegin).mock.calls[0]?.[0]
-    expect(request).toEqual(expect.objectContaining({
-      burn: true,
-      burnReason: '0xf39fd6e51aad88f6f4ce6ab8827279cfffb92266',
-    }))
-    expect(request).not.toHaveProperty('burnDestinationChainId')
-
-    await act(async () => {
-      await result.current.onSignPsbtHandleConfirm([{ psbtHex: 'signed-psbt' }] as any)
-    })
-    expect(navigation.navigate).toHaveBeenCalledWith(
-      'RGBTransferDetailScreen',
-      expect.objectContaining({
-        initialTransfer: expect.not.objectContaining({ burnDestinationChainId: expect.anything() }),
-      })
-    )
-  })
-
   it('includes the burn destination network in the completed transfer details', async () => {
     const assetId = 'rgb:bfa'
     const { wrapper, wallet, navigation } = createHookTestHarness({

@@ -3458,11 +3458,6 @@
     "message": "処理中"
   },
 "rgb_burn": { "message": "バーン" },
-  "rgb_burn_mode": { "message": "バーン形式" },
-  "rgb_burn_mode_v1": { "message": "V1 バーン（推奨）" },
-  "rgb_burn_mode_v1_description": { "message": "マルチネットワーク · JSON パッケージを出力" },
-  "rgb_burn_mode_legacy": { "message": "旧形式バーン" },
-  "rgb_burn_mode_legacy_description": { "message": "Arbitrum One のみ · 旧形式の JSON 証明を出力" },
   "rgb_burn_network": { "message": "送金先ネットワーク" },
   "rgb_burn_recipient_address": { "message": "受取アドレス" },
   "rgb_burn_tron_placeholder": { "message": "Tronアドレスを入力" },

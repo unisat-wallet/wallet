@@ -3449,11 +3449,6 @@
     "message": "Procesando"
   },
 "rgb_burn": { "message": "Quemar" },
-  "rgb_burn_mode": { "message": "Formato de quema" },
-  "rgb_burn_mode_v1": { "message": "Quema V1 (recomendada)" },
-  "rgb_burn_mode_v1_description": { "message": "Varias redes · Exporta un paquete JSON" },
-  "rgb_burn_mode_legacy": { "message": "Quema heredada" },
-  "rgb_burn_mode_legacy_description": { "message": "Solo Arbitrum One · Exporta una prueba JSON heredada" },
   "rgb_burn_network": { "message": "Red de destino" },
   "rgb_burn_recipient_address": { "message": "Dirección destinataria" },
   "rgb_burn_tron_placeholder": { "message": "Introduce una dirección de Tron" },

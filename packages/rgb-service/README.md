@@ -83,9 +83,9 @@ of being rejected.
 
 The BFA burn path consumes validated asset allocations and commits a `TS_BURN`
 transition to a locally signed Bitcoin transaction. It has no invoice,
-recipient, proxy post, or acknowledgement. The signed v1 transfer consignment
-has no terminals and is retained in the encrypted wallet state for export as
-an `RGB\0TFR` `.rgb` file from transfer details. Broadcast failures require an
+recipient, proxy post, or acknowledgement. The signed transfer consignment is
+retained in the encrypted wallet state and exported inside an `utexo-burn`
+JSON artifact. Broadcast failures require an
 explicit retry; ordinary synchronization never rebroadcasts a burn. Burning
 does not submit a redemption request to an EVM bridge.
 
@@ -98,15 +98,17 @@ wallet prepares the terminal Burn against its mempool output. This may require
 two confirmations in the signer and pays Bitcoin fees for two transactions;
 the internal split never uses Proxy or sends an ACK.
 
-For Arbitrum One, the wallet keeps the legacy direct-route format: a 20-byte
-EVM address is left-padded with 12 zero bytes in `burnReason`. For Ethereum,
-Polygon PoS, Plasma, and Tron, it constructs the V1 destination record and
-commits its EIP-712-style hash as `burnReason`. The record contains
-`version`, `destinationChainId`, `dstEid`, and chain-native `recipient` bytes.
-The UI downloads the original record as JSON alongside the `.rgb` consignment;
-both are needed by the redemption operator. The exported JSON uses the
-gateway's `BfaBurnDestination` fields, including a `0x`-prefixed hex
-`recipient`, and belongs in the `burnDestination` field of `/unlock/verify`
+Assets using the 1.8.2 BFA schema retain that schema's change-capable Burn
+rules and the 1.8.2 consignment container, including its empty terminals map.
+The wallet selects these rules automatically from the immutable SchemaId in
+Genesis; users cannot apply legacy rules to a current-schema asset or vice versa.
+
+Both schema generations construct the V1 destination record and commit its
+EIP-712-style hash as `burnReason`. The record contains `version`,
+`destinationChainId`, `dstEid`, and chain-native `recipient` bytes. The
+exported JSON bundles the base64 `RGB\0TFR` consignment and the gateway's
+`BfaBurnDestination` fields, including a `0x`-prefixed hex `recipient`. The
+destination record belongs in the `burnDestination` field of `/unlock/verify`
 and `/unlock` requests. The wallet retains the record in its encrypted state
 and verifies its hash on export. The destination cannot be changed after
 signing. A V1 hash alone is insufficient to redeem a burn.

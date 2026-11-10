@@ -81,8 +81,6 @@ export default function SendRGBScreen() {
     burn,
     burnReason,
     setBurnReason,
-    burnMode,
-    setBurnMode,
     burnDestinationChainId,
     setBurnDestinationChainId,
     ticker,
@@ -125,7 +123,6 @@ export default function SendRGBScreen() {
   const [showDonationPopover, setShowDonationPopover] = useState(false);
   const [understandDonation, setUnderstandDonation] = useState(false);
   const [showBurnPopover, setShowBurnPopover] = useState(false);
-  const [burnModeSelectorOpen, setBurnModeSelectorOpen] = useState(false);
   const [burnNetworkSelectorOpen, setBurnNetworkSelectorOpen] = useState(false);
   const [understandBurn, setUnderstandBurn] = useState(false);
   const selectedBurnNetwork = RGB_BURN_NETWORKS.find((network) => network.id === burnDestinationChainId);
@@ -261,42 +258,13 @@ export default function SendRGBScreen() {
 
           {burn ? (
             <Column gap="md">
-              <Text text={t('rgb_burn_mode')} size="sm" />
-              <Row
-                fullX
-                itemsCenter
-                justifyBetween
-                onClick={() => setBurnModeSelectorOpen(true)}
-                style={burnNetworkSelectorStyle}
-                data-testid="rgb-burn-mode-select">
-                <Column gap="zero">
-                  <Text
-                    text={t(burnMode === 'legacy' ? 'rgb_burn_mode_legacy' : 'rgb_burn_mode_v1')}
-                    size="sm"
-                    color="white"
-                  />
-                  <Text
-                    text={t(
-                      burnMode === 'legacy'
-                        ? 'rgb_burn_mode_legacy_description'
-                        : 'rgb_burn_mode_v1_description'
-                    )}
-                    size="xs"
-                    color="textDim"
-                  />
-                </Column>
-                <Icon icon="right" size={20} style={{ backgroundColor: 'rgba(255, 255, 255, 0.65)' }} />
-              </Row>
               <Text text={t('rgb_burn_network')} size="sm" />
               <Row
                 fullX
                 itemsCenter
                 justifyBetween
-                onClick={burnMode === 'v1' ? () => setBurnNetworkSelectorOpen(true) : undefined}
-                style={{
-                  ...burnNetworkSelectorStyle,
-                  cursor: burnMode === 'v1' ? 'pointer' : 'default'
-                }}
+                onClick={() => setBurnNetworkSelectorOpen(true)}
+                style={burnNetworkSelectorStyle}
                 data-testid="rgb-burn-network-select">
                 <Row itemsCenter gap="md">
                   {selectedBurnNetwork ? (
@@ -304,9 +272,7 @@ export default function SendRGBScreen() {
                   ) : null}
                   <Text text={selectedBurnNetwork?.name || ''} size="sm" color="white" />
                 </Row>
-                {burnMode === 'v1' ? (
-                  <Icon icon="right" size={20} style={{ backgroundColor: 'rgba(255, 255, 255, 0.65)' }} />
-                ) : null}
+                <Icon icon="right" size={20} style={{ backgroundColor: 'rgba(255, 255, 255, 0.65)' }} />
               </Row>
               <Text
                 text={t('rgb_burn_recipient_address')}
@@ -465,7 +431,7 @@ export default function SendRGBScreen() {
             <Line />
             <Column gap="md" fullX mb="md">
               <Text
-                text={t(burnMode === 'legacy' ? 'rgb_burn_description' : 'rgb_burn_destination_v1_description')}
+                text={t('rgb_burn_destination_v1_description')}
                 mt="md"
                 wrap
               />
@@ -477,7 +443,7 @@ export default function SendRGBScreen() {
               <Row justifyCenter mt="md">
                 <Checkbox checked={understandBurn} onChange={(event) => setUnderstandBurn(event.target.checked)}>
                   <Text
-                    text={t(burnMode === 'legacy' ? 'rgb_burn_confirm' : 'rgb_burn_destination_v1_confirm')}
+                    text={t('rgb_burn_destination_v1_confirm')}
                     preset="sub"
                     wrap
                   />
@@ -499,54 +465,6 @@ export default function SendRGBScreen() {
             </Row>
           </Column>
         </Popover>
-      ) : null}
-      {burnModeSelectorOpen ? (
-        <BottomModal onClose={() => setBurnModeSelectorOpen(false)} bodyStyle={{ padding: 0 }}>
-          <Column fullX gap="zero">
-            <BottomSheetHeader title={t('rgb_burn_mode')} onClose={() => setBurnModeSelectorOpen(false)} />
-            <Column gap="lg" fullX style={{ padding: '0 20px 24px', boxSizing: 'border-box' }}>
-              {(['v1', 'legacy'] as const).map((mode) => {
-                const selected = mode === burnMode;
-                return (
-                  <Row
-                    key={mode}
-                    fullX
-                    itemsCenter
-                    justifyBetween
-                    onClick={() => {
-                      if (!selected) setBurnMode(mode);
-                      setBurnModeSelectorOpen(false);
-                    }}
-                    style={{
-                      ...burnNetworkSelectorStyle,
-                      height: 76,
-                      border: selected ? `1px solid ${RGB_ACCENT_GOLD}` : burnNetworkSelectorStyle.border,
-                      background: selected ? 'rgba(244,182,44,0.08)' : burnNetworkSelectorStyle.background
-                    }}>
-                    <Column gap="zero">
-                      <Text
-                        text={t(mode === 'legacy' ? 'rgb_burn_mode_legacy' : 'rgb_burn_mode_v1')}
-                        size="sm"
-                        color={selected ? 'gold' : 'white'}
-                      />
-                      <Text
-                        text={t(
-                          mode === 'legacy'
-                            ? 'rgb_burn_mode_legacy_description'
-                            : 'rgb_burn_mode_v1_description'
-                        )}
-                        size="xs"
-                        color="textDim"
-                        wrap
-                      />
-                    </Column>
-                    {selected ? <Icon icon="checked" color="gold" size={20} /> : null}
-                  </Row>
-                );
-              })}
-            </Column>
-          </Column>
-        </BottomModal>
       ) : null}
       {burnNetworkSelectorOpen ? (
         <BottomModal onClose={() => setBurnNetworkSelectorOpen(false)} bodyStyle={{ padding: 0 }}>

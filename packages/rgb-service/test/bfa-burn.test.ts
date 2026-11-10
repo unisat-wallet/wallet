@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest'
-import { BFA_SCHEMA_ID, encodeBfaTransferConsignment, isBfaTransferConsignment } from '../src/protocol/bfa-consignment'
+import {
+  BFA_SCHEMA_ID,
+  LEGACY_BFA_SCHEMA_ID,
+  encodeBfaTransferConsignment,
+  isBfaTransferConsignment,
+  normalizeLegacyV1Consignment,
+} from '../src/protocol/bfa-consignment'
 import { encodeBfaBurnTransition } from '../src/protocol/nia'
 import {
   createBfaBurnDestinationV1,
@@ -90,5 +96,24 @@ describe('BFA burn encoding', () => {
     expect(proof[10]).toBe(0)
     expect(Buffer.from(proof.slice(11, 43)).toString('hex')).toBe(BFA_SCHEMA_ID)
     expect(isBfaTransferConsignment(proof)).toBe(true)
+  })
+
+  it('emits the Wallet 1.8.2 terminals-map layout for a legacy burn proof', () => {
+    const genesis = Uint8Array.from([0, 0, ...Buffer.from(LEGACY_BFA_SCHEMA_ID, 'hex')])
+    const witnessBundle = Uint8Array.from([1])
+    const legacy = encodeBfaTransferConsignment({
+      genesis,
+      validatedWitnessBundles: [],
+      witnessBundle,
+      legacyTerminals: [],
+    })
+    const current = encodeBfaTransferConsignment({
+      genesis,
+      validatedWitnessBundles: [],
+      witnessBundle,
+    })
+    expect(Buffer.from(legacy.slice(7, 11)).toString('hex')).toBe('01010000')
+    expect(normalizeLegacyV1Consignment(legacy)).toEqual(current)
+    expect(isBfaTransferConsignment(legacy)).toBe(true)
   })
 })

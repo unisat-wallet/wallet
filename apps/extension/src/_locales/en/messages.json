@@ -3478,11 +3478,6 @@
     "message": "Processing"
   },
 "rgb_burn": { "message": "Burn" },
-  "rgb_burn_mode": { "message": "Burn format" },
-  "rgb_burn_mode_v1": { "message": "V1 Burn (Recommended)" },
-  "rgb_burn_mode_v1_description": { "message": "Multi-network · Exports a JSON burn package" },
-  "rgb_burn_mode_legacy": { "message": "Legacy Burn" },
-  "rgb_burn_mode_legacy_description": { "message": "Arbitrum One only · Exports a legacy JSON burn proof" },
   "rgb_burn_network": { "message": "Destination network" },
   "rgb_burn_recipient_address": { "message": "Recipient address" },
   "rgb_burn_tron_placeholder": { "message": "Enter Tron address" },

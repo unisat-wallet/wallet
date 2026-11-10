@@ -231,7 +231,7 @@ export interface BfaValidationOptions {
   getEvmRpc?: (chainId: bigint) => (method: string, params: unknown[]) => Promise<unknown>
   /** Bound the number of finalized EVM blocks scanned per RPC call. */
   evmLogRange?: number
-  /** Bound legacy event queries for best-effort background repair only. */
+  /** Bound legacy event queries for one validation attempt. */
   evmLogRequestLimit?: number
   /** The sender witness is not broadcast until the receiver ACKs it. */
   pendingWitnessTxid?: string
@@ -357,6 +357,14 @@ export function cacheConfirmedBfaWitnesses(
 }
 
 function fail(message: string): never { throw new RgbServiceError(`RGB v1: ${message}`) }
+
+/** A finalized chain without the bridge contract cannot validate its historical mints. */
+export function validateBfaBridgeContractCode(address: string, code: unknown): void {
+  if (typeof code !== 'string' || !/^0x[0-9a-f]*$/i.test(code))
+    fail('EVM RPC returned invalid bridge contract code')
+  if (/^0x0*$/i.test(code))
+    fail(`BFA bridge contract ${address} is unavailable on the connected EVM chain`)
+}
 function hex(bytes: Uint8Array): string { return Buffer.from(bytes).toString('hex') }
 function bytes(value: string): Uint8Array { return Uint8Array.from(Buffer.from(value, 'hex')) }
 function concat(...parts: Uint8Array[]): Uint8Array {
@@ -1070,8 +1078,10 @@ async function verifyLegacyMintEvent(
   const finalized = await rpc('eth_getBlockByNumber', ['finalized', false]) as { number?: unknown } | null
   if (!finalized) throw new RgbBfaValidationUnavailableError('BFA EVM RPC has no finalized head')
   const end = hexQuantity(finalized.number, 'finalized block number')
+  const code = await rpc('eth_getCode', [address, `0x${end.toString(16)}`])
+  validateBfaBridgeContractCode(address, code)
   const start = operation.beforeBlock! + 1n
-  let range = options.evmLogRange ?? 1000
+  let range = options.evmLogRange ?? 10_000
   if (!Number.isSafeInteger(range) || range < 1 || range > 100000) fail('invalid EVM log range')
   for (let from = start; from <= end;) {
     if (requestBudget.remaining <= 0) {
@@ -1195,9 +1205,8 @@ export async function validateBfaTransferConsignment(
   if (reachable !== operations.size) fail('transition history is cyclic')
   const consumed = new Set<string>()
   const currentBfa = genesis.profile === 'bfa-current'
-  const evmLogRequestLimit = options.evmLogRequestLimit ?? Number.POSITIVE_INFINITY
-  if (evmLogRequestLimit !== Number.POSITIVE_INFINITY &&
-    (!Number.isSafeInteger(evmLogRequestLimit) || evmLogRequestLimit < 1))
+  const evmLogRequestLimit = options.evmLogRequestLimit ?? 64
+  if (!Number.isSafeInteger(evmLogRequestLimit) || evmLogRequestLimit < 1)
     fail('invalid EVM log request limit')
   const legacyEvmLogRequestBudget = { remaining: evmLogRequestLimit }
   for (const { operation, bundle } of operations.values()) {

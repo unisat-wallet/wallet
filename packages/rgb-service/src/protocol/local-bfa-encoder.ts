@@ -13,6 +13,7 @@ import type {
 } from '../types'
 import {
   BFA_SCHEMA_ID,
+  LEGACY_BFA_SCHEMA_ID,
   NIA_V1_SCHEMA_ID,
   encodeBfaTransferConsignment,
   isBfaSchemaId,
@@ -484,10 +485,12 @@ export function completeBfaBurn(input: { pending: RgbPendingTransfer; signedPsbt
   })
   if (hex(witnessBundle.bundleId) !== data['bundleId'])
     throw new RgbServiceError('BFA burn WitnessBundle does not match the transition')
+  const genesis = Uint8Array.from(Buffer.from(data['genesis'] || '', 'base64'))
   const consignment = encodeBfaTransferConsignment({
-    genesis: Uint8Array.from(Buffer.from(data['genesis'] || '', 'base64')),
+    genesis,
     validatedWitnessBundles: historyBundles,
     witnessBundle: witnessBundle.strict,
+    ...(hex(genesis.slice(2, 34)) === LEGACY_BFA_SCHEMA_ID ? { legacyTerminals: [] } : {}),
   })
   const changeVout = data['changeVout'] === '' ? undefined : Number(data['changeVout'])
   if (changeVout !== undefined && (!Number.isInteger(changeVout) || changeVout < 0))
@@ -550,7 +553,8 @@ export function createLocalRgbProtocolEncoder(
         requiredOperationIds,
         ...(pendingWitnessTxid ? { pendingWitnessTxid } : {}),
       })
-      if (!isBfaSchemaId(hex(history.genesis.slice(2, 34))))
+      const schemaId = hex(history.genesis.slice(2, 34))
+      if (!isBfaSchemaId(schemaId))
         throw new RgbServiceError('Only BFA assets can be burned')
       const spendHistory = selectBfaSpendHistory(history, requiredOperationIds)
       return prepareBfaBurn({
