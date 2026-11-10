@@ -3995,7 +3995,17 @@ export class RgbService {
       })
     )
     return {
-      snapshot: state.snapshot,
+      snapshot: {
+        ...state.snapshot,
+        utxos: state.snapshot.utxos.map(utxo => ({
+          ...utxo,
+          allocations: utxo.allocations.map(allocation => ({
+            ...allocation,
+            localHistoryAvailable: Boolean(allocation.opId) &&
+              this.localHistoryCoversAllocations(allocation.assetId, [allocation.opId!]),
+          })),
+        })),
+      },
       assetMetadata,
       invoiceReservations: this.getPendingReceives()
         // Rejected receives are retained as recovery tombstones, but their
@@ -5542,11 +5552,29 @@ export class RgbService {
           (allowedOutpoints === undefined || allowedOutpoints.has(outpointKey(utxo))) &&
           !locked.has(outpointKey(utxo))
       )
-      .map(utxo => ({ utxo, amount: getSpendableAmount(utxo, assetId) }))
+      .map(utxo => {
+        const assetAllocations = utxo.allocations.filter(allocation =>
+          allocation.assetId === assetId && allocation.settled && allocation.spendable
+        )
+        return {
+          utxo,
+          amount: getSpendableAmount(utxo, assetId),
+          // Prefer carriers already covered by the encrypted canonical DAG.
+          // A replica can retain an old allocation after its receive history
+          // was lost; spending a different proved carrier is safe, while
+          // fabricating or ignoring the missing branch is not.
+          historyBacked: assetAllocations.length > 0 && assetAllocations.every(allocation =>
+            Boolean(allocation.opId) &&
+            this.localHistoryCoversAllocations(assetId, [allocation.opId!])
+          ),
+        }
+      })
       .filter(candidate => candidate.amount > 0n)
-      .sort((a, b) => a.amount === b.amount
-        ? outpointKey(a.utxo).localeCompare(outpointKey(b.utxo))
-        : a.amount < b.amount ? -1 : 1)
+      .sort((a, b) => a.historyBacked !== b.historyBacked
+        ? (a.historyBacked ? -1 : 1)
+        : a.amount === b.amount
+          ? outpointKey(a.utxo).localeCompare(outpointKey(b.utxo))
+          : a.amount < b.amount ? -1 : 1)
 
     if (allowedOutpoints !== undefined) {
       const total = candidates.reduce((sum, candidate) => sum + candidate.amount, 0n)
@@ -5557,7 +5585,13 @@ export class RgbService {
       return candidates.map(candidate => candidate.utxo)
     }
 
-    const exact = candidates.find(candidate => candidate.amount === required)
+    const historyBackedTotal = candidates
+      .filter(candidate => candidate.historyBacked)
+      .reduce((sum, candidate) => sum + candidate.amount, 0n)
+    const exact = candidates.find(candidate => candidate.historyBacked && candidate.amount === required) ||
+      (historyBackedTotal < required
+        ? candidates.find(candidate => candidate.amount === required)
+        : undefined)
     if (exact) return [exact.utxo]
 
     if (requireExact) {

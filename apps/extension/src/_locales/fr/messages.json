@@ -3339,6 +3339,9 @@
   "rgb_utxo_available": {
     "message": "Disponible"
   },
+  "rgb_utxo_history_missing": {
+    "message": "Historique manquant"
+  },
   "rgb_utxo_chain_status": {
     "message": "{status} · {confirmations} confirmations · {sats} sats"
   },

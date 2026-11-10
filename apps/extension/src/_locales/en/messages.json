@@ -2868,6 +2868,9 @@
   "rgb_utxo_available": {
     "message": "Available"
   },
+  "rgb_utxo_history_missing": {
+    "message": "History missing"
+  },
   "rgb_utxo_chain_status": {
     "message": "{status} · {confirmations} confirmations · {sats} sats"
   },

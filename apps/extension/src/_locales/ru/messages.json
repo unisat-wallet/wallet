@@ -3339,6 +3339,9 @@
   "rgb_utxo_available": {
     "message": "Доступно"
   },
+  "rgb_utxo_history_missing": {
+    "message": "История отсутствует"
+  },
   "rgb_utxo_chain_status": {
     "message": "{status} · подтверждений: {confirmations} · {sats} sats"
   },

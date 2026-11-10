@@ -20,6 +20,8 @@ export interface RgbAllocation {
   opId?: string
   assignmentIndex?: number
   assignmentType?: number
+  /** Diagnostic only: this installation can prove the allocation from its canonical DAG. */
+  localHistoryAvailable?: boolean
 }
 
 /** A colored UTXO supplied by the address indexer, never by an xpub wallet API. */

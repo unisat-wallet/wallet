@@ -3330,6 +3330,9 @@
   "rgb_utxo_available": {
     "message": "Disponible"
   },
+  "rgb_utxo_history_missing": {
+    "message": "Falta el historial"
+  },
   "rgb_utxo_chain_status": {
     "message": "{status} · {confirmations} confirmaciones · {sats} sats"
   },

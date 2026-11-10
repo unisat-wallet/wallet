@@ -2859,6 +2859,9 @@
   "rgb_utxo_available": {
     "message": "可用"
   },
+  "rgb_utxo_history_missing": {
+    "message": "缺少歷史資料"
+  },
   "rgb_utxo_chain_status": {
     "message": "{status} · {confirmations} 個確認 · {sats} sats"
   },

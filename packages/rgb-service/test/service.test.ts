@@ -4642,6 +4642,67 @@ describe('RgbService', () => {
     expect(dependencies.encoder.prepareTransfer).toHaveBeenCalledTimes(2)
   })
 
+  it('prefers canonical-history allocations over an exact orphan allocation', async () => {
+    const dependencies = createDependencies()
+    const service = new RgbService(dependencies)
+    await service.open(wallet)
+    await service.sync()
+    const assetId = 'rgb:AQEBAQEB-AQEBAQE-BAQEBAQ-EBAQEBA-QEBAQEB-AQEBAQE'
+    ;(service as any).state.contracts = {
+      [assetId]: {
+        consignment: 'Y2Fub25pY2FsLWhpc3Rvcnk=',
+        createdAt: 1,
+        history: {
+          payload: 'Y2Fub25pY2FsLWhpc3Rvcnk=',
+          opIds: ['c'.repeat(64), 'd'.repeat(64)],
+          updatedAt: 1,
+        },
+      },
+    }
+    ;(service as any).state.snapshot.utxos.push({
+      outpoint: { txid: 'e'.repeat(64), vout: 2 },
+      satoshis: 330,
+      scriptPubKey: `5120${'33'.repeat(32)}`,
+      publicKey: `02${'44'.repeat(32)}`,
+      chainStatus: 'confirmed',
+      confirmations: 1,
+      allocations: [{
+        assetId,
+        amount: '100',
+        settled: true,
+        spendable: true,
+        opId: 'e'.repeat(64),
+        assignmentIndex: 0,
+        assignmentType: 4000,
+      }],
+    })
+
+    const inspection = service.getUtxoInspection()
+    expect(inspection.snapshot.utxos[0]?.allocations[0]?.localHistoryAvailable).toBe(true)
+    expect(inspection.snapshot.utxos.at(-1)?.allocations[0]?.localHistoryAvailable).toBe(false)
+
+    await service.prepareSend({
+      assetId,
+      amount: '100',
+      invoice: rgbInvoice(100),
+      feeRate: 2,
+    })
+
+    expect(dependencies.encoder.prepareTransfer).toHaveBeenCalledWith(
+      expect.objectContaining({
+        selectedUtxos: expect.arrayContaining([
+          expect.objectContaining({ outpoint: { txid: 'a'.repeat(64), vout: 0 } }),
+          expect.objectContaining({ outpoint: { txid: 'b'.repeat(64), vout: 1 } }),
+        ]),
+      })
+    )
+    const selected = vi.mocked(dependencies.encoder.prepareTransfer).mock.calls[0]![0].selectedUtxos
+    expect(selected).toHaveLength(2)
+    expect(selected).not.toContainEqual(
+      expect.objectContaining({ outpoint: { txid: 'e'.repeat(64), vout: 2 } })
+    )
+  })
+
   it('supplements stale backend history with retained burn proofs', async () => {
     const dependencies = createDependencies()
     const service = new RgbService(dependencies)

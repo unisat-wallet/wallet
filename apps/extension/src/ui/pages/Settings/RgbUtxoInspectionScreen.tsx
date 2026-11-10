@@ -245,6 +245,7 @@ export default function RgbUtxoInspectionScreen() {
                           isSameRgbAssetId(allocation.assetId, configuredUsdtAssetId);
                         const name = isUsdt ? 'USDT' : asset?.name || asset?.ticker || shortTxid(allocation.assetId);
                         const amount = toRgbDisplayAmount(allocation.amount, asset?.precision || 0);
+                        const historyMissing = allocation.localHistoryAvailable === false;
                         return (
                           <Row
                             key={`${allocation.assetId}:${index}`}
@@ -252,7 +253,10 @@ export default function RgbUtxoInspectionScreen() {
                             itemsCenter
                             justifyBetween
                             gap="sm"
-                            style={assetAllocationCardStyle}>
+                            style={{
+                              ...assetAllocationCardStyle,
+                              ...(historyMissing ? { border: '1px solid rgba(255,82,82,0.55)' } : {})
+                            }}>
                             <Row itemsCenter gap="sm" style={{ flex: 1, minWidth: 0, overflow: 'hidden' }}>
                               <RGBAssetIcon
                                 assetId={allocation.assetId}
@@ -270,9 +274,12 @@ export default function RgbUtxoInspectionScreen() {
                                 />
                               </Column>
                             </Row>
-                            <Row style={{ flexShrink: 0, marginLeft: 8 }}>
+                            <Column itemsEnd gap="xs" style={{ flexShrink: 0, marginLeft: 8 }}>
                               <HistoryAmount amount={amount} color="white" />
-                            </Row>
+                              {historyMissing ? (
+                                <Text text={t('rgb_utxo_history_missing')} color="red" size="xxs" />
+                              ) : null}
+                            </Column>
                           </Row>
                         );
                       })}
