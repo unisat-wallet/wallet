@@ -472,6 +472,10 @@ export interface RgbPendingSendHistory {
   recipientAck?: boolean
   /** Funding allocations removed locally when this broadcast was accepted. */
   spentOutpoints?: RgbOutpoint[]
+  /** The activity index has reported the Bitcoin transaction as confirmed. */
+  backendConfirmed?: boolean
+  /** The UTXO index has atomically removed spent inputs and indexed retained outputs. */
+  fundingSnapshotConverged?: boolean
   createdAt: number
   status: 'broadcasted' | 'canceled' | 'rejected'
   /** Local-only provider ownership retained while the status is available. */

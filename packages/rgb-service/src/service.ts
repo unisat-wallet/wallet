@@ -867,29 +867,65 @@ export class RgbService {
   private async reconcileStaleBroadcastedFundingOutpoints(snapshot: RgbWalletSnapshot) {
     const state = this.requireState()
     const histories = (state.pendingSendHistory || []).filter(item =>
-      item.status === 'broadcasted' && item.txid && item.spentOutpoints?.some(outpoint =>
-        snapshot.utxos.some(utxo => outpointKey(utxo) === `${outpoint.txid}:${outpoint.vout}`)
-      )
+      item.status === 'broadcasted' && item.txid && item.spentOutpoints?.length
     )
     if (!histories.length) return false
     const getTransactionStatus = this.dependencies.stateSource.getTransactionStatus
-    if (!getTransactionStatus) return true
+    const compactedTransferIds = new Set<string>()
     for (const history of histories) {
+      const spent = new Set((history.spentOutpoints || []).map(outpoint =>
+        `${outpoint.txid}:${outpoint.vout}`
+      ))
+      const localCreated = state.snapshot.utxos.filter(utxo => utxo.outpoint.txid === history.txid)
+      const remoteStillHasSpentInput = snapshot.utxos.some(utxo => spent.has(outpointKey(utxo)))
+      const remoteHasRetainedOutputs = localCreated.every(local => {
+        const remote = snapshot.utxos.find(utxo => outpointKey(utxo) === outpointKey(local))
+        return !!remote && local.allocations.every(allocation => remote.allocations.some(candidate =>
+          candidate.assetId === allocation.assetId &&
+          candidate.amount === allocation.amount &&
+          candidate.opId === allocation.opId &&
+          candidate.assignmentIndex === allocation.assignmentIndex
+        ))
+      })
+      if (!remoteStillHasSpentInput && remoteHasRetainedOutputs) {
+        history.fundingSnapshotConverged = true
+        if (history.backendConfirmed) compactedTransferIds.add(history.transferId)
+        continue
+      }
+      if (!getTransactionStatus) return true
       try {
         const chain = await getTransactionStatus(state.wallet, history.txid!)
         if (chain.status !== 'mempool' && chain.status !== 'confirmed') return true
       } catch {
         return true
       }
-      const spent = new Set((history.spentOutpoints || []).map(outpoint =>
-        `${outpoint.txid}:${outpoint.vout}`
-      ))
       snapshot.utxos = snapshot.utxos.filter(utxo => !spent.has(outpointKey(utxo)))
-      const remoteOutpoints = new Set(snapshot.utxos.map(outpointKey))
-      for (const local of state.snapshot.utxos) {
-        if (local.outpoint.txid !== history.txid || remoteOutpoints.has(outpointKey(local))) continue
-        snapshot.utxos.push(local)
+      for (const local of localCreated) {
+        const remoteIndex = snapshot.utxos.findIndex(utxo => outpointKey(utxo) === outpointKey(local))
+        if (remoteIndex < 0) {
+          snapshot.utxos.push(local)
+          continue
+        }
+        const remote = snapshot.utxos[remoteIndex]
+        const missingLocalAllocations = local.allocations.filter(allocation =>
+          !remote.allocations.some(candidate =>
+            candidate.assetId === allocation.assetId &&
+            candidate.opId === allocation.opId &&
+            candidate.assignmentIndex === allocation.assignmentIndex
+          )
+        )
+        if (missingLocalAllocations.length) {
+          snapshot.utxos[remoteIndex] = {
+            ...remote,
+            allocations: [...remote.allocations, ...missingLocalAllocations],
+          }
+        }
       }
+    }
+    if (compactedTransferIds.size) {
+      state.pendingSendHistory = (state.pendingSendHistory || []).filter(
+        item => !compactedTransferIds.has(item.transferId)
+      )
     }
     return false
   }
@@ -1739,9 +1775,16 @@ export class RgbService {
   async markSendHistoryConfirmed(transferId: string) {
     const state = this.requireState()
     const history = state.pendingSendHistory || []
-    const next = history.filter(item => item.transferId !== transferId || item.burn)
-    if (next.length === history.length) return
-    state.pendingSendHistory = next
+    const item = history.find(item => item.transferId === transferId && !item.burn)
+    if (!item) return
+    // Activity and UTXO indexing are independent. Removing this tombstone as
+    // soon as activity confirms can briefly restore a spent input or erase a
+    // not-yet-indexed change output. Only compact it after both views agree.
+    if (item.fundingSnapshotConverged) {
+      state.pendingSendHistory = history.filter(candidate => candidate !== item)
+    } else {
+      item.backendConfirmed = true
+    }
     await this.persist()
   }
 

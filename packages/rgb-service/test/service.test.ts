@@ -7749,10 +7749,14 @@ describe('RgbService', () => {
     }
     await service.completeSend('transfer-1', 'signed-psbt')
     await service.broadcastPendingSend('transfer-1')
+    await service.markSendHistoryConfirmed('transfer-1')
 
     expect(service.getSnapshot().utxos.map(utxo => utxo.outpoint)).toEqual([
       { txid: 'a'.repeat(64), vout: 0 },
       { txid: 'e'.repeat(64), vout: 1 },
+    ])
+    expect(service.getPendingSendHistory()).toEqual([
+      expect.objectContaining({ transferId: 'transfer-1', backendConfirmed: true }),
     ])
     expect(service.getLocalAssetBalance('rgb:AQEBAQEB-AQEBAQE-BAQEBAQ-EBAQEBA-QEBAQEB-AQEBAQE')).toMatchObject({
       settled: '40',
@@ -7768,10 +7772,41 @@ describe('RgbService', () => {
       { txid: 'e'.repeat(64), vout: 1 },
     ])
 
-    // As soon as the remote snapshot no longer contains the spent outpoint,
-    // normal snapshot synchronization resumes.
+    // Activity can confirm before the UTXO index has inserted the RGB change.
+    // Removing the old input alone is not enough to discard the local output.
     vi.mocked(dependencies.stateSource.getSnapshot).mockResolvedValue({
       syncedAt: 2,
+      utxos: [
+        {
+          outpoint: { txid: 'a'.repeat(64), vout: 0 },
+          satoshis: 1000,
+          scriptPubKey: '5120' + '00'.repeat(32),
+          publicKey: '02' + '11'.repeat(32),
+          allocations: [
+            {
+              assetId: 'rgb:AQEBAQEB-AQEBAQE-BAQEBAQ-EBAQEBA-QEBAQEB-AQEBAQE',
+              amount: '40',
+              settled: true,
+              spendable: true,
+              opId: 'c'.repeat(64),
+              assignmentIndex: 0,
+              assignmentType: 4000,
+            },
+          ],
+        },
+      ],
+    })
+    await service.sync()
+    expect(service.getSnapshot().utxos.map(utxo => utxo.outpoint)).toEqual([
+      { txid: 'a'.repeat(64), vout: 0 },
+      { txid: 'e'.repeat(64), vout: 1 },
+    ])
+    expect(service.getPendingSendHistory()).toHaveLength(1)
+
+    // Compact the local tombstone only after activity is confirmed and the
+    // UTXO index has both removed the input and inserted the retained output.
+    vi.mocked(dependencies.stateSource.getSnapshot).mockResolvedValue({
+      syncedAt: 3,
       utxos: [
         {
           outpoint: { txid: 'a'.repeat(64), vout: 0 },
@@ -7810,7 +7845,8 @@ describe('RgbService', () => {
       ],
     })
     await service.sync()
-    expect(service.getSnapshot().syncedAt).toBe(2)
+    expect(service.getSnapshot().syncedAt).toBe(3)
+    expect(service.getPendingSendHistory()).toEqual([])
     expect(service.getLocalAssetBalance('rgb:AQEBAQEB-AQEBAQE-BAQEBAQ-EBAQEBA-QEBAQEB-AQEBAQE')).toMatchObject({ balance: '80' })
   })
 
