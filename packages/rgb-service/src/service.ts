@@ -3214,22 +3214,31 @@ export class RgbService {
     // malformed branch must reject atomically rather than leave a spendable
     // UTXO whose required DAG was not durably retained.
     const historyPayload = validated.historyPayload || item.payload
-    if (this.needsV1HistoryMerge(assetId, historyPayload)) {
-      await this.storeAcceptedBfaHistory(
-        assetId,
-        historyPayload,
-        undefined,
-        validated.legacyPayload ? [validated.legacyPayload] : [],
-        [...new Set(receivedAssignments.map(assignment => assignment.opId))]
-      )
-    } else {
-      this.storeAcceptedHistory({
-        assetId,
-        payload: item.payload,
-        opId: validated.opId,
-        genesis: Buffer.from(validated.decoded.genesis.strict).toString('base64'),
-        metadata: validated.decoded.metadata,
-      })
+    const receivedOperationIds = [...new Set(
+      receivedAssignments.map(assignment => assignment.opId)
+    )]
+    // A donation sent to this same wallet reaches settlement after the sender
+    // has already retained the identical transition. Re-merging that branch
+    // makes the operation appear twice and leaves the accepted receive stuck
+    // in confirming even though its Bitcoin transaction is confirmed.
+    if (!this.localHistoryCoversAllocations(assetId, receivedOperationIds)) {
+      if (this.needsV1HistoryMerge(assetId, historyPayload)) {
+        await this.storeAcceptedBfaHistory(
+          assetId,
+          historyPayload,
+          undefined,
+          validated.legacyPayload ? [validated.legacyPayload] : [],
+          receivedOperationIds
+        )
+      } else {
+        this.storeAcceptedHistory({
+          assetId,
+          payload: item.payload,
+          opId: validated.opId,
+          genesis: Buffer.from(validated.decoded.genesis.strict).toString('base64'),
+          metadata: validated.decoded.metadata,
+        })
+      }
     }
     for (const assignment of receivedAssignments) {
       const existing = utxo.allocations.find(allocation =>

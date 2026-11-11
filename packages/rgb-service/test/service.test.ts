@@ -5931,6 +5931,67 @@ describe('RgbService', () => {
     })
   })
 
+  it('settles a self-donation without merging the sender-retained operation twice', async () => {
+    const dependencies = createDependencies()
+    dependencies.stateSource.getTransactionStatus = vi.fn().mockResolvedValue({
+      status: 'confirmed', confirmations: 1,
+    })
+    const service = new RgbService(dependencies)
+    await service.open(wallet)
+    const state = (service as any).state
+    const txid = 'e'.repeat(64)
+    const opId = 'f'.repeat(64)
+    const assetId = 'rgb:AQEBAQEB-AQEBAQE-BAQEBAQ-EBAQEBA-QEBAQEB-AQEBAQE'
+    const scriptPubKey = `5120${'11'.repeat(32)}`
+    state.contracts = {
+      [assetId]: {
+        consignment: 'sender-retained-history',
+        history: { payload: 'sender-retained-history', opIds: [opId], updatedAt: 1 },
+        createdAt: 1,
+      },
+    }
+    const storeAcceptedBfaHistory = vi.spyOn(service as any, 'storeAcceptedBfaHistory')
+    const receive = {
+      invoice: rgbInvoice(), recipientId: 'self', recipientType: 'witness', createdAt: 1,
+      witnessScriptPubKey: scriptPubKey, witnessPublicKey: `02${'22'.repeat(32)}`,
+      receivedConsignment: {
+        txid, receivedAt: 1, accepted: true, assetId, amount: '5', precision: 0,
+      },
+    }
+
+    const result = await (service as any).advanceAcceptedReceive(
+      receive,
+      { recipientId: 'self', payload: 'self-donation-consignment' },
+      {
+        txid, vout: 1, assetId, amount: '5', opId, assignmentIndex: 1,
+        assignments: [{ txid, vout: 1, opId, assignmentIndex: 1, amount: '5' }],
+        witness: { outputs: [undefined, { scriptPubKey, satoshis: 330 }] },
+        decoded: {
+          genesis: { strict: new Uint8Array() },
+          metadata: { ticker: 'TOK', name: 'Token', precision: 0, schema: 'NIA', issuedSupply: '6' },
+        },
+        historyPayload: 'self-donation-consignment',
+      },
+      false
+    )
+
+    expect(result).toBe(true)
+    expect(storeAcceptedBfaHistory).not.toHaveBeenCalled()
+    expect(service.getSnapshot().utxos).toEqual([
+      expect.objectContaining({
+        outpoint: { txid, vout: 1 },
+        chainStatus: 'confirmed',
+        allocations: [expect.objectContaining({
+          assetId, amount: '5', opId, assignmentIndex: 1,
+          settled: true, spendable: true,
+        })],
+      }),
+    ])
+    expect(service.getPendingReceiveHistory()).toEqual([
+      expect.objectContaining({ txid, assetId, amount: '5', status: 'settled' }),
+    ])
+  })
+
   it('reconciles a persisted ACK intent after restart without requiring the proxy payload', async () => {
     const anchor = receiveAnchorTransaction()
     const dependencies = createDependencies()
