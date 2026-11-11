@@ -862,7 +862,11 @@ export interface WalletController {
     assignmentIndex?: number
   }>
 
-  cancelRgbReceiveInvoice(params: { batchTransferIdx: number; skipSync?: boolean }): Promise<{
+  cancelRgbReceiveInvoice(params: {
+    batchTransferIdx: number
+    recipientId?: string
+    skipSync?: boolean
+  }): Promise<{
     changed: boolean
     [key: string]: any
   }>

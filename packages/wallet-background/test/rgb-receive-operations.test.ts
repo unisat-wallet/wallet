@@ -62,4 +62,26 @@ describe('RgbReceiveOperations', () => {
     await expect(operations.cancelReceiveInvoice(1)).resolves.toEqual({ changed: true })
     expect(removePendingReceive).toHaveBeenCalledWith('proxy-witness-second')
   })
+
+  it('releases an expired invoice by recipient ID after it leaves the active list', async () => {
+    const removePendingReceive = vi.fn().mockResolvedValue({ cancelled: true })
+    const context = {
+      service: {
+        getPendingReceives: vi.fn().mockReturnValue([]),
+        removePendingReceive,
+      },
+    }
+    const operations = new RgbReceiveOperations({
+      getContext: vi.fn().mockResolvedValue(context),
+      syncReceivedAllocations: vi.fn().mockResolvedValue(context),
+    } as never)
+
+    await expect(operations.cancelReceiveInvoice(
+      0,
+      undefined,
+      'expired-proxy-recipient'
+    )).resolves.toEqual({ changed: true })
+    expect(removePendingReceive).toHaveBeenCalledWith('expired-proxy-recipient')
+    expect(context.service.getPendingReceives).not.toHaveBeenCalled()
+  })
 })

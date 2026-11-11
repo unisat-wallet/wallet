@@ -624,6 +624,7 @@ export { toPublicRgbPendingReceiveInvoice }
 type RgbCancelReceiveInvoiceRequest = {
   wallet: RgbWalletRef
   batchTransferIdx: number
+  recipientId?: string
   skipSync?: boolean
 }
 
@@ -5376,7 +5377,11 @@ export class WalletController extends BaseController {
   cancelRgbReceiveInvoice = async (params: Omit<RgbCancelReceiveInvoiceRequest, 'wallet'>) => {
     const context = await this.getLocalRgbService()
     await this.ensureRgbWriteLease(context, { forceRenew: true })
-    return this.rgbReceiveOperations.cancelReceiveInvoice(params.batchTransferIdx, context)
+    return this.rgbReceiveOperations.cancelReceiveInvoice(
+      params.batchTransferIdx,
+      context,
+      params.recipientId
+    )
   }
 
   getRgbFundingAddress = async () => {

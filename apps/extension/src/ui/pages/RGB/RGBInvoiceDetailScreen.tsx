@@ -155,7 +155,11 @@ export default function RGBInvoiceDetailScreen() {
       }
       const batchTransferIdx = invoice.batchTransferIdx;
       if (typeof batchTransferIdx !== 'number') return;
-      const result = await wallet.cancelRgbReceiveInvoice({ batchTransferIdx, skipSync: false });
+      const result = await wallet.cancelRgbReceiveInvoice({
+        batchTransferIdx,
+        ...(invoice.recipientId ? { recipientId: invoice.recipientId } : {}),
+        skipSync: false
+      });
       if (result.changed) {
         closeInvoice();
         return;

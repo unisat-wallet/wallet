@@ -85,6 +85,7 @@ type RgbReceiveWallet = {
   }): Promise<RgbPendingReceiveInvoicesResult>
   cancelRgbReceiveInvoice(params: {
     batchTransferIdx: number
+    recipientId?: string
     skipSync?: boolean
   }): Promise<RgbCancelReceiveInvoiceResult>
   getRgbInvoiceExpirySeconds(): Promise<number>
@@ -348,6 +349,22 @@ export const isRgbPendingInvoiceAwaitingSenderConfirmation = (item?: RgbPendingR
   return String(item?.status || '').toLowerCase() === 'waitingsenderconfirmation'
 }
 
+export const getNextRgbInvoiceExpiryRefreshDelay = (
+  invoices: RgbPendingReceiveInvoice[],
+  now = Date.now()
+) => {
+  const nextExpiration = invoices.reduce<number | undefined>((next, item) => {
+    if (!item.expirationTimestamp || item.canCancel === false) return next
+    const expiresAt = item.expirationTimestamp > 1_000_000_000_000
+      ? item.expirationTimestamp
+      : item.expirationTimestamp * 1000
+    return next === undefined || expiresAt < next ? expiresAt : next
+  }, undefined)
+  return nextExpiration === undefined
+    ? undefined
+    : Math.min(2_147_483_647, Math.max(0, nextExpiration - now + 50))
+}
+
 export function useRGBReceiveScreenLogic(
   defaultInitialStep: RGBReceiveScreenStep = 'create_invoice'
 ) {
@@ -590,6 +607,13 @@ export function useRGBReceiveScreenLogic(
     const intervalId = setInterval(() => void loadPendingInvoices(), 10_000)
     return () => clearInterval(intervalId)
   }, [hasPendingInvoiceAwaitingUpdate, loadPendingInvoices])
+
+  useEffect(() => {
+    const delay = getNextRgbInvoiceExpiryRefreshDelay(pendingInvoices)
+    if (delay === undefined) return undefined
+    const timer = setTimeout(() => void loadPendingInvoices(), delay)
+    return () => clearTimeout(timer)
+  }, [loadPendingInvoices, pendingInvoices])
 
   const finishCreateInvoice = async (skipSync = false) => {
     setLoadingText(t('rgb_creating_invoice'))
@@ -865,6 +889,9 @@ export function useRGBReceiveScreenLogic(
     try {
       const result = await rgbWallet.cancelRgbReceiveInvoice({
         batchTransferIdx,
+        ...(selectedPendingInvoice?.recipientId
+          ? { recipientId: selectedPendingInvoice.recipientId }
+          : {}),
         skipSync: false,
       })
       await loadPendingInvoices()

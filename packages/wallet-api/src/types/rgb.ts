@@ -623,6 +623,8 @@ export interface RgbPendingReceiveInvoicesResult {
 export interface RgbCancelReceiveInvoiceRequest {
   wallet: RgbWalletRef
   batchTransferIdx: number
+  /** Stable identity used when expiration has removed the invoice from the active list. */
+  recipientId?: string
   skipSync?: boolean
 }
 

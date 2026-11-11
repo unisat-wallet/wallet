@@ -7,6 +7,7 @@ import { uiActions } from '../../src/reducers/ui'
 import {
   ANY_RGB_ASSET,
   formatRgbPendingAmountTag,
+  getNextRgbInvoiceExpiryRefreshDelay,
   isCancelableRgbPendingInvoice,
   isDeletableRgbWitnessInvoice,
   isInvoiceForAsset,
@@ -16,6 +17,21 @@ import {
 import { createHookTestHarness } from './testHelpers'
 
 describe('useRGBReceiveScreenLogic', () => {
+  it('refreshes at invoice expiry without polling receipts that cannot be released', () => {
+    const now = 1_800_000_000_000
+    expect(getNextRgbInvoiceExpiryRefreshDelay([
+      { invoice: 'later', expirationTimestamp: 1_800_000_010, canCancel: true },
+      { invoice: 'next', expirationTimestamp: 1_800_000_001, canCancel: true },
+      { invoice: 'accepted', expirationTimestamp: 1_800_000_000, canCancel: false },
+    ], now)).toBe(1_050)
+    expect(getNextRgbInvoiceExpiryRefreshDelay([
+      { invoice: 'expired', expirationTimestamp: 1_799_999_999, canCancel: true },
+    ], now)).toBe(0)
+    expect(getNextRgbInvoiceExpiryRefreshDelay([
+      { invoice: 'accepted', expirationTimestamp: 1_800_000_001, canCancel: false },
+    ], now)).toBeUndefined()
+  })
+
   it('prefers the backend receive proxy configuration', async () => {
     const { wrapper, wallet } = createHookTestHarness()
     wallet.getRgbReceiveProxyConfig.mockResolvedValue({

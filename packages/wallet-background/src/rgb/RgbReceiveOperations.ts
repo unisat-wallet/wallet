@@ -111,17 +111,20 @@ export class RgbReceiveOperations {
 
   async cancelReceiveInvoice(
     batchTransferIdx: number,
-    boundContext?: LocalRgbServiceContext
+    boundContext?: LocalRgbServiceContext,
+    recipientId?: string
   ): Promise<{ changed: boolean }> {
     const context = boundContext ?? (await this.dependencies.getContext())
     const { service } = context
-    const pending = service.getPendingReceives().filter(item => !item.rejection)[batchTransferIdx]
-    if (!pending) return { changed: false }
+    const pending = recipientId
+      ? undefined
+      : service.getPendingReceives().filter(item => !item.rejection)[batchTransferIdx]
+    const targetRecipientId = recipientId ??
+      (pending ? pending.proxyRecipientId ?? pending.recipientId : undefined)
+    if (!targetRecipientId) return { changed: false }
     await this.dependencies.ensureWriteLease?.(context)
     await this.dependencies.assertContext?.(context)
-    const result = await service.removePendingReceive(
-      pending.proxyRecipientId ?? pending.recipientId
-    )
+    const result = await service.removePendingReceive(targetRecipientId)
     return { changed: result.cancelled }
   }
 
