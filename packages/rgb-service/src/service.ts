@@ -22,6 +22,7 @@ import { hashBfaBurnDestinationV1, normalizeBfaBurnDestination } from './protoco
 import { decodeNiaConsignment } from './protocol/nia-consignment'
 import { getNiaAssetSpecIssue } from './protocol/nia-genesis'
 import { mergeNiaConsignmentHistory } from './protocol/nia-history'
+import { verifyRevealedNiaAllocations } from './protocol/nia-allocation'
 import {
   BFA_SCHEMA_ID,
   encodeBfaContractConsignment,
@@ -4252,6 +4253,9 @@ export class RgbService {
         ]
       })
     )
+    const failedRepairs = new Set(
+      (state.historyRepairFailures || []).map(item => allocationKey(item.outpoint, item))
+    )
     return {
       snapshot: {
         ...state.snapshot,
@@ -4261,15 +4265,21 @@ export class RgbService {
             .filter(allocation =>
               !discardedAllocations.has(allocationKey(utxo.outpoint, allocation))
             )
-            .map(allocation => ({
-              ...allocation,
-              localHistoryAvailable: Boolean(allocation.opId) &&
-                this.localHistoryCoversAllocations(allocation.assetId, [allocation.opId!]),
-              discardable: this.isRejectedAllocation(utxo.outpoint, allocation) ||
-                !allocation.opId ||
-                !this.localHistoryCoversAllocations(allocation.assetId, [allocation.opId]),
-              rejected: this.isRejectedAllocation(utxo.outpoint, allocation),
-            })),
+            .map(allocation => {
+              const localHistoryAvailable = Boolean(allocation.opId) &&
+                this.localHistoryCoversAllocations(allocation.assetId, [allocation.opId!])
+              const rejected = this.isRejectedAllocation(utxo.outpoint, allocation)
+              const repairFailed = !localHistoryAvailable &&
+                failedRepairs.has(allocationKey(utxo.outpoint, allocation))
+              return {
+                ...allocation,
+                localHistoryAvailable,
+                repairable: Boolean(allocation.opId) && !localHistoryAvailable,
+                repairFailed,
+                discardable: rejected || !allocation.opId || repairFailed,
+                rejected,
+              }
+            }),
         })),
       },
       assetMetadata,
@@ -4288,6 +4298,214 @@ export class RgbService {
           createdAt: receive.createdAt,
           ...(receive.seal ? { txid: receive.seal.txid, vout: receive.seal.vout } : {}),
         })),
+    }
+  }
+
+  /** Recover and strictly verify the canonical history for one indexed allocation. */
+  async repairUtxoAllocationHistory(input: {
+    outpoint: RgbOutpoint
+    assetId: string
+    opId: string
+    assignmentIndex: number
+  }) {
+    const state = this.requireState()
+    const normalized = normalizeAssetId(input.assetId)
+    const utxo = state.snapshot.utxos.find(item => outpointKey(item).toLowerCase() ===
+      `${input.outpoint.txid.toLowerCase()}:${input.outpoint.vout}`)
+    if (!utxo) throw new RgbServiceError('RGB carrier UTXO was not found')
+    const allocation = utxo.allocations.find(item =>
+      normalizeAssetId(item.assetId) === normalized &&
+      item.opId?.toLowerCase() === input.opId.toLowerCase() &&
+      item.assignmentIndex === input.assignmentIndex
+    )
+    if (!allocation) throw new RgbServiceError('RGB allocation was not found')
+    if (!Number.isInteger(allocation.assignmentType)) {
+      throw new RgbServiceError('RGB allocation assignment type is missing')
+    }
+    if (this.localHistoryCoversAllocations(normalized, [input.opId])) {
+      const previousLength = state.historyRepairFailures?.length || 0
+      state.historyRepairFailures = (state.historyRepairFailures || []).filter(item =>
+        allocationKey(item.outpoint, item) !== allocationKey(utxo.outpoint, allocation)
+      )
+      if (state.historyRepairFailures.length !== previousLength) {
+        await this.persist({ waitForRecovery: true })
+      }
+      return { repaired: true as const, alreadyAvailable: true as const }
+    }
+
+    const requestAllocation = {
+      outpoint: { ...utxo.outpoint },
+      opId: input.opId.toLowerCase(),
+      assignmentIndex: input.assignmentIndex,
+      assignmentType: allocation.assignmentType!,
+    }
+    const localRecoveryConsignments = [
+      ...Object.values(state.pending).flatMap(pending => [
+        ...(pending.delivery?.completed.consignments || []),
+        ...(pending.broadcast?.completed.consignments || []),
+      ]),
+      ...Object.values(state.pendingBroadcastSyncs || {}).flatMap(item =>
+        item.completed.consignments
+      ),
+    ].filter(consignment =>
+      consignment.payload &&
+      normalizeAssetId(consignment.assetId) === normalized &&
+      consignment.opIds.some(opId => opId.toLowerCase() === input.opId.toLowerCase())
+    ).map(consignment => ({ opId: input.opId.toLowerCase(), payload: consignment.payload }))
+
+    // Legacy Proxy payloads are not encrypted and can still be recovered by
+    // their invoice recipient ID after the local transfer has been compacted.
+    if (!localRecoveryConsignments.length && this.dependencies.transport.getConsignment) {
+      const send = (state.pendingSendHistory || []).find(item =>
+        item.txid?.toLowerCase() === utxo.outpoint.txid.toLowerCase() &&
+        normalizeAssetId(item.assetId) === normalized &&
+        item.invoice
+      )
+      if (send?.invoice) {
+        try {
+          const invoice = decodeRgbInvoice(send.invoice)
+          if (!invoice.proxyInvoiceId) {
+            const recovered = await this.dependencies.transport.getConsignment({
+              recipientId: invoice.proxyRecipientId,
+              endpoints: invoice.transportEndpoints,
+            })
+            if (recovered?.payload) {
+              localRecoveryConsignments.push({
+                opId: input.opId.toLowerCase(),
+                payload: recovered.payload,
+              })
+            }
+          }
+        } catch {
+          // The backend history source below remains authoritative. A legacy
+          // proxy outage alone must not turn the allocation into removable state.
+        }
+      }
+    }
+
+    let remote: RgbValidationHistory
+    try {
+      remote = await this.dependencies.stateSource.getValidationHistory(state.wallet, {
+        assetId: normalized,
+        allocations: [requestAllocation],
+      })
+    } catch (error) {
+      // A request failure is transient unless a complete local/proxy payload
+      // is already available and can be verified without the backend.
+      if (!localRecoveryConsignments.length) throw error
+      remote = { assetId: normalized, consignments: [] }
+    }
+    const rollback = snapshotState(state)
+    try {
+      const recoveryConsignments = [...remote.consignments, ...localRecoveryConsignments]
+        .filter((item, index, list) =>
+          list.findIndex(candidate => candidate.payload === item.payload) === index
+        )
+      if (!recoveryConsignments.length) {
+        throw new RgbServiceError(
+          'No recoverable RGB history was found locally, on the Proxy, or in the backend history store'
+        )
+      }
+      const payloads = [...new Set([
+        ...this.getLocalValidationHistory(normalized).map(item => item.payload),
+        ...recoveryConsignments.map(item => item.payload),
+      ])]
+      const hasV1 = payloads.some(payload => {
+        const bytes = normalizeLegacyV1Consignment(Uint8Array.from(Buffer.from(payload, 'base64')))
+        return isSupportedV1TransferConsignment(bytes) || isSupportedV1ContractConsignment(bytes)
+      })
+      if (hasV1) {
+        const pendingWitnessTxid = utxo.chainStatus === 'mempool' ? utxo.outpoint.txid : undefined
+        for (const payload of recoveryConsignments.map(item => item.payload)) {
+          const bytes = normalizeLegacyV1Consignment(Uint8Array.from(Buffer.from(payload, 'base64')))
+          if (isSupportedV1ContractConsignment(bytes)) continue
+          await this.storeAcceptedBfaHistory(
+            normalized,
+            Buffer.from(bytes).toString('base64'),
+            pendingWitnessTxid
+          )
+        }
+        const stored = state.contracts?.[normalized]?.history?.payload
+        if (!stored) throw new RgbServiceError('Recovered RGB history could not be stored')
+        const checked = await this.prepareV1HistoryMerge(
+          normalized, stored, pendingWitnessTxid, [], [input.opId.toLowerCase()]
+        )
+        const exact = checked.complete.terminalAssignments.find(item =>
+          item.opId.toLowerCase() === input.opId.toLowerCase() &&
+          item.assignmentIndex === input.assignmentIndex &&
+          item.txid.toLowerCase() === utxo.outpoint.txid.toLowerCase() &&
+          item.vout === utxo.outpoint.vout &&
+          item.amount === allocation.amount
+        )
+        if (!exact) throw new RgbServiceError('Recovered RGB history does not prove this allocation')
+      } else {
+        const consignments = [
+          ...recoveryConsignments,
+          ...this.getLocalValidationHistory(normalized),
+        ].filter((item, index, list) =>
+          list.findIndex(candidate => candidate.payload === item.payload) === index
+        )
+        const history = mergeNiaConsignmentHistory({
+          assetId: normalized,
+          consignments,
+          requiredOpIds: [input.opId],
+          knownBlindSeals: this.getKnownBlindSeals(),
+        })
+        const decoded = consignments.map(item =>
+          decodeNiaConsignment(Uint8Array.from(Buffer.from(item.payload, 'base64')))
+        )
+        verifyRevealedNiaAllocations({
+          consignments: decoded,
+          utxos: [{ ...utxo, allocations: [allocation] }],
+          assetId: normalized,
+          knownBlindSeals: this.getKnownBlindSeals(),
+        })
+        const lastBundle = history.witnessBundles.at(-1)
+        if (!lastBundle) throw new RgbServiceError('Recovered RGB history has no WitnessBundle')
+        const canonicalPayload = Buffer.from(encodeNiaTransferConsignment({
+          genesis: history.genesis,
+          priorWitnessBundles: history.witnessBundles.slice(0, -1),
+          witnessBundle: lastBundle,
+          terminals: [],
+        })).toString('base64')
+        const existing = state.contracts?.[normalized]
+        const metadata = decoded[0]?.metadata
+        if (!metadata) throw new RgbServiceError('Recovered RGB history has no asset metadata')
+        ;(state.contracts ||= {})[normalized] = {
+          consignment: canonicalPayload,
+          genesis: Buffer.from(history.genesis.strict).toString('base64'),
+          metadata,
+          createdAt: existing?.createdAt || this.now(),
+          history: { payload: canonicalPayload, opIds: history.transitionIds, updatedAt: this.now() },
+        }
+      }
+      if (!this.localHistoryCoversAllocations(normalized, [input.opId])) {
+        throw new RgbServiceError('Recovered RGB history does not contain this allocation')
+      }
+      state.historyRepairFailures = (state.historyRepairFailures || []).filter(item =>
+        allocationKey(item.outpoint, item) !== allocationKey(utxo.outpoint, allocation)
+      )
+      state.pendingUtxoSync = { txid: utxo.outpoint.txid.toLowerCase(), outpoints: state.snapshot.utxos }
+      await this.persistWithRecoveryRollback(rollback)
+      return { repaired: true as const, alreadyAvailable: false as const }
+    } catch (error) {
+      Object.assign(state, rollback)
+      state.historyRepairFailures = (state.historyRepairFailures || []).filter(item =>
+        allocationKey(item.outpoint, item) !== allocationKey(utxo.outpoint, allocation)
+      )
+      state.historyRepairFailures.push({
+        outpoint: { ...utxo.outpoint },
+        assetId: normalized,
+        opId: input.opId.toLowerCase(),
+        assignmentIndex: input.assignmentIndex,
+        failedAt: this.now(),
+      })
+      await this.persist({ waitForRecovery: true })
+      return {
+        repaired: false as const,
+        removable: true as const,
+        reason: error instanceof Error ? error.message : String(error),
+      }
     }
   }
 
@@ -4396,8 +4614,14 @@ export class RgbService {
     const localHistoryAvailable = Boolean(allocation.opId) &&
       this.localHistoryCoversAllocations(allocation.assetId, [allocation.opId!])
     const rejected = this.isRejectedAllocation(utxo.outpoint, allocation)
+    const repairFailed = (state.historyRepairFailures || []).some(item =>
+      allocationKey(item.outpoint, item) === allocationKey(utxo.outpoint, allocation)
+    )
     if (!rejected && localHistoryAvailable) {
       throw new RgbServiceError('A valid RGB allocation cannot be removed from the UTXO view')
+    }
+    if (!rejected && allocation.opId && !repairFailed) {
+      throw new RgbServiceError('Repair RGB history before removing this allocation')
     }
     const result = await this.discardAllocations([{
       outpoint: utxo.outpoint,
@@ -5065,8 +5289,8 @@ export class RgbService {
     const completed = pending.delivery?.completed
     if (!completed || !pending.burnSplit)
       throw new RgbServiceError('BFA burn allocation split is not signed')
-    this.applyFundingUpdate(completed, { createdSpendable: true })
     await this.retainCompletedLocalHistory(completed)
+    this.applyFundingUpdate(completed, { createdSpendable: true })
     state.pendingUtxoSync = {
       txid: completed.txid,
       outpoints: state.snapshot.utxos,
@@ -5342,7 +5566,13 @@ export class RgbService {
         const assetId = normalizeAssetId(consignment.assetId)
         const bytes = Uint8Array.from(Buffer.from(consignment.payload, 'base64'))
         if (isSupportedV1TransferConsignment(bytes)) {
-          await this.storeAcceptedBfaHistory(assetId, consignment.payload, completed.txid)
+          await this.storeAcceptedBfaHistory(
+            assetId,
+            consignment.payload,
+            completed.txid,
+            [],
+            consignment.opIds
+          )
           continue
         }
         const decoded = decodeNiaConsignment(bytes)
@@ -5352,7 +5582,13 @@ export class RgbService {
         )
         if (!opId) continue
         if (this.needsV1HistoryMerge(assetId, consignment.payload)) {
-          await this.storeAcceptedBfaHistory(assetId, consignment.payload, completed.txid)
+          await this.storeAcceptedBfaHistory(
+            assetId,
+            consignment.payload,
+            completed.txid,
+            [],
+            consignment.opIds
+          )
         } else {
           this.storeAcceptedHistory({
             assetId,
@@ -5368,12 +5604,27 @@ export class RgbService {
         // closed and may use the backend only as a recovery supplement.
       }
     }
+    const createdUtxos = completed.fundingUpdate?.createdUtxos ||
+      (completed.fundingUpdate?.createdUtxo ? [completed.fundingUpdate.createdUtxo] : [])
+    const missing = createdUtxos.flatMap(utxo => utxo.allocations.filter(allocation =>
+      !allocation.opId ||
+      !this.localHistoryCoversAllocations(allocation.assetId, [allocation.opId])
+    ))
+    if (missing.length) {
+      throw new RgbServiceError(
+        'RGB change history could not be retained; the complete transfer remains pending for recovery'
+      )
+    }
   }
 
   private async syncBroadcastedTransfer(transferId: string, pending: RgbPendingTransfer) {
     const state = this.requireState()
     const broadcast = pending.broadcast
     if (!broadcast) throw new RgbServiceError(`RGB transfer ${transferId} has not been broadcast`)
+    // Retry local DAG retention before the completed payload is compacted out
+    // of pending state. This repairs a prior merge attempt that was blocked by
+    // another independent, still-unconfirmed outgoing branch.
+    await this.retainCompletedLocalHistory(broadcast.completed)
     if (pending.request.burn) {
       try {
         await this.dependencies.onBurnBroadcasted?.({
@@ -5493,8 +5744,8 @@ export class RgbService {
     if (!getTransactionStatus) return undefined
     const chain = await getTransactionStatus(state.wallet, delivery.completed.txid)
     if (chain.status !== 'mempool' && chain.status !== 'confirmed') return undefined
-    this.applyFundingUpdate(delivery.completed)
     await this.retainCompletedLocalHistory(delivery.completed)
+    this.applyFundingUpdate(delivery.completed)
     pending.broadcast = { completed: delivery.completed, broadcastAt: this.now() }
     delete pending.delivery
     await this.persist({ waitForRecovery: true })
@@ -5570,8 +5821,8 @@ export class RgbService {
     }
     if (broadcastTxid !== delivery.completed.txid)
       throw new RgbServiceError('Broadcast transaction ID does not match the BFA burn')
-    this.applyFundingUpdate(delivery.completed)
     await this.retainCompletedLocalHistory(delivery.completed)
+    this.applyFundingUpdate(delivery.completed)
     this.recordBurnProof(pending, delivery.completed)
     pending.broadcast = { completed: delivery.completed, broadcastAt: this.now() }
     delete pending.delivery
@@ -5736,8 +5987,8 @@ export class RgbService {
   private async adoptPendingDeliveryBroadcast(pending: RgbPendingTransfer) {
     const delivery = pending.delivery
     if (!delivery) return false
-    this.applyFundingUpdate(delivery.completed)
     await this.retainCompletedLocalHistory(delivery.completed)
+    this.applyFundingUpdate(delivery.completed)
     this.recordBurnProof(pending, delivery.completed)
     pending.broadcast = { completed: delivery.completed, broadcastAt: this.now() }
     delete pending.delivery
@@ -6499,6 +6750,17 @@ function validateRecoveredState(state: RgbServiceState, currentWallet: RgbWallet
       !['rejected_receive', 'manual'].includes(discarded.reason)
     ) throw new RgbServiceError('RGB recovery checkpoint contains an invalid discarded allocation')
   }
+  for (const failed of state.historyRepairFailures || []) {
+    if (
+      !failed ||
+      normalizeAssetId(failed.assetId) !== failed.assetId ||
+      !/^[0-9a-f]{64}$/i.test(failed.outpoint?.txid || '') ||
+      !Number.isInteger(failed.outpoint?.vout) || failed.outpoint.vout < 0 ||
+      !/^[0-9a-f]{64}$/i.test(failed.opId) ||
+      !Number.isInteger(failed.assignmentIndex) || failed.assignmentIndex < 0 ||
+      !Number.isSafeInteger(failed.failedAt) || failed.failedAt < 0
+    ) throw new RgbServiceError('RGB recovery checkpoint contains an invalid history repair record')
+  }
   for (const utxo of state.snapshot.utxos) {
     if (
       !utxo ||
@@ -6755,6 +7017,14 @@ function normalizeStateAssetIds(state: RgbServiceState): RgbServiceState {
     if (state.pendingUtxoSync) {
       state.pendingUtxoSync.outpoints = removeDiscarded(state.pendingUtxoSync.outpoints)
     }
+  }
+  if (state.historyRepairFailures) {
+    state.historyRepairFailures = state.historyRepairFailures.map(item => ({
+      ...item,
+      assetId: normalizeAssetId(item.assetId),
+      outpoint: { ...item.outpoint, txid: item.outpoint.txid.toLowerCase() },
+      opId: item.opId.toLowerCase(),
+    }))
   }
   if (state.burnProofs) {
     for (const proof of Object.values(state.burnProofs)) {

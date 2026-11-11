@@ -5316,6 +5316,29 @@ export class WalletController extends BaseController {
     }
   }
 
+  repairRgbUtxoAllocationHistory = async (params: {
+    txid: string
+    vout: number
+    assetId: string
+    opId: string
+    assignmentIndex: number
+  }) => {
+    const context = await this.getLocalRgbService()
+    await this.ensureRgbWriteLease(context, { forceRenew: true })
+    await context.service.sync()
+    const result = await context.service.repairUtxoAllocationHistory({
+      outpoint: { txid: params.txid, vout: params.vout },
+      assetId: params.assetId,
+      opId: params.opId,
+      assignmentIndex: params.assignmentIndex,
+    })
+    if (result.repaired) {
+      await context.service.syncPendingHistoryFragments()
+      await this.rgbIndexerOutbox.sync(context.service, context.wallet)
+    }
+    return result
+  }
+
   discardRgbUtxoAllocation = async (params: {
     txid: string
     vout: number

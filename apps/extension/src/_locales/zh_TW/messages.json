@@ -2862,6 +2862,11 @@
   "rgb_utxo_history_missing": {
     "message": "缺少歷史資料"
   },
+  "rgb_utxo_repair_history": { "message": "修復歷史" },
+  "rgb_utxo_repair_history_title": { "message": "修復 RGB 歷史？" },
+  "rgb_utxo_repair_history_description": { "message": "錢包會先取得並嚴格驗證此 allocation 的完整 RGB 歷史，之後才可使用或移除。" },
+  "rgb_utxo_repair_failed_description": { "message": "未能恢復可證明此 allocation 的有效歷史。你可以重試，或從錢包狀態永久移除。" },
+  "rgb_utxo_repair_success": { "message": "RGB 歷史已修復" },
   "rgb_utxo_rejected_allocation": { "message": "已拒絕的 allocation" },
   "rgb_utxo_remove_allocation": { "message": "從錢包狀態移除" },
   "rgb_utxo_remove_allocation_title": { "message": "永久移除此 allocation？" },

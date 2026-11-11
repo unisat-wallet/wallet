@@ -2871,6 +2871,11 @@
   "rgb_utxo_history_missing": {
     "message": "History missing"
   },
+  "rgb_utxo_repair_history": { "message": "Repair history" },
+  "rgb_utxo_repair_history_title": { "message": "Repair RGB history?" },
+  "rgb_utxo_repair_history_description": { "message": "The wallet will retrieve and verify the complete RGB history for this allocation before it can be used or removed." },
+  "rgb_utxo_repair_failed_description": { "message": "No valid history proving this allocation could be recovered. You can retry, or permanently remove the allocation from wallet state." },
+  "rgb_utxo_repair_success": { "message": "RGB history repaired" },
   "rgb_utxo_rejected_allocation": { "message": "Rejected allocation" },
   "rgb_utxo_remove_allocation": { "message": "Remove from wallet state" },
   "rgb_utxo_remove_allocation_title": { "message": "Permanently remove this allocation?" },

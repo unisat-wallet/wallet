@@ -65,6 +65,7 @@ const UI_CONTROLLER_METHODS = new Set([
   'decodePsbt',
   'deleteNotification',
   'discardRgbUtxoAllocation',
+  'repairRgbUtxoAllocationHistory',
   'deriveAccountsFromXpub',
   'deriveNewAccountFromMnemonic',
   'enableRgbFeature',

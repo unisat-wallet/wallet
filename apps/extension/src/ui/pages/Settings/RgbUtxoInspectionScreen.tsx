@@ -102,6 +102,7 @@ export default function RgbUtxoInspectionScreen() {
     allocation: InspectedAllocation;
   }>();
   const [refreshing, setRefreshing] = useState(false);
+  const [repairing, setRepairing] = useState(false);
   const [discarding, setDiscarding] = useState(false);
 
   const refresh = useCallback(
@@ -165,6 +166,35 @@ export default function RgbUtxoInspectionScreen() {
       tools.toastError(error instanceof Error ? error.message : String(error));
     } finally {
       setDiscarding(false);
+    }
+  };
+  const repairSelectedAllocation = async () => {
+    if (!selectedAllocation?.allocation.opId || selectedAllocation.allocation.assignmentIndex === undefined) return;
+    setRepairing(true);
+    try {
+      const result = await wallet.repairRgbUtxoAllocationHistory({
+        txid: selectedAllocation.utxo.outpoint.txid,
+        vout: selectedAllocation.utxo.outpoint.vout,
+        assetId: selectedAllocation.allocation.assetId,
+        opId: selectedAllocation.allocation.opId,
+        assignmentIndex: selectedAllocation.allocation.assignmentIndex
+      });
+      if (result.repaired) {
+        setSelectedAllocation(undefined);
+        await refresh();
+        tools.toastSuccess(t('rgb_utxo_repair_success'));
+      } else {
+        setSelectedAllocation((current) => current ? {
+          ...current,
+          allocation: { ...current.allocation, repairFailed: true, discardable: true }
+        } : current);
+        await refresh();
+        tools.toastError(result.reason);
+      }
+    } catch (error) {
+      tools.toastError(error instanceof Error ? error.message : String(error));
+    } finally {
+      setRepairing(false);
     }
   };
   return (
@@ -287,9 +317,9 @@ export default function RgbUtxoInspectionScreen() {
                               ...(historyMissing || allocation.rejected
                                 ? { border: '1px solid rgba(255,82,82,0.55)' }
                                 : {}),
-                              ...(allocation.discardable ? { cursor: 'pointer' } : {})
+                              ...(allocation.discardable || allocation.repairable ? { cursor: 'pointer' } : {})
                             }}
-                            onClick={allocation.discardable
+                            onClick={allocation.discardable || allocation.repairable
                               ? () => {
                                   setSelectedUtxo(undefined);
                                   setSelectedAllocation({ utxo, allocation });
@@ -319,6 +349,9 @@ export default function RgbUtxoInspectionScreen() {
                               ) : null}
                               {allocation.rejected ? (
                                 <Text text={t('rgb_utxo_rejected_allocation')} color="red" size="xxs" />
+                              ) : null}
+                              {allocation.repairable && !allocation.rejected && !allocation.repairFailed ? (
+                                <Text text={t('rgb_utxo_repair_history')} color="gold" size="xxs" />
                               ) : null}
                               {allocation.discardable ? (
                                 <Text text={t('rgb_utxo_remove_allocation')} color="red" size="xxs" />
@@ -394,11 +427,22 @@ export default function RgbUtxoInspectionScreen() {
         </BottomModal>
       ) : null}
       {selectedAllocation ? (
-        <BottomModal onClose={() => !discarding && setSelectedAllocation(undefined)}>
+        <BottomModal onClose={() => !discarding && !repairing && setSelectedAllocation(undefined)}>
           <Column gap="lg">
-            <Text text={t('rgb_utxo_remove_allocation_title')} color="white" size="lg" textCenter />
             <Text
-              text={t('rgb_utxo_remove_allocation_description')}
+              text={t(selectedAllocation.allocation.rejected || selectedAllocation.allocation.discardable && !selectedAllocation.allocation.repairable
+                ? 'rgb_utxo_remove_allocation_title'
+                : 'rgb_utxo_repair_history_title')}
+              color="white"
+              size="lg"
+              textCenter
+            />
+            <Text
+              text={t(selectedAllocation.allocation.rejected || !selectedAllocation.allocation.repairable
+                ? 'rgb_utxo_remove_allocation_description'
+                : selectedAllocation.allocation.repairFailed
+                  ? 'rgb_utxo_repair_failed_description'
+                  : 'rgb_utxo_repair_history_description')}
               color="textDim"
               size="sm"
               textCenter
@@ -418,12 +462,22 @@ export default function RgbUtxoInspectionScreen() {
                 disableTranslate
               />
             </Column>
-            <Button
-              preset="danger"
-              text={t('rgb_utxo_remove_allocation_confirm')}
-              disabled={discarding}
-              onClick={() => void discardSelectedAllocation()}
-            />
+            {selectedAllocation.allocation.repairable && !selectedAllocation.allocation.rejected ? (
+              <Button
+                preset="primary"
+                text={t(selectedAllocation.allocation.repairFailed ? 'retry' : 'rgb_utxo_repair_history')}
+                disabled={repairing || discarding}
+                onClick={() => void repairSelectedAllocation()}
+              />
+            ) : null}
+            {selectedAllocation.allocation.discardable ? (
+              <Button
+                preset="danger"
+                text={t('rgb_utxo_remove_allocation_confirm')}
+                disabled={discarding || repairing}
+                onClick={() => void discardSelectedAllocation()}
+              />
+            ) : null}
           </Column>
         </BottomModal>
       ) : null}

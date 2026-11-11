@@ -819,6 +819,8 @@ export interface WalletController {
           historyAvailable?: boolean
           discardable?: boolean
           rejected?: boolean
+          repairable?: boolean
+          repairFailed?: boolean
         }>
       }>
     }
@@ -834,6 +836,17 @@ export interface WalletController {
       vout: number
     }>
   }>
+
+  repairRgbUtxoAllocationHistory(params: {
+    txid: string
+    vout: number
+    assetId: string
+    opId: string
+    assignmentIndex: number
+  }): Promise<
+    | { repaired: true; alreadyAvailable: boolean }
+    | { repaired: false; removable: true; reason: string }
+  >
 
   discardRgbUtxoAllocation(params: {
     txid: string

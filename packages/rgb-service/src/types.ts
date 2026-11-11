@@ -611,6 +611,14 @@ export interface RgbServiceState {
     discardedAt: number
     reason: 'rejected_receive' | 'manual'
   }>
+  /** Exact allocations whose authoritative history response could not be verified. */
+  historyRepairFailures?: Array<{
+    outpoint: RgbOutpoint
+    assetId: string
+    opId: string
+    assignmentIndex: number
+    failedAt: number
+  }>
   /** Unconfirmed fee-pool outputs retained until the address indexer exposes them. */
   pendingFeePoolUtxos?: RgbFeePoolUtxo[]
   /** Validated blind seals retained locally for later ownership proofs when spending received assets. */

@@ -531,7 +531,8 @@ describe('RgbService', () => {
     await service.open(wallet)
     ;(service as any).state.contracts = {
       [assetId]: { consignment: proof.toString('base64'), createdAt: 1,
-        metadata: { ticker: 'BFA', name: 'Burnable', precision: 0, schema: 'BFA', issuedSupply: '100' } },
+        metadata: { ticker: 'BFA', name: 'Burnable', precision: 0, schema: 'BFA', issuedSupply: '100' },
+        history: { payload: proof.toString('base64'), opIds: ['d'.repeat(64)], updatedAt: 1 } },
     }
     await service.sync()
     ;(service as any).state.snapshot.utxos[0].allocations[0].amount = '100'
@@ -711,6 +712,9 @@ describe('RgbService', () => {
         ],
       },
     })
+    ;(current.service as any).state.contracts[assetId].history = {
+      payload: 'AA==', opIds: ['a'.repeat(64)], updatedAt: 1,
+    }
     await current.service.completeSend('burn-split', 'signed-psbt')
     expect(current.dependencies.broadcaster.broadcast).toHaveBeenCalledWith('02000000000000000000')
     expect(current.service.getPendingTransfers()).toEqual([])
@@ -4096,7 +4100,8 @@ describe('RgbService', () => {
   })
 
   it('only allows manual removal of rejected or locally unverifiable allocations', async () => {
-    const service = new RgbService(createDependencies())
+    const dependencies = createDependencies()
+    const service = new RgbService(dependencies)
     await service.open(wallet)
     const state = (service as any).state
     const assetId = 'rgb:AQEBAQEB-AQEBAQE-BAQEBAQ-EBAQEBA-QEBAQEB-AQEBAQE'
@@ -4120,6 +4125,30 @@ describe('RgbService', () => {
     })).rejects.toThrow('valid RGB allocation cannot be removed')
 
     delete state.contracts[assetId]
+    await expect(service.discardUtxoAllocation({
+      outpoint: utxo.outpoint, assetId, opId: '1'.repeat(64), assignmentIndex: 0,
+    })).rejects.toThrow('Repair RGB history before removing')
+    vi.mocked(dependencies.stateSource.getValidationHistory).mockRejectedValueOnce(
+      new Error('history service unavailable')
+    )
+    await expect(service.repairUtxoAllocationHistory({
+      outpoint: utxo.outpoint, assetId, opId: '1'.repeat(64), assignmentIndex: 0,
+    })).rejects.toThrow('history service unavailable')
+    expect(service.getUtxoInspection().snapshot.utxos[0].allocations[0]).toMatchObject({
+      repairable: true,
+      repairFailed: false,
+      discardable: false,
+    })
+    vi.mocked(dependencies.stateSource.getValidationHistory).mockResolvedValue({
+      assetId,
+      consignments: [],
+    })
+    await expect(service.repairUtxoAllocationHistory({
+      outpoint: utxo.outpoint, assetId, opId: '1'.repeat(64), assignmentIndex: 0,
+    })).resolves.toMatchObject({
+      repaired: false,
+      removable: true,
+    })
     await expect(service.discardUtxoAllocation({
       outpoint: utxo.outpoint, assetId, opId: '1'.repeat(64), assignmentIndex: 0,
     })).resolves.toMatchObject({ discarded: 1, assetId })
@@ -5110,6 +5139,41 @@ describe('RgbService', () => {
       })
     )
     expect(dependencies.stateSource.getValidationHistory).toHaveBeenCalledTimes(2)
+  })
+
+  it('scopes completed local history validation to the newly broadcast operations', async () => {
+    const dependencies = createDependencies()
+    const service = new RgbService(dependencies)
+    await service.open(wallet)
+    const genesis = encodeNiaGenesis({
+      ticker: 'NIA', name: 'Parallel', precision: 0, timestamp: 1,
+      network: 'mainnet', allocations: [{
+        txid: 'a'.repeat(64), vout: 0, blinding: 1n, amount: 100n,
+      }],
+    })
+    const assetId = encodeRgbContractId(genesis.assetId)
+    const opId = 'd'.repeat(64)
+    const payload = Buffer.from(encodeBfaTransferConsignment({
+      genesis: genesis.strict,
+      validatedWitnessBundles: [],
+      witnessBundle: Uint8Array.of(1),
+    })).toString('base64')
+    const storeAcceptedBfaHistory = vi
+      .spyOn(service as any, 'storeAcceptedBfaHistory')
+      .mockResolvedValue(undefined)
+
+    await (service as any).retainCompletedLocalHistory({
+      txid: 'c'.repeat(64),
+      consignments: [{ recipientId: 'recipient', payload, assetId, opIds: [opId] }],
+    })
+
+    expect(storeAcceptedBfaHistory).toHaveBeenCalledWith(
+      assetId,
+      payload,
+      'c'.repeat(64),
+      [],
+      [opId]
+    )
   })
 
   it('waits for the sender to broadcast after recipient acknowledgement', async () => {
@@ -7679,6 +7743,10 @@ describe('RgbService', () => {
       invoice: rgbInvoice(),
       feeRate: 2,
     })
+    ;((service as any).state.contracts ||= {})['rgb:AQEBAQEB-AQEBAQE-BAQEBAQ-EBAQEBA-QEBAQEB-AQEBAQE'] = {
+      consignment: 'AA==', createdAt: 1,
+      history: { payload: 'AA==', opIds: ['d'.repeat(64)], updatedAt: 1 },
+    }
     await service.completeSend('transfer-1', 'signed-psbt')
     await service.broadcastPendingSend('transfer-1')
 
@@ -7744,6 +7812,47 @@ describe('RgbService', () => {
     await service.sync()
     expect(service.getSnapshot().syncedAt).toBe(2)
     expect(service.getLocalAssetBalance('rgb:AQEBAQEB-AQEBAQE-BAQEBAQ-EBAQEBA-QEBAQEB-AQEBAQE')).toMatchObject({ balance: '80' })
+  })
+
+  it('keeps the complete broadcast payload when RGB change history cannot be retained', async () => {
+    const dependencies = createDependencies()
+    const service = new RgbService(dependencies)
+    await service.open(wallet)
+    const assetId = 'rgb:AQEBAQEB-AQEBAQE-BAQEBAQ-EBAQEBA-QEBAQEB-AQEBAQE'
+    const completed = {
+      txid: 'e'.repeat(64),
+      rawTx: '02000000000000000000',
+      consignments: [{
+        recipientId: 'recipient', payload: 'complete-recovery-payload', assetId,
+        opIds: ['d'.repeat(64)],
+      }],
+      fundingUpdate: {
+        spentOutpoints: [{ txid: 'b'.repeat(64), vout: 1 }],
+        createdUtxo: {
+          outpoint: { txid: 'e'.repeat(64), vout: 1 }, satoshis: 700,
+          scriptPubKey: `5120${'11'.repeat(32)}`, publicKey: `02${'22'.repeat(32)}`,
+          allocations: [{ assetId, amount: '40', settled: true, spendable: true,
+            opId: 'd'.repeat(64), assignmentIndex: 1, assignmentType: 4000 }],
+        },
+      },
+    }
+    const state = (service as any).state
+    state.pending['transfer-with-unretained-history'] = {
+      prepared: { id: 'prepared', psbt: '', toSignInputs: [], lockedOutpoints: [] },
+      request: { assetId, amount: '60', invoice: rgbInvoice(), feeRate: 1 },
+      createdAt: 1,
+      broadcast: { completed, broadcastAt: 2 },
+    }
+
+    await expect((service as any).syncBroadcastedTransfer(
+      'transfer-with-unretained-history',
+      state.pending['transfer-with-unretained-history']
+    )).rejects.toThrow('complete transfer remains pending for recovery')
+
+    expect(state.pending['transfer-with-unretained-history'].broadcast.completed)
+      .toEqual(completed)
+    expect(state.pendingSendHistory).toBeUndefined()
+    expect(state.pendingBroadcastSyncs).toBeUndefined()
   })
 
   it('checkpoints only irreversible RGB send milestones', async () => {
