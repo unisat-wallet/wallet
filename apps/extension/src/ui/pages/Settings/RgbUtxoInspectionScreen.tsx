@@ -3,7 +3,15 @@ import { useCallback, useEffect, useState } from 'react';
 import { Button, Card, Column, Content, CopyableAddress, Header, Icon, Layout, RGBAssetIcon, Row, Text, Tooltip } from '@/ui/components';
 import { BottomModal } from '@/ui/components/BottomModal';
 import { HistoryAmount } from '@/ui/components/HistoryAmount';
-import { isSameRgbAssetId, toRgbDisplayAmount, useI18n, useNavigation, useTools, useWallet, useWalletConfig } from '@unisat/wallet-state';
+import {
+  findRgbAssetPolicy,
+  toRgbDisplayAmount,
+  useI18n,
+  useNavigation,
+  useTools,
+  useWallet,
+  useWalletConfig
+} from '@unisat/wallet-state';
 
 type UtxoInspection = Awaited<ReturnType<ReturnType<typeof useWallet>['getRgbUtxoInspection']>>;
 type InspectedUtxo = NonNullable<UtxoInspection>['snapshot']['utxos'][number];
@@ -94,7 +102,7 @@ export default function RgbUtxoInspectionScreen() {
   const nav = useNavigation();
   const tools = useTools();
   const { t } = useI18n();
-  const configuredUsdtAssetId = useWalletConfig().rgbUsdtAssetId?.trim();
+  const walletConfig = useWalletConfig();
   const [inspection, setInspection] = useState<UtxoInspection>();
   const [selectedUtxo, setSelectedUtxo] = useState<InspectedUtxo>();
   const [selectedAllocation, setSelectedAllocation] = useState<{
@@ -146,6 +154,13 @@ export default function RgbUtxoInspectionScreen() {
     : selectedUtxo?.allocations.length
       ? t('rgb_utxo_has_assets')
       : t('rgb_utxo_available');
+  const selectedAllocationPolicy = findRgbAssetPolicy(selectedAllocation?.allocation.assetId, walletConfig);
+  const selectedAllocationMetadata = selectedAllocation
+    ? inspection?.assetMetadata[selectedAllocation.allocation.assetId]
+    : undefined;
+  const selectedAllocationName = selectedAllocationPolicy?.displayName || selectedAllocationPolicy?.ticker ||
+    selectedAllocationMetadata?.name || selectedAllocationMetadata?.ticker ||
+    (selectedAllocation ? shortTxid(selectedAllocation.allocation.assetId) : '');
   const discardSelectedAllocation = async () => {
     if (!selectedAllocation) return;
     setDiscarding(true);
@@ -299,9 +314,9 @@ export default function RgbUtxoInspectionScreen() {
                     <Column fullX gap="xs">
                       {utxo.allocations.map((allocation, index) => {
                         const asset = inspection?.assetMetadata[allocation.assetId];
-                        const isUsdt = configuredUsdtAssetId !== '-' &&
-                          isSameRgbAssetId(allocation.assetId, configuredUsdtAssetId);
-                        const name = isUsdt ? 'USDT' : asset?.name || asset?.ticker || shortTxid(allocation.assetId);
+                        const assetPolicy = findRgbAssetPolicy(allocation.assetId, walletConfig);
+                        const ticker = assetPolicy?.ticker || asset?.ticker;
+                        const name = assetPolicy?.displayName || ticker || asset?.name || shortTxid(allocation.assetId);
                         const amount = toRgbDisplayAmount(allocation.amount, asset?.precision || 0);
                         const historyMissing = allocation.historyAvailable === false ||
                           allocation.localHistoryAvailable === false;
@@ -328,12 +343,17 @@ export default function RgbUtxoInspectionScreen() {
                             <Row itemsCenter gap="sm" style={{ flex: 1, minWidth: 0, overflow: 'hidden' }}>
                               <RGBAssetIcon
                                 assetId={allocation.assetId}
-                                ticker={isUsdt ? 'USDT' : asset?.ticker}
+                                ticker={ticker}
                                 name={name}
                                 size={20}
                               />
                               <Column gap="xs" style={{ minWidth: 0, flex: 1, overflow: 'hidden' }}>
-                                <Text text={name} color="white" size="xs" ellipsis style={{ width: '100%' }} />
+                                <Row itemsCenter gap="xs" style={{ minWidth: 0 }}>
+                                  <Text text={name} color="white" size="xs" ellipsis style={{ minWidth: 0 }} />
+                                  {assetPolicy?.status === 'deprecated' ? (
+                                    <Text text={t('rgb_asset_deprecated')} color="gold" size="xxs" />
+                                  ) : null}
+                                </Row>
                                 <CopyableAddress
                                   address={allocation.assetId}
                                   copyPosition="after"
@@ -449,6 +469,12 @@ export default function RgbUtxoInspectionScreen() {
               wrap
             />
             <Column gap="sm" fullX style={{ padding: 14, borderRadius: 12, background: 'rgba(255,255,255,0.06)' }}>
+              <Row itemsCenter gap="xs">
+                <Text text={selectedAllocationName} color="white" size="sm" />
+                {selectedAllocationPolicy?.status === 'deprecated' ? (
+                  <Text text={t('rgb_asset_deprecated')} color="gold" size="xxs" />
+                ) : null}
+              </Row>
               <CopyableAddress
                 address={selectedAllocation.allocation.assetId}
                 copyPosition="after"
