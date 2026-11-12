@@ -3,7 +3,11 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { RgbActivityItem, RgbActivityType, RgbAssetDetail, RgbBalance } from '..'
 import { useI18n, useNavigation, useWallet, useWalletConfig } from '..'
 import { getRgbIconShortName } from '../utils/rgb-amount-utils'
-import { isSameRgbAssetId, normalizeConfiguredRgbUsdt } from '../utils/rgb-usdt'
+import {
+  findRgbAssetPolicy,
+  isSameRgbAssetId,
+  normalizeConfiguredRgbAsset,
+} from '../utils/rgb-usdt'
 import { useInfiniteList } from './useInfiniteList'
 import { UNCONFIGURED_RGB_USDT_ASSET_ID } from './useRGBListLogic'
 
@@ -23,9 +27,8 @@ export function useRGBTokenScreenLogic() {
   const nav = useNavigation()
   const { assetId, tokenBalance } = nav.getRouteState<'RGBTokenScreen'>()
   const isUnconfiguredUsdt = assetId === UNCONFIGURED_RGB_USDT_ASSET_ID
-  const configuredUsdtAssetId = useWalletConfig().rgbUsdtAssetId?.trim()
-  const isConfiguredUsdt = !!configuredUsdtAssetId && !isUnconfiguredUsdt &&
-    isSameRgbAssetId(assetId, configuredUsdtAssetId)
+  const walletConfig = useWalletConfig()
+  const assetPolicy = findRgbAssetPolicy(assetId, walletConfig)
   const wallet = useWallet()
   const { t } = useI18n()
 
@@ -212,15 +215,13 @@ export function useRGBTokenScreenLogic() {
     latestTokenBalance && resolvedPrecision !== undefined
       ? { ...latestTokenBalance, precision: resolvedPrecision }
       : latestTokenBalance
-  const displayTokenBalance = resolvedTokenBalance && isConfiguredUsdt
-    ? normalizeConfiguredRgbUsdt(resolvedTokenBalance, configuredUsdtAssetId)
+  const displayTokenBalance = resolvedTokenBalance
+    ? normalizeConfiguredRgbAsset(resolvedTokenBalance, walletConfig)
     : resolvedTokenBalance
-  const displayDetail = detail && isConfiguredUsdt
-    ? normalizeConfiguredRgbUsdt(detail, configuredUsdtAssetId)
+  const displayDetail = detail
+    ? normalizeConfiguredRgbAsset(detail, walletConfig)
     : detail
-  const displayActivity = isConfiguredUsdt
-    ? activity.map(item => normalizeConfiguredRgbUsdt(item, configuredUsdtAssetId))
-    : activity
+  const displayActivity = activity.map(item => normalizeConfiguredRgbAsset(item, walletConfig))
 
   const tokenSummary = displayDetail
     ? {
@@ -312,6 +313,7 @@ export function useRGBTokenScreenLogic() {
 
     tokenSummary,
     iconInfo,
+    assetPolicy,
     t,
     activityItems: displayActivity,
     activityTotal: total,

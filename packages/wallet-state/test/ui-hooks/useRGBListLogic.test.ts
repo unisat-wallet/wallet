@@ -78,6 +78,51 @@ describe('useRGBListLogic', () => {
     expect(result.current.total).toBe(1)
   })
 
+  it('shows the active USDT separately from a held deprecated issuance', async () => {
+    const { store, wrapper, wallet } = createRgbHookTestHarness()
+    store.dispatch(settingsActions.updateSettings({
+      walletConfig: {
+        ...store.getState().settings.walletConfig,
+        rgbUsdtAssetId: 'rgb:new-usdt',
+        rgbAssetPolicies: [
+          {
+            assetId: 'rgb:new-usdt', displayName: 'USDT', ticker: 'USDT',
+            official: true, status: 'active', showWhenZero: true, sortOrder: 100,
+          },
+          {
+            assetId: 'rgb:old-usdt', displayName: 'USDT (Legacy)', ticker: 'USDT',
+            official: true, status: 'deprecated', sortOrder: 10,
+          },
+        ],
+      },
+    }))
+    wallet.getRGBList.mockResolvedValue({
+      list: [{
+        assetId: 'rgb:old-usdt', ticker: 'USDT', name: 'USDT',
+        balance: '50', spendable: '50',
+      }],
+      total: 1,
+    })
+    wallet.getRGBAssetBalance.mockRejectedValue(new Error('not held'))
+
+    const { result } = renderHook(() => useRGBListLogic(), { wrapper })
+
+    await waitFor(() => expect(result.current.items).toHaveLength(2))
+    expect(result.current.items).toEqual([
+      expect.objectContaining({
+        assetId: 'rgb:new-usdt', name: 'USDT', configuredPlaceholder: true,
+        rgbAssetPolicyStatus: 'active',
+      }),
+      expect.objectContaining({
+        assetId: 'rgb:old-usdt', name: 'USDT (Legacy)', balance: '50',
+        rgbAssetPolicyStatus: 'deprecated',
+      }),
+    ])
+    expect(result.current.total).toBe(2)
+    expect(wallet.getRGBAssetBalance).toHaveBeenCalledWith('', 'rgb:new-usdt')
+    expect(wallet.getRGBAssetBalance).not.toHaveBeenCalledWith('', 'rgb:old-usdt')
+  })
+
   it('does not load the RGB asset list when disabled', async () => {
     const { wrapper, wallet } = createRgbHookTestHarness()
 

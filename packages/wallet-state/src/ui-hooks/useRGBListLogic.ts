@@ -12,7 +12,12 @@ import type { RgbBalance } from '../types'
 import { WalletView } from '../types/ui'
 import { useInfiniteList } from './useInfiniteList'
 import { uiEventBus } from '../utils/eventBus'
-import { isSameRgbAssetId, normalizeConfiguredRgbUsdt } from '../utils/rgb-usdt'
+import {
+  getRgbAssetPolicies,
+  isSameRgbAssetId,
+  normalizeConfiguredRgbAsset,
+  normalizeConfiguredRgbUsdt,
+} from '../utils/rgb-usdt'
 
 export const UNCONFIGURED_RGB_USDT_ASSET_ID = '-'
 
@@ -37,6 +42,50 @@ export function includeConfiguredRgbUsdt(items: RgbBalance[], assetId: string, b
   return [usdt, ...items.filter(item => !isSameRgbAssetId(item.assetId, assetId))]
 }
 
+export function includeConfiguredRgbAssets(
+  items: RgbBalance[],
+  walletConfig: ReturnType<typeof useWalletConfig>,
+  fetchedBalances: RgbBalance[] = []
+) {
+  const policies = getRgbAssetPolicies(walletConfig)
+  if (!policies.length) {
+    return includeConfiguredRgbUsdt(items, walletConfig.rgbUsdtAssetId?.trim() || '')
+  }
+
+  const normalized = items.map(item => normalizeConfiguredRgbAsset(item, walletConfig))
+  for (const policy of policies) {
+    if (policy.status === 'disabled' || !policy.showWhenZero) continue
+    if (normalized.some(item => isSameRgbAssetId(item.assetId, policy.assetId))) continue
+    const fetched = fetchedBalances.find(item => isSameRgbAssetId(item.assetId, policy.assetId))
+    normalized.push(normalizeConfiguredRgbAsset(fetched || {
+      assetId: policy.assetId,
+      name: policy.displayName || policy.ticker || 'RGB',
+      ticker: policy.ticker || policy.displayName || 'RGB',
+      balance: '0',
+      spendable: '0',
+      configuredPlaceholder: true,
+    }, walletConfig))
+  }
+
+  const policyOrder = new Map(
+    policies.map(policy => [
+      policy.assetId.replace(/^rgb:/i, '').toLowerCase(),
+      policy.sortOrder ?? 0,
+    ])
+  )
+  return normalized
+    .map((item, index) => ({ item, index }))
+    .sort((left, right) => {
+      const leftOrder = policyOrder.get(left.item.assetId.replace(/^rgb:/i, '').toLowerCase())
+      const rightOrder = policyOrder.get(right.item.assetId.replace(/^rgb:/i, '').toLowerCase())
+      if (leftOrder === undefined && rightOrder === undefined) return left.index - right.index
+      if (leftOrder === undefined) return 1
+      if (rightOrder === undefined) return -1
+      return rightOrder - leftOrder || left.index - right.index
+    })
+    .map(entry => entry.item)
+}
+
 export function useRGBListLogic({
   autoRefresh = false,
   enabled = true,
@@ -47,12 +96,19 @@ export function useRGBListLogic({
   const currentKeyring = useCurrentKeyring()
   const currentAccount = useCurrentAccount()
   const chainType = useChainType()
-  const configuredUsdtAssetId = useWalletConfig().rgbUsdtAssetId?.trim() || ''
+  const walletConfig = useWalletConfig()
+  const configuredAssetPolicies = useMemo(() => getRgbAssetPolicies(walletConfig), [walletConfig])
+  const zeroBalancePolicyIds = useMemo(
+    () => configuredAssetPolicies
+      .filter(policy => policy.showWhenZero && policy.status !== 'disabled')
+      .map(policy => policy.assetId),
+    [configuredAssetPolicies]
+  )
   const walletView = useWalletView()
   const isFocus = focused ?? walletView === WalletView.RGB
   const [fundingAddress, setFundingAddress] = useState('')
   const [fundingBalance, setFundingBalance] = useState(0)
-  const [configuredUsdtBalance, setConfiguredUsdtBalance] = useState<RgbBalance>()
+  const [configuredAssetBalances, setConfiguredAssetBalances] = useState<RgbBalance[]>([])
 
   const supportedAssets = getSupportedAssets(chainType, '', {
     keyringType: currentKeyring?.type,
@@ -61,18 +117,18 @@ export function useRGBListLogic({
 
   useEffect(() => {
     let active = true
-    setConfiguredUsdtBalance(undefined)
-    if (enabled && isRgbSupported && configuredUsdtAssetId && configuredUsdtAssetId !== UNCONFIGURED_RGB_USDT_ASSET_ID) {
-      void wallet.getRGBAssetBalance('', configuredUsdtAssetId)
-        .then(balance => {
-          if (active) setConfiguredUsdtBalance(balance)
-        })
-        .catch(() => undefined)
+    setConfiguredAssetBalances([])
+    if (enabled && isRgbSupported && zeroBalancePolicyIds.length) {
+      void Promise.all(zeroBalancePolicyIds.map(assetId =>
+        wallet.getRGBAssetBalance('', assetId).catch(() => undefined)
+      )).then(balances => {
+        if (active) setConfiguredAssetBalances(balances.filter(Boolean) as RgbBalance[])
+      })
     }
     return () => {
       active = false
     }
-  }, [enabled, isRgbSupported, configuredUsdtAssetId, chainType, currentKeyring?.key, currentAccount?.key, wallet])
+  }, [enabled, isRgbSupported, zeroBalancePolicyIds.join('|'), chainType, currentKeyring?.key, currentAccount?.key, wallet])
 
   const refreshFundingAddress = useCallback(async () => {
     if (!enabled || !isRgbSupported) {
@@ -130,20 +186,15 @@ export function useRGBListLogic({
   })
   const lastRefreshTimeRef = useRef<number>(0)
   const visibleItems = useMemo(
-    () => includeConfiguredRgbUsdt(
-      items,
-      enabled && isRgbSupported ? configuredUsdtAssetId : '',
-      configuredUsdtBalance && isSameRgbAssetId(configuredUsdtBalance.assetId, configuredUsdtAssetId)
-        ? configuredUsdtBalance
-        : undefined
-    ),
-    [items, enabled, isRgbSupported, configuredUsdtAssetId, configuredUsdtBalance]
+    () => enabled && isRgbSupported
+      ? includeConfiguredRgbAssets(items, walletConfig, configuredAssetBalances)
+      : items,
+    [items, enabled, isRgbSupported, walletConfig, configuredAssetBalances]
   )
-  const usdtAlreadyCounted = configuredUsdtAssetId !== UNCONFIGURED_RGB_USDT_ASSET_ID && (
-    items.some(item => configuredUsdtAssetId && isSameRgbAssetId(item.assetId, configuredUsdtAssetId)) ||
-    !!(configuredUsdtBalance && isSameRgbAssetId(configuredUsdtBalance.assetId, configuredUsdtAssetId))
-  )
-  const visibleTotal = total + (enabled && isRgbSupported && configuredUsdtAssetId && !usdtAlreadyCounted ? 1 : 0)
+  const injectedCount = visibleItems.filter(item =>
+    !items.some(existing => isSameRgbAssetId(existing.assetId, item.assetId))
+  ).length
+  const visibleTotal = total + injectedCount
   const walletTabFocusRefresh = useWallTabFocusRefresh()
 
   useEffect(() => {

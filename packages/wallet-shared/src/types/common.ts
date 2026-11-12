@@ -75,6 +75,20 @@ export interface CoinPrice {
   fb: number
 }
 
+export type RgbAssetLifecycle = 'active' | 'deprecated' | 'disabled'
+
+/** Backend-controlled presentation and capability policy for an exact RGB asset ID. */
+export interface RgbAssetPolicy {
+  assetId: string
+  displayName?: string
+  ticker?: string
+  official?: boolean
+  status?: RgbAssetLifecycle
+  notice?: string
+  showWhenZero?: boolean
+  sortOrder?: number
+}
+
 export interface WalletConfig {
   version: string
   moonPayEnabled: boolean
@@ -84,6 +98,8 @@ export interface WalletConfig {
   disableUtxoTools: boolean
   /** RGB USDT asset shown before it has a balance; '-' displays an inactive zero-balance item. */
   rgbUsdtAssetId?: string
+  /** Exact-ID RGB asset lifecycle and presentation policies. */
+  rgbAssetPolicies?: RgbAssetPolicy[]
 }
 
 export enum WebsiteState {

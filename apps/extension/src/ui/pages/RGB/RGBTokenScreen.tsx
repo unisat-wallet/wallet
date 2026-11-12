@@ -60,6 +60,7 @@ export default function RGBTokenScreen() {
     onClickBurn,
     enableReceive,
     enableTransfer,
+    assetPolicy,
     activeTab,
     setActiveTab,
     tabItems
@@ -219,7 +220,30 @@ export default function RGBTokenScreen() {
                   <Text text={t('rgb_non_standard_nia')} size="xs" color="gold" />
                 </Row>
               ) : null}
+              {assetPolicy?.status === 'deprecated' ? (
+                <Row
+                  itemsCenter
+                  gap="xs"
+                  style={{ marginTop: 4, padding: '5px 9px', borderRadius: 8, background: 'rgba(244,182,44,0.12)' }}>
+                  <Icon icon="warning" color="gold" size={14} />
+                  <Text text={t('rgb_asset_deprecated')} size="xs" color="gold" />
+                </Row>
+              ) : null}
             </Column>
+            {assetPolicy?.status === 'deprecated' ? (
+              <Column
+                fullX
+                gap="xs"
+                style={{ margin: '12px 20px 0', padding: 12, borderRadius: 8, background: 'rgba(244,182,44,0.08)' }}>
+                <Text
+                  text={assetPolicy.notice || t('rgb_asset_deprecated_description')}
+                  size="xs"
+                  color="gold"
+                  textCenter
+                  wrap
+                />
+              </Column>
+            ) : null}
             <Column itemsCenter fullX justifyCenter>
               <Text
                 text={t(

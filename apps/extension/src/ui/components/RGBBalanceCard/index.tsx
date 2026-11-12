@@ -1,4 +1,10 @@
-import { useI18n, useRGBBalanceCardLogic, useWalletConfig, type RGBBalanceCardProps } from '@unisat/wallet-state';
+import {
+  findRgbAssetPolicy,
+  useI18n,
+  useRGBBalanceCardLogic,
+  useWalletConfig,
+  type RGBBalanceCardProps
+} from '@unisat/wallet-state';
 
 import { formatRgbUsdtValue, isConfiguredRgbUsdt } from '@/ui/utils/rgbUsdtPrice';
 
@@ -23,7 +29,9 @@ export default function RGBBalanceCard(props: RGBBalanceCardProps) {
     iconInfo
   } = useRGBBalanceCardLogic(props);
   const { t } = useI18n();
-  const configuredUsdtAssetId = useWalletConfig().rgbUsdtAssetId;
+  const walletConfig = useWalletConfig();
+  const configuredUsdtAssetId = walletConfig.rgbUsdtAssetId;
+  const assetPolicy = findRgbAssetPolicy(props.tokenBalance?.assetId, walletConfig);
   const showUsdtPrice = showPrice && isConfiguredRgbUsdt(props.tokenBalance?.assetId || '', configuredUsdtAssetId);
   const hasPendingBalance = pendingBalance.gt(0);
   const hasLockedBalance = lockedBalance.gt(0);
@@ -33,7 +41,19 @@ export default function RGBBalanceCard(props: RGBBalanceCardProps) {
       <TokenBalanceCardLayout
         icon={<RGBAssetIcon iconInfo={iconInfo} ticker={ticker} name={name} size={32} />}
         onIconClick={onClick}
-        title={<TruncatedAssetName text={name || ticker || ''} size="sm" color="white" />}
+        title={
+          <Row itemsCenter gap="xs">
+            <TruncatedAssetName text={name || ticker || ''} size="sm" color="white" />
+            {assetPolicy?.status === 'deprecated' ? (
+              <Text
+                text={t('rgb_asset_deprecated')}
+                size="xxs"
+                color="gold"
+                style={{ padding: '2px 6px', borderRadius: 6, background: 'rgba(244,182,44,0.12)' }}
+              />
+            ) : null}
+          </Row>
+        }
         quantity={
           <Row itemsCenter gap="sm">
             <Text text={balanceStr} size="xs" digital />

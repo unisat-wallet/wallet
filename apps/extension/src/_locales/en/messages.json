@@ -3763,6 +3763,8 @@
   "rgb_asset_abandon_cleanup_pending": { "message": "The carrier transaction was broadcast, but local history cleanup is pending." },
   "rgb_asset_standard": { "message": "Asset standard" },
   "rgb_non_standard_nia": { "message": "Non-standard NIA" },
+  "rgb_asset_deprecated": { "message": "Deprecated" },
+  "rgb_asset_deprecated_description": { "message": "This asset has been deprecated. Verify the asset ID before making another transfer." },
   "rgb_non_standard_send_title": { "message": "Send a non-standard NIA asset?" },
   "rgb_non_standard_send_description": { "message": "This asset's ticker, name, or precision does not meet the RGB NIA standard. Strict RGB wallets may reject the transfer. The asset cannot be repaired because its Genesis is immutable; reissuing a standard asset is recommended." }
 }

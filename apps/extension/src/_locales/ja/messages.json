@@ -3647,6 +3647,8 @@
   "rgb_asset_abandon_cleanup_pending": { "message": "キャリアトランザクションはブロードキャストされましたが、ローカル履歴の整理は保留中です。" },
   "rgb_asset_standard": { "message": "Asset standard" },
   "rgb_non_standard_nia": { "message": "Non-standard NIA" },
+  "rgb_asset_deprecated": { "message": "非推奨" },
+  "rgb_asset_deprecated_description": { "message": "この資産は非推奨です。別の送金を行う前に資産 ID を確認してください。" },
   "rgb_non_standard_send_title": { "message": "Send a non-standard NIA asset?" },
   "rgb_non_standard_send_description": { "message": "This asset does not meet the RGB NIA metadata standard. Strict RGB wallets may reject the transfer. Reissuing a standard asset is recommended." }
 }

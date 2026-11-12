@@ -56,6 +56,16 @@ export interface WalletConfig {
   enabledFeatures: string[]
   /** '-' displays USDT without enabling receive or send. */
   rgbUsdtAssetId?: string
+  rgbAssetPolicies?: Array<{
+    assetId: string
+    displayName?: string
+    ticker?: string
+    official?: boolean
+    status?: 'active' | 'deprecated' | 'disabled'
+    notice?: string
+    showWhenZero?: boolean
+    sortOrder?: number
+  }>
   feeRates: {
     slow: number
     standard: number

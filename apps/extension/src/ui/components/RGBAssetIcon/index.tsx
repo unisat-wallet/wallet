@@ -1,5 +1,5 @@
 import { CSSProperties } from 'react';
-import { useWalletConfig } from '@unisat/wallet-state';
+import { findRgbAssetPolicy, useWalletConfig } from '@unisat/wallet-state';
 
 import { Icon } from '../Icon';
 import { Image } from '../Image';
@@ -60,10 +60,15 @@ function resolveRgbAssetIconUrl(iconInfo?: RGBAssetIconInfo, isConfiguredUsdt?: 
 }
 
 export function RGBAssetIcon({ assetId, iconInfo, ticker, name, size = 24, isAnyRgbAsset, style }: RGBAssetIconProps) {
-  const configuredUsdtAssetId = useWalletConfig().rgbUsdtAssetId?.trim() || '';
+  const walletConfig = useWalletConfig();
+  const configuredUsdtAssetId = walletConfig.rgbUsdtAssetId?.trim() || '';
   const resolvedAssetId = assetId || iconInfo?.assetId || '';
-  const isConfiguredUsdt = !!configuredUsdtAssetId && !!resolvedAssetId &&
-    resolvedAssetId.replace(/^rgb:/i, '') === configuredUsdtAssetId.replace(/^rgb:/i, '');
+  const assetPolicy = findRgbAssetPolicy(resolvedAssetId, walletConfig);
+  const isConfiguredUsdt = (
+    !!configuredUsdtAssetId &&
+    !!resolvedAssetId &&
+    resolvedAssetId.replace(/^rgb:/i, '') === configuredUsdtAssetId.replace(/^rgb:/i, '')
+  ) || (assetPolicy?.official === true && assetPolicy.ticker?.toUpperCase() === 'USDT');
   const iconUrl = resolveRgbAssetIconUrl(iconInfo, isConfiguredUsdt);
   const showImage = !isAnyRgbAsset && !!iconUrl;
   const isUsdtLogo = iconUrl === USDT_LOGO;

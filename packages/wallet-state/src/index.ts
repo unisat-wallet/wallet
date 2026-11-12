@@ -52,7 +52,13 @@ export * from './types'
 export * from './ui-hooks'
 export { uiEventBus } from './utils/eventBus'
 export { getReadyRgbBroadcasts, selectReadyRgbBroadcastId } from './utils/rgb-broadcast-queue'
-export { isSameRgbAssetId, normalizeConfiguredRgbUsdt } from './utils/rgb-usdt'
+export {
+  findRgbAssetPolicy,
+  getRgbAssetPolicies,
+  isSameRgbAssetId,
+  normalizeConfiguredRgbAsset,
+  normalizeConfiguredRgbUsdt,
+} from './utils/rgb-usdt'
 export {
   groupRgbPendingAcceptances,
   isRgbPendingAcceptance,

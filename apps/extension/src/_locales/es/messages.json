@@ -3636,6 +3636,8 @@
   "rgb_asset_abandon_cleanup_pending": { "message": "La transacción portadora fue transmitida, pero la limpieza del historial local sigue pendiente." },
   "rgb_asset_standard": { "message": "Asset standard" },
   "rgb_non_standard_nia": { "message": "Non-standard NIA" },
+  "rgb_asset_deprecated": { "message": "Obsoleto" },
+  "rgb_asset_deprecated_description": { "message": "Este activo ha quedado obsoleto. Verifica el ID del activo antes de realizar otra transferencia." },
   "rgb_non_standard_send_title": { "message": "Send a non-standard NIA asset?" },
   "rgb_non_standard_send_description": { "message": "This asset does not meet the RGB NIA metadata standard. Strict RGB wallets may reject the transfer. Reissuing a standard asset is recommended." }
 }

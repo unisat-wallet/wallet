@@ -1,8 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
 
 import { Icon } from '@/ui/components';
-import type { AddressAssetOverviewItem } from '@unisat/wallet-shared';
-import { AssetTabKey, MoreAssetTabKey, useChainType, useCurrentAccount, useCurrentAddress, useCurrentKeyring, useI18n, useNavigation, useWallTabFocusRefresh, useWallet } from '@unisat/wallet-state';
+import type { AddressAssetOverviewItem, RgbAssetPolicy } from '@unisat/wallet-shared';
+import { AssetTabKey, findRgbAssetPolicy, MoreAssetTabKey, useChainType, useCurrentAccount, useCurrentAddress, useCurrentKeyring, useI18n, useNavigation, useWallTabFocusRefresh, useWallet, useWalletConfig } from '@unisat/wallet-state';
 
 import styles from './asset-overview.module.less';
 
@@ -30,12 +30,12 @@ function formatBalance(value: string) {
   return fraction ? `${grouped}.${fraction}` : grouped;
 }
 
-function AssetOverviewCard({ item, onClick, isUsdt, index }: { item: AddressAssetOverviewItem; onClick: () => void; isUsdt: boolean; index: number }) {
+function AssetOverviewCard({ item, onClick, isUsdt, assetPolicy, index }: { item: AddressAssetOverviewItem; onClick: () => void; isUsdt: boolean; assetPolicy?: RgbAssetPolicy; index: number }) {
   const { t } = useI18n();
   const [imageError, setImageError] = useState(false);
-  const name = isUsdt ? 'USDT' : isToken(item) ? item.displayName || item.name || item.symbol :
+  const name = assetPolicy?.displayName || (isUsdt ? 'USDT' : isToken(item) ? item.displayName || item.name || item.symbol :
     item.kind === 'domain' ? item.category :
-    item.kind === 'inscription-summary' ? t('ordinals') : item.name;
+    item.kind === 'inscription-summary' ? t('ordinals') : item.name);
   const imageUrl = isUsdt ? './images/icons/protocol/usdt-logo.svg' : isToken(item) ? item.logo :
     item.kind === 'ord-collection' ? item.logo :
     item.kind === 'alkanes-collection' ? item.image : '';
@@ -129,6 +129,7 @@ function AssetOverviewContent({ address, isRgbActive, rgbUsdtAssetId }: { addres
   const chainType = useChainType();
   const currentAccount = useCurrentAccount();
   const currentKeyring = useCurrentKeyring();
+  const walletConfig = useWalletConfig();
   const focusRefresh = useWallTabFocusRefresh();
   const [result, setResult] = useState<{ address: string; items: AddressAssetOverviewItem[] } | null>(null);
   const [errorAddress, setErrorAddress] = useState<string | null>(null);
@@ -209,7 +210,9 @@ function AssetOverviewContent({ address, isRgbActive, rgbUsdtAssetId }: { addres
   const overviewItems = result?.address === address ? result.items : null;
   const configuredUsdtId = isRgbActive ? rgbUsdtAssetId : '';
   const isRgbUsdt = (item: AddressAssetOverviewItem) => item.kind === 'rgb' &&
-    !!configuredUsdtId && item.tokenId.replace(/^rgb:/i, '') === configuredUsdtId.replace(/^rgb:/i, '');
+    ((!!configuredUsdtId && item.tokenId.replace(/^rgb:/i, '') === configuredUsdtId.replace(/^rgb:/i, '')) ||
+      (findRgbAssetPolicy(item.tokenId, walletConfig)?.official === true &&
+        findRgbAssetPolicy(item.tokenId, walletConfig)?.ticker?.toUpperCase() === 'USDT'));
   const items = overviewItems?.filter(item => !(
     isRgbUsdt(item) && isToken(item) && /^0+(?:\.0+)?$/.test(item.balance.trim())
   )) ?? null;
@@ -293,7 +296,14 @@ function AssetOverviewContent({ address, isRgbActive, rgbUsdtAssetId }: { addres
               }
             }}
           >
-            {items.map((item, index) => <AssetOverviewCard key={getItemKey(item)} item={item} index={index} isUsdt={isRgbUsdt(item)} onClick={() => openItem(item)} />)}
+            {items.map((item, index) => <AssetOverviewCard
+              key={getItemKey(item)}
+              item={item}
+              index={index}
+              isUsdt={isRgbUsdt(item)}
+              assetPolicy={item.kind === 'rgb' ? findRgbAssetPolicy(item.tokenId, walletConfig) : undefined}
+              onClick={() => openItem(item)}
+            />)}
           </div>
         </div>
       ) : (
