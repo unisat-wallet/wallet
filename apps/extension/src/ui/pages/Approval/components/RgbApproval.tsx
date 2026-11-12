@@ -19,6 +19,7 @@ type Receive = {
 type RgbAssetMetadata = {
   name?: string;
   ticker?: string;
+  precision?: number;
   iconInfo?: {
     iconShortName?: string;
     iconUrl?: string;
@@ -511,7 +512,15 @@ function RgbPaymentApproval({
   const proxyEndpoints = data.rgbProxyApproval?.endpoints || [];
 
   const normalizedAmount = data.amount == null ? '' : String(data.amount).trim();
-  const amount = normalizedAmount || t('rgb_approval_use_invoice_amount');
+  const assetPrecision = assetMetadata?.precision;
+  // Provider payment amounts are atomic integers. Keep that value untouched
+  // in approval data and convert only the text rendered to the user. Until
+  // metadata resolves, avoid briefly presenting the atomic amount as tokens.
+  const amount = normalizedAmount
+    ? assetPrecision === undefined && data.assetId
+      ? '--'
+      : toRgbDisplayAmount(normalizedAmount, assetPrecision ?? 0)
+    : t('rgb_approval_use_invoice_amount');
   const ticker = assetMetadata?.ticker?.trim();
   const assetName = assetMetadata?.name?.trim();
   const amountLabel = ticker && normalizedAmount ? `${amount} ${ticker}` : amount;
@@ -536,6 +545,7 @@ function RgbPaymentApproval({
         setAssetMetadata({
           name: asset.name,
           ticker: asset.ticker,
+          precision: asset.precision ?? asset.balance?.precision,
           iconInfo: asset.iconInfo,
           iconUrl: asset.iconUrl
         });
