@@ -104,7 +104,11 @@ export function useRGBTokenScreenLogic() {
         assetId,
         ...(activityType ? { type: activityType } : {}),
       })
-      const list: RgbActivityItem[] = transfers.list.map(transfer => ({
+      const scopedTransfers = transfers.list.filter(transfer =>
+        isSameRgbAssetId(transfer.assetId, assetId) &&
+        (!activityType || transfer.type === activityType)
+      )
+      const list: RgbActivityItem[] = scopedTransfers.map(transfer => ({
         id: transfer.id,
         transferId: transfer.transferId,
         local: transfer.local,
@@ -125,7 +129,9 @@ export function useRGBTokenScreenLogic() {
       }))
       return {
         list,
-        total: transfers.total,
+        total: scopedTransfers.length === transfers.list.length
+          ? transfers.total
+          : scopedTransfers.length,
       }
     },
     dependencies: [assetId, activityType, isUnconfiguredUsdt],
@@ -147,18 +153,20 @@ export function useRGBTokenScreenLogic() {
         statusOnly: true,
       })
       const current = activityRef.current
-      const changed = transfers.list.some(transfer => {
-        const identities = new Set(
-          [transfer.transferId, transfer.id, transfer.txid].filter(Boolean)
-        )
-        const previous = current.find(item =>
-          [item.transferId, item.id, item.txid].some(identity => identity && identities.has(identity))
-        )
-        return !previous ||
-          previous.status !== transfer.status ||
-          previous.txid !== (transfer.txid ?? '') ||
-          previous.rejectionReason !== transfer.rejectionReason
-      })
+      const changed = transfers.list
+        .filter(transfer => isSameRgbAssetId(transfer.assetId, assetId))
+        .some(transfer => {
+          const identities = new Set(
+            [transfer.transferId, transfer.id, transfer.txid].filter(Boolean)
+          )
+          const previous = current.find(item =>
+            [item.transferId, item.id, item.txid].some(identity => identity && identities.has(identity))
+          )
+          return !previous ||
+            previous.status !== transfer.status ||
+            previous.txid !== (transfer.txid ?? '') ||
+            previous.rejectionReason !== transfer.rejectionReason
+        })
       if (changed) onRefreshActivity({ showLoading: false })
     } catch {
       // Keep the currently rendered history and retry on the next poll.

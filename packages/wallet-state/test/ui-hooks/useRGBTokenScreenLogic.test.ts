@@ -110,6 +110,32 @@ describe('useRGBTokenScreenLogic', () => {
     expect(result.current.enableTransfer).toBe(true)
   })
 
+  it('filters history from unrelated RGB assets', async () => {
+    const { wrapper, wallet } = createHookTestHarness({ routeState: { assetId } })
+    wallet.getRGBAssetDetail.mockResolvedValue(detail)
+    wallet.getRGBAssetBalance.mockResolvedValue(fetchedBalance)
+    wallet.getRgbTransfers.mockResolvedValue({
+      list: [
+        {
+          id: 'selected-local', assetId, local: true, type: 'send', status: 'signed',
+          amount: '1', txid: 'a'.repeat(64), timestamp: 2,
+        },
+        {
+          id: 'other-token', assetId: 'rgb:other', type: 'receive', status: 'confirmed',
+          amount: '9', txid: 'b'.repeat(64), timestamp: 3,
+        },
+      ],
+      total: 2,
+    })
+    const { result } = renderHook(() => useRGBTokenScreenLogic(), { wrapper })
+    await waitFor(() => expect(result.current.activityItems).toHaveLength(1))
+
+    expect(result.current.activityItems.map(item => item.id)).toEqual(['selected-local'])
+    expect(result.current.activityItems.every(item => item.assetId === assetId)).toBe(true)
+    expect(result.current.activityTotal).toBe(1)
+    expect(wallet.getRGBAssetActivity).not.toHaveBeenCalled()
+  })
+
   it('refreshes a pending token balance automatically while its detail page is open', async () => {
     vi.useFakeTimers()
     const { wrapper, wallet } = createHookTestHarness({ routeState: { assetId } })
