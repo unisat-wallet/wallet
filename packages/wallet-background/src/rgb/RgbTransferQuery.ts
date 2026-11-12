@@ -333,7 +333,9 @@ export class RgbTransferQuery {
       status: transfer.delivery?.broadcastError
         ? 'broadcast_failed'
         : transfer.delivery?.externalBroadcast
-          ? 'ready_for_dapp_finalize'
+          ? transfer.delivery.externalBroadcastController === 'backend'
+            ? 'ready_for_external_broadcast'
+            : 'ready_for_dapp_finalize'
           : transfer.delivery?.acknowledgedAt
             ? now - transfer.delivery.acknowledgedAt < RECEIVER_BROADCAST_PROPAGATION_MS
               ? 'broadcasting'

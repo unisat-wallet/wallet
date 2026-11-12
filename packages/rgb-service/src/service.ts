@@ -4906,7 +4906,10 @@ export class RgbService {
     return { available: true }
   }
 
-  async prepareSend(request: RgbTransferRequest, options: { providerOrigin?: string } = {}) {
+  async prepareSend(
+    request: RgbTransferRequest,
+    options: { providerOrigin?: string; providerBackendPublicKey?: string } = {}
+  ) {
     const previous = this.prepareSendInFlight
     let release = () => undefined
     const current = new Promise<void>(resolve => {
@@ -4926,7 +4929,7 @@ export class RgbService {
   /** Prepare a BFA burn using the same local allocation reservation as a send. */
   async prepareBurn(
     request: Omit<RgbTransferRequest, 'invoice' | 'burn'> & { amount: string },
-    options: { providerOrigin?: string } = {}
+    options: { providerOrigin?: string; providerBackendPublicKey?: string } = {}
   ) {
     return this.prepareSend({ ...request, invoice: '', burn: true }, options)
   }
@@ -4938,7 +4941,10 @@ export class RgbService {
   }
 
   /** Reserve RGB allocations and persist the pending transfer as one serialized operation. */
-  private async prepareSendOnce(request: RgbTransferRequest, options: { providerOrigin?: string }) {
+  private async prepareSendOnce(
+    request: RgbTransferRequest,
+    options: { providerOrigin?: string; providerBackendPublicKey?: string }
+  ) {
     const state = this.requireState()
     const burn = request.burn === true
     if (burn && (request.donation || request.swapPsbt))
@@ -5008,6 +5014,7 @@ export class RgbService {
           !pending.delivery &&
           !pending.broadcast &&
           pending.providerOrigin === options.providerOrigin &&
+          pending.providerBackendPublicKey === options.providerBackendPublicKey &&
           pending.request.assetId === requestedAssetId &&
           pending.request.amount === amount &&
           pending.request.invoice === request.invoice &&
@@ -5220,6 +5227,9 @@ export class RgbService {
         : { preparedCheckpointGeneration: state.recoveryCheckpointGeneration }),
       ...(proxySenderPrivateKey ? { proxySenderPrivateKey } : {}),
       ...(options.providerOrigin ? { providerOrigin: options.providerOrigin } : {}),
+      ...(options.providerBackendPublicKey
+        ? { providerBackendPublicKey: options.providerBackendPublicKey }
+        : {}),
       ...(burnSplitRequired ? { burnSplit: { request: resolvedRequest as RgbTransferRequest & { amount: string; burn: true } } } : {}),
     }
     // The unsigned reservation is locally durable and can be rebuilt after a
@@ -5262,6 +5272,9 @@ export class RgbService {
           endpoints,
           requiresCounterpartySignature: true,
           makerSignedPsbt,
+          makerSignedPsbtHash: bitcoinCrypto
+            .sha256(Buffer.from(makerSignedPsbt, 'base64'))
+            .toString('hex'),
         }
         await this.persistWithRecoveryRollback(rollback)
       }
@@ -5319,6 +5332,53 @@ export class RgbService {
         pending,
         options.externalBroadcast ? 'external' : 'broadcast'
       )
+    })
+  }
+
+  /**
+   * Accept a backend-held final seller transaction without importing its PSBT.
+   * The caller authenticates the backend commitment before entering here; this
+   * serialized transition independently verifies the immutable txid and Proxy ACK.
+   */
+  async acceptPublishedSwap(
+    transferId: string,
+    txid: string,
+    transactionCommitment: string
+  ): Promise<RgbCompletedTransfer> {
+    return this.runPendingTransferOperation(transferId, async () => {
+      const state = this.requireState()
+      const pending = state.pending[transferId]
+      if (!pending) throw new RgbServiceError(`RGB transfer ${transferId} does not exist`)
+      if (pending.broadcast) return this.syncBroadcastedTransfer(transferId, pending)
+      this.assertPreparedTransferGeneration(pending)
+      const delivery = pending.delivery
+      if (
+        delivery?.externalBroadcast &&
+        delivery.externalBroadcastController === 'backend' &&
+        delivery.completed.txid.toLowerCase() === txid.toLowerCase() &&
+        delivery.backendTransactionCommitment === transactionCommitment
+      ) {
+        return delivery.completed
+      }
+      if (!delivery?.requiresCounterpartySignature || !delivery.makerSignedPsbt) {
+        throw new RgbServiceError('RGB transfer is not awaiting backend swap completion')
+      }
+      if (!pending.providerBackendPublicKey) {
+        throw new RgbServiceError('RGB seller swap backend identity is missing')
+      }
+      if (delivery.completed.txid.toLowerCase() !== txid.toLowerCase()) {
+        throw new RgbServiceError('RGB seller swap transaction ID does not match')
+      }
+
+      // Manual mode authenticates every recipient ACK but never broadcasts.
+      await this.advancePendingDelivery(transferId, pending, 'manual')
+      delete delivery.requiresCounterpartySignature
+      delete delivery.makerSignedPsbt
+      delivery.backendTransactionCommitment = transactionCommitment
+      delivery.externalBroadcast = true
+      delivery.externalBroadcastController = 'backend'
+      await this.persist({ waitForRecovery: true })
+      return delivery.completed
     })
   }
 
@@ -6817,7 +6877,11 @@ function recoverySnapshot(state: ReturnType<typeof persistState>) {
       : {}),
     pending: Object.fromEntries(
       Object.entries(pending).map(([transferId, transfer]) => {
-        const { providerOrigin: _providerOrigin, ...recoveryTransfer } = transfer
+        const {
+          providerOrigin: _providerOrigin,
+          providerBackendPublicKey: _providerBackendPublicKey,
+          ...recoveryTransfer
+        } = transfer
         return [transferId, recoveryTransfer]
       })
     ),
@@ -6837,7 +6901,10 @@ function recoverySnapshot(state: ReturnType<typeof persistState>) {
 }
 
 function stripProviderOrigins(state: RgbServiceState) {
-  Object.values(state.pending).forEach(transfer => delete transfer.providerOrigin)
+  Object.values(state.pending).forEach(transfer => {
+    delete transfer.providerOrigin
+    delete transfer.providerBackendPublicKey
+  })
   state.pendingReceives?.forEach(receive => delete receive.providerOrigin)
   state.pendingSendHistory?.forEach(item => {
     delete item.providerOrigin

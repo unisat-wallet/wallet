@@ -5,6 +5,8 @@
   "rgb_status_ready_to_broadcast": {
     "message": "Prêt à diffuser"
   },
+  "rgb_status_ready_for_external_broadcast": { "message": "En attente de diffusion par le backend" },
+  "rgb_transfer_ready_for_external_broadcast_description": { "message": "Le destinataire a accepté. Le backend conserve la transaction finale et la diffusera." },
   "rgb_transfer_ready_to_broadcast_description": {
     "message": "Le destinataire a accepté. Vérifiez le transfert, puis appuyez sur Diffuser pour envoyer la transaction."
   },

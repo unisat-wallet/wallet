@@ -34,7 +34,7 @@ function isInProgress(item: RgbTransferItem) {
   }
   return (
     item.local ||
-    ['incomplete', 'signed', 'waiting_ack', 'broadcasting', 'broadcasted', 'broadcast_failed', 'pending_accept', 'validation_failed', 'confirming', 'waiting_batch_release', 'waiting_receive', 'pending', 'unconfirmed'].includes(
+    ['incomplete', 'signed', 'waiting_ack', 'broadcasting', 'broadcasted', 'broadcast_failed', 'ready_for_external_broadcast', 'pending_accept', 'validation_failed', 'confirming', 'waiting_batch_release', 'waiting_receive', 'pending', 'unconfirmed'].includes(
       item.status.toLowerCase()
     )
   )

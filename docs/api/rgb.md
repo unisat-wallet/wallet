@@ -57,6 +57,7 @@ rejected, signed, finalized, canceled, or aborted by another origin.
 | `prepareSwap`                              |      Yes | Prepare a seller-side RGB-for-BTC atomic swap.                                               |
 | `signSellSwapAndPublishConsignment`        |      Yes | Add seller signatures and publish the consignment, without broadcasting.                     |
 | `confirmSellSwap`                          |       No | Verify the buyer's returned signed PSBT and ACK; the dApp finalizes and broadcasts it.       |
+| `acceptSellSwap`                           |       No | Verify a backend commitment and Proxy ACK without importing or returning the final PSBT.     |
 | `applySellSwapAbort` / `applyBuySwapAbort` |      Yes | Apply a mutually signed, terminal swap-abort agreement to local seller/buyer RGB state.      |
 | `cancelSwap` / `getOperationStatus`        | Yes / No | Cancel or inspect a swap.                                                                    |
 | `signBuySwap` / `acceptBuySwap`            |      Yes | Sign buyer BTC inputs, then ACK a backend-committed swap.                                     |
@@ -497,6 +498,8 @@ const prepared = await rgb.prepareSwap({
   btcReceiveAmount: '250000', // minimum sats to current wallet BTC address
   feeRate: 5,
   psbt: makerUnsignedPsbt, // hex or base64
+  // Required when acceptSellSwap will be used:
+  backendPublicKey, // 32-byte Ed25519 public key, lowercase hex
 })
 
 // { transferId, coloredPsbt, status: 'waiting_counterparty_signature' }
@@ -520,10 +523,10 @@ This is the seller's first completion phase. It signs the seller-controlled
 inputs, publishes the RGB consignment, and returns the seller-signed PSBT to
 relay to the buyer. It never broadcasts at this point.
 
-This method describes the legacy wallet-to-wallet/P2P seller flow. A
-backend-controlled market implementing the buy flow above must not expose this
-seller-signed result to the buyer dApp. It should keep the maker signing key and
-final transaction inside the backend signing service.
+This method returns only the seller-partial PSBT. It cannot be broadcast until
+the counterparty inputs are signed. A backend-controlled market sends this
+partial PSBT directly to its backend signing service; the complete PSBT and raw
+transaction must never be returned to the page.
 
 ```ts
 const published = await rgb.signSellSwapAndPublishConsignment(
@@ -533,10 +536,42 @@ const published = await rgb.signSellSwapAndPublishConsignment(
 // { transferId, txid, status: 'awaiting_buyer_signature', makerSignedPsbt }
 ```
 
-For backend-controlled buys, submit `buyerSignedPsbt` directly to the backend.
-After validating the quote, the backend completes the maker signatures, creates
-the Proxy v1 commitment described above, waits for the buyer ACK, and broadcasts
-the final transaction without returning it to the dApp.
+### `acceptSellSwap(transferId, txid, transactionCommitment)`
+
+Use this second phase when the backend retains the complete transaction and
+controls final broadcast. The `backendPublicKey` supplied to `prepareSwap` is
+bound to the encrypted local transfer state and cannot be replaced here.
+
+After validating the quote and completing the counterparty signatures, the
+backend signs this exact UTF-8 message:
+
+```text
+rgb-sell-swap/commit/v1:<transferId>:<txid>:<sha256(makerSignedPsbtBytes)>
+```
+
+`makerSignedPsbtBytes` means the binary PSBT decoded from the hex returned by
+`signSellSwapAndPublishConsignment`. IDs and hashes are lowercase hex. As with
+Proxy v1, SHA-256 the UTF-8 message first and sign that 32-byte digest with
+Ed25519. Pass the lowercase 64-byte signature as `transactionCommitment`:
+
+```ts
+const accepted = await rgb.acceptSellSwap(
+  published.transferId,
+  published.txid,
+  transactionCommitment,
+)
+// { transferId, txid, status: 'ready_for_external_broadcast' }
+```
+
+The wallet verifies the origin, immutable transaction ID, bound backend key,
+commitment signature, and the receiver's signed Proxy ACK. It then discards its
+seller-partial PSBT and only observes the transaction ID on chain. It does not
+receive or return the complete PSBT and cannot broadcast it. The backend must
+wait for this method to succeed before broadcasting its retained transaction.
+
+`confirmSellSwap` remains available for legacy P2P integrations where the page
+already holds the complete PSBT. New backend-controlled integrations should use
+`acceptSellSwap`.
 
 ### `getOperationStatus(transferId)` and `cancelSwap(transferId)`
 

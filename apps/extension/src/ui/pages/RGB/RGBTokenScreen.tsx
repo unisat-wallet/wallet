@@ -83,7 +83,7 @@ export default function RGBTokenScreen() {
       item.local &&
       item.type === 'send' &&
       !item.burn &&
-      ['incomplete', 'signed', 'waiting_ack', 'ready_to_broadcast'].includes(item.status.toLowerCase()) &&
+      ['incomplete', 'signed', 'waiting_ack', 'ready_to_broadcast', 'ready_for_external_broadcast'].includes(item.status.toLowerCase()) &&
       /^\d+$/.test(item.amount) &&
       /^\d+$/.test(item.lockedAmount || '') &&
       BigInt(item.lockedAmount || '0') >= BigInt(item.amount)

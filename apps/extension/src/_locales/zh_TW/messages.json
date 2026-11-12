@@ -5,6 +5,8 @@
   "rgb_status_ready_to_broadcast": {
     "message": "待廣播"
   },
+  "rgb_status_ready_for_external_broadcast": { "message": "等待後端廣播" },
+  "rgb_transfer_ready_for_external_broadcast_description": { "message": "接收方已接受。完整交易由後端保管並負責廣播。" },
   "rgb_transfer_ready_to_broadcast_description": {
     "message": "接收方已接受。請確認此轉帳，點擊「廣播交易」後才會提交交易。"
   },

@@ -43,6 +43,8 @@ function getStatusLabel(status: string, t: (key: string) => string, type: RgbTra
       return t('rgb_status_ready_to_broadcast');
     case 'ready_for_dapp_finalize':
       return t('rgb_status_ready_for_dapp_finalize');
+    case 'ready_for_external_broadcast':
+      return t('rgb_status_ready_for_external_broadcast');
     case 'broadcasting':
       return t('rgb_status_broadcasting');
     case 'broadcasted':

@@ -5,6 +5,8 @@
   "rgb_status_ready_to_broadcast": {
     "message": "ブロードキャスト待ち"
   },
+  "rgb_status_ready_for_external_broadcast": { "message": "バックエンドのブロードキャスト待ち" },
+  "rgb_transfer_ready_for_external_broadcast_description": { "message": "受信者が承認しました。最終トランザクションはバックエンドが保持し、ブロードキャストします。" },
   "rgb_transfer_ready_to_broadcast_description": {
     "message": "受信者が承認しました。内容を確認してから「ブロードキャスト」を押してください。"
   },

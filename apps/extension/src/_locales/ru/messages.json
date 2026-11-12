@@ -5,6 +5,8 @@
   "rgb_status_ready_to_broadcast": {
     "message": "Готово к трансляции"
   },
+  "rgb_status_ready_for_external_broadcast": { "message": "Ожидание трансляции сервером" },
+  "rgb_transfer_ready_for_external_broadcast_description": { "message": "Получатель подтвердил перевод. Сервер хранит финальную транзакцию и выполнит её трансляцию." },
   "rgb_transfer_ready_to_broadcast_description": {
     "message": "Получатель подтвердил перевод. Проверьте его и нажмите «Транслировать», чтобы отправить транзакцию."
   },

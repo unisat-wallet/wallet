@@ -27,6 +27,7 @@ function isInProgress(transfer?: RgbTransferItem) {
       'broadcasted',
       'broadcast_failed',
       'ready_for_dapp_finalize',
+      'ready_for_external_broadcast',
       'pending_accept',
       'confirming',
       'waiting_batch_release',

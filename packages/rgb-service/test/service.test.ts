@@ -5345,6 +5345,84 @@ describe('RgbService', () => {
     expect(service.getPendingTransfers()).toEqual([])
   })
 
+  it('accepts a backend-held seller swap after ACK without importing a final PSBT', async () => {
+    const dependencies = createDependencies()
+    const service = new RgbService(dependencies)
+    await service.open(wallet)
+    await service.sync()
+    await service.prepareSend(
+      {
+        assetId: 'rgb:AQEBAQEB-AQEBAQE-BAQEBAQ-EBAQEBA-QEBAQEB-AQEBAQE',
+        amount: '60',
+        invoice: rgbInvoice(),
+        feeRate: 2,
+      },
+      {
+        providerOrigin: 'https://market.example',
+        providerBackendPublicKey: 'ab'.repeat(32),
+      }
+    )
+    await service.publishSwap('transfer-1', 'maker-signed-psbt')
+
+    const completed = await service.acceptPublishedSwap(
+      'transfer-1',
+      'c'.repeat(64),
+      'commitment'
+    )
+
+    expect(completed.txid).toBe('c'.repeat(64))
+    expect(dependencies.encoder.completeTransfer).toHaveBeenCalledTimes(1)
+    expect(dependencies.broadcaster.broadcast).not.toHaveBeenCalled()
+    expect(service.getPendingTransfers()).toEqual([
+      expect.objectContaining({
+        id: 'transfer-1',
+        delivery: expect.objectContaining({
+          acknowledgedAt: expect.any(Number),
+          externalBroadcast: true,
+          externalBroadcastController: 'backend',
+          backendTransactionCommitment: 'commitment',
+        }),
+      }),
+    ])
+    expect(service.getPendingTransfers()[0]?.delivery?.makerSignedPsbt).toBeUndefined()
+    expect(service.getPendingTransfers()[0]?.delivery?.requiresCounterpartySignature).toBeUndefined()
+
+    await expect(service.acceptPublishedSwap(
+      'transfer-1',
+      'c'.repeat(64),
+      'commitment'
+    )).resolves.toEqual(completed)
+
+    await service.sync()
+    expect(dependencies.broadcaster.broadcast).not.toHaveBeenCalled()
+  })
+
+  it('does not accept a backend-held seller swap before Proxy ACK', async () => {
+    const dependencies = createDependencies()
+    vi.mocked(dependencies.transport.getAcknowledgement!).mockResolvedValue(undefined)
+    const service = new RgbService(dependencies)
+    await service.open(wallet)
+    await service.sync()
+    await service.prepareSend(
+      {
+        assetId: 'rgb:AQEBAQEB-AQEBAQE-BAQEBAQ-EBAQEBA-QEBAQEB-AQEBAQE',
+        amount: '60',
+        invoice: rgbInvoice(),
+        feeRate: 2,
+      },
+      { providerBackendPublicKey: 'ab'.repeat(32) }
+    )
+    await service.publishSwap('transfer-1', 'maker-signed-psbt')
+
+    await expect(service.acceptPublishedSwap('transfer-1', 'c'.repeat(64), 'commitment'))
+      .rejects.toThrow('awaiting recipient acknowledgement')
+    expect(service.getPendingTransfers()[0]?.delivery).toEqual(expect.objectContaining({
+      requiresCounterpartySignature: true,
+      makerSignedPsbt: 'maker-signed-psbt',
+    }))
+    expect(dependencies.broadcaster.broadcast).not.toHaveBeenCalled()
+  })
+
   it('releases a non-broadcast external swap through the acknowledged abort path', async () => {
     const dependencies = createDependencies()
     const service = new RgbService(dependencies)

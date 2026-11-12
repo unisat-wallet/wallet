@@ -11,6 +11,7 @@ import { assertValidFeeRate } from '@unisat/base-utils'
 import { toRgbDisplayAmount, type ToSignData } from '@unisat/wallet-shared'
 
 import { psbtFromString } from '../utils/psbt-utils'
+import { proxyV1Hash, proxyV1Verify } from '../adapters/rgb-proxy-v1'
 import type { LocalRgbServiceContext } from './RgbWalletCoordinator'
 
 type RgbSendOperationsDependencies = {
@@ -51,6 +52,8 @@ export type RgbSendBeginParams = {
   swapPsbt?: string
   /** Trusted provider origin persisted with a dApp-created payment. */
   providerOrigin?: string
+  /** Ed25519 backend identity bound when a backend-controlled swap is prepared. */
+  providerBackendPublicKey?: string
 }
 
 /** Local RGB send state machine. Signing presentation remains a controller-provided capability. */
@@ -105,7 +108,14 @@ export class RgbSendOperations {
         : await service.prepareBurn(burnRequest, { providerOrigin: params.providerOrigin })
       : await service.prepareSend(
           sendRequest,
-          params.providerOrigin === undefined ? {} : { providerOrigin: params.providerOrigin }
+          {
+            ...(params.providerOrigin === undefined
+              ? {}
+              : { providerOrigin: params.providerOrigin }),
+            ...(params.providerBackendPublicKey === undefined
+              ? {}
+              : { providerBackendPublicKey: params.providerBackendPublicKey }),
+          }
         )
     await this.dependencies.assertContext?.({ service, wallet })
     const toSignData = await this.dependencies.getToSignData({
@@ -224,6 +234,53 @@ export class RgbSendOperations {
       txid: completed.txid,
       signedPsbt: relayedPsbt.toHex(),
       status: 'ready_for_dapp_finalize' as const,
+    }
+  }
+
+  /** Verify a backend completion attestation, then observe its external broadcast only. */
+  async acceptExternalSwapBroadcast(params: {
+    transferId: string
+    txid: string
+    transactionCommitment: string
+  }) {
+    const { service, wallet } = await this.dependencies.getContext()
+    await this.dependencies.ensureWriteLease?.({ service, wallet }, { forceRenew: true })
+    const pending = service.getPendingTransfers().find(item => item.id === params.transferId)
+    const delivery = pending?.delivery
+    const backendPublicKey = pending?.providerBackendPublicKey
+    if (
+      !pending ||
+      !delivery ||
+      (!delivery.requiresCounterpartySignature &&
+        delivery.externalBroadcastController !== 'backend') ||
+      !backendPublicKey
+    ) {
+      throw new Error('RGB seller swap is not awaiting backend completion')
+    }
+    if (delivery.completed.txid.toLowerCase() !== params.txid.toLowerCase()) {
+      throw new Error('RGB seller swap transaction ID does not match')
+    }
+    const makerSignedPsbtHash = delivery.makerSignedPsbtHash ||
+      (delivery.makerSignedPsbt
+        ? proxyV1Hash(psbtFromString(delivery.makerSignedPsbt).toBuffer())
+        : undefined)
+    if (!makerSignedPsbtHash) {
+      throw new Error('RGB seller swap commitment state is incomplete')
+    }
+    const message =
+      `rgb-sell-swap/commit/v1:${params.transferId}:${params.txid.toLowerCase()}:${makerSignedPsbtHash}`
+    if (!proxyV1Verify(backendPublicKey, params.transactionCommitment, message)) {
+      throw new Error('RGB seller swap backend commitment is invalid')
+    }
+    const completed = await service.acceptPublishedSwap(
+      params.transferId,
+      params.txid,
+      params.transactionCommitment
+    )
+    return {
+      transferId: params.transferId,
+      txid: completed.txid,
+      status: 'ready_for_external_broadcast' as const,
     }
   }
 

@@ -24,6 +24,7 @@ vi.mock('../src/controllers/wallet', () => ({
     getRgbBuySwapReceive: vi.fn(),
     stageRgbBuySwapIntent: vi.fn(),
     acceptRgbBuySwap: vi.fn(),
+    acceptRgbSwapExternalBroadcast: vi.fn(),
     getRgbPendingReceiveInvoices: vi.fn(),
     abandonRgbAcceptedReceive: vi.fn(),
     getRgbProxyApprovalRequirement: vi.fn(),
@@ -73,6 +74,7 @@ describe('provider RGB payment ownership', () => {
       'getRgbPendingReceives',
       'getRgbPaymentStatus',
       'confirmRgbSellSwap',
+      'acceptRgbSellSwap',
       'getRgbSwapStatus',
     ]
 
@@ -367,6 +369,40 @@ describe('provider RGB payment ownership', () => {
 
     expect(() => approval[1](request)).toThrow('fee rate must be between')
     expect(wallet.createRgbSendBegin).not.toHaveBeenCalled()
+  })
+
+  it('rejects an invalid seller-swap backend identity before preparation', async () => {
+    await expect(providerController.prepareRgbSwap({
+      data: { params: {
+        invoice: 'rgb:invoice', assetId: 'rgb:asset', amount: '1',
+        btcReceiveAmount: '1', psbt: '00', backendPublicKey: 'invalid',
+      } },
+      session: { origin: 'https://dapp.example' },
+    } as any)).rejects.toThrow('backendPublicKey must be a 32-byte Ed25519 public key')
+    expect(wallet.createRgbSendBegin).not.toHaveBeenCalled()
+  })
+
+  it('origin-binds backend-controlled seller swap acceptance without a PSBT', async () => {
+    vi.mocked(wallet.getRgbPaymentOrigin).mockResolvedValue('https://dapp.example')
+    vi.mocked(wallet.acceptRgbSwapExternalBroadcast).mockResolvedValue({
+      transferId: 'transfer-1',
+      txid: 'ab'.repeat(32),
+      status: 'ready_for_external_broadcast',
+    } as any)
+
+    await expect(providerController.acceptRgbSellSwap({
+      data: { params: {
+        transferId: 'transfer-1',
+        txid: 'AB'.repeat(32),
+        transactionCommitment: 'CD'.repeat(64),
+      } },
+      session: { origin: 'https://dapp.example' },
+    })).resolves.toEqual(expect.objectContaining({ status: 'ready_for_external_broadcast' }))
+    expect(wallet.acceptRgbSwapExternalBroadcast).toHaveBeenCalledWith({
+      transferId: 'transfer-1',
+      txid: 'ab'.repeat(32),
+      transactionCommitment: 'cd'.repeat(64),
+    })
   })
 
   it('validates and origin-binds a WebRGB BFA burn before reserving funds', async () => {
