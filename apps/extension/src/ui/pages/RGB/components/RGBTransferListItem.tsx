@@ -109,21 +109,22 @@ export function RGBTransferListItem({
   const pending = isPending(item.status);
   const showStatus = item.type !== 'issue' && (pending || ['canceled', 'cancelled', 'rejected'].includes(status));
   const isReceive = item.type === 'receive';
+  const isCanceled = ['canceled', 'cancelled'].includes(status);
   const isCanceledReceive = isReceive && ['canceled', 'cancelled'].includes(status);
   const isRejectedReceive = isReceive && status === 'rejected';
   const isRejectedUnbroadcastSend = item.type === 'send' && status === 'rejected' && !item.broadcasted;
-  const isRejectedWithoutBalanceChange = isRejectedReceive || isRejectedUnbroadcastSend;
+  const isWithoutBalanceChange = isCanceled || isRejectedReceive || isRejectedUnbroadcastSend;
   // A user-rejected receive has already passed consignment validation, so its
   // durable history amount is safe to display. Only validation failures may
   // contain untrusted metadata/amounts and must remain hidden.
   const hideReceiveAmount = isReceive && status === 'validation_failed';
   const secondaryAssetLabel = assetName || (isCanceledReceive ? assetSymbol : '');
-  const amountColor = isRejectedWithoutBalanceChange
+  const amountColor = isWithoutBalanceChange
     ? colors.textDim
     : isReceive || item.type === 'issue'
       ? 'rgba(124, 219, 152, 0.85)'
       : 'rgba(255, 255, 255, 0.85)';
-  const sign = item.type === 'issue' || isRejectedWithoutBalanceChange ? '' : isReceive ? '+' : '-';
+  const sign = item.type === 'issue' || isWithoutBalanceChange ? '' : isReceive ? '+' : '-';
   const transferTime = formatTransferTime(item.timestamp);
   const date = getRgbTransferDateKey(item.timestamp);
   const displayAmount = item.amount ? toRgbDisplayAmount(item.amount, getRgbTokenPrecision(item)) : '--';
@@ -207,7 +208,7 @@ export function RGBTransferListItem({
             ) : null}
           </Column>
         </Row>
-        {!isCanceledReceive && !hideReceiveAmount ? (
+        {!hideReceiveAmount ? (
           <Row gap="xs" style={{ alignItems: 'center', flexShrink: 0, maxWidth: showAssetLabel ? '58%' : undefined, marginLeft: 12, ...(showStatus ? { alignSelf: 'flex-start', marginTop: 24, minHeight: 24 } : {}) }}>
             {showAssetLabel ? (
               <div title={signedDisplayAmount} style={{ display: 'flex', alignItems: 'center', height: 20, minWidth: 0, flexShrink: 1, overflow: 'hidden' }}>

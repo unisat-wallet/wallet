@@ -253,7 +253,10 @@ export function RGBTransferDetailSheet({
   const isCanceledReceive = transfer?.type === 'receive' && ['canceled', 'cancelled'].includes(status.toLowerCase());
   const isRejectedReceive = transfer?.type === 'receive' && status.toLowerCase() === 'rejected';
   const hasValidationFailure = transfer?.type === 'receive' && status.toLowerCase() === 'validation_failed';
-  const amountPrefix = isCanceledReceive
+  const isCanceled = ['canceled', 'cancelled'].includes(status.toLowerCase());
+  const isRejectedUnbroadcastSend = transfer?.type === 'send' && status.toLowerCase() === 'rejected' && !transfer.broadcasted;
+  const isWithoutBalanceChange = isCanceled || isRejectedReceive || isRejectedUnbroadcastSend;
+  const amountPrefix = isWithoutBalanceChange
     ? ''
     : transfer?.type === 'receive'
       ? '+'
@@ -549,13 +552,13 @@ export function RGBTransferDetailSheet({
                 size={32}
               />
               <Column gap="xs" style={{ minWidth: 0, maxWidth: 'calc(100% - 40px)' }}>
-                {!isCanceledReceive && !isRejectedReceive && !hasValidationFailure && transfer?.amount ? (
+                {!hasValidationFailure && transfer?.amount ? (
                   <Text
                     text={amountText}
                     style={{
                       fontSize: amountText.length > 22 ? 16 : 18,
                       fontWeight: 500,
-                      color: 'rgba(255,255,255,0.85)',
+                      color: isWithoutBalanceChange ? colors.textDim : 'rgba(255,255,255,0.85)',
                       lineHeight: '1.4',
                       maxWidth: '100%',
                       whiteSpace: 'nowrap',
@@ -564,13 +567,11 @@ export function RGBTransferDetailSheet({
                   />
                 ) : null}
                 <Row itemsCenter style={{ gap: 8, minWidth: 0 }}>
-                  {!isCanceledReceive ? (
-                    <Text
-                      text={assetName}
-                      ellipsis
-                      style={{ minWidth: 0, fontSize: 16, fontWeight: 500, color: 'rgba(255,255,255,0.85)', lineHeight: '1.4' }}
-                    />
-                  ) : null}
+                  <Text
+                    text={assetName}
+                    ellipsis
+                    style={{ minWidth: 0, fontSize: 16, fontWeight: 500, color: 'rgba(255,255,255,0.85)', lineHeight: '1.4' }}
+                  />
                   <Row itemsCenter justifyCenter style={{ height: 20, flexShrink: 0, paddingLeft: 6, paddingRight: 6, borderRadius: 4, backgroundColor: 'rgba(244,182,44,0.1)' }}>
                     <Text text="RGB" style={{ fontSize: 12, fontWeight: 600, color: 'rgba(244,182,44,0.85)' }} />
                   </Row>
@@ -609,9 +610,6 @@ export function RGBTransferDetailSheet({
                   ) : null}
                 </Row>
               </Row>
-              {isRejectedReceive && transfer?.amount ? (
-                <DetailRow label={t('amount')} value={displayAmount} />
-              ) : null}
               {assetId || (!isRejectedReceive && !hasValidationFailure) ? <Row fullX justifyBetween itemsCenter style={{ minHeight: 32 }}>
                 <Text
                   text={t('asset_id')}

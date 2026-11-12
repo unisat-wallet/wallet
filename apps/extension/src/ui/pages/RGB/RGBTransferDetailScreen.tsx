@@ -141,6 +141,9 @@ export default function RGBTransferDetailScreen() {
   const isConfirmed = isConfirmedStatus(status);
   const isFailed = isFailedStatus(status);
   const isRejectedReceive = transfer?.type === 'receive' && status.toLowerCase() === 'rejected';
+  const isCanceled = ['canceled', 'cancelled'].includes(status.toLowerCase());
+  const isRejectedUnbroadcastSend = transfer?.type === 'send' && status.toLowerCase() === 'rejected' && !transfer.broadcasted;
+  const isWithoutBalanceChange = isCanceled || isRejectedReceive || isRejectedUnbroadcastSend;
   const hasValidationFailure = transfer?.type === 'receive' && status.toLowerCase() === 'validation_failed';
   const isIssue = transfer?.type === 'issue';
   const recordId = isIssue ? transfer?.txid : transfer?.transferId || transferId;
@@ -213,7 +216,7 @@ export default function RGBTransferDetailScreen() {
             </Row>
             <Row justifyBetween itemsCenter>
               <Text text={t('amount')} color="textDim" />
-              <Text text={displayAmount} color="ticker_color2" />
+              <Text text={displayAmount} color={isWithoutBalanceChange ? 'textDim' : 'ticker_color2'} />
             </Row>
             {transfer?.batch ? (
               <Row justifyBetween itemsCenter>
