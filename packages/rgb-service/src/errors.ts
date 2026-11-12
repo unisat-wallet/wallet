@@ -93,3 +93,13 @@ export class RgbInvoiceUnavailableError extends RgbServiceError {
     this.name = 'RgbInvoiceUnavailableError'
   }
 }
+
+/** A fully signed Bitcoin transaction was rejected before any RGB payload was published. */
+export class RgbTransactionPreflightRejectedError extends RgbServiceError {
+  readonly code = 'RGB_TX_PREFLIGHT_REJECTED'
+
+  constructor(readonly reason: string) {
+    super(`RGB transaction cannot be broadcast: ${reason}`)
+    this.name = 'RgbTransactionPreflightRejectedError'
+  }
+}

@@ -18,6 +18,7 @@ export enum SendRGBScreenStep {
 }
 
 const RGB_INVOICE_UNAVAILABLE_ERROR_CODE = 'RGB_INVOICE_UNAVAILABLE'
+const RGB_TX_PREFLIGHT_REJECTED_ERROR_CODE = 'RGB_TX_PREFLIGHT_REJECTED'
 const RGB_FEE_POOL_INSUFFICIENT_BTC_ERROR_CODE = 'RGB_FEE_POOL_INSUFFICIENT_BTC'
 
 type InvoiceAvailability = 'idle' | 'checking' | 'available' | 'unavailable' | 'error'
@@ -622,6 +623,24 @@ export function useSendRGBScreenLogic() {
       })
       transferData.current = {}
     } catch (e) {
+      const error = e as { code?: string; message?: string }
+      if (
+        error?.code === RGB_TX_PREFLIGHT_REJECTED_ERROR_CODE ||
+        error?.message?.includes(RGB_TX_PREFLIGHT_REJECTED_ERROR_CODE) ||
+        error?.message?.includes('RGB transaction cannot be broadcast:')
+      ) {
+        transferData.current = {}
+        setStep(SendRGBScreenStep.CREATE_TX)
+        setError(
+          getSendErrorMessage(
+            e,
+            t('rgb_send_transaction_unavailable'),
+            t('rgb_invoice_unavailable'),
+            t
+          )
+        )
+        return
+      }
       nav.navigate('TxFailScreen', {
         error: getSendErrorMessage(
           e,

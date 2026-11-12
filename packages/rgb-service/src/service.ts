@@ -10,6 +10,7 @@ import {
   RgbTransferAwaitingAckError,
   RgbTransferCanceledError,
   RgbTransferRejectedError,
+  RgbTransactionPreflightRejectedError,
 } from './errors'
 import {
   appendRgbInvoiceRecipientNonce,
@@ -5305,6 +5306,10 @@ export class RgbService {
       if (completed.txid !== delivery.completed.txid) {
         throw new RgbServiceError('RGB swap PSBT does not match the published consignment')
       }
+      // The swap consignment is necessarily published before the buyer adds
+      // their signature. Validate the final transaction before either the
+      // wallet or the dApp is allowed to broadcast it.
+      await this.assertTransactionAcceptedByMempool(completed)
       delivery.completed = completed
       delete delivery.requiresCounterpartySignature
       delete delivery.makerSignedPsbt
@@ -5357,6 +5362,16 @@ export class RgbService {
           !checked.bundles.at(-1)?.operationIds.includes(pending.prepared.metadata?.['transitionId'] || ''))
           throw new RgbServiceError('BFA burn proof does not match the prepared operation')
       }
+      try {
+        await this.assertTransactionAcceptedByMempool(completed)
+      } catch (error) {
+        if (error instanceof RgbTransactionPreflightRejectedError) {
+          const rollback = snapshotState(state)
+          delete state.pending[transferId]
+          await this.persistWithRecoveryRollback(rollback, { skipRecovery: true })
+        }
+        throw error
+      }
       const endpoints = pending.request.burn || pending.burnSplit
         ? []
         : decodeRgbInvoice(pending.request.invoice).transportEndpoints
@@ -5369,6 +5384,23 @@ export class RgbService {
     if (pending.burnSplit) return this.advanceBurnSplitDelivery(transferId, pending)
     if (pending.request.burn) return this.advanceBurnDelivery(transferId, pending)
     return this.advancePendingDelivery(transferId, pending)
+  }
+
+  /** Check the fully signed transaction before publishing any irreversible RGB transport state. */
+  private async assertTransactionAcceptedByMempool(completed: RgbCompletedTransfer) {
+    const testAcceptance = this.dependencies.stateSource.testTransactionAcceptance
+    const result = await testAcceptance(this.requireState().wallet, completed.rawTx)
+    if (result.txid.toLowerCase() !== completed.txid.toLowerCase()) {
+      throw new RgbServiceError('RGB transaction preflight returned a mismatched txid')
+    }
+    if (result.allowed) return
+    const reason = result.rejectReason?.trim() || 'rejected by the Bitcoin node'
+    // A duplicate transaction is already accepted by the network. Keep the
+    // transfer publishable so normal broadcast reconciliation can complete it.
+    if (
+      /already[ -]?(?:known|in (?:chain|mempool))|txn-already|already.*utxo set/i.test(reason)
+    ) return
+    throw new RgbTransactionPreflightRejectedError(reason)
   }
 
   /** Broadcast an internal self-transfer and expose both exact split allocations locally. */

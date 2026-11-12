@@ -127,6 +127,10 @@ function createDependencies(): RgbServiceDependencies {
         consignments: [],
       }),
       syncBroadcast: vi.fn(),
+      testTransactionAcceptance: vi.fn().mockResolvedValue({
+        txid: 'c'.repeat(64),
+        allowed: true,
+      }),
     },
     validateBfaConsignment: ({ payload, pendingWitnessTxid, allowPendingLastWitness, requiredOperationIds, knownBlindSeals }) =>
       validateBfaTransferConsignment(payload, {
@@ -360,6 +364,61 @@ describe('RgbService', () => {
     })).resolves.toBe(false)
     expect(service.getPendingTransfers()).toHaveLength(1)
     expect(service.getPendingSendHistory()).toEqual([])
+  })
+
+  it('releases a signed send rejected by mempool preflight before publishing it', async () => {
+    const dependencies = createDependencies()
+    dependencies.stateSource.testTransactionAcceptance = vi.fn().mockResolvedValue({
+      txid: 'c'.repeat(64),
+      allowed: false,
+      rejectReason: 'bad-txns-inputs-missingorspent',
+    })
+    const service = new RgbService(dependencies)
+    await service.open(wallet)
+    await service.sync()
+    await service.prepareSend({
+      assetId: 'rgb:AQEBAQEB-AQEBAQE-BAQEBAQ-EBAQEBA-QEBAQEB-AQEBAQE',
+      amount: '60', invoice: rgbInvoice(), feeRate: 2,
+    })
+
+    await expect(service.completeSend('transfer-1', 'signed-psbt'))
+      .rejects.toThrow('bad-txns-inputs-missingorspent')
+
+    expect(dependencies.stateSource.testTransactionAcceptance).toHaveBeenCalledWith(
+      wallet,
+      '02000000000000000000'
+    )
+    expect(dependencies.transport.publishConsignment).not.toHaveBeenCalled()
+    expect(dependencies.broadcaster.broadcast).not.toHaveBeenCalled()
+    expect(service.getPendingTransfers()).toEqual([])
+    expect(service.getPendingSendHistory()).toEqual([])
+    expect(service.getLocalAssetBalance(
+      'rgb:AQEBAQEB-AQEBAQE-BAQEBAQ-EBAQEBA-QEBAQEB-AQEBAQE'
+    )?.spendable).toBe('100')
+
+    const reopened = new RgbService(dependencies)
+    await reopened.open(wallet)
+    expect(reopened.getPendingTransfers()).toEqual([])
+  })
+
+  it('keeps a signed send retryable when mempool preflight is unavailable', async () => {
+    const dependencies = createDependencies()
+    dependencies.stateSource.testTransactionAcceptance = vi.fn().mockRejectedValue(
+      new Error('Bitcoin RPC unavailable')
+    )
+    const service = new RgbService(dependencies)
+    await service.open(wallet)
+    await service.sync()
+    await service.prepareSend({
+      assetId: 'rgb:AQEBAQEB-AQEBAQE-BAQEBAQ-EBAQEBA-QEBAQEB-AQEBAQE',
+      amount: '60', invoice: rgbInvoice(), feeRate: 2,
+    })
+
+    await expect(service.completeSend('transfer-1', 'signed-psbt'))
+      .rejects.toThrow('Bitcoin RPC unavailable')
+
+    expect(dependencies.transport.publishConsignment).not.toHaveBeenCalled()
+    expect(service.getPendingTransfers()).toHaveLength(1)
   })
 
   it('does not count both sides of a self-transfer while its source UTXO is still active', async () => {
@@ -7936,6 +7995,9 @@ describe('RgbService', () => {
       },
     })
     vi.mocked(dependencies.broadcaster.broadcast).mockResolvedValue('e'.repeat(64))
+    vi.mocked(dependencies.stateSource.testTransactionAcceptance).mockResolvedValue({
+      txid: 'e'.repeat(64), allowed: true,
+    })
     const service = new RgbService(dependencies)
     await service.open(wallet)
     await service.sync()

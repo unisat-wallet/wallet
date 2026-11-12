@@ -314,6 +314,13 @@ export class RgbService {
     return this.privatePost(`/v5/rgb/chain/transactions/${encodeURIComponent(txid)}`, params)
   }
 
+  async testRgbTransactionAcceptance(params: {
+    wallet: RgbTransactionStatusRequest['wallet']
+    rawTx: string
+  }): Promise<{ txid: string; allowed: boolean; rejectReason?: string }> {
+    return this.privatePost('/v5/rgb/chain/test-mempool-accept', params)
+  }
+
   async reportRgbBroadcastFailure(params: {
     wallet: RgbTransactionStatusRequest['wallet']
     transferId: string

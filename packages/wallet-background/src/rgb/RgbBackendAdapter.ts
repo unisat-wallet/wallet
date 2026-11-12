@@ -102,6 +102,10 @@ export type RgbBackendApi = {
     status: 'mempool' | 'confirmed' | 'pending_spend' | 'spent' | 'replaced' | 'unknown'
     confirmations: number
   }>
+  testRgbTransactionAcceptance: (params: {
+    wallet: RgbWalletRef
+    rawTx: string
+  }) => Promise<{ txid: string; allowed: boolean; rejectReason?: string }>
   reportRgbBroadcastFailure: (params: {
     wallet: RgbWalletRef
     transferId: string
@@ -260,6 +264,8 @@ export function createRgbBackendAdapter(
       return result.consignments
     },
     getTransactionStatus: (wallet, txid) => api.getRgbTransactionStatus(txid, { wallet }),
+    testTransactionAcceptance: (wallet, rawTx) =>
+      api.testRgbTransactionAcceptance({ wallet, rawTx }),
     reportBroadcastFailure: (wallet, report) => api.reportRgbBroadcastFailure({ wallet, ...report }),
     getBroadcastCancellation: async (wallet, recipientId, txid) => {
       const result = await api.getRgbBroadcastFailureStatus({ wallet, recipientId, txid })

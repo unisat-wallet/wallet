@@ -696,6 +696,11 @@ export interface RgbStateSource {
     status: 'mempool' | 'confirmed' | 'pending_spend' | 'spent' | 'replaced' | 'unknown'
     confirmations: number
   }>
+  testTransactionAcceptance(wallet: RgbWalletRef, rawTx: string): Promise<{
+    txid: string
+    allowed: boolean
+    rejectReason?: string
+  }>
   reportBroadcastFailure?(wallet: RgbWalletRef, report: {
     transferId: string
     recipientId: string
