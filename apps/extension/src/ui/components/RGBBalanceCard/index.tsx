@@ -6,7 +6,7 @@ import {
   type RGBBalanceCardProps
 } from '@unisat/wallet-state';
 
-import { formatRgbUsdtValue, isConfiguredRgbUsdt } from '@/ui/utils/rgbUsdtPrice';
+import { formatRgbUsdtValue, isOfficialRgbUsdt } from '@/ui/utils/rgbUsdtPrice';
 
 import { Card } from '../Card';
 import { RGBAssetIcon } from '../RGBAssetIcon';
@@ -32,7 +32,8 @@ export default function RGBBalanceCard(props: RGBBalanceCardProps) {
   const walletConfig = useWalletConfig();
   const configuredUsdtAssetId = walletConfig.rgbUsdtAssetId;
   const assetPolicy = findRgbAssetPolicy(props.tokenBalance?.assetId, walletConfig);
-  const showUsdtPrice = showPrice && isConfiguredRgbUsdt(props.tokenBalance?.assetId || '', configuredUsdtAssetId);
+  const showUsdtPrice =
+    showPrice && isOfficialRgbUsdt(props.tokenBalance?.assetId || '', configuredUsdtAssetId, assetPolicy);
   const hasPendingBalance = pendingBalance.gt(0);
   const hasLockedBalance = lockedBalance.gt(0);
 

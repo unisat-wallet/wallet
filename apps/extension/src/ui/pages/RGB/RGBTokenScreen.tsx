@@ -18,7 +18,7 @@ import { BottomModal } from '@/ui/components/BottomModal';
 import { TabBar } from '@/ui/components/TabBar';
 import { colors } from '@/ui/theme/colors';
 import { fontSizes } from '@/ui/theme/font';
-import { formatRgbUsdtValue, isConfiguredRgbUsdt } from '@/ui/utils/rgbUsdtPrice';
+import { formatRgbUsdtValue, isOfficialRgbUsdt } from '@/ui/utils/rgbUsdtPrice';
 import { EllipsisOutlined } from '@ant-design/icons';
 import {
   RGBTokenScreenTabKey,
@@ -108,7 +108,8 @@ export default function RGBTokenScreen() {
   const isNonStandardNia =
     String(tokenInfo?.schema || tokenBalance?.schema || '').toUpperCase() === 'NIA' &&
     (tokenInfo?.isStandard === false || tokenBalance?.isStandard === false);
-  const showUsdtPrice = chain.showPrice && isConfiguredRgbUsdt(assetId, configuredUsdtAssetId) && totalBalance !== '--';
+  const showUsdtPrice =
+    chain.showPrice && isOfficialRgbUsdt(assetId, configuredUsdtAssetId, assetPolicy) && totalBalance !== '--';
 
   const renderTabChildren = useMemo(() => {
     if (activeTab === RGBTokenScreenTabKey.DETAILS) {
