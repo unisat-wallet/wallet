@@ -1,5 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { RgbProxyOperationNotFoundError } from '@unisat/rgb-service'
+import {
+  RgbProxyAlreadyAcknowledgedError,
+  RgbProxyOperationNotFoundError,
+} from '@unisat/rgb-service'
 
 import { createRgbProxyTransport } from '../src/adapters/rgb-proxy'
 import { proxyV1DecryptBlob, proxyV1EncryptBlob, proxyV1Hash, proxyV1HashText, proxyV1Pow, proxyV1PublicKey, proxyV1Sign, proxyV1TransferId, proxyV1Verify, RGB_PROXY_MAX_POW_DIFFICULTY } from '../src/adapters/rgb-proxy-v1'
@@ -773,6 +776,16 @@ describe('RGB proxy transport', () => {
       endpoints: [endpoint],
       allowMissing: false,
     })).resolves.toBeUndefined()
+  })
+
+  it('reports an immutable ACK instead of exposing the raw ack.clean proxy error', async () => {
+    fetchMock.mockResolvedValueOnce(rpcError(-101, 'Already acked'))
+    await expect(createRgbProxyTransport([endpoint]).cancelConsignment?.({
+      proxyInvoiceId: '22'.repeat(32),
+      proxySenderPrivateKey: '11'.repeat(32),
+      endpoints: [endpoint],
+      allowMissing: false,
+    })).rejects.toBeInstanceOf(RgbProxyAlreadyAcknowledgedError)
   })
 
   it('cleans the sender proxy that accepted a failover operation', async () => {

@@ -4,6 +4,7 @@ import {
   RgbInvoiceUnavailableError,
   RgbInsufficientBalanceError,
   RgbMissingAncestorError,
+  RgbProxyAlreadyAcknowledgedError,
   RgbProxyOperationNotFoundError,
   RgbServiceError,
   RgbTransferAwaitingAckError,
@@ -5534,12 +5535,36 @@ export class RgbService {
         if (!pending.proxySenderPrivateKey || !this.dependencies.transport.cancelConsignment) {
           throw new RgbServiceError('RGB proxy v1 cancellation is unavailable')
         }
-        await this.dependencies.transport.cancelConsignment({
-          proxyInvoiceId: invoice.proxyInvoiceId,
-          proxySenderPrivateKey: pending.proxySenderPrivateKey,
-          endpoints: pending.delivery.endpoints,
-          allowMissing: !pending.delivery.publishedAt,
-        })
+        try {
+          await this.dependencies.transport.cancelConsignment({
+            proxyInvoiceId: invoice.proxyInvoiceId,
+            proxySenderPrivateKey: pending.proxySenderPrivateKey,
+            endpoints: pending.delivery.endpoints,
+            allowMissing: !pending.delivery.publishedAt,
+          })
+        } catch (error) {
+          if (!(error instanceof RgbProxyAlreadyAcknowledgedError)) throw error
+          // The ACK may have landed after our last poll. It makes ack.clean
+          // unsafe, but the unbroadcast signed transaction can still enter the
+          // reviewed bilateral cancellation flow.
+          pending.delivery.acknowledgedAt ||= this.now()
+          pending.delivery.broadcastError =
+            'RGB transfer was acknowledged before cancellation but was not broadcast'
+          delete pending.delivery.failureReportedAt
+          await this.persist({ waitForRecovery: true })
+          let reviewRequested = false
+          try {
+            await this.reportPendingBroadcastFailure(transferId, pending)
+            reviewRequested = Boolean(pending.delivery.failureReportedAt)
+          } catch { /* The detail screen can retry the review request. */ }
+          return {
+            aborted: false,
+            reason: reviewRequested
+              ? ('cancellation_review_requested' as const)
+              : ('acknowledged_requires_review' as const),
+            reviewRequested,
+          }
+        }
       } else if (this.dependencies.transport.acknowledgeConsignment) {
         for (const consignment of pending.delivery.completed.consignments) {
           try {

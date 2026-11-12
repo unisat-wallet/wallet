@@ -186,8 +186,17 @@ export function useRGBTransferDetailLogic() {
             txid: abortId,
             ...(discardUnsigned ? { discardUnsigned: true } : {}),
           })
+      if (result?.['reviewRequested']) {
+        setTransfer(current => current ? { ...current, status: 'broadcast_failed', local: true } : current)
+        tools.toastSuccess(t('rgb_broadcast_cancellation_review_requested'))
+        return true
+      }
       if (!result?.aborted) {
-        throw new Error(result?.['reason'] || t('rgb_cancel_send_failed'))
+        throw new Error(
+          result?.['reason'] === 'acknowledged_requires_review'
+            ? t('rgb_acknowledged_requires_cancellation_review')
+            : result?.['reason'] || t('rgb_cancel_send_failed')
+        )
       }
       tools.toastSuccess(t('rgb_cancel_send_success'))
       setTransfer(current =>

@@ -3569,6 +3569,7 @@
   "rgb_request_cancellation_review": { "message": "Demander l’annulation" },
   "rgb_broadcast_cancellation_review_requested": { "message": "Examen de l’annulation demandé" },
   "rgb_broadcast_cancellation_review_failed": { "message": "Impossible de demander l’examen de l’annulation" },
+  "rgb_acknowledged_requires_cancellation_review": { "message": "Le destinataire a déjà accepté ce transfert. Demandez un examen de l’annulation dans les détails." },
   "rgb_approval_any_amount": { "message": "Any amount" },
   "rgb_approval_any_rgb_asset": { "message": "Any RGB asset" },
   "rgb_approval_rgb_asset": { "message": "RGB asset" },

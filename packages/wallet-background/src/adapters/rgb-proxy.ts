@@ -3,7 +3,11 @@ import type {
   RgbTransport,
   RgbTransportConsignment,
 } from '@unisat/rgb-service'
-import { rgbProxyInvoiceId, RgbProxyOperationNotFoundError } from '@unisat/rgb-service'
+import {
+  rgbProxyInvoiceId,
+  RgbProxyAlreadyAcknowledgedError,
+  RgbProxyOperationNotFoundError,
+} from '@unisat/rgb-service'
 import { ed25519 } from '@noble/curves/ed25519'
 
 import {
@@ -1216,6 +1220,9 @@ export function createRgbProxyTransport(
           )
           if (body.error) {
             if (body.error.code === -104) continue
+            if (/already\s+acked/i.test(body.error.message || '')) {
+              throw new RgbProxyAlreadyAcknowledgedError()
+            }
             throw new Error(`RGB proxy ack.clean failed: ${body.error.message || body.error.code}`)
           }
           cleaned = true

@@ -31,6 +31,14 @@ export class RgbProxyOperationNotFoundError extends RgbServiceError {
   }
 }
 
+/** The receiver has already ACKed this Proxy v1 transfer, so ack.clean is unsafe. */
+export class RgbProxyAlreadyAcknowledgedError extends RgbServiceError {
+  constructor() {
+    super('RGB proxy transfer is already acknowledged')
+    this.name = 'RgbProxyAlreadyAcknowledgedError'
+  }
+}
+
 export class RgbInsufficientBalanceError extends RgbServiceError {
   constructor(assetId: string, amount: string) {
     super(`Insufficient spendable RGB balance for ${assetId}: ${amount}`)

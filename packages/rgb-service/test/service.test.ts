@@ -24,6 +24,7 @@ import {
   RgbBfaValidationUnavailableError,
   RgbInsufficientBalanceError,
   RgbMissingAncestorError,
+  RgbProxyAlreadyAcknowledgedError,
   RgbProxyOperationNotFoundError,
   RgbService,
   RgbServiceError,
@@ -7652,6 +7653,57 @@ describe('RgbService', () => {
       expect.objectContaining({ transferId: 'transfer-1', status: 'canceled', amount: '60' }),
     ])
     expect(dependencies.broadcaster.broadcast).not.toHaveBeenCalled()
+  })
+
+  it('moves a remotely ACKed cancellation into reviewed recovery instead of calling it canceled', async () => {
+    const dependencies = createDependencies()
+    vi.mocked(dependencies.transport.getAcknowledgement!).mockResolvedValueOnce(undefined)
+    dependencies.transport.cancelConsignment = vi.fn().mockRejectedValue(
+      new RgbProxyAlreadyAcknowledgedError()
+    )
+    dependencies.stateSource.reportBroadcastFailure = vi.fn().mockResolvedValue(undefined)
+    const service = new RgbService(dependencies)
+    const assetId = 'rgb:AQEBAQEB-AQEBAQE-BAQEBAQ-EBAQEBA-QEBAQEB-AQEBAQE'
+    const invoice = encodeWitnessRgbInvoice({
+      network: 'mainnet',
+      scriptPubKey: '512079be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798',
+      assetId,
+      amount: '60',
+      transportEndpoints: [proxyEndpoint],
+      proxyPublicKey: 'ab'.repeat(32),
+    })
+    await service.open(wallet)
+    await service.sync()
+    await service.prepareSend({
+      assetId,
+      amount: '60',
+      invoice,
+      feeRate: 2,
+    })
+    await expect(service.completeSend('transfer-1', 'signed-psbt')).rejects.toThrow(
+      'awaiting recipient acknowledgement'
+    )
+
+    await expect(service.abortSend('transfer-1')).resolves.toEqual({
+      aborted: false,
+      reason: 'cancellation_review_requested',
+      reviewRequested: true,
+    })
+    expect(service.getPendingTransfers()).toEqual([
+      expect.objectContaining({
+        id: 'transfer-1',
+        delivery: expect.objectContaining({
+          acknowledgedAt: expect.any(Number),
+          broadcastError: expect.stringContaining('acknowledged before cancellation'),
+          failureReportedAt: expect.any(Number),
+        }),
+      }),
+    ])
+    expect(dependencies.stateSource.reportBroadcastFailure).toHaveBeenCalledWith(
+      wallet,
+      expect.objectContaining({ transferId: 'transfer-1', txid: 'c'.repeat(64) })
+    )
+    expect(service.getPendingSendHistory()).toEqual([])
   })
 
   it('refuses to cancel a delivery that another party already broadcast', async () => {

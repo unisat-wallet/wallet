@@ -3560,6 +3560,7 @@
   "rgb_request_cancellation_review": { "message": "Solicitar cancelación" },
   "rgb_broadcast_cancellation_review_requested": { "message": "Revisión de cancelación solicitada" },
   "rgb_broadcast_cancellation_review_failed": { "message": "No se pudo solicitar la revisión de cancelación" },
+  "rgb_acknowledged_requires_cancellation_review": { "message": "El receptor ya aceptó esta transferencia. Solicita una revisión de cancelación desde los detalles." },
   "rgb_approval_any_amount": { "message": "Any amount" },
   "rgb_approval_any_rgb_asset": { "message": "Any RGB asset" },
   "rgb_approval_rgb_asset": { "message": "RGB asset" },
