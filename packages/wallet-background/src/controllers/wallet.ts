@@ -777,6 +777,7 @@ function sameUnsignedTransaction(left: bitcoin.Psbt, right: bitcoin.Psbt) {
 const RGB_FUNDING_UTXO_DUST = 330
 const RGB_FEE_POOL_UTXO_SATS = 3_000
 const RGB_FEE_POOL_TARGET_UTXOS = 3
+const RGB_FEE_POOL_LOCAL_INDEX_GRACE_MS = 60_000
 /** Covers a top-up transaction with several pool outputs and a change output. */
 const RGB_FEE_POOL_TOP_UP_ESTIMATED_VBYTES = 500
 export const RGB_FEE_POOL_INSUFFICIENT_BTC = 'RGB_FEE_POOL_INSUFFICIENT_BTC'
@@ -5693,17 +5694,24 @@ export class WalletController extends BaseController {
         { txid: utxo.txid, vout: utxo.vout, satoshis: utxo.satoshis, pending: false },
       ])
     )
-    local.forEach(utxo => {
-      const key = `${utxo.outpoint.txid}:${utxo.outpoint.vout}`
-      if (!all.has(key)) {
-        all.set(key, {
-          txid: utxo.outpoint.txid,
-          vout: utxo.outpoint.vout,
-          satoshis: utxo.satoshis,
-          pending: true,
-        })
-      }
-    })
+    const now = this.getRgbNow()
+    local
+      .filter(utxo =>
+        Number.isFinite(utxo.createdAt) &&
+        utxo.createdAt <= now &&
+        now - utxo.createdAt <= RGB_FEE_POOL_LOCAL_INDEX_GRACE_MS
+      )
+      .forEach(utxo => {
+        const key = `${utxo.outpoint.txid}:${utxo.outpoint.vout}`
+        if (!all.has(key)) {
+          all.set(key, {
+            txid: utxo.outpoint.txid,
+            vout: utxo.outpoint.vout,
+            satoshis: utxo.satoshis,
+            pending: true,
+          })
+        }
+      })
     // The pool unit is only the recommended size for newly created outputs.
     // RGB PSBT building combines fee UTXOs, so every unlocked output remains
     // eligible even when it is smaller than the recommended unit.
@@ -7406,10 +7414,19 @@ export class WalletController extends BaseController {
                 },
               ])
           )
-          pendingUtxos.forEach(utxo => {
-            const key = `${utxo.outpoint.txid}:${utxo.outpoint.vout}`
-            if (!feeUtxosByOutpoint.has(key)) feeUtxosByOutpoint.set(key, utxo)
-          })
+          const now = this.getRgbNow()
+          pendingUtxos
+            .filter(utxo =>
+              Number.isFinite(utxo.createdAt) &&
+              utxo.createdAt <= now &&
+              now - utxo.createdAt <= RGB_FEE_POOL_LOCAL_INDEX_GRACE_MS
+            )
+            .forEach(utxo => {
+              const key = `${utxo.outpoint.txid}:${utxo.outpoint.vout}`
+              if (!feeUtxosByOutpoint.has(key)) {
+                feeUtxosByOutpoint.set(`${utxo.outpoint.txid}:${utxo.outpoint.vout}`, utxo)
+              }
+            })
           return {
             utxos: [...feeUtxosByOutpoint.values()],
             changeScriptPubKey: bitcoin.address

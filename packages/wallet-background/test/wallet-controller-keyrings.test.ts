@@ -939,20 +939,64 @@ describe('RGB fee-pool inspection', () => {
     const inspection = await wallet.getRgbFeePoolInspection()
 
     expect(inspection.ready).toBe(false)
-    expect(inspection.availableCount).toBe(2)
+    expect(inspection.availableCount).toBe(1)
     expect(inspection.withdrawals).toEqual([])
     expect(inspection.utxos).toEqual(
       expect.arrayContaining([
         expect.objectContaining({ txid: 'a'.repeat(64), vout: 0, available: true, locked: false }),
         expect.objectContaining({ txid: 'b'.repeat(64), vout: 1, available: false, locked: true }),
-        expect.objectContaining({ txid: 'c'.repeat(64), vout: 2, available: true, pending: true }),
       ])
     )
+    expect(inspection.utxos).not.toEqual(
+      expect.arrayContaining([expect.objectContaining({ txid: 'c'.repeat(64), vout: 2 })])
+    )
     vi.mocked(walletApiService.bitcoin.getAllBTCUtxos).mockResolvedValue([
-      { txid: 'a'.repeat(64), vout: 0, satoshis: 2_500 },
+      { txid: 'a'.repeat(64), vout: 0, satoshis: 3_000 },
       { txid: 'b'.repeat(64), vout: 1, satoshis: 5_000 },
     ] as any)
     expect((await wallet.getRgbFeePoolInspection()).ready).toBe(true)
+  })
+
+  it('supplements insufficient remote Fee Pool outputs only during the one-minute indexing grace period', async () => {
+    const wallet = new WalletController()
+    const now = 100_000
+    const service = {
+      getPendingTransfers: vi.fn(() => []),
+      getPendingFeePoolUtxos: vi.fn(() => [
+        {
+          outpoint: { txid: 'a'.repeat(64), vout: 0 }, satoshis: 3_000,
+          scriptPubKey: '5120' + '11'.repeat(32), publicKey: validCompressedPubkey,
+          createdAt: now - 30_000,
+        },
+        {
+          outpoint: { txid: 'b'.repeat(64), vout: 1 }, satoshis: 3_000,
+          scriptPubKey: '5120' + '22'.repeat(32), publicKey: validCompressedPubkey,
+          createdAt: now - 60_001,
+        },
+      ]),
+    }
+    vi.spyOn(wallet as any, 'getRgbNow').mockReturnValue(now)
+    vi.spyOn(wallet as any, 'getLocalRgbService').mockResolvedValue({
+      service,
+      wallet: { fundingAddress: 'bc1p-rgb-funding', network: 'mainnet' },
+    })
+    vi.spyOn(wallet as any, 'getCurrentRgbFeeAccount').mockResolvedValue({
+      address: 'bc1p-rgb-fee', derivationPath: "m/86'/0'/0'/1/0",
+    })
+    vi.mocked(walletApiService.bitcoin.getAllBTCUtxos).mockResolvedValue([
+      { txid: 'c'.repeat(64), vout: 2, satoshis: 500 },
+    ] as any)
+
+    const inspection = await wallet.getRgbFeePoolInspection()
+
+    expect(inspection.utxos).toEqual(expect.arrayContaining([
+      expect.objectContaining({ txid: 'a'.repeat(64), vout: 0, pending: true }),
+      expect.objectContaining({ txid: 'c'.repeat(64), vout: 2, pending: false }),
+    ]))
+    expect(inspection.utxos).not.toEqual(
+      expect.arrayContaining([expect.objectContaining({ txid: 'b'.repeat(64), vout: 1 })])
+    )
+    expect(inspection.ready).toBe(true)
   })
 })
 
