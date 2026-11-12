@@ -7559,7 +7559,11 @@ describe('RgbService', () => {
         error: 'bad-txns-inputs-missingorspent',
       })
     )
-    expect(service.getPendingTransfers()).toHaveLength(1)
+    expect(service.getPendingTransfers()).toEqual([
+      expect.objectContaining({
+        delivery: expect.objectContaining({ cancellationReviewRequestedAt: expect.any(Number) }),
+      }),
+    ])
 
     vi.mocked(dependencies.stateSource.getBroadcastCancellation).mockResolvedValue(true)
     await expect(service.requestBroadcastCancellationReview('transfer-1')).resolves.toEqual({
@@ -7696,6 +7700,7 @@ describe('RgbService', () => {
           acknowledgedAt: expect.any(Number),
           broadcastError: expect.stringContaining('acknowledged before cancellation'),
           failureReportedAt: expect.any(Number),
+          cancellationReviewRequestedAt: expect.any(Number),
         }),
       }),
     ])

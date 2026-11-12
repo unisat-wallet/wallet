@@ -3669,6 +3669,7 @@
     "message": "Failed to broadcast transaction"
   },
   "rgb_request_cancellation_review": { "message": "Request cancellation review" },
+  "rgb_cancellation_review_pending": { "message": "Cancellation review pending" },
   "rgb_broadcast_cancellation_review_requested": { "message": "Cancellation review requested" },
   "rgb_broadcast_cancellation_review_failed": { "message": "Failed to request cancellation review" },
   "rgb_acknowledged_requires_cancellation_review": { "message": "The receiver already accepted this transfer. Request cancellation review from the transfer details." },

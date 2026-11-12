@@ -3565,6 +3565,7 @@
   "rgb_retry_broadcast": { "message": "Повторить отправку" },
   "rgb_retry_broadcast_failed": { "message": "Не удалось отправить транзакцию в сеть" },
   "rgb_request_cancellation_review": { "message": "Запросить отмену" },
+  "rgb_cancellation_review_pending": { "message": "Проверка отмены ожидается" },
   "rgb_broadcast_cancellation_review_requested": { "message": "Запрошена проверка отмены" },
   "rgb_broadcast_cancellation_review_failed": { "message": "Не удалось запросить проверку отмены" },
   "rgb_acknowledged_requires_cancellation_review": { "message": "Получатель уже принял перевод. Запросите проверку отмены в деталях перевода." },

@@ -285,6 +285,8 @@ export interface RgbPendingTransfer {
     broadcastError?: string
     /** Last successful report to the wallet backend. */
     failureReportedAt?: number
+    /** The user explicitly requested reviewed bilateral cancellation. */
+    cancellationReviewRequestedAt?: number
   }
   /** Broadcast has succeeded; only delivery/index synchronization remains. */
   broadcast?: {

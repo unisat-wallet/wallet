@@ -107,6 +107,7 @@ export default function RGBTransferDetailScreen() {
     acceptProgress,
     broadcastRetryLoading,
     cancellationReviewLoading,
+    cancellationReviewRequested,
     cancelLoading,
     canCancelSend,
     canAcceptReceive,
@@ -300,9 +301,11 @@ export default function RGBTransferDetailScreen() {
             <Row fullX gap="md">
               <Button
                 full
-                text={t('rgb_request_cancellation_review')}
+                text={t(cancellationReviewRequested
+                  ? 'rgb_cancellation_review_pending'
+                  : 'rgb_request_cancellation_review')}
                 preset="default"
-                disabled={cancellationReviewLoading || broadcastRetryLoading}
+                disabled={cancellationReviewRequested || cancellationReviewLoading || broadcastRetryLoading}
                 onClick={() => void onRequestCancellationReview()}
               />
               <Button

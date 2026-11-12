@@ -329,6 +329,7 @@ export class RgbTransferQuery {
       txid: transfer.delivery?.completed.txid ?? transfer.broadcast?.completed.txid,
       timestamp: transfer.createdAt,
       acknowledgedAt: transfer.delivery?.acknowledgedAt,
+      cancellationReviewRequested: Boolean(transfer.delivery?.cancellationReviewRequestedAt),
       status: transfer.delivery?.broadcastError
         ? 'broadcast_failed'
         : transfer.delivery?.externalBroadcast

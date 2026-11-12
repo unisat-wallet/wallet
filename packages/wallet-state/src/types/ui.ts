@@ -128,6 +128,8 @@ export interface RgbTransferItem {
   timestamp: number
   /** Time the receiver accepted this send, used to order pending broadcasts. */
   acknowledgedAt?: number
+  /** A broadcast-failure cancellation case has already been submitted for review. */
+  cancellationReviewRequested?: boolean
   status: RgbTransferStatus
   /** Local explanation for a rejected RGB receive, when recorded by the wallet. */
   rejectionReason?: string

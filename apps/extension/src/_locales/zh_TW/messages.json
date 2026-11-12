@@ -3646,6 +3646,7 @@
     "message": "廣播交易失敗"
   },
   "rgb_request_cancellation_review": { "message": "申請取消審核" },
+  "rgb_cancellation_review_pending": { "message": "取消審核中" },
   "rgb_broadcast_cancellation_review_requested": { "message": "已提交取消審核" },
   "rgb_broadcast_cancellation_review_failed": { "message": "提交取消審核失敗" },
   "rgb_acknowledged_requires_cancellation_review": { "message": "接收方已接受此轉帳，請在轉帳詳情中申請取消審核。" },

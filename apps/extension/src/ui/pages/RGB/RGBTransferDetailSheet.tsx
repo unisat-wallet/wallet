@@ -231,6 +231,9 @@ export function RGBTransferDetailSheet({
   const [actionLoading, setActionLoading] = useState(false);
   const [broadcastRetryLoading, setBroadcastRetryLoading] = useState(false);
   const [cancellationReviewLoading, setCancellationReviewLoading] = useState(false);
+  const [cancellationReviewRequested, setCancellationReviewRequested] = useState(
+    transfer?.cancellationReviewRequested === true
+  );
   const [senderCanceledVisible, setSenderCanceledVisible] = useState(false);
   const {
     progress: acceptProgress,
@@ -304,6 +307,7 @@ export function RGBTransferDetailSheet({
             ...(discardUnsigned ? { discardUnsigned: true } : {})
           });
       if (result?.['reviewRequested']) {
+        setCancellationReviewRequested(true);
         tools.toastSuccess(t('rgb_broadcast_cancellation_review_requested'));
         return true;
       }
@@ -431,10 +435,11 @@ export function RGBTransferDetailSheet({
 
   const onRequestCancellationReview = async () => {
     const retryTransferId = resolveAbortTransferId(transfer, transferId);
-    if (!retryTransferId || cancellationReviewLoading) return;
+    if (!retryTransferId || cancellationReviewLoading || cancellationReviewRequested) return;
     setCancellationReviewLoading(true);
     try {
       const result = await wallet.requestRgbBroadcastCancellationReview({ transferId: retryTransferId });
+      setCancellationReviewRequested(result.status === 'pending_review');
       tools.toastSuccess(t(result.status === 'canceled'
         ? 'rgb_cancel_send_success'
         : 'rgb_broadcast_cancellation_review_requested'));
@@ -712,9 +717,11 @@ export function RGBTransferDetailSheet({
             ) : canRetryBroadcast ? (
               <Row gap="md" fullX>
                 <Button
-                  text={t('rgb_request_cancellation_review')}
+                  text={t(cancellationReviewRequested
+                    ? 'rgb_cancellation_review_pending'
+                    : 'rgb_request_cancellation_review')}
                   preset="default"
-                  disabled={cancellationReviewLoading || broadcastRetryLoading}
+                  disabled={cancellationReviewRequested || cancellationReviewLoading || broadcastRetryLoading}
                   onClick={() => void requestWrite(() => void onRequestCancellationReview())}
                   full
                   style={{ height: 48, minHeight: 48 }}

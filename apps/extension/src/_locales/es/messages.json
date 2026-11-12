@@ -3558,6 +3558,7 @@
   "rgb_retry_broadcast": { "message": "Reintentar transmisión" },
   "rgb_retry_broadcast_failed": { "message": "No se pudo transmitir la transacción" },
   "rgb_request_cancellation_review": { "message": "Solicitar cancelación" },
+  "rgb_cancellation_review_pending": { "message": "Revisión de cancelación pendiente" },
   "rgb_broadcast_cancellation_review_requested": { "message": "Revisión de cancelación solicitada" },
   "rgb_broadcast_cancellation_review_failed": { "message": "No se pudo solicitar la revisión de cancelación" },
   "rgb_acknowledged_requires_cancellation_review": { "message": "El receptor ya aceptó esta transferencia. Solicita una revisión de cancelación desde los detalles." },

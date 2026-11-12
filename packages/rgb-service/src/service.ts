@@ -5444,7 +5444,13 @@ export class RgbService {
       throw new RgbServiceError('RGB broadcast cancellation review is unavailable')
     }
     delete delivery.failureReportedAt
-    await this.reportPendingBroadcastFailure(transferId, pending)
+    delivery.cancellationReviewRequestedAt = this.now()
+    try {
+      await this.reportPendingBroadcastFailure(transferId, pending)
+    } catch (error) {
+      delete delivery.cancellationReviewRequestedAt
+      throw error
+    }
     const canceled = await this.dependencies.stateSource.getBroadcastCancellation(
       state.wallet,
       decodeRgbInvoice(pending.request.invoice).proxyRecipientId,
@@ -5553,10 +5559,14 @@ export class RgbService {
           delete pending.delivery.failureReportedAt
           await this.persist({ waitForRecovery: true })
           let reviewRequested = false
+          pending.delivery.cancellationReviewRequestedAt = this.now()
           try {
             await this.reportPendingBroadcastFailure(transferId, pending)
             reviewRequested = Boolean(pending.delivery.failureReportedAt)
-          } catch { /* The detail screen can retry the review request. */ }
+          } catch {
+            delete pending.delivery.cancellationReviewRequestedAt
+            // The detail screen can retry the review request.
+          }
           return {
             aborted: false,
             reason: reviewRequested

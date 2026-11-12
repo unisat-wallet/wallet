@@ -187,7 +187,12 @@ export function useRGBTransferDetailLogic() {
             ...(discardUnsigned ? { discardUnsigned: true } : {}),
           })
       if (result?.['reviewRequested']) {
-        setTransfer(current => current ? { ...current, status: 'broadcast_failed', local: true } : current)
+        setTransfer(current => current ? {
+          ...current,
+          status: 'broadcast_failed',
+          local: true,
+          cancellationReviewRequested: true,
+        } : current)
         tools.toastSuccess(t('rgb_broadcast_cancellation_review_requested'))
         return true
       }
@@ -313,7 +318,7 @@ export function useRGBTransferDetailLogic() {
 
   const onRequestCancellationReview = async () => {
     const retryId = resolveAbortTransferId(transfer, transferId)
-    if (!retryId || cancellationReviewLoading) return false
+    if (!retryId || cancellationReviewLoading || transfer?.cancellationReviewRequested) return false
     setCancellationReviewLoading(true)
     try {
       const result = await wallet.requestRgbBroadcastCancellationReview({ transferId: retryId })
@@ -321,6 +326,7 @@ export function useRGBTransferDetailLogic() {
         setTransfer(current => current ? { ...current, status: 'canceled', local: true } : current)
         tools.toastSuccess(t('rgb_cancel_send_success'))
       } else {
+        setTransfer(current => current ? { ...current, cancellationReviewRequested: true } : current)
         tools.toastSuccess(t('rgb_broadcast_cancellation_review_requested'))
       }
       return true
@@ -341,6 +347,7 @@ export function useRGBTransferDetailLogic() {
     acceptProgress,
     broadcastRetryLoading,
     cancellationReviewLoading,
+    cancellationReviewRequested: transfer?.cancellationReviewRequested === true,
     canCancelSend,
     canAcceptReceive,
     canRetryBroadcast,

@@ -3569,6 +3569,7 @@
   "rgb_retry_broadcast": { "message": "ブロードキャストを再試行" },
   "rgb_retry_broadcast_failed": { "message": "トランザクションをブロードキャストできませんでした" },
   "rgb_request_cancellation_review": { "message": "キャンセルを申請" },
+  "rgb_cancellation_review_pending": { "message": "キャンセル審査中" },
   "rgb_broadcast_cancellation_review_requested": { "message": "キャンセル審査を申請しました" },
   "rgb_broadcast_cancellation_review_failed": { "message": "キャンセル審査を申請できませんでした" },
   "rgb_acknowledged_requires_cancellation_review": { "message": "受取人はこの送金を承認済みです。送金詳細からキャンセル審査を申請してください。" },
