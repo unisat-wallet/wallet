@@ -547,6 +547,8 @@ export interface RgbPendingAssetMetadata {
 
 export interface RgbServiceState {
   version: 1
+  /** One-time cleanup for broadcast outputs retained by the legacy snapshot overlay. */
+  broadcastOutputVerificationVersion?: 1
   /** Existing pending invoices were tagged when strict Proxy v1 witness matching was introduced. */
   witnessBlindingPolicyVersion?: 1
   wallet: RgbWalletRef

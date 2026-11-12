@@ -3359,6 +3359,97 @@ describe('RgbService', () => {
     })
   })
 
+  it('prunes a spent locally overlaid broadcast output when the backend revision is unchanged', async () => {
+    const dependencies = createDependencies()
+    const firstSnapshot = {
+      ...(await vi.mocked(dependencies.stateSource.getSnapshot)(wallet)),
+      revision: 33,
+    }
+    vi.mocked(dependencies.stateSource.getSnapshot)
+      .mockReset()
+      .mockResolvedValueOnce(firstSnapshot)
+      .mockResolvedValueOnce({
+        unchanged: true,
+        revision: 33,
+        syncedAt: 2,
+        utxos: [],
+      })
+    const service = new RgbService(dependencies)
+    await service.open(wallet)
+    await service.sync()
+    const state = (service as any).state
+    const txid = 'e'.repeat(64)
+    state.snapshot.utxos.push({
+      ...structuredClone(state.snapshot.utxos[0]),
+      outpoint: { txid, vout: 1 },
+      chainStatus: 'mempool',
+      confirmations: 0,
+    })
+    state.pendingSendHistory = [{
+      transferId: 'broadcast-transfer', invoice: rgbInvoice(),
+      assetId: state.snapshot.utxos[0].allocations[0].assetId,
+      amount: '40', txid, spentOutpoints: [{ txid: 'b'.repeat(64), vout: 1 }],
+      createdAt: 1, status: 'broadcasted', fundingSnapshotConverged: true,
+    }]
+    dependencies.stateSource.verifyUtxos = vi.fn(async (_wallet, outpoints) =>
+      outpoints.map(utxo => ({
+        outpoint: utxo.outpoint,
+        status: 'spent' as const,
+        confirmations: 0,
+      }))
+    )
+
+    await service.sync()
+
+    expect(dependencies.stateSource.verifyUtxos).toHaveBeenCalledWith(
+      wallet,
+      [expect.objectContaining({ outpoint: { txid, vout: 1 } })]
+    )
+    expect(service.getSnapshot().utxos).not.toContainEqual(
+      expect.objectContaining({ outpoint: { txid, vout: 1 } })
+    )
+    expect(service.getSnapshot()).toMatchObject({ revision: 33, syncedAt: 2 })
+    expect(state.broadcastOutputVerificationVersion).toBe(1)
+  })
+
+  it('does not restore a broadcast output omitted by the snapshot after it was spent', async () => {
+    const dependencies = createDependencies()
+    const service = new RgbService(dependencies)
+    await service.open(wallet)
+    await service.sync()
+    const state = (service as any).state
+    const txid = 'e'.repeat(64)
+    const created = {
+      ...structuredClone(state.snapshot.utxos[0]),
+      outpoint: { txid, vout: 1 },
+      chainStatus: 'mempool' as const,
+      confirmations: 0,
+    }
+    state.snapshot.utxos.push(created)
+    state.pendingSendHistory = [{
+      transferId: 'broadcast-transfer', invoice: rgbInvoice(),
+      assetId: created.allocations[0].assetId,
+      amount: '40', txid, spentOutpoints: [{ txid: 'b'.repeat(64), vout: 1 }],
+      createdAt: 1, status: 'broadcasted',
+    }]
+    dependencies.stateSource.verifyUtxos = vi.fn().mockResolvedValue([{
+      outpoint: created.outpoint,
+      status: 'spent',
+      confirmations: 0,
+    }])
+    vi.mocked(dependencies.stateSource.getSnapshot).mockResolvedValueOnce({
+      syncedAt: 2,
+      utxos: [structuredClone(state.snapshot.utxos[0])],
+    })
+
+    await service.sync()
+
+    expect(service.getSnapshot().utxos).not.toContainEqual(
+      expect.objectContaining({ outpoint: { txid, vout: 1 } })
+    )
+    expect(state.pendingSendHistory[0].fundingSnapshotConverged).toBe(true)
+  })
+
   it('clears local allocations for an empty snapshot after every local UTXO is confirmed terminal', async () => {
     const dependencies = createDependencies()
     dependencies.stateSource.getTransactionStatus = vi.fn().mockResolvedValue({

@@ -671,6 +671,9 @@ export class RgbService {
           knownRevision: state.snapshot.revision,
         })
     if (remoteSnapshot.unchanged) {
+      if (state.broadcastOutputVerificationVersion !== 1) {
+        await this.pruneTerminalBroadcastedOutputs()
+      }
       state.snapshot = {
         ...state.snapshot,
         syncedAt: remoteSnapshot.syncedAt,
@@ -886,7 +889,43 @@ export class RgbService {
       ))
       const localCreated = state.snapshot.utxos.filter(utxo => utxo.outpoint.txid === history.txid)
       const remoteStillHasSpentInput = snapshot.utxos.some(utxo => spent.has(outpointKey(utxo)))
-      const remoteHasRetainedOutputs = localCreated.every(local => {
+      const terminalCreated = new Set<string>()
+      const missingLocalCreated = localCreated.filter(local => {
+        const remote = snapshot.utxos.find(utxo => outpointKey(utxo) === outpointKey(local))
+        return !remote || !local.allocations.every(allocation => remote.allocations.some(candidate =>
+          candidate.assetId === allocation.assetId &&
+          candidate.amount === allocation.amount &&
+          candidate.opId === allocation.opId &&
+          candidate.assignmentIndex === allocation.assignmentIndex
+        ))
+      })
+      if (missingLocalCreated.length && this.dependencies.stateSource.verifyUtxos) {
+        try {
+          const verified = await this.dependencies.stateSource.verifyUtxos(
+            state.wallet,
+            missingLocalCreated
+          )
+          const statuses = new Map(verified.map(item => [
+            `${item.outpoint.txid}:${item.outpoint.vout}`,
+            item.status,
+          ]))
+          for (const local of missingLocalCreated) {
+            const status = statuses.get(outpointKey(local))
+            if (status === 'spent' || status === 'replaced' || status === 'pending_spend') {
+              terminalCreated.add(outpointKey(local))
+            } else if (status !== 'confirmed' && status !== 'mempool') {
+              // An absent output with an unknown chain state is not safe to discard.
+              return true
+            }
+          }
+        } catch {
+          return true
+        }
+      }
+      const retainedLocalCreated = localCreated.filter(local =>
+        !terminalCreated.has(outpointKey(local))
+      )
+      const remoteHasRetainedOutputs = retainedLocalCreated.every(local => {
         const remote = snapshot.utxos.find(utxo => outpointKey(utxo) === outpointKey(local))
         return !!remote && local.allocations.every(allocation => remote.allocations.some(candidate =>
           candidate.assetId === allocation.assetId &&
@@ -908,7 +947,7 @@ export class RgbService {
         return true
       }
       snapshot.utxos = snapshot.utxos.filter(utxo => !spent.has(outpointKey(utxo)))
-      for (const local of localCreated) {
+      for (const local of retainedLocalCreated) {
         const remoteIndex = snapshot.utxos.findIndex(utxo => outpointKey(utxo) === outpointKey(local))
         if (remoteIndex < 0) {
           snapshot.utxos.push(local)
@@ -936,6 +975,51 @@ export class RgbService {
       )
     }
     return false
+  }
+
+  /** Remove locally overlaid broadcast outputs after the backend revision stops changing. */
+  private async pruneTerminalBroadcastedOutputs() {
+    const state = this.requireState()
+    const verifyUtxos = this.dependencies.stateSource.verifyUtxos
+    if (!verifyUtxos) return
+    const broadcastTxids = new Set(
+      (state.pendingSendHistory || [])
+        .filter(item => item.status === 'broadcasted' && item.txid)
+        .map(item => item.txid!)
+    )
+    if (!broadcastTxids.size) {
+      state.broadcastOutputVerificationVersion = 1
+      return
+    }
+    const candidates = state.snapshot.utxos.filter(utxo => broadcastTxids.has(utxo.outpoint.txid))
+    if (!candidates.length) {
+      state.broadcastOutputVerificationVersion = 1
+      return
+    }
+    let verified: Awaited<ReturnType<typeof verifyUtxos>>
+    try {
+      verified = await verifyUtxos(state.wallet, candidates)
+    } catch {
+      return
+    }
+    state.broadcastOutputVerificationVersion = 1
+    const terminal = new Set(verified
+      .filter(item => item.status === 'spent' || item.status === 'replaced' ||
+        item.status === 'pending_spend')
+      .map(item => `${item.outpoint.txid}:${item.outpoint.vout}`))
+    if (!terminal.size) return
+    state.snapshot = {
+      ...state.snapshot,
+      utxos: state.snapshot.utxos.filter(utxo => !terminal.has(outpointKey(utxo))),
+    }
+    if (state.pendingUtxoSync) {
+      state.pendingUtxoSync.outpoints = state.pendingUtxoSync.outpoints.filter(
+        utxo => !terminal.has(outpointKey(utxo))
+      )
+      if (!state.pendingUtxoSync.outpoints.some(
+        utxo => utxo.outpoint.txid === state.pendingUtxoSync!.txid
+      )) delete state.pendingUtxoSync
+    }
   }
 
   /** Preserve only the locally queued transaction outputs while refreshing unrelated assets. */
