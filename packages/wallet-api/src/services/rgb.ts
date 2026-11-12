@@ -333,6 +333,13 @@ export class RgbService {
     return this.privatePost('/v5/rgb/broadcast-failures/status', params)
   }
 
+  async getRgbBroadcastFailureStatuses(params: {
+    wallet: RgbTransactionStatusRequest['wallet']
+    items: Array<{ recipientId: string; txid: string }>
+  }): Promise<{ items: Array<{ recipientId: string; txid: string; canceled: boolean }> }> {
+    return this.privatePost('/v5/rgb/broadcast-failures/status-batch', params)
+  }
+
   /**
    * Fetch opaque history required for local consignment construction. This is
    * a transport read: no wallet key material or transaction parameters leave

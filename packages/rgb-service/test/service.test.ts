@@ -7603,6 +7603,42 @@ describe('RgbService', () => {
     ).resolves.toBe(true)
   })
 
+  it('removes a staged receive before exposing it when cancellation review completed', async () => {
+    const dependencies = createDependencies()
+    dependencies.stateSource.getBroadcastCancellations = vi.fn().mockResolvedValue([{
+      recipientId: 'recipient',
+      txid: 'c'.repeat(64),
+      canceled: true,
+    }])
+    const service = new RgbService(dependencies)
+    await service.open(wallet)
+    ;(service as any).state.pendingReceives = [{
+      invoice: rgbInvoice(),
+      recipientId: 'recipient',
+      createdAt: 1,
+      pendingAccept: {
+        payload: 'consignment',
+        txid: 'c'.repeat(64),
+        assetId: 'rgb:AQEBAQEB-AQEBAQE-BAQEBAQ-EBAQEBA-QEBAQEB-AQEBAQE',
+        amount: '60',
+        discoveredAt: 1,
+      },
+    }]
+
+    await expect(service.processClaimedReceives()).resolves.toEqual({
+      received: 0,
+      snapshotRequired: false,
+    })
+    expect(dependencies.stateSource.getBroadcastCancellations).toHaveBeenCalledWith(
+      wallet,
+      [{ recipientId: 'recipient', txid: 'c'.repeat(64) }]
+    )
+    expect(service.getPendingReceives()).toEqual([])
+    expect(service.getPendingReceiveHistory()).toEqual([
+      expect.objectContaining({ status: 'canceled', txid: 'c'.repeat(64) }),
+    ])
+  })
+
   it('discards an unsigned send without adding a canceled transfer to history', async () => {
     const dependencies = createDependencies()
     const service = new RgbService(dependencies)

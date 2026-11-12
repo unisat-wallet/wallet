@@ -704,6 +704,10 @@ export interface RgbStateSource {
     error: string
   }): Promise<void>
   getBroadcastCancellation?(wallet: RgbWalletRef, recipientId: string, txid: string): Promise<boolean>
+  getBroadcastCancellations?(
+    wallet: RgbWalletRef,
+    items: Array<{ recipientId: string; txid: string }>
+  ): Promise<Array<{ recipientId: string; txid: string; canceled: boolean }>>
   reportReceiveValidationFailure?(
     wallet: RgbWalletRef,
     failure: {

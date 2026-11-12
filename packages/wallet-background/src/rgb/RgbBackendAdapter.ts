@@ -115,6 +115,10 @@ export type RgbBackendApi = {
     recipientId: string
     txid: string
   }) => Promise<{ canceled: boolean }>
+  getRgbBroadcastFailureStatuses: (params: {
+    wallet: RgbWalletRef
+    items: Array<{ recipientId: string; txid: string }>
+  }) => Promise<{ items: Array<{ recipientId: string; txid: string; canceled: boolean }> }>
   reportRgbReceiveValidationFailure: (params: {
     wallet: RgbWalletRef
     recipientId: string
@@ -260,6 +264,10 @@ export function createRgbBackendAdapter(
     getBroadcastCancellation: async (wallet, recipientId, txid) => {
       const result = await api.getRgbBroadcastFailureStatus({ wallet, recipientId, txid })
       return result.canceled
+    },
+    getBroadcastCancellations: async (wallet, items) => {
+      const result = await api.getRgbBroadcastFailureStatuses({ wallet, items })
+      return result.items
     },
     reportReceiveValidationFailure: (wallet, failure) =>
       api.reportRgbReceiveValidationFailure({ wallet, ...failure }),

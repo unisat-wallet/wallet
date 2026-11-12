@@ -1928,6 +1928,67 @@ export class RgbService {
         // NACK or prevent the local validator from retrying the consignment.
       }
     }
+
+    // Consume reviewed sender cancellations before fetching or exposing
+    // consignments. One batch request prevents a large pending-acceptance set
+    // from producing one backend round trip per invoice.
+    const cancellationCandidates = pending.flatMap(receive => {
+      if (receive.rejection) return []
+      const txid = receive.receivedConsignment?.txid || receive.pendingAccept?.txid
+      return txid
+        ? [{ receive, recipientId: receive.proxyRecipientId || receive.recipientId, txid }]
+        : []
+    })
+    if (cancellationCandidates.length) {
+      try {
+        const getMany = this.dependencies.stateSource.getBroadcastCancellations
+        const getIndividually = () => Promise.all(cancellationCandidates.map(
+          async ({ recipientId, txid }) => ({
+              recipientId,
+              txid,
+              canceled: await this.dependencies.stateSource.getBroadcastCancellation?.(
+                state.wallet,
+                recipientId,
+                txid
+              ) === true,
+            })
+        ))
+        let results: Array<{ recipientId: string; txid: string; canceled: boolean }>
+        if (getMany) {
+          try {
+            results = (await Promise.all(Array.from(
+              { length: Math.ceil(cancellationCandidates.length / 100) },
+              (_, index) => getMany(
+                state.wallet,
+                cancellationCandidates.slice(index * 100, index * 100 + 100).map(
+                  ({ recipientId, txid }) => ({ recipientId, txid })
+                )
+              )
+            ))).flat()
+          } catch {
+            // During a rolling backend deployment, retain compatibility with
+            // the existing single-status route.
+            results = await getIndividually()
+          }
+        } else {
+          results = await getIndividually()
+        }
+        const canceled = new Set(results.filter(item => item.canceled).map(
+          item => JSON.stringify([item.recipientId, item.txid.toLowerCase()])
+        ))
+        for (let index = pending.length - 1; index >= 0; index--) {
+          const receive = pending[index]!
+          const txid = receive.receivedConsignment?.txid || receive.pendingAccept?.txid
+          const recipientId = receive.proxyRecipientId || receive.recipientId
+          if (!txid || !canceled.has(JSON.stringify([recipientId, txid.toLowerCase()]))) continue
+          this.recordReceiveOutcome(receive, 'canceled', txid)
+          pending.splice(index, 1)
+          changed = true
+        }
+      } catch {
+        // A backend outage must not discard or hide a valid pending receive.
+      }
+    }
     const getClaimed = this.dependencies.stateSource.getClaimedConsignments
     let received: Array<{ recipientId: string; payload: string }> = []
     if (includeClaimed) {
@@ -3373,6 +3434,7 @@ export class RgbService {
   }
 
   private async isReceiveCanceledBySender(receive: import('./types').RgbPendingReceive) {
+    if (await this.isAcceptedReceiveTerminallyCanceled(receive)) return true
     if (await this.isProxyAckRejected(receive, receive.pendingAccept?.endpoint)) return true
     const getConsignment = this.dependencies.transport.getConsignment
     if (!getConsignment || !receive.pendingAccept) return false

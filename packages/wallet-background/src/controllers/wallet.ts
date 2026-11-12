@@ -555,6 +555,7 @@ type RgbControllerApiService = {
   RgbBackendApi,
   | 'reportRgbBroadcastFailure'
   | 'getRgbBroadcastFailureStatus'
+  | 'getRgbBroadcastFailureStatuses'
   | 'reportRgbReceiveValidationFailure'
   | 'getRgbReceiveValidationFailureStatus'
   | 'resolveRgbReceiveValidationFailure'
