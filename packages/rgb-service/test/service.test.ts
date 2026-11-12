@@ -7059,7 +7059,12 @@ describe('RgbService', () => {
 
   it('persists a signed transfer without broadcasting until the proxy returns an acknowledgement', async () => {
     const dependencies = createDependencies()
-    vi.mocked(dependencies.transport.getAcknowledgement!).mockResolvedValueOnce(undefined)
+    vi.mocked(dependencies.transport.getAcknowledgement!)
+      .mockResolvedValueOnce(undefined)
+      .mockResolvedValueOnce(true)
+      // The Proxy may discard its immutable ACK operation after the sender
+      // has durably observed it. Broadcasting must not depend on reading it again.
+      .mockResolvedValueOnce(undefined)
     const service = new RgbService(dependencies)
     await service.open(wallet)
     await service.sync()
@@ -7081,13 +7086,13 @@ describe('RgbService', () => {
       'not ready for sender broadcast'
     )
 
-    vi.mocked(dependencies.transport.getAcknowledgement!).mockResolvedValueOnce(true)
     await service.sync()
 
     expect(service.getPendingTransfers()[0]?.delivery?.acknowledgedAt).toEqual(expect.any(Number))
     expect(dependencies.broadcaster.broadcast).not.toHaveBeenCalled()
     await service.broadcastPendingSend('transfer-1')
     expect(dependencies.broadcaster.broadcast).toHaveBeenCalledTimes(1)
+    expect(dependencies.transport.getAcknowledgement).toHaveBeenCalledTimes(2)
     expect(service.getPendingTransfers()).toEqual([])
   })
 

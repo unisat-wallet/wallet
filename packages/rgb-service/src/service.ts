@@ -6122,7 +6122,7 @@ export class RgbService {
         // The signed transaction must be recoverable before it can be broadcast.
         await this.persistWithRecoveryRollback(rollback)
       }
-    } else {
+    } else if (!delivery.acknowledgedAt) {
       const getAcknowledgement = this.dependencies.transport.getAcknowledgement
       if (!getAcknowledgement)
         throw new RgbServiceError('RGB transport does not support acknowledgement')
@@ -6154,10 +6154,8 @@ export class RgbService {
       if (acknowledgements.some(acknowledged => acknowledged === undefined)) {
         throw new RgbTransferAwaitingAckError(transferId)
       }
-      if (!delivery.acknowledgedAt) {
-        delivery.acknowledgedAt = this.now()
-        await this.persist({ waitForRecovery: true })
-      }
+      delivery.acknowledgedAt = this.now()
+      await this.persist({ waitForRecovery: true })
     }
 
     if (mode === 'manual' && !pending.request.donation) return delivery.completed
