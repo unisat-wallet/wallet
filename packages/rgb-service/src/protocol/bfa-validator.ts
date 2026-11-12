@@ -56,6 +56,8 @@ type SealPatch = { start: number; end: number; replacement: Uint8Array }
 type SchemaProfile = 'nia' | 'bfa-legacy' | 'bfa-current'
 
 export interface ValidatedBfaConsignment extends ValidatedBfaTransferHistory {
+  profile: SchemaProfile
+  revealedSeals: RgbBlindSeal[]
   metadata: RgbContractMetadata
   hasDynamicRejectList: boolean
   witnessOutputScripts: string[]
@@ -836,6 +838,21 @@ function applyPatches(body: Uint8Array, patches: SealPatch[]): Uint8Array {
   return concat(...parts)
 }
 
+function revealWitnessBundleBlindSeals(
+  strict: Uint8Array,
+  contractId: string,
+  profile: SchemaProfile,
+  seals: RgbBlindSeal[]
+): Uint8Array {
+  if (!seals.length) return strict
+  const known = new Map(seals.map(seal => [hex(concealBlindSeal(seal)), seal]))
+  const reader = new StrictReader(strict)
+  const patches: SealPatch[] = []
+  readBundle(reader, contractId, known, patches, profile)
+  if (reader.remaining) fail('witness bundle has trailing bytes')
+  return patches.length ? applyPatches(strict, patches) : strict
+}
+
 /** Disclose locally owned blind seals before keeping or forwarding a BFA history. */
 export function revealBfaConsignmentBlindSeals(value: Uint8Array, network: BfaValidationOptions['network'], seals: RgbBlindSeal[]): Uint8Array {
   if (!seals.length) return value
@@ -860,6 +877,17 @@ function buildValidatedConsignment(
   const operations = new Map<string, { operation: Operation; bundle: Bundle }>()
   for (const bundle of bundles) for (const operation of bundle.operations)
     operations.set(operation.id, { operation, bundle })
+  const revealedSeals = new Map<string, RgbBlindSeal>()
+  const retainRevealedSeal = (seal: Seal | null, fallbackTxid?: string) => {
+    const txid = seal?.txid ?? fallbackTxid
+    if (!seal || seal.vout < 0 || seal.blinding === undefined || !txid) return
+    const revealed = { txid, vout: seal.vout, blinding: seal.blinding }
+    revealedSeals.set(hex(concealBlindSeal(revealed)), revealed)
+  }
+  for (const assignment of genesis.assignments) retainRevealedSeal(assignment.seal)
+  for (const bundle of bundles) for (const operation of bundle.operations)
+    for (const assignment of operation.assignments)
+      retainRevealedSeal(assignment.seal, bundle.txid)
   for (const { operation, bundle } of operations.values()) for (const item of operation.assignments) {
     if (item.type !== OS_ASSET || consumed.has(`${operation.id}:${item.type}:${item.index}`) || !item.seal) continue
     const output = item.seal.vout >= 0 && (item.seal.txid === null || item.seal.txid === bundle.txid)
@@ -881,6 +909,8 @@ function buildValidatedConsignment(
       .reduce((sum, item) => sum + item.operation.amount, 0n)
   return {
     assetId: encodeRgbContractId(bytes(genesis.id)), genesis: genesis.strict,
+    profile: genesis.profile,
+    revealedSeals: [...revealedSeals.values()],
     witnessBundles: bundles.map(bundle => bundle.strict), allocations,
     hasDynamicRejectList: Boolean(genesis.rejectListAddress),
     metadata: { ...genesis.metadata, issuedSupply: issuedSupply.toString() },
@@ -1308,7 +1338,8 @@ export function mergeBfaValidatedHistories(
   const reference = histories[0]!
   const referenceGenesis = hex(reference.genesis)
   for (const history of histories) {
-    if (history.assetId !== reference.assetId || hex(history.genesis) !== referenceGenesis)
+    if (history.assetId !== reference.assetId || hex(history.genesis) !== referenceGenesis ||
+      history.profile !== reference.profile)
       fail('histories disagree on Genesis')
   }
   if (selectedOpIds) {
@@ -1334,13 +1365,29 @@ export function mergeBfaValidatedHistories(
     if (!histories.length) fail('selected history has no witness bundles')
   }
   const first = histories[0]!
+  const revealedSeals = new Map<string, RgbBlindSeal>()
+  for (const history of histories) for (const seal of history.revealedSeals) {
+    revealedSeals.set(hex(concealBlindSeal(seal)), seal)
+  }
+  const disclosures = [...revealedSeals.values()]
+  const contractId = rgbContractIdHex(first.assetId)
   const bundles = new Map<string, ValidatedBfaConsignment['bundles'][number]>()
   for (const history of histories) {
     for (const bundle of history.bundles) {
+      const disclosedBundle = {
+        ...bundle,
+        strict: revealWitnessBundleBlindSeals(
+          bundle.strict,
+          contractId,
+          first.profile,
+          disclosures
+        ),
+      }
       const existing = bundles.get(bundle.id)
       if (existing && (existing.operationIds.join(',') !== bundle.operationIds.join(',') ||
         existing.parentOpIds.join(',') !== bundle.parentOpIds.join(','))) fail('conflicting witness bundle')
-      if (!existing || bundle.strict.length > existing.strict.length) bundles.set(bundle.id, bundle)
+      if (!existing || disclosedBundle.strict.length > existing.strict.length)
+        bundles.set(bundle.id, disclosedBundle)
     }
   }
   const bundleForOp = new Map<string, string>()

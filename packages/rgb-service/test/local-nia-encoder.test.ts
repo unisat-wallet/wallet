@@ -4,11 +4,14 @@ import {
   concealBlindSeal,
   createLocalRgbProtocolEncoder,
   decodeRgbInvoice,
+  encodeBfaTransferConsignment,
   encodeBlindRgbInvoice,
   encodeNiaContract,
   encodeNiaGenesis,
   isSupportedV1TransferConsignment,
   localNiaProtocolEncoder,
+  mergeBfaValidatedHistories,
+  serializeBfaOpretWitnessBundle,
   validateBfaTransferConsignment,
 } from '../src'
 
@@ -195,6 +198,23 @@ describe('localNiaProtocolEncoder', () => {
       assignment => assignment.secretSeal === secretSeal
     )
     expect(firstTransition).toBeDefined()
+    const firstMetadata = firstPrepared.metadata!
+    const firstUnsignedPsbt = Psbt.fromHex(firstPrepared.psbt)
+    const firstUnsignedTx = ((firstUnsignedPsbt.data.globalMap.unsignedTx as any).tx ||
+      firstUnsignedPsbt.data.globalMap.unsignedTx).toBuffer()
+    const firstUnsignedBundle = serializeBfaOpretWitnessBundle({
+      witnessTx: firstUnsignedTx,
+      contractId: first.request.assetId,
+      transitionId: Uint8Array.from(Buffer.from(firstMetadata['transitionId']!, 'hex')),
+      transition: Uint8Array.from(Buffer.from(firstMetadata['transition']!, 'hex')),
+      inputs: JSON.parse(firstMetadata['inputs']!),
+      entropy: BigInt(firstMetadata['entropy']!),
+    })
+    const firstUnsignedPayload = Buffer.from(encodeBfaTransferConsignment({
+      genesis: Uint8Array.from(Buffer.from(firstMetadata['genesis']!, 'base64')),
+      validatedWitnessBundles: [],
+      witnessBundle: firstUnsignedBundle.strict,
+    })).toString('base64')
 
     const nextInvoice = decodeRgbInvoice(
       encodeBlindRgbInvoice({
@@ -243,7 +263,7 @@ describe('localNiaProtocolEncoder', () => {
         ...first.validationHistory,
         consignments: [
           first.validationHistory.consignments[0]!,
-          { opId: firstTransition!.opId, payload: firstPayload },
+          { opId: firstTransition!.opId, payload: firstUnsignedPayload },
         ],
         knownBlindSeals: [receiveSeal],
       },
@@ -286,6 +306,13 @@ describe('localNiaProtocolEncoder', () => {
     expect(secondConsignment.terminalAssignments).toContainEqual(expect.objectContaining({
       amount: '50', secretSeal: nextSecretSeal,
     }))
+    const concealedSignedParent = await validateBfaTransferConsignment(firstPayloadBytes, {
+      network: 0, isBitcoinTxConfirmed: async () => true, allowPendingLastWitness: true,
+    })
+    const merged = mergeBfaValidatedHistories([concealedSignedParent, secondConsignment])
+    await expect(validateBfaTransferConsignment(merged, {
+      network: 0, isBitcoinTxConfirmed: async () => true, allowPendingLastWitness: true,
+    })).resolves.toMatchObject({ assetId: concealedSignedParent.assetId })
   })
 
   it('refuses malformed history before constructing a PSBT', async () => {
