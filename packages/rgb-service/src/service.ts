@@ -5606,6 +5606,12 @@ export class RgbService {
         ? { aborted: false, reason: 'already_broadcast' as const }
         : { aborted: false, reason: 'transfer_not_found' as const }
     }
+    // An explicit unsigned discard is intentionally narrower than cancel.
+    // Refuse stale UI requests once signing/delivery/broadcast has advanced so
+    // this recovery action can never cancel a normal transfer by accident.
+    if (options.discardUnsigned === true && (pending.delivery || pending.broadcast)) {
+      return { aborted: false, reason: 'transfer_already_progressed' as const }
+    }
     // Allow cancel until the Bitcoin transaction is broadcast. Consignment
     // delivery alone is still off-chain and can be discarded by the sender.
     // An acknowledged consignment is committed to the receiver and is about

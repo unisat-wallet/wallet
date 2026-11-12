@@ -7728,7 +7728,7 @@ describe('RgbService', () => {
     expect(reopened.getPendingSendHistory()).toEqual([])
   })
 
-  it('allows the sender to abort a delivered transfer before it is broadcast', async () => {
+  it('refuses an unsigned discard after the transfer has been delivered', async () => {
     const dependencies = createDependencies()
     vi.mocked(dependencies.transport.getAcknowledgement!).mockResolvedValueOnce(undefined)
     const service = new RgbService(dependencies)
@@ -7749,6 +7749,16 @@ describe('RgbService', () => {
     ])
 
     await expect(service.abortSend('transfer-1', { discardUnsigned: true })).resolves.toEqual({
+      aborted: false,
+      reason: 'transfer_already_progressed',
+    })
+    expect(service.getPendingTransfers()).toEqual([
+      expect.objectContaining({ id: 'transfer-1', delivery: expect.any(Object) }),
+    ])
+    expect(service.getPendingSendHistory()).toEqual([])
+    expect(dependencies.broadcaster.broadcast).not.toHaveBeenCalled()
+
+    await expect(service.abortSend('transfer-1')).resolves.toEqual({
       aborted: true,
       status: 'canceled',
     })
@@ -7756,7 +7766,6 @@ describe('RgbService', () => {
     expect(service.getPendingSendHistory()).toEqual([
       expect.objectContaining({ transferId: 'transfer-1', status: 'canceled', amount: '60' }),
     ])
-    expect(dependencies.broadcaster.broadcast).not.toHaveBeenCalled()
   })
 
   it('moves a remotely ACKed cancellation into reviewed recovery instead of calling it canceled', async () => {

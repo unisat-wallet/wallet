@@ -3474,6 +3474,14 @@
   "rgb_status_signed": {
     "message": "Signed"
   },
+  "rgb_status_incomplete": { "message": "Incomplete" },
+  "rgb_transfer_incomplete_description": { "message": "This transfer was prepared locally but was not signed or sent." },
+  "rgb_discard_incomplete_transfer": { "message": "Discard incomplete transfer" },
+  "rgb_discard_incomplete_transfer_title": { "message": "Discard this incomplete transfer?" },
+  "rgb_discard_incomplete_transfer_description": { "message": "This only removes the unfinished local transfer and releases its reserved RGB and fee inputs. Nothing was sent, and the invoice remains usable." },
+  "rgb_discard_incomplete_transfer_acknowledgement": { "message": "I understand this clears only an unfinished local transfer." },
+  "rgb_discard_incomplete_transfer_success": { "message": "Incomplete transfer cleared and reserved inputs released." },
+  "rgb_discard_incomplete_transfer_progressed": { "message": "This transfer has already progressed and can no longer be discarded as incomplete. Refresh its status before taking another action." },
   "rgb_status_waiting_ack": {
     "message": "Awaiting acceptance"
   },

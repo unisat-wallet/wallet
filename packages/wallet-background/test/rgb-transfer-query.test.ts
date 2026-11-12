@@ -46,6 +46,7 @@ describe('RgbTransferQuery', () => {
       'funding', 1, 20, { assetId: 'rgb:selected', type: 'send' }
     )
     expect(result.list.map(item => item.id)).toEqual(['local-send:selected', 'remote'])
+    expect(result.list[0]).toEqual(expect.objectContaining({ status: 'incomplete' }))
     expect(result.total).toBe(2)
   })
 

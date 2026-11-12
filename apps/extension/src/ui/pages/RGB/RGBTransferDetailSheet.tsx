@@ -25,6 +25,8 @@ import { RGBAcceptProgress } from './components/RGBAcceptProgress';
 
 function getStatusLabel(status: string, t: (key: string) => string, type?: RgbTransferItem['type']) {
   switch (status.toLowerCase()) {
+    case 'incomplete':
+      return t('rgb_status_incomplete');
     case 'signed':
       return t('rgb_status_signed');
     case 'waiting_ack':
@@ -73,6 +75,9 @@ function getTransferTitle(type: RgbTransferItem['type'] | undefined, t: (key: st
 }
 
 function getDescription(transfer: RgbTransferItem | undefined, t: (key: string) => string) {
+  if (['incomplete', 'signed'].includes(String(transfer?.status || '').toLowerCase())) {
+    return t('rgb_transfer_incomplete_description');
+  }
   if (transfer?.status === 'waiting_ack') return t('rgb_transfer_waiting_ack_description');
   if (transfer?.status === 'ready_to_broadcast') return t('rgb_transfer_ready_to_broadcast_description');
   if (transfer?.status === 'ready_for_dapp_finalize') return t('rgb_transfer_ready_for_dapp_finalize_description');
@@ -272,11 +277,14 @@ export function RGBTransferDetailSheet({
     !!onClickExploreTx;
   const canCancelSend =
     transfer?.type === 'send' &&
-    ['signed', 'waiting_ack', 'ready_for_dapp_finalize'].includes(
+    ['incomplete', 'signed', 'waiting_ack', 'ready_for_dapp_finalize'].includes(
       String(transfer?.status || '').toLowerCase()
     );
   const requiresAcknowledgedAbort =
     String(transfer?.status || '').toLowerCase() === 'ready_for_dapp_finalize';
+  const isIncompleteSend = ['incomplete', 'signed'].includes(
+    String(transfer?.status || '').toLowerCase()
+  );
   const canAcceptReceive =
     transfer?.type === 'receive' &&
     transfer.local === true &&
@@ -302,7 +310,7 @@ export function RGBTransferDetailSheet({
 
     setCancelLoading(true);
     try {
-      const discardUnsigned = String(transfer?.status || '').toLowerCase() === 'signed';
+      const discardUnsigned = isIncompleteSend;
       const result = requiresAcknowledgedAbort
         ? await wallet.abortRgbAcknowledgedSwap({ txid: abortId })
         : await wallet.abortRgbVanillaTx({
@@ -318,10 +326,14 @@ export function RGBTransferDetailSheet({
         throw new Error(
           result?.['reason'] === 'acknowledged_requires_review'
             ? t('rgb_acknowledged_requires_cancellation_review')
-            : result?.['reason'] || t('rgb_cancel_send_failed')
+            : result?.['reason'] === 'transfer_already_progressed'
+              ? t('rgb_discard_incomplete_transfer_progressed')
+              : result?.['reason'] || t('rgb_cancel_send_failed')
         );
       }
-      tools.toastSuccess(t('rgb_cancel_send_success'));
+      tools.toastSuccess(t(isIncompleteSend
+        ? 'rgb_discard_incomplete_transfer_success'
+        : 'rgb_cancel_send_success'));
       onClose();
       onCanceled?.();
       return true;
@@ -470,10 +482,19 @@ export function RGBTransferDetailSheet({
             onClick={() => setCancelConfirmVisible(false)}
             containerStyle={{ position: 'absolute', top: 30, right: 22 }}
           />
-          <Text text={t('rgb_cancel_send_confirm_title')} color="white" size="md" textCenter />
+          <Text
+            text={t(isIncompleteSend
+              ? 'rgb_discard_incomplete_transfer_title'
+              : 'rgb_cancel_send_confirm_title')}
+            color="white"
+            size="md"
+            textCenter
+          />
           <Text
             text={t(
-              requiresAcknowledgedAbort
+              isIncompleteSend
+                ? 'rgb_discard_incomplete_transfer_description'
+                : requiresAcknowledgedAbort
                 ? 'rgb_abort_external_swap_confirm_description'
                 : 'rgb_cancel_send_confirm_description'
             )}
@@ -490,7 +511,9 @@ export function RGBTransferDetailSheet({
           >
             <Text
               text={t(
-                requiresAcknowledgedAbort
+                isIncompleteSend
+                  ? 'rgb_discard_incomplete_transfer_acknowledgement'
+                  : requiresAcknowledgedAbort
                   ? 'rgb_abort_external_swap_acknowledgement'
                   : 'rgb_cancel_send_acknowledgement'
               )}
@@ -501,7 +524,7 @@ export function RGBTransferDetailSheet({
           </Checkbox>
           <Row gap="md" fullX style={{ marginTop: 24 }}>
             <Button
-              text={t('cancel_transfer')}
+              text={t(isIncompleteSend ? 'rgb_discard_incomplete_transfer' : 'cancel_transfer')}
               preset="default"
               disabled={cancelLoading || !cancelAcknowledged}
               onClick={() => {
@@ -745,7 +768,7 @@ export function RGBTransferDetailSheet({
               />
             ) : canCancelSend ? (
               <Button
-                text={t('cancel_transfer')}
+                text={t(isIncompleteSend ? 'rgb_discard_incomplete_transfer' : 'cancel_transfer')}
                 preset="default"
                 disabled={cancelLoading}
                 onClick={() => {

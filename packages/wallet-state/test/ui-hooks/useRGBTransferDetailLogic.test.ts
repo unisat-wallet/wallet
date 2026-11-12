@@ -278,11 +278,11 @@ describe('useRGBTransferDetailLogic', () => {
     await waitFor(() => expect(result.current.canCancelSend).toBe(true))
   })
 
-  it('discards a signed burn without retaining canceled history', async () => {
+  it('discards an incomplete burn without retaining canceled history', async () => {
     const signedBurn = {
       ...waitingSend,
       burn: true,
-      status: 'signed',
+      status: 'incomplete',
       transferId: 'signed-burn',
     }
     const { wrapper, wallet } = createHookTestHarness({

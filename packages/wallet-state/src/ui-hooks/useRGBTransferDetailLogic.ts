@@ -20,6 +20,7 @@ function isInProgress(transfer?: RgbTransferItem) {
   return (
     transfer.local ||
     [
+      'incomplete',
       'signed',
       'waiting_ack',
       'broadcasting',
@@ -147,7 +148,7 @@ export function useRGBTransferDetailLogic() {
   const canCancelSend =
     source !== 'send_result' &&
     transfer?.type === 'send' &&
-    ['signed', 'waiting_ack', 'ready_for_dapp_finalize'].includes(
+    ['incomplete', 'signed', 'waiting_ack', 'ready_for_dapp_finalize'].includes(
       String(transfer?.status || '').toLowerCase()
     )
   const canAcceptReceive =
@@ -179,7 +180,8 @@ export function useRGBTransferDetailLogic() {
     try {
       const requiresAcknowledgedAbort =
         String(transfer?.status || '').toLowerCase() === 'ready_for_dapp_finalize'
-      const discardUnsigned = String(transfer?.status || '').toLowerCase() === 'signed'
+      const transferStatus = String(transfer?.status || '').toLowerCase()
+      const discardUnsigned = ['incomplete', 'signed'].includes(transferStatus)
       const result = requiresAcknowledgedAbort
         ? await wallet.abortRgbAcknowledgedSwap({ txid: abortId })
         : await wallet.abortRgbVanillaTx({
@@ -200,10 +202,14 @@ export function useRGBTransferDetailLogic() {
         throw new Error(
           result?.['reason'] === 'acknowledged_requires_review'
             ? t('rgb_acknowledged_requires_cancellation_review')
-            : result?.['reason'] || t('rgb_cancel_send_failed')
+            : result?.['reason'] === 'transfer_already_progressed'
+              ? t('rgb_discard_incomplete_transfer_progressed')
+              : result?.['reason'] || t('rgb_cancel_send_failed')
         )
       }
-      tools.toastSuccess(t('rgb_cancel_send_success'))
+      tools.toastSuccess(t(discardUnsigned
+        ? 'rgb_discard_incomplete_transfer_success'
+        : 'rgb_cancel_send_success'))
       setTransfer(current =>
         current
           ? {
@@ -349,6 +355,9 @@ export function useRGBTransferDetailLogic() {
     cancellationReviewLoading,
     cancellationReviewRequested: transfer?.cancellationReviewRequested === true,
     canCancelSend,
+    isIncompleteSend: ['incomplete', 'signed'].includes(
+      String(transfer?.status || '').toLowerCase()
+    ),
     canAcceptReceive,
     canRetryBroadcast,
     canBroadcast,

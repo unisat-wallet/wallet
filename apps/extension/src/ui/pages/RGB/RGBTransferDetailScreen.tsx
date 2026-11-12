@@ -22,6 +22,8 @@ import { getRgbBurnNetworkName } from './rgbBurnNetworks';
 
 function getStatusLabel(status: string, t: (key: string) => string, type?: RgbTransferItem['type']) {
   switch (status.toLowerCase()) {
+    case 'incomplete':
+      return t('rgb_status_incomplete');
     case 'signed':
       return t('rgb_status_signed');
     case 'waiting_ack':
@@ -64,6 +66,9 @@ function getStatusLabel(status: string, t: (key: string) => string, type?: RgbTr
 }
 
 function getDescription(transfer: RgbTransferItem | undefined, t: (key: string) => string) {
+  if (['incomplete', 'signed'].includes(String(transfer?.status || '').toLowerCase())) {
+    return t('rgb_transfer_incomplete_description');
+  }
   if (transfer?.status === 'waiting_ack') return t('rgb_transfer_waiting_ack_description');
   if (transfer?.status === 'ready_to_broadcast') return t('rgb_transfer_ready_to_broadcast_description');
   if (transfer?.status === 'ready_for_dapp_finalize') return t('rgb_transfer_ready_for_dapp_finalize_description');
@@ -110,6 +115,7 @@ export default function RGBTransferDetailScreen() {
     cancellationReviewRequested,
     cancelLoading,
     canCancelSend,
+    isIncompleteSend,
     canAcceptReceive,
     canRetryBroadcast,
     canBroadcast,
@@ -328,7 +334,7 @@ export default function RGBTransferDetailScreen() {
           ) : canCancelSend ? (
             <Button
               full
-              text={t('cancel_transfer')}
+              text={t(isIncompleteSend ? 'rgb_discard_incomplete_transfer' : 'cancel_transfer')}
               disabled={cancelLoading}
               onClick={() => {
                 setCancelAcknowledged(false);
@@ -362,10 +368,17 @@ export default function RGBTransferDetailScreen() {
       {cancelConfirmVisible ? (
         <BottomModal onClose={() => setCancelConfirmVisible(false)}>
           <Column fullX gap="lg">
-            <Text preset="title" text={t('rgb_cancel_send_confirm_title')} />
+            <Text
+              preset="title"
+              text={t(isIncompleteSend
+                ? 'rgb_discard_incomplete_transfer_title'
+                : 'rgb_cancel_send_confirm_title')}
+            />
             <Text
               text={t(
-                status === 'ready_for_dapp_finalize'
+                isIncompleteSend
+                  ? 'rgb_discard_incomplete_transfer_description'
+                  : status === 'ready_for_dapp_finalize'
                   ? 'rgb_abort_external_swap_confirm_description'
                   : 'rgb_cancel_send_confirm_description'
               )}
@@ -377,7 +390,9 @@ export default function RGBTransferDetailScreen() {
             >
               <Text
                 text={t(
-                  status === 'ready_for_dapp_finalize'
+                  isIncompleteSend
+                    ? 'rgb_discard_incomplete_transfer_acknowledgement'
+                    : status === 'ready_for_dapp_finalize'
                     ? 'rgb_abort_external_swap_acknowledgement'
                     : 'rgb_cancel_send_acknowledgement'
                 )}
@@ -386,7 +401,7 @@ export default function RGBTransferDetailScreen() {
             </Checkbox>
             <Button
               full
-              text={t('cancel_transfer')}
+              text={t(isIncompleteSend ? 'rgb_discard_incomplete_transfer' : 'cancel_transfer')}
               disabled={cancelLoading || !cancelAcknowledged}
               onClick={() => {
                 void onCancelSend().then(canceled => {

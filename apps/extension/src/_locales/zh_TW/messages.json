@@ -3457,6 +3457,14 @@
   "rgb_status_signed": {
     "message": "已簽署"
   },
+  "rgb_status_incomplete": { "message": "未完成" },
+  "rgb_transfer_incomplete_description": { "message": "此轉帳僅在本機完成準備，尚未簽名或發送。" },
+  "rgb_discard_incomplete_transfer": { "message": "清除未完成轉帳" },
+  "rgb_discard_incomplete_transfer_title": { "message": "清除此未完成轉帳？" },
+  "rgb_discard_incomplete_transfer_description": { "message": "此操作只會移除未完成的本機轉帳，並釋放已預留的 RGB 與手續費輸入。資產尚未發送，Invoice 仍可繼續使用。" },
+  "rgb_discard_incomplete_transfer_acknowledgement": { "message": "我了解此操作只會清除未完成的本機轉帳。" },
+  "rgb_discard_incomplete_transfer_success": { "message": "未完成轉帳已清除，預留輸入已釋放。" },
+  "rgb_discard_incomplete_transfer_progressed": { "message": "此轉帳已進入後續階段，不能再按未完成轉帳清除。請先重新整理狀態，再選擇其他操作。" },
   "rgb_status_waiting_ack": {
     "message": "等待接受"
   },

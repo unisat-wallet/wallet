@@ -344,7 +344,7 @@ export class RgbTransferQuery {
                 ? 'waiting_ack'
                 : transfer.broadcast
                   ? 'broadcasted'
-                  : 'signed',
+                  : 'incomplete',
       local: true,
     })).filter(matchesScope)
     const localSendHistory = (service.getPendingSendHistory?.() || []).map(send => ({

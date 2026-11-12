@@ -3444,6 +3444,14 @@
   "rgb_status_signed": {
     "message": "Подписано"
   },
+  "rgb_status_incomplete": { "message": "Не завершено" },
+  "rgb_transfer_incomplete_description": { "message": "Перевод был подготовлен локально, но не был подписан или отправлен." },
+  "rgb_discard_incomplete_transfer": { "message": "Удалить незавершённый перевод" },
+  "rgb_discard_incomplete_transfer_title": { "message": "Удалить этот незавершённый перевод?" },
+  "rgb_discard_incomplete_transfer_description": { "message": "Будет удалён только незавершённый локальный перевод и освобождены зарезервированные входы RGB и комиссии. Ничего не отправлено, инвойс останется доступен." },
+  "rgb_discard_incomplete_transfer_acknowledgement": { "message": "Я понимаю, что удаляется только незавершённый локальный перевод." },
+  "rgb_discard_incomplete_transfer_success": { "message": "Незавершённый перевод удалён, зарезервированные входы освобождены." },
+  "rgb_discard_incomplete_transfer_progressed": { "message": "Этот перевод уже перешёл на следующий этап и не может быть удалён как незавершённый. Обновите его статус перед другим действием." },
   "rgb_status_waiting_ack": {
     "message": "Ожидание подтверждения получателя"
   },

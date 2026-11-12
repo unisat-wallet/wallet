@@ -33,6 +33,8 @@ function getTransferTitle(type: RgbTransferItem['type'], t: (key: string) => str
 
 function getStatusLabel(status: string, t: (key: string) => string, type: RgbTransferItem['type']) {
   switch (status.toLowerCase()) {
+    case 'incomplete':
+      return t('rgb_status_incomplete');
     case 'signed':
       return t('rgb_status_signed');
     case 'waiting_ack':

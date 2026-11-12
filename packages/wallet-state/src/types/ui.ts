@@ -100,6 +100,7 @@ export interface RgbActivityItem {
 }
 
 export type RgbTransferStatus =
+  | 'incomplete'
   | 'signed'
   | 'waiting_ack'
   | 'pending_accept'
