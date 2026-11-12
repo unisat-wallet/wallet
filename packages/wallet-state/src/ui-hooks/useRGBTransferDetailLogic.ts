@@ -75,6 +75,7 @@ export function useRGBTransferDetailLogic() {
   const [cancelLoading, setCancelLoading] = useState(false)
   const [receiveActionLoading, setReceiveActionLoading] = useState(false)
   const [broadcastRetryLoading, setBroadcastRetryLoading] = useState(false)
+  const [cancellationReviewLoading, setCancellationReviewLoading] = useState(false)
   const [senderCanceledVisible, setSenderCanceledVisible] = useState(false)
   const {
     progress: acceptProgress,
@@ -301,6 +302,27 @@ export function useRGBTransferDetailLogic() {
     }
   }
 
+  const onRequestCancellationReview = async () => {
+    const retryId = resolveAbortTransferId(transfer, transferId)
+    if (!retryId || cancellationReviewLoading) return false
+    setCancellationReviewLoading(true)
+    try {
+      const result = await wallet.requestRgbBroadcastCancellationReview({ transferId: retryId })
+      if (result.status === 'canceled') {
+        setTransfer(current => current ? { ...current, status: 'canceled', local: true } : current)
+        tools.toastSuccess(t('rgb_cancel_send_success'))
+      } else {
+        tools.toastSuccess(t('rgb_broadcast_cancellation_review_requested'))
+      }
+      return true
+    } catch (e: unknown) {
+      tools.toastError(getTransferActionErrorMessage(e, t('rgb_broadcast_cancellation_review_failed')))
+      return false
+    } finally {
+      setCancellationReviewLoading(false)
+    }
+  }
+
   return {
     transfer,
     transferId,
@@ -309,6 +331,7 @@ export function useRGBTransferDetailLogic() {
     receiveActionLoading,
     acceptProgress,
     broadcastRetryLoading,
+    cancellationReviewLoading,
     canCancelSend,
     canAcceptReceive,
     canRetryBroadcast,
@@ -321,6 +344,7 @@ export function useRGBTransferDetailLogic() {
     onAcceptReceive,
     onRejectReceive,
     onRetryBroadcast,
+    onRequestCancellationReview,
     dismissSenderCanceled: () => setSenderCanceledVisible(false),
   }
 }

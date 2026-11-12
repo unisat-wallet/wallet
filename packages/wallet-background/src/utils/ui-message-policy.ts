@@ -199,6 +199,7 @@ const UI_CONTROLLER_METHODS = new Set([
   'restoreLatestRgbRecoveryCheckpoint',
   'restoreRgbBackupFile',
   'retryRgbBroadcast',
+  'requestRgbBroadcastCancellationReview',
   'saveContactsOrder',
   'setAcceptLowFeeMode',
   'setAccountAlianName',

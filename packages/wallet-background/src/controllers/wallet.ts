@@ -27,6 +27,7 @@ import {
   restoreAttestedBfaHistory,
   validateBfaTransferConsignment,
   type BfaValidationAttestationPayload,
+  type RgbIssueHistoryItem,
   type RgbServiceDependencies,
   type RgbNetwork,
 } from '@unisat/rgb-service'
@@ -4286,7 +4287,7 @@ export class WalletController extends BaseController {
     const { service, wallet } = await this.getLocalRgbReadService()
     if (params.address !== wallet.fundingAddress) return page
 
-    const issueHistory = service.getIssueHistory?.() || []
+    const issueHistory: RgbIssueHistoryItem[] = service.getIssueHistory?.() || []
     if (!issueHistory.length) return page
     const issueByAssetId = new Map(issueHistory.map(issue => [issue.assetId, issue]))
     const pageList = page.list.map(item => {
@@ -6279,6 +6280,9 @@ export class WalletController extends BaseController {
 
   retryRgbBroadcast = (params: { transferId: string }) =>
     this.rgbSendOperations.retryBroadcast(params.transferId)
+
+  requestRgbBroadcastCancellationReview = (params: { transferId: string }) =>
+    this.rgbSendOperations.requestBroadcastCancellationReview(params.transferId)
 
   private syncRgbReceivedAllocations = async () => {
     const context = await this.getLocalRgbService()

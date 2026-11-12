@@ -5425,6 +5425,37 @@ export class RgbService {
     return canceled
   }
 
+  /** Explicitly enqueue an ACKed broadcast failure for reviewed cancellation. */
+  async requestBroadcastCancellationReview(transferId: string) {
+    const state = this.requireState()
+    const pending = state.pending[transferId]
+    const delivery = pending?.delivery
+    if (!pending || !delivery?.broadcastError || pending.broadcast) {
+      throw new RgbServiceError('RGB transfer is not eligible for broadcast cancellation review')
+    }
+    if (!delivery.acknowledgedAt && !pending.request.donation) {
+      throw new RgbServiceError('RGB transfer has not been acknowledged by the receiver')
+    }
+    if (
+      !this.dependencies.stateSource.reportBroadcastFailure ||
+      !this.dependencies.stateSource.getBroadcastCancellation
+    ) {
+      throw new RgbServiceError('RGB broadcast cancellation review is unavailable')
+    }
+    delete delivery.failureReportedAt
+    await this.reportPendingBroadcastFailure(transferId, pending)
+    const canceled = await this.dependencies.stateSource.getBroadcastCancellation(
+      state.wallet,
+      decodeRgbInvoice(pending.request.invoice).proxyRecipientId,
+      delivery.completed.txid
+    )
+    if (canceled) {
+      await this.cancelTerminalBroadcastFailure(transferId, pending)
+      return { requested: true as const, status: 'canceled' as const }
+    }
+    return { requested: true as const, status: 'pending_review' as const }
+  }
+
   private async reportPendingBroadcastFailure(transferId: string, pending: RgbPendingTransfer) {
     const delivery = pending.delivery
     const report = this.dependencies.stateSource.reportBroadcastFailure

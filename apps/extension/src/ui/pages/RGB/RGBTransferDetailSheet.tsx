@@ -230,6 +230,7 @@ export function RGBTransferDetailSheet({
   const [cancelLoading, setCancelLoading] = useState(false);
   const [actionLoading, setActionLoading] = useState(false);
   const [broadcastRetryLoading, setBroadcastRetryLoading] = useState(false);
+  const [cancellationReviewLoading, setCancellationReviewLoading] = useState(false);
   const [senderCanceledVisible, setSenderCanceledVisible] = useState(false);
   const {
     progress: acceptProgress,
@@ -417,6 +418,26 @@ export function RGBTransferDetailSheet({
       tools.toastError(message);
     } finally {
       setBroadcastRetryLoading(false);
+    }
+  };
+
+  const onRequestCancellationReview = async () => {
+    const retryTransferId = resolveAbortTransferId(transfer, transferId);
+    if (!retryTransferId || cancellationReviewLoading) return;
+    setCancellationReviewLoading(true);
+    try {
+      const result = await wallet.requestRgbBroadcastCancellationReview({ transferId: retryTransferId });
+      tools.toastSuccess(t(result.status === 'canceled'
+        ? 'rgb_cancel_send_success'
+        : 'rgb_broadcast_cancellation_review_requested'));
+      if (result.status === 'canceled') {
+        onClose();
+        onCanceled?.();
+      }
+    } catch (e: unknown) {
+      tools.toastError(getTransferActionErrorMessage(e, t('rgb_broadcast_cancellation_review_failed')));
+    } finally {
+      setCancellationReviewLoading(false);
     }
   };
 
@@ -680,9 +701,28 @@ export function RGBTransferDetailSheet({
                 full
                 style={{ height: 48, minHeight: 48 }}
               />
-            ) : canBroadcast || canRetryBroadcast ? (
+            ) : canRetryBroadcast ? (
+              <Row gap="md" fullX>
+                <Button
+                  text={t('rgb_request_cancellation_review')}
+                  preset="default"
+                  disabled={cancellationReviewLoading || broadcastRetryLoading}
+                  onClick={() => void requestWrite(() => void onRequestCancellationReview())}
+                  full
+                  style={{ height: 48, minHeight: 48 }}
+                />
+                <Button
+                  text={t('rgb_retry_broadcast')}
+                  preset="primary"
+                  disabled={broadcastRetryLoading || cancellationReviewLoading}
+                  onClick={() => void requestWrite(() => void onRetryBroadcast())}
+                  full
+                  style={{ height: 48, minHeight: 48 }}
+                />
+              </Row>
+            ) : canBroadcast ? (
               <Button
-                text={t(canBroadcast ? 'Broadcast' : 'rgb_retry_broadcast')}
+                text={t('Broadcast')}
                 preset="primary"
                 disabled={broadcastRetryLoading}
                 onClick={() => void requestWrite(() => void onRetryBroadcast())}

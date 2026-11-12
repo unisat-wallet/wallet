@@ -273,6 +273,13 @@ export class RgbSendOperations {
     return { broadcast: true, status: 'confirming' as const }
   }
 
+  async requestBroadcastCancellationReview(transferId: string) {
+    const { service, wallet } = await this.dependencies.getContext()
+    await this.dependencies.ensureWriteLease?.({ service, wallet }, { forceRenew: true })
+    await this.dependencies.assertContext?.({ service, wallet })
+    return service.requestBroadcastCancellationReview(transferId)
+  }
+
   async abortVanillaTx(
     txid: string,
     boundContext?: LocalRgbServiceContext,

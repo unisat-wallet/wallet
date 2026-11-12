@@ -106,6 +106,7 @@ export default function RGBTransferDetailScreen() {
     receiveActionLoading,
     acceptProgress,
     broadcastRetryLoading,
+    cancellationReviewLoading,
     cancelLoading,
     canCancelSend,
     canAcceptReceive,
@@ -117,6 +118,7 @@ export default function RGBTransferDetailScreen() {
     onAcceptReceive,
     onRejectReceive,
     onRetryBroadcast,
+    onRequestCancellationReview,
     onCancelSend,
     dismissSenderCanceled,
     t
@@ -294,10 +296,26 @@ export default function RGBTransferDetailScreen() {
                 onClick={() => void onAcceptReceive()}
               />
             </Row>
-          ) : canBroadcast || canRetryBroadcast ? (
+          ) : canRetryBroadcast ? (
+            <Row fullX gap="md">
+              <Button
+                full
+                text={t('rgb_request_cancellation_review')}
+                preset="default"
+                disabled={cancellationReviewLoading || broadcastRetryLoading}
+                onClick={() => void onRequestCancellationReview()}
+              />
+              <Button
+                full
+                text={t('rgb_retry_broadcast')}
+                disabled={broadcastRetryLoading || cancellationReviewLoading}
+                onClick={() => void onRetryBroadcast()}
+              />
+            </Row>
+          ) : canBroadcast ? (
             <Button
               full
-              text={t(canBroadcast ? 'Broadcast' : 'rgb_retry_broadcast')}
+              text={t('Broadcast')}
               disabled={broadcastRetryLoading}
               onClick={() => void onRetryBroadcast()}
             />

@@ -943,6 +943,11 @@ export interface WalletController {
     error?: string
   }>
 
+  requestRgbBroadcastCancellationReview(params: { transferId: string }): Promise<{
+    requested: true
+    status: 'pending_review' | 'canceled'
+  }>
+
   acceptRgbReceive(params: { recipientId: string; progressId?: string }): Promise<{
     accepted: boolean
     status: 'accepted' | 'pending' | 'canceled'

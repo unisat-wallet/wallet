@@ -3668,6 +3668,9 @@
   "rgb_retry_broadcast_failed": {
     "message": "Failed to broadcast transaction"
   },
+  "rgb_request_cancellation_review": { "message": "Request cancellation review" },
+  "rgb_broadcast_cancellation_review_requested": { "message": "Cancellation review requested" },
+  "rgb_broadcast_cancellation_review_failed": { "message": "Failed to request cancellation review" },
   "rgb_transfer_confirming_description": {
     "message": "Accepted. Waiting for on-chain confirmation."
   },

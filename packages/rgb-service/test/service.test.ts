@@ -7523,6 +7523,54 @@ describe('RgbService', () => {
     ])
   })
 
+  it('re-reports an ACKed broadcast failure for cancellation review and applies the decision', async () => {
+    const dependencies = createDependencies()
+    dependencies.broadcaster.broadcast = vi.fn().mockRejectedValue(
+      new Error('bad-txns-inputs-missingorspent')
+    )
+    dependencies.stateSource.reportBroadcastFailure = vi.fn().mockResolvedValue(undefined)
+    dependencies.stateSource.getBroadcastCancellation = vi.fn().mockResolvedValue(false)
+    const service = new RgbService(dependencies)
+    await service.open(wallet)
+    await service.sync()
+    await service.prepareSend({
+      assetId: 'rgb:AQEBAQEB-AQEBAQE-BAQEBAQ-EBAQEBA-QEBAQEB-AQEBAQE',
+      amount: '60',
+      invoice: rgbInvoice(),
+      feeRate: 2,
+    })
+
+    await service.completeSend('transfer-1', 'signed-psbt')
+    await expect(service.broadcastPendingSend('transfer-1')).rejects.toThrow(
+      'bad-txns-inputs-missingorspent'
+    )
+    await expect(service.requestBroadcastCancellationReview('transfer-1')).resolves.toEqual({
+      requested: true,
+      status: 'pending_review',
+    })
+    expect(dependencies.stateSource.reportBroadcastFailure).toHaveBeenLastCalledWith(
+      wallet,
+      expect.objectContaining({
+        transferId: 'transfer-1',
+        recipientId: expect.any(String),
+        txid: 'c'.repeat(64),
+        rawTx: '02000000000000000000',
+        error: 'bad-txns-inputs-missingorspent',
+      })
+    )
+    expect(service.getPendingTransfers()).toHaveLength(1)
+
+    vi.mocked(dependencies.stateSource.getBroadcastCancellation).mockResolvedValue(true)
+    await expect(service.requestBroadcastCancellationReview('transfer-1')).resolves.toEqual({
+      requested: true,
+      status: 'canceled',
+    })
+    expect(service.getPendingTransfers()).toEqual([])
+    expect(service.getPendingSendHistory()).toEqual([
+      expect.objectContaining({ transferId: 'transfer-1', status: 'canceled' }),
+    ])
+  })
+
   it('releases an accepted receive only for a reviewed backend cancellation', async () => {
     const dependencies = createDependencies()
     dependencies.transport.getAcknowledgement = vi.fn().mockResolvedValue(false)
