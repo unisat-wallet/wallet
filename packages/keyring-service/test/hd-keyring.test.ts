@@ -30,13 +30,17 @@ describe('bitcoin-hd-keyring', () => {
         mnemonic: sampleMnemonic,
         activeIndexes: [0],
       })
+      keyring.getAddresses(5, 6)
       const masterPrivateKey = keyring.hdWallet.privateKey
       const accountPrivateKey = keyring.wallets[0]!.privateKey!
+      const pagedPrivateKey = (keyring as any)._index2wallet[5][1].privateKey
 
       keyring.clearSensitiveData()
 
       expect([...masterPrivateKey]).toEqual(new Array(32).fill(0))
       expect([...accountPrivateKey]).toEqual(new Array(32).fill(0))
+      expect([...pagedPrivateKey]).toEqual(new Array(32).fill(0))
+      expect((keyring as any)._index2wallet).toEqual({})
       expect(keyring.mnemonic).toBe('')
       expect(keyring.passphrase).toBe('')
       expect(keyring.hdWallet).toBeUndefined()

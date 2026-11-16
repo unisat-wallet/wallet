@@ -516,6 +516,10 @@ export class HdKeyring extends SimpleKeyring {
   override clearSensitiveData() {
     super.clearSensitiveData()
 
+    for (const [, wallet] of Object.values(this._index2wallet)) {
+      wallet.privateKey?.fill(0)
+    }
+
     const wipeHdNode = (node: any) => {
       node?.privateKey?.fill(0)
       node?._privateKey?.fill(0)
