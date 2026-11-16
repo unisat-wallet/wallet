@@ -8,7 +8,7 @@ import { useNavigate } from '@/ui/pages/MainRoute';
 import { satoshisToAmount } from '@/ui/utils';
 import { isValidHdPath } from '@/ui/utils/bitcoin-utils';
 import { LoadingOutlined } from '@ant-design/icons';
-import { ADDRESS_TYPES, RESTORE_WALLETS, RestoreWalletType, getAccountDerivationPath } from '@unisat/wallet-shared';
+import { ADDRESS_TYPES, RestoreWalletType, getAccountDerivationPath } from '@unisat/wallet-shared';
 import {
   keyringsActions,
   useAppDispatch,
@@ -19,6 +19,8 @@ import {
   useWallet
 } from '@unisat/wallet-state';
 import { AddressType } from '@unisat/wallet-types';
+
+import { constrainRestoreDerivationParams, getRestoreWalletConfig } from './restoreWalletPolicy';
 
 export function Step_ChooseAddressType({
   contextData,
@@ -34,7 +36,10 @@ export function Step_ChooseAddressType({
   const tools = useTools();
   const { t } = useI18n();
 
-  const restoreWallet = RESTORE_WALLETS[contextData.restoreWalletType];
+  const restoreWallet = getRestoreWalletConfig(contextData.restoreWalletType);
+  const effectivePassphrase = contextData.isRestore && !restoreWallet.phraseSupport ? '' : contextData.passphrase;
+  const effectiveCustomHdPath =
+    contextData.isRestore && !restoreWallet.customPathSupport ? '' : contextData.customHdPath;
 
   const hdPathOptions = useMemo(() => {
     return ADDRESS_TYPES.filter((v) => {
@@ -49,7 +54,7 @@ export function Step_ChooseAddressType({
         return false;
       }
 
-      if (contextData.customHdPath && v.isUnisatLegacy) {
+      if (effectiveCustomHdPath && v.isUnisatLegacy) {
         return false;
       }
 
@@ -64,7 +69,7 @@ export function Step_ChooseAddressType({
           isUnisatLegacy: v.isUnisatLegacy
         };
       });
-  }, [contextData.customHdPath, contextData.isRestore, contextData.restoreWalletType]);
+  }, [contextData.isRestore, effectiveCustomHdPath, restoreWallet.addressTypes]);
 
   const allHdPathOptions = useMemo(() => {
     return ADDRESS_TYPES.map((v) => v)
@@ -130,24 +135,30 @@ export function Step_ChooseAddressType({
 
     try {
       const keyrings = await Promise.all(
-        hdPathOptions.map((options) =>
-          contextData.isRestore
+        hdPathOptions.map((options) => {
+          const derivation = constrainRestoreDerivationParams({
+            restoreWalletType: contextData.restoreWalletType,
+            defaultHdPath: options.hdPath,
+            customHdPath: effectiveCustomHdPath,
+            passphrase: effectivePassphrase
+          });
+          return contextData.isRestore
             ? wallet.createTmpKeyringWithMnemonics(
                 contextData.mnemonics,
-                contextData.customHdPath || options.hdPath,
-                contextData.passphrase,
+                derivation.hdPath,
+                derivation.passphrase,
                 options.addressType,
                 1,
                 isMagicEden
               )
             : wallet.createTmpKeyringWithPreMnemonic(
-                contextData.customHdPath || options.hdPath,
-                contextData.passphrase,
+                derivation.hdPath,
+                derivation.passphrase,
                 options.addressType,
                 1,
                 isMagicEden
-              )
-        )
+              );
+        })
       );
       const addresses = keyrings.map((keyring) => keyring.accounts[0]?.address ?? '');
 
@@ -164,10 +175,11 @@ export function Step_ChooseAddressType({
       }
     }
   }, [
-    contextData.customHdPath,
     contextData.isRestore,
     contextData.mnemonics,
-    contextData.passphrase,
+    contextData.restoreWalletType,
+    effectiveCustomHdPath,
+    effectivePassphrase,
     hdPathOptions,
     isMagicEden,
     wallet
@@ -281,22 +293,27 @@ export function Step_ChooseAddressType({
     try {
       if (scannedGroups.length > 0) {
         const option = allHdPathOptions[contextData.addressTypeIndex];
-        const hdPath = contextData.customHdPath || option.hdPath;
+        const derivation = constrainRestoreDerivationParams({
+          restoreWalletType: contextData.restoreWalletType,
+          defaultHdPath: option.hdPath,
+          customHdPath: effectiveCustomHdPath,
+          passphrase: effectivePassphrase
+        });
         const selected = scannedGroups[contextData.addressTypeIndex];
 
         if (contextData.isRestore) {
           await createAccount(
             contextData.mnemonics,
-            hdPath,
-            contextData.passphrase,
+            derivation.hdPath,
+            derivation.passphrase,
             contextData.addressType,
             selected.address_arr.length,
             isMagicEden
           );
         } else {
           await createAccountFromPreMnemonic(
-            hdPath,
-            contextData.passphrase,
+            derivation.hdPath,
+            derivation.passphrase,
             contextData.addressType,
             selected.address_arr.length,
             isMagicEden
@@ -304,18 +321,29 @@ export function Step_ChooseAddressType({
         }
       } else {
         const option = hdPathOptions[contextData.addressTypeIndex];
-        const hdPath = contextData.customHdPath || option.hdPath;
+        const derivation = constrainRestoreDerivationParams({
+          restoreWalletType: contextData.restoreWalletType,
+          defaultHdPath: option.hdPath,
+          customHdPath: effectiveCustomHdPath,
+          passphrase: effectivePassphrase
+        });
         if (contextData.isRestore) {
           await createAccount(
             contextData.mnemonics,
-            hdPath,
-            contextData.passphrase,
+            derivation.hdPath,
+            derivation.passphrase,
             contextData.addressType,
             1,
             isMagicEden
           );
         } else {
-          await createAccountFromPreMnemonic(hdPath, contextData.passphrase, contextData.addressType, 1, isMagicEden);
+          await createAccountFromPreMnemonic(
+            derivation.hdPath,
+            derivation.passphrase,
+            contextData.addressType,
+            1,
+            isMagicEden
+          );
         }
       }
 
@@ -352,18 +380,24 @@ export function Step_ChooseAddressType({
         const address_arr: string[] = [];
         const satoshis_arr: number[] = [];
         try {
+          const derivation = constrainRestoreDerivationParams({
+            restoreWalletType: contextData.restoreWalletType,
+            defaultHdPath: options.hdPath,
+            customHdPath: effectiveCustomHdPath,
+            passphrase: effectivePassphrase
+          });
           const keyring = contextData.isRestore
             ? await wallet.createTmpKeyringWithMnemonics(
                 contextData.mnemonics,
-                contextData.customHdPath || options.hdPath,
-                contextData.passphrase,
+                derivation.hdPath,
+                derivation.passphrase,
                 options.addressType,
                 10,
                 isMagicEden
               )
             : await wallet.createTmpKeyringWithPreMnemonic(
-                contextData.customHdPath || options.hdPath,
-                contextData.passphrase,
+                derivation.hdPath,
+                derivation.passphrase,
                 options.addressType,
                 10,
                 isMagicEden
@@ -440,7 +474,16 @@ export function Step_ChooseAddressType({
               items={item.address_arr.map((v, index) => ({
                 address: v,
                 satoshis: item.satoshis_arr[index],
-                path: getAccountDerivationPath(contextData.customHdPath || options.hdPath, index, isMagicEden)
+                path: getAccountDerivationPath(
+                  constrainRestoreDerivationParams({
+                    restoreWalletType: contextData.restoreWalletType,
+                    defaultHdPath: options.hdPath,
+                    customHdPath: effectiveCustomHdPath,
+                    passphrase: effectivePassphrase
+                  }).hdPath,
+                  index,
+                  isMagicEden
+                )
               }))}
               checked={index == contextData.addressTypeIndex}
               onClick={() => {
@@ -466,7 +509,16 @@ export function Step_ChooseAddressType({
             return null;
           }
 
-          const hdPath = getAccountDerivationPath(contextData.customHdPath || item.hdPath, 0, isMagicEden);
+          const hdPath = getAccountDerivationPath(
+            constrainRestoreDerivationParams({
+              restoreWalletType: contextData.restoreWalletType,
+              defaultHdPath: item.hdPath,
+              customHdPath: effectiveCustomHdPath,
+              passphrase: effectivePassphrase
+            }).hdPath,
+            0,
+            isMagicEden
+          );
           return (
             <AddressTypeCard
               key={index}

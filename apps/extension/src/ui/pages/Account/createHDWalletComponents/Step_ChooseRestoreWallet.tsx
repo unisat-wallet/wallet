@@ -1,8 +1,10 @@
 import { Button, Column, Row, Text } from '@/ui/components';
-import { ContextData, TabType, UpdateContextDataParams } from '@/ui/pages/Account/createHDWalletComponents/types';
+import { ContextData, UpdateContextDataParams } from '@/ui/pages/Account/createHDWalletComponents/types';
 import { colors } from '@/ui/theme/colors';
-import { RESTORE_WALLETS, WordsType } from '@unisat/wallet-shared';
+import { RESTORE_WALLETS } from '@unisat/wallet-shared';
 import { useI18n } from '@unisat/wallet-state';
+
+import { getRestoreWalletSwitchState } from './restoreWalletPolicy';
 
 export function Step_ChooseRestoreWallet({
   contextData,
@@ -37,11 +39,7 @@ export function Step_ChooseRestoreWallet({
                 borderColor: colors.white_light2
               }}
               onClick={() => {
-                const wordsType = item.wordsTypes.includes(contextData.wordsType)
-                  ? contextData.wordsType
-                  : (item.wordsTypes[0] ?? WordsType.WORDS_12);
-
-                updateContextData({ tabType: TabType.IMPORT_WORDS, restoreWalletType: item.value, wordsType });
+                updateContextData(getRestoreWalletSwitchState(item.value, contextData.wordsType));
               }}
               data-testid={`restore-wallet-type-option-${index}`}
             >

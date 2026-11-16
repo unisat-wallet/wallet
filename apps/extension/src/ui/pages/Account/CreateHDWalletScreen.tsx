@@ -135,6 +135,7 @@ export default function CreateHDWalletScreen() {
             label: t('address_type'),
             children: (
               <Step_ChooseAddressType
+                key={contextData.restoreWalletType}
                 contextData={contextData}
                 updateContextData={updateContextData}
                 clearSensitiveState={clearSensitiveState}
