@@ -21,13 +21,22 @@ export class ApprovalService extends EventEmitter {
   getApproval = () => this.approval?.data
 
   resolveApproval = async (data?: any, forceReject = false) => {
-    if (forceReject) {
-      this.approval?.reject(new WalletError(ErrorCodes.UserCancel, 'User Cancel'))
-    } else {
-      this.approval?.resolve(data)
-    }
+    const approval = this.approval
     this.approval = null
-    await this.clear()
+    // Finish removing the current notification before settling its Promise.
+    // The provider flow may synchronously request its next approval as soon as
+    // this Promise settles; resolving first lets the old window-removal event
+    // reject that newly-created approval.
+    try {
+      await this.clear()
+    } catch {
+      // Window cleanup must never leave the dApp request pending forever.
+    }
+    if (forceReject) {
+      approval?.reject(new WalletError(ErrorCodes.UserCancel, 'User Cancel'))
+    } else {
+      approval?.resolve(data)
+    }
     this.emit('resolve', data)
   }
 
@@ -48,13 +57,18 @@ export class ApprovalService extends EventEmitter {
 
   rejectApproval = async (err?: string, stay = false, isInternal = false) => {
     if (!this.approval) return
-    if (isInternal) {
-      this.approval?.reject(new WalletError(ErrorCodes.UserCancel, err))
-    } else {
-      this.approval?.reject(new WalletError(ErrorCodes.UserCancel, err))
+    const approval = this.approval
+    this.approval = null
+    try {
+      await this.clear(stay)
+    } catch {
+      // Reject the dApp request even when the notification cannot be closed.
     }
-
-    await this.clear(stay)
+    if (isInternal) {
+      approval.reject(new WalletError(ErrorCodes.UserCancel, err))
+    } else {
+      approval.reject(new WalletError(ErrorCodes.UserCancel, err))
+    }
     this.emit('reject', err)
   }
 

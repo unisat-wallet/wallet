@@ -22,10 +22,13 @@ export default function UnlockScreen() {
   const isUnlocked = useIsUnlocked();
 
   useEffect(() => {
-    if (isUnlocked) {
+    // A notification unlock is only the first stage of the dApp request.
+    // Its background flow will close this window and open the real approval;
+    // navigating to MainScreen here makes the request appear to be lost.
+    if (isUnlocked && !isInNotification) {
       navigate('MainScreen');
     }
-  }, [isUnlocked, navigate]);
+  }, [isInNotification, isUnlocked, navigate]);
 
   const [loading, setLoading] = useState(false);
 

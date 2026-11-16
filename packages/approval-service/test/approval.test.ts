@@ -183,6 +183,35 @@ describe('ApprovalService', () => {
       await service.resolveApproval()
       expect(service.platformCloseWindow).toHaveBeenCalled()
     })
+
+    it('settles only after the old notification is closed', async () => {
+      let finishClose!: () => void
+      service.platformCloseWindow = vi.fn(() => new Promise<void>(resolve => {
+        finishClose = resolve
+      }))
+      const promise = service.requestApproval(makeApprovalData())
+      await flushAsync()
+      let settled = false
+      void promise.finally(() => { settled = true })
+
+      const resolving = service.resolveApproval('unlocked')
+      await Promise.resolve()
+      expect(settled).toBe(false)
+
+      finishClose()
+      await resolving
+      await expect(promise).resolves.toBe('unlocked')
+      expect(settled).toBe(true)
+    })
+
+    it('still settles when closing the notification fails', async () => {
+      service.platformCloseWindow = vi.fn().mockRejectedValue(new Error('window already gone'))
+      const promise = service.requestApproval(makeApprovalData())
+      await flushAsync()
+
+      await expect(service.resolveApproval('ok')).resolves.toBeUndefined()
+      await expect(promise).resolves.toBe('ok')
+    })
   })
 
   // ── rejectApproval ────────────────────────────────────────────────────────
@@ -221,6 +250,15 @@ describe('ApprovalService', () => {
       await service.rejectApproval('err', true)
       await expect(promise).rejects.toBeDefined()
       expect((service.platformCloseWindow as ReturnType<typeof vi.fn>).mock.calls.length).toBe(closeCallsBefore)
+    })
+
+    it('still rejects when closing the notification fails', async () => {
+      service.platformCloseWindow = vi.fn().mockRejectedValue(new Error('window already gone'))
+      const promise = service.requestApproval(makeApprovalData())
+      await flushAsync()
+
+      await expect(service.rejectApproval('cancelled')).resolves.toBeUndefined()
+      await expect(promise).rejects.toMatchObject({ code: 4001, message: 'cancelled' })
     })
   })
 

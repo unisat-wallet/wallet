@@ -80,4 +80,25 @@ describe('provider connection approval', () => {
     expect(approvalService.requestApproval).toHaveBeenCalledTimes(1)
     expect(approvalService.requestApproval).toHaveBeenCalledWith({ lock: true })
   })
+
+  it('continues to the original connection approval after unlock', async () => {
+    vi.mocked(keyringService.memStore.getState).mockReturnValue({ isUnlocked: false } as any)
+    vi.mocked(permissionService.hasPermission).mockReturnValue(false)
+    vi.mocked(approvalService.requestApproval)
+      .mockResolvedValueOnce(undefined)
+      .mockResolvedValueOnce({
+        approved: true,
+        origin: 'https://dapp.example',
+      })
+
+    await expect(rpcFlow(request())).resolves.toBe('public-key')
+
+    expect(approvalService.requestApproval).toHaveBeenCalledTimes(2)
+    expect(approvalService.requestApproval).toHaveBeenNthCalledWith(1, { lock: true })
+    expect(approvalService.requestApproval).toHaveBeenNthCalledWith(
+      2,
+      expect.objectContaining({ approvalComponent: 'Connect' }),
+      { height: 600 }
+    )
+  })
 })
