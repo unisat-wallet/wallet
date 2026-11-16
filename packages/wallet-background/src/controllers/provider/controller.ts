@@ -1393,7 +1393,7 @@ class ProviderController extends BaseController {
     session: { origin },
     approvalRes,
   }: {
-    data: { params: { invoice: string; assetId: string; amount: string; btcReceiveAmount: string; feeRate?: number; psbt: string; backendPublicKey?: string; rgbProxyApproval?: RgbProxyApprovalRequirement } }
+    data: { params: { invoice: string; assetId: string; amount: string; btcReceiveAmount: string; feeRate?: number; psbt: string; rgbProxyApproval?: RgbProxyApprovalRequirement } }
     session: { origin: string }
     approvalRes?: { approvedRgbProxyEndpoints?: unknown }
   }) => {
@@ -1410,12 +1410,6 @@ class ProviderController extends BaseController {
     if (!Number.isSafeInteger(btcReceiveAmount) || btcReceiveAmount <= 0) {
       throw new Error('btcReceiveAmount is out of range')
     }
-    if (
-      params.backendPublicKey !== undefined &&
-      !/^[0-9a-f]{64}$/i.test(params.backendPublicKey)
-    ) {
-      throw new Error('backendPublicKey must be a 32-byte Ed25519 public key')
-    }
     const account = await wallet.getCurrentAccount()
     if (!account) throw new Error('no current account')
     const receiveScript = bitcoin.address.toOutputScript(account.address, toPsbtNetwork(wallet.getNetworkType()))
@@ -1431,9 +1425,6 @@ class ProviderController extends BaseController {
       ...(params.feeRate === undefined ? {} : { feeRate: params.feeRate }),
       swapPsbt: params.psbt,
       providerOrigin: origin,
-      ...(params.backendPublicKey
-        ? { providerBackendPublicKey: params.backendPublicKey.toLowerCase() }
-        : {}),
     })
     return {
       transferId: prepared.id,
@@ -1500,30 +1491,17 @@ class ProviderController extends BaseController {
     })
   }
 
-  /**
-   * The backend retained and finalized the transaction. Authenticate that
-   * commitment and the receiver ACK without importing or returning its PSBT.
-   */
-  acceptRgbSellSwap = async ({
+  /** Query and verify the receiver's Proxy ACK without accepting transaction bytes. */
+  syncRgbSellSwapAck = async ({
     data: { params },
     session: { origin },
   }: {
-    data: { params: { transferId: string; txid: string; transactionCommitment: string } }
+    data: { params: { transferId: string } }
     session: { origin: string }
   }) => {
-    if (
-      !params.transferId ||
-      !/^[0-9a-f]{64}$/i.test(params.txid) ||
-      !/^[0-9a-f]{128}$/i.test(params.transactionCommitment)
-    ) {
-      throw new Error('transferId, txid and a 64-byte transactionCommitment are required')
-    }
+    if (!params.transferId) throw new Error('transferId is required')
     await assertRgbPaymentOrigin(params.transferId, origin)
-    return wallet.acceptRgbSwapExternalBroadcast({
-      transferId: params.transferId,
-      txid: params.txid.toLowerCase(),
-      transactionCommitment: params.transactionCommitment.toLowerCase(),
-    })
+    return wallet.syncRgbSellSwapAcknowledgement({ transferId: params.transferId })
   }
 
   @Reflect.metadata('APPROVAL', ['RgbPaymentCancel', prepareRgbPaymentCancelApproval])

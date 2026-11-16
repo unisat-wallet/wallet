@@ -260,8 +260,6 @@ export interface RgbPendingTransfer {
    * state only and is deliberately omitted from recovery checkpoints.
    */
   providerOrigin?: string
-  /** Ed25519 identity authorized to attest backend-controlled swap completion. */
-  providerBackendPublicKey?: string
   /** Internal self-transfer that creates an exact allocation for a terminal BFA burn. */
   burnSplit?: {
     request: RgbTransferRequest & { amount: string; burn: true }
@@ -281,10 +279,8 @@ export interface RgbPendingTransfer {
     requiresCounterpartySignature?: boolean
     /** Encrypted local copy used to ensure the returned final PSBT retains maker signatures. */
     makerSignedPsbt?: string
-    /** SHA-256 of the binary seller-partial PSBT, retained after its bytes are discarded. */
-    makerSignedPsbtHash?: string
-    /** Backend Ed25519 attestation retained for idempotent accept retries. */
-    backendTransactionCommitment?: string
+    /** Last result of an explicit backend-controlled seller ACK synchronization. */
+    sellSwapAckStatus?: 'waiting_ack' | 'receiver_acked' | 'expired'
     /** Buyer-signed swap is ready; the dApp, not this wallet, broadcasts it. */
     externalBroadcast?: boolean
     /** Distinguishes legacy dApp broadcasting from backend-held final transactions. */

@@ -4906,10 +4906,7 @@ export class RgbService {
     return { available: true }
   }
 
-  async prepareSend(
-    request: RgbTransferRequest,
-    options: { providerOrigin?: string; providerBackendPublicKey?: string } = {}
-  ) {
+  async prepareSend(request: RgbTransferRequest, options: { providerOrigin?: string } = {}) {
     const previous = this.prepareSendInFlight
     let release = () => undefined
     const current = new Promise<void>(resolve => {
@@ -4929,7 +4926,7 @@ export class RgbService {
   /** Prepare a BFA burn using the same local allocation reservation as a send. */
   async prepareBurn(
     request: Omit<RgbTransferRequest, 'invoice' | 'burn'> & { amount: string },
-    options: { providerOrigin?: string; providerBackendPublicKey?: string } = {}
+    options: { providerOrigin?: string } = {}
   ) {
     return this.prepareSend({ ...request, invoice: '', burn: true }, options)
   }
@@ -4941,10 +4938,7 @@ export class RgbService {
   }
 
   /** Reserve RGB allocations and persist the pending transfer as one serialized operation. */
-  private async prepareSendOnce(
-    request: RgbTransferRequest,
-    options: { providerOrigin?: string; providerBackendPublicKey?: string }
-  ) {
+  private async prepareSendOnce(request: RgbTransferRequest, options: { providerOrigin?: string }) {
     const state = this.requireState()
     const burn = request.burn === true
     if (burn && (request.donation || request.swapPsbt))
@@ -5014,7 +5008,6 @@ export class RgbService {
           !pending.delivery &&
           !pending.broadcast &&
           pending.providerOrigin === options.providerOrigin &&
-          pending.providerBackendPublicKey === options.providerBackendPublicKey &&
           pending.request.assetId === requestedAssetId &&
           pending.request.amount === amount &&
           pending.request.invoice === request.invoice &&
@@ -5227,9 +5220,6 @@ export class RgbService {
         : { preparedCheckpointGeneration: state.recoveryCheckpointGeneration }),
       ...(proxySenderPrivateKey ? { proxySenderPrivateKey } : {}),
       ...(options.providerOrigin ? { providerOrigin: options.providerOrigin } : {}),
-      ...(options.providerBackendPublicKey
-        ? { providerBackendPublicKey: options.providerBackendPublicKey }
-        : {}),
       ...(burnSplitRequired ? { burnSplit: { request: resolvedRequest as RgbTransferRequest & { amount: string; burn: true } } } : {}),
     }
     // The unsigned reservation is locally durable and can be rebuilt after a
@@ -5272,9 +5262,6 @@ export class RgbService {
           endpoints,
           requiresCounterpartySignature: true,
           makerSignedPsbt,
-          makerSignedPsbtHash: bitcoinCrypto
-            .sha256(Buffer.from(makerSignedPsbt, 'base64'))
-            .toString('hex'),
         }
         await this.persistWithRecoveryRollback(rollback)
       }
@@ -5335,50 +5322,96 @@ export class RgbService {
     })
   }
 
-  /**
-   * Accept a backend-held final seller transaction without importing its PSBT.
-   * The caller authenticates the backend commitment before entering here; this
-   * serialized transition independently verifies the immutable txid and Proxy ACK.
-   */
-  async acceptPublishedSwap(
-    transferId: string,
-    txid: string,
-    transactionCommitment: string
-  ): Promise<RgbCompletedTransfer> {
+  /** Query and authenticate the receiver ACK for a backend-broadcast seller swap. */
+  async syncPublishedSwapAcknowledgement(transferId: string) {
     return this.runPendingTransferOperation(transferId, async () => {
       const state = this.requireState()
       const pending = state.pending[transferId]
-      if (!pending) throw new RgbServiceError(`RGB transfer ${transferId} does not exist`)
-      if (pending.broadcast) return this.syncBroadcastedTransfer(transferId, pending)
+      if (!pending) {
+        const history = state.pendingSendHistory?.find(item => item.transferId === transferId)
+        if (history?.status === 'rejected') {
+          return { transferId, txid: history.txid, status: 'rejected' as const }
+        }
+        if (history?.status === 'broadcasted') {
+          return { transferId, txid: history.txid, status: 'receiver_acked' as const }
+        }
+        throw new RgbServiceError(`RGB transfer ${transferId} does not exist`)
+      }
+      if (pending.broadcast) {
+        return {
+          transferId,
+          txid: pending.broadcast.completed.txid,
+          status: 'receiver_acked' as const,
+        }
+      }
       this.assertPreparedTransferGeneration(pending)
       const delivery = pending.delivery
       if (
         delivery?.externalBroadcast &&
-        delivery.externalBroadcastController === 'backend' &&
-        delivery.completed.txid.toLowerCase() === txid.toLowerCase() &&
-        delivery.backendTransactionCommitment === transactionCommitment
+        delivery.externalBroadcastController === 'backend'
       ) {
-        return delivery.completed
+        return {
+          transferId,
+          txid: delivery.completed.txid,
+          status: 'receiver_acked' as const,
+        }
+      }
+      if (delivery?.sellSwapAckStatus === 'expired') {
+        return {
+          transferId,
+          txid: delivery.completed.txid,
+          status: 'expired' as const,
+        }
       }
       if (!delivery?.requiresCounterpartySignature || !delivery.makerSignedPsbt) {
-        throw new RgbServiceError('RGB transfer is not awaiting backend swap completion')
-      }
-      if (!pending.providerBackendPublicKey) {
-        throw new RgbServiceError('RGB seller swap backend identity is missing')
-      }
-      if (delivery.completed.txid.toLowerCase() !== txid.toLowerCase()) {
-        throw new RgbServiceError('RGB seller swap transaction ID does not match')
+        throw new RgbServiceError('RGB transfer is not awaiting a receiver ACK')
       }
 
-      // Manual mode authenticates every recipient ACK but never broadcasts.
-      await this.advancePendingDelivery(transferId, pending, 'manual')
+      delivery.sellSwapAckStatus = 'waiting_ack'
+      await this.persist({ skipRecovery: true })
+      try {
+        // This verifies the Proxy operation ID, recipient signature and exact
+        // consignment hash, which in turn commits to the locally saved anchor txid.
+        await this.advancePendingDelivery(transferId, pending, 'manual')
+      } catch (error) {
+        if (error instanceof RgbTransferRejectedError) {
+          return { transferId, txid: error.txid, status: 'rejected' as const }
+        }
+        if (error instanceof RgbTransferAwaitingAckError) {
+          const expirationTimestamp = decodeRgbInvoice(pending.request.invoice)
+            .expirationTimestamp
+          if (
+            expirationTimestamp !== undefined &&
+            expirationTimestamp <= Math.floor(this.now() / 1000)
+          ) {
+            delivery.sellSwapAckStatus = 'expired'
+            await this.persist({ skipRecovery: true })
+            return {
+              transferId,
+              txid: delivery.completed.txid,
+              status: 'expired' as const,
+            }
+          }
+          return {
+            transferId,
+            txid: delivery.completed.txid,
+            status: 'waiting_ack' as const,
+          }
+        }
+        throw error
+      }
+
       delete delivery.requiresCounterpartySignature
       delete delivery.makerSignedPsbt
-      delivery.backendTransactionCommitment = transactionCommitment
+      delivery.sellSwapAckStatus = 'receiver_acked'
       delivery.externalBroadcast = true
       delivery.externalBroadcastController = 'backend'
       await this.persist({ waitForRecovery: true })
-      return delivery.completed
+      return {
+        transferId,
+        txid: delivery.completed.txid,
+        status: 'receiver_acked' as const,
+      }
     })
   }
 
@@ -6877,11 +6910,7 @@ function recoverySnapshot(state: ReturnType<typeof persistState>) {
       : {}),
     pending: Object.fromEntries(
       Object.entries(pending).map(([transferId, transfer]) => {
-        const {
-          providerOrigin: _providerOrigin,
-          providerBackendPublicKey: _providerBackendPublicKey,
-          ...recoveryTransfer
-        } = transfer
+        const { providerOrigin: _providerOrigin, ...recoveryTransfer } = transfer
         return [transferId, recoveryTransfer]
       })
     ),
@@ -6901,10 +6930,7 @@ function recoverySnapshot(state: ReturnType<typeof persistState>) {
 }
 
 function stripProviderOrigins(state: RgbServiceState) {
-  Object.values(state.pending).forEach(transfer => {
-    delete transfer.providerOrigin
-    delete transfer.providerBackendPublicKey
-  })
+  Object.values(state.pending).forEach(transfer => delete transfer.providerOrigin)
   state.pendingReceives?.forEach(receive => delete receive.providerOrigin)
   state.pendingSendHistory?.forEach(item => {
     delete item.providerOrigin

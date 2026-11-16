@@ -32,10 +32,14 @@ export class UnisatProvider extends EventEmitter {
     getPaymentStatus: (transferId: string) => Promise<any>;
     signBuySwap: (params: { recipientId: string; assetId: string; amount: string; maxBtcSpend: string; swapPsbt: string }) => Promise<any>;
     acceptBuySwap: (params: { recipientId: string; backendCommit: string }) => Promise<any>;
-    prepareSwap: (params: { invoice: string; assetId: string; amount: string; btcReceiveAmount: string; feeRate?: number; psbt: string; backendPublicKey?: string }) => Promise<any>;
+    prepareSwap: (params: { invoice: string; assetId: string; amount: string; btcReceiveAmount: string; feeRate?: number; psbt: string }) => Promise<any>;
     signSellSwapAndPublishConsignment: (transferId: string, makerSignedPsbt: string) => Promise<any>;
     confirmSellSwap: (transferId: string, signedPsbt: string) => Promise<any>;
-    acceptSellSwap: (transferId: string, txid: string, transactionCommitment: string) => Promise<any>;
+    syncSellSwapAck: (transferId: string) => Promise<{
+      transferId: string;
+      txid?: string;
+      status: 'waiting_ack' | 'receiver_acked' | 'rejected' | 'expired';
+    }>;
     applySellSwapAbort: (transferId: string) => Promise<any>;
     applyBuySwapAbort: (recipientId: string) => Promise<any>;
     cancelSwap: (transferId: string) => Promise<any>;
@@ -68,7 +72,7 @@ export class UnisatProvider extends EventEmitter {
       prepareSwap: params => this.bitcoinAPI.prepareRgbSwap(params),
       signSellSwapAndPublishConsignment: (transferId, makerSignedPsbt) => this.bitcoinAPI.signRgbSellSwapAndPublishConsignment(transferId, makerSignedPsbt),
       confirmSellSwap: (transferId, signedPsbt) => this.bitcoinAPI.confirmRgbSellSwap(transferId, signedPsbt),
-      acceptSellSwap: (transferId, txid, transactionCommitment) => this.bitcoinAPI.acceptRgbSellSwap(transferId, txid, transactionCommitment),
+      syncSellSwapAck: transferId => this.bitcoinAPI.syncRgbSellSwapAck(transferId),
       applySellSwapAbort: transferId => this.bitcoinAPI.applyRgbSellSwapAbort(transferId),
       applyBuySwapAbort: recipientId => this.bitcoinAPI.applyRgbBuySwapAbort(recipientId),
       cancelSwap: transferId => this.bitcoinAPI.cancelRgbSwap(transferId),

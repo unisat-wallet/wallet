@@ -6193,11 +6193,8 @@ export class WalletController extends BaseController {
   prepareRgbSwapExternalBroadcast = (params: { transferId: string; signedPsbt: string }) =>
     this.rgbSendOperations.prepareExternalSwapBroadcast(params)
 
-  acceptRgbSwapExternalBroadcast = (params: {
-    transferId: string
-    txid: string
-    transactionCommitment: string
-  }) => this.rgbSendOperations.acceptExternalSwapBroadcast(params)
+  syncRgbSellSwapAcknowledgement = (params: { transferId: string }) =>
+    this.rgbSendOperations.syncSellSwapAcknowledgement(params.transferId)
 
   /** Local provider owner for a prepared payment or its retained status history. */
   getRgbPaymentOrigin = async (params: { transferId: string }) => {
@@ -6267,10 +6264,10 @@ export class WalletController extends BaseController {
         amount: pending.request.amount,
         txid: pending.delivery?.completed.txid ?? pending.broadcast?.completed.txid,
         status: pending.delivery?.requiresCounterpartySignature
-          ? 'awaiting_buyer_signature'
+          ? pending.delivery.sellSwapAckStatus || 'awaiting_buyer_signature'
           : pending.delivery?.externalBroadcast
             ? pending.delivery.externalBroadcastController === 'backend'
-              ? 'ready_for_external_broadcast'
+              ? 'receiver_acked'
               : 'ready_for_dapp_finalize'
             : pending.delivery?.broadcastError
               ? 'broadcast_failed'

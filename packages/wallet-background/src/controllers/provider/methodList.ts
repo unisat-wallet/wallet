@@ -135,7 +135,6 @@ export type ProviderMethodList = {
     btcReceiveAmount: string
     feeRate?: number
     psbt: string
-    backendPublicKey?: string
   }
   signRgbSellSwapAndPublishConsignment: {
     transferId: string
@@ -146,11 +145,9 @@ export type ProviderMethodList = {
     transferId: string
     signedPsbt: string
   }
-  /** Accept a backend-held final transaction after its commitment and Proxy ACK verify. */
-  acceptRgbSellSwap: {
+  /** Query and verify the receiver's Proxy ACK for a backend-controlled seller swap. */
+  syncRgbSellSwapAck: {
     transferId: string
-    txid: string
-    transactionCommitment: string
   }
   /** Apply an already mutually agreed abort and release the seller RGB lock. */
   applyRgbSellSwapAbort: {
