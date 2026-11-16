@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { PhishingAdapter, PhishingConfig } from '../src/types'
 import { PhishingService } from '../src/phishing-service'
+import { normalizePhishingHostname, parsePhishingTargetUrl } from '../src/hostname'
 import { fetchHotlist, fetchPhishingList } from 'utils/fetch'
 
 vi.mock('utils/fetch', () => ({
@@ -150,5 +151,60 @@ describe('PhishingService', () => {
       reason: 'Temporary whitelist',
     })
     expect(service.checkPhishing('evil-hot.com').isPhishing).toBe(true)
+  })
+
+  it('normalizes valid hostnames, rejects filter syntax, and matches subdomains consistently', async () => {
+    const adapter = createAdapter(
+      createRemoteConfig({
+        blacklist: ['WWW.EVIL.com', 'sub.bad.example', '*.injected.example', 'bad.example/path'],
+      })
+    )
+    const service = new PhishingService()
+    services.push(service)
+
+    await service.init({ adapter })
+
+    expect(service.getConfig().blacklist).toEqual(['evil.com', 'sub.bad.example'])
+    expect(service.checkPhishing('login.evil.com')).toMatchObject({
+      isPhishing: true,
+      matchedPattern: 'evil.com',
+    })
+    expect(service.getBlockedHostnames()).toEqual(['evil.com', 'sub.bad.example'])
+
+    service.addToWhitelist('evil.com')
+    expect(service.getBlockedHostnames()).toEqual(['sub.bad.example'])
+  })
+
+  it('keeps the last known-good blacklist when an update has no valid domains', async () => {
+    const adapter = createAdapter(createRemoteConfig({ blacklist: ['known-bad.example'] }))
+    const service = new PhishingService()
+    services.push(service)
+    await service.init({ adapter })
+    mockedFetchPhishingList.mockResolvedValue(
+      createRemoteConfig({ blacklist: ['*', 'https://invalid.example/path'] })
+    )
+
+    await service.forceUpdate()
+
+    expect(service.checkPhishing('known-bad.example').isPhishing).toBe(true)
+    expect(service.getConfig().blacklist).toEqual(['known-bad.example'])
+  })
+})
+
+describe('phishing target validation', () => {
+  it('accepts only credential-free HTTP(S) URLs with safe hostnames', () => {
+    expect(parsePhishingTargetUrl('https://Example.com/path?q=1')).toEqual({
+      href: 'https://example.com/path?q=1',
+      hostname: 'example.com',
+    })
+    expect(parsePhishingTargetUrl('javascript:alert(1)')).toBeNull()
+    expect(parsePhishingTargetUrl('https://trusted.example@evil.example/')).toBeNull()
+    expect(parsePhishingTargetUrl('https://evil.example|redirect/')).toBeNull()
+  })
+
+  it('normalizes hostnames without accepting DNR filter characters', () => {
+    expect(normalizePhishingHostname('WWW.Example.com.')).toBe('example.com')
+    expect(normalizePhishingHostname('*.example.com')).toBeNull()
+    expect(normalizePhishingHostname('example.com/path')).toBeNull()
   })
 })

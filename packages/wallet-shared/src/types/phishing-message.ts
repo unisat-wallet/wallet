@@ -29,14 +29,15 @@ export enum PhishingMessageType {
   REDIRECT_TO_PHISHING_PAGE = 'REDIRECT_TO_PHISHING_PAGE',
 
   /**
-   * Add a hostname to the phishing whitelist to skip protection
-   * This is used when a user chooses to proceed to a site despite the warning
+   * Continue to the validated target shown by the phishing warning page.
+   * The background derives the hostname from the warning page URL and ignores caller-supplied hosts.
    *
    * Expected parameters:
-   * - hostname: string - The hostname to whitelist
+   * - href: string - The exact HTTP(S) target displayed by the warning page
    *
    * Response:
-   * - success: boolean - Whether the hostname was added to the whitelist
+   * - success: boolean - Whether the temporary bypass and DNR update both succeeded
+   * - href: string - The background-validated target URL
    */
   SKIP_PHISHING_PROTECTION = 'SKIP_PHISHING_PROTECTION',
 

@@ -33,7 +33,7 @@ export async function checkPhishing(): Promise<boolean> {
             resolve(false);
             return;
           }
-          resolve(response);
+          resolve(response?.isPhishing === true);
         }
       );
     });
@@ -44,7 +44,8 @@ export async function checkPhishing(): Promise<boolean> {
         chrome.runtime.sendMessage(
           {
             type: 'REDIRECT_TO_PHISHING_PAGE',
-            hostname
+            hostname,
+            url: window.location.href
           },
           () => {
             // eslint-disable-next-line @typescript-eslint/no-unused-expressions

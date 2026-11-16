@@ -1,5 +1,6 @@
 import log from 'loglevel'
 
+import { normalizePhishingHostname, parsePhishingTargetUrl } from '@unisat/phishing-detect'
 import { PhishingMessageType, PlatformEnv } from '@unisat/wallet-shared'
 import { phishingDetectService as phishingService } from 'src/services'
 
@@ -65,40 +66,62 @@ class PhishingController {
         }
 
         case PhishingMessageType.REDIRECT_TO_PHISHING_PAGE: {
-          if (!sender.tab?.id || !message.hostname) {
+          if (!sender.tab?.id || sender.frameId !== 0) {
             sendResponse({ error: 'Invalid parameters or sender' })
             return false
           }
 
+          const senderTarget = parsePhishingTargetUrl(sender.url)
+          const requestedTarget = parsePhishingTargetUrl(message.url)
+          const requestedHostname = normalizePhishingHostname(message.hostname)
+          if (
+            !senderTarget ||
+            !requestedTarget ||
+            requestedTarget.href !== senderTarget.href ||
+            !requestedHostname ||
+            requestedHostname !== normalizePhishingHostname(senderTarget.hostname)
+          ) {
+            sendResponse({ error: 'Navigation target does not match the top-level sender' })
+            return false
+          }
+
           // Verify the domain is still in the blacklist before redirecting
-          const isPhishing = phishingService.checkPhishing(message.hostname).isPhishing
+          const isPhishing = phishingService.checkPhishing(senderTarget.hostname).isPhishing
           if (!isPhishing) {
             sendResponse({ success: false, skipped: true })
             return false
           }
 
-          this.redirectToPhishingPage(sender.tab.id, message.url || '', message.hostname)
+          this.redirectToPhishingPage(sender.tab.id, senderTarget.href, senderTarget.hostname)
             .then(() => sendResponse({ success: true }))
             .catch(error => sendResponse({ error: String(error) }))
           return true
         }
 
         case PhishingMessageType.SKIP_PHISHING_PROTECTION: {
-          if (!message.hostname) {
-            sendResponse({ error: 'Missing hostname parameter' })
+          if (sender.frameId !== 0) {
+            sendResponse({ error: 'Only the top-level warning page may continue' })
             return false
           }
 
-          // Only extension pages may whitelist (not arbitrary extension contexts without URL).
-          const extensionOrigin = chrome.runtime.getURL('')
-          if (!sender.url || !sender.url.startsWith(extensionOrigin)) {
-            sendResponse({ error: 'Unauthorized' })
+          const target = this.getWarningPageTarget(sender.url)
+          if (!target || message.href !== target.href) {
+            sendResponse({ error: 'Invalid warning target' })
+            return false
+          }
+          if (!phishingService.checkPhishing(target.hostname).isPhishing) {
+            sendResponse({ error: 'The warning target is not currently blocked' })
             return false
           }
 
-          phishingService.addToWhitelist(message.hostname)
-          sendResponse({ success: true })
-          return false
+          phishingService.addToWhitelist(target.hostname)
+          this.updateDeclarativeRules({ allowEmpty: true })
+            .then(() => sendResponse({ success: true, ...target }))
+            .catch(error => {
+              phishingService.removeFromTemporaryWhitelist(target.hostname)
+              sendResponse({ error: String(error) })
+            })
+          return true
         }
 
         case PhishingMessageType.FORCE_UPDATE_PHISHING_LIST: {
@@ -134,7 +157,7 @@ class PhishingController {
 
             const isPhishing = phishingService.checkPhishing(url.hostname).isPhishing
 
-            if (isPhishing && sender.tab?.id) {
+            if (isPhishing && sender.tab?.id && sender.frameId === 0) {
               this.redirectToPhishingPage(sender.tab.id, message.url, url.hostname)
                 .then(() => sendResponse({ isPhishing, redirected: true }))
                 .catch(error =>
@@ -165,18 +188,28 @@ class PhishingController {
    */
   public async redirectToPhishingPage(tabId: number, url: string, hostname: string): Promise<void> {
     try {
+      const target = parsePhishingTargetUrl(url)
+      if (
+        !target ||
+        normalizePhishingHostname(target.hostname) !== normalizePhishingHostname(hostname)
+      ) {
+        throw new Error('Invalid phishing redirect target')
+      }
+
       // Check if current URL is already the warning page to avoid repeated redirects
       const tab = await chrome.tabs.get(tabId)
       const currentUrl = tab.url || ''
 
       // If already on warning page, don't redirect again
-      if (currentUrl.includes('phishing.html#/phishing') || currentUrl.includes('index.html#/phishing')) {
+      if (
+        currentUrl.includes('phishing.html#/phishing') ||
+        currentUrl.includes('index.html#/phishing')
+      ) {
         return
       }
 
       const params = new URLSearchParams({
-        hostname,
-        href: url,
+        href: target.href,
         timestamp: Date.now().toString(), // Add timestamp to prevent caching
       })
 
@@ -202,7 +235,11 @@ class PhishingController {
     this.initDeclarativeRules()
 
     // Schedule periodic updates of the rules
-    this.updateIntervalId = setInterval(() => this.updateDeclarativeRules(), updateInterval)
+    this.updateIntervalId = setInterval(() => {
+      void this.updateDeclarativeRules().catch(error => {
+        log.error('[Phishing] Scheduled declarative rule update failed:', error)
+      })
+    }, updateInterval)
   }
 
   /**
@@ -221,31 +258,29 @@ class PhishingController {
    * Update declarative network request rules based on phishing list
    * Only applicable for MV3 extensions
    */
-  public async updateDeclarativeRules(): Promise<void> {
+  public async updateDeclarativeRules(options: { allowEmpty?: boolean } = {}): Promise<void> {
     if (PlatformEnv.MANIFEST_VERSION !== 'mv3' || !chrome.declarativeNetRequest) {
       log.warn('[Phishing] Declarative rules are only available in MV3')
       return
     }
 
     try {
-      const config = phishingService.getConfig()
-      const blacklist = config.blacklist || []
+      const blacklist = phishingService.getBlockedHostnames()
 
       if (!blacklist.length) {
         log.warn('[Phishing] No blacklisted domains available for rules')
-        return
+        if (!options.allowEmpty) return
       }
-
-      // First, remove existing rules
-      await chrome.declarativeNetRequest.updateDynamicRules({
-        removeRuleIds: await this.getCurrentRuleIds(),
-      })
 
       // Create new rules based on blacklist
       const rules = this.createPhishingRules(blacklist)
+      if (!rules.length && !options.allowEmpty) {
+        throw new Error('No valid phishing rules were generated; keeping the existing rules')
+      }
 
-      // Update with new rules
+      // Replace the rules atomically. If validation or installation fails, Chrome keeps the old set.
       await chrome.declarativeNetRequest.updateDynamicRules({
+        removeRuleIds: await this.getCurrentRuleIds(),
         addRules: rules,
       })
 
@@ -254,6 +289,7 @@ class PhishingController {
       )
     } catch (error) {
       log.error('[Phishing] Failed to update declarative rules:', error)
+      throw error
     }
   }
 
@@ -262,13 +298,8 @@ class PhishingController {
    * @returns Array of rule IDs
    */
   private async getCurrentRuleIds(): Promise<number[]> {
-    try {
-      const rules = await chrome.declarativeNetRequest.getDynamicRules()
-      return rules.map(rule => rule.id)
-    } catch (error) {
-      log.error('[Phishing] Failed to get current rule IDs:', error)
-      return []
-    }
+    const rules = await chrome.declarativeNetRequest.getDynamicRules()
+    return rules.map(rule => rule.id)
   }
 
   /**
@@ -280,7 +311,11 @@ class PhishingController {
     // Limit number of rules to avoid hitting Chrome's limits
     // Chrome has a limit of 5,000 dynamic rules
     const MAX_RULES = 4900
-    const domains = blacklist.slice(0, MAX_RULES)
+    const domains = Array.from(
+      new Set(
+        blacklist.map(normalizePhishingHostname).filter((domain): domain is string => !!domain)
+      )
+    ).slice(0, MAX_RULES)
 
     return domains.map((domain, index) => {
       // Rule IDs should be between 1 and 2^32-1
@@ -293,7 +328,7 @@ class PhishingController {
           type: chrome.declarativeNetRequest.RuleActionType.REDIRECT,
           redirect: {
             url: chrome.runtime.getURL(
-              `phishing.html#/phishing?hostname=${encodeURIComponent(domain)}&timestamp=${Date.now()}`
+              `phishing.html#/phishing?href=${encodeURIComponent(`https://${domain}/`)}&timestamp=${Date.now()}`
             ),
           },
         },
@@ -388,6 +423,27 @@ class PhishingController {
    */
   public getStats(): any {
     return phishingService.getConfig()
+  }
+
+  private getWarningPageTarget(senderUrl?: string) {
+    if (!senderUrl) return null
+    try {
+      const sender = new URL(senderUrl)
+      const extension = new URL(chrome.runtime.getURL(''))
+      if (
+        sender.protocol !== extension.protocol ||
+        sender.host !== extension.host ||
+        sender.pathname !== '/phishing.html'
+      ) {
+        return null
+      }
+      const separator = sender.hash.indexOf('?')
+      if (separator < 0 || sender.hash.slice(0, separator) !== '#/phishing') return null
+      const params = new URLSearchParams(sender.hash.slice(separator + 1))
+      return parsePhishingTargetUrl(params.get('href'))
+    } catch {
+      return null
+    }
   }
 }
 

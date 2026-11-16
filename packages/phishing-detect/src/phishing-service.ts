@@ -4,6 +4,7 @@
 
 import { EventEmitter } from 'eventemitter3'
 import { fetchHotlist, fetchPhishingList } from 'utils/fetch'
+import { normalizePhishingHostname } from './hostname'
 import type {
   PhishingAdapter,
   PhishingCheckResult,
@@ -125,25 +126,29 @@ export class PhishingService extends EventEmitter<PhishingServiceEvents> {
     }
 
     // Normalize hostname
-    const normalizedHostname = this.normalizeHostname(hostname)
+    const normalizedHostname = normalizePhishingHostname(hostname)
+    if (!normalizedHostname) {
+      return { isPhishing: false, reason: 'Invalid hostname' }
+    }
 
     // Check temporary whitelist
-    if (this.temporaryWhitelist.has(normalizedHostname)) {
+    if (this.hasHostnameMatch(this.temporaryWhitelist, normalizedHostname)) {
       return { isPhishing: false, reason: 'Temporary whitelist' }
     }
 
     // Check permanent whitelist
-    if (this.whitelistSet.has(normalizedHostname)) {
+    if (this.hasHostnameMatch(this.whitelistSet, normalizedHostname)) {
       return { isPhishing: false, reason: 'Permanent whitelist' }
     }
 
     // Check blacklist
-    if (this.blacklistSet.has(normalizedHostname)) {
+    const matchedPattern = this.findHostnameMatch(this.blacklistSet, normalizedHostname)
+    if (matchedPattern) {
       this.emit('phishing:detected', hostname, 'Blacklist match')
       return {
         isPhishing: true,
         reason: 'Blacklist match',
-        matchedPattern: normalizedHostname,
+        matchedPattern,
       }
     }
 
@@ -172,15 +177,31 @@ export class PhishingService extends EventEmitter<PhishingServiceEvents> {
    * Add hostname to temporary whitelist
    */
   addToWhitelist(hostname: string): void {
-    const normalizedHostname = this.normalizeHostname(hostname)
+    const normalizedHostname = normalizePhishingHostname(hostname)
+    if (!normalizedHostname) return
     this.temporaryWhitelist.add(normalizedHostname)
+  }
+
+  removeFromTemporaryWhitelist(hostname: string): void {
+    const normalizedHostname = normalizePhishingHostname(hostname)
+    if (!normalizedHostname) return
+    this.temporaryWhitelist.delete(normalizedHostname)
+  }
+
+  getBlockedHostnames(): string[] {
+    return Array.from(this.blacklistSet).filter(
+      hostname =>
+        !this.hasHostnameMatch(this.temporaryWhitelist, hostname) &&
+        !this.hasHostnameMatch(this.whitelistSet, hostname)
+    )
   }
 
   /**
    * Add hostname to permanent whitelist
    */
   async addToPermanentWhitelist(hostname: string): Promise<void> {
-    const normalizedHostname = this.normalizeHostname(hostname)
+    const normalizedHostname = normalizePhishingHostname(hostname)
+    if (!normalizedHostname) return
     if (!this.config.whitelist.includes(normalizedHostname)) {
       this.config.whitelist.push(normalizedHostname)
       this.whitelistSet.add(normalizedHostname)
@@ -192,7 +213,8 @@ export class PhishingService extends EventEmitter<PhishingServiceEvents> {
    * Remove hostname from whitelist
    */
   async removeFromWhitelist(hostname: string): Promise<void> {
-    const normalizedHostname = this.normalizeHostname(hostname)
+    const normalizedHostname = normalizePhishingHostname(hostname)
+    if (!normalizedHostname) return
 
     // Remove from temporary whitelist
     this.temporaryWhitelist.delete(normalizedHostname)
@@ -297,6 +319,16 @@ export class PhishingService extends EventEmitter<PhishingServiceEvents> {
   }
 
   private updateSets(): void {
+    const normalizeList = (values: unknown): string[] =>
+      Array.isArray(values)
+        ? Array.from(
+            new Set(
+              values.map(normalizePhishingHostname).filter((value): value is string => !!value)
+            )
+          )
+        : []
+    this.config.blacklist = normalizeList(this.config.blacklist)
+    this.config.whitelist = normalizeList(this.config.whitelist)
     this.blacklistSet = new Set(this.config.blacklist)
     this.whitelistSet = new Set(this.config.whitelist)
   }
@@ -330,11 +362,13 @@ export class PhishingService extends EventEmitter<PhishingServiceEvents> {
       if (!result) return
 
       for (const domain of result.allowlist) {
-        this.temporaryWhitelist.add(this.normalizeHostname(domain))
+        const normalized = normalizePhishingHostname(domain)
+        if (normalized) this.temporaryWhitelist.add(normalized)
       }
 
       for (const domain of result.blacklist) {
-        this.blacklistSet.add(this.normalizeHostname(domain))
+        const normalized = normalizePhishingHostname(domain)
+        if (normalized) this.blacklistSet.add(normalized)
       }
     } finally {
       this.scheduleHotlistUpdate()
@@ -345,36 +379,28 @@ export class PhishingService extends EventEmitter<PhishingServiceEvents> {
     try {
       const newConfig = await fetchPhishingList()
 
-      // Ensure domains in default whitelist are not in the blacklist
-      const defaultWhitelist = new Set(initConfig.whitelist)
-
-      // Filter blacklist, remove whitelisted domains and their subdomains
-      let filteredBlacklist: string[] = []
-      if (Array.isArray(newConfig.blacklist)) {
-        filteredBlacklist = newConfig.blacklist.filter(domain => {
-          // Remove domains in whitelist
-          if (defaultWhitelist.has(domain)) {
-            return false
-          }
-
-          // Remove subdomains of whitelisted domains
-          const domainParts = domain.split('.')
-          if (domainParts.length > 2) {
-            const mainDomain = domainParts.slice(domainParts.length - 2).join('.')
-            if (defaultWhitelist.has(mainDomain)) {
-              return false
-            }
-          }
-
-          // Keep other domains
-          return true
-        })
-      }
-
-      // Merge remote whitelist and default whitelist
+      const normalizeList = (values: unknown): string[] =>
+        Array.isArray(values)
+          ? Array.from(
+              new Set(
+                values.map(normalizePhishingHostname).filter((value): value is string => !!value)
+              )
+            )
+          : []
+      const defaultWhitelist = normalizeList(initConfig.whitelist)
       const mergedWhitelist = Array.from(
-        new Set([...(newConfig.whitelist || []), ...initConfig.whitelist])
+        new Set([...normalizeList(newConfig.whitelist), ...defaultWhitelist])
       )
+
+      const filteredBlacklist = normalizeList(newConfig.blacklist).filter(
+        domain =>
+          !mergedWhitelist.some(
+            whitelisted => domain === whitelisted || domain.endsWith(`.${whitelisted}`)
+          )
+      )
+      if (filteredBlacklist.length === 0) {
+        throw new Error('Phishing update did not contain any valid blocked hostnames')
+      }
 
       this.config = {
         ...newConfig,
@@ -405,10 +431,6 @@ export class PhishingService extends EventEmitter<PhishingServiceEvents> {
     }
   }
 
-  private normalizeHostname(hostname: string): string {
-    return hostname.toLowerCase().replace(/^www\./, '')
-  }
-
   private checkFuzzyMatch(hostname: string): string | null {
     if (!this.config.fuzzylist.length) {
       return null
@@ -422,6 +444,16 @@ export class PhishingService extends EventEmitter<PhishingServiceEvents> {
     }
 
     return null
+  }
+
+  private findHostnameMatch(hostnames: Set<string>, hostname: string): string | undefined {
+    return Array.from(hostnames).find(
+      candidate => hostname === candidate || hostname.endsWith(`.${candidate}`)
+    )
+  }
+
+  private hasHostnameMatch(hostnames: Set<string>, hostname: string): boolean {
+    return this.findHostnameMatch(hostnames, hostname) !== undefined
   }
 
   private isPhishingMatch(hostname: string, pattern: string): boolean {

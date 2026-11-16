@@ -1,34 +1,13 @@
 import { useSearchParams } from 'react-router-dom';
 import { useMemo } from 'react';
 
+import { parsePhishingTargetUrl } from '@unisat/phishing-detect';
 import { useI18n } from '@unisat/wallet-state';
 
 import './PhishingScreen.css';
 
-/**
- * Only allow http(s) navigation after phishing proceed.
- * Blocks chrome-extension:, javascript:, data:, etc. (open-redirect / WAR pivot).
- */
-function sanitizeProceedHref(href: string | null, hostname: string | null): string | null {
-  if (href) {
-    try {
-      const u = new URL(href);
-      if (u.protocol === 'http:' || u.protocol === 'https:') {
-        return u.toString();
-      }
-    } catch {
-      // fall through
-    }
-  }
-  if (hostname && /^[a-z0-9.-]+$/i.test(hostname)) {
-    return `https://${hostname}`;
-  }
-  return null;
-}
-
 const PhishingScreen = () => {
   const [searchParams] = useSearchParams();
-  const hostname = searchParams.get('hostname');
   const href = searchParams.get('href');
   const { t } = useI18n();
 
@@ -41,22 +20,31 @@ const PhishingScreen = () => {
     }
   }, []);
 
-  const safeHref = useMemo(() => sanitizeProceedHref(href, hostname), [href, hostname]);
+  const target = useMemo(() => parsePhishingTargetUrl(href), [href]);
 
   const handleProceed = async () => {
     if (isFramed) {
       return;
     }
-    if (!hostname || !safeHref) {
+    if (!target) {
+      return;
+    }
+    if (!window.confirm(`${t('if_you_insist_on_continuing_proceed_at_your_own_risk')}\n${target.hostname}`)) {
       return;
     }
 
-    await chrome.runtime.sendMessage({
-      type: 'SKIP_PHISHING_PROTECTION',
-      hostname
-    });
-
-    window.location.href = safeHref;
+    try {
+      const response = await chrome.runtime.sendMessage({
+        type: 'SKIP_PHISHING_PROTECTION',
+        href: target.href
+      });
+      const approvedTarget = parsePhishingTargetUrl(response?.href);
+      if (response?.success === true && approvedTarget?.href === target.href) {
+        window.location.href = approvedTarget.href;
+      }
+    } catch {
+      // Keep the user on the warning page if the background cannot safely apply the bypass.
+    }
   };
 
   return (
@@ -81,7 +69,7 @@ const PhishingScreen = () => {
 
         <div className="phishing-title-section">
           <h1>{t('danger_potential_phishing_website_detected')}</h1>
-          <p className="phishing-domain">{hostname}</p>
+          <p className="phishing-domain">{target?.hostname || ''}</p>
         </div>
 
         <div className="phishing-warning-box">
@@ -98,7 +86,8 @@ const PhishingScreen = () => {
             href="https://github.com/unisat-wallet/phishing-detect/issues/new"
             target="_blank"
             rel="noopener noreferrer"
-            className="phishing-report-link">
+            className="phishing-report-link"
+          >
             {t('think_this_is_a_false_positive_click_here_to_report_an_issue')}
           </a>
           {isFramed ? (
@@ -109,11 +98,8 @@ const PhishingScreen = () => {
           ) : (
             <p className="phishing-proceed-text">
               {t('if_you_insist_on_continuing_proceed_at_your_own_risk')}
-              <button
-                onClick={handleProceed}
-                className="phishing-proceed-button"
-                disabled={!safeHref || !hostname}>
-                {t('continue_to')} {hostname}
+              <button onClick={handleProceed} className="phishing-proceed-button" disabled={!target}>
+                {t('continue_to')} {target?.hostname || ''}
               </button>
             </p>
           )}
