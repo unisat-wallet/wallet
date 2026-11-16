@@ -6,7 +6,6 @@ import { KeystoneSignEnum } from '@unisat/keyring-service/types';
 import { CosmosSignDataType } from '@unisat/wallet-shared';
 import {
   useAccountAddress,
-  useBabylonConfig,
   useCurrentAccount,
   useCurrentKeyring,
   useWallet
@@ -18,6 +17,7 @@ interface Props {
   isFinalize?: boolean;
   signatureText?: string;
   id?: number;
+  chainId?: string;
   onSuccess?: (data: { psbtHex?: string; rawtx?: string; signature: string }) => void;
   onBack: () => void;
 }
@@ -27,8 +27,6 @@ export default function KeystoneSignScreen(props: Props) {
   const currentKeyring = useCurrentKeyring();
   const currentAccount = useCurrentAccount();
   const address = useAccountAddress();
-  const babylonConfig = useBabylonConfig();
-  const babylonChain = COSMOS_CHAINS_MAP[babylonConfig.chainId];
 
   const generateUR = useCallback(async () => {
     switch (props.type) {
@@ -38,29 +36,37 @@ export default function KeystoneSignScreen(props: Props) {
         return wallet.genSignMsgUr(props.data, props.type);
       case KeystoneSignEnum.PSBT:
         return wallet.genSignPsbtUr(props.data);
-      case KeystoneSignEnum.COSMOS_DIRECT:
+      case KeystoneSignEnum.COSMOS_DIRECT: {
+        if (!props.chainId || !COSMOS_CHAINS_MAP[props.chainId]) {
+          throw new Error(`Unsupported Cosmos network: ${String(props.chainId)}`);
+        }
         return wallet.genSignCosmosUr({
           signData: props.data,
           dataType: CosmosSignDataType.COSMOS_DIRECT,
           path: currentKeyring.hdPath + '/' + currentAccount.index,
           address,
-          chainId: babylonChain.chainId
+          chainId: props.chainId
         });
-      case KeystoneSignEnum.COSMOS_ARBITRARY:
+      }
+      case KeystoneSignEnum.COSMOS_ARBITRARY: {
+        if (!props.chainId || !COSMOS_CHAINS_MAP[props.chainId]) {
+          throw new Error(`Unsupported Cosmos network: ${String(props.chainId)}`);
+        }
         return wallet.genSignCosmosUr({
           signData: props.data,
           dataType: CosmosSignDataType.COSMOS_AMINO,
           path: currentKeyring.hdPath + '/' + currentAccount.index,
           address,
-          chainId: babylonChain.chainId
+          chainId: props.chainId
         });
+      }
       default:
         return {
           type: '',
           cbor: ''
         };
     }
-  }, [props.data, props.type, wallet]);
+  }, [address, currentAccount.index, currentKeyring.hdPath, props.chainId, props.data, props.type, wallet]);
 
   const parseUR = useCallback(
     async (type: string, cbor: string) => {

@@ -4,7 +4,7 @@ import { Button, Column, Content, Header, Icon, Input, Layout, Row, Text, Transf
 import { FeeOptionsPopover } from '@/ui/components/FeeOptionsPopover';
 import { FeeSettings } from '@/ui/components/FeeOptionsPopover/interface';
 import { useNavigate } from '@/ui/pages/MainRoute';
-import { COSMOS_CHAINS_MAP, DEFAULT_BBN_GAS_LIMIT } from '@unisat/babylon-service/types';
+import { BabylonConfig, COSMOS_CHAINS_MAP, DEFAULT_BBN_GAS_LIMIT } from '@unisat/babylon-service/types';
 import { bnUtils } from '@unisat/base-utils';
 import { BabylonAddressSummary } from '@unisat/wallet-shared';
 import {
@@ -24,6 +24,15 @@ import { NotSupportedLayout } from './BabylonStakingScreen';
 const BABYLON_FEE_SETTINGS_KEY = 'babylonFeeSettings';
 
 export default function SendBabyScreen() {
+  const babylonConfig = useBabylonConfig();
+  if (!babylonConfig) {
+    return <NotSupportedLayout />;
+  }
+
+  return <SupportedSendBabyScreen babylonConfig={babylonConfig} />;
+}
+
+function SupportedSendBabyScreen({ babylonConfig }: { babylonConfig: BabylonConfig }) {
   const nav = useNavigation();
   const navigate = useNavigate();
   const wallet = useWallet();
@@ -31,16 +40,15 @@ export default function SendBabyScreen() {
   const hasInitializedRef = useRef(false);
   const { t } = useI18n();
 
-  let savedBabylonState;
   const navigationSource = useAppSelector((state) => state.ui.navigationSource);
-  if (navigationSource === NavigationSource.BACK) {
-    savedBabylonState = useAppSelector((state) => state.ui.babylonSendScreen);
-  } else {
-    savedBabylonState = {
-      inputAmount: '',
-      memo: ''
-    };
-  }
+  const storedBabylonState = useAppSelector((state) => state.ui.babylonSendScreen);
+  const savedBabylonState =
+    navigationSource === NavigationSource.BACK
+      ? storedBabylonState
+      : {
+          inputAmount: '',
+          memo: ''
+        };
 
   const [disabled, setDisabled] = useState(true);
   const [isSimulating, setIsSimulating] = useState(false);
@@ -60,11 +68,6 @@ export default function SendBabyScreen() {
   const [memo, setMemo] = useState(savedBabylonState.memo);
 
   const [feeOptionVisible, setFeeOptionVisible] = useState(false);
-
-  const babylonConfig = useBabylonConfig();
-  if (!babylonConfig) {
-    return <NotSupportedLayout />;
-  }
 
   const babylonChainId = babylonConfig.chainId;
   const babylonChain = COSMOS_CHAINS_MAP[babylonChainId];

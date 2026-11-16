@@ -23,6 +23,7 @@ import {
 } from '@unisat/wallet-state';
 
 import { useNavigate } from '../MainRoute';
+import { NotSupportedLayout } from './BabylonStakingScreen';
 import CosmosSignScreen from '../Wallet/CosmosSignScreen';
 
 interface LocationState {
@@ -62,8 +63,7 @@ export default function BabylonTxConfirmScreen() {
   const tools = useTools();
 
   const babylonConfig = useBabylonConfig();
-
-  const babylonChain = COSMOS_CHAINS_MAP[babylonConfig.chainId];
+  const babylonChain = babylonConfig ? COSMOS_CHAINS_MAP[babylonConfig.chainId] : undefined;
 
   const [isCosmosSignScreenOpen, setIsCosmosSignScreenOpen] = useState(false);
   const [cosmosSignRequest, setCosmosSignRequest] = useState<{
@@ -80,6 +80,10 @@ export default function BabylonTxConfirmScreen() {
   const currentKeyring = useCurrentKeyring();
   const address = useAccountAddress();
   const isKeystone = useIsKeystoneWallet();
+
+  if (!babylonConfig || !babylonChain) {
+    return <NotSupportedLayout />;
+  }
 
   const clearReduxState = () => {
     dispatch(uiActions.resetBabylonSendScreen(null));

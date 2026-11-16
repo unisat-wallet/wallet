@@ -6,7 +6,7 @@ import { Popover } from '@/ui/components/Popover';
 import { colors } from '@/ui/theme/colors';
 import { satoshisToAmount } from '@/ui/utils';
 import { openSafeUrl } from '@/ui/utils/openSafeUrl';
-import { BabylonConfigV2, BabylonPhaseState, COSMOS_CHAINS_MAP } from '@unisat/babylon-service/types';
+import { BabylonConfig, BabylonConfigV2, BabylonPhaseState, COSMOS_CHAINS_MAP } from '@unisat/babylon-service/types';
 import { bnUtils } from '@unisat/base-utils';
 import { BabylonAddressSummary } from '@unisat/wallet-shared';
 import { useBabylonConfig, useChain, useChainType, useI18n, useTools, useWallet } from '@unisat/wallet-state';
@@ -373,15 +373,20 @@ function TransferBabyPopover({ onClose }: { onClose: () => void }) {
 }
 
 export default function BabylonStakingScreen() {
-  const chainType = useChainType();
-  const navigate = useNavigate();
-  const { t } = useI18n();
   const babylonConfig = useBabylonConfig();
-  const wallet = useWallet();
-  const chain = useChain();
   if (!babylonConfig) {
     return <NotSupportedLayout />;
   }
+
+  return <SupportedBabylonStakingScreen babylonConfig={babylonConfig} />;
+}
+
+function SupportedBabylonStakingScreen({ babylonConfig }: { babylonConfig: BabylonConfig }) {
+  const chainType = useChainType();
+  const navigate = useNavigate();
+  const { t } = useI18n();
+  const wallet = useWallet();
+  const chain = useChain();
 
   const babylonChain = COSMOS_CHAINS_MAP[babylonConfig.chainId];
 

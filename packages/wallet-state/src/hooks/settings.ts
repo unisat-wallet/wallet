@@ -2,6 +2,7 @@ import compareVersions from 'compare-versions'
 import { useCallback } from 'react'
 
 import { BABYLON_CONFIG_MAP } from '@unisat/babylon-service/types'
+import type { BabylonConfig } from '@unisat/babylon-service/types'
 import { CHAINS_MAP, PlatformEnv } from '@unisat/wallet-shared'
 import { ChainType, NetworkType } from '@unisat/wallet-types'
 import { useWallet } from '../context/WalletContext'
@@ -272,9 +273,13 @@ export function useAutoLockTimeId() {
   return state.autoLockTimeId
 }
 
-export function useBabylonConfig() {
+export function getBabylonConfig(chainType: ChainType): BabylonConfig | undefined {
+  return BABYLON_CONFIG_MAP[chainType]
+}
+
+export function useBabylonConfig(): BabylonConfig | undefined {
   const chainType = useChainType()
-  return BABYLON_CONFIG_MAP[chainType] || BABYLON_CONFIG_MAP[ChainType.BITCOIN_MAINNET]
+  return getBabylonConfig(chainType)
 }
 
 export function useIsMainnetChain() {

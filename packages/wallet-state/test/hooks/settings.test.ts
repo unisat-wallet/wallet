@@ -1,6 +1,23 @@
 import { describe, expect, it } from 'vitest'
 
-import { getVersionInfo } from '../../src/hooks/settings'
+import { ChainType } from '@unisat/wallet-types'
+import { getBabylonConfig, getVersionInfo } from '../../src/hooks/settings'
+
+describe('getBabylonConfig', () => {
+  it('maps only the explicitly supported Bitcoin networks', () => {
+    expect(getBabylonConfig(ChainType.BITCOIN_MAINNET)?.chainId).toBe('bbn-1')
+    expect(getBabylonConfig(ChainType.BITCOIN_SIGNET)?.chainId).toBe('bbn-test-6')
+  })
+
+  it.each([
+    ChainType.BITCOIN_TESTNET,
+    ChainType.BITCOIN_TESTNET4,
+    ChainType.FRACTAL_BITCOIN_MAINNET,
+    ChainType.FRACTAL_BITCOIN_TESTNET,
+  ])('does not fall back to Babylon mainnet for unsupported chain %s', chainType => {
+    expect(getBabylonConfig(chainType)).toBeUndefined()
+  })
+})
 
 describe('getVersionInfo', () => {
   it('reports an update only for a newer, non-skipped version', () => {

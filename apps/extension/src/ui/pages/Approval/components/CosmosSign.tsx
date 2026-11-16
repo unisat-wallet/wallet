@@ -91,6 +91,7 @@ export default function CosmosSign({
       <KeystoneSignScreen
         type={keystoneSignType}
         data={data.signBytesHex}
+        chainId={data.chainId}
         onSuccess={(result) => {
           resolveApproval(result);
           setIsKeystoneSigning(false);
