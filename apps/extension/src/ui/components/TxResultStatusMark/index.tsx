@@ -1,4 +1,23 @@
-export function TxResultStatusMark({ pending, size = 72 }: { pending: boolean; size?: number }) {
+export function TxResultStatusMark({
+  pending,
+  failed = false,
+  size = 72
+}: {
+  pending: boolean;
+  failed?: boolean;
+  size?: number;
+}) {
+  if (failed) {
+    return (
+      <svg width={size} height={size} viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <circle cx="50" cy="50" r="50" fill="#EE344C" fillOpacity="0.05" />
+        <circle cx="50" cy="50" r="39.0909" fill="#EE344C" fillOpacity="0.06" />
+        <circle cx="50" cy="50" r="27.275" fill="#EE344C" />
+        <path d="M41.5 41.5L58.5 58.5M58.5 41.5L41.5 58.5" stroke="#070606" strokeWidth="4" strokeLinecap="round" />
+      </svg>
+    );
+  }
+
   if (pending) {
     return (
       <svg width={size} height={size} viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
