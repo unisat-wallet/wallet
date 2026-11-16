@@ -227,6 +227,8 @@ function assertReadonlyMessageSignature(
 }
 
 function assertSameUnsignedTx(psbt: bitcoin.Psbt, sourcePsbt: bitcoin.Psbt) {
+  const hasSameTransactionHeader =
+    psbt.version === sourcePsbt.version && psbt.locktime === sourcePsbt.locktime
   const hasSameInputs =
     psbt.txInputs.length === sourcePsbt.txInputs.length &&
     psbt.txInputs.every((input, index) => {
@@ -235,7 +237,8 @@ function assertSameUnsignedTx(psbt: bitcoin.Psbt, sourcePsbt: bitcoin.Psbt) {
         sourceInput &&
         input.hash.equals(sourceInput.hash) &&
         input.index === sourceInput.index &&
-        input.sequence === sourceInput.sequence
+        input.sequence === sourceInput.sequence &&
+        psbt.data.inputs[index]?.sighashType === sourcePsbt.data.inputs[index]?.sighashType
       )
     })
   const hasSameOutputs =
@@ -249,7 +252,7 @@ function assertSameUnsignedTx(psbt: bitcoin.Psbt, sourcePsbt: bitcoin.Psbt) {
       )
     })
 
-  if (!hasSameInputs || !hasSameOutputs) {
+  if (!hasSameTransactionHeader || !hasSameInputs || !hasSameOutputs) {
     throw new Error('invalid psbt')
   }
 }
@@ -276,12 +279,20 @@ function assertRequiredSignatures(psbt: bitcoin.Psbt, toSignData: ToSignData) {
   }
 }
 
-function assertReadonlySignedPsbt(
+function assertExternalSignedPsbt(
   account: Awaited<ReturnType<typeof wallet.getCurrentAccount>>,
   toSignData: ToSignData,
   psbtHex?: string
 ) {
-  if (!account || getAccountCapabilities(account).signMethod !== AccountSignMethod.External) return
+  if (!account) return
+  const signMethod = getAccountCapabilities(account).signMethod
+  if (
+    signMethod !== AccountSignMethod.External &&
+    signMethod !== AccountSignMethod.Keystone &&
+    signMethod !== AccountSignMethod.ColdWallet
+  ) {
+    return
+  }
   if (!psbtHex) throw new Error('invalid psbt')
 
   const psbt = bitcoin.Psbt.fromHex(psbtHex)
@@ -667,7 +678,7 @@ class ProviderController extends BaseController {
     approvalRes: SignPsbtResult
   }) => {
     const account = await wallet.getCurrentAccount()
-    assertReadonlySignedPsbt(
+    assertExternalSignedPsbt(
       account,
       getToSignDatas(params.toSignDatas)[0]!,
       approvalRes[0]!.psbtHex
@@ -707,7 +718,7 @@ class ProviderController extends BaseController {
     approvalRes: SignPsbtResult
   }) => {
     const account = await wallet.getCurrentAccount()
-    assertReadonlySignedPsbt(
+    assertExternalSignedPsbt(
       account,
       getToSignDatas(params.toSignDatas)[0]!,
       approvalRes[0]!.psbtHex
@@ -751,7 +762,7 @@ class ProviderController extends BaseController {
     approvalRes: SignPsbtResult
   }) => {
     const account = await wallet.getCurrentAccount()
-    assertReadonlySignedPsbt(
+    assertExternalSignedPsbt(
       account,
       getToSignDatas(params.toSignDatas)[0]!,
       approvalRes[0]!.psbtHex
@@ -818,7 +829,7 @@ class ProviderController extends BaseController {
   }) => {
     const account = await wallet.getCurrentAccount()
     const toSignData = getToSignDatas(params.toSignDatas)[0]!
-    assertReadonlySignedPsbt(account, toSignData, approvalRes[0]!.psbtHex)
+    assertExternalSignedPsbt(account, toSignData, approvalRes[0]!.psbtHex)
     return approvalRes[0]!.psbtHex
   }
 
@@ -871,7 +882,7 @@ class ProviderController extends BaseController {
   }) => {
     const account = await wallet.getCurrentAccount()
     getToSignDatas(params.toSignDatas).forEach((toSignData, index) => {
-      assertReadonlySignedPsbt(account, toSignData, approvalRes[index]!.psbtHex)
+      assertExternalSignedPsbt(account, toSignData, approvalRes[index]!.psbtHex)
     })
     return approvalRes.map(v => v.psbtHex)
   }
@@ -1162,7 +1173,7 @@ class ProviderController extends BaseController {
     if (params.toSignData) {
       const signedPsbt = approvalRes?.signedPsbt
       if (!signedPsbt) throw new Error('RGB funding transaction was not signed')
-      assertReadonlySignedPsbt(currentAccount, params.toSignData, signedPsbt)
+      assertExternalSignedPsbt(currentAccount, params.toSignData, signedPsbt)
       if (order.status !== 'pending') throw new Error('RGB issuance order changed during signing')
       const transaction = bitcoin.Psbt.fromHex(signedPsbt).extractTransaction(true)
       const paid = transaction.outs
@@ -1340,7 +1351,7 @@ class ProviderController extends BaseController {
     const toSignData = getToSignDatas(params.toSignDatas)[0]!
     const signedPsbt = approvalRes[0]?.psbtHex
     if (!signedPsbt) throw new Error('RGB payment signing did not return a PSBT')
-    assertReadonlySignedPsbt(account, toSignData, signedPsbt)
+    assertExternalSignedPsbt(account, toSignData, signedPsbt)
     return wallet.createRgbSendEnd({
       transferId: params.transferId,
       signedPsbt,
@@ -1451,7 +1462,7 @@ class ProviderController extends BaseController {
     const toSignData = getToSignDatas(params.toSignDatas)[0]!
     const signedPsbt = approvalRes[0]?.psbtHex
     if (!signedPsbt) throw new Error('RGB swap signing did not return a PSBT')
-    assertReadonlySignedPsbt(account, toSignData, signedPsbt)
+    assertExternalSignedPsbt(account, toSignData, signedPsbt)
     const published = await wallet.publishRgbSwap({ transferId: params.transferId, signedPsbt })
     return { ...published, makerSignedPsbt: signedPsbt }
   }
@@ -1609,7 +1620,7 @@ class ProviderController extends BaseController {
     assertSameUnsignedTx(psbt, sourcePsbt)
     const buyerInputIndexes = new Set(toSignData.toSignInputs.map(input => input.index))
     assertNoCounterpartyPsbtSignatures(psbt, buyerInputIndexes)
-    assertReadonlySignedPsbt(account, { ...toSignData, autoFinalized: false }, psbt.toHex())
+    assertExternalSignedPsbt(account, { ...toSignData, autoFinalized: false }, psbt.toHex())
     const transaction = ((psbt.data.globalMap.unsignedTx as any).tx ||
       psbt.data.globalMap.unsignedTx) as any
     const txid = transaction.getId()

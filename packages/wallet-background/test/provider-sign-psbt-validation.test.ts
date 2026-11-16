@@ -2,7 +2,7 @@ import 'reflect-metadata'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { bitcoin } from '@unisat/wallet-bitcoin'
-import { ErrorCodes } from '@unisat/wallet-shared'
+import { ErrorCodes, KeyringType } from '@unisat/wallet-shared'
 
 vi.mock('@unisat/babylon-service', () => ({
   encodeSignature: vi.fn(),
@@ -14,6 +14,7 @@ vi.mock('../src/services', () => ({
 }))
 vi.mock('../src/controllers/wallet', () => ({
   default: {
+    getCurrentAccount: vi.fn(),
     getToSignData: vi.fn(),
   },
 }))
@@ -33,6 +34,31 @@ function createPsbtWithInputs(count: number, seed: number) {
     })
   }
   return psbt.toHex()
+}
+
+function createExternalSigningRequest() {
+  const signerPubkey = Buffer.from(
+    '0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798',
+    'hex'
+  )
+  const sourcePsbt = new bitcoin.Psbt()
+    .addInput({
+      hash: '11'.repeat(32),
+      index: 0,
+      sequence: 0xfffffffd,
+      sighashType: bitcoin.Transaction.SIGHASH_ALL,
+      witnessUtxo: {
+        script: bitcoin.payments.p2wpkh({ pubkey: signerPubkey }).output!,
+        value: 10_000,
+      },
+    })
+    .addOutput({ script: Buffer.from('6a', 'hex'), value: 0 })
+  return {
+    sourcePsbt,
+    params: {
+      toSignDatas: [{ psbtHex: sourcePsbt.toHex(), toSignInputs: [], autoFinalized: false }],
+    },
+  }
 }
 
 describe('provider batch PSBT signing validation', () => {
@@ -89,4 +115,56 @@ describe('provider batch PSBT signing validation', () => {
     expect(wallet.getToSignData).not.toHaveBeenCalled()
     expect(params).not.toHaveProperty('toSignDatas')
   })
+})
+
+describe('external PSBT signing result validation', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+  })
+
+  const externalKeyringTypes = [
+    KeyringType.ReadonlyKeyring,
+    KeyringType.KeystoneKeyring,
+    KeyringType.ColdWalletKeyring,
+  ]
+
+  it.each(externalKeyringTypes)('accepts an unchanged PSBT from %s', async type => {
+    const { sourcePsbt, params } = createExternalSigningRequest()
+    vi.mocked(wallet.getCurrentAccount).mockResolvedValue({ type } as any)
+
+    await expect(
+      providerController.signPsbt({
+        data: { params },
+        approvalRes: [{ psbtHex: sourcePsbt.toHex() }],
+      } as any)
+    ).resolves.toBe(sourcePsbt.toHex())
+  })
+
+  it.each(externalKeyringTypes)(
+    'rejects transaction header and sighash changes from %s',
+    async type => {
+      vi.mocked(wallet.getCurrentAccount).mockResolvedValue({ type } as any)
+      const mutations = [
+        (psbt: bitcoin.Psbt) => psbt.setVersion(1),
+        (psbt: bitcoin.Psbt) => psbt.setLocktime(500),
+        (psbt: bitcoin.Psbt) => {
+          psbt.data.inputs[0]!.sighashType = bitcoin.Transaction.SIGHASH_NONE
+        },
+      ]
+
+      for (const mutate of mutations) {
+        const { sourcePsbt, params } = createExternalSigningRequest()
+        const candidate = bitcoin.Psbt.fromHex(sourcePsbt.toHex())
+        mutate(candidate)
+
+        await expect(
+          providerController.signPsbt({
+            data: { params },
+            approvalRes: [{ psbtHex: candidate.toHex() }],
+          } as any)
+        ).rejects.toThrow('invalid psbt')
+      }
+    }
+  )
+
 })
