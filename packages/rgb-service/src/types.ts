@@ -281,6 +281,14 @@ export interface RgbPendingTransfer {
     makerSignedPsbt?: string
     /** Last result of an explicit backend-controlled seller ACK synchronization. */
     sellSwapAckStatus?: 'waiting_ack' | 'receiver_acked' | 'expired'
+    /** One immutable buyer proposal authorized by this transfer's ephemeral Proxy sender key. */
+    buyerSwapCommit?: {
+      proxyTransferId: string
+      txid: string
+      buyerSignedPsbtHash: string
+      commitment: string
+      signedAt: number
+    }
     /** Buyer-signed swap is ready; the dApp, not this wallet, broadcasts it. */
     externalBroadcast?: boolean
     /** Distinguishes legacy dApp broadcasting from backend-held final transactions. */

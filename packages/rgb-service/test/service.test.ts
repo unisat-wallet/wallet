@@ -19,7 +19,10 @@ import {
   decodeRgbInvoice,
   deriveProxyV1SealBlinding,
   prepareNiaOpretTransfer,
+  proxyV1SenderPublicKey,
+  proxyV1SenderTransferId,
   serializeNiaOpretWitnessBundle,
+  signProxyV1SenderMessage,
   rgbProxyInvoiceId,
   RgbBfaValidationUnavailableError,
   RgbInsufficientBalanceError,
@@ -5343,6 +5346,70 @@ describe('RgbService', () => {
     dependencies.stateSource.getTransactionStatus = vi.fn().mockResolvedValue({ status: 'mempool' })
     await service.sync()
     expect(service.getPendingTransfers()).toEqual([])
+  })
+
+  it('signs one immutable P2P buyer proposal with the seller Proxy key', async () => {
+    const dependencies = createDependencies()
+    const service = new RgbService(dependencies)
+    await service.open(wallet)
+    await service.sync()
+    const assetId = 'rgb:AQEBAQEB-AQEBAQE-BAQEBAQ-EBAQEBA-QEBAQEB-AQEBAQE'
+    const invoice = encodeWitnessRgbInvoice({
+      network: 'mainnet',
+      scriptPubKey: '512079be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798',
+      assetId,
+      amount: '60',
+      transportEndpoints: [proxyEndpoint],
+      proxyPublicKey: 'a09aa5f47a6759802ff955f8dc2d2a14a5c99d23be97f864127ff9383455a4f0',
+    })
+    await service.prepareSend(
+      { assetId, amount: '60', invoice, feeRate: 2 },
+      { providerOrigin: 'https://market.example' }
+    )
+    await service.publishSwap('transfer-1', 'maker-signed-psbt')
+
+    const buyerSignedPsbtHash = '44'.repeat(32)
+    const result = await service.signPublishedSwapBuyerCommitment(
+      'transfer-1',
+      'c'.repeat(64),
+      buyerSignedPsbtHash
+    )
+    const privateKey = (service as any).state.pending['transfer-1'].proxySenderPrivateKey
+    const senderPublicKey = proxyV1SenderPublicKey(privateKey)
+    const proxyTransferId = proxyV1SenderTransferId(
+      decodeRgbInvoice(invoice).proxyInvoiceId!,
+      senderPublicKey
+    )
+    const message =
+      `rgb-buy-swap/commit/v1:${proxyTransferId}:${'c'.repeat(64)}:${buyerSignedPsbtHash}`
+    expect(result).toEqual({
+      proxyTransferId,
+      txid: 'c'.repeat(64),
+      buyerSignedPsbtHash,
+      commitment: signProxyV1SenderMessage(privateKey, message),
+      signedAt: expect.any(Number),
+    })
+    await expect(service.signPublishedSwapBuyerCommitment(
+      'transfer-1', 'c'.repeat(64), buyerSignedPsbtHash
+    )).resolves.toEqual(result)
+    await expect(service.signPublishedSwapBuyerCommitment(
+      'transfer-1', 'c'.repeat(64), '55'.repeat(32)
+    )).rejects.toThrow('already bound to a different buyer proposal')
+    await expect(service.signPublishedSwapBuyerCommitment(
+      'transfer-1', 'd'.repeat(64), buyerSignedPsbtHash
+    )).rejects.toThrow('transaction ID does not match')
+
+    const reopened = new RgbService(dependencies)
+    await reopened.open(wallet)
+    await expect(reopened.signPublishedSwapBuyerCommitment(
+      'transfer-1', 'c'.repeat(64), buyerSignedPsbtHash
+    )).resolves.toEqual(result)
+    await reopened.completePublishedSwap('transfer-1', 'fully-signed-psbt', {
+      externalBroadcast: true,
+    })
+    await expect(reopened.signPublishedSwapBuyerCommitment(
+      'transfer-1', 'c'.repeat(64), buyerSignedPsbtHash
+    )).resolves.toEqual(result)
   })
 
   it('synchronizes a signed receiver ACK without importing a final PSBT', async () => {

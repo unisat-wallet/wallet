@@ -6190,6 +6190,12 @@ export class WalletController extends BaseController {
   publishRgbSwap = (params: { transferId: string; signedPsbt: string }) =>
     this.rgbSendOperations.publishSwap(params)
 
+  signRgbBuySwapCommit = (params: {
+    transferId: string
+    txid: string
+    buyerSignedPsbtHash: string
+  }) => this.rgbSendOperations.signBuySwapCommit(params)
+
   prepareRgbSwapExternalBroadcast = (params: { transferId: string; signedPsbt: string }) =>
     this.rgbSendOperations.prepareExternalSwapBroadcast(params)
 

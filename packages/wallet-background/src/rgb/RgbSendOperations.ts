@@ -209,6 +209,21 @@ export class RgbSendOperations {
     }
   }
 
+  /** Sign the standard buyer commitment with this seller transfer's Proxy key. */
+  async signBuySwapCommit(params: {
+    transferId: string
+    txid: string
+    buyerSignedPsbtHash: string
+  }) {
+    const { service, wallet } = await this.dependencies.getContext()
+    await this.dependencies.ensureWriteLease?.({ service, wallet }, { forceRenew: true })
+    return service.signPublishedSwapBuyerCommitment(
+      params.transferId,
+      params.txid,
+      params.buyerSignedPsbtHash
+    )
+  }
+
   /** Record buyer ACK/signatures; the dApp finalizes and broadcasts the PSBT. */
   async prepareExternalSwapBroadcast(params: { transferId: string; signedPsbt: string }) {
     const { service, wallet } = await this.dependencies.getContext()

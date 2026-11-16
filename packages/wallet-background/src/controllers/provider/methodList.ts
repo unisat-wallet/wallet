@@ -140,6 +140,12 @@ export type ProviderMethodList = {
     transferId: string
     makerSignedPsbt: string
   }
+  /** Sign one buyer-partial PSBT hash with the seller transfer's Proxy sender key. */
+  signRgbBuySwapCommit: {
+    transferId: string
+    txid: string
+    buyerSignedPsbtHash: string
+  }
   /** Confirm the buyer-signed seller swap; its dApp broadcasts the final PSBT. */
   confirmRgbSellSwap: {
     transferId: string

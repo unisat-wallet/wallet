@@ -24,6 +24,7 @@ vi.mock('../src/controllers/wallet', () => ({
     getRgbBuySwapReceive: vi.fn(),
     stageRgbBuySwapIntent: vi.fn(),
     acceptRgbBuySwap: vi.fn(),
+    signRgbBuySwapCommit: vi.fn(),
     syncRgbSellSwapAcknowledgement: vi.fn(),
     getRgbPendingReceiveInvoices: vi.fn(),
     abandonRgbAcceptedReceive: vi.fn(),
@@ -74,6 +75,7 @@ describe('provider RGB payment ownership', () => {
       'getRgbPendingReceives',
       'getRgbPaymentStatus',
       'confirmRgbSellSwap',
+      'signRgbBuySwapCommit',
       'syncRgbSellSwapAck',
       'getRgbSwapStatus',
     ]
@@ -385,6 +387,33 @@ describe('provider RGB payment ownership', () => {
     })).resolves.toEqual(expect.objectContaining({ status: 'receiver_acked' }))
     expect(wallet.syncRgbSellSwapAcknowledgement).toHaveBeenCalledWith({
       transferId: 'transfer-1',
+    })
+  })
+
+  it('origin-binds a seller Proxy commitment to one buyer PSBT hash', async () => {
+    const txid = '11'.repeat(32)
+    const buyerSignedPsbtHash = '22'.repeat(32)
+    vi.mocked(wallet.getRgbPaymentOrigin).mockResolvedValue('https://dapp.example')
+    vi.mocked(wallet.signRgbBuySwapCommit).mockResolvedValue({
+      proxyTransferId: '33'.repeat(32),
+      txid,
+      buyerSignedPsbtHash,
+      commitment: '44'.repeat(64),
+      signedAt: 1,
+    } as any)
+
+    await expect(providerController.signRgbBuySwapCommit({
+      data: { params: { transferId: 'transfer-1', txid, buyerSignedPsbtHash } },
+      session: { origin: 'https://dapp.example' },
+    })).resolves.toEqual({
+      transferId: 'transfer-1',
+      proxyTransferId: '33'.repeat(32),
+      txid,
+      buyerSignedPsbtHash,
+      commitment: '44'.repeat(64),
+    })
+    expect(wallet.signRgbBuySwapCommit).toHaveBeenCalledWith({
+      transferId: 'transfer-1', txid, buyerSignedPsbtHash,
     })
   })
 

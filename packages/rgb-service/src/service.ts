@@ -48,7 +48,13 @@ import {
   encodeBlindRgbInvoice,
 } from './protocol/receive'
 import { getSwapPsbtInputOutpoints } from './protocol/opret-transfer'
-import { deriveProxyV1SealBlinding } from './protocol/proxy-v1'
+import {
+  deriveProxyV1SealBlinding,
+  proxyV1SenderPublicKey,
+  proxyV1SenderTransferId,
+  rgbBuySwapCommitMessage,
+  signProxyV1SenderMessage,
+} from './protocol/proxy-v1'
 import { planFungibleTransition } from './protocol/transition'
 import type {
   RgbCompletedTransfer,
@@ -5270,6 +5276,74 @@ export class RgbService {
       }
       await this.publishPendingDelivery(transferId, pending)
       return pending.delivery.completed
+    })
+  }
+
+  /**
+   * Authorize one buyer-partial PSBT hash with this transfer's ephemeral Proxy
+   * sender key. This is the missing bridge for non-custodial P2P swaps: the
+   * receiver can verify the standard buy-swap commitment without the sender
+   * key ever leaving the seller wallet.
+   */
+  async signPublishedSwapBuyerCommitment(
+    transferId: string,
+    txid: string,
+    buyerSignedPsbtHash: string
+  ) {
+    return this.runPendingTransferOperation(transferId, async () => {
+      const pending = this.requireState().pending[transferId]
+      if (!pending) throw new RgbServiceError(`RGB transfer ${transferId} does not exist`)
+      this.assertPreparedTransferGeneration(pending)
+      const delivery = pending.delivery
+      if (!delivery?.publishedAt || !pending.proxySenderPrivateKey) {
+        throw new RgbServiceError('RGB seller swap has not published a Proxy v1 consignment')
+      }
+      const normalizedTxid = txid.toLowerCase()
+      const normalizedBuyerHash = buyerSignedPsbtHash.toLowerCase()
+      if (!/^[0-9a-f]{64}$/.test(normalizedTxid) ||
+          normalizedTxid !== delivery.completed.txid.toLowerCase()) {
+        throw new RgbServiceError('RGB buyer swap commitment transaction ID does not match')
+      }
+      if (!/^[0-9a-f]{64}$/.test(normalizedBuyerHash)) {
+        throw new RgbServiceError('RGB buyer signed PSBT hash is invalid')
+      }
+      const existing = delivery.buyerSwapCommit
+      if (existing) {
+        if (existing.txid !== normalizedTxid ||
+            existing.buyerSignedPsbtHash !== normalizedBuyerHash) {
+          throw new RgbServiceError('RGB seller swap is already bound to a different buyer proposal')
+        }
+        return existing
+      }
+      if (!delivery.requiresCounterpartySignature) {
+        throw new RgbServiceError(
+          'RGB buyer swap commitment must be signed before seller swap confirmation'
+        )
+      }
+      const invoice = decodeRgbInvoice(pending.request.invoice)
+      if (!invoice.proxyInvoiceId) {
+        throw new RgbServiceError('RGB buyer swap commitment requires a Proxy v1 invoice')
+      }
+      const senderPublicKey = proxyV1SenderPublicKey(pending.proxySenderPrivateKey)
+      const proxyTransferId = proxyV1SenderTransferId(
+        invoice.proxyInvoiceId,
+        senderPublicKey
+      )
+      const message = rgbBuySwapCommitMessage({
+        proxyTransferId,
+        txid: normalizedTxid,
+        buyerSignedPsbtHash: normalizedBuyerHash,
+      })
+      const result = {
+        proxyTransferId,
+        txid: normalizedTxid,
+        buyerSignedPsbtHash: normalizedBuyerHash,
+        commitment: signProxyV1SenderMessage(pending.proxySenderPrivateKey, message),
+        signedAt: this.now(),
+      }
+      delivery.buyerSwapCommit = result
+      await this.persist({ waitForRecovery: true })
+      return result
     })
   }
 

@@ -3,6 +3,7 @@ import { assertValidFeeRate } from '@unisat/base-utils'
 import {
   createBfaBurnDestinationV1,
   decodeRgbInvoice as decodeLocalRgbInvoice,
+  rgbBuySwapCommitMessage,
 } from '@unisat/rgb-service'
 import type { BfaBurnDestinationV1 } from '@unisat/rgb-service'
 import { keccak_256 } from '@noble/hashes/sha3'
@@ -386,14 +387,6 @@ function assertNoCounterpartyPsbtSignatures(psbt: bitcoin.Psbt, buyerInputIndexe
   )) {
     throw new Error('RGB buy swap PSBT must not expose maker signatures to the wallet client')
   }
-}
-
-function rgbBuySwapCommitMessage(input: {
-  proxyTransferId: string
-  txid: string
-  buyerSignedPsbtHash: string
-}) {
-  return `rgb-buy-swap/commit/v1:${input.proxyTransferId}:${input.txid}:${input.buyerSignedPsbtHash}`
 }
 
 /** bitcoinjs interprets an omitted type as DEFAULT for P2TR, ALL otherwise. */
@@ -1465,6 +1458,36 @@ class ProviderController extends BaseController {
     assertExternalSignedPsbt(account, toSignData, signedPsbt)
     const published = await wallet.publishRgbSwap({ transferId: params.transferId, signedPsbt })
     return { ...published, makerSignedPsbt: signedPsbt }
+  }
+
+  /**
+   * Pure P2P only: authorize the buyer's partial-PSBT hash with the ephemeral
+   * Proxy sender key after the seller consignment has been published.
+   */
+  signRgbBuySwapCommit = async ({
+    data: { params },
+    session: { origin },
+  }: {
+    data: { params: { transferId: string; txid: string; buyerSignedPsbtHash: string } }
+    session: { origin: string }
+  }) => {
+    if (!params.transferId || !/^[0-9a-f]{64}$/i.test(params.txid) ||
+        !/^[0-9a-f]{64}$/i.test(params.buyerSignedPsbtHash)) {
+      throw new Error('transferId, txid and buyerSignedPsbtHash are required')
+    }
+    await assertRgbPaymentOrigin(params.transferId, origin)
+    const result = await wallet.signRgbBuySwapCommit({
+      transferId: params.transferId,
+      txid: params.txid.toLowerCase(),
+      buyerSignedPsbtHash: params.buyerSignedPsbtHash.toLowerCase(),
+    })
+    return {
+      transferId: params.transferId,
+      proxyTransferId: result.proxyTransferId,
+      txid: result.txid,
+      buyerSignedPsbtHash: result.buyerSignedPsbtHash,
+      commitment: result.commitment,
+    }
   }
 
   /**

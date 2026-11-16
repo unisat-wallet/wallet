@@ -34,6 +34,13 @@ export class UnisatProvider extends EventEmitter {
     acceptBuySwap: (params: { recipientId: string; backendCommit: string }) => Promise<any>;
     prepareSwap: (params: { invoice: string; assetId: string; amount: string; btcReceiveAmount: string; feeRate?: number; psbt: string }) => Promise<any>;
     signSellSwapAndPublishConsignment: (transferId: string, makerSignedPsbt: string) => Promise<any>;
+    signBuySwapCommit: (transferId: string, txid: string, buyerSignedPsbtHash: string) => Promise<{
+      transferId: string;
+      proxyTransferId: string;
+      txid: string;
+      buyerSignedPsbtHash: string;
+      commitment: string;
+    }>;
     confirmSellSwap: (transferId: string, signedPsbt: string) => Promise<any>;
     syncSellSwapAck: (transferId: string) => Promise<{
       transferId: string;
@@ -71,6 +78,7 @@ export class UnisatProvider extends EventEmitter {
       acceptBuySwap: params => this.bitcoinAPI.acceptRgbBuySwap(params),
       prepareSwap: params => this.bitcoinAPI.prepareRgbSwap(params),
       signSellSwapAndPublishConsignment: (transferId, makerSignedPsbt) => this.bitcoinAPI.signRgbSellSwapAndPublishConsignment(transferId, makerSignedPsbt),
+      signBuySwapCommit: (transferId, txid, buyerSignedPsbtHash) => this.bitcoinAPI.signRgbBuySwapCommit(transferId, txid, buyerSignedPsbtHash),
       confirmSellSwap: (transferId, signedPsbt) => this.bitcoinAPI.confirmRgbSellSwap(transferId, signedPsbt),
       syncSellSwapAck: transferId => this.bitcoinAPI.syncRgbSellSwapAck(transferId),
       applySellSwapAbort: transferId => this.bitcoinAPI.applyRgbSellSwapAbort(transferId),
