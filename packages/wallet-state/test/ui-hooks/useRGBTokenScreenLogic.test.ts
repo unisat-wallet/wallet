@@ -110,6 +110,43 @@ describe('useRGBTokenScreenLogic', () => {
     expect(result.current.enableTransfer).toBe(true)
   })
 
+  it('loads pending allocation details and applies the refreshed balance', async () => {
+    const { wrapper, wallet } = createHookTestHarness({ routeState: { assetId } })
+    wallet.getRGBAssetDetail.mockResolvedValue(detail)
+    wallet.getRGBAssetBalance.mockResolvedValue({ ...fetchedBalance, spendable: '0', pending: '12' })
+    wallet.getRgbAssetPendingDetails.mockResolvedValue({
+      assetId,
+      balance: { ...fetchedBalance, spendable: '12', pending: '0' },
+      items: [{
+        kind: 'utxo',
+        reason: 'waiting_confirmation',
+        amount: '12',
+        outpoint: { txid: 'a'.repeat(64), vout: 1 },
+        chainStatus: 'mempool',
+        confirmations: 0,
+        requiredConfirmations: 1,
+        settled: false,
+        spendable: false,
+        historyAvailable: true,
+      }],
+      refreshedAt: 123,
+    })
+
+    const { result } = renderHook(() => useRGBTokenScreenLogic(), { wrapper })
+    await waitFor(() => expect(result.current.tokenBalance?.pending).toBe('12'))
+
+    await act(async () => {
+      await result.current.loadPendingDetails(true)
+    })
+
+    expect(wallet.getRgbAssetPendingDetails).toHaveBeenCalledWith({ assetId, forceSync: true })
+    expect(result.current.pendingDetails?.items[0]).toMatchObject({
+      reason: 'waiting_confirmation',
+      amount: '12',
+    })
+    expect(result.current.tokenBalance).toMatchObject({ spendable: '12', pending: '0' })
+  })
+
   it('filters history from unrelated RGB assets', async () => {
     const { wrapper, wallet } = createHookTestHarness({ routeState: { assetId } })
     wallet.getRGBAssetDetail.mockResolvedValue(detail)

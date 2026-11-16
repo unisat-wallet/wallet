@@ -15,4 +15,9 @@ export {
   type StorageContextType,
 } from './StorageContext'
 export { ToolsContext, useTools, type ToolsContextType } from './ToolsContext'
-export { useWallet, WalletProvider } from './WalletContext'
+export {
+  useWallet,
+  WalletProvider,
+  type RgbAssetPendingDetailItem,
+  type RgbAssetPendingDetails,
+} from './WalletContext'

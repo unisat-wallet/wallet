@@ -3450,6 +3450,71 @@ describe('RgbService', () => {
     expect(state.pendingSendHistory[0].fundingSnapshotConverged).toBe(true)
   })
 
+  it('promotes confirmed local send change when the UTXO snapshot remains at mempool', async () => {
+    const dependencies = createDependencies()
+    const service = new RgbService(dependencies)
+    await service.open(wallet)
+    await service.sync()
+    const state = (service as any).state
+    const txid = 'e'.repeat(64)
+    const assetId = state.snapshot.utxos[0].allocations[0].assetId
+    const opId = 'f'.repeat(64)
+    const created = {
+      ...structuredClone(state.snapshot.utxos[0]),
+      outpoint: { txid, vout: 1 },
+      chainStatus: 'mempool' as const,
+      confirmations: 0,
+      allocations: [{
+        ...structuredClone(state.snapshot.utxos[0].allocations[0]),
+        opId,
+        amount: '968',
+        settled: false,
+        spendable: false,
+        historyAvailable: true,
+      }],
+    }
+    state.snapshot.utxos.push(created)
+    state.contracts = {
+      [assetId]: {
+        consignment: 'local-consignment',
+        createdAt: 1,
+        metadata: { ticker: 'RGB', name: 'RGB', precision: 0, schema: 'NIA', issuedSupply: '1000' },
+        history: { payload: 'local-consignment', opIds: [opId], updatedAt: 1 },
+      },
+    }
+    // Activity confirmation may already have compacted the send tombstone
+    // while the UTXO index still reports this output as mempool.
+    state.pendingSendHistory = []
+    dependencies.stateSource.verifyUtxos = vi.fn().mockResolvedValue([{
+      outpoint: created.outpoint,
+      status: 'confirmed',
+      confirmations: 4,
+      confirmationHeight: 53_511,
+    }])
+    vi.mocked(dependencies.stateSource.getSnapshot).mockResolvedValueOnce({
+      syncedAt: 2,
+      utxos: [
+        structuredClone(state.snapshot.utxos[0]),
+        structuredClone(created),
+      ],
+    })
+
+    await service.sync()
+
+    expect(dependencies.stateSource.verifyUtxos).toHaveBeenCalledWith(
+      wallet,
+      [expect.objectContaining({ outpoint: { txid, vout: 1 } })]
+    )
+    expect(service.getSnapshot().utxos).toContainEqual(expect.objectContaining({
+      outpoint: { txid, vout: 1 },
+      chainStatus: 'confirmed',
+      confirmations: 4,
+      confirmationHeight: 53_511,
+      allocations: [expect.objectContaining({ amount: '968', settled: true, spendable: true })],
+    }))
+    expect(state.pendingUtxoSync).toMatchObject({ txid })
+  })
+
   it('clears local allocations for an empty snapshot after every local UTXO is confirmed terminal', async () => {
     const dependencies = createDependencies()
     dependencies.stateSource.getTransactionStatus = vi.fn().mockResolvedValue({

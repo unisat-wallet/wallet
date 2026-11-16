@@ -129,6 +129,11 @@ export function createWalletMock() {
     createSplitInscriptionPsbt: vi.fn(),
     createSendRunesPsbt: vi.fn(),
     getRGBAssetBalance: vi.fn(),
+    getRgbAssetPendingDetails: vi.fn().mockResolvedValue({
+      assetId: '',
+      items: [],
+      refreshedAt: 0,
+    }),
     getRGBAssetDetail: vi.fn(),
     getRGBAssetActivity: vi.fn(),
     getRGBList: vi.fn().mockResolvedValue({ list: [], total: 0 }),

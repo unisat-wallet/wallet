@@ -3441,6 +3441,61 @@ describe('RGB wallet references', () => {
     expect(syncListState).toHaveBeenCalledOnce()
   })
 
+  it('explains the UTXOs and accepted receives behind an RGB pending balance', async () => {
+    const wallet = new WalletController()
+    const pendingTxid = 'a'.repeat(64)
+    const acceptedTxid = 'b'.repeat(64)
+    const service = {
+      getLocalAssetBalance: vi.fn(() => ({
+        assetId: 'rgb:asset', settled: '0', spendable: '0', pending: '15',
+      })),
+      getUtxoInspection: vi.fn(() => ({
+        snapshot: {
+          utxos: [{
+            outpoint: { txid: pendingTxid, vout: 1 },
+            chainStatus: 'mempool',
+            confirmations: 0,
+            allocations: [{
+              assetId: 'rgb:asset', amount: '10', settled: false, spendable: false,
+            }],
+          }],
+        },
+      })),
+      getPendingReceives: vi.fn(() => [{
+        recipientId: 'recipient-1',
+        minConfirmations: 2,
+        receivedConsignment: {
+          accepted: true,
+          assetId: 'rgb:asset',
+          amount: '5',
+          txid: acceptedTxid,
+        },
+      }]),
+    }
+    vi.spyOn(wallet as any, 'getLocalRgbReadService').mockResolvedValue({ service })
+    vi.spyOn(wallet as any, 'getRgbPendingLockedAmounts').mockResolvedValue(new Map())
+
+    await expect(wallet.getRgbAssetPendingDetails({ assetId: 'rgb:asset' })).resolves.toMatchObject({
+      assetId: 'rgb:asset',
+      balance: { pending: '15' },
+      items: [
+        {
+          kind: 'utxo',
+          reason: 'waiting_confirmation',
+          amount: '10',
+          outpoint: { txid: pendingTxid, vout: 1 },
+        },
+        {
+          kind: 'receive',
+          reason: 'waiting_receive_settlement',
+          amount: '5',
+          txid: acceptedTxid,
+          requiredConfirmations: 2,
+        },
+      ],
+    })
+  })
+
   it('keeps a broadcast RGB history entry locked after it is compacted from pending transfers', async () => {
     const wallet = new WalletController()
     const service = {

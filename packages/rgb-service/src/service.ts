@@ -877,6 +877,7 @@ export class RgbService {
 
   private async reconcileStaleBroadcastedFundingOutpoints(snapshot: RgbWalletSnapshot) {
     const state = this.requireState()
+    await this.promoteConfirmedLocallyValidatedOutputs(snapshot)
     const histories = (state.pendingSendHistory || []).filter(item =>
       item.status === 'broadcasted' && item.txid && item.spentOutpoints?.length
     )
@@ -975,6 +976,82 @@ export class RgbService {
       )
     }
     return false
+  }
+
+  /**
+   * The UTXO index can lag behind the chain endpoint and keep a sender change
+   * output at mempool/0 after its transaction confirms. Promote only outputs
+   * whose complete local RGB DAG is available and which are not also awaiting
+   * receive acceptance. This also repairs transfers whose send tombstone was
+   * already compacted after the activity index reported confirmation.
+   */
+  private async promoteConfirmedLocallyValidatedOutputs(snapshot: RgbWalletSnapshot) {
+    const state = this.requireState()
+    const verifyUtxos = this.dependencies.stateSource.verifyUtxos
+    if (!verifyUtxos) return
+    const receiveTxids = new Set((state.pendingReceives || [])
+      .map(receive => receive.receivedConsignment?.txid || receive.pendingAccept?.txid)
+      .filter((txid): txid is string => Boolean(txid)))
+    const candidates = state.snapshot.utxos.filter(utxo =>
+      !receiveTxids.has(utxo.outpoint.txid) &&
+      (utxo.chainStatus !== 'confirmed' || utxo.allocations.some(allocation =>
+        !allocation.settled || !allocation.spendable
+      )) &&
+      utxo.allocations.length > 0 &&
+      utxo.allocations.every(allocation =>
+        allocation.historyAvailable !== false &&
+        allocation.localHistoryAvailable !== false &&
+        this.localHistoryCoversAllocations(allocation.assetId, [allocation.opId])
+      )
+    )
+    if (!candidates.length) return
+
+    let verified: Awaited<ReturnType<typeof verifyUtxos>>
+    try {
+      verified = await verifyUtxos(state.wallet, candidates)
+    } catch {
+      return
+    }
+    const confirmed = new Map(verified
+      .filter(item => item.status === 'confirmed')
+      .map(item => [`${item.outpoint.txid}:${item.outpoint.vout}`, item]))
+    let changed = false
+    for (const local of candidates) {
+      const chain = confirmed.get(outpointKey(local))
+      if (!chain) continue
+      local.chainStatus = 'confirmed'
+      local.confirmations = chain.confirmations
+      if (chain.confirmationHeight !== undefined) {
+        local.confirmationHeight = chain.confirmationHeight
+      }
+      local.allocations = local.allocations.map(allocation => ({
+        ...allocation,
+        settled: true,
+        spendable: true,
+      }))
+      const remote = snapshot.utxos.find(utxo => outpointKey(utxo) === outpointKey(local))
+      if (remote) {
+        remote.chainStatus = 'confirmed'
+        remote.confirmations = chain.confirmations
+        if (chain.confirmationHeight !== undefined) {
+          remote.confirmationHeight = chain.confirmationHeight
+        }
+        remote.allocations = remote.allocations.map(allocation => {
+          const validated = local.allocations.find(candidate =>
+            candidate.assetId === allocation.assetId &&
+            candidate.opId === allocation.opId &&
+            candidate.assignmentIndex === allocation.assignmentIndex
+          )
+          return validated ? { ...allocation, settled: true, spendable: true } : allocation
+        })
+      }
+      state.pendingUtxoSync = {
+        txid: local.outpoint.txid,
+        outpoints: state.snapshot.utxos,
+      }
+      changed = true
+    }
+    if (changed) state.snapshot.syncedAt = this.now()
   }
 
   /** Remove locally overlaid broadcast outputs after the backend revision stops changing. */

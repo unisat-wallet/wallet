@@ -78,6 +78,32 @@ interface ContactBookItem {
 }
 type ContactBookStore = Record<string, ContactBookItem | undefined>
 
+export type RgbAssetPendingDetailItem = {
+  kind: 'utxo' | 'receive'
+  reason:
+    | 'waiting_confirmation'
+    | 'waiting_required_confirmations'
+    | 'waiting_snapshot_sync'
+    | 'waiting_receive_settlement'
+    | 'history_unavailable'
+  amount: string
+  outpoint?: { txid: string; vout: number }
+  txid?: string
+  chainStatus?: 'mempool' | 'confirmed' | 'pending_spend' | 'spent' | 'replaced' | 'unknown'
+  confirmations: number
+  requiredConfirmations: number
+  settled: boolean
+  spendable: boolean
+  historyAvailable: boolean
+}
+
+export type RgbAssetPendingDetails = {
+  assetId: string
+  balance?: RgbBalance
+  items: RgbAssetPendingDetailItem[]
+  refreshedAt: number
+}
+
 export interface WalletController {
   openapi: {
     [key: string]: (...params: any) => Promise<any>
@@ -640,6 +666,7 @@ export interface WalletController {
   enableRgbFeature(): Promise<{ enabled: true }>
 
   getRGBAssetBalance(address: string, assetId: string): Promise<RgbBalance | undefined>
+  getRgbAssetPendingDetails(params: { assetId: string; forceSync?: boolean }): Promise<RgbAssetPendingDetails>
 
   getRGBAssetDetail(address: string, assetId: string): Promise<RgbAssetDetail>
 

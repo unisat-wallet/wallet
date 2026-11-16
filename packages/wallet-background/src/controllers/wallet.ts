@@ -185,6 +185,25 @@ type RgbControllerBalance = {
   [key: string]: unknown
 }
 
+type RgbPendingDetailItem = {
+  kind: 'utxo' | 'receive'
+  reason:
+    | 'waiting_confirmation'
+    | 'waiting_required_confirmations'
+    | 'waiting_snapshot_sync'
+    | 'waiting_receive_settlement'
+    | 'history_unavailable'
+  amount: string
+  outpoint?: { txid: string; vout: number }
+  txid?: string
+  chainStatus?: 'mempool' | 'confirmed' | 'pending_spend' | 'spent' | 'replaced' | 'unknown'
+  confirmations: number
+  requiredConfirmations: number
+  settled: boolean
+  spendable: boolean
+  historyAvailable: boolean
+}
+
 type RgbControllerWriteLease = {
   deviceId: string
   leaseId: string
@@ -4123,6 +4142,99 @@ export class WalletController extends BaseController {
     return balance
       ? this.applyRgbPendingLock(balance, await this.getRgbPendingLockedAmounts())
       : undefined
+  }
+
+  /** Explain the local allocations contributing to one asset's pending balance. */
+  getRgbAssetPendingDetails = async (params: { assetId: string; forceSync?: boolean }) => {
+    let context = await this.getLocalRgbReadService()
+    if (params.forceSync) {
+      // Refresh both accepted receives and the authoritative UTXO snapshot.
+      // Automatic calls remain rate-limited; an explicit user refresh bypasses
+      // those intervals while retaining the normal writer-lease checks.
+      context = await this.rgbCoordinator.syncReceivedAllocations(
+        context,
+        undefined,
+        { force: true }
+      )
+      await this.rgbCoordinator.syncListState({ force: true })
+      context = await this.getLocalRgbReadService()
+    }
+    const { service } = context
+    const assetId = params.assetId
+    const localBalance = service.getLocalAssetBalance(assetId)
+    const balance = localBalance
+      ? this.applyRgbPendingLock(localBalance, await this.getRgbPendingLockedAmounts())
+      : undefined
+    const inspection = service.getUtxoInspection()
+    const acceptedReceives = service.getPendingReceives().filter(receive =>
+      receive.receivedConsignment?.accepted &&
+      receive.receivedConsignment.assetId === assetId &&
+      receive.receivedConsignment.amount
+    )
+    const matchedReceives = new Set<string>()
+    const items: RgbPendingDetailItem[] = inspection.snapshot.utxos.flatMap(utxo => {
+      if (utxo.chainStatus === 'spent' || utxo.chainStatus === 'replaced' ||
+        utxo.chainStatus === 'pending_spend') return []
+      return utxo.allocations
+        .filter(allocation => allocation.assetId === assetId && !allocation.settled)
+        .map(allocation => {
+          const receive = acceptedReceives.find(candidate => {
+            if (candidate.seal) {
+              return candidate.seal.txid === utxo.outpoint.txid &&
+                candidate.seal.vout === utxo.outpoint.vout
+            }
+            return candidate.receivedConsignment?.txid === utxo.outpoint.txid
+          })
+          if (receive) matchedReceives.add(receive.recipientId)
+          const requiredConfirmations = receive?.minConfirmations || 1
+          const confirmations = utxo.confirmations || 0
+          const reason: RgbPendingDetailItem['reason'] = allocation.historyAvailable === false ||
+            allocation.localHistoryAvailable === false
+            ? 'history_unavailable'
+            : utxo.chainStatus === 'mempool' || utxo.chainStatus === undefined
+              ? 'waiting_confirmation'
+              : confirmations < requiredConfirmations
+                ? 'waiting_required_confirmations'
+                : 'waiting_snapshot_sync'
+          return {
+            kind: 'utxo' as const,
+            reason,
+            amount: allocation.amount,
+            outpoint: utxo.outpoint,
+            ...(utxo.chainStatus ? { chainStatus: utxo.chainStatus } : {}),
+            confirmations,
+            requiredConfirmations,
+            settled: allocation.settled,
+            spendable: allocation.spendable,
+            historyAvailable: allocation.historyAvailable !== false &&
+              allocation.localHistoryAvailable !== false,
+          }
+        })
+    })
+    for (const receive of acceptedReceives) {
+      if (matchedReceives.has(receive.recipientId)) continue
+      const receipt = receive.receivedConsignment!
+      items.push({
+        kind: 'receive',
+        reason: 'waiting_receive_settlement',
+        amount: receipt.amount!,
+        ...(receive.seal
+          ? { outpoint: { txid: receive.seal.txid, vout: receive.seal.vout } }
+          : {}),
+        ...(receipt.txid ? { txid: receipt.txid } : {}),
+        confirmations: 0,
+        requiredConfirmations: receive.minConfirmations || 1,
+        settled: false,
+        spendable: false,
+        historyAvailable: true,
+      })
+    }
+    return {
+      assetId,
+      ...(balance ? { balance } : {}),
+      items,
+      refreshedAt: Date.now(),
+    }
   }
 
   getRgbAssetDetail = async (assetId: string) => {

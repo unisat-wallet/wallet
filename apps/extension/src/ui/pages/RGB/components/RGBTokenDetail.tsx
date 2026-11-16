@@ -19,9 +19,10 @@ export function RGBTokenDetail(props: {
   estimatedBalance?: string;
   otherLockedAmount?: string;
   isNonStandardNia?: boolean;
+  onClickPending?: () => void;
 }) {
   const { t } = useI18n();
-  const { assetId, name, ticker, tokenInfo, tokenBalance, reservedSendAmount, estimatedBalance, otherLockedAmount, isNonStandardNia } = props;
+  const { assetId, name, ticker, tokenInfo, tokenBalance, reservedSendAmount, estimatedBalance, otherLockedAmount, isNonStandardNia, onClickPending } = props;
   const precision = getRgbTokenPrecision(tokenBalance) || getRgbTokenPrecision(tokenInfo);
   const formatValue = (value: unknown) => {
     return value === undefined || value === null || value === '' ? '--' : value.toString();
@@ -75,7 +76,13 @@ export function RGBTokenDetail(props: {
       <Line />
       <Section title={t('available_balance')} value={available} maxLength={Number.POSITIVE_INFINITY} wrapValue />
       <Line />
-      <Section title={t('rgb_pending_balance')} value={pending} maxLength={Number.POSITIVE_INFINITY} wrapValue />
+      <Section
+        title={t('rgb_pending_balance')}
+        value={pending}
+        maxLength={Number.POSITIVE_INFINITY}
+        wrapValue
+        onClick={Number(tokenBalance?.pending || 0) > 0 ? onClickPending : undefined}
+      />
       <Line />
       {reservedSendAmount !== undefined && estimatedBalance !== undefined ? (
         <>

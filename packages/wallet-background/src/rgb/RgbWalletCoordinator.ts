@@ -75,13 +75,15 @@ export class RgbWalletCoordinator {
 
   async syncReceivedAllocations(
     boundContext?: LocalRgbServiceContext,
-    beforeSync?: () => Promise<void>
+    beforeSync?: () => Promise<void>,
+    options?: { force?: boolean }
   ): Promise<LocalRgbServiceContext> {
     const context = boundContext ?? (await this.dependencies.getContext())
     const key = walletKey(context.wallet)
     const activePolling = this.receivePolling.get(key)
     if (activePolling) return activePolling
-    if ((this.receivePollingAt.get(key) ?? 0) + RECEIVE_POLL_INTERVAL > Date.now()) {
+    if (!options?.force &&
+      (this.receivePollingAt.get(key) ?? 0) + RECEIVE_POLL_INTERVAL > Date.now()) {
       return context
     }
 
@@ -97,7 +99,7 @@ export class RgbWalletCoordinator {
     return polling
   }
 
-  async syncListState(): Promise<void> {
+  async syncListState(options?: { force?: boolean }): Promise<void> {
     // This is initiated by a list render. Use local read state first and only
     // escalate to a writer for applying a refreshed snapshot. Snapshot
     // freshness is required even when optional recovery backup is disabled.
@@ -117,10 +119,13 @@ export class RgbWalletCoordinator {
       : LIST_SNAPSHOT_SYNC_INTERVAL
     // Avoid a lease round-trip when this is only a render-triggered call that
     // is already covered by an in-flight or recently completed list refresh.
-    if (
-      this.snapshotSyncing.has(key) ||
-      (this.snapshotSyncAt.get(key) ?? 0) + minInterval > Date.now()
-    ) return
+    const activeSync = this.snapshotSyncing.get(key)
+    if (activeSync) {
+      await activeSync
+      if (!options?.force) return
+    }
+    if (!options?.force &&
+      (this.snapshotSyncAt.get(key) ?? 0) + minInterval > Date.now()) return
     // Snapshot refresh can persist changed local state and enqueue a recovery
     // checkpoint. Acquire or renew before it runs; after a background restart
     // there is no in-memory lease to attach to that checkpoint.
@@ -129,7 +134,7 @@ export class RgbWalletCoordinator {
     if (!canWrite) return
 
     try {
-      await this.syncSnapshot(service, wallet, minInterval)
+      await this.syncSnapshot(service, wallet, options?.force ? 0 : minInterval)
       // Snapshot repair can recreate a confirmed local allocation after the
       // receive invoice has already left the pending list. Flush it here;
       // receive polling no longer runs for that invoice.

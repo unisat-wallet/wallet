@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 
 import {
   BottomSheetHeader,
@@ -33,6 +33,7 @@ import {
 import { RgbReceiveSelectorModal } from '../Main/WalletTabScreen/RgbReceiveSelectorModal';
 import { RGBTokenDetail } from './components/RGBTokenDetail';
 import { RGBTokenHistory } from './components/RGBTokenHistory';
+import { RGBPendingBalanceModal } from './components/RGBPendingBalanceModal';
 import { useRgbWriteLeaseGuard } from './components/useRgbWriteLeaseGuard';
 
 export default function RGBTokenScreen() {
@@ -42,6 +43,7 @@ export default function RGBTokenScreen() {
   const [receiveSelectorOpen, setReceiveSelectorOpen] = useState(false);
   const [actionMenuVisible, setActionMenuVisible] = useState(false);
   const [nonStandardSendWarningVisible, setNonStandardSendWarningVisible] = useState(false);
+  const [pendingDetailsVisible, setPendingDetailsVisible] = useState(false);
   const {
     assetId: routeAssetId,
     tokenSummary,
@@ -54,6 +56,10 @@ export default function RGBTokenScreen() {
     activityHasMore = false,
     onLoadMoreActivity,
     onRefreshActivity,
+    pendingDetails,
+    pendingDetailsLoading,
+    pendingDetailsError,
+    loadPendingDetails,
     onClickReceive,
     onClickViewInvoices,
     onClickSend,
@@ -111,6 +117,11 @@ export default function RGBTokenScreen() {
   const showUsdtPrice =
     chain.showPrice && isOfficialRgbUsdt(assetId, configuredUsdtAssetId, assetPolicy) && totalBalance !== '--';
 
+  const openPendingDetails = useCallback(() => {
+    setPendingDetailsVisible(true);
+    void loadPendingDetails(false);
+  }, [loadPendingDetails]);
+
   const renderTabChildren = useMemo(() => {
     if (activeTab === RGBTokenScreenTabKey.DETAILS) {
       return (
@@ -124,6 +135,7 @@ export default function RGBTokenScreen() {
           estimatedBalance={estimatedBalanceAtomic?.toString()}
           otherLockedAmount={remainingLockedAtomic.toString()}
           isNonStandardNia={isNonStandardNia}
+          onClickPending={openPendingDetails}
         />
       );
     }
@@ -161,7 +173,8 @@ export default function RGBTokenScreen() {
     ticker,
     tokenBalance,
     tokenInfo,
-    isNonStandardNia
+    isNonStandardNia,
+    openPendingDetails
   ]);
 
   if (loading) {
@@ -271,7 +284,15 @@ export default function RGBTokenScreen() {
               ) : null}
               <Text text={`${t('available_balance')}: ${spendable}`} size="xs" color="textDim" textCenter wrap />
               {Number(tokenBalance?.pending || 0) > 0 ? (
-                <Text text={`${t('pending')}: ${pendingAmount}`} size="xs" color="gold" textCenter wrap />
+                <Text
+                  text={`${t('pending')}: ${pendingAmount} ›`}
+                  size="xs"
+                  color="gold"
+                  textCenter
+                  wrap
+                  onClick={openPendingDetails}
+                  style={{ cursor: 'pointer' }}
+                />
               ) : null}
               {estimatedBalanceAtomic !== undefined ? (
                 <Column
@@ -421,6 +442,17 @@ export default function RGBTokenScreen() {
             </Row>
           </Column>
         </BottomModal>
+      ) : null}
+      {pendingDetailsVisible ? (
+        <RGBPendingBalanceModal
+          details={pendingDetails}
+          loading={pendingDetailsLoading}
+          error={pendingDetailsError}
+          precision={precision}
+          pendingAmount={pendingAmount}
+          onRefresh={() => void loadPendingDetails(true)}
+          onClose={() => setPendingDetailsVisible(false)}
+        />
       ) : null}
       {writeLeaseModal}
     </Layout>

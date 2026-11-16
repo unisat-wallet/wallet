@@ -37,6 +37,11 @@ export function useRGBTokenScreenLogic() {
   const [fetchedTokenBalance, setFetchedTokenBalance] = useState<RgbBalance>()
   const [balanceLoading, setBalanceLoading] = useState(true)
   const [balanceChecked, setBalanceChecked] = useState(false)
+  const [pendingDetails, setPendingDetails] = useState<
+    Awaited<ReturnType<typeof wallet.getRgbAssetPendingDetails>>
+  >()
+  const [pendingDetailsLoading, setPendingDetailsLoading] = useState(false)
+  const [pendingDetailsError, setPendingDetailsError] = useState<string>()
   const [activityType, setActivityType] = useState<RgbActivityType | undefined>()
   const [activeTab, setActiveTab] = useState<RGBTokenScreenTabKey>(RGBTokenScreenTabKey.HISTORY)
 
@@ -87,6 +92,29 @@ export function useRGBTokenScreenLogic() {
   useEffect(() => {
     loadBalance()
   }, [loadBalance])
+
+  useEffect(() => {
+    setPendingDetails(undefined)
+    setPendingDetailsError(undefined)
+  }, [assetId])
+
+  const loadPendingDetails = useCallback(async (forceSync = false) => {
+    if (assetId === '' || isUnconfiguredUsdt) return
+    setPendingDetailsLoading(true)
+    setPendingDetailsError(undefined)
+    try {
+      const data = await wallet.getRgbAssetPendingDetails({ assetId, forceSync })
+      setPendingDetails(data)
+      if (data.balance) {
+        setFetchedTokenBalance(data.balance)
+        setBalanceChecked(true)
+      }
+    } catch (error) {
+      setPendingDetailsError(error instanceof Error ? error.message : String(error))
+    } finally {
+      setPendingDetailsLoading(false)
+    }
+  }, [assetId, isUnconfiguredUsdt, wallet])
 
   const {
     data: activity,
@@ -320,6 +348,10 @@ export function useRGBTokenScreenLogic() {
     activityHasMore: hasMore,
     onLoadMoreActivity: onLoadMore,
     onRefreshActivity: onRefresh,
+    pendingDetails,
+    pendingDetailsLoading,
+    pendingDetailsError,
+    loadPendingDetails,
     enableTransfer,
     enableReceive,
     onClickSend,

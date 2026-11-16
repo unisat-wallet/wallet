@@ -145,6 +145,7 @@ const UI_CONTROLLER_METHODS = new Set([
   'getPrivateKey',
   'getRGBAssetActivity',
   'getRGBAssetBalance',
+  'getRgbAssetPendingDetails',
   'getRGBAssetDetail',
   'getRGBList',
   'getRgbAllocationSummary',

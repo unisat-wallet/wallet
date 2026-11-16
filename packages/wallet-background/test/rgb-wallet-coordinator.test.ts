@@ -177,6 +177,48 @@ describe('RgbWalletCoordinator', () => {
     expect(service.sync).toHaveBeenCalledTimes(1)
   })
 
+  it('bypasses receive and snapshot throttles for an explicit refresh', async () => {
+    const snapshot = {
+      syncedAt: 1,
+      utxos: [{
+        outpoint: { txid: 'a'.repeat(64), vout: 0 },
+        chainStatus: 'mempool',
+        allocations: [{ assetId: 'rgb:asset', amount: '1', settled: false, spendable: false }],
+      }],
+    }
+    const service = {
+      hasKnownAssetHistory: vi.fn().mockReturnValue(true),
+      getSnapshot: vi.fn().mockReturnValue(snapshot),
+      getPendingReceives: vi.fn().mockReturnValue([]),
+      claimPendingReceives: vi.fn(),
+      processBroadcastCancellations: vi.fn(),
+      processClaimedReceives: vi.fn().mockResolvedValue({ received: 0, snapshotRequired: false }),
+      getPendingUtxoSync: vi.fn(),
+      sync: vi.fn().mockResolvedValue(snapshot),
+    }
+    const context = {
+      service,
+      wallet: { walletId: 'wallet', fundingAddress: 'bc1p-funding', network: 'mainnet' },
+    }
+    const coordinator = new RgbWalletCoordinator({
+      getContext: vi.fn().mockResolvedValue(context as any),
+      getReadContext: vi.fn().mockResolvedValue(context as any),
+      syncIndexerOutbox: vi.fn().mockResolvedValue(true),
+      syncReceiveHistory: vi.fn(),
+      tryEnsureWriteLease: vi.fn().mockResolvedValue(true),
+    })
+
+    await coordinator.syncReceivedAllocations(context as any)
+    await coordinator.syncReceivedAllocations(context as any)
+    await coordinator.syncReceivedAllocations(context as any, undefined, { force: true })
+    expect(service.processClaimedReceives).toHaveBeenCalledTimes(2)
+
+    await coordinator.syncListState()
+    await coordinator.syncListState()
+    await coordinator.syncListState({ force: true })
+    expect(service.sync).toHaveBeenCalledTimes(2)
+  })
+
   it('treats the network and wallet id as part of RGB wallet identity', () => {
     const wallet = {
       walletId: 'wallet-1',
