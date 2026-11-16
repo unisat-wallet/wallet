@@ -37,7 +37,7 @@ export default function ConnectedSitesScreen() {
       <Content>
         <Column>
           {sites.length > 0 ? (
-            sites.map((item, index) => {
+            sites.map((item) => {
               return (
                 <Card key={item.origin}>
                   <Row full justifyBetween itemsCenter>
@@ -58,7 +58,9 @@ export default function ConnectedSitesScreen() {
               );
             })
           ) : (
-            <Empty />
+            <Row fullX justifyCenter>
+              <Empty />
+            </Row>
           )}
         </Column>
       </Content>
