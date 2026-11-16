@@ -158,8 +158,8 @@ export default function RgbUtxoInspectionScreen() {
   const selectedAllocationMetadata = selectedAllocation
     ? inspection?.assetMetadata[selectedAllocation.allocation.assetId]
     : undefined;
-  const selectedAllocationName = selectedAllocationPolicy?.displayName || selectedAllocationPolicy?.ticker ||
-    selectedAllocationMetadata?.name || selectedAllocationMetadata?.ticker ||
+  const selectedAllocationName = selectedAllocationPolicy?.displayName || selectedAllocationMetadata?.name ||
+    selectedAllocationPolicy?.ticker || selectedAllocationMetadata?.ticker ||
     (selectedAllocation ? shortTxid(selectedAllocation.allocation.assetId) : '');
   const discardSelectedAllocation = async () => {
     if (!selectedAllocation) return;
@@ -316,7 +316,7 @@ export default function RgbUtxoInspectionScreen() {
                         const asset = inspection?.assetMetadata[allocation.assetId];
                         const assetPolicy = findRgbAssetPolicy(allocation.assetId, walletConfig);
                         const ticker = assetPolicy?.ticker || asset?.ticker;
-                        const name = assetPolicy?.displayName || ticker || asset?.name || shortTxid(allocation.assetId);
+                        const name = assetPolicy?.displayName || asset?.name || ticker || shortTxid(allocation.assetId);
                         const amount = toRgbDisplayAmount(allocation.amount, asset?.precision || 0);
                         const historyMissing = allocation.historyAvailable === false ||
                           allocation.localHistoryAvailable === false;
