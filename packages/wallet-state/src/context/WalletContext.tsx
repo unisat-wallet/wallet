@@ -1039,6 +1039,8 @@ export interface WalletController {
     address: string
   }>
 
+  getRgbFeeAccountInfo(): Promise<{ address: string; derivationPath: string }>
+
   getRgbFeePoolInspection(params?: { feeRate?: number }): Promise<{
     ready: boolean
     availableCount: number

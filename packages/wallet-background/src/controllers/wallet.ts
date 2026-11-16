@@ -5857,6 +5857,11 @@ export class WalletController extends BaseController {
     }
   }
 
+  getRgbFeeAccountInfo = async () => {
+    const { address, derivationPath } = await this.getCurrentRgbFeeAccount()
+    return { address, derivationPath }
+  }
+
   getRgbFeePoolStatus = async (params: { feeRate?: number } = {}) => {
     const { address, minimumSatoshis, availableCount, targetCount, ready } =
       await this.getRgbFeePoolInspection(params)

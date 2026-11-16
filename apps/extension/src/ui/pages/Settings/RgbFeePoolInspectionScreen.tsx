@@ -12,6 +12,7 @@ import { SignPsbt } from '../Approval/components';
 import { useRgbWriteLeaseGuard } from '../RGB/components/useRgbWriteLeaseGuard';
 
 type FeePoolInspection = Awaited<ReturnType<ReturnType<typeof useWallet>['getRgbFeePoolInspection']>>;
+type RgbFeeAccountInfo = Awaited<ReturnType<ReturnType<typeof useWallet>['getRgbFeeAccountInfo']>>;
 type FeePoolTabKey = 'utxos' | 'withdrawals';
 type FeePoolSelection =
   | { kind: 'utxo'; item: NonNullable<FeePoolInspection>['utxos'][number] }
@@ -79,7 +80,8 @@ export default function RgbFeePoolInspectionScreen() {
   const { t } = useI18n();
   const { requestWrite, writeLeaseModal } = useRgbWriteLeaseGuard();
   const [inspection, setInspection] = useState<FeePoolInspection>();
-  const [refreshing, setRefreshing] = useState(false);
+  const [feeAccountInfo, setFeeAccountInfo] = useState<RgbFeeAccountInfo>();
+  const [refreshing, setRefreshing] = useState(true);
   const [withdrawPreparing, setWithdrawPreparing] = useState(false);
   const [withdrawSubmitting, setWithdrawSubmitting] = useState(false);
   const [withdrawToSignData, setWithdrawToSignData] = useState<ToSignData>();
@@ -92,6 +94,7 @@ export default function RgbFeePoolInspectionScreen() {
       try {
         const result = await wallet.getRgbFeePoolInspection();
         setInspection(result);
+        setFeeAccountInfo({ address: result.address, derivationPath: result.derivationPath });
         if (showSuccess) {
           tools.toastSuccess(t('success'));
         }
@@ -107,6 +110,18 @@ export default function RgbFeePoolInspectionScreen() {
   useEffect(() => {
     void refresh();
   }, [refresh]);
+
+  useEffect(() => {
+    let active = true;
+    void wallet.getRgbFeeAccountInfo().then((result) => {
+      if (active) setFeeAccountInfo(result);
+    }).catch(() => {
+      // The inspection request reports actionable errors; this fast local read is best-effort.
+    });
+    return () => {
+      active = false;
+    };
+  }, [wallet]);
 
   const beginWithdraw = async () => {
     if (withdrawPreparing) return;
@@ -168,9 +183,9 @@ export default function RgbFeePoolInspectionScreen() {
           <Column fullX gap="zero">
             <Row fullX itemsCenter justifyBetween gap="md" style={accountInfoRowStyle}>
               <Text text={t('address')} color="textDim" size="sm" style={{ flexShrink: 0 }} />
-              {inspection ? (
-                <Tooltip title={inspection.address} overlayStyle={{ maxWidth: 'calc(100vw - 32px)', overflowWrap: 'anywhere', boxSizing: 'border-box' }}>
-                  <CopyableAddress address={inspection.address} copyPosition="after" color="ticker_color2" />
+              {inspection || feeAccountInfo ? (
+                <Tooltip title={inspection?.address || feeAccountInfo?.address} overlayStyle={{ maxWidth: 'calc(100vw - 32px)', overflowWrap: 'anywhere', boxSizing: 'border-box' }}>
+                  <CopyableAddress address={inspection?.address || feeAccountInfo?.address || ''} copyPosition="after" color="ticker_color2" />
                 </Tooltip>
               ) : (
                 <Text text="—" color="white" size="xs" />
@@ -180,7 +195,7 @@ export default function RgbFeePoolInspectionScreen() {
             <Row fullX itemsCenter justifyBetween gap="md" style={accountInfoRowStyle}>
               <Text text={t('derivation_path')} color="textDim" size="sm" style={{ flexShrink: 0 }} />
               <Text
-                text={inspection?.derivationPath || '—'}
+                text={inspection?.derivationPath || feeAccountInfo?.derivationPath || '—'}
                 selectText
                 color="white"
                 size="xs"
@@ -192,11 +207,19 @@ export default function RgbFeePoolInspectionScreen() {
           </Column>
         </Card>
 
-        <Tabs
-          defaultActiveKey="utxos"
-          activeKey={activeTab}
-          onTabClick={(key) => setActiveTab(key as FeePoolTabKey)}
-          items={[
+        {!inspection && refreshing ? (
+          <Column fullX itemsCenter gap="sm" style={emptyStateCardStyle}>
+            <LoadingOutlined style={{ color: '#F4B62C', fontSize: 24 }} />
+            <Text text={t('loading')} color="textDim" size="sm" textCenter />
+          </Column>
+        ) : null}
+
+        {inspection ? (
+          <Tabs
+            defaultActiveKey="utxos"
+            activeKey={activeTab}
+            onTabClick={(key) => setActiveTab(key as FeePoolTabKey)}
+            items={[
             {
               key: 'utxos',
               label: (
@@ -293,8 +316,9 @@ export default function RgbFeePoolInspectionScreen() {
                 </Column>
               )
             }
-          ]}
-        />
+            ]}
+          />
+        ) : null}
       </Content>
       {activeTab === 'utxos' ? (
         <Row style={{ padding: '0 16px 16px' }}>
