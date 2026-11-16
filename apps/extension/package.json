@@ -1,6 +1,6 @@
 {
   "name": "unisat-extension",
-  "version": "1.8.3",
+  "version": "1.8.4",
   "private": true,
   "homepage": "https://github.com/unisat-wallet/extension#readme",
   "bugs": {
@@ -12,7 +12,7 @@
   },
   "scripts": {
     "clean": "mkdir -p dist && rm -rf dist/* && cp -r build/_raw/* dist",
-    "build:chrome:dev": "gulp prepare --env=dev --browser=chrome --manifest=mv3 --channel=github --variant=production && webpack --progress --env browser=chrome output=chrome manifest=mv3 config=dev channel=github version=1.8.3 variant=production",
+    "build:chrome:dev": "gulp prepare --env=dev --browser=chrome --manifest=mv3 --channel=github --variant=production && webpack --progress --env browser=chrome output=chrome manifest=mv3 config=dev channel=github version=1.8.4 variant=production",
     "build:chrome": "pnpm --dir ../.. build && gulp build --env=pro --browser=chrome --manifest=mv3 --channel=store",
     "build:firefox": "gulp build --env=pro --browser=firefox --manifest=mv2 --channel=github",
     "build:brave": "gulp build --env=pro --browser=brave --manifest=mv3 --channel=github",

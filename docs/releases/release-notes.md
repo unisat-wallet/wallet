@@ -1,5 +1,48 @@
 # UniSat Wallet Release Notes
 
+## v1.8.4
+
+This release expands RGB/BTC trading support, improves RGB balance and UTXO recovery, and strengthens wallet security around phishing, provider access, signing, and key handling.
+
+### RGB Trading and Integration APIs
+
+- Added direct Proxy ACK synchronization for backend-controlled seller swaps without importing or exposing the final transaction.
+- Added seller-wallet commitments for pure P2P swaps, allowing the buyer to verify the seller's per-transfer Proxy identity without exposing private keys.
+- Added an Instant Swap flow for NIA assets, including seller listings and buyer completion with exact asset, amount, price, outpoint, output, and signature validation.
+- Added restart-safe and idempotent swap handling, provider-origin binding, buyer spend limits, and protection against changing committed proposals or seller signatures.
+- Preserved RGB allocation locks and swap state until the externally broadcast transaction is observed, acknowledged, or safely canceled.
+- Added dedicated backend-coordinated and pure P2P integration guides covering call order, commitments, broadcast ownership, cancellation, and recovery responsibilities.
+
+### RGB Balance, UTXO, and Transfer Recovery
+
+- Added pending-balance diagnostics that explain confirmation, snapshot synchronization, missing-history, and receive-processing states.
+- Improved automatic and manual cleanup of spent, replaced, stale, and locally overlaid RGB UTXOs so balances and UTXO inspection converge with Bitcoin chain state.
+- Added searchable RGB UTXO inspection with asset names, clearer loading states, history repair actions, and improved fee-pool inspection.
+- Improved recovery for interrupted broadcasts, reviewed cancellations, incomplete transfers, missing allocation history, expired invoices, and stale fee-pool outputs.
+- Fixed balance and history consistency across consecutive sends, donations, self-transfers, burns, externally broadcast swaps, and asset-scoped activity lists.
+- Improved transfer status, amount precision, cancellation presentation, and failed-transfer indicators.
+
+### Asset and UI Improvements
+
+- Added exact-asset lifecycle policies for active, deprecated, and disabled assets, including official labels, notices, ordering, and optional zero-balance visibility.
+- Improved configured official USDT presentation and fixed-price display.
+- Added a fallback path for opening the Alkanes mint flow when indexed mint information is unavailable.
+
+### Security and Privacy
+
+- Hardened phishing-domain normalization, subdomain matching, warning-page redirects, temporary exceptions, and remote phishing-rule updates.
+- Centralized external URL opening and limited remote or untrusted links to validated HTTP and HTTPS destinations.
+- Prevented connected account data from being exposed while the wallet is locked, while allowing interrupted approval flows to resume safely after unlock.
+- Strengthened validation of externally signed PSBTs before accepting them back into wallet flows.
+- Enforced a minimum vault KDF strength, rejected unsafe legacy password-verifier states, and cleared cached derived private keys when appropriate.
+- Removed unnecessary clipboard-read behavior from private-key export while retaining explicit clipboard writes.
+- Required unlock before Cosmos key access and rejected unsupported Babylon network fallbacks.
+
+### Other Fixes
+
+- Cleared unsupported restore parameters when switching wallet recovery types.
+- Improved the Connected Sites empty state and safely handled notification identifiers containing special characters.
+
 ## v1.8.3
 
 This release focuses on improving the stability, compatibility, and usability of RGB asset transfers. It also enhances transaction recovery, batch receiving, and asset management while fixing several known issues.
