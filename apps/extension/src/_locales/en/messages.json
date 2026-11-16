@@ -2901,6 +2901,9 @@
   "rgb_utxo_empty_description": {
     "message": "RGB UTXOs are created automatically when you create a blind invoice."
   },
+  "rgb_utxo_search_placeholder": {
+    "message": "Search asset name, asset ID, or transaction ID"
+  },
   "rgb_asset": {
     "message": "RGB Asset"
   },

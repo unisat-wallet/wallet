@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useState } from 'react';
 
-import { Button, Card, Column, Content, CopyableAddress, Header, Icon, Layout, RGBAssetIcon, Row, Text, Tooltip } from '@/ui/components';
+import { Button, Card, Column, Content, CopyableAddress, Header, Icon, Input, Layout, RGBAssetIcon, Row, Text, Tooltip } from '@/ui/components';
 import { BottomModal } from '@/ui/components/BottomModal';
 import { HistoryAmount } from '@/ui/components/HistoryAmount';
+import { LoadingOutlined } from '@ant-design/icons';
 import {
   findRgbAssetPolicy,
   toRgbDisplayAmount,
@@ -14,6 +15,7 @@ import {
 } from '@unisat/wallet-state';
 
 type UtxoInspection = Awaited<ReturnType<ReturnType<typeof useWallet>['getRgbUtxoInspection']>>;
+type RgbFundingInfo = Awaited<ReturnType<ReturnType<typeof useWallet>['getRgbFundingAccountInfo']>>;
 type InspectedUtxo = NonNullable<UtxoInspection>['snapshot']['utxos'][number];
 type InspectedAllocation = InspectedUtxo['allocations'][number];
 
@@ -104,20 +106,24 @@ export default function RgbUtxoInspectionScreen() {
   const { t } = useI18n();
   const walletConfig = useWalletConfig();
   const [inspection, setInspection] = useState<UtxoInspection>();
+  const [fundingInfo, setFundingInfo] = useState<RgbFundingInfo>();
   const [selectedUtxo, setSelectedUtxo] = useState<InspectedUtxo>();
   const [selectedAllocation, setSelectedAllocation] = useState<{
     utxo: InspectedUtxo;
     allocation: InspectedAllocation;
   }>();
-  const [refreshing, setRefreshing] = useState(false);
+  const [refreshing, setRefreshing] = useState(true);
   const [repairing, setRepairing] = useState(false);
   const [discarding, setDiscarding] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
 
   const refresh = useCallback(
     async (showSuccess = false) => {
       setRefreshing(true);
       try {
-        setInspection(await wallet.getRgbUtxoInspection({ forceSync: true }));
+        const result = await wallet.getRgbUtxoInspection({ forceSync: true });
+        setInspection(result);
+        setFundingInfo({ address: result.address, derivationPath: result.derivationPath });
         if (showSuccess) {
           tools.toastSuccess(t('success'));
         }
@@ -134,6 +140,18 @@ export default function RgbUtxoInspectionScreen() {
     void refresh();
   }, [refresh]);
 
+  useEffect(() => {
+    let active = true;
+    void wallet.getRgbFundingAccountInfo().then((result) => {
+      if (active) setFundingInfo(result);
+    }).catch(() => {
+      // The snapshot request reports actionable errors; this fast local read is best-effort.
+    });
+    return () => {
+      active = false;
+    };
+  }, [wallet]);
+
   const invoiceReservations = new Map(
     inspection?.invoiceReservations.map((item) => [`${item.txid}:${item.vout}`, item]) || []
   );
@@ -146,6 +164,19 @@ export default function RgbUtxoInspectionScreen() {
     if (priorityDifference) return priorityDifference;
     return left.outpoint.txid.localeCompare(right.outpoint.txid) || left.outpoint.vout - right.outpoint.vout;
   });
+  const normalizedSearchQuery = searchQuery.trim().toLowerCase();
+  const visibleUtxos = normalizedSearchQuery
+    ? utxos.filter((utxo) => {
+        if (utxo.outpoint.txid.toLowerCase().includes(normalizedSearchQuery)) return true;
+        return utxo.allocations.some((allocation) => {
+          const metadata = inspection?.assetMetadata[allocation.assetId];
+          const policy = findRgbAssetPolicy(allocation.assetId, walletConfig);
+          return [allocation.assetId, policy?.displayName, metadata?.name, policy?.ticker, metadata?.ticker]
+            .filter((value): value is string => typeof value === 'string')
+            .some((value) => value.toLowerCase().includes(normalizedSearchQuery));
+        });
+      })
+    : utxos;
   const selectedUtxoReservation = selectedUtxo
     ? invoiceReservations.get(`${selectedUtxo.outpoint.txid}:${selectedUtxo.outpoint.vout}`)
     : undefined;
@@ -220,9 +251,9 @@ export default function RgbUtxoInspectionScreen() {
           <Column fullX gap="zero">
             <Row fullX itemsCenter justifyBetween gap="md" style={accountInfoRowStyle}>
               <Text text={t('address')} color="textDim" size="sm" style={{ flexShrink: 0 }} />
-              {inspection ? (
-                <Tooltip title={inspection.address} overlayStyle={{ maxWidth: 'calc(100vw - 32px)', overflowWrap: 'anywhere', boxSizing: 'border-box' }}>
-                  <CopyableAddress address={inspection.address} copyPosition="after" color="ticker_color2" />
+              {inspection || fundingInfo ? (
+                <Tooltip title={inspection?.address || fundingInfo?.address} overlayStyle={{ maxWidth: 'calc(100vw - 32px)', overflowWrap: 'anywhere', boxSizing: 'border-box' }}>
+                  <CopyableAddress address={inspection?.address || fundingInfo?.address || ''} copyPosition="after" color="ticker_color2" />
                 </Tooltip>
               ) : (
                 <Text text="—" color="white" size="xs" />
@@ -232,7 +263,7 @@ export default function RgbUtxoInspectionScreen() {
             <Row fullX itemsCenter justifyBetween gap="md" style={accountInfoRowStyle}>
               <Text text={t('derivation_path')} color="textDim" size="sm" style={{ flexShrink: 0 }} />
               <Text
-                text={inspection?.derivationPath || '—'}
+                text={inspection?.derivationPath || fundingInfo?.derivationPath || '—'}
                 selectText
                 color="white"
                 size="xs"
@@ -244,7 +275,24 @@ export default function RgbUtxoInspectionScreen() {
           </Column>
         </Card>
 
-        {utxos.map((utxo, index) => {
+        {!inspection && refreshing ? (
+          <Column fullX itemsCenter gap="sm" style={emptyStateCardStyle}>
+            <LoadingOutlined style={{ color: '#F4B62C', fontSize: 24 }} />
+            <Text text={t('loading')} color="textDim" size="sm" textCenter />
+          </Column>
+        ) : null}
+
+        {inspection ? (
+          <Input
+            value={searchQuery}
+            placeholder={t('rgb_utxo_search_placeholder')}
+            onChange={(event) => setSearchQuery(event.target.value)}
+            autoComplete="off"
+            spellCheck={false}
+          />
+        ) : null}
+
+        {visibleUtxos.map((utxo, index) => {
           const key = `${utxo.outpoint.txid}:${utxo.outpoint.vout}`;
           const reservation = invoiceReservations.get(key);
           const hasAssets = utxo.allocations.length > 0;
@@ -392,6 +440,12 @@ export default function RgbUtxoInspectionScreen() {
             <Icon icon="emptyBox" color="textDim" size={32} />
             <Text text={t('rgb_utxo_empty')} color="white" size="sm" />
             <Text text={t('rgb_utxo_empty_description')} color="textDim" size="xs" textCenter wrap />
+          </Column>
+        ) : null}
+        {inspection && utxos.length > 0 && visibleUtxos.length === 0 ? (
+          <Column fullX itemsCenter gap="sm" style={emptyStateCardStyle}>
+            <Icon icon="emptyBox" color="textDim" size={32} />
+            <Text text={t('no_data')} color="textDim" size="sm" textCenter />
           </Column>
         ) : null}
       </Content>

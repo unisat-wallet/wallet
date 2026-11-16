@@ -2892,6 +2892,9 @@
   "rgb_utxo_empty_description": {
     "message": "建立 blind 發票時會自動建立 RGB UTXO。"
   },
+  "rgb_utxo_search_placeholder": {
+    "message": "搜尋資產名稱、資產 ID 或交易 ID"
+  },
   "rgb_asset": {
     "message": "RGB 資產"
   },

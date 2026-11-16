@@ -3362,6 +3362,9 @@
   "rgb_utxo_empty_description": {
     "message": "RGB UTXO は、blind インボイスを作成すると自動的に作成されます。"
   },
+  "rgb_utxo_search_placeholder": {
+    "message": "資産名、資産 ID、またはトランザクション ID を検索"
+  },
   "rgb_asset": {
     "message": "RGB 資産"
   },

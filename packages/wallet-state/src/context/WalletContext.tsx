@@ -900,6 +900,8 @@ export interface WalletController {
 
   getRgbFundingAddress(): Promise<{ address: string }>
 
+  getRgbFundingAccountInfo(): Promise<{ address: string; derivationPath: string }>
+
   getRgbAssetAbandonmentPlan(params: { assetId: string }): Promise<{
     assetId: string
     name?: string

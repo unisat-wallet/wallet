@@ -5505,6 +5505,11 @@ export class WalletController extends BaseController {
     return { address }
   }
 
+  getRgbFundingAccountInfo = async () => {
+    const { address, derivationPath } = await this.getCurrentRgbFundingAccount()
+    return { address, derivationPath }
+  }
+
   private assertRgbAssetAbandonmentEnabled() {
     const isLocalDevelopmentBuild =
       (process.env as { NODE_ENV?: string }).NODE_ENV === 'development'

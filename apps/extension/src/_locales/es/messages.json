@@ -3353,6 +3353,9 @@
   "rgb_utxo_empty_description": {
     "message": "Los UTXO RGB se crean automáticamente al crear una factura blind."
   },
+  "rgb_utxo_search_placeholder": {
+    "message": "Buscar nombre, ID de activo o ID de transacción"
+  },
   "rgb_asset": {
     "message": "Activo RGB"
   },
