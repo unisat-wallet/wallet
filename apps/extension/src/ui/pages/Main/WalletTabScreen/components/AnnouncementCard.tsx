@@ -1,5 +1,6 @@
 import { Card, Column, Icon, Image, Row, Text } from '@/ui/components';
 import { shortDesc } from '@/ui/utils';
+import { openSafeUrl } from '@/ui/utils/openSafeUrl';
 import { AnnouncementLinkType } from '@unisat/wallet-shared';
 import { useAnnouncementCardLogic, useI18n } from '@unisat/wallet-state';
 
@@ -16,7 +17,7 @@ export function AnnouncementCard() {
     switch (current.linkType) {
       case AnnouncementLinkType.EXTERNAL_LINK:
       case AnnouncementLinkType.INTERNAL_LINK:
-        window.open(current.link);
+        openSafeUrl(current.link);
         break;
       default:
         break;

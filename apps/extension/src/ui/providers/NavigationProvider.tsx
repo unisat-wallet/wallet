@@ -5,6 +5,7 @@ import { NavigationContext, NavigationContextType, RouteTypes, useChain } from '
 import { ChainType } from '@unisat/wallet-types';
 
 import { routes } from '../pages/MainRoute';
+import { openSafeUrl } from '../utils/openSafeUrl';
 import { openExtensionInTab } from '../web/tabs';
 
 export function useNavigate() {
@@ -94,7 +95,7 @@ export function NavigationProvider({ children }: { children: React.ReactNode }) 
       },
 
       navToUrl: (url: string) => {
-        window.open(url);
+        openSafeUrl(url);
       },
 
       navToExplorerTx: (txid: string) => {
