@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 
 import { Icon, Row, Text } from '@/ui/components';
 import { isValidAddress } from '@/ui/utils/bitcoin-utils';
+import { openSafeUrl } from '@/ui/utils/openSafeUrl';
 import { namesUtils } from '@unisat/base-utils';
 import { Inscription } from '@unisat/wallet-shared';
 import { SAFE_DOMAIN_CONFIRMATION } from '@unisat/wallet-shared';
@@ -252,7 +253,7 @@ export const AddressInput = (props: InputProps) => {
             color="yellow"
             text={t('more_details')}
             onClick={() => {
-              window.open('https://docs.unisat.io/unisat-wallet/name-recognized-and-resolved');
+              openSafeUrl('https://docs.unisat.io/unisat-wallet/name-recognized-and-resolved');
             }}
           />
         </Row>

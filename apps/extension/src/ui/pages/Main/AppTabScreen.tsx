@@ -1,6 +1,7 @@
 import { Card, Column, Content, Footer, Header, Image, Layout, Row, Text } from '@/ui/components';
 import { fontSizes } from '@/ui/theme/font';
 import { shortDesc } from '@/ui/utils';
+import { openSafeUrl } from '@/ui/utils/openSafeUrl';
 import { AppInfo } from '@unisat/wallet-shared';
 import { useAppSummary, useI18n, useReadApp } from '@unisat/wallet-state';
 
@@ -11,7 +12,7 @@ function AppItem({ info }: { info: AppInfo }) {
     <Card
       preset="style1"
       onClick={() => {
-        if (info.url) window.open(info.url);
+        if (info.url) openSafeUrl(info.url);
         readApp(info.id);
       }}>
       <Row full>

@@ -6,6 +6,21 @@ export function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+/** Open an HTTPS URL in a new tab without exposing the caller through window.opener. */
+export function openSafeExternalUrl(rawUrl: string): boolean {
+  if (typeof rawUrl !== 'string') return false;
+
+  try {
+    const url = new URL(rawUrl.trim());
+    if (url.protocol !== 'https:') return false;
+
+    window.open(url.href, '_blank', 'noopener,noreferrer');
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 /**
  * Convert hex string to base64
  * @param hex Hex string

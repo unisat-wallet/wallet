@@ -91,7 +91,7 @@ export function NavigationProvider({ children }: { children: React.ReactNode }) 
       },
 
       navToUtxoTools: () => {
-        window.open(`${chain.unisatUrl}/utxo?tab=all`);
+        openSafeUrl(`${chain.unisatUrl}/utxo?tab=all`);
       },
 
       navToUrl: (url: string) => {
@@ -101,40 +101,40 @@ export function NavigationProvider({ children }: { children: React.ReactNode }) 
       navToExplorerTx: (txid: string) => {
         let url = '';
         if (chain.enum === ChainType.BITCOIN_MAINNET) {
-          url = `${chain.unisatExplorerUrl}/tx/${txid}`;
+          url = `${chain.unisatExplorerUrl}/tx/${encodeURIComponent(txid)}`;
         } else if (chain.defaultExplorer === 'mempool-space') {
-          url = `${chain.mempoolSpaceUrl}/tx/${txid}`;
+          url = `${chain.mempoolSpaceUrl}/tx/${encodeURIComponent(txid)}`;
         } else {
-          url = `${chain.unisatExplorerUrl}/tx/${txid}`;
+          url = `${chain.unisatExplorerUrl}/tx/${encodeURIComponent(txid)}`;
         }
-        window.open(url);
+        openSafeUrl(url);
       },
 
       navToExplorerAddress: (address: string) => {
         let url = '';
         if (chain.enum === ChainType.BITCOIN_MAINNET) {
-          url = `${chain.unisatExplorerUrl}/address/${address}`;
+          url = `${chain.unisatExplorerUrl}/address/${encodeURIComponent(address)}`;
         } else if (chain.defaultExplorer === 'mempool-space') {
-          url = `${chain.mempoolSpaceUrl}/address/${address}`;
+          url = `${chain.mempoolSpaceUrl}/address/${encodeURIComponent(address)}`;
         } else {
-          url = `${chain.unisatExplorerUrl}/address/${address}`;
+          url = `${chain.unisatExplorerUrl}/address/${encodeURIComponent(address)}`;
         }
-        window.open(url);
+        openSafeUrl(url);
       },
 
       navToExplorerInscription: (inscriptionId: string) => {
         let url = '';
         if (chain.unisatExplorerUrl) {
-          url = `${chain.unisatExplorerUrl}/inscription/${inscriptionId}`;
+          url = `${chain.unisatExplorerUrl}/inscription/${encodeURIComponent(inscriptionId)}`;
         } else {
-          url = `${chain.ordinalsUrl}/inscription/${inscriptionId}`;
+          url = `${chain.ordinalsUrl}/inscription/${encodeURIComponent(inscriptionId)}`;
         }
-        window.open(url);
+        openSafeUrl(url);
       },
 
       navToMarketPlace() {
         const url = `${chain.unisatUrl}/market`;
-        window.open(url);
+        openSafeUrl(url);
       },
 
       navToMarketPlaceBrc20(ticker: string) {
@@ -142,12 +142,12 @@ export function NavigationProvider({ children }: { children: React.ReactNode }) 
         if (chain.enum === ChainType.BITCOIN_MAINNET) {
           if (ticker.length == 6) {
             url = `${chain.unisatUrl}/market/brc20_prog?tick=${encodeURIComponent(ticker)}`;
-            window.open(url);
+            openSafeUrl(url);
             return;
           }
         }
         url = `${chain.unisatUrl}/market/brc20?tick=${encodeURIComponent(ticker)}`;
-        window.open(url);
+        openSafeUrl(url);
       },
 
       navToInscribeBrc20(ticker: string) {
@@ -165,7 +165,7 @@ export function NavigationProvider({ children }: { children: React.ReactNode }) 
         } else {
           url = `${chain.unisatUrl}/inscribe?tick=${encodeURIComponent(ticker)}`;
         }
-        window.open(url);
+        openSafeUrl(url);
       },
       navToTest: () => {
         // todo

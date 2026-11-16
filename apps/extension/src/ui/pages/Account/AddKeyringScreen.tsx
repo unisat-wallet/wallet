@@ -1,4 +1,5 @@
 import { Card, Column, Content, Header, Icon, Layout, Text } from '@/ui/components';
+import { openSafeUrl } from '@/ui/utils/openSafeUrl';
 import { useDeveloperMode, useDevice, useI18n, useNavigation } from '@unisat/wallet-state';
 
 const isDevelopment = process.env.NODE_ENV === 'development';
@@ -83,7 +84,7 @@ export default function AddKeyringScreen() {
               if (isExtensionInExpandView) {
                 nav.navigate('CreateKeystoneWalletScreen', {});
               } else {
-                window.open('#/account/create-keystone-wallet');
+                openSafeUrl('#/account/create-keystone-wallet');
               }
             }}
             data-testid="connect-hardware-wallet-option">

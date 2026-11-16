@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 
 import { Column, Input, Row, Spin, Text } from '@/ui/components';
 import { shortAddress } from '@/ui/utils';
+import { openSafeUrl } from '@/ui/utils/openSafeUrl';
 import { EnterOutlined } from '@ant-design/icons';
 import { useChain, useI18n, useWallet } from '@unisat/wallet-state';
 
@@ -53,7 +54,7 @@ export function SearchBar() {
     if (value) {
       if (isAddress(value)) {
         const onSearch = () => {
-          window.open(chain.unisatExplorerUrl + '/address/' + value);
+          openSafeUrl(chain.unisatExplorerUrl + '/address/' + encodeURIComponent(value));
         };
 
         return {
@@ -70,7 +71,7 @@ export function SearchBar() {
 
       if (isTxid(value)) {
         const onSearch = () => {
-          window.open(chain.unisatExplorerUrl + '/tx/' + value);
+          openSafeUrl(chain.unisatExplorerUrl + '/tx/' + encodeURIComponent(value));
         };
         return {
           searchContent: (
@@ -86,7 +87,7 @@ export function SearchBar() {
 
       if (isBlock(value)) {
         const onSearch = () => {
-          window.open(chain.unisatExplorerUrl + '/block/' + value);
+          openSafeUrl(chain.unisatExplorerUrl + '/block/' + encodeURIComponent(value));
         };
         return {
           searchContent: (
@@ -101,7 +102,7 @@ export function SearchBar() {
       }
 
       const onSearch = () => {
-        window.open(chain.unisatUrl + '/search2?type=text&q=' + value);
+        openSafeUrl(chain.unisatUrl + '/search2?type=text&q=' + encodeURIComponent(value));
       };
 
       return {
@@ -117,7 +118,7 @@ export function SearchBar() {
     }
 
     function gotoExplorer() {
-      window.open(chain.unisatExplorerUrl);
+      openSafeUrl(chain.unisatExplorerUrl);
     }
 
     return {

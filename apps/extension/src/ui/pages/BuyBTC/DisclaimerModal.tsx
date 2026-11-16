@@ -4,6 +4,7 @@ import { Button, Checkbox, Column, Icon, Row, Text } from '@/ui/components';
 import { BottomModal } from '@/ui/components/BottomModal';
 import { colors } from '@/ui/theme/colors';
 import { fontSizes } from '@/ui/theme/font';
+import { openSafeUrl } from '@/ui/utils/openSafeUrl';
 import { PAYMENT_CHANNELS, PaymentChannelType } from '@unisat/wallet-shared';
 import { useChain, useCurrentAccount, useI18n, useTools, useWallet } from '@unisat/wallet-state';
 import { ChainType } from '@unisat/wallet-types';
@@ -79,7 +80,7 @@ export default function DisclaimerModal({ channelType, onClose }: { channelType:
             wallet
               .createBuyCoinPaymentUrl(chain.unit, currentAccount.address, channelType)
               .then((url) => {
-                window.open(url);
+                openSafeUrl(url);
               })
               .catch((e) => {
                 tools.toastError(e.message);

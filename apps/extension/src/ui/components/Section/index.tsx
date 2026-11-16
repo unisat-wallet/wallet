@@ -1,4 +1,5 @@
 import { copyToClipboard, shortAddress } from '@/ui/utils';
+import { openSafeUrl } from '@/ui/utils/openSafeUrl';
 import { CopyOutlined } from '@ant-design/icons';
 import { useI18n, useTools } from '@unisat/wallet-state';
 
@@ -50,7 +51,7 @@ export function Section({
             if (onClick) {
               onClick();
             } else if (link) {
-              window.open(link);
+              openSafeUrl(link);
             } else {
               copyToClipboard(value).then(() => {
                 tools.toastSuccess(t('copied'));

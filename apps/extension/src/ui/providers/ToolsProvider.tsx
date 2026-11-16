@@ -6,6 +6,7 @@ import { Loading } from '../components/ActionComponent/Loading';
 import { Tip } from '../components/ActionComponent/Tip';
 import { Toast, ToastPresets, ToastProps } from '../components/ActionComponent/Toast';
 import { copyToClipboard } from '../utils';
+import { openSafeUrl } from '../utils/openSafeUrl';
 
 type ToastFunction = (content: string) => void;
 type LoadingFunction = (visible: boolean, content?: string) => void;
@@ -143,7 +144,7 @@ const initContext = {
     // todo
   },
   openUrl: (url: string) => {
-    window.open(url);
+    openSafeUrl(url);
   }
 };
 

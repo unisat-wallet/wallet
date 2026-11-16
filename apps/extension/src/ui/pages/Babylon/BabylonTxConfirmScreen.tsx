@@ -4,6 +4,7 @@ import { Button, Card, Column, Content, Footer, Header, Icon, Image, Layout, Row
 import { AddressText } from '@/ui/components/AddressText';
 import { colors } from '@/ui/theme/colors';
 import { spacing } from '@/ui/theme/spacing';
+import { openSafeUrl } from '@/ui/utils/openSafeUrl';
 import { COSMOS_CHAINS_MAP } from '@unisat/babylon-service/types';
 import { BabylonTxInfo, CosmosSignDataType } from '@unisat/wallet-shared';
 import {
@@ -139,7 +140,9 @@ export default function BabylonTxConfirmScreen() {
               <Row
                 justifyCenter
                 onClick={() => {
-                  window.open(`${babylonChain.explorer}/transaction/${result.txid}`, '_blank');
+                  openSafeUrl(
+                    `${babylonChain.explorer}/transaction/${encodeURIComponent(result.txid ?? '')}`
+                  );
                 }}
               >
                 <Icon icon="eye" color="textDim" />

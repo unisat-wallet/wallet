@@ -13,6 +13,7 @@ import RunesPreviewCard from '@/ui/components/RunesPreviewCard';
 import { colors } from '@/ui/theme/colors';
 import { spacing } from '@/ui/theme/spacing';
 import { amountToSatoshis } from '@/ui/utils';
+import { openSafeUrl } from '@/ui/utils/openSafeUrl';
 import { DecodedPsbt, RuneBalance, TickPriceItem } from '@unisat/wallet-shared';
 import { useBTCUnit, useI18n } from '@unisat/wallet-state';
 
@@ -188,7 +189,7 @@ export default function AssetOverviewSection({
               balance={w.amt}
               type="TRANSFER"
               inscriptionNumber={w.inscriptionNumber}
-              onClick={() => window.open(w.preview)}
+              onClick={() => openSafeUrl(w.preview)}
               priceInProps={true}
               price={brc20PriceMap?.[w.tick]}
             />

@@ -9,7 +9,7 @@ import type {
   ChainType,
 } from '../types';
 import { ALL_CHAIN_TYPES, getChainFlags } from '../types';
-import { getBitcoinAddressNetwork } from '../utils';
+import { getBitcoinAddressNetwork, openSafeExternalUrl } from '../utils';
 
 /**
  * Abstract base class for wallet implementations
@@ -119,7 +119,7 @@ export abstract class BaseWallet {
       onClick: () => {
         this.notifier?.destroy(key);
         if (this.config.downloadUrl) {
-          window.open(this.config.downloadUrl, '_blank');
+          openSafeExternalUrl(this.config.downloadUrl);
         }
       },
     });

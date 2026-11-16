@@ -89,8 +89,26 @@ describe('BaseWallet', () => {
     expect(destroy).toHaveBeenCalledTimes(1)
     expect((globalThis as any).window.open).toHaveBeenCalledWith(
       'https://example.com/download',
-      '_blank'
+      '_blank',
+      'noopener,noreferrer'
     )
+  })
+
+  it.each([
+    'http://example.com/download',
+    'javascript:alert(1)',
+    'data:text/html,<h1>fake wallet</h1>',
+    '//example.com/download',
+  ])('rejects unsafe wallet download link %s', (downloadUrl) => {
+    const wallet = new DummyWallet()
+    ;(wallet.config as { downloadUrl?: string }).downloadUrl = downloadUrl
+
+    const warning = vi.fn()
+    wallet.setNotifier({ warning, destroy: vi.fn() })
+    wallet.exposeShowWarning()
+    warning.mock.calls[0][0].onClick()
+
+    expect((globalThis as any).window.open).not.toHaveBeenCalled()
   })
 
   it('rejects unsupported chain values before storing them', () => {

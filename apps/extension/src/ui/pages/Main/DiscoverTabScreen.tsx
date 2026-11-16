@@ -9,6 +9,7 @@ import { colors } from '@/ui/theme/colors';
 import { fontSizes } from '@/ui/theme/font';
 import { SearchBar } from '@/ui/pages/Main/DiscoverTabComponents/SearchBar';
 import { getAddressType } from '@/ui/utils/bitcoin-utils';
+import { openSafeUrl } from '@/ui/utils/openSafeUrl';
 import { AppDisclaimer, AppInfo } from '@unisat/wallet-shared';
 import {
   discoveryActions,
@@ -37,7 +38,7 @@ function BannerItem({ img, link }: { img: string; link: string }) {
     <Row
       justifyCenter
       onClick={() => {
-        window.open(link);
+        openSafeUrl(link);
       }}>
       <Image
         src={img}
@@ -181,7 +182,7 @@ export default function DiscoverTabScreen() {
     }
 
     if (info.url) {
-      window.open(info.url);
+      openSafeUrl(info.url);
       return;
     }
 

@@ -5,6 +5,7 @@ import { CopyableAddress } from '@/ui/components/CopyableAddress';
 import { Popover } from '@/ui/components/Popover';
 import { colors } from '@/ui/theme/colors';
 import { satoshisToAmount } from '@/ui/utils';
+import { openSafeUrl } from '@/ui/utils/openSafeUrl';
 import { BabylonConfigV2, BabylonPhaseState, COSMOS_CHAINS_MAP } from '@unisat/babylon-service/types';
 import { bnUtils } from '@unisat/base-utils';
 import { BabylonAddressSummary } from '@unisat/wallet-shared';
@@ -563,7 +564,7 @@ export default function BabylonStakingScreen() {
               <Button
                 text={t('go_to_babylon')}
                 onClick={() => {
-                  window.open(babylonConfigV2.phase1.stakingUrl, '_blank');
+                  openSafeUrl(babylonConfigV2.phase1.stakingUrl);
                 }}
               />
             </Column>
@@ -585,7 +586,7 @@ export default function BabylonStakingScreen() {
               <Button
                 text={t('go_to_babylon')}
                 onClick={() => {
-                  window.open(babylonConfigV2.phase2.stakingUrl, '_blank');
+                  openSafeUrl(babylonConfigV2.phase2.stakingUrl);
                 }}
               />
             </Column>
@@ -610,7 +611,7 @@ export default function BabylonStakingScreen() {
                 text={t('go_to_babylon')}
                 preset="minimal"
                 onClick={() => {
-                  window.open(babylonConfigV2.phase2.stakingUrl, '_blank');
+                  openSafeUrl(babylonConfigV2.phase2.stakingUrl);
                 }}
               />
             </Column>
@@ -638,7 +639,7 @@ export default function BabylonStakingScreen() {
                 preset="minimal"
                 disabled={summaryLoading || babylonAddressSummary.stakedBalance === 0}
                 onClick={() => {
-                  window.open(babylonConfigV2.phase2.stakingUrl, '_blank');
+                  openSafeUrl(babylonConfigV2.phase2.stakingUrl);
                 }}
               />
             }
@@ -665,7 +666,7 @@ export default function BabylonStakingScreen() {
                     preset="minimal"
                     disabled={summaryLoading || babylonAddressSummary.rewardBalance === 0}
                     onClick={() => {
-                      window.open(babylonConfigV2.phase2.stakingUrl, '_blank');
+                      openSafeUrl(babylonConfigV2.phase2.stakingUrl);
                     }}
                   />
                 }

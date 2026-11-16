@@ -3,6 +3,7 @@ import { CSSProperties } from 'react';
 import { Column, Icon, Text } from '@/ui/components';
 import { IconTypes } from '@/ui/components/Icon';
 import { copyToClipboard } from '@/ui/utils';
+import { openSafeUrl } from '@/ui/utils/openSafeUrl';
 import { useTools } from '@unisat/wallet-state';
 
 interface ContactItemProps {
@@ -24,7 +25,7 @@ export default function ContactItem({ icon, text, url, iconSize = 20, style, tex
         tools.toastSuccess(`Copy: ${email}`);
       });
     } else {
-      window.open(url);
+      openSafeUrl(url);
     }
   };
 

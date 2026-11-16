@@ -1,4 +1,5 @@
 import { useChain, useI18n, useNavigation } from '@unisat/wallet-state';
+import { openSafeUrl } from '@/ui/utils/openSafeUrl';
 
 import { Image } from '../Image';
 import { Text } from '../Text';
@@ -19,7 +20,7 @@ export function AssetEmptyState({ marketplacePath }: { marketplacePath?: string 
         </div>
         {chain.enableMarket !== false && (
           <button type="button" className={styles.marketButton} onClick={() => {
-            if (marketplacePath) window.open(`${chain.unisatUrl}${marketplacePath}`);
+            if (marketplacePath) openSafeUrl(`${chain.unisatUrl}${marketplacePath}`);
             else nav.navToMarketPlace();
           }}>
             {t('go_to_marketplace')}

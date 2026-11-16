@@ -2,6 +2,7 @@ import { useState } from 'react';
 
 import { Button, Checkbox, Column, Row, Text } from '@/ui/components';
 import { BottomModal } from '@/ui/components/BottomModal';
+import { openSafeUrl } from '@/ui/utils/openSafeUrl';
 import { PlatformEnv } from '@unisat/wallet-shared';
 import { useI18n } from '@unisat/wallet-state';
 
@@ -28,7 +29,7 @@ export function RgbFeatureActivationModal({
 }) {
   const [termsAccepted, setTermsAccepted] = useState(false);
   const { t } = useI18n();
-  const openTerms = () => window.open(rgbTermsOfUseUrl(), '_blank', 'noopener,noreferrer');
+  const openTerms = () => openSafeUrl(rgbTermsOfUseUrl());
 
   return (
     <BottomModal onClose={loading ? undefined : onClose}>

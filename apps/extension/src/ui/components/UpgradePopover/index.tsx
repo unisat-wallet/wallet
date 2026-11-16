@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 
 import { fontSizes } from '@/ui/theme/font';
+import { openSafeUrl } from '@/ui/utils/openSafeUrl';
 import { VersionDetail } from '@unisat/wallet-shared';
 import { useVersionInfo, useWallet } from '@unisat/wallet-state';
 
@@ -66,7 +67,7 @@ export const UpgradePopover = ({
             full
             preset="primary"
             onClick={() => {
-              window.open('https://unisat.io/extension/update');
+              openSafeUrl('https://unisat.io/extension/update');
             }}
           />
         </Row>
