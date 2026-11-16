@@ -53,6 +53,103 @@ describe('KeyringService PSBT signing guards', () => {
 })
 
 describe('KeyringService booted KDF migration', () => {
+  it('rejects a literal true verifier instead of accepting it as the password', async () => {
+    const service = new KeyringService()
+    await service.init({
+      storage: {
+        get: vi.fn().mockResolvedValue({
+          booted: 'attacker-controlled-verifier',
+          vault: null,
+          boostValue,
+        }),
+        set: vi.fn(),
+      } as any,
+      encryptor: {
+        decrypt: vi.fn().mockResolvedValue('true'),
+        encrypt: vi.fn(),
+      },
+      logger: { debug: vi.fn(), info: vi.fn(), error: vi.fn() },
+      t: (key: string) => key,
+    })
+
+    await expect(service.verifyPassword('attacker-password')).resolves.toBe(false)
+    await expect(service.submitPassword('attacker-password')).rejects.toThrow('password_error')
+  })
+
+  it('migrates a legacy true verifier only during a successful full unlock', async () => {
+    const legacyTrueBooted = 'legacy-true-verifier'
+    const currentVault = JSON.stringify({
+      data: 'current-vault-ciphertext',
+      iv: 'current-vault-iv',
+      salt: 'current-vault-salt',
+      iterations: 600000,
+    })
+    const encryptor = {
+      decrypt: vi.fn(async (_password: string, encrypted: string) => {
+        if (encrypted === legacyTrueBooted) return 'true'
+        if (encrypted === currentVault) return emptyKeyringVault
+        if (encrypted.startsWith('current-verifier:')) {
+          return encrypted.slice('current-verifier:'.length)
+        }
+        throw new Error('Incorrect password')
+      }),
+      encrypt: vi.fn(async (_password: string, value: any) => `current-verifier:${value}`),
+    }
+    const service = new KeyringService()
+    await service.init({
+      storage: {
+        get: vi.fn().mockResolvedValue({
+          booted: legacyTrueBooted,
+          vault: currentVault,
+          boostValue: 'true',
+        }),
+        set: vi.fn(),
+      } as any,
+      encryptor,
+      logger: { debug: vi.fn(), info: vi.fn(), error: vi.fn() },
+      t: (key: string) => key,
+    })
+
+    await expect(service.verifyPassword(password)).resolves.toBe(false)
+    await service.submitPassword(password)
+
+    const migratedBoostValue = service.store.getState().boostValue
+    expect(migratedBoostValue).toMatch(/^secure_/)
+    expect(service.store.getState().booted).toBe(`current-verifier:${migratedBoostValue}`)
+    await expect(service.verifyPassword(password)).resolves.toBe(true)
+    expect(encryptor.decrypt).toHaveBeenCalledWith(password, currentVault)
+  })
+
+  it('does not migrate a legacy true verifier when the vault password is invalid', async () => {
+    const legacyTrueBooted = 'legacy-true-verifier'
+    const vault = 'wallet-vault'
+    const encryptor = {
+      decrypt: vi.fn(async (_password: string, encrypted: string) => {
+        if (encrypted === legacyTrueBooted) return 'true'
+        throw new Error('Incorrect password')
+      }),
+      encrypt: vi.fn(),
+    }
+    const service = new KeyringService()
+    await service.init({
+      storage: {
+        get: vi.fn().mockResolvedValue({ booted: legacyTrueBooted, vault, boostValue: 'true' }),
+        set: vi.fn(),
+      } as any,
+      encryptor,
+      logger: { debug: vi.fn(), info: vi.fn(), error: vi.fn() },
+      t: (key: string) => key,
+    })
+
+    await expect(service.submitPassword('attacker-password')).rejects.toThrow('Incorrect password')
+    expect(service.store.getState()).toMatchObject({
+      booted: legacyTrueBooted,
+      boostValue: 'true',
+    })
+    expect(service.password).toBeNull()
+    expect(encryptor.encrypt).not.toHaveBeenCalled()
+  })
+
   it('persists feature state encrypted and clears its decrypted cache when locked', async () => {
     const values = new Map<string, any>()
     const storage = {

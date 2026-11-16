@@ -665,20 +665,31 @@ export class KeyringService extends EventEmitter {
   submitPassword = async (password: string): Promise<MemStoreState> => {
     return this.unlockingMutex.lock(async () => {
       const isValidPassword = await this.verifyPassword(password)
-      if (!isValidPassword) {
+      const isLegacyPassword = !isValidPassword && (await this.verifyLegacyPassword(password))
+      if (!isValidPassword && !isLegacyPassword) {
         throw new Error(this.t('password_error'))
       }
 
-      this.password = password
-      await this.upgradeLegacyBootedIfNeeded(password)
+      // A literal `true` verifier must not be upgraded until the vault has also
+      // been decrypted. Otherwise a replaced verifier could be persisted before
+      // the supplied password has been checked against the wallet secrets.
+      if (!isLegacyPassword) {
+        this.password = password
+        await this.upgradeLegacyBootedIfNeeded(password)
+      }
 
       if (this.hasVault()) {
         const shouldUpgradeVault = this.isLegacyEncryptedPayload(this.store.getState().vault)
         this.keyrings = await this.unlockKeyrings(password)
+        if (isLegacyPassword) {
+          this.password = password
+        }
         if (shouldUpgradeVault) {
           await this.persistAllKeyrings()
           this.logger.info('[KeyringService] Legacy vault payload upgraded to current KDF')
         }
+      } else if (isLegacyPassword) {
+        this.password = password
       }
 
       // Upgrade boost value if needed (on first unlock after initialization)
@@ -912,13 +923,33 @@ export class KeyringService extends EventEmitter {
   }
 
   /**
+   * Recognize the one-time legacy verifier used by older wallets.
+   *
+   * This compatibility path is intentionally private to the full unlock flow,
+   * where an existing vault is subsequently decrypted before the verifier is
+   * replaced. Other password-gated operations must use verifyPassword instead.
+   */
+  private verifyLegacyPassword = async (password: string): Promise<boolean> => {
+    if (this.getBoostValue() !== 'true') {
+      return false
+    }
+
+    try {
+      const val = await this.encryptor.decrypt(password, this.store.getState().booted)
+      return val === 'true'
+    } catch {
+      return false
+    }
+  }
+
+  /**
    * Verify Password
    *
    * Attempts to decrypt the current vault with a given password
    * to verify its validity.
    *
-   * Security: Only accepts upgraded boost values. Initial 'true' value
-   * is rejected to prevent dictionary/collision attacks.
+   * Security: Only accepts the current upgraded boost value. The initial
+   * literal 'true' value is restricted to the one-time full unlock migration.
    *
    * @param {string} password
    */
@@ -929,19 +960,11 @@ export class KeyringService extends EventEmitter {
     }
     try {
       const val = await this.encryptor.decrypt(password, encryptedBooted)
-      // SECURITY: Only accept the current boost value
-      // Reject initial 'true' value to prevent weak value attacks
-
       if (val === 'true') {
-        // for backward compatibility
-        return true
+        return false
       }
 
-      if (val === this.getBoostValue()) {
-        return true
-      }
-
-      return false
+      return val === this.getBoostValue()
     } catch {
       return false
     }
