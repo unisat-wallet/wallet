@@ -3,6 +3,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { AddressAlkanesTokenSummary } from '@unisat/wallet-shared'
 import {
   useAlkanesIconInfo,
+  useAlkanesInscribeUrl,
   useAlkanesTokenInfoExplorerUrl,
   useCurrentAccount,
   useCurrentAccountCapabilities,
@@ -56,6 +57,7 @@ export function useAlkanesTokenScreenLogic() {
   const [warning, setWarning] = useState(false)
 
   const { t } = useI18n()
+  const defaultMintUrl = useAlkanesInscribeUrl()
 
   useEffect(() => {
     wallet.getAddressAlkanesTokenSummary(account.address, alkaneid, false).then(tokenSummary => {
@@ -66,9 +68,15 @@ export function useAlkanesTokenScreenLogic() {
 
   const resetTxState = useResetTxState()
 
-  const enableMint = useMemo(() => {
-    return tokenSummary.mintUrl && tokenSummary.mintUrl.trim() !== ''
-  }, [tokenSummary.mintUrl])
+  const mintUrl = useMemo(() => {
+    const configuredMintUrl = tokenSummary.mintUrl?.trim()
+    if (configuredMintUrl) {
+      return configuredMintUrl
+    }
+    return tokenSummary.tokenInfo.mintable ? defaultMintUrl : ''
+  }, [defaultMintUrl, tokenSummary.mintUrl, tokenSummary.tokenInfo.mintable])
+
+  const enableMint = mintUrl !== ''
 
   const enableTransfer = useMemo(() => {
     let enable = false
@@ -85,8 +93,8 @@ export function useAlkanesTokenScreenLogic() {
   }, [tokenSummary.tradeUrl])
 
   const onClickMint = () => {
-    if (tokenSummary.mintUrl) {
-      nav.navToUrl(tokenSummary.mintUrl)
+    if (mintUrl) {
+      nav.navToUrl(mintUrl)
     }
   }
 

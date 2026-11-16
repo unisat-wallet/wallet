@@ -334,6 +334,11 @@ export function useAlkanesMarketPlaceWebsite(alkaneid: string) {
   return `${unisatWebsite}/alkanes/market?tick=${alkaneid}`
 }
 
+export function useAlkanesInscribeUrl() {
+  const unisatWebsite = useUnisatWebsite()
+  return `${unisatWebsite}/alkanes/inscribe`
+}
+
 export function useRunesInscribeUrl(rune: string) {
   const unisatWebsite = useUnisatWebsite()
   const newUrl = `${unisatWebsite}/runes/inscribe?only=1&tab=mint&rune=${rune}`
