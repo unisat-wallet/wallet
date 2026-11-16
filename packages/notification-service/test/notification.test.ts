@@ -93,6 +93,17 @@ describe('NotificationService', () => {
       expect(storage.set).toHaveBeenCalled()
     })
 
+    it('stores notification IDs that match object prototype keys', async () => {
+      await initService(service, {
+        list: [makeItem({ id: '__proto__' }), makeItem({ id: 'constructor' })],
+      })
+
+      const results = await service.getNotifications()
+
+      expect(results.map(item => item.id)).toEqual(['__proto__', 'constructor'])
+      expect(service.getUnreadCount()).toBe(2)
+    })
+
     it('preserves local readAt when server returns same item', async () => {
       const readAt = Date.now() - 1000
       const stored = { n1: makeItem({ readAt }) }

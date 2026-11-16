@@ -7,6 +7,9 @@ const MAX_NOTIFICATIONS = 20
 // Read notifications are deleted after 7 days
 const READ_EXPIRY_MS = 7 * 24 * 60 * 60 * 1000
 
+const createNotificationStore = (storedData?: NotificationStore): NotificationStore =>
+  Object.assign(Object.create(null), storedData)
+
 // Default no-op logger
 const defaultLogger: Logger = {
   debug: () => {},
@@ -25,7 +28,7 @@ export class NotificationService {
   private storage: ProxyStorageAdapter = undefined as any
   private logger: Logger = defaultLogger
   private storageKey: string = 'notifications'
-  private store: NotificationStore = {}
+  private store: NotificationStore = createNotificationStore()
   private api: WalletApiService = undefined as any
 
   constructor() {}
@@ -45,7 +48,7 @@ export class NotificationService {
 
     try {
       const storedData = await this.storage.get(this.storageKey)
-      this.store = storedData || {}
+      this.store = createNotificationStore(storedData)
       this.logger.debug('Notification service initialization completed')
     } catch (error) {
       this.logger.error('Notification service initialization failed:', error)
@@ -55,7 +58,7 @@ export class NotificationService {
 
   resetAllData = () => {
     this.storage.set(this.storageKey, {})
-    this.store = {}
+    this.store = createNotificationStore()
   }
 
   // Fetch the published list from the server and keep local read state.
