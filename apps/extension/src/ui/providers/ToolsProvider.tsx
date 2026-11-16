@@ -113,9 +113,14 @@ function TipContainer({ handler }: { handler: ToolsContextType }) {
 
 function CopyContainer({ handler }: { handler: ToolsContextType }) {
   const { t } = useI18n();
-  handler.copyToClipboard = useCallback((text, options) => {
-    copyToClipboard(text, options).then(() => {
+  handler.copyToClipboard = useCallback((text) => {
+    copyToClipboard(text).then(() => {
       handler.toastSuccess(t('copied'));
+    });
+  }, []);
+  handler.clearClipboard = useCallback(() => {
+    copyToClipboard('').then(() => {
+      handler.toastSuccess(t('clipboard_cleared'));
     });
   }, []);
   return <div />;
@@ -141,6 +146,9 @@ const initContext = {
     // todo
   },
   copyToClipboard: (text: string) => {
+    // todo
+  },
+  clearClipboard: () => {
     // todo
   },
   openUrl: (url: string) => {

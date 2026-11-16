@@ -524,6 +524,15 @@
   "copied": {
     "message": "已複製"
   },
+  "clipboard_cleared": {
+    "message": "剪貼簿已清空"
+  },
+  "clear_clipboard": {
+    "message": "清空剪貼簿"
+  },
+  "private_key_clipboard_warning": {
+    "message": "複製到剪貼簿的私鑰不會自動清除。使用後請清空剪貼簿。"
+  },
   "copy_address": {
     "message": "複製地址"
   },

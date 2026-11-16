@@ -524,6 +524,15 @@
   "copied": {
     "message": "コピーしました"
   },
+  "clipboard_cleared": {
+    "message": "クリップボードを消去しました"
+  },
+  "clear_clipboard": {
+    "message": "クリップボードを消去"
+  },
+  "private_key_clipboard_warning": {
+    "message": "クリップボードにコピーした秘密鍵は自動的に消去されません。使用後にクリップボードを消去してください。"
+  },
   "copy_address": {
     "message": "アドレスをコピー"
   },

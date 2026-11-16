@@ -94,8 +94,19 @@ function PrivateKeyValue({
 export default function ExportPrivateKeyScreen() {
   const [showWifPrivateKey, setShowWifPrivateKey] = useState(false);
   const [showHexPrivateKey, setShowHexPrivateKey] = useState(false);
-  const { t, password, setPassword, disabled, btnClick, handleOnKeyUp, privateKey, error, copy, onClickBack } =
-    useExportPrivateKeyScreenLogic();
+  const {
+    t,
+    password,
+    setPassword,
+    disabled,
+    btnClick,
+    handleOnKeyUp,
+    privateKey,
+    error,
+    copy,
+    clearClipboard,
+    onClickBack
+  } = useExportPrivateKeyScreenLogic();
 
   useEffect(() => {
     setShowWifPrivateKey(false);
@@ -177,6 +188,25 @@ export default function ExportPrivateKeyScreen() {
               onReveal={() => setShowHexPrivateKey(true)}
               onHide={() => setShowHexPrivateKey(false)}
               onCopy={copy}
+            />
+
+            <Card
+              mt="lg"
+              style={{
+                height: 'auto',
+                border: `1px solid ${colors.warning}`,
+                borderRadius: 10
+              }}>
+              <Icon icon="wallet-info" size={20} color="warning" />
+              <Text text={t('private_key_clipboard_warning')} color="warning" size="sm" />
+            </Card>
+
+            <Button
+              mt="md"
+              text={t('clear_clipboard')}
+              preset="default"
+              onClick={clearClipboard}
+              data-testid="clear-private-key-clipboard-button"
             />
           </Column>
         )}

@@ -524,6 +524,15 @@
   "copied": {
     "message": "Copié"
   },
+  "clipboard_cleared": {
+    "message": "Presse-papiers effacé"
+  },
+  "clear_clipboard": {
+    "message": "Effacer le presse-papiers"
+  },
+  "private_key_clipboard_warning": {
+    "message": "Les clés privées copiées dans le presse-papiers ne sont pas effacées automatiquement. Effacez le presse-papiers après utilisation."
+  },
   "copy_address": {
     "message": "Copier l'adresse"
   },

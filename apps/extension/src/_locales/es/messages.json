@@ -524,6 +524,15 @@
   "copied": {
     "message": "Copiado"
   },
+  "clipboard_cleared": {
+    "message": "Portapapeles borrado"
+  },
+  "clear_clipboard": {
+    "message": "Borrar portapapeles"
+  },
+  "private_key_clipboard_warning": {
+    "message": "Las claves privadas copiadas al portapapeles no se borran automáticamente. Borra el portapapeles después de usarlas."
+  },
   "copy_address": {
     "message": "Copiar dirección"
   },

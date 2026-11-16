@@ -4,10 +4,6 @@ import React, { useCallback, useContext, useRef, useState } from 'react'
 type ToastFunction = (content: string) => void
 type LoadingFunction = (visible: boolean, content?: string) => void
 
-export type CopyToClipboardOptions = {
-  clearAfterMs?: number
-}
-
 export interface ToolsContextType {
   toast: ToastFunction
   toastSuccess: ToastFunction
@@ -15,7 +11,8 @@ export interface ToolsContextType {
   toastWarning: ToastFunction
   showLoading: LoadingFunction
   showTip: ToastFunction
-  copyToClipboard: (text: string, options?: CopyToClipboardOptions) => void
+  copyToClipboard: (text: string) => void
+  clearClipboard: () => void
   openUrl: (url: string) => void
 }
 
@@ -39,6 +36,9 @@ const initContext = {
     // todo
   },
   copyToClipboard: (text: string) => {
+    // todo
+  },
+  clearClipboard: () => {
     // todo
   },
   openUrl(url: string) {

@@ -117,36 +117,7 @@ export async function sleep(timeSec: number) {
   });
 }
 
-type CopyToClipboardOptions = {
-  clearAfterMs?: number;
-};
-
-let clipboardClearTimer: number | undefined;
-
-const scheduleClipboardClear = (copiedText: string, clearAfterMs?: number) => {
-  if (clipboardClearTimer !== undefined) {
-    window.clearTimeout(clipboardClearTimer);
-    clipboardClearTimer = undefined;
-  }
-  if (!clearAfterMs || clearAfterMs <= 0) return;
-
-  clipboardClearTimer = window.setTimeout(async () => {
-    clipboardClearTimer = undefined;
-    try {
-      if (!navigator.clipboard || !window.isSecureContext) return;
-      if ((await navigator.clipboard.readText()) === copiedText) {
-        await navigator.clipboard.writeText('');
-      }
-    } catch {
-      // Clipboard access may be revoked after the copy operation.
-    }
-  }, clearAfterMs);
-};
-
-export const copyToClipboard = async (
-  textToCopy: string | number,
-  options: CopyToClipboardOptions = {}
-) => {
+export const copyToClipboard = async (textToCopy: string | number) => {
   const text = textToCopy.toString();
   if (navigator.clipboard && window.isSecureContext) {
     await navigator.clipboard.writeText(text);
@@ -165,7 +136,6 @@ export const copyToClipboard = async (
       textArea.remove();
     });
   }
-  scheduleClipboardClear(text, options.clearAfterMs);
 };
 
 export function formatDate(date: Date, fmt = 'yyyy-MM-dd hh:mm:ss') {

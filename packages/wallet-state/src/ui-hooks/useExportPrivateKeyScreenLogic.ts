@@ -4,7 +4,6 @@ import { useI18n, useNavigation, useTools, useWallet } from 'src/context'
 import { uiEventBus } from 'src/utils/eventBus'
 
 type Status = '' | 'error' | 'warning' | undefined
-const PRIVATE_KEY_CLIPBOARD_CLEAR_DELAY_MS = 60_000
 
 export function useExportPrivateKeyScreenLogic() {
   const { t } = useI18n()
@@ -66,7 +65,11 @@ export function useExportPrivateKeyScreenLogic() {
   }, [clearSensitiveState, nav])
 
   function copy(str: string) {
-    tools.copyToClipboard(str, { clearAfterMs: PRIVATE_KEY_CLIPBOARD_CLEAR_DELAY_MS })
+    tools.copyToClipboard(str)
+  }
+
+  function clearClipboard() {
+    tools.clearClipboard()
   }
 
   const onClickBack = () => {
@@ -84,6 +87,7 @@ export function useExportPrivateKeyScreenLogic() {
     privateKey,
     error,
     copy,
+    clearClipboard,
     onClickBack,
   }
 }

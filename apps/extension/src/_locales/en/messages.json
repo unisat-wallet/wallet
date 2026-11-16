@@ -536,6 +536,15 @@
   "copied": {
     "message": "Copied"
   },
+  "clipboard_cleared": {
+    "message": "Clipboard cleared"
+  },
+  "clear_clipboard": {
+    "message": "Clear clipboard"
+  },
+  "private_key_clipboard_warning": {
+    "message": "Private keys copied to the clipboard are not cleared automatically. Clear the clipboard after use."
+  },
   "copy_address": {
     "message": "Copy Address"
   },

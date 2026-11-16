@@ -169,6 +169,7 @@ export function createToolsMock(): ToolsContextType {
     showLoading: vi.fn(),
     showTip: vi.fn(),
     copyToClipboard: vi.fn(),
+    clearClipboard: vi.fn(),
     openUrl: vi.fn(),
   }
 }
