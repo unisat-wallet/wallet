@@ -493,7 +493,10 @@ class ProviderController extends BaseController {
 
   @Reflect.metadata('SAFE', true)
   getAccounts = async ({ session: { origin } }) => {
-    if (!permissionService.hasPermission(origin)) {
+    // Intentional provider privacy policy: keep getAccounts SAFE so passive
+    // dApp polling never opens an unlock prompt, but expose no account while
+    // the site is unauthorized or the wallet is locked.
+    if (!permissionService.hasPermission(origin) || !(await wallet.isUnlocked())) {
       return []
     }
 
@@ -576,14 +579,12 @@ class ProviderController extends BaseController {
     return getChainInfo(chain)
   }
 
-  @Reflect.metadata('SAFE', true)
   getPublicKey = async () => {
     const account = await wallet.getCurrentAccount()
     if (!account) return ''
     return account.pubkey
   }
 
-  @Reflect.metadata('SAFE', true)
   getInscriptions = async req => {
     const params: RequestMethodGetInscriptionsParams = req.data.params
     const { cursor, size } = params
@@ -601,7 +602,6 @@ class ProviderController extends BaseController {
     return { list, total }
   }
 
-  @Reflect.metadata('SAFE', true)
   getBalance = async () => {
     const account = await wallet.getCurrentAccount()
     if (!account) return null
@@ -613,7 +613,6 @@ class ProviderController extends BaseController {
     }
   }
 
-  @Reflect.metadata('SAFE', true)
   getBalanceV2 = async () => {
     const account = await wallet.getCurrentAccount()
     if (!account) return null
@@ -1729,7 +1728,6 @@ class ProviderController extends BaseController {
     return false
   }
 
-  @Reflect.metadata('SAFE', true)
   getBitcoinUtxos = async () => {
     const account = await wallet.getCurrentAccount()
     if (!account) return []
