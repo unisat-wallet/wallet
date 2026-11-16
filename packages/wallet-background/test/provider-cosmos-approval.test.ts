@@ -6,7 +6,7 @@ import { TxBody } from 'cosmjs-types/cosmos/tx/v1beta1/tx.js'
 
 vi.mock('@unisat/babylon-service', async () => import('../../babylon-service/src/cosmos/utils'))
 vi.mock('../src/services', () => ({
-  keyringService: { memStore: { getState: () => ({ isUnlocked: true }) } },
+  keyringService: { memStore: { getState: vi.fn(() => ({ isUnlocked: true })) } },
   permissionService: {
     hasPermission: vi.fn(() => true),
     touchConnectedSite: vi.fn(),
@@ -32,6 +32,16 @@ vi.mock('../src/controllers/wallet', async () => {
           signBytesHex: arbitrarySignDocToBytesHex(signerAddress, data),
         })
       ),
+      getCosmosKeyring: vi.fn(async () => ({
+        getKey: () => ({
+          name: 'Test',
+          algo: 'secp256k1',
+          bech32Address: signerAddress,
+          address: new Uint8Array([1, 2, 3]),
+          pubKey: new Uint8Array([2, 4, 6]),
+          isNanoLedger: false,
+        }),
+      })),
     },
   }
 })
@@ -42,7 +52,7 @@ vi.mock('src/utils/eventBus', () => ({ bgEventBus: { emit: vi.fn() } }))
 
 import rpcFlow from '../src/controllers/provider/rpcFlow'
 import approvalService from 'src/services/approval'
-import { permissionService } from '../src/services'
+import { keyringService, permissionService } from '../src/services'
 import {
   directSignDocToBytesHex,
   arbitrarySignDocToBytesHex,
@@ -81,11 +91,26 @@ const request = (method: string, params: any) => ({
 describe('Cosmos approval payload binding', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    vi.mocked(keyringService.memStore.getState).mockReturnValue({ isUnlocked: true } as any)
     vi.mocked(permissionService.hasPermission).mockReturnValue(true)
     vi.mocked(approvalService.requestApproval).mockResolvedValue({
       publicKey: `02${'11'.repeat(32)}`,
       signature: '22'.repeat(64),
     })
+  })
+
+  it('requests wallet unlock before returning the Cosmos key', async () => {
+    vi.mocked(keyringService.memStore.getState).mockReturnValue({ isUnlocked: false } as any)
+    vi.mocked(approvalService.requestApproval).mockResolvedValue(undefined)
+
+    await expect(rpcFlow(request('cosmos_getKey', {}))).resolves.toMatchObject({
+      bech32Address: signerAddress,
+      address: '1,2,3',
+      pubKey: '2,4,6',
+    })
+
+    expect(approvalService.requestApproval).toHaveBeenCalledTimes(1)
+    expect(approvalService.requestApproval).toHaveBeenCalledWith({ lock: true })
   })
 
   it('rejects an unsupported Cosmos network before any connection approval', async () => {

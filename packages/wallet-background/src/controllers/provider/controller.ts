@@ -1721,7 +1721,6 @@ class ProviderController extends BaseController {
     throw new Error('not implemented')
   }
 
-  @Reflect.metadata('SAFE', true)
   cosmosGetKey = async ({
     data: {
       params: { chainId },
