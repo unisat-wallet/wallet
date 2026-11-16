@@ -98,7 +98,9 @@ async function decrypt(password: string, encryptedData: string): Promise<any> {
   }
 
   const candidates =
-    typeof payload.iterations === 'number' ? [payload.iterations] : [CURRENT_ITERATIONS, LEGACY_ITERATIONS];
+    typeof payload.iterations === 'number'
+      ? [Math.max(payload.iterations, LEGACY_ITERATIONS)]
+      : [CURRENT_ITERATIONS, LEGACY_ITERATIONS];
 
   for (const iterations of candidates) {
     try {

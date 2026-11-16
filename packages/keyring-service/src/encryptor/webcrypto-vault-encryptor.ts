@@ -45,7 +45,11 @@ function bufferToUtf8(buf: ArrayBuffer | Uint8Array): string {
   return new TextDecoder().decode(bytes)
 }
 
-async function deriveAesKey(password: string, saltB64: string, iterations: number): Promise<CryptoKey> {
+async function deriveAesKey(
+  password: string,
+  saltB64: string,
+  iterations: number
+): Promise<CryptoKey> {
   const passKey = await crypto.subtle.importKey(
     'raw',
     utf8ToBuffer(password) as BufferSource,
@@ -112,7 +116,7 @@ export class WebCryptoVaultEncryptor implements Encryptor {
 
     const candidates =
       typeof payload.iterations === 'number'
-        ? [payload.iterations]
+        ? [Math.max(payload.iterations, LEGACY_ITERATIONS)]
         : [CURRENT_ITERATIONS, LEGACY_ITERATIONS]
 
     let lastError: unknown
