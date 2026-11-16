@@ -28,7 +28,7 @@ const singletonPackages = {
 
 const config = (env) => {
   const version = env.version;
-  const paths = getBrowserPaths(env.browser);
+  const paths = getBrowserPaths(env.output || env.browser);
   const manifest = env.manifest;
   const channel = env.channel;
   // Check if Tailwind config exists
@@ -498,7 +498,8 @@ const config = (env) => {
         'process.env.version': JSON.stringify(`Version: ${version}`),
         'process.env.release': JSON.stringify(version),
         'process.env.manifest': JSON.stringify(manifest),
-        'process.env.channel': JSON.stringify(channel)
+        'process.env.channel': JSON.stringify(channel),
+        'process.env.BUILD_VARIANT': JSON.stringify(env.variant || 'production')
       }),
       new MiniCssExtractPlugin({
         // Options similar to the same options in webpackOptions.output

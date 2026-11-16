@@ -12,12 +12,13 @@ const path = require('path');
 
 //parse arguments
 var knownOptions = {
-  string: ['env', 'browser', 'manifest', 'channel', 'artifact-version', 'tag'],
+  string: ['env', 'browser', 'manifest', 'channel', 'artifact-version', 'tag', 'variant'],
   default: {
     env: 'dev',
     browser: 'chrome',
     manifest: 'mv3',
-    channel: 'store'
+    channel: 'store',
+    variant: 'production'
   }
 };
 
@@ -33,6 +34,8 @@ var options = {
   manifest: knownOptions.default.manifest
 };
 options = minimist(process.argv.slice(2), knownOptions);
+var isDefaultVariant = options.variant === knownOptions.default.variant;
+var outputTarget = isDefaultVariant ? options.browser : `${options.browser}-${options.variant}`;
 var artifactVersion = options['artifact-version'] || version;
 var artifactTag = (options.tag || '').trim();
 var artifactGitHash =
@@ -54,6 +57,10 @@ if (!supported_mvs.includes(options.manifest)) {
   console.error(`not supported browser: [${options.manifest}]. It should be one of ${supported_mvs.join(', ')}.`);
   exit(0);
 }
+if (!/^[a-z0-9][a-z0-9-]*$/.test(options.variant)) {
+  console.error(`invalid variant: [${options.variant}]. Use lowercase letters, numbers, or hyphens.`);
+  exit(1);
+}
 if (artifactVersion !== validVersion && !artifactVersion.startsWith(`${validVersion}-`)) {
   console.error(
     `invalid artifact-version: [${artifactVersion}]. It should match ${validVersion} or start with ${validVersion}- .`
@@ -71,13 +78,26 @@ function artifactSuffix() {
   return `${gitHashSuffix}${tagSuffix}`;
 }
 
+function artifactName(extension) {
+  const artifactBrand = `${brandName}${isDefaultVariant ? '' : `-${options.variant}`}`;
+  return `${artifactBrand}-${options.browser}-${options.manifest}-v${artifactVersion}${artifactSuffix()}.${extension}`;
+}
+
 //tasks...
 function task_clean() {
-  return gulp.src(`dist/${options.browser}/*`, { read: false }).pipe(clean());
+  return gulp.src(`dist/${outputTarget}/*`, { read: false }).pipe(clean());
 }
 
 function task_prepare() {
-  return gulp.src('build/_raw/**/*').pipe(gulp.dest(`dist/${options.browser}`));
+  return gulp.src('build/_raw/**/*').pipe(gulp.dest(`dist/${outputTarget}`));
+}
+
+function task_prepare_variant(cb) {
+  if (isDefaultVariant) {
+    cb();
+    return;
+  }
+  return gulp.src(`build/${options.variant}/**/*`).pipe(gulp.dest(`dist/${outputTarget}`));
 }
 
 function task_merge_manifest() {
@@ -87,8 +107,8 @@ function task_merge_manifest() {
   }
   return gulp
     .src([
-      `dist/${options.browser}/manifest/${baseFile}.json`,
-      `dist/${options.browser}/manifest/${options.browser}.json`
+      `dist/${outputTarget}/manifest/${baseFile}.json`,
+      `dist/${outputTarget}/manifest/${options.browser}.json`
     ])
     .pipe(
       jsoncombine('manifest.json', (data, meta) => {
@@ -97,11 +117,11 @@ function task_merge_manifest() {
         return Buffer.from(JSON.stringify(result));
       })
     )
-    .pipe(gulp.dest(`dist/${options.browser}`));
+    .pipe(gulp.dest(`dist/${outputTarget}`));
 }
 
 function task_clean_tmps() {
-  return gulp.src(`dist/${options.browser}/manifest`, { read: false }).pipe(clean());
+  return gulp.src(`dist/${outputTarget}/manifest`, { read: false }).pipe(clean());
 }
 
 function task_webpack(cb) {
@@ -110,8 +130,10 @@ function task_webpack(cb) {
       version: validVersion,
       config: options.env,
       browser: options.browser,
+      output: outputTarget,
       manifest: options.manifest,
-      channel: options.channel
+      channel: options.channel,
+      variant: options.variant
     }),
     cb
   );
@@ -121,13 +143,13 @@ function task_package(cb) {
   if (options.env == 'pro') {
     if (options.browser == 'firefox') {
       return gulp
-        .src(`dist/${options.browser}/**/*`)
-        .pipe(zip(`${brandName}-${options.browser}-${options.manifest}-v${artifactVersion}${artifactSuffix()}.xpi`))
+        .src(`dist/${outputTarget}/**/*`)
+        .pipe(zip(artifactName('xpi')))
         .pipe(gulp.dest('./dist'));
     } else {
       return gulp
-        .src(`dist/${options.browser}/**/*`)
-        .pipe(zip(`${brandName}-${options.browser}-${options.manifest}-v${artifactVersion}${artifactSuffix()}.zip`))
+        .src(`dist/${outputTarget}/**/*`)
+        .pipe(zip(artifactName('zip')))
         .pipe(gulp.dest('./dist'));
     }
   }
@@ -137,11 +159,9 @@ function task_package(cb) {
 function task_print_output(cb) {
   if (options.env == 'pro') {
     const extension = options.browser == 'firefox' ? 'xpi' : 'zip';
-    const artifactName =
-      `${brandName}-${options.browser}-${options.manifest}-v${artifactVersion}` + `${artifactSuffix()}.${extension}`;
-    console.log(`Build artifact: ${path.resolve(__dirname, 'dist', artifactName)}`);
+    console.log(`Build artifact: ${path.resolve(__dirname, 'dist', artifactName(extension))}`);
   } else {
-    console.log(`Build output: ${path.resolve(__dirname, 'dist', options.browser)}`);
+    console.log(`Build output: ${path.resolve(__dirname, 'dist', outputTarget)}`);
   }
   cb();
 }
@@ -149,9 +169,21 @@ function task_print_output(cb) {
 exports.build = gulp.series(
   task_clean,
   task_prepare,
+  task_prepare_variant,
   task_merge_manifest,
   task_clean_tmps,
   task_webpack,
   task_package,
   task_print_output
+);
+
+// Prepare a complete extension directory before starting webpack in watch mode.
+// Keeping preparation separate lets the development scripts retain webpack's
+// CLI progress output while still generating the manifest and variant assets.
+exports.prepare = gulp.series(
+  task_clean,
+  task_prepare,
+  task_prepare_variant,
+  task_merge_manifest,
+  task_clean_tmps
 );
