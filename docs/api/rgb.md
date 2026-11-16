@@ -340,6 +340,34 @@ Choose exactly one integration model for each application. The two models have
 different key ownership and call ordering; do not combine their completion
 methods.
 
+### Version requirements
+
+| Method | Minimum wallet version |
+| --- | --- |
+| `prepareSwap` | v1.8.0 |
+| `signSellSwapAndPublishConsignment` | v1.8.0 |
+| `confirmSellSwap` | v1.8.0 |
+| `cancelSwap` / `getOperationStatus` | v1.8.0 |
+| `createReceiveInvoice({ purpose: "buy_swap" })` | v1.8.3 |
+| `signBuySwap` / `acceptBuySwap` | v1.8.3 |
+| `syncSellSwapAck` | **v1.8.4** |
+| `signBuySwapCommit` | **v1.8.4** |
+
+The RGB-seller flow in each integration model requires **v1.8.4 or later**.
+The backend-coordinated BTC-to-RGB buyer flow remains available in v1.8.3.
+Applications should also feature-detect the model-specific method instead of
+relying only on a version string:
+
+```ts
+if (typeof window.unisat?.rgb?.syncSellSwapAck !== 'function') {
+  throw new Error('Backend-coordinated RGB swaps require UniSat Wallet v1.8.4+')
+}
+
+if (typeof window.unisat?.rgb?.signBuySwapCommit !== 'function') {
+  throw new Error('Pure P2P RGB swaps require UniSat Wallet v1.8.4+')
+}
+```
+
 - [Backend-coordinated mode](./rgb-swap-backend.md): the application backend is
   the RGB counterparty, retains the final transaction and broadcasts it. Use
   `syncSellSwapAck` for an RGB seller.

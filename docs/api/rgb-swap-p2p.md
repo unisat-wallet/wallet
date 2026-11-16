@@ -5,6 +5,21 @@ application backend never holds wallet keys or assets. Do not use
 `syncSellSwapAck`; that method belongs to the backend-coordinated mode in
 [`rgb-swap-backend.md`](./rgb-swap-backend.md).
 
+## Wallet version
+
+The complete flow requires **UniSat Wallet v1.8.4 or later** because
+`signBuySwapCommit` was introduced in v1.8.4. Seller preparation and
+confirmation APIs are available from v1.8.0; the split buyer signing and ACK
+APIs are available from v1.8.3.
+
+Feature-detect the required method before starting a swap:
+
+```ts
+if (typeof window.unisat?.rgb?.signBuySwapCommit !== 'function') {
+  throw new Error('Pure P2P RGB swaps require UniSat Wallet v1.8.4+')
+}
+```
+
 ## Required order
 
 ```text
@@ -26,12 +41,14 @@ dependency because seller confirmation verifies the buyer ACK.
 ## Seller preparation and publication
 
 ```ts
+// v1.8.3+
 const buyerInvoice = await buyer.rgb.createReceiveInvoice({
   assetId,
   amount,
   purpose: 'buy_swap',
 })
 
+// v1.8.0+
 const prepared = await seller.rgb.prepareSwap({
   invoice: buyerInvoice.invoice,
   assetId,
@@ -41,6 +58,7 @@ const prepared = await seller.rgb.prepareSwap({
   psbt: unsignedSwapPsbt,
 })
 
+// v1.8.0+
 const sellerPartial = await seller.rgb.signSellSwapAndPublishConsignment(
   prepared.transferId,
   prepared.coloredPsbt,
@@ -56,6 +74,7 @@ After the buyer invoice becomes `PendingAccept`, the buyer signs the same
 unsigned transaction without seller signatures:
 
 ```ts
+// v1.8.3+
 const buyerPartial = await buyer.rgb.signBuySwap({
   recipientId: buyerInvoice.recipientId,
   assetId,
@@ -75,6 +94,7 @@ const buyerSignedPsbtHash = sha256BinaryPsbt(
   buyerPartial.buyerSignedPsbt,
 )
 
+// v1.8.4+
 const authorization = await seller.rgb.signBuySwapCommit(
   prepared.transferId,
   buyerPartial.txid,
@@ -106,6 +126,7 @@ ephemeral Proxy sender key.
 ## Buyer ACK, final combination and broadcast
 
 ```ts
+// v1.8.3+
 await buyer.rgb.acceptBuySwap({
   recipientId: buyerInvoice.recipientId,
   backendCommit: authorization.commitment,
@@ -116,6 +137,7 @@ const fullySignedPsbt = combinePartialPsbts(
   buyerPartial.buyerSignedPsbt,
 )
 
+// v1.8.0+
 const ready = await seller.rgb.confirmSellSwap(
   prepared.transferId,
   fullySignedPsbt,

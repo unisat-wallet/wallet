@@ -4,6 +4,22 @@ Use this mode only when the application backend is the RGB counterparty and
 retains the final Bitcoin transaction. Do not combine this flow with the pure
 P2P flow in [`rgb-swap-p2p.md`](./rgb-swap-p2p.md).
 
+## Wallet version
+
+The RGB-to-BTC seller flow requires **UniSat Wallet v1.8.4 or later** because
+`syncSellSwapAck` was introduced in v1.8.4. The shared seller APIs
+`prepareSwap` and `signSellSwapAndPublishConsignment` are available from
+v1.8.0. The backend-controlled BTC-to-RGB buyer flow uses the split buyer APIs
+available from v1.8.3 and does not require `syncSellSwapAck`.
+
+Feature-detect the required method before starting a swap:
+
+```ts
+if (typeof window.unisat?.rgb?.syncSellSwapAck !== 'function') {
+  throw new Error('Backend-coordinated RGB swaps require UniSat Wallet v1.8.4+')
+}
+```
+
 ## Sell RGB for BTC
 
 In this direction the UniSat user is the RGB seller. The backend controls the
@@ -21,6 +37,7 @@ prepareSwap
 ```
 
 ```ts
+// v1.8.0+
 const prepared = await unisat.rgb.prepareSwap({
   invoice: backendReceiveInvoice,
   assetId,
@@ -30,11 +47,13 @@ const prepared = await unisat.rgb.prepareSwap({
   psbt: unsignedSwapPsbt,
 })
 
+// v1.8.0+
 const published = await unisat.rgb.signSellSwapAndPublishConsignment(
   prepared.transferId,
   prepared.coloredPsbt,
 )
 
+// v1.8.4+
 const ack = await unisat.rgb.syncSellSwapAck(published.transferId)
 // waiting_ack | receiver_acked | rejected | expired
 ```
@@ -65,12 +84,14 @@ createReceiveInvoice({ purpose: 'buy_swap' })
 ```
 
 ```ts
+// v1.8.3+
 const receive = await unisat.rgb.createReceiveInvoice({
   assetId,
   amount,
   purpose: 'buy_swap',
 })
 
+// v1.8.3+
 const signed = await unisat.rgb.signBuySwap({
   recipientId: receive.recipientId,
   assetId,
@@ -84,6 +105,7 @@ const message =
   sha256BinaryPsbt(signed.buyerSignedPsbt)
 const backendCommit = signProxyV1Message(proxySenderPrivateKey, message)
 
+// v1.8.3+
 await unisat.rgb.acceptBuySwap({
   recipientId: receive.recipientId,
   backendCommit,
