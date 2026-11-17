@@ -5560,6 +5560,21 @@ describe('RgbService', () => {
     await expect(reopened.signPublishedSwapBuyerCommitment(
       'transfer-1', 'c'.repeat(64), buyerSignedPsbtHash
     )).resolves.toEqual(result)
+    await expect(reopened.syncPublishedSwapAcknowledgement('transfer-1'))
+      .resolves.toEqual({
+        transferId: 'transfer-1',
+        txid: 'c'.repeat(64),
+        status: 'receiver_acked',
+      })
+    expect(reopened.getPendingTransfers()[0]?.delivery).toEqual(
+      expect.objectContaining({
+        acknowledgedAt: expect.any(Number),
+        requiresCounterpartySignature: true,
+        makerSignedPsbt: 'maker-signed-psbt',
+        sellSwapAckStatus: 'receiver_acked',
+      })
+    )
+    expect(reopened.getPendingTransfers()[0]?.delivery?.externalBroadcast).toBeUndefined()
     await reopened.completePublishedSwap('transfer-1', 'fully-signed-psbt', {
       externalBroadcast: true,
     })

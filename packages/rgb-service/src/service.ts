@@ -5636,9 +5636,23 @@ export class RgbService {
         throw error
       }
 
+      delivery.sellSwapAckStatus = 'receiver_acked'
+      // A committed P2P market swap still needs the buyer- and seller-signed
+      // PSBTs to be combined and passed to completePublishedSwap. Syncing the
+      // Proxy ACK only proves that the buyer accepted the RGB consignment; it
+      // must not turn this into the separate backend-broadcast flow or discard
+      // the PSBT completion state.
+      if (delivery.buyerSwapCommit) {
+        await this.persist({ waitForRecovery: true })
+        return {
+          transferId,
+          txid: delivery.completed.txid,
+          status: 'receiver_acked' as const,
+        }
+      }
+
       delete delivery.requiresCounterpartySignature
       delete delivery.makerSignedPsbt
-      delivery.sellSwapAckStatus = 'receiver_acked'
       delivery.externalBroadcast = true
       delivery.externalBroadcastController = 'backend'
       await this.persist({ waitForRecovery: true })
