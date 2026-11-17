@@ -461,7 +461,12 @@ export class RgbTransferQuery {
             batch: receive.pendingAccept.batch,
             txid: receive.pendingAccept.txid,
             timestamp: receive.pendingAccept.discoveredAt || receive.createdAt,
-            status: 'pending_accept',
+            // Buy-swap receipts are acknowledged only after the market
+            // relays the seller's verified commitment through acceptBuySwap.
+            // Do not expose the wallet's ordinary Accept action beforehand.
+            status: receive.acceptancePolicy === 'buy_swap_backend_commit'
+              ? 'waiting_swap_commit'
+              : 'pending_accept',
             local: true,
           },
         ]

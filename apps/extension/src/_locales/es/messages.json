@@ -3539,6 +3539,7 @@
   "rgb_cancel_send_success": { "message": "Transferencia cancelada" },
   "rgb_cancel_send_failed": { "message": "No se pudo cancelar la transferencia" },
   "rgb_status_pending_accept": { "message": "Esperando tu aceptación" },
+  "rgb_status_waiting_swap_commit": { "message": "Esperando autorización del swap" },
   "rgb_status_confirmed": { "message": "Confirmada" },
   "rgb_status_canceled_by_sender": { "message": "Cancelada por el remitente" },
   "rgb_status_canceled": { "message": "Cancelada" },

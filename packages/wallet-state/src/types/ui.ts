@@ -104,6 +104,7 @@ export type RgbTransferStatus =
   | 'signed'
   | 'waiting_ack'
   | 'pending_accept'
+  | 'waiting_swap_commit'
   | 'validation_failed'
   | 'confirming'
   | 'waiting_batch_release'

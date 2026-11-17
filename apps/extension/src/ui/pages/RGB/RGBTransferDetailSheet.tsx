@@ -45,6 +45,8 @@ function getStatusLabel(status: string, t: (key: string) => string, type?: RgbTr
       return t('rgb_status_broadcast_failed');
     case 'pending_accept':
       return t('rgb_status_pending_accept');
+    case 'waiting_swap_commit':
+      return t('rgb_status_waiting_swap_commit');
     case 'validation_failed':
       return t('rgb_status_validation_failed');
     case 'confirming':

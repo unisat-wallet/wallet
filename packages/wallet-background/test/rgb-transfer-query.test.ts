@@ -4,6 +4,51 @@ import { toRgbDisplayAmount } from '@unisat/wallet-shared'
 import { RgbTransferQuery } from '../src/rgb/RgbTransferQuery'
 
 describe('RgbTransferQuery', () => {
+  it('does not expose a buy-swap receipt as an ordinary acceptance action', async () => {
+    const service = {
+      getPendingTransfers: vi.fn().mockReturnValue([]),
+      getPendingSendHistory: vi.fn().mockReturnValue([]),
+      getIssueHistory: vi.fn().mockReturnValue([]),
+      getPendingReceiveHistory: vi.fn().mockReturnValue([]),
+      getPendingReceives: vi.fn().mockReturnValue([{
+        recipientId: 'recipient',
+        proxyRecipientId: 'proxy-recipient',
+        createdAt: 1,
+        acceptancePolicy: 'buy_swap_backend_commit',
+        pendingAccept: {
+          txid: 'c'.repeat(64),
+          discoveredAt: 2,
+          assetId: 'rgb:asset',
+          amount: '1',
+          precision: 0,
+          payload: 'consignment',
+        },
+      }]),
+      getSnapshot: vi.fn().mockReturnValue({ utxos: [] }),
+      getLocalAssetDetail: vi.fn().mockReturnValue({}),
+    }
+    const context = {
+      service,
+      wallet: { walletId: 'wallet', fundingAddress: 'funding', network: 'mainnet' },
+    }
+    const query = new RgbTransferQuery({
+      getContext: vi.fn().mockResolvedValue(context as never),
+      syncReceiveHistory: vi.fn(), syncPendingTransfers: vi.fn(),
+      syncReceivedAllocations: vi.fn().mockResolvedValue(context as never),
+      getRemoteActivity: vi.fn().mockResolvedValue({ total: 0, list: [] }),
+      warn: vi.fn(),
+    })
+
+    const result = await query.getTransfers(1, 20, { skipSync: true })
+
+    expect(result.list).toEqual([
+      expect.objectContaining({
+        transferId: 'proxy-recipient',
+        status: 'waiting_swap_commit',
+      }),
+    ])
+  })
+
   it('scopes remote and local activity to one token', async () => {
     const service = {
       getPendingTransfers: vi.fn().mockReturnValue([

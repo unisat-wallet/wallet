@@ -3546,6 +3546,7 @@
   "rgb_cancel_send_success": { "message": "Перевод отменён" },
   "rgb_cancel_send_failed": { "message": "Не удалось отменить перевод" },
   "rgb_status_pending_accept": { "message": "Ожидается ваше подтверждение" },
+  "rgb_status_waiting_swap_commit": { "message": "Ожидание авторизации обмена" },
   "rgb_status_confirmed": { "message": "Подтверждено" },
   "rgb_status_canceled_by_sender": { "message": "Отменено отправителем" },
   "rgb_status_canceled": { "message": "Отменено" },

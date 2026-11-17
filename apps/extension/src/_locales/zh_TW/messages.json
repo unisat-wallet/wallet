@@ -3560,6 +3560,9 @@
   "rgb_status_pending_accept": {
     "message": "等待你的確認"
   },
+  "rgb_status_waiting_swap_commit": {
+    "message": "等待交換授權"
+  },
   "rgb_status_confirmed": {
     "message": "已確認"
   },

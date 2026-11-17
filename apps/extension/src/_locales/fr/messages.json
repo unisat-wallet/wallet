@@ -3548,6 +3548,7 @@
   "rgb_cancel_send_success": { "message": "Transfert annulé" },
   "rgb_cancel_send_failed": { "message": "Échec de l'annulation du transfert" },
   "rgb_status_pending_accept": { "message": "En attente de votre acceptation" },
+  "rgb_status_waiting_swap_commit": { "message": "En attente de l’autorisation du swap" },
   "rgb_status_confirmed": { "message": "Confirmé" },
   "rgb_status_canceled_by_sender": { "message": "Annulé par l'expéditeur" },
   "rgb_status_canceled": { "message": "Annulé" },

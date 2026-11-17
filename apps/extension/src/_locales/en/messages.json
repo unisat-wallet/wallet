@@ -3583,6 +3583,9 @@
   "rgb_status_pending_accept": {
     "message": "Awaiting your acceptance"
   },
+  "rgb_status_waiting_swap_commit": {
+    "message": "Waiting for swap authorization"
+  },
   "rgb_status_confirmed": {
     "message": "Confirmed"
   },
