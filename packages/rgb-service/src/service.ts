@@ -6869,6 +6869,13 @@ export class RgbService {
   }
 
   private assertPreparedTransferGeneration(pending: RgbPendingTransfer) {
+    // The generation fence protects an unsigned PSBT from being completed
+    // after another checkpoint changed its reserved inputs. Once delivery
+    // exists, the exact signed transaction and consignment are already
+    // durable; this installation's publication of that delivery advances the
+    // checkpoint generation itself and must not make ACK/finalization retries
+    // stale.
+    if (pending.delivery) return
     const prepared = pending.preparedCheckpointGeneration
     const current = this.requireState().recoveryCheckpointGeneration
     if (prepared !== undefined && prepared !== current) {

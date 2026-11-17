@@ -5623,6 +5623,53 @@ describe('RgbService', () => {
     expect(dependencies.broadcaster.broadcast).not.toHaveBeenCalled()
   })
 
+  it('keeps a published seller swap valid when its recovery checkpoint advances', async () => {
+    const dependencies = createDependencies()
+    let generation = 7
+    dependencies.onStatePersisted = vi.fn().mockImplementation(async () => ({
+      saved: true,
+      revision: `${++generation}`.padStart(24, '0'),
+      generation,
+      verified: true,
+    }))
+    vi.mocked(dependencies.transport.getAcknowledgement!).mockResolvedValue(undefined)
+    const service = new RgbService(dependencies)
+    await service.open(wallet)
+    await service.sync()
+    ;(service as any).recoveryBackupEnabled = true
+    ;(service as any).state.recoveryRemoteStateKnown = true
+    ;(service as any).state.recoveryCheckpointGeneration = generation
+    ;(service as any).state.recoveryCheckpoint = { dirty: false, verified: true }
+
+    await service.prepareSend(
+      {
+        assetId: 'rgb:AQEBAQEB-AQEBAQE-BAQEBAQ-EBAQEBA-QEBAQEB-AQEBAQE',
+        amount: '60',
+        invoice: rgbInvoice(),
+        feeRate: 2,
+      },
+      { providerOrigin: 'https://market.example' }
+    )
+    await service.publishSwap('transfer-1', 'maker-signed-psbt')
+
+    expect((service as any).state.recoveryCheckpointGeneration).toBeGreaterThan(7)
+    expect(service.getPendingTransfers()).toEqual([
+      expect.objectContaining({
+        id: 'transfer-1',
+        preparedCheckpointGeneration: 7,
+        delivery: expect.objectContaining({
+          requiresCounterpartySignature: true,
+          makerSignedPsbt: 'maker-signed-psbt',
+        }),
+      }),
+    ])
+    await expect(service.syncPublishedSwapAcknowledgement('transfer-1')).resolves.toEqual({
+      transferId: 'transfer-1',
+      txid: 'c'.repeat(64),
+      status: 'waiting_ack',
+    })
+  })
+
   it('records a negative seller swap ACK as rejected', async () => {
     const dependencies = createDependencies()
     vi.mocked(dependencies.transport.getAcknowledgement!).mockResolvedValue(false)
