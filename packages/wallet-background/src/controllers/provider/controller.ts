@@ -1703,6 +1703,11 @@ class ProviderController extends BaseController {
       throw new Error('RGB buy swap backend commitment is invalid')
     }
     const accepted = await wallet.acceptRgbBuySwap({ recipientId: params.recipientId })
+    if (accepted.status !== 'accepted') {
+      throw new Error(
+        `RGB buy swap acknowledgement was not completed (${accepted.status})`
+      )
+    }
     return { recipientId: params.recipientId, status: accepted.status }
   }
 

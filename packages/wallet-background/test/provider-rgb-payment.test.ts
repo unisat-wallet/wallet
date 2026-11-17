@@ -676,4 +676,33 @@ describe('provider RGB payment ownership', () => {
     })).rejects.toThrow('backend commitment is invalid')
     expect(wallet.acceptRgbBuySwap).not.toHaveBeenCalled()
   })
+
+  it('does not report a buy swap as accepted while its Proxy ACK is pending', async () => {
+    const senderPrivateKey = '11'.repeat(32)
+    const receive = {
+      providerOrigin: 'https://dapp.example',
+      proxyTransferId: '22'.repeat(32),
+      proxySenderPublicKey: proxyV1PublicKey(senderPrivateKey),
+      buySwapIntent: {
+        txid: '33'.repeat(32),
+        buyerSignedPsbtHash: '44'.repeat(32),
+      },
+    }
+    vi.mocked(wallet.getRgbBuySwapReceive).mockResolvedValue(receive as any)
+    vi.mocked(wallet.acceptRgbBuySwap).mockResolvedValue({
+      accepted: false,
+      status: 'pending',
+    } as any)
+    const message = `rgb-buy-swap/commit/v1:${receive.proxyTransferId}:${receive.buySwapIntent.txid}:${receive.buySwapIntent.buyerSignedPsbtHash}`
+
+    await expect(providerController.acceptRgbBuySwap({
+      data: {
+        params: {
+          recipientId: 'recipient-1',
+          backendCommit: proxyV1Sign(senderPrivateKey, message),
+        },
+      },
+      session: { origin: 'https://dapp.example' },
+    })).rejects.toThrow('acknowledgement was not completed (pending)')
+  })
 })
