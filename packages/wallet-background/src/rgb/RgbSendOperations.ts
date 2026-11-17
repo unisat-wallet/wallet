@@ -13,6 +13,29 @@ import { toRgbDisplayAmount, type ToSignData } from '@unisat/wallet-shared'
 import { psbtFromString } from '../utils/psbt-utils'
 import type { LocalRgbServiceContext } from './RgbWalletCoordinator'
 
+/** Finalize a copy for node preflight while leaving the dApp's PSBT untouched. */
+function finalizeSwapPsbtForPreflight(psbt: ReturnType<typeof psbtFromString>) {
+  const finalized = psbt.clone()
+  finalized.data.inputs.forEach((input, index) => {
+    if (input.finalScriptSig || input.finalScriptWitness) return
+    if (input.tapKeySig) {
+      const signature = Buffer.from(input.tapKeySig)
+      if (signature.length !== 64 && signature.length !== 65) {
+        throw new Error(`RGB swap PSBT input ${index} has an invalid Taproot signature`)
+      }
+      // One-item witness stack: CompactSize(1), CompactSize(sig length), sig.
+      input.finalScriptWitness = Buffer.concat([Buffer.from([1, signature.length]), signature])
+      return
+    }
+    try {
+      finalized.finalizeInput(index)
+    } catch {
+      throw new Error(`RGB swap PSBT input ${index} is not fully signed`)
+    }
+  })
+  return finalized
+}
+
 type RgbSendOperationsDependencies = {
   getContext: () => Promise<LocalRgbServiceContext>
   ensureWriteLease?: (
@@ -229,9 +252,19 @@ export class RgbSendOperations {
     const { service, wallet } = await this.dependencies.getContext()
     await this.dependencies.ensureWriteLease?.({ service, wallet }, { forceRenew: true })
     const relayedPsbt = psbtFromString(params.signedPsbt)
+    const makerSignedPsbt = service.getPendingTransfers()
+      .find(item => item.id === params.transferId)
+      ?.delivery?.makerSignedPsbt
+    if (makerSignedPsbt) {
+      // Never rely on the market relay to preserve the seller signature. The
+      // wallet retained the approved maker PSBT specifically so it can merge
+      // that signature back into the buyer-completed transaction here.
+      relayedPsbt.combine(psbtFromString(makerSignedPsbt))
+    }
+    const finalizedForPreflight = finalizeSwapPsbtForPreflight(relayedPsbt)
     const completed = await service.completePublishedSwap(
       params.transferId,
-      relayedPsbt.toBase64(),
+      finalizedForPreflight.toBase64(),
       { externalBroadcast: true }
     )
     return {

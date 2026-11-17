@@ -56,8 +56,16 @@ export function completeRgbOpretPsbt(input: {
 
   if (input.allowIncomplete) {
     // RGB's OpretFirst witness commits to the unsigned transaction. This is
-    // only for seller-side swap consignment publication; it is never
-    // broadcast until the returned PSBT is fully finalized.
+    // used for seller-side swap consignment publication before the buyer has
+    // signed. If a later caller supplies a finalized PSBT, preserve its
+    // witnesses so node preflight validates the transaction that will really
+    // be broadcast instead of the unsigned transaction skeleton.
+    try {
+      const transaction = signed.extractTransaction()
+      return { rawTx: transaction.toHex(), txid: transaction.getId() }
+    } catch {
+      // The initial seller publication is intentionally not fully signed.
+    }
     const transaction = (signed.data.globalMap.unsignedTx as any).tx || signed.data.globalMap.unsignedTx
     if (!transaction?.toHex || !transaction?.getId)
       throw new RgbServiceError('RGB PSBT is missing its unsigned transaction')

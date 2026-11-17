@@ -1454,6 +1454,9 @@ class ProviderController extends BaseController {
     const toSignData = getToSignDatas(params.toSignDatas)[0]!
     const signedPsbt = approvalRes[0]?.psbtHex
     if (!signedPsbt) throw new Error('RGB swap signing did not return a PSBT')
+    const parsedSignedPsbt = bitcoin.Psbt.fromHex(signedPsbt)
+    assertSameUnsignedTx(parsedSignedPsbt, bitcoin.Psbt.fromHex(toSignData.psbtHex))
+    assertRequiredSignatures(parsedSignedPsbt, toSignData)
     assertExternalSignedPsbt(account, toSignData, signedPsbt)
     const published = await wallet.publishRgbSwap({ transferId: params.transferId, signedPsbt })
     return { ...published, makerSignedPsbt: signedPsbt }

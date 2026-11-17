@@ -1,4 +1,4 @@
-import { Psbt } from 'bitcoinjs-lib'
+import { Psbt, Transaction } from 'bitcoinjs-lib'
 import { describe, expect, it } from 'vitest'
 import { completeRgbOpretPsbt, decodeRgbInvoice, prepareNiaOpretTransfer } from '../src'
 
@@ -93,5 +93,23 @@ describe('completeRgbOpretPsbt', () => {
     const transaction = ((psbt.data.globalMap.unsignedTx as any).tx || psbt.data.globalMap.unsignedTx) as any
     expect(completed.txid).toBe(transaction.getId())
     expect(completed.rawTx).toMatch(/^[0-9a-f]+$/)
+  })
+
+  it('preserves finalized witnesses during incomplete-compatible swap completion', () => {
+    const prepared = preparedPsbt()
+    const signed = Psbt.fromHex(prepared.psbtHex)
+    signed.data.inputs.forEach(input => {
+      input.finalScriptWitness = Buffer.from([1, 1, 1])
+    })
+
+    const completed = completeRgbOpretPsbt({
+      preparedPsbt: prepared.psbtHex,
+      signedPsbt: signed.toHex(),
+      hostVout: prepared.hostVout,
+      commitment: prepared.commitment,
+      allowIncomplete: true,
+    })
+
+    expect(Transaction.fromHex(completed.rawTx).hasWitnesses()).toBe(true)
   })
 })
