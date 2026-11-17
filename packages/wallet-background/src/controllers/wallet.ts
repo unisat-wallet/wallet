@@ -1164,6 +1164,7 @@ export class WalletController extends BaseController {
     syncAssetMetadata: (item, wallet) => this.syncRgbAssetMetadataToIndexer(item, wallet),
     replaceUtxos: (sync, wallet) => this.replaceRgbUtxosInIndexer(sync, wallet),
     syncReceiveHistory: (receive, wallet) => this.syncRgbReceiveHistoryToIndexer(receive, wallet),
+    syncSendHistory: (send, wallet) => this.syncRgbSendHistoryToIndexer(send, wallet),
     warn: (message, error) => log.warn(message, error),
   })
   /** Invalidates a restore when the selected wallet, network or lock state changes. */
@@ -6796,6 +6797,35 @@ export class WalletController extends BaseController {
     })
   }
 
+  /** Replay a legacy post-broadcast send into the disposable backend index. */
+  private syncRgbSendHistoryToIndexer = async (
+    send: import('@unisat/rgb-service').RgbPendingSendHistory,
+    wallet: LocalRgbWallet
+  ) => {
+    if (!send.txid || !send.spentOutpoints?.length) {
+      throw new Error('Legacy RGB send is missing its transaction identity')
+    }
+    const api = getRgbApiService()
+    const chain = await api.getRgbTransactionStatus(send.txid, { wallet })
+    if (chain.status !== 'mempool' && chain.status !== 'confirmed') {
+      throw new Error(`Legacy RGB send transaction is ${chain.status}`)
+    }
+    const lease = this.getRgbWriteLeaseCredential(wallet)
+    await api.syncRgbTransfer({
+      wallet,
+      ...(lease ? { lease } : {}),
+      transferId: send.transferId,
+      txid: send.txid,
+      assetId: send.assetId,
+      amount: send.amount,
+      createdAt: send.createdAt,
+      spentOutpoints: send.spentOutpoints,
+      // The recipient already accepted the original consignment. This repair
+      // only recreates sender activity and must never republish transport data.
+      consignments: [],
+    })
+  }
+
   /** Refresh colored UTXO chain state without polling receive consignments or proxy endpoints. */
   private syncRgbListState = async (previousList?: {
     currentPage: number
@@ -6836,6 +6866,9 @@ export class WalletController extends BaseController {
     )
     try {
       await this.rgbCoordinator.syncPendingTransfers(service)
+      if (service.getPendingSendIndexRepairs?.().length) {
+        await this.rgbIndexerOutbox.sync(service, context.wallet)
+      }
     } finally {
       // A late recipient NACK is independent of other pending sends.
       await service.syncBroadcastedSendAcknowledgements?.()

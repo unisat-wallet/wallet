@@ -14,7 +14,7 @@ describe('RgbIndexerOutbox', () => {
     const syncReceiveHistory = vi.fn().mockRejectedValue(new Error('outcome endpoint unavailable'))
     const outbox = new RgbIndexerOutbox({
       syncIssue: vi.fn(), syncAssetMetadata: vi.fn(), replaceUtxos: vi.fn(),
-      syncReceiveHistory, warn: vi.fn(),
+      syncReceiveHistory, syncSendHistory: vi.fn(), warn: vi.fn(),
     })
 
     await outbox.syncReceiveHistory(service, { fundingAddress: 'address' } as any)
@@ -49,6 +49,7 @@ describe('RgbIndexerOutbox', () => {
       syncAssetMetadata: vi.fn(),
       replaceUtxos,
       syncReceiveHistory: vi.fn(),
+      syncSendHistory: vi.fn(),
       warn: vi.fn(),
     })
     const wallet = { walletId: 'wallet', fundingAddress: 'address', network: 'mainnet' } as any
@@ -65,5 +66,27 @@ describe('RgbIndexerOutbox', () => {
     expect(service.markUtxoSyncCompleted).toHaveBeenCalledWith(empty.txid, empty)
     expect(service.markUtxoSyncCompleted).toHaveBeenCalledWith(settled.txid, settled)
     expect(pending).toBeUndefined()
+  })
+
+  it('records a legacy send repair attempt before replaying activity', async () => {
+    const send = {
+      transferId: 'legacy-send', assetId: 'rgb:asset', amount: '10',
+      txid: 'b'.repeat(64), spentOutpoints: [{ txid: 'a'.repeat(64), vout: 1 }],
+      createdAt: 1, status: 'broadcasted',
+    } as any
+    const service = {
+      getPendingSendIndexRepairs: vi.fn().mockReturnValue([send]),
+      markSendIndexRepairAttempted: vi.fn(),
+    } as unknown as RgbService
+    const syncSendHistory = vi.fn()
+    const outbox = new RgbIndexerOutbox({
+      syncIssue: vi.fn(), syncAssetMetadata: vi.fn(), replaceUtxos: vi.fn(),
+      syncReceiveHistory: vi.fn(), syncSendHistory, warn: vi.fn(),
+    })
+
+    await outbox.sync(service, { fundingAddress: 'address' } as any)
+
+    expect(syncSendHistory).toHaveBeenCalledWith(send, expect.anything())
+    expect(service.markSendIndexRepairAttempted).toHaveBeenCalledWith('legacy-send')
   })
 })

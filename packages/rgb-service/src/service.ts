@@ -69,6 +69,7 @@ import type {
   RgbPreparedTransfer,
   RgbReceivedConsignment,
   RgbPendingIssue,
+  RgbPendingSendHistory,
   RgbPendingAssetMetadata,
   RgbPendingReceive,
   RgbIssueHistoryItem,
@@ -99,6 +100,7 @@ const PROVIDER_ORIGIN_HISTORY_TTL_MS = 24 * 60 * 60 * 1000
 // wallet locally usable only until its next recovery.
 const MAX_RECOVERY_HISTORY_PAYLOAD_LENGTH = 48_000_000
 const MAX_RECOVERY_HISTORY_OPERATION_IDS = 65_535
+const SEND_INDEX_REPAIR_RETRY_MS = 5 * 60_000
 const MAX_EXACT_BURN_SELECTION_STATES = 100_000
 const RECEIVE_VALIDATION_RETRY_DELAYS_MS = [
   5 * 60_000,
@@ -1916,6 +1918,37 @@ export class RgbService {
 
   getPendingSendHistory() {
     return this.requireState().pendingSendHistory || []
+  }
+
+  /**
+   * Older wallets could persist a completed send after its Bitcoin transaction
+   * was broadcast but before the backend activity request succeeded. Replaying
+   * this public metadata is idempotent and never republishes a consignment or
+   * rebroadcasts the transaction.
+   */
+  getPendingSendIndexRepairs(now = this.now()): RgbPendingSendHistory[] {
+    return (this.requireState().pendingSendHistory ?? []).filter(
+      send =>
+        send.status === 'broadcasted' &&
+        !send.burn &&
+        !!send.txid &&
+        !!send.spentOutpoints?.length &&
+        !send.backendConfirmed &&
+        (send.backendSyncAttemptedAt === undefined ||
+          now - send.backendSyncAttemptedAt >= SEND_INDEX_REPAIR_RETRY_MS)
+    )
+  }
+
+  async markSendIndexRepairAttempted(
+    transferId: string,
+    submittedAt = this.now()
+  ): Promise<void> {
+    const send = (this.requireState().pendingSendHistory ?? []).find(
+      item => item.transferId === transferId
+    )
+    if (!send || send.status !== 'broadcasted') return
+    send.backendSyncAttemptedAt = submittedAt
+    await this.persist({ skipRecovery: true })
   }
 
   /** Observe late legacy ACK/NACKs without changing the chain broadcast state. */
@@ -6858,6 +6891,10 @@ export class RgbService {
             invoice: item.invoice,
           }
         )
+        const history = (state.pendingSendHistory ?? []).find(
+          send => send.transferId === transferId
+        )
+        if (history) history.backendSyncAttemptedAt = this.now()
         delete state.pendingBroadcastSyncs[transferId]
         if (Object.keys(state.pendingBroadcastSyncs).length === 0)
           state.pendingBroadcastSyncs = undefined

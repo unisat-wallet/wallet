@@ -1,6 +1,7 @@
 import {
   RgbService,
   type RgbPendingIssue,
+  type RgbPendingSendHistory,
   type RgbPendingAssetMetadata,
   type RgbPendingReceiveHistory,
   type RgbPendingUtxoSync,
@@ -14,6 +15,7 @@ type RgbIndexerOutboxDependencies = {
   syncAssetMetadata: (item: RgbPendingAssetMetadata, wallet: LocalRgbWallet) => Promise<void>
   replaceUtxos: (sync: RgbPendingUtxoSync, wallet: LocalRgbWallet) => Promise<void>
   syncReceiveHistory: (receive: RgbPendingReceiveHistory, wallet: LocalRgbWallet) => Promise<void>
+  syncSendHistory: (send: RgbPendingSendHistory, wallet: LocalRgbWallet) => Promise<void>
   warn: (message: string, error: unknown) => void
 }
 
@@ -64,6 +66,16 @@ export class RgbIndexerOutbox {
       } catch (error) {
         synced = false
         this.dependencies.warn('Failed to sync pending RGB issuance', error)
+      }
+    }
+
+    for (const send of service.getPendingSendIndexRepairs?.() || []) {
+      try {
+        await service.markSendIndexRepairAttempted(send.transferId)
+        await this.dependencies.syncSendHistory(send, wallet)
+      } catch (error) {
+        synced = false
+        this.dependencies.warn('Failed to repair missing RGB send activity', error)
       }
     }
 

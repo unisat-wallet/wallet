@@ -8891,6 +8891,30 @@ describe('RgbService', () => {
     expect(service.getLocalAssetBalance('rgb:AQEBAQEB-AQEBAQE-BAQEBAQ-EBAQEBA-QEBAQEB-AQEBAQE')).toMatchObject({ balance: '80' })
   })
 
+  it('retries a legacy send index repair only after the submission backoff', async () => {
+    const dependencies = createDependencies()
+    const service = new RgbService({ ...dependencies, now: () => 1_000_000 })
+    await service.open(wallet)
+    const state = (service as any).state
+    state.pendingSendHistory = [{
+      transferId: 'legacy-send',
+      assetId: 'rgb:AQEBAQEB-AQEBAQE-BAQEBAQ-EBAQEBA-QEBAQEB-AQEBAQE',
+      amount: '10',
+      txid: 'e'.repeat(64),
+      spentOutpoints: [{ txid: 'b'.repeat(64), vout: 1 }],
+      createdAt: 1,
+      status: 'broadcasted',
+    }]
+
+    expect(service.getPendingSendIndexRepairs()).toHaveLength(1)
+    await service.markSendIndexRepairAttempted('legacy-send')
+    expect(service.getPendingSendIndexRepairs()).toHaveLength(0)
+    expect(service.getPendingSendIndexRepairs(1_300_000)).toHaveLength(1)
+
+    state.pendingSendHistory[0].backendConfirmed = true
+    expect(service.getPendingSendIndexRepairs(2_000_000)).toHaveLength(0)
+  })
+
   it('keeps the complete broadcast payload when RGB change history cannot be retained', async () => {
     const dependencies = createDependencies()
     const service = new RgbService(dependencies)

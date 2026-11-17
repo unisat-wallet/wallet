@@ -138,7 +138,7 @@ export class RgbWalletCoordinator {
       // Snapshot repair can recreate a confirmed local allocation after the
       // receive invoice has already left the pending list. Flush it here;
       // receive polling no longer runs for that invoice.
-      if (service.getPendingUtxoSync?.()) {
+      if (service.getPendingUtxoSync?.() || service.getPendingSendIndexRepairs?.().length) {
         await this.dependencies.syncIndexerOutbox(service, wallet)
       }
     } catch (error) {

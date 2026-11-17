@@ -185,7 +185,8 @@ export class RgbTransferQuery {
       const hasLateAcknowledgement = (service.getPendingSendHistory?.() || []).some(send =>
         send.status === 'broadcasted' && send.recipientAckExpected && send.recipientAck === undefined
       )
-      if (service.getPendingTransfers().length || hasLateAcknowledgement) {
+      const hasSendIndexRepair = Boolean(service.getPendingSendIndexRepairs?.().length)
+      if (service.getPendingTransfers().length || hasLateAcknowledgement || hasSendIndexRepair) {
         try {
           await this.dependencies.syncPendingTransfers(service, context)
         } catch (error) {

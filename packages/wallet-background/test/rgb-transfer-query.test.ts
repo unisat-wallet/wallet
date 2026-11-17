@@ -139,6 +139,40 @@ describe('RgbTransferQuery', () => {
     ])
   })
 
+  it('runs pending synchronization for a legacy send index repair', async () => {
+    const txid = 'c'.repeat(64)
+    const send = {
+      transferId: 'legacy-send', assetId: 'rgb:asset', amount: '10', txid,
+      spentOutpoints: [{ txid: 'b'.repeat(64), vout: 1 }],
+      createdAt: 1, status: 'broadcasted',
+    }
+    const service = {
+      getPendingTransfers: vi.fn().mockReturnValue([]),
+      getPendingSendHistory: vi.fn().mockReturnValue([send]),
+      getPendingSendIndexRepairs: vi.fn().mockReturnValue([send]),
+      getIssueHistory: vi.fn().mockReturnValue([]),
+      getPendingReceiveHistory: vi.fn().mockReturnValue([]),
+      getPendingReceives: vi.fn().mockReturnValue([]),
+      getSnapshot: vi.fn().mockReturnValue({ utxos: [] }),
+      getLocalAssetDetail: vi.fn().mockReturnValue({}),
+    }
+    const context = {
+      service,
+      wallet: { walletId: 'wallet', fundingAddress: 'funding', network: 'mainnet' },
+    }
+    const syncPendingTransfers = vi.fn()
+    const query = new RgbTransferQuery({
+      getContext: vi.fn().mockResolvedValue(context as never),
+      syncReceiveHistory: vi.fn(), syncPendingTransfers,
+      syncReceivedAllocations: vi.fn().mockResolvedValue(context as never),
+      getRemoteActivity: vi.fn().mockResolvedValue({ total: 0, list: [] }), warn: vi.fn(),
+    })
+
+    await query.getTransfers(1, 20)
+
+    expect(syncPendingTransfers).toHaveBeenCalledWith(service, context)
+  })
+
   it('does not label a non-batch ACK recovery as waiting for other recipients', async () => {
     const service = {
       getPendingTransfers: vi.fn().mockReturnValue([]),

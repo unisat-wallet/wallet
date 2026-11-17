@@ -505,6 +505,8 @@ export interface RgbPendingSendHistory {
   backendConfirmed?: boolean
   /** The UTXO index has atomically removed spent inputs and indexed retained outputs. */
   fundingSnapshotConverged?: boolean
+  /** Last attempt to replay this legacy send into the backend activity index. */
+  backendSyncAttemptedAt?: number
   createdAt: number
   status: 'broadcasted' | 'canceled' | 'rejected'
   /** Local-only provider ownership retained while the status is available. */
