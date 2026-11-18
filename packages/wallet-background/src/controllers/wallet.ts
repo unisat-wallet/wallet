@@ -5732,6 +5732,55 @@ export class WalletController extends BaseController {
     }
   }
 
+  /** Wallet-tool view of every carrier containing more than one RGB contract. */
+  getRgbAllocationUtxos = async () => {
+    const { service } = await this.getLocalRgbReadService()
+    const locked = new Set(
+      service
+        .getPendingTransfers()
+        .flatMap(transfer => transfer.prepared.lockedOutpoints)
+        .map(outpoint => `${outpoint.txid}:${outpoint.vout}`)
+    )
+    return {
+      utxos: service
+        .getSnapshot()
+        .utxos.filter(utxo =>
+          utxo.chainStatus !== 'spent' &&
+          utxo.chainStatus !== 'replaced' &&
+          utxo.chainStatus !== 'pending_spend' &&
+          new Set(utxo.allocations.map(allocation => allocation.assetId)).size > 1
+        )
+        .map(utxo => {
+          const key = `${utxo.outpoint.txid}:${utxo.outpoint.vout}`
+          const isLocked = locked.has(key)
+          const available =
+            utxo.chainStatus === 'confirmed' &&
+            !isLocked &&
+            utxo.allocations.every(allocation =>
+              allocation.settled &&
+              allocation.spendable &&
+              allocation.historyAvailable !== false
+            )
+          return {
+            txid: utxo.outpoint.txid,
+            vout: utxo.outpoint.vout,
+            satoshis: utxo.satoshis,
+            scriptPubKey: utxo.scriptPubKey,
+            chainStatus: utxo.chainStatus,
+            locked: isLocked,
+            available,
+            allocations: utxo.allocations.map(allocation => ({
+              assetId: allocation.assetId,
+              amount: allocation.amount,
+              settled: allocation.settled,
+              spendable: allocation.spendable,
+              historyAvailable: allocation.historyAvailable !== false,
+            })),
+          }
+        }),
+    }
+  }
+
   /** Explicit user refresh: bypass wallet polling throttles and reconcile spent carriers. */
   refreshRgbState = async () => {
     await this.assertRgbEnabled()

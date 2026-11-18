@@ -1115,6 +1115,8 @@ class ProviderController extends BaseController {
     return wallet.getRgbFundingUtxos({ assetId: params.assetId })
   }
 
+  getRgbAllocationUtxos = async () => wallet.getRgbAllocationUtxos()
+
   refreshRgbState = async () => wallet.refreshRgbState()
 
   getRgbFeeUtxos = async () => wallet.getRgbFeeUtxos()

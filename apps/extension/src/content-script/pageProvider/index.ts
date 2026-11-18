@@ -19,6 +19,7 @@ export class UnisatProvider extends EventEmitter {
   public rgb: {
     getAssets: (page?: number, pageSize?: number) => Promise<any>;
     getFundingUtxos: (assetId: string) => Promise<any>;
+    getAllocationUtxos: () => Promise<any>;
     refreshState: () => Promise<any>;
     getFeeUtxos: () => Promise<any>;
     getIssueAvailability: () => Promise<any>;
@@ -68,6 +69,7 @@ export class UnisatProvider extends EventEmitter {
     this.rgb = {
       getAssets: (page, pageSize) => this.bitcoinAPI.getRgbAssets(page, pageSize),
       getFundingUtxos: assetId => this.bitcoinAPI.getRgbFundingUtxos(assetId),
+      getAllocationUtxos: () => this.bitcoinAPI.getRgbAllocationUtxos(),
       refreshState: () => this.bitcoinAPI.refreshRgbState(),
       getFeeUtxos: () => this.bitcoinAPI.getRgbFeeUtxos(),
       getIssueAvailability: () => this.bitcoinAPI.getRgbIssueAvailability(),
