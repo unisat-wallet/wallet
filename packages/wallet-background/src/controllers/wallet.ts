@@ -5720,6 +5720,19 @@ export class WalletController extends BaseController {
     }
   }
 
+  /** Explicit user refresh: bypass wallet polling throttles and reconcile spent carriers. */
+  refreshRgbState = async () => {
+    await this.assertRgbEnabled()
+    await this.rgbCoordinator.syncListState({ force: true })
+    const { service } = await this.getLocalRgbReadService()
+    const snapshot = service.getSnapshot()
+    return {
+      syncedAt: snapshot.syncedAt,
+      revision: snapshot.revision,
+      utxoCount: snapshot.utxos.length,
+    }
+  }
+
   /** Minimal view of unlocked confirmed RGB fee-pool UTXOs for swap templates. */
   getRgbFeeUtxos = async () => {
     const { service } = await this.getLocalRgbReadService()
@@ -6347,15 +6360,19 @@ export class WalletController extends BaseController {
         throw new Error('RGB swap PSBT changed the prepared transaction')
       }
     }
-    if (
-      signingPsbt.data.inputs.some(
-        input =>
-          input.sighashType !== undefined &&
-          input.sighashType !== bitcoin.Transaction.SIGHASH_DEFAULT &&
-          input.sighashType !== bitcoin.Transaction.SIGHASH_ALL
-      )
-    ) {
-      throw new Error('RGB swap PSBT must use SIGHASH_ALL')
+    const instant = pending.request?.instantSwap === true
+    const requiredSighash = instant
+      ? bitcoin.Transaction.SIGHASH_SINGLE | bitcoin.Transaction.SIGHASH_ANYONECANPAY
+      : bitcoin.Transaction.SIGHASH_ALL
+    if (signingPsbt.data.inputs.some((input, index) =>
+      input.sighashType !== undefined &&
+      input.sighashType !== bitcoin.Transaction.SIGHASH_DEFAULT &&
+      input.sighashType !== bitcoin.Transaction.SIGHASH_ALL &&
+      !(instant && index === 1 && input.sighashType === requiredSighash)
+    )) {
+      throw new Error(instant
+        ? 'RGB Instant Swap seller input must use SINGLE|ANYONECANPAY'
+        : 'RGB swap PSBT must use SIGHASH_ALL')
     }
     const toSignInputs = pending.prepared.toSignInputs.map(input => {
       const psbtInput = signingPsbt.data.inputs[input.index]

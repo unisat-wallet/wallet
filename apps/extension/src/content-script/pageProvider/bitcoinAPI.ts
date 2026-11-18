@@ -273,6 +273,10 @@ export class BitcoinAPIMethods {
     return this.provider[requestMethodKey]({ method: 'getRgbFundingUtxos', params: { assetId } });
   };
 
+  refreshRgbState = async () => {
+    return this.provider[requestMethodKey]({ method: 'refreshRgbState' });
+  };
+
   getRgbFeeUtxos = async () => {
     return this.provider[requestMethodKey]({ method: 'getRgbFeeUtxos' });
   };

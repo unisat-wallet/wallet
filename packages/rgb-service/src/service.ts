@@ -5215,6 +5215,22 @@ export class RgbService {
       )
     }
     await this.verifySelectedUtxos(state.wallet, selectedUtxos)
+    if (request.instantSwap) {
+      const instantAllocations = selectedUtxos.flatMap(utxo => utxo.allocations)
+      const instantAmount = instantAllocations
+        .filter(allocation => allocation.assetId === requestedAssetId)
+        .reduce((total, allocation) => total + BigInt(allocation.amount), 0n)
+      if (
+        selectedUtxos.length !== 1 ||
+        instantAllocations.length === 0 ||
+        instantAllocations.some(allocation => allocation.assetId !== requestedAssetId) ||
+        instantAmount !== BigInt(amount)
+      ) {
+        throw new RgbServiceError(
+          'RGB Instant Swap requires one exact-total UTXO with no companion asset'
+        )
+      }
+    }
     const allocations = selectedUtxos.flatMap(utxo =>
       utxo.allocations
         .filter(allocation => allocation.assetId === requestedAssetId)

@@ -83,6 +83,7 @@ export type ProviderMethodList = {
   getRgbFundingUtxos: {
     assetId: string
   }
+  refreshRgbState: undefined
   getRgbFeeUtxos: undefined
   getRgbIssueAvailability: undefined
   issueRgbNia: {
