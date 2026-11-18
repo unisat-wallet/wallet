@@ -4892,6 +4892,16 @@ export class WalletController extends BaseController {
   getRgbPendingReceiveInvoices = (params: { skipSync?: boolean; providerOrigin?: string } = {}) =>
     this.rgbReceiveOperations.getPendingReceiveInvoices(params)
 
+  /** Origin ownership check that also works before a direct Instant consignment is staged. */
+  getRgbReceiveProviderOrigin = async (params: { recipientId: string }) => {
+    const { service } = await this.getLocalRgbReadService()
+    return service
+      .getPendingReceives()
+      .find(item =>
+        item.recipientId === params.recipientId || item.proxyRecipientId === params.recipientId
+      )?.providerOrigin
+  }
+
   /** Internal provider preflight for a buyer-side RGB/BTC swap. */
   getRgbBuySwapReceive = async (params: { recipientId: string }) => {
     const { service } = await this.getLocalRgbService()

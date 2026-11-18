@@ -22,6 +22,8 @@ vi.mock('../src/controllers/wallet', () => ({
     abortRgbAcknowledgedSwap: vi.fn(),
     abortRgbVanillaTx: vi.fn(),
     getRgbBuySwapReceive: vi.fn(),
+    getRgbReceiveProviderOrigin: vi.fn(),
+    stageRgbInstantSwapReceive: vi.fn(),
     stageRgbBuySwapIntent: vi.fn(),
     acceptRgbBuySwap: vi.fn(),
     signRgbBuySwapCommit: vi.fn(),
@@ -588,6 +590,25 @@ describe('provider RGB payment ownership', () => {
     expect(wallet.getRgbPendingReceiveInvoices).toHaveBeenCalledWith({
       providerOrigin: 'https://dapp.example',
     })
+  })
+
+  it('stages an origin-owned Instant receive before requiring acceptance state', async () => {
+    vi.mocked(wallet.getRgbReceiveProviderOrigin).mockResolvedValue('https://dapp.example')
+    vi.mocked(wallet.getRgbBuySwapReceive).mockRejectedValue(
+      new Error('RGB receive is not awaiting acceptance')
+    )
+    vi.mocked(wallet.stageRgbInstantSwapReceive).mockRejectedValue(new Error('staging reached'))
+    const approval = Reflect.getMetadata('APPROVAL', providerController, 'signRgbInstantSwap')
+
+    await expect(approval[1]({
+      data: { params: {
+        recipientId: 'recipient-1', listing: {}, finalPsbt: 'psbt', maxBtcSpend: '1000',
+      } },
+      session: { origin: 'https://dapp.example' },
+    })).rejects.toThrow('staging reached')
+
+    expect(wallet.stageRgbInstantSwapReceive).toHaveBeenCalled()
+    expect(wallet.getRgbBuySwapReceive).not.toHaveBeenCalled()
   })
 
   it('rejects maker signatures before opening buy-swap signing approval', async () => {

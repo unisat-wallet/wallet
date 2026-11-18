@@ -425,6 +425,12 @@ async function assertRgbReceiveOrigin(recipientId: string, origin: string) {
   return receive
 }
 
+async function assertRgbPendingReceiveOrigin(recipientId: string, origin: string) {
+  if ((await wallet.getRgbReceiveProviderOrigin({ recipientId })) !== origin) {
+    throw new Error('RGB receive is not available to this site')
+  }
+}
+
 async function prepareRgbPaymentCancelApproval(req: any) {
   const params = req.data.params as { transferId: string; payment?: unknown }
   if (!params.transferId) throw new Error('transferId is required')
@@ -1425,6 +1431,171 @@ class ProviderController extends BaseController {
       coloredPsbt: prepared.psbt,
       status: 'waiting_counterparty_signature' as const,
     }
+  }
+
+  prepareRgbInstantSwap = async ({
+    data: { params },
+    session: { origin },
+  }: {
+    data: { params: { assetId: string; amount: string; priceSats: string; feeRate?: number; psbt: string } }
+    session: { origin: string }
+  }) => {
+    validateRgbProviderFeeRate({ data: { params } })
+    const amount = normalizeRgbPaymentAmount(params.amount)
+    const priceSats = normalizeRgbPaymentAmount(params.priceSats)
+    if (!params.assetId || !amount || !priceSats || !params.psbt) {
+      throw new Error('assetId, amount, priceSats and psbt are required')
+    }
+    const account = await wallet.getCurrentAccount()
+    if (!account) throw new Error('no current account')
+    const template = bitcoin.Psbt.fromHex(formatPsbtHex(params.psbt))
+    if (template.inputCount < 2 || template.txOutputs.length !== 3) {
+      throw new Error('RGB Instant Swap template must contain two inputs and three outputs')
+    }
+    if (!template.txOutputs[0]?.script.equals(Buffer.from([0x6a]))) {
+      throw new Error('RGB Instant Swap template must have an empty OP_RETURN at vout 0')
+    }
+    const receiver = template.txOutputs[2]
+    if (!receiver || receiver.value < 330 || !/^(5120)[0-9a-f]{64}$/i.test(receiver.script.toString('hex'))) {
+      throw new Error('RGB Instant Swap receiver placeholder must be a dust-safe P2TR vout 2')
+    }
+    const sellerInput = template.data.inputs[1]
+    if (!sellerInput?.witnessUtxo) throw new Error('RGB Instant Swap seller input is missing witness UTXO data')
+    const receiveScript = bitcoin.address.toOutputScript(account.address, toPsbtNetwork(wallet.getNetworkType()))
+    const payout = template.txOutputs[1]
+    const expectedPayout = BigInt(priceSats) + BigInt(sellerInput.witnessUtxo.value)
+    if (!payout || !payout.script.equals(receiveScript) || BigInt(payout.value) !== expectedPayout) {
+      throw new Error('RGB Instant Swap template does not pay the current wallet the exact price')
+    }
+    const prepared = await wallet.prepareRgbInstantSwap({
+      assetId: params.assetId,
+      amount,
+      priceSats,
+      ...(params.feeRate === undefined ? {} : { feeRate: params.feeRate }),
+      psbt: template.toHex(),
+      providerOrigin: origin,
+    })
+    return { transferId: prepared.id, coloredPsbt: prepared.psbt, status: 'awaiting_seller_signature' as const }
+  }
+
+  @Reflect.metadata('APPROVAL', [
+    'SignPsbt',
+    async req => {
+      const params = req.data.params as { transferId: string; priceSats: string; toSignDatas?: unknown[] }
+      if (!params.transferId || !normalizeRgbPaymentAmount(params.priceSats)) {
+        throw new Error('transferId and priceSats are required')
+      }
+      const origin = req.session?.origin
+      if (!origin) throw new Error('missing request origin')
+      await assertRgbPaymentOrigin(params.transferId, origin)
+      params.toSignDatas = [await wallet.getRgbPaymentSigningData({ transferId: params.transferId })]
+    },
+  ])
+  signRgbInstantSwapListing = async ({
+    data: { params },
+    session: { origin },
+    approvalRes,
+  }: {
+    data: { params: { transferId: string; priceSats: string; toSignDatas?: any[] } }
+    session: { origin: string }
+    approvalRes: SignPsbtResult
+  }) => {
+    await assertRgbPaymentOrigin(params.transferId, origin)
+    const account = await wallet.getCurrentAccount()
+    const toSignData = getToSignDatas(params.toSignDatas)[0]!
+    const signedPsbt = approvalRes[0]?.psbtHex
+    if (!signedPsbt) throw new Error('RGB Instant Swap signing did not return a PSBT')
+    const parsed = bitcoin.Psbt.fromHex(signedPsbt)
+    assertSameUnsignedTx(parsed, bitcoin.Psbt.fromHex(toSignData.psbtHex))
+    assertRequiredSignatures(parsed, toSignData)
+    assertExternalSignedPsbt(account, toSignData, signedPsbt)
+    return wallet.finalizeRgbInstantListing({
+      transferId: params.transferId,
+      signedPsbt,
+      priceSats: params.priceSats,
+    })
+  }
+
+  @Reflect.metadata('APPROVAL', [
+    'SignPsbt',
+    async req => {
+      const params = req.data.params as {
+        recipientId: string
+        listing: import('@unisat/rgb-service').RgbInstantSwapListingPackage
+        finalPsbt: string
+        maxBtcSpend: string
+        toSignDatas?: unknown[]
+        stagedTxid?: string
+      }
+      if (!params.recipientId || !params.listing || !params.finalPsbt || !params.maxBtcSpend) {
+        throw new Error('recipientId, listing, finalPsbt and maxBtcSpend are required')
+      }
+      const origin = req.session?.origin
+      await assertRgbPendingReceiveOrigin(params.recipientId, origin)
+      const staged = await wallet.stageRgbInstantSwapReceive({
+        recipientId: params.recipientId,
+        listing: params.listing,
+        finalPsbt: params.finalPsbt,
+      })
+      params.finalPsbt = staged.psbt
+      params.stagedTxid = staged.txid
+      let maxBtcSpend: number
+      try { maxBtcSpend = Number(BigInt(params.maxBtcSpend)) } catch { throw new Error('maxBtcSpend must be an unsigned integer') }
+      if (!Number.isSafeInteger(maxBtcSpend) || maxBtcSpend <= 0) throw new Error('maxBtcSpend is out of range')
+      const psbt = bitcoin.Psbt.fromHex(formatPsbtHex(staged.psbt))
+      const account = await wallet.getCurrentAccount()
+      if (!account) throw new Error('no current account')
+      const networkType = wallet.getNetworkType()
+      const ownedInputs = psbt.data.inputs
+        .map((input, index) => ({ input, index }))
+        .filter(({ input }) => input.witnessUtxo && scriptPkToAddress(input.witnessUtxo.script, networkType) === account.address)
+      if (!ownedInputs.length || ownedInputs.some(item => item.index === 1)) {
+        throw new Error('RGB Instant Swap buyer funding inputs are invalid')
+      }
+      const userInputValue = ownedInputs.reduce((total, item) => total + item.input.witnessUtxo!.value, 0)
+      const userChangeValue = psbt.txOutputs
+        .filter(output => scriptPkToAddress(output.script, networkType) === account.address)
+        .reduce((total, output) => total + output.value, 0)
+      if (userInputValue - userChangeValue > maxBtcSpend) throw new Error('RGB Instant Swap exceeds maxBtcSpend')
+      params.toSignDatas = [await wallet.getToSignData({
+        psbtHex: psbt.toHex(),
+        options: {
+          toSignInputs: ownedInputs.map(({ input, index }) => ({
+            index,
+            address: account.address,
+            sighashTypes: [effectiveInputSighashType(input)],
+          })),
+          autoFinalized: true,
+        },
+      })]
+    },
+  ])
+  signRgbInstantSwap = async ({
+    data: { params },
+    session: { origin },
+    approvalRes,
+  }: {
+    data: { params: { recipientId: string; stagedTxid?: string; toSignDatas?: any[] } }
+    session: { origin: string }
+    approvalRes: SignPsbtResult
+  }) => {
+    await assertRgbReceiveOrigin(params.recipientId, origin)
+    const account = await wallet.getCurrentAccount()
+    const toSignData = getToSignDatas(params.toSignDatas)[0]!
+    const signedPsbt = approvalRes[0]?.psbtHex
+    if (!signedPsbt) throw new Error('RGB Instant Swap signing did not return a PSBT')
+    const parsed = bitcoin.Psbt.fromHex(formatPsbtHex(signedPsbt))
+    const source = bitcoin.Psbt.fromHex(formatPsbtHex(toSignData.psbtHex))
+    assertSameUnsignedTx(parsed, source)
+    if (!source.data.inputs[1]?.tapKeySig ||
+        !parsed.data.inputs[1]?.tapKeySig?.equals(source.data.inputs[1]!.tapKeySig!)) {
+      throw new Error('RGB Instant Swap seller signature was changed')
+    }
+    assertRequiredSignatures(parsed, toSignData)
+    assertExternalSignedPsbt(account, { ...toSignData, autoFinalized: false }, parsed.toHex())
+    const txid = ((parsed.data.globalMap.unsignedTx as any).tx || parsed.data.globalMap.unsignedTx).getId()
+    if (params.stagedTxid !== txid) throw new Error('RGB Instant Swap transaction changed after persistence')
+    return { recipientId: params.recipientId, txid, signedPsbt: parsed.toHex(), status: 'ready_to_broadcast' as const }
   }
 
   @Reflect.metadata('APPROVAL', [
