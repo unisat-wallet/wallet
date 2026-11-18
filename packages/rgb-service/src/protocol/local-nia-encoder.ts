@@ -182,6 +182,7 @@ export const localNiaProtocolEncoder: RgbProtocolEncoder = {
       changeBlinding,
       ...(input.feeFunding === undefined ? {} : { feeFunding: input.feeFunding }),
       ...(input.request.swapPsbt === undefined ? {} : { swapPsbt: input.request.swapPsbt }),
+      ...(input.request.instantSwap ? { swapMode: 'instant' as const } : {}),
     })
     const feeUtxosByOutpoint = new Map(
       input.feeFunding?.utxos.map(utxo => [`${utxo.outpoint.txid}:${utxo.outpoint.vout}`, utxo]) || []
@@ -194,6 +195,7 @@ export const localNiaProtocolEncoder: RgbProtocolEncoder = {
           index: findPsbtInputIndex(prepared.psbtHex, utxo.outpoint.txid, utxo.outpoint.vout),
           publicKey: utxo.publicKey,
           useTweakedSigner: true,
+          ...(input.request.instantSwap ? { sighashTypes: [0x83] } : {}),
         })),
         ...prepared.feeOutpoints.map(outpoint => ({
           index: findPsbtInputIndex(prepared.psbtHex, outpoint.txid, outpoint.vout),
@@ -229,6 +231,7 @@ export const localNiaProtocolEncoder: RgbProtocolEncoder = {
             assignmentIndex: allocation.assignmentIndex,
           }))
         ),
+        ...(input.request.instantSwap ? { instantSwap: 'true' } : {}),
       },
     }
   },

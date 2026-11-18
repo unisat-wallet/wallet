@@ -24,6 +24,7 @@ import {
   cacheBfaEvmRpc,
   createBfaEvmRpc,
   createLocalRgbProtocolEncoder,
+  encodeWitnessRgbInvoice,
   restoreAttestedBfaHistory,
   validateBfaTransferConsignment,
   type BfaValidationAttestationPayload,
@@ -743,6 +744,7 @@ type RgbSendBeginRequest = {
   burnDestination?: import('@unisat/rgb-service').BfaBurnDestinationV1
   /** Maker-built, unsigned swap template. */
   swapPsbt?: string
+  instantSwap?: boolean
   /** Trusted provider origin for a dApp-created RGB payment. */
   providerOrigin?: string
   witnessData?: {
@@ -6308,6 +6310,16 @@ export class WalletController extends BaseController {
     buyerSignedPsbtHash: string
   }) => this.rgbReceiveOperations.stageBuySwapIntent(params.recipientId, params)
 
+  stageRgbInstantSwapReceive = async (params: {
+    recipientId: string
+    listing: import('@unisat/rgb-service').RgbInstantSwapListingPackage
+    finalPsbt: string
+  }) => {
+    const { service } = await this.getLocalRgbService()
+    const result = await service.stageInstantSwapReceive(params)
+    return result
+  }
+
   acceptRgbBuySwap = async (params: { recipientId: string }) =>
     this.rgbReceiveOperations.acceptBuySwap(params.recipientId)
 
@@ -6331,6 +6343,47 @@ export class WalletController extends BaseController {
     await this.ensureRgbWriteLease(context, { forceRenew: true })
     return this.rgbSendOperations.begin(params)
   }
+
+  prepareRgbInstantSwap = async (params: {
+    assetId: string
+    amount: string
+    priceSats: string
+    feeRate?: number
+    psbt: string
+    providerOrigin: string
+  }) => {
+    if (!/^[1-9][0-9]*$/.test(params.priceSats)) throw new Error('priceSats must be positive')
+    const template = psbtFromString(params.psbt)
+    const receiver = template.txOutputs[2]
+    if (!receiver || !/^(5120)[0-9a-f]{64}$/i.test(receiver.script.toString('hex'))) {
+      throw new Error('RGB Instant Swap requires a P2TR placeholder at vout 2')
+    }
+    const { wallet: rgbWallet } = await this.getLocalRgbService()
+    const invoice = encodeWitnessRgbInvoice({
+      network: rgbWallet.network,
+      scriptPubKey: receiver.script.toString('hex'),
+      assetId: params.assetId,
+      amount: params.amount,
+      // Instant Swap never contacts this endpoint. A syntactically complete
+      // invoice lets the standard transition planner derive the witness seal.
+      transportEndpoints: ['rpcs://instant.invalid/v1/json-rpc'],
+    })
+    return this.rgbSendOperations.begin({
+      invoice,
+      assetId: params.assetId,
+      amount: params.amount,
+      ...(params.feeRate === undefined ? {} : { feeRate: params.feeRate }),
+      swapPsbt: params.psbt,
+      instantSwap: true,
+      providerOrigin: params.providerOrigin,
+    })
+  }
+
+  finalizeRgbInstantListing = (params: {
+    transferId: string
+    signedPsbt: string
+    priceSats: string
+  }) => this.rgbSendOperations.finalizeInstantListing(params)
 
   createRgbSendEnd = (params: Omit<RgbSendEndRequest, 'wallet'>) =>
     this.rgbSendOperations.complete(params)
@@ -6390,14 +6443,14 @@ export class WalletController extends BaseController {
     const toSignInputs = pending.prepared.toSignInputs.map(input => {
       const psbtInput = signingPsbt.data.inputs[input.index]
       if (!psbtInput) throw new Error('RGB signing input is missing from PSBT')
-      psbtInput.sighashType = bitcoin.Transaction.SIGHASH_ALL
-      return { ...input, sighashTypes: [bitcoin.Transaction.SIGHASH_ALL] }
+      psbtInput.sighashType = requiredSighash
+      return { ...input, sighashTypes: [requiredSighash] }
     })
     return this.getRgbToSignData({
       psbt: signingPsbt.toHex(),
       toSignInputs,
       action: {
-        name: pending.request?.burn ? 'Burn RGB' : 'Send RGB',
+        name: instant ? 'List RGB for Instant Swap' : pending.request?.burn ? 'Burn RGB' : 'Send RGB',
         description: '',
         type: PsbtActionType.CUSTOM,
       },

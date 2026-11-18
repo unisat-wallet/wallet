@@ -1,4 +1,4 @@
-import { crypto as bitcoinCrypto, Transaction } from 'bitcoinjs-lib'
+import { crypto as bitcoinCrypto, Psbt, Transaction } from 'bitcoinjs-lib'
 import {
   RgbBfaValidationUnavailableError,
   RgbInvoiceUnavailableError,
@@ -48,6 +48,10 @@ import {
   encodeBlindRgbInvoice,
 } from './protocol/receive'
 import { getSwapPsbtInputOutpoints } from './protocol/opret-transfer'
+import {
+  completeInstantSwapTemplate,
+  type RgbInstantSwapListingPackage,
+} from './protocol/instant-swap'
 import {
   deriveProxyV1SealBlinding,
   proxyV1SenderPublicKey,
@@ -2764,6 +2768,90 @@ export class RgbService {
     })
   }
 
+  /**
+   * Validate and durably accept an Instant Swap consignment before any buyer
+   * BTC signature can be produced. There is deliberately no Proxy ACK: the
+   * receiver is also the final transaction broadcaster.
+   */
+  async stageInstantSwapReceive(input: {
+    recipientId: string
+    listing: RgbInstantSwapListingPackage
+    finalPsbt: string
+  }) {
+    return this.runPendingReceiveOperation(async () => {
+      const state = this.requireState()
+      const receive = (state.pendingReceives || []).find(item =>
+        item.recipientId === input.recipientId || item.proxyRecipientId === input.recipientId
+      )
+      if (!receive || receive.recipientType !== 'witness' || !receive.witnessScriptPubKey) {
+        throw new RgbServiceError('RGB Instant Swap requires a local witness receive invoice')
+      }
+      if (receive.providerOrigin === undefined) {
+        throw new RgbServiceError('RGB Instant Swap receive is not provider-bound')
+      }
+      if (receive.acceptancePolicy === 'buy_swap_backend_commit') {
+        throw new RgbServiceError('RGB Instant Swap cannot use a backend-commit receive invoice')
+      }
+      const completed = completeInstantSwapTemplate({
+        listing: input.listing,
+        finalPsbt: input.finalPsbt,
+        receiverScriptPubKey: receive.witnessScriptPubKey,
+      })
+      if (receive.assetId && normalizeAssetId(receive.assetId) !== completed.assetId) {
+        throw new RgbServiceError('RGB Instant Swap asset does not match its receive invoice')
+      }
+      if (receive.amount && receive.amount !== completed.amount) {
+        throw new RgbServiceError('RGB Instant Swap amount does not match its receive invoice')
+      }
+      if (receive.receivedConsignment?.accepted) {
+        if (receive.receivedConsignment.txid !== completed.txid ||
+            receive.receivedConsignment.payload !== completed.consignment) {
+          throw new RgbServiceError('RGB Instant Swap receive is already bound to another transaction')
+        }
+        return { ...completed, status: 'staged' as const }
+      }
+      const item = {
+        recipientId: receive.proxyRecipientId || receive.recipientId,
+        payload: completed.consignment,
+        txid: completed.txid,
+      }
+      // Instant delivery is direct from the market package, not from this
+      // invoice's Proxy operation. Match the locally controlled witness
+      // script without applying Proxy sender/receiver blinding derivation.
+      const {
+        proxyPrivateKey: _proxyPrivateKey,
+        proxyPublicKey: _proxyPublicKey,
+        proxyInvoiceId: _proxyInvoiceId,
+        ...directReceive
+      } = receive
+      const validated = await this.validateIncomingConsignment(directReceive, item)
+      if (!validated) throw new RgbServiceError('RGB Instant Swap consignment does not pay this wallet')
+      const operationIds = [...new Set(
+        (validated.assignments || [{ opId: validated.opId }]).map(item => item.opId)
+      )]
+      await this.preflightReceiveHistory(
+        validated.assetId,
+        completed.consignment,
+        completed.txid,
+        operationIds
+      )
+      const rollback = snapshotState(state)
+      receive.receivedConsignment = {
+        txid: completed.txid,
+        receivedAt: this.now(),
+        assetId: validated.assetId,
+        amount: validated.amount,
+        precision: validated.decoded.metadata.precision,
+        accepted: true,
+        payload: completed.consignment,
+        counterpartyScriptPubKeys: validated.counterpartyScriptPubKeys,
+      }
+      delete receive.pendingAccept
+      await this.persistWithRecoveryRollback(rollback)
+      return { ...completed, status: 'staged' as const }
+    })
+  }
+
   async acceptReceive(
     recipientId: string,
     options: {
@@ -5152,6 +5240,9 @@ export class RgbService {
   private async prepareSendOnce(request: RgbTransferRequest, options: { providerOrigin?: string }) {
     const state = this.requireState()
     const burn = request.burn === true
+    if (request.instantSwap && (!request.swapPsbt || burn || request.donation)) {
+      throw new RgbServiceError('RGB Instant Swap requires a dedicated swap PSBT')
+    }
     if (burn && (request.donation || request.swapPsbt))
       throw new RgbServiceError('BFA burn cannot use donation or swap delivery')
     if (request.donation && request.swapPsbt) {
@@ -5161,6 +5252,9 @@ export class RgbService {
     const requestedAssetId = normalizeAssetId(request.assetId)
     const requestedAsset = this.getLocalAssetDetail(requestedAssetId)
     const requestedAssetSchema = requestedAsset.schema?.toUpperCase()
+    if (request.instantSwap && requestedAssetSchema !== 'NIA') {
+      throw new RgbServiceError('RGB Instant Swap currently supports NIA assets only')
+    }
     if (burn && requestedAssetSchema !== 'BFA')
       throw new RgbServiceError('Only BFA assets can be burned')
     const storedBurnSchemaId = burn ? this.getStoredV1SchemaId(requestedAssetId) : undefined
@@ -5498,6 +5592,99 @@ export class RgbService {
       await this.publishPendingDelivery(transferId, pending)
       return pending.delivery.completed
     })
+  }
+
+  /**
+   * Retain a seller-signed SINGLE|ANYONECANPAY package without publishing it
+   * through Proxy. The market may expose this package to any buyer, while the
+   * RGB outpoint remains reserved by this pending wallet transfer.
+   */
+  async finalizeInstantListing(transferId: string, makerSignedPsbt: string, priceSats: string) {
+    if (!/^[1-9][0-9]*$/.test(priceSats)) {
+      throw new RgbServiceError('RGB Instant Swap price must be a positive integer')
+    }
+    return this.runPendingTransferOperation(transferId, async () => {
+      const state = this.requireState()
+      const pending = state.pending[transferId]
+      if (!pending) throw new RgbServiceError(`RGB transfer ${transferId} does not exist`)
+      if (!pending.request.instantSwap || pending.prepared.metadata?.['instantSwap'] !== 'true') {
+        throw new RgbServiceError('RGB transfer is not an Instant Swap listing')
+      }
+      if (pending.instantListing) return this.instantListingPackage(pending)
+      const psbt = Psbt.fromHex(makerSignedPsbt)
+      const sellerInput = psbt.data.inputs[1]
+      const sellerUtxo = sellerInput?.witnessUtxo
+      const sellerPayout = psbt.txOutputs[1]
+      const sighash = Transaction.SIGHASH_SINGLE | Transaction.SIGHASH_ANYONECANPAY
+      if (
+        !sellerUtxo || !sellerInput.tapKeySig || sellerInput.sighashType !== sighash ||
+        sellerInput.tapKeySig.length !== 65 || sellerInput.tapKeySig[64] !== sighash
+      ) {
+        throw new RgbServiceError(
+          'RGB Instant Swap seller input is not signed with SINGLE|ANYONECANPAY'
+        )
+      }
+      if (!sellerPayout || BigInt(sellerPayout.value) !== BigInt(priceSats) + BigInt(sellerUtxo.value)) {
+        throw new RgbServiceError('RGB Instant Swap seller payout does not match its price')
+      }
+      const completed = await this.dependencies.encoder.completeTransfer({
+        wallet: state.wallet,
+        pending,
+        signedPsbt: makerSignedPsbt,
+        allowIncomplete: true,
+      })
+      const rollback = snapshotState(state)
+      pending.instantListing = {
+        completed,
+        makerSignedPsbt,
+        priceSats,
+        createdAt: this.now(),
+      }
+      await this.persistWithRecoveryRollback(rollback)
+      return this.instantListingPackage(pending)
+    })
+  }
+
+  private instantListingPackage(pending: RgbPendingTransfer) {
+    const listing = pending.instantListing
+    const metadata = pending.prepared.metadata
+    if (!listing || !metadata) throw new RgbServiceError('RGB Instant Swap listing is incomplete')
+    const psbt = Psbt.fromHex(listing.makerSignedPsbt)
+    const transaction = ((psbt.data.globalMap.unsignedTx as any).tx ||
+      psbt.data.globalMap.unsignedTx) as Transaction
+    const sellerInput = transaction.ins[1]
+    if (!sellerInput) throw new RgbServiceError('RGB Instant Swap seller input is missing')
+    const protocolState = {
+      version: 1,
+      assetId: pending.request.assetId,
+      amount: pending.request.amount,
+      transitionId: metadata['transitionId'],
+      transition: metadata['transition'],
+      bundleId: metadata['bundleId'],
+      entropy: metadata['entropy'],
+      genesis: metadata['genesis'],
+      historyWitnessBundles: metadata['historyWitnessBundles'],
+      inputs: metadata['inputs'],
+      recipientVout: 2,
+    }
+    return {
+      version: 1 as const,
+      transferId: pending.prepared.id,
+      assetId: pending.request.assetId,
+      amount: pending.request.amount,
+      priceSats: listing.priceSats,
+      psbt: listing.makerSignedPsbt,
+      consignment: listing.completed.consignments[0]?.payload || '',
+      templateTxid: transaction.getId(),
+      sellerOutpoint: {
+        txid: Buffer.from(sellerInput.hash).reverse().toString('hex'),
+        vout: sellerInput.index,
+      },
+      sellerInputIndex: 1 as const,
+      sellerPayoutVout: 1 as const,
+      receiverVout: 2 as const,
+      protocolState: Buffer.from(JSON.stringify(protocolState)).toString('base64'),
+    }
   }
 
   /**

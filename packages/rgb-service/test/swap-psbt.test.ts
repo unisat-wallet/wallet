@@ -1,6 +1,6 @@
 import { Psbt } from 'bitcoinjs-lib'
 import { describe, expect, it } from 'vitest'
-import { prepareNiaOpretTransfer } from '../src'
+import { decodeRgbInvoice, invoiceSealToScriptPubKey, prepareNiaOpretTransfer } from '../src'
 
 const txid = '11'.repeat(32)
 const fundingScript = `5120${'22'.repeat(32)}`
@@ -94,5 +94,45 @@ describe('RGB swap PSBT preparation', () => {
       },
     })
     expect(prepared.feeOutpoints).toEqual([{ txid: feeTxid, vout: 2 }])
+  })
+
+  it('colors the fixed Instant Swap layout without RGB change', () => {
+    const invoice = decodeRgbInvoice(
+      'rgb:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/~/~/bc:wvout:BX7FZkmK-bLqNoIA-vMTGR6Z-iEeSRxL-56usKVf-tl3E0xT-GXpycHA'
+    )
+    const recipientScript = invoiceSealToScriptPubKey(invoice.seal)!
+    const psbt = new Psbt()
+    psbt.addInput({
+      hash: '00'.repeat(32),
+      index: 0,
+      sequence: 0xffff_ffff,
+      witnessUtxo: { value: 10_330, script: Buffer.from(`5120${'55'.repeat(32)}`, 'hex') },
+    })
+    psbt.addInput({
+      hash: txid,
+      index: 1,
+      sequence: 0xffff_ffff,
+      witnessUtxo: { value: 1000, script: Buffer.from(fundingScript, 'hex') },
+      sighashType: 0x83,
+    })
+    psbt.addOutput({ script: Buffer.from([0x6a]), value: 0 })
+    psbt.addOutput({ script: Buffer.from(`5120${'66'.repeat(32)}`, 'hex'), value: 11_000 })
+    psbt.addOutput({ script: Buffer.from(recipientScript), value: 330 })
+
+    const prepared = prepareNiaOpretTransfer({
+      ...input(psbt.toHex()),
+      recipientSeal: invoice.seal,
+      witnessAmountSat: 330,
+      swapMode: 'instant',
+    })
+    const colored = Psbt.fromHex(prepared.psbtHex)
+    expect(prepared.recipientVout).toBe(2)
+    expect(prepared.changeVout).toBeUndefined()
+    expect(colored.data.inputs[1]?.sighashType).toBe(0x83)
+  })
+
+  it('rejects Instant Swap when the RGB seller input is not index 1', () => {
+    expect(() => prepareNiaOpretTransfer({ ...input(swapPsbt()), swapMode: 'instant' }))
+      .toThrow('seller input must be at index 1')
   })
 })

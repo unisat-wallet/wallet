@@ -138,6 +138,8 @@ export interface RgbTransferRequest {
    * signature is requested.
    */
   swapPsbt?: string
+  /** Seller-preauthorized template whose buyer may replace input 0 and output 2. */
+  instantSwap?: boolean
 }
 
 export interface RgbTransferIntent {
@@ -264,6 +266,13 @@ export interface RgbPendingTransfer {
   burnSplit?: {
     request: RgbTransferRequest & { amount: string; burn: true }
   }
+  /** Public seller authorization retained locally while an Instant listing is open. */
+  instantListing?: {
+    completed: RgbCompletedTransfer
+    makerSignedPsbt: string
+    priceSats: string
+    createdAt: number
+  }
   /** A signed transfer posted to transport, awaiting recipient acknowledgement. */
   delivery?: {
     completed: RgbCompletedTransfer
@@ -293,6 +302,8 @@ export interface RgbPendingTransfer {
     externalBroadcast?: boolean
     /** Distinguishes legacy dApp broadcasting from backend-held final transactions. */
     externalBroadcastController?: 'dapp' | 'backend'
+    /** Seller-signed public listing; no Proxy publication or receiver ACK is used. */
+    instantListing?: boolean
     /** The last Bitcoin broadcast failure; retrying reuses the signed transaction. */
     broadcastError?: string
     /** Last successful report to the wallet backend. */

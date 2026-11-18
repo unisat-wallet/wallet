@@ -72,6 +72,7 @@ export type RgbSendBeginParams = {
   burnDestination?: BfaBurnDestinationV1
   /** Maker-built, unsigned swap template. It is validated and colored locally. */
   swapPsbt?: string
+  instantSwap?: boolean
   /** Trusted provider origin persisted with a dApp-created payment. */
   providerOrigin?: string
 }
@@ -110,6 +111,7 @@ export class RgbSendOperations {
           ? {}
           : { minConfirmations: params.minConfirmations }),
         ...(params.swapPsbt === undefined ? {} : { swapPsbt: params.swapPsbt }),
+        ...(params.instantSwap === undefined ? {} : { instantSwap: params.instantSwap }),
       }
     const burnRequest = {
       assetId: params.assetId,
@@ -230,6 +232,20 @@ export class RgbSendOperations {
       txid: completed.txid,
       status: 'awaiting_buyer_signature' as const,
     }
+  }
+
+  async finalizeInstantListing(params: {
+    transferId: string
+    signedPsbt: string
+    priceSats: string
+  }) {
+    const { service, wallet } = await this.dependencies.getContext()
+    await this.dependencies.ensureWriteLease?.({ service, wallet }, { forceRenew: true })
+    return service.finalizeInstantListing(
+      params.transferId,
+      psbtFromString(params.signedPsbt).toHex(),
+      params.priceSats
+    )
   }
 
   /** Sign the standard buyer commitment with this seller transfer's Proxy key. */

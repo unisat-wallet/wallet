@@ -137,6 +137,23 @@ export type ProviderMethodList = {
     feeRate?: number
     psbt: string
   }
+  prepareRgbInstantSwap: {
+    assetId: string
+    amount: string
+    priceSats: string
+    feeRate?: number
+    psbt: string
+  }
+  signRgbInstantSwapListing: {
+    transferId: string
+    priceSats: string
+  }
+  signRgbInstantSwap: {
+    recipientId: string
+    listing: import('@unisat/rgb-service').RgbInstantSwapListingPackage
+    finalPsbt: string
+    maxBtcSpend: string
+  }
   signRgbSellSwapAndPublishConsignment: {
     transferId: string
     makerSignedPsbt: string

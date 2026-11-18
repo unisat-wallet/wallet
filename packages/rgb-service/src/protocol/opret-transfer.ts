@@ -24,6 +24,7 @@ export interface NiaOpretTransferRequest {
   feeFunding?: RgbFeeFunding
   /** Constrained external template used by an RGB/BTC atomic swap. */
   swapPsbt?: string
+  swapMode?: 'p2p' | 'instant'
 }
 
 export interface PreparedNiaOpretTransfer {
@@ -108,8 +109,14 @@ function prepareExternalSwapPsbt(input: NiaOpretTransferRequest, hasRgbChange: b
   ) {
     throw new RgbServiceError('RGB swap PSBT must be unsigned when prepared')
   }
-  if (psbt.data.inputs.some(item => item.sighashType !== undefined && item.sighashType !== 0 && item.sighashType !== 1)) {
-    throw new RgbServiceError('RGB swap PSBT must use SIGHASH_ALL')
+  const instant = input.swapMode === 'instant'
+  if (psbt.data.inputs.some((item, index) => {
+    const allowed = instant && index === 1 ? [0, 1, 0x83] : [0, 1]
+    return item.sighashType !== undefined && !allowed.includes(item.sighashType)
+  })) {
+    throw new RgbServiceError(instant
+      ? 'RGB Instant Swap seller input must use SINGLE|ANYONECANPAY'
+      : 'RGB swap PSBT must use SIGHASH_ALL')
   }
   if (psbt.txOutputs.length === 0 || !psbt.txOutputs[0]!.script.equals(Buffer.from([0x6a]))) {
     throw new RgbServiceError('RGB swap PSBT must have an empty OP_RETURN at vout 0')
@@ -127,6 +134,17 @@ function prepareExternalSwapPsbt(input: NiaOpretTransferRequest, hasRgbChange: b
   const actualInputs = getSwapPsbtInputOutpoints(input.swapPsbt || '')
   if (![...expectedInputs].every(key => actualInputs.has(key))) {
     throw new RgbServiceError('RGB swap PSBT does not contain every reserved RGB input')
+  }
+  if (instant) {
+    if (input.selectedUtxos.length !== 1 || hasRgbChange) {
+      throw new RgbServiceError('RGB Instant Swap requires one exact-amount RGB UTXO')
+    }
+    const selected = input.selectedUtxos[0]!
+    const sellerInput = transaction.ins[1]
+    if (!sellerInput || outpointKey(Buffer.from(sellerInput.hash).reverse().toString('hex'), sellerInput.index) !== outpointKey(selected.outpoint.txid, selected.outpoint.vout)) {
+      throw new RgbServiceError('RGB Instant Swap seller input must be at index 1')
+    }
+    psbt.data.inputs[1]!.sighashType = 0x83
   }
   for (const utxo of input.selectedUtxos) {
     const index = transaction.ins.findIndex((txin: any) =>
@@ -163,6 +181,9 @@ function prepareExternalSwapPsbt(input: NiaOpretTransferRequest, hasRgbChange: b
     : undefined
   if (recipientScript && recipientVout === -1) {
     throw new RgbServiceError('RGB swap PSBT does not pay the witness recipient seal')
+  }
+  if (instant && recipientVout !== 2) {
+    throw new RgbServiceError('RGB Instant Swap receiver must be at vout 2')
   }
   const fundingScript = Buffer.from(input.selectedUtxos[0]!.scriptPubKey, 'hex')
   const changeVout = hasRgbChange
