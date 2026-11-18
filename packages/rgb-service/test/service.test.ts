@@ -3359,6 +3359,72 @@ describe('RgbService', () => {
     })
   })
 
+  it('consumes terminal snapshot tombstones without retaining spent UTXOs locally', async () => {
+    const dependencies = createDependencies()
+    const firstSnapshot = {
+      ...(await vi.mocked(dependencies.stateSource.getSnapshot)(wallet)),
+      revision: 20,
+    }
+    const spent = {
+      ...structuredClone(firstSnapshot.utxos[0]),
+      chainStatus: 'spent' as const,
+      confirmations: 0,
+    }
+    vi.mocked(dependencies.stateSource.getSnapshot)
+      .mockReset()
+      .mockResolvedValueOnce(firstSnapshot)
+      .mockResolvedValueOnce({
+        revision: 21,
+        syncedAt: 2,
+        utxos: [spent, firstSnapshot.utxos[1]],
+      })
+    const service = new RgbService(dependencies)
+    await service.open(wallet)
+    await service.sync()
+
+    await service.sync()
+
+    expect(service.getSnapshot()).toMatchObject({ revision: 21, syncedAt: 2 })
+    expect(service.getSnapshot().utxos.map(utxo => utxo.outpoint)).toEqual([
+      firstSnapshot.utxos[1].outpoint,
+    ])
+    expect(service.getUtxoInspection().snapshot.utxos).toHaveLength(1)
+  })
+
+  it('removes explicit terminal tombstones while retaining unresolved local state', async () => {
+    const dependencies = createDependencies()
+    const firstSnapshot = {
+      ...(await vi.mocked(dependencies.stateSource.getSnapshot)(wallet)),
+      revision: 20,
+    }
+    vi.mocked(dependencies.stateSource.getSnapshot)
+      .mockReset()
+      .mockResolvedValueOnce(firstSnapshot)
+      .mockResolvedValueOnce({
+        revision: 21,
+        syncedAt: 2,
+        utxos: [{
+          ...structuredClone(firstSnapshot.utxos[0]),
+          chainStatus: 'spent' as const,
+          confirmations: 0,
+        }],
+      })
+    dependencies.stateSource.getTransactionStatus = vi.fn(async () => ({
+      status: 'confirmed' as const,
+      confirmations: 1,
+    }))
+    const service = new RgbService(dependencies)
+    await service.open(wallet)
+    await service.sync()
+
+    await service.sync()
+
+    expect(service.getSnapshot().revision).toBe(20)
+    expect(service.getSnapshot().utxos.map(utxo => utxo.outpoint)).toEqual([
+      firstSnapshot.utxos[1].outpoint,
+    ])
+  })
+
   it('prunes a spent locally overlaid broadcast output when the backend revision is unchanged', async () => {
     const dependencies = createDependencies()
     const firstSnapshot = {

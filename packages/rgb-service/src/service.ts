@@ -687,6 +687,15 @@ export class RgbService {
       return state.snapshot
     }
     const snapshot = normalizeSnapshot(remoteSnapshot)
+    // Recent terminal entries are compatibility tombstones, not wallet UTXOs.
+    // Consume them as explicit deletions but never retain them in local state.
+    const terminalOutpoints = new Set(
+      snapshot.utxos
+        .filter(utxo => utxo.chainStatus === 'pending_spend' ||
+          utxo.chainStatus === 'spent' || utxo.chainStatus === 'replaced')
+        .map(outpointKey)
+    )
+    snapshot.utxos = snapshot.utxos.filter(utxo => !terminalOutpoints.has(outpointKey(utxo)))
     const discardedOutpoints = new Set(
       Object.values(state.discardedAssets || {}).flatMap(item =>
         item.outpoints.map(outpoint => `${outpoint.txid}:${outpoint.vout}`)
@@ -761,12 +770,17 @@ export class RgbService {
     // UTXO is terminal. This preserves state while an indexer is rebuilding,
     // but lets an authoritative empty snapshot remove externally spent RGB
     // allocations instead of retaining a phantom balance forever.
-    if (
-      snapshot.utxos.length === 0 &&
-      state.snapshot.utxos.length > 0 &&
-      !(await this.areLocalSnapshotUtxosTerminal())
-    ) {
-      return state.snapshot
+    if (snapshot.utxos.length === 0 && state.snapshot.utxos.length > 0) {
+      const unresolvedLocalUtxos = state.snapshot.utxos.filter(
+        utxo => !terminalOutpoints.has(outpointKey(utxo))
+      )
+      if (unresolvedLocalUtxos.length > 0 && !(await this.areLocalSnapshotUtxosTerminal())) {
+        if (unresolvedLocalUtxos.length !== state.snapshot.utxos.length) {
+          state.snapshot = { ...state.snapshot, utxos: unresolvedLocalUtxos }
+          await this.persist()
+        }
+        return state.snapshot
+      }
     }
     // Indexers commonly advance syncedAt on every response even if neither
     // UTXOs nor allocations changed. Keep that local freshness marker, but
