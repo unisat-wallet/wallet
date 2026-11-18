@@ -8,6 +8,7 @@ export class ApprovalService extends EventEmitter {
   approval: Approval | null = null
   public approvalWindowId = 0
   isLocked = false
+  private closingApproval: Approval | null = null
 
   constructor() {
     super()
@@ -22,15 +23,17 @@ export class ApprovalService extends EventEmitter {
 
   resolveApproval = async (data?: any, forceReject = false) => {
     const approval = this.approval
-    this.approval = null
+    if (!approval || !this.beginClosing(approval)) return
     // Finish removing the current notification before settling its Promise.
     // The provider flow may synchronously request its next approval as soon as
     // this Promise settles; resolving first lets the old window-removal event
     // reject that newly-created approval.
     try {
-      await this.clear()
+      await this.closeNotificationWindow()
     } catch {
       // Window cleanup must never leave the dApp request pending forever.
+    } finally {
+      this.finishClosing(approval)
     }
     if (forceReject) {
       approval?.reject(new WalletError(ErrorCodes.UserCancel, 'User Cancel'))
@@ -56,13 +59,14 @@ export class ApprovalService extends EventEmitter {
   }
 
   rejectApproval = async (err?: string, stay = false, isInternal = false) => {
-    if (!this.approval) return
     const approval = this.approval
-    this.approval = null
+    if (!approval || !this.beginClosing(approval)) return
     try {
-      await this.clear(stay)
+      await this.closeNotificationWindow(stay)
     } catch {
       // Reject the dApp request even when the notification cannot be closed.
+    } finally {
+      this.finishClosing(approval)
     }
     if (isInternal) {
       approval.reject(new WalletError(ErrorCodes.UserCancel, err))
@@ -97,10 +101,16 @@ export class ApprovalService extends EventEmitter {
   }
 
   clear = async (stay = false) => {
-    this.approval = null
-    if (this.approvalWindowId && !stay) {
-      await this.platformCloseWindow(this.approvalWindowId)
-      this.approvalWindowId = 0
+    const approval = this.approval
+    if (!approval) {
+      await this.closeNotificationWindow(stay)
+      return
+    }
+    if (!this.beginClosing(approval)) return
+    try {
+      await this.closeNotificationWindow(stay)
+    } finally {
+      this.finishClosing(approval)
     }
   }
 
@@ -114,8 +124,9 @@ export class ApprovalService extends EventEmitter {
 
   openNotification = async (winProps?: any) => {
     if (this.approvalWindowId) {
-      await this.platformCloseWindow(this.approvalWindowId)
+      const windowId = this.approvalWindowId
       this.approvalWindowId = 0
+      await this.platformCloseWindow(windowId)
     }
     this.approvalWindowId = await this.platformOpenWindow(winProps)
   }
@@ -139,5 +150,26 @@ export class ApprovalService extends EventEmitter {
 
   platformFocusWindow = async (windowId: number) => {
     // todo
+  }
+
+  private beginClosing(approval: Approval): boolean {
+    if (this.closingApproval) return false
+    this.closingApproval = approval
+    return true
+  }
+
+  private finishClosing(approval: Approval): void {
+    if (this.approval === approval) this.approval = null
+    if (this.closingApproval === approval) this.closingApproval = null
+  }
+
+  private async closeNotificationWindow(stay = false): Promise<void> {
+    if (!this.approvalWindowId || stay) return
+    const windowId = this.approvalWindowId
+    // Disarm the old removal event before yielding to the platform. The
+    // approval itself remains installed as a closing sentinel until this
+    // method settles, so a concurrent request cannot occupy the old slot.
+    this.approvalWindowId = 0
+    await this.platformCloseWindow(windowId)
   }
 }

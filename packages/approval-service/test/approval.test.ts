@@ -204,6 +204,33 @@ describe('ApprovalService', () => {
       expect(settled).toBe(true)
     })
 
+    it('keeps the approval slot occupied while its window is closing', async () => {
+      let finishClose!: () => void
+      service.platformCloseWindow = vi.fn(() => new Promise<void>(resolve => {
+        finishClose = resolve
+      }))
+      const first = service.requestApproval(makeApprovalData({ approvalType: 'first' }))
+      await flushAsync()
+
+      const resolving = service.resolveApproval('approved')
+      await Promise.resolve()
+
+      await expect(
+        service.requestApproval(makeApprovalData({ approvalType: 'second' }))
+      ).rejects.toMatchObject({ message: 'Another approval request is already pending' })
+      expect(service.getApproval()?.approvalType).toBe('first')
+
+      // A programmatic close may emit this before its Promise settles. It is
+      // the old window's event and must not turn the approval into a rejection.
+      await service.handleWindowRemoved(42)
+      expect(service.getApproval()?.approvalType).toBe('first')
+
+      finishClose()
+      await resolving
+      await expect(first).resolves.toBe('approved')
+      expect(service.approval).toBeNull()
+    })
+
     it('still settles when closing the notification fails', async () => {
       service.platformCloseWindow = vi.fn().mockRejectedValue(new Error('window already gone'))
       const promise = service.requestApproval(makeApprovalData())
@@ -259,6 +286,31 @@ describe('ApprovalService', () => {
 
       await expect(service.rejectApproval('cancelled')).resolves.toBeUndefined()
       await expect(promise).rejects.toMatchObject({ code: 4001, message: 'cancelled' })
+    })
+
+    it('keeps the approval slot occupied while rejection closes its window', async () => {
+      let finishClose!: () => void
+      service.platformCloseWindow = vi.fn(() => new Promise<void>(resolve => {
+        finishClose = resolve
+      }))
+      const first = service.requestApproval(makeApprovalData({ approvalType: 'first' }))
+      await flushAsync()
+
+      const rejecting = service.rejectApproval('cancelled')
+      await Promise.resolve()
+
+      await expect(
+        service.requestApproval(makeApprovalData({ approvalType: 'second' }))
+      ).rejects.toMatchObject({ message: 'Another approval request is already pending' })
+      expect(service.getApproval()?.approvalType).toBe('first')
+
+      await service.handleWindowRemoved(42)
+      expect(service.getApproval()?.approvalType).toBe('first')
+
+      finishClose()
+      await rejecting
+      await expect(first).rejects.toMatchObject({ code: 4001, message: 'cancelled' })
+      expect(service.approval).toBeNull()
     })
   })
 
