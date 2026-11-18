@@ -4187,6 +4187,50 @@ export class RgbService {
     return this.requireState().snapshot
   }
 
+  /** Explicitly verify and remove terminal RGB carriers retained only in local state. */
+  async pruneSpentSnapshotUtxos() {
+    const state = this.requireState()
+    const verifyUtxos = this.dependencies.stateSource.verifyUtxos
+    const rollback = snapshotState(state)
+    const terminal = new Set(
+      state.snapshot.utxos
+        .filter(utxo => utxo.chainStatus === 'spent' || utxo.chainStatus === 'replaced')
+        .map(outpointKey)
+    )
+    const candidates = state.snapshot.utxos.filter(utxo =>
+      utxo.allocations.length > 0 && !terminal.has(outpointKey(utxo))
+    )
+    let checked = 0
+    if (verifyUtxos) {
+      for (let offset = 0; offset < candidates.length; offset += 100) {
+        const batch = candidates.slice(offset, offset + 100)
+        const verified = await verifyUtxos(state.wallet, batch)
+        checked += verified.length
+        for (const item of verified) {
+          if (item.status === 'spent' || item.status === 'replaced') {
+            terminal.add(`${item.outpoint.txid}:${item.outpoint.vout}`)
+          }
+        }
+      }
+    }
+    if (!terminal.size) {
+      return { checked, removed: 0, remaining: state.snapshot.utxos.length }
+    }
+    state.snapshot = {
+      ...state.snapshot,
+      syncedAt: this.now(),
+      utxos: state.snapshot.utxos.filter(utxo => !terminal.has(outpointKey(utxo))),
+    }
+    if (state.pendingUtxoSync) {
+      state.pendingUtxoSync.outpoints = state.pendingUtxoSync.outpoints.filter(
+        utxo => !terminal.has(outpointKey(utxo))
+      )
+      if (!state.pendingUtxoSync.outpoints.length) delete state.pendingUtxoSync
+    }
+    await this.persistWithRecoveryRollback(rollback)
+    return { checked, removed: terminal.size, remaining: state.snapshot.utxos.length }
+  }
+
   /** Inspect the exact single-asset carriers eligible for an irreversible BTC sweep. */
   getAssetAbandonmentPlan(assetId: string) {
     const state = this.requireState()

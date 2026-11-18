@@ -118,13 +118,14 @@ export default function RgbUtxoInspectionScreen() {
   const [searchQuery, setSearchQuery] = useState('');
 
   const refresh = useCallback(
-    async (showSuccess = false) => {
+    async (forceSync = false) => {
       setRefreshing(true);
       try {
-        const result = await wallet.getRgbUtxoInspection({ forceSync: true });
+        if (forceSync) await wallet.refreshRgbState();
+        const result = await wallet.getRgbUtxoInspection();
         setInspection(result);
         setFundingInfo({ address: result.address, derivationPath: result.derivationPath });
-        if (showSuccess) {
+        if (forceSync) {
           tools.toastSuccess(t('success'));
         }
       } catch (error) {

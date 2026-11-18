@@ -191,6 +191,7 @@ const UI_CONTROLLER_METHODS = new Set([
   'readTab',
   'rejectApproval',
   'rejectRgbReceive',
+  'refreshRgbState',
   'removeAddressFlag',
   'removeConnectedSite',
   'removeContact',

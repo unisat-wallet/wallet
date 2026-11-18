@@ -5725,11 +5725,14 @@ export class WalletController extends BaseController {
     await this.assertRgbEnabled()
     await this.rgbCoordinator.syncListState({ force: true })
     const { service } = await this.getLocalRgbReadService()
+    const cleanup = await service.pruneSpentSnapshotUtxos()
     const snapshot = service.getSnapshot()
     return {
       syncedAt: snapshot.syncedAt,
       revision: snapshot.revision,
       utxoCount: snapshot.utxos.length,
+      checked: cleanup.checked,
+      removed: cleanup.removed,
     }
   }
 

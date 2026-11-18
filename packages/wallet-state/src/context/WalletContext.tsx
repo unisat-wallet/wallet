@@ -825,6 +825,15 @@ export interface WalletController {
 
   releaseRgbWriteLease(): Promise<{ released: boolean }>
 
+  /** Force RGB state refresh and remove locally cached carriers verified as spent. */
+  refreshRgbState(): Promise<{
+    syncedAt: number
+    revision: number
+    utxoCount: number
+    checked: number
+    removed: number
+  }>
+
   getRgbUtxoInspection(params?: { forceSync?: boolean }): Promise<{
     address: string
     derivationPath: string

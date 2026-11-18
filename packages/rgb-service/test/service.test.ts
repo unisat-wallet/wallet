@@ -3412,6 +3412,31 @@ describe('RgbService', () => {
     expect(state.broadcastOutputVerificationVersion).toBe(1)
   })
 
+  it('explicitly removes spent carriers retained by a correct unchanged backend snapshot', async () => {
+    const dependencies = createDependencies()
+    dependencies.stateSource.verifyUtxos = vi.fn(async (_wallet, outpoints) =>
+      outpoints.map(utxo => ({
+        outpoint: utxo.outpoint,
+        status: utxo.outpoint.txid === 'a'.repeat(64) ? 'spent' as const : 'confirmed' as const,
+        confirmations: utxo.outpoint.txid === 'a'.repeat(64) ? 0 : 1,
+      }))
+    )
+    const service = new RgbService(dependencies)
+    await service.open(wallet)
+    await service.sync()
+
+    await expect(service.pruneSpentSnapshotUtxos()).resolves.toEqual({
+      checked: 2,
+      removed: 1,
+      remaining: 1,
+    })
+    expect(service.getSnapshot().utxos.map(utxo => utxo.outpoint)).toEqual([
+      { txid: 'b'.repeat(64), vout: 1 },
+    ])
+    expect(service.getLocalAssetBalance('rgb:AQEBAQEB-AQEBAQE-BAQEBAQ-EBAQEBA-QEBAQEB-AQEBAQE'))
+      .toMatchObject({ settled: '60', spendable: '60' })
+  })
+
   it('does not restore a broadcast output omitted by the snapshot after it was spent', async () => {
     const dependencies = createDependencies()
     const service = new RgbService(dependencies)
