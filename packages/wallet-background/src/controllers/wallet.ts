@@ -6318,11 +6318,7 @@ export class WalletController extends BaseController {
     recipientId: string
     listing: import('@unisat/rgb-service').RgbInstantSwapListingPackage
     finalPsbt: string
-  }) => {
-    const { service } = await this.getLocalRgbService()
-    const result = await service.stageInstantSwapReceive(params)
-    return result
-  }
+  }) => this.rgbReceiveOperations.stageInstantSwapReceive(params)
 
   acceptRgbBuySwap = async (params: { recipientId: string }) =>
     this.rgbReceiveOperations.acceptBuySwap(params.recipientId)

@@ -3,6 +3,37 @@ import { describe, expect, it, vi } from 'vitest'
 import { RgbReceiveOperations } from '../src/rgb/RgbReceiveOperations'
 
 describe('RgbReceiveOperations', () => {
+  it('fences Instant Swap receive staging with the writer lease and active context', async () => {
+    const calls: string[] = []
+    const stageInstantSwapReceive = vi.fn(async () => {
+      calls.push('stage')
+      return { recipientId: 'recipient', txid: 'txid' }
+    })
+    const context = { service: { stageInstantSwapReceive } }
+    const operations = new RgbReceiveOperations({
+      getContext: vi.fn().mockResolvedValue(context),
+      ensureWriteLease: vi.fn(async () => {
+        calls.push('lease')
+      }),
+      assertContext: vi.fn(async () => {
+        calls.push('context')
+      }),
+      syncReceivedAllocations: vi.fn(),
+    } as never)
+    const input = {
+      recipientId: 'recipient',
+      listing: {} as never,
+      finalPsbt: 'psbt',
+    }
+
+    await expect(operations.stageInstantSwapReceive(input)).resolves.toEqual({
+      recipientId: 'recipient',
+      txid: 'txid',
+    })
+    expect(calls).toEqual(['lease', 'context', 'stage'])
+    expect(stageInstantSwapReceive).toHaveBeenCalledWith(input)
+  })
+
   it('reports the shared receive invoice capacity with the pending list', async () => {
     const context = {
       service: {

@@ -1,4 +1,4 @@
-import type { RgbService } from '@unisat/rgb-service'
+import type { RgbInstantSwapListingPackage, RgbService } from '@unisat/rgb-service'
 
 import type { LocalRgbServiceContext } from './RgbWalletCoordinator'
 import {
@@ -165,6 +165,18 @@ export class RgbReceiveOperations {
     await this.dependencies.ensureWriteLease?.(context)
     await this.dependencies.assertContext?.(context)
     return service.stageBuySwapIntent(recipientId, input)
+  }
+
+  async stageInstantSwapReceive(input: {
+    recipientId: string
+    listing: RgbInstantSwapListingPackage
+    finalPsbt: string
+  }): Promise<Awaited<ReturnType<RgbService['stageInstantSwapReceive']>>> {
+    const context = await this.dependencies.getContext()
+    const { service } = context
+    await this.dependencies.ensureWriteLease?.(context)
+    await this.dependencies.assertContext?.(context)
+    return service.stageInstantSwapReceive(input)
   }
 
   async acceptBuySwap(recipientId: string) {
