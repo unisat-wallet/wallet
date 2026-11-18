@@ -5735,8 +5735,12 @@ export class WalletController extends BaseController {
   /** Explicit user refresh: bypass wallet polling throttles and reconcile spent carriers. */
   refreshRgbState = async () => {
     await this.assertRgbEnabled()
+    const context = await this.getLocalRgbService()
+    await this.ensureRgbWriteLease(context, { forceRenew: true })
+    await this.assertActiveRgbWallet(context.wallet)
     await this.rgbCoordinator.syncListState({ force: true })
-    const { service } = await this.getLocalRgbReadService()
+    await this.assertActiveRgbWallet(context.wallet)
+    const { service } = context
     const cleanup = await service.pruneSpentSnapshotUtxos()
     const snapshot = service.getSnapshot()
     return {

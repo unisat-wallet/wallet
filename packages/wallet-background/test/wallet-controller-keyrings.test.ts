@@ -2972,6 +2972,29 @@ describe('RGB wallet references', () => {
     expect(service.sync).not.toHaveBeenCalled()
   })
 
+  it('does not refresh or prune RGB UTXOs without the writer lease', async () => {
+    const wallet = new WalletController()
+    const service = {
+      pruneSpentSnapshotUtxos: vi.fn(),
+      getSnapshot: vi.fn(() => ({ syncedAt: 0, revision: 0, utxos: [] })),
+    }
+    const context = {
+      service,
+      wallet: { network: 'mainnet', fundingAddress: 'bc1p-rgb-funding', walletId: 'rgb-wallet' },
+    }
+    vi.spyOn(wallet as any, 'assertRgbEnabled').mockResolvedValue(undefined)
+    vi.spyOn(wallet as any, 'getLocalRgbService').mockResolvedValue(context)
+    vi.spyOn(wallet as any, 'ensureRgbWriteLease').mockRejectedValue(
+      new Error('RGB write lease is unavailable')
+    )
+    const sync = vi.spyOn((wallet as any).rgbCoordinator, 'syncListState')
+
+    await expect(wallet.refreshRgbState()).rejects.toThrow('RGB write lease is unavailable')
+
+    expect(sync).not.toHaveBeenCalled()
+    expect(service.pruneSpentSnapshotUtxos).not.toHaveBeenCalled()
+  })
+
   it('notifies the UI only when a background RGB list sync changes the local assets', async () => {
     const wallet = new WalletController()
     vi.spyOn((wallet as any).rgbCoordinator, 'syncListState').mockResolvedValue(undefined)
