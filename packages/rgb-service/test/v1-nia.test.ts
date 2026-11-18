@@ -12,7 +12,7 @@ import {
   unwrapRgbContractConsignment,
 } from '../src/protocol/bfa-consignment'
 import { bfaConsignmentAllocationOutpointHints, createBfaValidationAttestationPayload, mergeBfaValidatedHistories, refreshPersistedBfaValidation, restoreAttestedBfaHistory, restoreValidatedBfaHistory, selectBfaSpendHistory, validateBfaTransferConsignment } from '../src/protocol/bfa-validator'
-import { decodeRgbInvoice } from '../src/protocol/invoice'
+import { decodeRgbInvoice, encodeWitnessRgbInvoice } from '../src/protocol/invoice'
 import { encodeRgbContractId } from '../src/protocol/contract-id'
 import { createLocalRgbProtocolEncoder } from '../src/protocol/local-bfa-encoder'
 import { encodeNiaTransferConsignment } from '../src/protocol/nia-contract'
@@ -286,7 +286,7 @@ describe('NIA v1 transfer', () => {
     expect(normalizeLegacyV1Consignment(malformed)).toBe(malformed)
   })
 
-  it('uses validated v1 history when preparing a subsequent NIA send', async () => {
+  it('uses validated v1 history when preparing ordinary and Instant Swap NIA sends', async () => {
     const { consignment, v0Consignment, assetId, prepared: first, transaction } = fixture()
     const validate = async (input: Parameters<NonNullable<import('../src/types').RgbServiceDependencies['validateBfaConsignment']>>[0]) =>
       validateBfaTransferConsignment(input.payload, {
@@ -340,6 +340,47 @@ describe('NIA v1 transfer', () => {
     const prepared = await encoder.prepareTransfer(sendInput)
     expect(prepared.metadata?.['schema']).toBe('NIA_V1')
     expect(prepared.psbt).toMatch(/^70736274ff/i)
+
+    const placeholderScript = `5120${'33'.repeat(32)}`
+    const instantInvoice = decodeRgbInvoice(encodeWitnessRgbInvoice({
+      network: 'mainnet', scriptPubKey: placeholderScript, assetId, amount: '40',
+      transportEndpoints: ['rpcs://instant.invalid/v1/json-rpc'],
+    }))
+    const instantTemplate = new Psbt()
+      .addInput({
+        hash: '00'.repeat(32), index: 0, sequence: 0xffff_ffff,
+        witnessUtxo: { value: 1_546, script: Buffer.from(placeholderScript, 'hex') },
+      })
+      .addInput({
+        hash: utxo.outpoint.txid, index: utxo.outpoint.vout, sequence: 0xffff_ffff,
+        witnessUtxo: { value: utxo.satoshis, script: Buffer.from(utxo.scriptPubKey, 'hex') },
+        sighashType: Transaction.SIGHASH_SINGLE | Transaction.SIGHASH_ANYONECANPAY,
+      })
+      .addOutput({ script: Buffer.from([0x6a]), value: 0 })
+      .addOutput({ script: Buffer.from(utxo.scriptPubKey, 'hex'), value: 1_330 })
+      .addOutput({ script: Buffer.from(placeholderScript, 'hex'), value: 330 })
+    const instantPrepared = await encoder.prepareTransfer({
+      ...sendInput,
+      request: {
+        assetId, amount: '40', invoice: instantInvoice.raw, feeRate: 2,
+        swapPsbt: instantTemplate.toHex(), instantSwap: true,
+      },
+      intent: {
+        assetId, amount: '40', invoice: instantInvoice,
+        transition: {
+          assetId, inputAmount: '40', recipientAmount: '40', changeAmount: '0',
+          recipientId: instantInvoice.recipientId,
+          inputs: [{ outpoint: utxo.outpoint, assetId, amount: '40' }],
+          preservedAllocations: [],
+        },
+      },
+    })
+    const instantPsbt = Psbt.fromHex(instantPrepared.psbt)
+    expect(instantPrepared.metadata).toMatchObject({ schema: 'NIA_V1', instantSwap: 'true' })
+    expect(instantPsbt.data.inputs[1]?.sighashType).toBe(0x83)
+    expect(instantPrepared.toSignInputs).toContainEqual(expect.objectContaining({
+      index: 1, sighashTypes: [0x83],
+    }))
     expect(Object.keys(validatedV1SendHistories)).toHaveLength(1)
     const saved = validatedV1SendHistories[assetId]!
     expect(restoreValidatedBfaHistory(consignment, 0, [], saved)).toBeDefined()

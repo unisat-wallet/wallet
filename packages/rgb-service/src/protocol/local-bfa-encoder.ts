@@ -114,6 +114,7 @@ export function prepareBfaTransfer(input: {
   feeRate: number
   feeFunding?: RgbFeeFunding
   swapPsbt?: string
+  instantSwap?: boolean
 }): RgbPreparedTransfer {
   const schemaId = hex(input.history.genesis.slice(2, 34))
   if (!isBfaSchemaId(schemaId) && schemaId !== NIA_V1_SCHEMA_ID)
@@ -173,6 +174,7 @@ export function prepareBfaTransfer(input: {
     changeBlinding: randomU64(),
     ...(input.feeFunding ? { feeFunding: input.feeFunding } : {}),
     ...(input.swapPsbt ? { swapPsbt: input.swapPsbt } : {}),
+    ...(input.instantSwap ? { swapMode: 'instant' as const } : {}),
   })
   const feeUtxos = new Map(input.feeFunding?.utxos.map(utxo => [
     `${utxo.outpoint.txid}:${utxo.outpoint.vout}`, utxo,
@@ -187,6 +189,7 @@ export function prepareBfaTransfer(input: {
         index: findInputIndex(prepared.psbtHex, utxo.outpoint.txid, utxo.outpoint.vout),
         publicKey: utxo.publicKey,
         useTweakedSigner: true,
+        ...(input.instantSwap ? { sighashTypes: [0x83] } : {}),
       })),
       ...prepared.feeOutpoints.map(outpoint => {
         const fee = feeUtxos.get(`${outpoint.txid}:${outpoint.vout}`)
@@ -228,6 +231,7 @@ export function prepareBfaTransfer(input: {
         assignmentType: 4000,
         assignmentIndex: allocation.assignmentIndex,
       }))),
+      ...(input.instantSwap ? { instantSwap: 'true' } : {}),
     },
   }
 }
@@ -630,6 +634,7 @@ export function createLocalRgbProtocolEncoder(
         history: spendHistory, feeRate: input.request.feeRate,
         ...(input.feeFunding ? { feeFunding: input.feeFunding } : {}),
         ...(input.request.swapPsbt ? { swapPsbt: input.request.swapPsbt } : {}),
+        ...(input.request.instantSwap ? { instantSwap: true } : {}),
       })
     },
     async completeTransfer(input) {
