@@ -31,6 +31,7 @@ export class UnisatProvider extends EventEmitter {
     signPayment: (transferId: string) => Promise<any>;
     cancelPayment: (transferId: string) => Promise<any>;
     getPaymentStatus: (transferId: string) => Promise<any>;
+    splitAllocation: (params: { txid: string; vout: number; feeRate?: number; assetCount?: number }) => Promise<any>;
     signBuySwap: (params: { recipientId: string; assetId: string; amount: string; maxBtcSpend: string; swapPsbt: string }) => Promise<any>;
     acceptBuySwap: (params: { recipientId: string; backendCommit: string }) => Promise<any>;
     prepareSwap: (params: { invoice: string; assetId: string; amount: string; btcReceiveAmount: string; feeRate?: number; psbt: string }) => Promise<any>;
@@ -79,6 +80,19 @@ export class UnisatProvider extends EventEmitter {
       signPayment: transferId => this.bitcoinAPI.signRgbPayment(transferId),
       cancelPayment: transferId => this.bitcoinAPI.cancelRgbPayment(transferId),
       getPaymentStatus: transferId => this.bitcoinAPI.getRgbPaymentStatus(transferId),
+      splitAllocation: async params => {
+        const prepared = await this.bitcoinAPI.prepareRgbAllocationSplit(params);
+        try {
+          return await this.bitcoinAPI.signRgbAllocationSplit(prepared.id);
+        } catch (error) {
+          try {
+            await this.bitcoinAPI.releasePreparedRgbPayment(prepared.id);
+          } catch {
+            // Preserve the signing error; recovery can still discard an unsigned reservation.
+          }
+          throw error;
+        }
+      },
       signBuySwap: params => this.bitcoinAPI.signRgbBuySwap(params),
       acceptBuySwap: params => this.bitcoinAPI.acceptRgbBuySwap(params),
       prepareSwap: params => this.bitcoinAPI.prepareRgbSwap(params),

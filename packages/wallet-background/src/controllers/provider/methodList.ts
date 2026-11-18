@@ -125,6 +125,15 @@ export type ProviderMethodList = {
   getRgbPaymentStatus: {
     transferId: string
   }
+  prepareRgbAllocationSplit: {
+    txid: string
+    vout: number
+    feeRate?: number
+    assetCount?: number
+  }
+  signRgbAllocationSplit: {
+    transferId: string
+  }
   /**
    * Experimental RGB/BTC swap: the maker supplies an unsigned Opret-first
    * template and the wallet colors only the locally reserved RGB inputs.

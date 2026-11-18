@@ -38,6 +38,10 @@ import { deriveProxyV1SealBlinding } from './proxy-v1'
 import { localNiaProtocolEncoder } from './local-nia-encoder'
 import { convertNiaV0ConsignmentToV1 } from './nia-v0-migration'
 import { witnessSealDustLimit } from './witness'
+import { completeAllocationSplit, prepareAllocationSplit } from './allocation-split'
+import { decodeNiaConsignment } from './nia-consignment'
+import { mergeNiaConsignmentHistory } from './nia-history'
+import { verifyRevealedNiaAllocations } from './nia-allocation'
 
 export interface ValidatedBfaTransferHistory {
   assetId: string
@@ -529,6 +533,94 @@ export function createLocalRgbProtocolEncoder(
   validateBfa: NonNullable<RgbServiceDependencies['validateBfaConsignment']>
 ): RgbProtocolEncoder {
   return {
+    async prepareAllocationSplit(input) {
+      const histories = await Promise.all(input.validationHistories.map(async validationHistory => {
+        const assetId = normalizeRgbAssetId(validationHistory.assetId)
+        const selectedUtxo = {
+          ...input.selectedUtxo,
+          allocations: input.selectedUtxo.allocations.filter(allocation =>
+            normalizeRgbAssetId(allocation.assetId) === assetId
+          ),
+        }
+        const requiredOperationIds = selectedUtxo.allocations.map(allocation => allocation.opId || '')
+        const payloads = validationHistory.consignments.map(item =>
+          Uint8Array.from(Buffer.from(item.payload, 'base64'))
+        )
+        const hasV1 = payloads.some(payload =>
+          isSupportedV1TransferConsignment(payload) || isSupportedV1ContractConsignment(payload)
+        )
+        if (!hasV1) {
+          const decoded = payloads.map(decodeNiaConsignment)
+          verifyRevealedNiaAllocations({
+            consignments: decoded,
+            utxos: [selectedUtxo],
+            assetId,
+            knownBlindSeals: validationHistory.knownBlindSeals,
+          })
+          const history = mergeNiaConsignmentHistory({
+            assetId,
+            consignments: validationHistory.consignments,
+            requiredOpIds: requiredOperationIds,
+            knownBlindSeals: validationHistory.knownBlindSeals,
+          })
+          return {
+            assetId,
+            format: 'v0' as const,
+            genesis: history.genesis.strict,
+            witnessBundles: history.witnessBundles,
+          }
+        }
+        const compatible = payloads.map(payload =>
+          isSupportedV1TransferConsignment(payload) || isSupportedV1ContractConsignment(payload)
+            ? payload
+            : convertNiaV0ConsignmentToV1(payload)
+        )
+        const transfers = compatible.filter(isSupportedV1TransferConsignment)
+        if (!transfers.length) throw new RgbServiceError(`RGB split history has no transfer for ${assetId}`)
+        const knownBlindSeals = validationHistory.knownBlindSeals || []
+        const evmRpcCache = new Map<string, Promise<unknown>>()
+        const bitcoinStatusCache = new Map<string, Promise<boolean>>()
+        const checked = await Promise.all(transfers.map(payload => validateBfa({
+          wallet: input.wallet,
+          payload,
+          knownBlindSeals,
+          evmRpcCache,
+          bitcoinStatusCache,
+          confirmedBitcoinWitnesses: validationHistory.confirmedBitcoinWitnesses,
+          requiredOperationIds,
+          ...(selectedPendingWitnessTxid([selectedUtxo]) ? {
+            pendingWitnessTxid: selectedPendingWitnessTxid([selectedUtxo]),
+          } : {}),
+        })))
+        const merged = mergeBfaValidatedHistories(checked, requiredOperationIds)
+        const validated = await validateBfa({
+          wallet: input.wallet,
+          payload: merged,
+          knownBlindSeals,
+          evmRpcCache,
+          bitcoinStatusCache,
+          confirmedBitcoinWitnesses: validationHistory.confirmedBitcoinWitnesses,
+          requiredOperationIds,
+          ...(selectedPendingWitnessTxid([selectedUtxo]) ? {
+            pendingWitnessTxid: selectedPendingWitnessTxid([selectedUtxo]),
+          } : {}),
+        })
+        const history = selectBfaSpendHistory(validated, requiredOperationIds)
+        return {
+          assetId,
+          format: 'v1' as const,
+          genesis: history.genesis,
+          witnessBundles: history.witnessBundles,
+        }
+      }))
+      return prepareAllocationSplit({
+        wallet: input.wallet,
+        selectedUtxo: input.selectedUtxo,
+        feeRate: input.feeRate,
+        histories,
+        ...(input.feeFunding ? { feeFunding: input.feeFunding } : {}),
+      })
+    },
     async prepareBurn(input) {
       const payloads = input.validationHistory.consignments.map(item =>
         Uint8Array.from(Buffer.from(item.payload, 'base64'))
@@ -638,7 +730,9 @@ export function createLocalRgbProtocolEncoder(
       })
     },
     async completeTransfer(input) {
-      return input.pending.prepared.metadata?.['schema'] === 'BFA_BURN'
+      return input.pending.prepared.metadata?.['schema'] === 'ALLOCATION_SPLIT'
+        ? completeAllocationSplit(input)
+        : input.pending.prepared.metadata?.['schema'] === 'BFA_BURN'
         ? completeBfaBurn(input)
         : ['BFA', 'NIA_V1'].includes(input.pending.prepared.metadata?.['schema'] || '')
           ? completeBfaTransfer(input)

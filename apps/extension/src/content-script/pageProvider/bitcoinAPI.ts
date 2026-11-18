@@ -321,6 +321,18 @@ export class BitcoinAPIMethods {
     return this.provider[requestMethodKey]({ method: 'getRgbPaymentStatus', params: { transferId } });
   };
 
+  prepareRgbAllocationSplit = async (params: { txid: string; vout: number; feeRate?: number; assetCount?: number }) => {
+    return this.provider[requestMethodKey]({ method: 'prepareRgbAllocationSplit', params });
+  };
+
+  signRgbAllocationSplit = async (transferId: string) => {
+    return this.provider[requestMethodKey]({ method: 'signRgbAllocationSplit', params: { transferId } });
+  };
+
+  releasePreparedRgbPayment = async (transferId: string) => {
+    return this.provider[requestMethodKey]({ method: 'webRgbReleasePreparedPayment', params: { transferId } });
+  };
+
   prepareRgbSwap = async (params: { invoice: string; assetId: string; amount: string; btcReceiveAmount: string; feeRate?: number; psbt: string }) => {
     return this.provider[requestMethodKey]({ method: 'prepareRgbSwap', params });
   };

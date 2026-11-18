@@ -156,6 +156,36 @@ export class RgbSendOperations {
     }
   }
 
+  async beginAllocationSplit(params: {
+    txid: string
+    vout: number
+    feeRate?: number
+    providerOrigin?: string
+  }) {
+    const { service, wallet } = await this.dependencies.getContext()
+    await this.dependencies.ensureWriteLease?.({ service, wallet })
+    await this.dependencies.assertContext?.({ service, wallet })
+    const feeRate = assertValidFeeRate(params.feeRate ?? (await this.dependencies.getFeeRate()), {
+      supportLowFeeMode: true,
+    })
+    await service.sync()
+    const prepared = await service.prepareAllocationSplit(
+      { txid: params.txid, vout: params.vout, feeRate },
+      params.providerOrigin ? { providerOrigin: params.providerOrigin } : {}
+    )
+    const pending = service.getPendingTransfers().find(item => item.id === prepared.id)
+    const assetCount = pending?.allocationSplit?.assets.length || 0
+    const toSignData = await this.dependencies.getToSignData({
+      wallet,
+      psbt: prepared.psbt,
+      toSignInputs: prepared.toSignInputs,
+      amountDisplay: `${assetCount} RGB assets`,
+      actionName: 'Split RGB asset UTXO',
+    })
+    this.dependencies.setActiveTransferId(wallet.fundingAddress, prepared.id)
+    return { ...prepared, txid: prepared.id, psbtHex: toSignData.psbtHex, toSignData }
+  }
+
   async complete(params: { signedPsbt: string; transferId?: string }) {
     const { service, wallet } = await this.dependencies.getContext()
     // A signer may be open long enough for another device to take over. Do
@@ -172,7 +202,9 @@ export class RgbSendOperations {
         'No uniquely identified locally prepared RGB transfer is awaiting a signature'
       )
     }
-    const burnSplit = pending.find(transfer => transfer.id === transferId)?.burnSplit
+    const selectedPending = pending.find(transfer => transfer.id === transferId)
+    const burnSplit = selectedPending?.burnSplit
+    const allocationSplit = selectedPending?.allocationSplit
     this.dependencies.setActiveTransferId(wallet.fundingAddress, transferId)
     try {
       const completed = await service.completeSend(
@@ -184,6 +216,13 @@ export class RgbSendOperations {
           transferId,
           txid: completed.txid,
           status: 'burn_split_complete' as const,
+        }
+      }
+      if (allocationSplit) {
+        return {
+          transferId,
+          txid: completed.txid,
+          status: 'allocation_split_complete' as const,
         }
       }
       const latest = service.getPendingTransfers().find(item => item.id === transferId)

@@ -174,6 +174,65 @@ function createDependencies(): RgbServiceDependencies {
 }
 
 describe('RgbService', () => {
+  it('reserves every companion contract as one atomic allocation split', async () => {
+    const dependencies = createDependencies()
+    const selected = (await dependencies.stateSource.getSnapshot(wallet)).utxos[0]!
+    const companionAssetId = encodeRgbContractId(Uint8Array.from({ length: 32 }, () => 2))
+    selected.allocations.push({
+      assetId: companionAssetId,
+      amount: '25',
+      settled: true,
+      spendable: true,
+      opId: 'e'.repeat(64),
+      assignmentIndex: 1,
+      assignmentType: 4000,
+    })
+    vi.mocked(dependencies.stateSource.getSnapshot).mockResolvedValue({ syncedAt: 1, utxos: [selected] })
+    dependencies.encoder.prepareAllocationSplit = vi.fn().mockResolvedValue({
+      id: 'split-1',
+      psbt: 'cHNidP8=',
+      toSignInputs: [{ index: 0, publicKey: selected.publicKey }],
+      lockedOutpoints: [selected.outpoint],
+      metadata: { schema: 'ALLOCATION_SPLIT' },
+    })
+    const service = new RgbService(dependencies)
+    await service.open(wallet)
+    await service.sync()
+
+    await expect(service.prepareAllocationSplit({
+      txid: selected.outpoint.txid,
+      vout: selected.outpoint.vout,
+      feeRate: 2,
+    })).resolves.toMatchObject({ id: 'split-1' })
+    expect(dependencies.encoder.prepareAllocationSplit).toHaveBeenCalledWith(expect.objectContaining({
+      selectedUtxo: expect.objectContaining({ outpoint: selected.outpoint }),
+      validationHistories: expect.arrayContaining([
+        expect.objectContaining({ assetId: selected.allocations[0]!.assetId }),
+        expect.objectContaining({ assetId: selected.allocations[1]!.assetId }),
+      ]),
+    }))
+    expect(service.getPendingTransfers()[0]).toMatchObject({
+      id: 'split-1',
+      allocationSplit: {
+        assets: expect.arrayContaining([
+          { assetId: selected.allocations[0]!.assetId, amount: '40' },
+          { assetId: selected.allocations[1]!.assetId, amount: '25' },
+        ]),
+      },
+    })
+  })
+
+  it('does not prepare an allocation split for a single-asset UTXO', async () => {
+    const dependencies = createDependencies()
+    const service = new RgbService(dependencies)
+    await service.open(wallet)
+    await service.sync()
+
+    await expect(service.prepareAllocationSplit({
+      txid: 'a'.repeat(64), vout: 0, feeRate: 2,
+    })).rejects.toThrow('does not contain multiple assets')
+  })
+
   it('uploads canonical history once and persists the content-addressed delivery cursor', async () => {
     const dependencies = createDependencies()
     dependencies.stateSource.storeValidationHistory = vi.fn(async (_wallet, fragment) => ({

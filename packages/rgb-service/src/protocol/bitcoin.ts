@@ -28,6 +28,10 @@ export interface RgbOpretPsbt {
   feeOutpoints: RgbFeeUtxo['outpoint'][]
 }
 
+export interface RgbAllocationSplitPsbt extends RgbOpretPsbt {
+  assetVouts: number[]
+}
+
 function scriptBytes(value: string, name: string) {
   if (!/^[0-9a-f]*$/i.test(value) || value.length % 2) {
     throw new RgbServiceError(`${name} must be hexadecimal`)
@@ -227,6 +231,103 @@ export function createRgbOpretPsbt(input: RgbOpretPsbtRequest): RgbOpretPsbt {
     hostVout: 0,
     recipientVout,
     changeVout,
+    fee,
+    feeInputCount: selectedFeeUtxos.length,
+    feeOutpoints: selectedFeeUtxos.map(utxo => utxo.outpoint),
+  }
+}
+
+/** Build one Opret transaction with one wallet-owned carrier output per RGB contract. */
+export function createRgbAllocationSplitPsbt(input: {
+  network: RgbNetwork
+  selectedUtxo: RgbUtxo
+  outputCount: number
+  feeRate: number
+  feeFunding?: RgbFeeFunding
+  enableRbf?: boolean
+}): RgbAllocationSplitPsbt {
+  validateRequest({
+    ...input,
+    selectedUtxos: [input.selectedUtxo],
+    preserveFundingOutput: true,
+  })
+  if (!Number.isInteger(input.outputCount) || input.outputCount < 2) {
+    throw new RgbServiceError('RGB allocation split requires at least two asset outputs')
+  }
+  const selected = input.selectedUtxo
+  if (!Number.isSafeInteger(selected.satoshis) || selected.satoshis <= 0) {
+    throw new RgbServiceError('RGB funding UTXO value is invalid')
+  }
+  const fundingScript = scriptBytes(selected.scriptPubKey, 'RGB funding script')
+  if (!isTaprootScript(fundingScript)) {
+    throw new RgbServiceError('RGB funding UTXOs must use the dedicated BIP86 Taproot account')
+  }
+  publicKeyBytes(selected.publicKey)
+  const carrierValue = 330
+  const fixedOutputScripts = [
+    new Uint8Array(OPRET_RGB_COMMITMENT_SCRIPT_SIZE),
+    ...Array.from({ length: input.outputCount }, () => fundingScript),
+  ]
+  const feeFunding = input.feeFunding
+  if (!feeFunding?.utxos.length) {
+    throw new RgbServiceError('RGB allocation split requires an ordinary BTC UTXO for fees and carriers')
+  }
+  const feeChangeScript = scriptBytes(feeFunding.changeScriptPubKey, 'RGB BTC change script')
+  const feeUtxos = [...feeFunding.utxos].sort((left, right) => left.satoshis - right.satoshis)
+  const selectedFeeUtxos: RgbFeeUtxo[] = []
+  let feeInputValue = 0
+  let fee = 0
+  let btcChange = 0
+  let hasBtcChange = false
+  const carrierTotal = carrierValue * input.outputCount
+  for (const feeUtxo of feeUtxos) {
+    selectedFeeUtxos.push(feeUtxo)
+    feeInputValue += feeUtxo.satoshis
+    const inputScripts = [
+      fundingScript,
+      ...selectedFeeUtxos.map(utxo => scriptBytes(utxo.scriptPubKey, 'RGB fee UTXO script')),
+    ]
+    const feeWithoutChange = Math.ceil(
+      estimateSegwitVsize(inputScripts, fixedOutputScripts) * input.feeRate
+    )
+    if (selected.satoshis + feeInputValue < carrierTotal + feeWithoutChange) continue
+    const feeWithChange = Math.ceil(
+      estimateSegwitVsize(inputScripts, [...fixedOutputScripts, feeChangeScript]) * input.feeRate
+    )
+    const candidateChange = selected.satoshis + feeInputValue - carrierTotal - feeWithChange
+    if (candidateChange >= feeFunding.changeDustLimit) {
+      fee = feeWithChange
+      btcChange = candidateChange
+      hasBtcChange = true
+    } else {
+      fee = selected.satoshis + feeInputValue - carrierTotal
+    }
+    break
+  }
+  if (!fee) {
+    throw new RgbServiceError('Ordinary BTC UTXOs do not cover the RGB allocation split')
+  }
+  const psbt = new Psbt({ network: bitcoinNetwork(input.network) })
+  const publicKey = publicKeyBytes(selected.publicKey)
+  psbt.addInput({
+    hash: selected.outpoint.txid,
+    index: selected.outpoint.vout,
+    witnessUtxo: { value: selected.satoshis, script: fundingScript },
+    tapInternalKey: publicKey.slice(1),
+    ...(input.enableRbf === false ? {} : { sequence: 0xfffffffd }),
+  })
+  selectedFeeUtxos.forEach(utxo => addFeeInput(psbt, utxo, input.enableRbf))
+  psbt.addOutput({ script: Buffer.from([0x6a]), value: 0 })
+  const assetVouts = Array.from({ length: input.outputCount }, () => {
+    const vout = psbt.txOutputs.length
+    psbt.addOutput({ script: fundingScript, value: carrierValue })
+    return vout
+  })
+  if (hasBtcChange) psbt.addOutput({ script: feeChangeScript, value: btcChange })
+  return {
+    psbtHex: psbt.toHex(),
+    hostVout: 0,
+    assetVouts,
     fee,
     feeInputCount: selectedFeeUtxos.length,
     feeOutpoints: selectedFeeUtxos.map(utxo => utxo.outpoint),

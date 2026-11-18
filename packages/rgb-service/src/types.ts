@@ -266,6 +266,10 @@ export interface RgbPendingTransfer {
   burnSplit?: {
     request: RgbTransferRequest & { amount: string; burn: true }
   }
+  /** Internal atomic self-transfer that moves every companion asset to its own output. */
+  allocationSplit?: {
+    assets: Array<{ assetId: string; amount: string }>
+  }
   /** Public seller authorization retained locally while an Instant listing is open. */
   instantListing?: {
     completed: RgbCompletedTransfer
@@ -842,6 +846,13 @@ export interface BitcoinBroadcaster {
  * context and no private keys.
  */
 export interface RgbProtocolEncoder {
+  prepareAllocationSplit?(input: {
+    wallet: RgbWalletRef
+    selectedUtxo: RgbUtxo
+    feeRate: number
+    feeFunding?: RgbFeeFunding
+    validationHistories: RgbValidationHistory[]
+  }): Promise<RgbPreparedTransfer>
   prepareBurn?(input: {
     wallet: RgbWalletRef
     request: RgbTransferRequest & { amount: string }

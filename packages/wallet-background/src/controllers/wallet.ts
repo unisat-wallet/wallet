@@ -6344,6 +6344,17 @@ export class WalletController extends BaseController {
     return this.rgbSendOperations.begin(params)
   }
 
+  createRgbAllocationSplitBegin = async (params: {
+    txid: string
+    vout: number
+    feeRate?: number
+    providerOrigin?: string
+  }) => {
+    const context = await this.getLocalRgbService()
+    await this.ensureRgbWriteLease(context, { forceRenew: true })
+    return this.rgbSendOperations.beginAllocationSplit(params)
+  }
+
   prepareRgbInstantSwap = async (params: {
     assetId: string
     amount: string
@@ -6427,6 +6438,7 @@ export class WalletController extends BaseController {
       }
     }
     const instant = pending.request?.instantSwap === true
+    const allocationSplit = Boolean(pending.allocationSplit)
     const requiredSighash = instant
       ? bitcoin.Transaction.SIGHASH_SINGLE | bitcoin.Transaction.SIGHASH_ANYONECANPAY
       : bitcoin.Transaction.SIGHASH_ALL
@@ -6450,7 +6462,7 @@ export class WalletController extends BaseController {
       psbt: signingPsbt.toHex(),
       toSignInputs,
       action: {
-        name: instant ? 'List RGB for Instant Swap' : pending.request?.burn ? 'Burn RGB' : 'Send RGB',
+        name: allocationSplit ? 'Split RGB asset UTXO' : instant ? 'List RGB for Instant Swap' : pending.request?.burn ? 'Burn RGB' : 'Send RGB',
         description: '',
         type: PsbtActionType.CUSTOM,
       },

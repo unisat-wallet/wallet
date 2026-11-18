@@ -11,6 +11,7 @@ export { default as RgbProxy } from './RgbProxy';
 export {
   RgbPayment,
   RgbBurn,
+  RgbAllocationSplit,
   RgbConsignment,
   RgbPaymentCancel,
   RgbIssue,

@@ -1,7 +1,7 @@
 import { RgbServiceError } from '../errors'
 import { transitionBundleId, type RgbBundleInput } from './bundle'
 import { serializeStrictBitcoinTransaction } from './fascia'
-import { serializeMpcMerkleProof } from './mpc'
+import { serializeMpcMerkleProof, type MpcMessage } from './mpc'
 import { rgbContractIdBytes } from './contract-id'
 import { StrictWriter } from './strict'
 
@@ -82,6 +82,8 @@ export function serializeNiaOpretWitnessBundle(input: {
   transition: Uint8Array
   inputs: Omit<RgbBundleInput, 'transitionId'>[]
   entropy: bigint
+  /** All contract messages sharing the witness commitment. */
+  mpcMessages?: MpcMessage[]
 }): NiaOpretWitnessBundle {
   if (input.transitionId.length !== 32)
     throw new RgbServiceError('RGB transition ID must be 32 bytes')
@@ -95,8 +97,9 @@ export function serializeNiaOpretWitnessBundle(input: {
   const bundleId = transitionBundleId(
     inputs.map(item => ({ ...item, transitionId: input.transitionId }))
   )
+  const messages = input.mpcMessages || [{ protocolId: contractId, message: bundleId }]
   const proof = serializeMpcMerkleProof(
-    [{ protocolId: contractId, message: bundleId }],
+    messages,
     input.entropy,
     contractId
   )

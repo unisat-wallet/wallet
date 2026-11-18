@@ -71,6 +71,8 @@ interface Props {
         digest: string;
       };
       txid?: string;
+      vout?: number;
+      assetCount?: number;
     };
     session: {
       origin: string;
@@ -490,14 +492,20 @@ export function RgbBurn({ params: { data, session } }: Props) {
   return <RgbPaymentApproval data={data} session={session} burn />;
 }
 
+export function RgbAllocationSplit({ params: { data, session } }: Props) {
+  return <RgbPaymentApproval data={data} session={session} split />;
+}
+
 function RgbPaymentApproval({
   data,
   session,
-  burn = false
+  burn = false,
+  split = false
 }: {
   data: Props['params']['data'];
   session: Props['params']['session'];
   burn?: boolean;
+  split?: boolean;
 }) {
   const wallet = useWallet();
   const { t } = useI18n();
@@ -523,8 +531,8 @@ function RgbPaymentApproval({
     : t('rgb_approval_use_invoice_amount');
   const ticker = assetMetadata?.ticker?.trim();
   const assetName = assetMetadata?.name?.trim();
-  const amountLabel = ticker && normalizedAmount ? `${amount} ${ticker}` : amount;
-  const assetLabel = data.assetId
+  const amountLabel = split ? `${data.assetCount || 2}+ assets` : ticker && normalizedAmount ? `${amount} ${ticker}` : amount;
+  const assetLabel = split ? `UTXO ${shortAddress(data.txid || '', 8)}:${data.vout ?? '-'}` : data.assetId
     ? [ticker, assetName && assetName !== ticker ? assetName : ''].filter(Boolean).join(' · ') ||
       `${t('rgb_approval_rgb_asset')} · ${shortAddress(data.assetId, 6)}`
     : t('rgb_approval_asset_from_invoice');
@@ -633,8 +641,8 @@ function RgbPaymentApproval({
       </Header>
       <Content>
         <Column mt="lg" gap="md">
-          <Text text={t(burn ? 'rgb_approval_burn_title' : 'rgb_approval_prepare_payment_title')} preset="title-bold" textCenter />
-          <Text text={t(burn ? 'rgb_approval_burn_description' : 'rgb_approval_prepare_payment_description')} preset="sub" textCenter />
+          <Text text={split ? 'Split RGB assets' : t(burn ? 'rgb_approval_burn_title' : 'rgb_approval_prepare_payment_title')} preset="title-bold" textCenter />
+          <Text text={split ? 'Move each asset in this UTXO to a separate wallet output.' : t(burn ? 'rgb_approval_burn_description' : 'rgb_approval_prepare_payment_description')} preset="sub" textCenter />
 
           <Card style={{ display: 'block' }}>
             <Column gap="md" fullX>
@@ -648,7 +656,7 @@ function RgbPaymentApproval({
                     size={52}
                   />
                   <Column gap="xs" style={{ minWidth: 0, flex: 1 }}>
-                    <Text text={t(burn ? 'rgb_approval_burn' : 'rgb_approval_pay')} size="sm" color="textDim" />
+                    <Text text={split ? 'Split' : t(burn ? 'rgb_approval_burn' : 'rgb_approval_pay')} size="sm" color="textDim" />
                     <Text text={amountLabel} size="xxl" preset="title-bold" style={{ wordBreak: 'break-word' }} />
                     <Text text={assetLabel} size="sm" color="textDim" max2Lines style={{ wordBreak: 'break-word' }} />
                   </Column>
@@ -688,7 +696,7 @@ function RgbPaymentApproval({
               <Column gap="xs" fullX style={{ minWidth: 0, alignItems: 'flex-start' }}>
                 <Text text={t('asset_id')} size="xs" color="textDim" />
                 <Text
-                  text={data.assetId ? shortAddress(data.assetId, 10) : t('rgb_approval_from_invoice')}
+                  text={split ? `${data.txid || '-'}:${data.vout ?? '-'}` : data.assetId ? shortAddress(data.assetId, 10) : t('rgb_approval_from_invoice')}
                   size="sm"
                   style={{ maxWidth: '100%', wordBreak: 'break-all' }}
                 />
@@ -699,7 +707,7 @@ function RgbPaymentApproval({
           <Card style={{ display: 'block', padding: 0 }}>
             <RgbApprovalAccordion
               title={t('rgb_approval_how_it_works')}
-              description={t(burn ? 'rgb_approval_burn_how_it_works_description' : 'rgb_approval_payment_how_it_works_description')}
+              description={split ? 'One transaction preserves all contracts and creates one RGB carrier output per asset.' : t(burn ? 'rgb_approval_burn_how_it_works_description' : 'rgb_approval_payment_how_it_works_description')}
               expanded={howItWorksExpanded}
               onClick={() => setHowItWorksExpanded((value) => !value)}
             >
@@ -722,7 +730,9 @@ function RgbPaymentApproval({
               <Column gap="sm">
                 <RgbReceiveDetail label={t('asset')} value={assetLabel} />
                 <RgbReceiveDetail label={t('amount')} value={amountLabel} />
-                {burn ? (
+                {split ? (
+                  <RgbReceiveDetail label="UTXO" value={`${data.txid || '-'}:${data.vout ?? '-'}`} />
+                ) : burn ? (
                   <>
                     <RgbReceiveDetail label={t('network')} value={data.burnRecipient?.chainId || '-'} />
                     <RgbReceiveDetail label={t('address')} value={data.burnRecipient?.address || '-'} />
@@ -775,7 +785,7 @@ function RgbPaymentApproval({
         <Row full>
           <Button text={t('cancel')} preset="default" onClick={() => rejectApproval()} full />
           <Button
-            text={loading ? t('rgb_approval_checking') : t(burn ? 'rgb_approval_prepare_burn' : 'rgb_approval_prepare_payment')}
+            text={loading ? t('rgb_approval_checking') : split ? 'Prepare split' : t(burn ? 'rgb_approval_prepare_burn' : 'rgb_approval_prepare_payment')}
             preset="primary"
             onClick={() => void requestWrite(() => void onPreparePayment())}
             disabled={loading}

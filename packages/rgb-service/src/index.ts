@@ -1,5 +1,6 @@
 export * from './errors'
 export * from './protocol/anchor'
+export * from './protocol/allocation-split'
 export * from './protocol/bitcoin'
 export * from './protocol/bfa-consignment'
 export * from './protocol/bfa-burn-destination'

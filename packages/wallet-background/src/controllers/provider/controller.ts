@@ -1358,6 +1358,54 @@ class ProviderController extends BaseController {
     })
   }
 
+  @Reflect.metadata('APPROVAL', ['RgbAllocationSplit'])
+  prepareRgbAllocationSplit = async ({
+    data: { params },
+    session: { origin },
+  }: {
+    data: { params: { txid: string; vout: number; feeRate?: number; assetCount?: number } }
+    session: { origin: string }
+  }) => {
+    validateRgbProviderFeeRate({ data: { params } })
+    if (!/^[0-9a-f]{64}$/i.test(params.txid)) throw new Error('txid is invalid')
+    if (!Number.isInteger(params.vout) || params.vout < 0) throw new Error('vout is invalid')
+    return wallet.createRgbAllocationSplitBegin({
+      txid: params.txid,
+      vout: params.vout,
+      ...(params.feeRate === undefined ? {} : { feeRate: params.feeRate }),
+      providerOrigin: origin,
+    })
+  }
+
+  @Reflect.metadata('APPROVAL', [
+    'SignPsbt',
+    async req => {
+      const params = req.data.params as { transferId: string; toSignDatas?: unknown[] }
+      if (!params.transferId) throw new Error('transferId is required')
+      const origin = req.session?.origin
+      if (!origin) throw new Error('missing request origin')
+      await assertRgbPaymentOrigin(params.transferId, origin)
+      params.toSignDatas = [await wallet.getRgbPaymentSigningData({ transferId: params.transferId })]
+    },
+  ])
+  signRgbAllocationSplit = async ({
+    data: { params },
+    session: { origin },
+    approvalRes,
+  }: {
+    data: { params: { transferId: string; toSignDatas?: any[] } }
+    session: { origin: string }
+    approvalRes: SignPsbtResult
+  }) => {
+    await assertRgbPaymentOrigin(params.transferId, origin)
+    const account = await wallet.getCurrentAccount()
+    const toSignData = getToSignDatas(params.toSignDatas)[0]!
+    const signedPsbt = approvalRes[0]?.psbtHex
+    if (!signedPsbt) throw new Error('RGB allocation split signing did not return a PSBT')
+    assertExternalSignedPsbt(account, toSignData, signedPsbt)
+    return wallet.createRgbSendEnd({ transferId: params.transferId, signedPsbt })
+  }
+
   @Reflect.metadata('APPROVAL', ['RgbPaymentCancel', prepareRgbPaymentCancelApproval])
   cancelRgbPayment = async ({
     data: { params },

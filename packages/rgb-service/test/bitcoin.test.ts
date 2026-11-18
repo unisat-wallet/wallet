@@ -1,6 +1,6 @@
 import { Psbt } from 'bitcoinjs-lib'
 import { describe, expect, it } from 'vitest'
-import { createRgbOpretPsbt, decodeRgbInvoice } from '../src'
+import { createRgbAllocationSplitPsbt, createRgbOpretPsbt, decodeRgbInvoice } from '../src'
 
 const utxo = {
   outpoint: { txid: 'a'.repeat(64), vout: 1 },
@@ -181,5 +181,28 @@ describe('createRgbOpretPsbt', () => {
         feeFunding,
       })
     ).toThrow('requires at least 546 sats')
+  })
+})
+
+describe('createRgbAllocationSplitPsbt', () => {
+  it('creates one wallet carrier output per asset without reusing the RGB input value twice', () => {
+    const selected = { ...utxo, satoshis: 330 }
+    const built = createRgbAllocationSplitPsbt({
+      network: 'mainnet', selectedUtxo: selected, outputCount: 3, feeRate: 2, feeFunding,
+    })
+    const psbt = Psbt.fromHex(built.psbtHex)
+
+    expect(built.assetVouts).toEqual([1, 2, 3])
+    expect(psbt.txOutputs.slice(1, 4).map(output => output.value)).toEqual([330, 330, 330])
+    expect(psbt.txOutputs.slice(1, 4).every(output =>
+      output.script.toString('hex') === selected.scriptPubKey
+    )).toBe(true)
+    expect(built.feeOutpoints).toEqual([feeFunding.utxos[0]!.outpoint])
+  })
+
+  it('rejects a split that has fewer than two contract outputs', () => {
+    expect(() => createRgbAllocationSplitPsbt({
+      network: 'mainnet', selectedUtxo: utxo, outputCount: 1, feeRate: 2, feeFunding,
+    })).toThrow('requires at least two asset outputs')
   })
 })

@@ -13,8 +13,9 @@ export interface OpretRgbPsbtCommitment {
   hostVout: number
   entropy: bigint
   messages: MpcMessage[]
-  transitionId: Uint8Array
-  transition: Uint8Array
+  transitionId?: Uint8Array
+  transition?: Uint8Array
+  transitions?: Array<{ transitionId: Uint8Array; transition: Uint8Array }>
   closeMethod?: 'opretFirst'
 }
 
@@ -62,7 +63,10 @@ function opretScript(commitment: Uint8Array): Buffer {
  * unsigned transaction is modified before signing.
  */
 export function commitOpretRgbPsbt(input: OpretRgbPsbtCommitment): CommittedOpretRgbPsbt {
-  if (input.transitionId.length !== 32)
+  const transitions = input.transitions || (input.transitionId && input.transition
+    ? [{ transitionId: input.transitionId, transition: input.transition }]
+    : [])
+  if (!transitions.length || transitions.some(item => item.transitionId.length !== 32))
     throw new RgbServiceError('RGB transition ID must be 32 bytes')
   const psbt = Psbt.fromHex(input.psbtHex)
   const hostOutput = psbt.txOutputs[input.hostVout]
@@ -111,15 +115,17 @@ export function commitOpretRgbPsbt(input: OpretRgbPsbtCommitment): CommittedOpre
     }),
     mpc.commitment
   )
-  setProprietaryRecord(
-    psbt.data.globalMap,
-    encodeProprietaryPsbtKey({
-      prefix: RGB_PSBT_PREFIX.RGB,
-      subtype: RGB_PSBT_SUBTYPE.RGB_TRANSITION,
-      keyData: input.transitionId,
-    }),
-    input.transition
-  )
+  for (const item of transitions) {
+    setProprietaryRecord(
+      psbt.data.globalMap,
+      encodeProprietaryPsbtKey({
+        prefix: RGB_PSBT_PREFIX.RGB,
+        subtype: RGB_PSBT_SUBTYPE.RGB_TRANSITION,
+        keyData: item.transitionId,
+      }),
+      item.transition
+    )
+  }
   setProprietaryRecord(
     psbt.data.globalMap,
     encodeProprietaryPsbtKey({
