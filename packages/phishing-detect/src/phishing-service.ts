@@ -191,8 +191,8 @@ export class PhishingService extends EventEmitter<PhishingServiceEvents> {
   getBlockedHostnames(): string[] {
     return Array.from(this.blacklistSet).filter(
       hostname =>
-        !this.hasHostnameMatch(this.temporaryWhitelist, hostname) &&
-        !this.hasHostnameMatch(this.whitelistSet, hostname)
+        !this.hasWhitelistException(this.temporaryWhitelist, hostname) &&
+        !this.hasWhitelistException(this.whitelistSet, hostname)
     )
   }
 
@@ -454,6 +454,13 @@ export class PhishingService extends EventEmitter<PhishingServiceEvents> {
 
   private hasHostnameMatch(hostnames: Set<string>, hostname: string): boolean {
     return this.findHostnameMatch(hostnames, hostname) !== undefined
+  }
+
+  /** A parent DNR block also covers its children, so any allowed child is an exception. */
+  private hasWhitelistException(hostnames: Set<string>, blockedHostname: string): boolean {
+    return Array.from(hostnames).some(
+      hostname => hostname === blockedHostname || hostname.endsWith(`.${blockedHostname}`)
+    )
   }
 
   private isPhishingMatch(hostname: string, pattern: string): boolean {

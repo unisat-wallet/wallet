@@ -175,6 +175,28 @@ describe('PhishingService', () => {
     expect(service.getBlockedHostnames()).toEqual(['sub.bad.example'])
   })
 
+  it('removes a parent DNR block when an allowed subdomain needs an exception', async () => {
+    const adapter = createAdapter(
+      createRemoteConfig({
+        whitelist: [],
+        blacklist: ['evil.com', 'other.example'],
+      })
+    )
+    const service = new PhishingService()
+    services.push(service)
+    await service.init({ adapter })
+
+    service.addToWhitelist('login.evil.com')
+    expect(service.checkPhishing('login.evil.com')).toEqual({
+      isPhishing: false,
+      reason: 'Temporary whitelist',
+    })
+    expect(service.getBlockedHostnames()).toEqual(['other.example'])
+
+    await service.addToPermanentWhitelist('account.other.example')
+    expect(service.getBlockedHostnames()).toEqual([])
+  })
+
   it('keeps the last known-good blacklist when an update has no valid domains', async () => {
     const adapter = createAdapter(createRemoteConfig({ blacklist: ['known-bad.example'] }))
     const service = new PhishingService()
