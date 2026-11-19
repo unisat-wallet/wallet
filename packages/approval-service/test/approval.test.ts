@@ -166,10 +166,10 @@ describe('ApprovalService', () => {
       await expect(second).resolves.toEqual({ approved: true, origin: 'https://dapp.example' })
     })
 
-    it('does not reopen a duplicate Connect that settles while being focused', async () => {
-      let finishFocus!: () => void
-      service.platformFocusWindow = vi.fn(() => new Promise<void>(resolve => {
-        finishFocus = resolve
+    it('does not reopen a duplicate Connect that settles before focus fails', async () => {
+      let failFocus!: (error: Error) => void
+      service.platformFocusWindow = vi.fn(() => new Promise<void>((_resolve, reject) => {
+        failFocus = reject
       }))
       const connect = {
         approvalComponent: 'Connect',
@@ -182,12 +182,13 @@ describe('ApprovalService', () => {
       await Promise.resolve()
 
       await service.resolveApproval(result)
-      finishFocus()
+      failFocus(new Error('window disappeared'))
 
       await expect(first).resolves.toEqual(result)
       await expect(second).resolves.toEqual(result)
       expect(service.platformOpenWindow).toHaveBeenCalledTimes(1)
       expect(service.approval).toBeNull()
+      expect(service.approvalWindowId).toBe(0)
     })
 
     it('clears the approval slot when its notification cannot be opened', async () => {

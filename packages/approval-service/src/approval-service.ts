@@ -224,6 +224,9 @@ export class ApprovalService extends EventEmitter {
         await this.platformFocusWindow(windowId)
         return
       } catch {
+        // The user may have settled this approval while the browser focus
+        // request was in flight. Never restore a window for a completed slot.
+        if (this.approval !== approval || this.closingApproval === approval) return
         // A stale browser window ID must not strand an invisible approval.
         if (this.approvalWindowId === windowId) this.approvalWindowId = 0
         try {
@@ -231,8 +234,10 @@ export class ApprovalService extends EventEmitter {
         } catch {
           // The stale window is already gone.
         }
+        if (this.approval !== approval || this.closingApproval === approval) return
       }
     }
+    if (this.approval !== approval || this.closingApproval === approval) return
     try {
       await this.openNotification(this.approvalWindowProps)
     } catch {
