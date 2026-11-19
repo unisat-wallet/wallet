@@ -8394,6 +8394,78 @@ describe('RgbService', () => {
     expect(service.getPendingSendHistory()).toEqual([])
   })
 
+  it('cancels an expired send after the proxy removes its ACK operation', async () => {
+    let now = 2_000_000
+    const dependencies = createDependencies()
+    dependencies.now = () => now
+    vi.mocked(dependencies.transport.getAcknowledgement!).mockResolvedValue(undefined)
+    dependencies.transport.cancelConsignment = vi.fn().mockRejectedValue(
+      new RgbProxyOperationNotFoundError()
+    )
+    const service = new RgbService(dependencies)
+    const assetId = 'rgb:AQEBAQEB-AQEBAQE-BAQEBAQ-EBAQEBA-QEBAQEB-AQEBAQE'
+    const invoice = encodeWitnessRgbInvoice({
+      network: 'mainnet',
+      scriptPubKey: '512079be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798',
+      assetId,
+      amount: '60',
+      expirationTimestamp: Math.floor(now / 1000) + 60,
+      transportEndpoints: [proxyEndpoint],
+      proxyPublicKey: 'ab'.repeat(32),
+    })
+    await service.open(wallet)
+    await service.sync()
+    await service.prepareSend({ assetId, amount: '60', invoice, feeRate: 2 })
+    await expect(service.completeSend('transfer-1', 'signed-psbt')).rejects.toThrow(
+      'awaiting recipient acknowledgement'
+    )
+    now += 61_000
+
+    await expect(service.abortSend('transfer-1')).resolves.toEqual({
+      aborted: true,
+      status: 'canceled',
+    })
+    expect(service.getPendingTransfers()).toEqual([])
+    expect(service.getPendingSendHistory()).toEqual([
+      expect.objectContaining({ transferId: 'transfer-1', status: 'canceled' }),
+    ])
+  })
+
+  it('keeps a send locked when its missing proxy ACK operation has not expired', async () => {
+    const now = 2_000_000
+    const dependencies = createDependencies()
+    dependencies.now = () => now
+    vi.mocked(dependencies.transport.getAcknowledgement!).mockResolvedValue(undefined)
+    dependencies.transport.cancelConsignment = vi.fn().mockRejectedValue(
+      new RgbProxyOperationNotFoundError()
+    )
+    const service = new RgbService(dependencies)
+    const assetId = 'rgb:AQEBAQEB-AQEBAQE-BAQEBAQ-EBAQEBA-QEBAQEB-AQEBAQE'
+    const invoice = encodeWitnessRgbInvoice({
+      network: 'mainnet',
+      scriptPubKey: '512079be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798',
+      assetId,
+      amount: '60',
+      expirationTimestamp: Math.floor(now / 1000) + 60,
+      transportEndpoints: [proxyEndpoint],
+      proxyPublicKey: 'ab'.repeat(32),
+    })
+    await service.open(wallet)
+    await service.sync()
+    await service.prepareSend({ assetId, amount: '60', invoice, feeRate: 2 })
+    await expect(service.completeSend('transfer-1', 'signed-psbt')).rejects.toThrow(
+      'awaiting recipient acknowledgement'
+    )
+
+    await expect(service.abortSend('transfer-1')).rejects.toBeInstanceOf(
+      RgbProxyOperationNotFoundError
+    )
+    expect(service.getPendingTransfers()).toEqual([
+      expect.objectContaining({ id: 'transfer-1', delivery: expect.any(Object) }),
+    ])
+    expect(service.getPendingSendHistory()).toEqual([])
+  })
+
   it('refuses to cancel a delivery that another party already broadcast', async () => {
     const dependencies = createDependencies()
     dependencies.transport.cancelConsignment = vi.fn()

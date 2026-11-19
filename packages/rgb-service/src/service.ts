@@ -6427,30 +6427,40 @@ export class RgbService {
             allowMissing: !pending.delivery.publishedAt,
           })
         } catch (error) {
-          if (!(error instanceof RgbProxyAlreadyAcknowledgedError)) throw error
-          // The ACK may have landed after our last poll. It makes ack.clean
-          // unsafe, but the unbroadcast signed transaction can still enter the
-          // reviewed bilateral cancellation flow.
-          pending.delivery.acknowledgedAt ||= this.now()
-          pending.delivery.broadcastError =
-            'RGB transfer was acknowledged before cancellation but was not broadcast'
-          delete pending.delivery.failureReportedAt
-          await this.persist({ waitForRecovery: true })
-          let reviewRequested = false
-          pending.delivery.cancellationReviewRequestedAt = this.now()
-          try {
-            await this.reportPendingBroadcastFailure(transferId, pending)
-            reviewRequested = Boolean(pending.delivery.failureReportedAt)
-          } catch {
-            delete pending.delivery.cancellationReviewRequestedAt
-            // The detail screen can retry the review request.
-          }
-          return {
-            aborted: false,
-            reason: reviewRequested
-              ? ('cancellation_review_requested' as const)
-              : ('acknowledged_requires_review' as const),
-            reviewRequested,
+          const operationExpired =
+            error instanceof RgbProxyOperationNotFoundError &&
+            invoice.expirationTimestamp !== undefined &&
+            invoice.expirationTimestamp <= Math.floor(this.now() / 1000)
+          // Proxy v1 removes expired ACK operations after its retention grace
+          // period. Once the invoice itself has expired, ack.clean is
+          // idempotent because the operation can no longer release the signed
+          // transaction to the receiver.
+          if (!operationExpired) {
+            if (!(error instanceof RgbProxyAlreadyAcknowledgedError)) throw error
+            // The ACK may have landed after our last poll. It makes ack.clean
+            // unsafe, but the unbroadcast signed transaction can still enter the
+            // reviewed bilateral cancellation flow.
+            pending.delivery.acknowledgedAt ||= this.now()
+            pending.delivery.broadcastError =
+              'RGB transfer was acknowledged before cancellation but was not broadcast'
+            delete pending.delivery.failureReportedAt
+            await this.persist({ waitForRecovery: true })
+            let reviewRequested = false
+            pending.delivery.cancellationReviewRequestedAt = this.now()
+            try {
+              await this.reportPendingBroadcastFailure(transferId, pending)
+              reviewRequested = Boolean(pending.delivery.failureReportedAt)
+            } catch {
+              delete pending.delivery.cancellationReviewRequestedAt
+              // The detail screen can retry the review request.
+            }
+            return {
+              aborted: false,
+              reason: reviewRequested
+                ? ('cancellation_review_requested' as const)
+                : ('acknowledged_requires_review' as const),
+              reviewRequested,
+            }
           }
         }
       } else if (this.dependencies.transport.acknowledgeConsignment) {
