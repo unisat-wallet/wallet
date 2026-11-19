@@ -38,17 +38,26 @@ export default function UnlockScreen() {
         return;
       }
       setLoading(true);
-      await unlock(password);
+      const backgroundWillContinue = await unlock(password);
 
-      if (!isInNotification) {
-        const hasVault = await wallet.hasVault();
-        if (!hasVault) {
-          navigate('WelcomeScreen');
-          return;
-        } else {
-          navigate('MainScreen');
-          return;
+      if (isInNotification) {
+        // A request that started while locked owns a dedicated { lock: true }
+        // approval. Resolving it closes this notification and lets the
+        // background open the real approval. If an already-open approval was
+        // auto-locked, it remains installed and must be restored in-place.
+        if (!backgroundWillContinue) {
+          navigate('ApprovalScreen');
         }
+        return;
+      }
+
+      const hasVault = await wallet.hasVault();
+      if (!hasVault) {
+        navigate('WelcomeScreen');
+        return;
+      } else {
+        navigate('MainScreen');
+        return;
       }
     } catch (e) {
       console.log(e);
