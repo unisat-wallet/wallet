@@ -6229,10 +6229,12 @@ describe('RgbService', () => {
   it('broadcasts the signed witness when accepting a proxy v1 donation', async () => {
     const anchor = receiveAnchorTransaction()
     const dependencies = createDependencies()
+    let finishRelease!: () => void
+    const releasePending = new Promise<void>(resolve => { finishRelease = resolve })
     dependencies.broadcaster.broadcast = vi.fn().mockResolvedValue(anchor.txid)
     dependencies.transport.getAcknowledgement = vi.fn().mockResolvedValue(undefined)
     dependencies.transport.acknowledgeConsignment = vi.fn().mockRejectedValue(new RgbProxyOperationNotFoundError())
-    dependencies.transport.markConsignmentRetrieved = vi.fn()
+    dependencies.transport.markConsignmentRetrieved = vi.fn().mockReturnValue(releasePending)
     dependencies.stateSource.getTransactionStatus = vi.fn().mockResolvedValue({ status: 'unknown', confirmations: 0 })
     const service = new RgbService(dependencies)
     await service.open(wallet)
@@ -6259,13 +6261,18 @@ describe('RgbService', () => {
     expect((service as any).state.pendingReceives[0].receivedConsignment).not.toHaveProperty('acknowledgementPending')
     expect(dependencies.transport.acknowledgeConsignment).toHaveBeenCalledTimes(1)
     expect(dependencies.broadcaster.broadcast).toHaveBeenCalledWith(anchor.rawTx)
-    expect(dependencies.transport.markConsignmentRetrieved).toHaveBeenCalledWith({
+    await vi.waitFor(() => expect(dependencies.transport.markConsignmentRetrieved).toHaveBeenCalledWith({
       endpoint: proxyEndpoint,
       proxyTransferId: 'd'.repeat(64),
       proxyPrivateKey: '44'.repeat(32),
-    })
+    }))
     expect((service as any).state.pendingReceives[0].receivedConsignment)
-      .toMatchObject({ proxyDataReleasedAt: expect.any(Number) })
+      .toMatchObject({ accepted: true, proxyDataReleasePending: true })
+    finishRelease()
+    await vi.waitFor(() => expect((service as any).state.pendingReceives[0].receivedConsignment)
+      .toMatchObject({ proxyDataReleasedAt: expect.any(Number) }))
+    expect((service as any).state.pendingReceives[0].receivedConsignment)
+      .not.toHaveProperty('proxyDataReleasePending')
   })
 
   it('retries Proxy v1 payload release for an already durable accepted receive', async () => {

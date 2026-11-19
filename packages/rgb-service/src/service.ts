@@ -2997,9 +2997,7 @@ export class RgbService {
       }
       if (staged.length) {
         await this.persist({ waitForRecovery: true })
-        if (await this.releaseHandledProxyData()) {
-          await this.persist({ waitForRecovery: true })
-        }
+        this.queueHandledProxyDataRelease()
       }
       return results
     })
@@ -3247,9 +3245,7 @@ export class RgbService {
     this.markProxyDataReleasePending(receive)
     options.onProgress?.({ phase: 'finalizing', recipientId })
     if (!control.deferFinalPersist) await this.persist({ waitForRecovery: true })
-    if (!control.deferProxyRelease && await this.releaseHandledProxyData(receive)) {
-      await this.persist({ waitForRecovery: true })
-    }
+    if (!control.deferProxyRelease) this.queueHandledProxyDataRelease(receive)
 
     // Ordinary Proxy v1 receives broadcast the released transaction above.
     // A backend-committed buy swap intentionally leaves broadcast to its
@@ -3803,6 +3799,20 @@ export class RgbService {
       }
     }
     return changed
+  }
+
+  /**
+   * Proxy payload cleanup is not part of the durable Accept commit. Queue it
+   * behind the current receive transition so the caller can finish as soon as
+   * the accepted state and recovery checkpoint are safely persisted.
+   */
+  private queueHandledProxyDataRelease(only?: import('./types').RgbPendingReceive) {
+    if (!this.dependencies.transport.markConsignmentRetrieved) return
+    void this.runPendingReceiveOperation(async () => {
+      if (await this.releaseHandledProxyData(only)) {
+        await this.persist({ waitForRecovery: true })
+      }
+    }).catch(() => undefined)
   }
 
   /** A v1 donation has no sender ACK operation; broadcast its validated signed witness if needed. */
