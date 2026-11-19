@@ -9,6 +9,9 @@ export class ApprovalService extends EventEmitter {
   public approvalWindowId = 0
   isLocked = false
   private closingApproval: Approval | null = null
+  private approvalPromise: Promise<any> | null = null
+  private approvalWindowProps: any
+  private notificationOpening: Promise<void> | null = null
 
   constructor() {
     super()
@@ -78,26 +81,36 @@ export class ApprovalService extends EventEmitter {
 
   // currently it only support one approval at the same time
   requestApproval = async (data: any, winProps?: any): Promise<any> => {
-    if (this.approval) {
-      if (this.approvalWindowId) {
-        try {
-          await this.platformFocusWindow(this.approvalWindowId)
-        } catch (e) {
-          // keep original behavior even if focusing existing window fails
-        }
+    const existing = this.approval
+    if (existing) {
+      const existingPromise = this.approvalPromise
+      const reusable = this.isReusableApproval(existing.data, data)
+      await this.focusOrRestoreNotification(existing)
+      if (this.approval !== existing) {
+        if (reusable && existingPromise) return existingPromise
+        // The old approval may have settled while its window was being
+        // restored. Let this request claim the now-empty slot.
+        return this.requestApproval(data, winProps)
       }
+      if (reusable && existingPromise) return existingPromise
       throw new WalletError(ErrorCodes.UNKNOWN, 'Another approval request is already pending')
     }
 
-    return new Promise((resolve, reject) => {
-      this.approval = {
+    let approval!: Approval
+    const promise = new Promise((resolve, reject) => {
+      approval = {
         data,
         resolve,
         reject,
       }
-
-      this.openNotification(winProps)
+      this.approval = approval
     })
+    this.approvalPromise = promise
+    this.approvalWindowProps = winProps
+    void this.openNotification(winProps).catch(() => {
+      this.failApprovalWithoutWindow(approval)
+    })
+    return promise
   }
 
   clear = async (stay = false) => {
@@ -123,6 +136,17 @@ export class ApprovalService extends EventEmitter {
   }
 
   openNotification = async (winProps?: any) => {
+    if (this.notificationOpening) return this.notificationOpening
+    const opening = this.openNotificationOnce(winProps)
+    this.notificationOpening = opening
+    try {
+      await opening
+    } finally {
+      if (this.notificationOpening === opening) this.notificationOpening = null
+    }
+  }
+
+  private async openNotificationOnce(winProps?: any): Promise<void> {
     if (this.approvalWindowId) {
       const windowId = this.approvalWindowId
       this.approvalWindowId = 0
@@ -159,17 +183,80 @@ export class ApprovalService extends EventEmitter {
   }
 
   private finishClosing(approval: Approval): void {
-    if (this.approval === approval) this.approval = null
+    if (this.approval === approval) {
+      this.approval = null
+      this.approvalPromise = null
+      this.approvalWindowProps = undefined
+    }
     if (this.closingApproval === approval) this.closingApproval = null
   }
 
   private async closeNotificationWindow(stay = false): Promise<void> {
-    if (!this.approvalWindowId || stay) return
+    if (stay) return
+    if (this.notificationOpening) {
+      try {
+        await this.notificationOpening
+      } catch {
+        // The caller still owns settlement of the active approval.
+      }
+    }
+    if (!this.approvalWindowId) return
     const windowId = this.approvalWindowId
     // Disarm the old removal event before yielding to the platform. The
     // approval itself remains installed as a closing sentinel until this
     // method settles, so a concurrent request cannot occupy the old slot.
     this.approvalWindowId = 0
     await this.platformCloseWindow(windowId)
+  }
+
+  private async focusOrRestoreNotification(approval: Approval): Promise<void> {
+    if (this.notificationOpening) {
+      try {
+        await this.notificationOpening
+      } catch {
+        // The initial request's failure handler clears the occupied slot.
+      }
+    }
+    if (this.approval !== approval || this.closingApproval === approval) return
+    if (this.approvalWindowId) {
+      const windowId = this.approvalWindowId
+      try {
+        await this.platformFocusWindow(windowId)
+        return
+      } catch {
+        // A stale browser window ID must not strand an invisible approval.
+        if (this.approvalWindowId === windowId) this.approvalWindowId = 0
+        try {
+          await this.platformCloseWindow(windowId)
+        } catch {
+          // The stale window is already gone.
+        }
+      }
+    }
+    try {
+      await this.openNotification(this.approvalWindowProps)
+    } catch {
+      this.failApprovalWithoutWindow(approval)
+    }
+  }
+
+  private failApprovalWithoutWindow(approval: Approval): void {
+    if (this.approval !== approval || !this.beginClosing(approval)) return
+    this.approvalWindowId = 0
+    this.finishClosing(approval)
+    const message = 'Unable to open approval window'
+    approval.reject(new WalletError(ErrorCodes.UNKNOWN, message))
+    this.emit('reject', message)
+  }
+
+  private isReusableApproval(existing: any, incoming: any): boolean {
+    if (existing?.lock === true || incoming?.lock === true) {
+      return existing?.lock === true && incoming?.lock === true
+    }
+    if (existing?.approvalComponent !== 'Connect' || incoming?.approvalComponent !== 'Connect')
+      return false
+    const existingOrigin = existing.params?.session?.origin ?? existing.origin
+    const incomingOrigin = incoming.params?.session?.origin ?? incoming.origin
+    return typeof existingOrigin === 'string' && existingOrigin === incomingOrigin
   }
 }

@@ -110,10 +110,13 @@ describe('ApprovalService', () => {
       expect(service.platformFocusWindow).toHaveBeenCalledWith(42)
     })
 
-    it('still rejects second request when focus fails', async () => {
+    it('reopens a stale approval window before rejecting a second request', async () => {
       const first = makeApprovalData({ approvalType: 'first' })
       const second = makeApprovalData({ approvalType: 'second' })
-      service.platformFocusWindow = vi.fn().mockRejectedValue(new Error('focus failed'))
+      service.platformOpenWindow = vi.fn()
+        .mockResolvedValueOnce(42)
+        .mockResolvedValueOnce(43)
+      service.platformFocusWindow = vi.fn().mockRejectedValueOnce(new Error('focus failed'))
       service.requestApproval(first).catch(() => {})
       await flushAsync()
 
@@ -121,18 +124,86 @@ describe('ApprovalService', () => {
         message: 'Another approval request is already pending',
       })
       expect(service.getApproval()?.approvalType).toBe('first')
+      expect(service.platformCloseWindow).toHaveBeenCalledWith(42)
+      expect(service.platformOpenWindow).toHaveBeenCalledTimes(2)
+      expect(service.approvalWindowId).toBe(43)
     })
 
-    it('does not try to focus when there is no window id', async () => {
+    it('waits for an opening window before focusing a second request', async () => {
+      let finishOpen!: (windowId: number) => void
+      service.platformOpenWindow = vi.fn(() => new Promise<number>(resolve => {
+        finishOpen = resolve
+      }))
       const first = makeApprovalData({ approvalType: 'first' })
       const second = makeApprovalData({ approvalType: 'second' })
       service.requestApproval(first).catch(() => {})
-      service.approvalWindowId = 0
+      const duplicate = service.requestApproval(second)
+      await Promise.resolve()
+      expect(service.platformOpenWindow).toHaveBeenCalledTimes(1)
+      expect(service.platformFocusWindow).not.toHaveBeenCalled()
 
-      await expect(service.requestApproval(second)).rejects.toMatchObject({
+      finishOpen(42)
+      await expect(duplicate).rejects.toMatchObject({
         message: 'Another approval request is already pending',
       })
-      expect(service.platformFocusWindow).not.toHaveBeenCalled()
+      expect(service.platformFocusWindow).toHaveBeenCalledWith(42)
+    })
+
+    it('reuses a pending Connect approval from the same origin', async () => {
+      const connect = {
+        approvalComponent: 'Connect',
+        params: { session: { origin: 'https://dapp.example' } },
+      }
+      const first = service.requestApproval(connect)
+      await flushAsync()
+      const second = service.requestApproval(connect)
+      await Promise.resolve()
+
+      expect(service.platformOpenWindow).toHaveBeenCalledTimes(1)
+      expect(service.platformFocusWindow).toHaveBeenCalledWith(42)
+      await service.resolveApproval({ approved: true, origin: 'https://dapp.example' })
+      await expect(first).resolves.toEqual({ approved: true, origin: 'https://dapp.example' })
+      await expect(second).resolves.toEqual({ approved: true, origin: 'https://dapp.example' })
+    })
+
+    it('does not reopen a duplicate Connect that settles while being focused', async () => {
+      let finishFocus!: () => void
+      service.platformFocusWindow = vi.fn(() => new Promise<void>(resolve => {
+        finishFocus = resolve
+      }))
+      const connect = {
+        approvalComponent: 'Connect',
+        params: { session: { origin: 'https://dapp.example' } },
+      }
+      const result = { approved: true, origin: 'https://dapp.example' }
+      const first = service.requestApproval(connect)
+      await flushAsync()
+      const second = service.requestApproval(connect)
+      await Promise.resolve()
+
+      await service.resolveApproval(result)
+      finishFocus()
+
+      await expect(first).resolves.toEqual(result)
+      await expect(second).resolves.toEqual(result)
+      expect(service.platformOpenWindow).toHaveBeenCalledTimes(1)
+      expect(service.approval).toBeNull()
+    })
+
+    it('clears the approval slot when its notification cannot be opened', async () => {
+      service.platformOpenWindow = vi.fn().mockRejectedValueOnce(new Error('popup blocked'))
+      const first = service.requestApproval(makeApprovalData({ approvalType: 'first' }))
+
+      await expect(first).rejects.toMatchObject({ message: 'Unable to open approval window' })
+      expect(service.approval).toBeNull()
+      expect(service.approvalWindowId).toBe(0)
+
+      vi.mocked(service.platformOpenWindow).mockResolvedValueOnce(43)
+      const second = service.requestApproval(makeApprovalData({ approvalType: 'second' }))
+      await flushAsync()
+      expect(service.approvalWindowId).toBe(43)
+      await service.rejectApproval('done')
+      await expect(second).rejects.toMatchObject({ message: 'done' })
     })
 
     it('returns a Promise that resolves when resolveApproval is called', async () => {
@@ -202,6 +273,23 @@ describe('ApprovalService', () => {
       await resolving
       await expect(promise).resolves.toBe('unlocked')
       expect(settled).toBe(true)
+    })
+
+    it('closes a notification that finishes opening during approval settlement', async () => {
+      let finishOpen!: (windowId: number) => void
+      service.platformOpenWindow = vi.fn(() => new Promise<number>(resolve => {
+        finishOpen = resolve
+      }))
+      const promise = service.requestApproval(makeApprovalData())
+      const resolving = service.resolveApproval('approved')
+      await Promise.resolve()
+
+      finishOpen(42)
+      await resolving
+
+      await expect(promise).resolves.toBe('approved')
+      expect(service.platformCloseWindow).toHaveBeenCalledWith(42)
+      expect(service.approvalWindowId).toBe(0)
     })
 
     it('keeps the approval slot occupied while its window is closing', async () => {

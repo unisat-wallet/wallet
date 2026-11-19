@@ -16,7 +16,10 @@ export function initWindow() {
       winMgr.remove(approvalService.approvalWindowId);
     }
     const winId = await winMgr.openNotification(winProps);
-    return winId || 1;
+    if (typeof winId !== 'number' || !Number.isInteger(winId) || winId <= 0) {
+      throw new Error('Approval window was not created');
+    }
+    return winId;
   };
 
   approvalService.platformCloseWindow = async (winId) => {
