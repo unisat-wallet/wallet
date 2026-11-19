@@ -525,7 +525,12 @@ describe('RGB HD backup orchestration', () => {
     { index: 2, key: 'keyring_0#2' },
   ]
 
-  beforeEach(() => vi.clearAllMocks())
+  beforeEach(() => {
+    vi.clearAllMocks()
+    vi.mocked(preferenceService.getCurrentKeyringIndex).mockReturnValue(0)
+    vi.mocked(preferenceService.getCurrentAccount).mockReturnValue(accounts[0] as any)
+    keyringService.keyrings[0] = {} as any
+  })
 
   it('exports a verified checkpoint without acquiring a write lease', async () => {
     const controller = new WalletController()
@@ -581,6 +586,21 @@ describe('RGB HD backup orchestration', () => {
     expect(service.restoreRecoveryState).toHaveBeenCalledWith(state)
     expect(service.retryRecoveryCheckpoint).toHaveBeenCalledWith('replacement', true)
     expect(lease.mock.invocationCallOrder[0]).toBeLessThan(service.restoreRecoveryState.mock.invocationCallOrder[0]!)
+  })
+
+  it('stops a backup restore if the selected account changes while loading its context', async () => {
+    const controller = new WalletController()
+    let resolveContext!: (value: any) => void
+    const contextPromise = new Promise(resolve => { resolveContext = resolve })
+    vi.spyOn(controller as any, 'getLocalRgbService').mockReturnValue(contextPromise)
+    const restore = vi.spyOn(controller as any, 'restoreRgbBackupForContext')
+
+    const pending = controller.restoreRgbBackup({ payload: 'backup', replaceRemote: true })
+    vi.mocked(preferenceService.getCurrentAccount).mockReturnValue(accounts[1] as any)
+    resolveContext({ wallet: {}, service: {} })
+
+    await expect(pending).rejects.toThrow('active wallet or network changed')
+    expect(restore).not.toHaveBeenCalled()
   })
 
   it('exports both created accounts without switching the selected account', async () => {
@@ -761,7 +781,11 @@ describe('RGB HD backup orchestration', () => {
       controller.restoreRgbBackupFile({ payload: legacyPayload, replaceRemote: true })
     ).resolves.toMatchObject({ accountIndexes: [2] })
     expect(inspect).toHaveBeenCalledWith(legacyPayload, { service: {}, wallet: target.wallet })
-    expect(restore).toHaveBeenCalledWith(legacyPayload, { service: {}, wallet: target.wallet })
+    expect(restore).toHaveBeenCalledWith(
+      legacyPayload,
+      { service: {}, wallet: target.wallet },
+      expect.any(Function)
+    )
   })
 
   it('finds a legacy backup even when another account is selected', async () => {

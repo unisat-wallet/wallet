@@ -1162,6 +1162,41 @@ export class WalletController extends BaseController {
     syncReceiveHistory: (receive, wallet) => this.syncRgbReceiveHistoryToIndexer(receive, wallet),
     warn: (message, error) => log.warn(message, error),
   })
+  /** Invalidates a restore when the selected wallet, network or lock state changes. */
+  private rgbBackupScopeVersion = 0
+
+  private rgbBackupSelection = () => {
+    const account = preferenceService.getCurrentAccount()
+    return JSON.stringify([
+      preferenceService.getCurrentKeyringIndex(),
+      this.getChainType(),
+      this.getNetworkType(),
+      account?.key,
+      account?.pubkey,
+      account?.type,
+      account?.index,
+      account?.address,
+    ])
+  }
+
+  private captureRgbBackupScope = () => {
+    const version = this.rgbBackupScopeVersion
+    const selection = this.rgbBackupSelection()
+    const keyringIndex = preferenceService.getCurrentKeyringIndex()
+    const keyring = keyringService.keyrings[keyringIndex]
+    const isCurrent = () =>
+      !!keyring &&
+      isWalletUnlocked() &&
+      version === this.rgbBackupScopeVersion &&
+      selection === this.rgbBackupSelection() &&
+      keyringService.keyrings[keyringIndex] === keyring
+    const assertCurrent = () => {
+      if (!isCurrent()) throw new RgbWalletContextChangedError()
+    }
+    assertCurrent()
+    return { isCurrent, assertCurrent }
+  }
+
   private readonly rgbRecoveryRestores = new Map<string, Promise<void>>()
   private readonly rgbRecoveryBackups = new Map<string, Promise<unknown>>()
   private readonly rgbHdBackupWallets = new Map<string, number>()
@@ -1336,6 +1371,7 @@ export class WalletController extends BaseController {
       this.createRgbRequestAuthorization(request)
     )
     keyringService.on?.('lock', () => {
+      this.rgbBackupScopeVersion++
       void this.releaseAllRgbWriteLeases()
       this.rgbServiceRegistry.clear()
       this.rgbCoordinator.clear()
@@ -1612,6 +1648,7 @@ export class WalletController extends BaseController {
   }
 
   lockWallet = async () => {
+    this.rgbBackupScopeVersion++
     this.clearCosmosKeyringCache()
     await keyringService.setLocked()
     // sessionService.broadcastEvent(SESSION_EVENTS.accountsChanged, [])
@@ -2159,9 +2196,20 @@ export class WalletController extends BaseController {
       throw new Error('Keyring is corrupted')
     }
 
+    const account = keyring.accounts[accountIndex]!
+    const current = preferenceService.getCurrentAccount()
+    if (
+      preferenceService.getCurrentKeyringIndex() !== keyring.index ||
+      current?.key !== account?.key ||
+      current?.pubkey !== account?.pubkey ||
+      current?.type !== account?.type ||
+      current?.index !== account?.index ||
+      current?.address !== account?.address
+    ) {
+      this.rgbBackupScopeVersion++
+    }
     this.clearCosmosKeyringCache()
     preferenceService.setCurrentKeyringIndex(keyring.index)
-    const account = keyring.accounts[accountIndex]!
     preferenceService.setCurrentAccount(account)
     if (account) {
       sessionService.broadcastEvent(SESSION_EVENTS.accountsChanged, [account.address])
@@ -2690,6 +2738,7 @@ export class WalletController extends BaseController {
       return
     }
 
+    this.rgbBackupScopeVersion++
     preferenceService.setChainType(chainType)
     await walletApiService.setEndpoint(CHAINS_MAP[chainType]!.endpoints[0]!)
     this.rgbProxyPolicyCache = undefined
@@ -5090,15 +5139,22 @@ export class WalletController extends BaseController {
       throw new Error('Restoring an RGB backup requires explicit replacement confirmation')
     if (typeof params.payload !== 'string' || !params.payload)
       throw new Error('RGB backup package is required')
+    const scope = this.captureRgbBackupScope()
     const context = await this.getLocalRgbService()
-    return this.restoreRgbBackupForContext(params.payload, context)
+    scope.assertCurrent()
+    return this.restoreRgbBackupForContext(params.payload, context, scope.assertCurrent)
   }
 
-  private restoreRgbBackupForContext = async (payload: string, context: LocalRgbServiceContext) => {
-    const backup = await readRgbBackupPackage(
-      payload,
-      await this.rgbBackupKey(context.wallet)
-    )
+  private restoreRgbBackupForContext = async (
+    payload: string,
+    context: LocalRgbServiceContext,
+    assertCurrent: () => void
+  ) => {
+    assertCurrent()
+    const key = await this.rgbBackupKey(context.wallet)
+    assertCurrent()
+    const backup = await readRgbBackupPackage(payload, key)
+    assertCurrent()
     if (!context.service.canRestoreRecoveryState(backup.state)) {
       throw new Error('RGB backup package does not belong to this wallet')
     }
@@ -5107,15 +5163,18 @@ export class WalletController extends BaseController {
     // an older installation holding the writer lease; the checkpoint revision
     // still prevents replacing a newer unknown state.
     await this.ensureRgbWriteLease(context, { forceRenew: true, takeover: true })
+    assertCurrent()
     if (!(await context.service.restoreRecoveryState(backup.state))) {
       throw new Error('RGB backup package could not be restored')
     }
+    assertCurrent()
     // The controller retains the remote revision it read before acquiring the
     // lease. retryRecoveryCheckpoint publishes this replacement through that
     // CAS baseline; it must not be reset to an unconditional overwrite.
     if (!(await context.service.retryRecoveryCheckpoint('replacement', true))) {
       throw new Error('RGB backup checkpoint publication failed')
     }
+    assertCurrent()
     return { restored: true, createdAt: backup.createdAt }
   }
 
@@ -5254,7 +5313,12 @@ export class WalletController extends BaseController {
     if (!params?.replaceRemote) {
       throw new Error('Restoring an RGB backup requires explicit replacement confirmation')
     }
+    const scope = this.captureRgbBackupScope()
+    const originalAccount = preferenceService.getCurrentAccount()
+    const keyringIndex = preferenceService.getCurrentKeyringIndex()
+    const hdKeyring = keyringService.keyrings[keyringIndex]
     const preview = await this.inspectRgbHdBackup(params.payload)
+    scope.assertCurrent()
     this.reportRgbBackupRestoreProgress(params.progressId, {
       completed: 0,
       total: preview.accountIndexes.length,
@@ -5264,15 +5328,17 @@ export class WalletController extends BaseController {
       if (!params.createMissingAccounts) {
         throw new Error(`RGB account ${preview.missingAccountIndexes[0]! + 1} has not been created`)
       }
-      const originalAccount = preferenceService.getCurrentAccount()
       const keyring = await this.getCurrentKeyring()
+      scope.assertCurrent()
       if (!keyring || keyring.type !== KeyringType.HdKeyring || !originalAccount) {
         throw new Error('RGB HD backup requires an HD wallet')
       }
-      const hdKeyring = keyringService.keyrings[keyring.index]
-      if (!hdKeyring) throw new Error('RGB HD wallet keyring is unavailable')
+      if (!hdKeyring || keyring.index !== keyringIndex) {
+        throw new Error('RGB HD wallet keyring is unavailable')
+      }
       try {
         for (const index of preview.accountsToCreateIndexes) {
+          scope.assertCurrent()
           this.reportRgbBackupRestoreProgress(params.progressId, {
             completed: 0,
             total: preview.accountIndexes.length,
@@ -5280,24 +5346,38 @@ export class WalletController extends BaseController {
             accountNumber: index + 1,
           })
           await keyringService.addNewAccount(hdKeyring)
+          scope.assertCurrent()
           const updatedKeyring = await this.getCurrentKeyring()
+          scope.assertCurrent()
           if (updatedKeyring?.accounts[updatedKeyring.accounts.length - 1]?.index !== index) {
             throw new Error('RGB account creation did not match the backup account index')
           }
         }
       } finally {
-        const updatedKeyring = await this.getCurrentKeyring()
-        if (updatedKeyring) await this.changeKeyring(updatedKeyring, originalAccount.index)
+        if (scope.isCurrent()) {
+          const updatedKeyring = await this.getCurrentKeyring()
+          scope.assertCurrent()
+          if (updatedKeyring) await this.changeKeyring(updatedKeyring, originalAccount.index)
+          scope.assertCurrent()
+        }
       }
+      scope.assertCurrent()
       const verified = await this.inspectRgbHdBackup(params.payload)
+      scope.assertCurrent()
       if (verified.missingAccountIndexes.length > 0) {
         throw new Error(`RGB account ${verified.missingAccountIndexes[0]! + 1} has not been created`)
       }
     }
-    const backup = await readRgbHdBackupPackage(params.payload, await this.rgbHdBackupKey())
+    scope.assertCurrent()
+    const key = await this.rgbHdBackupKey()
+    scope.assertCurrent()
+    const backup = await readRgbHdBackupPackage(params.payload, key)
+    scope.assertCurrent()
     const accounts = await this.getRgbHdBackupAccounts()
+    scope.assertCurrent()
     const restoredIndexes: number[] = []
     for (const entry of backup.accounts) {
+      scope.assertCurrent()
       const account = accounts.find(item => item.index === entry.index)
       if (!account) throw new Error(`RGB account ${entry.index + 1} has not been created`)
       this.reportRgbBackupRestoreProgress(params.progressId, {
@@ -5308,10 +5388,14 @@ export class WalletController extends BaseController {
       })
       try {
         const wallet = await this.getRgbWalletRefForAccount(account)
+        scope.assertCurrent()
         await this.withRgbHdBackupWallet(wallet, async () => {
+          scope.assertCurrent()
           const context = await this.getLocalRgbServiceForWallet(wallet)
-          await this.restoreRgbBackupForContext(entry.payload, context)
+          scope.assertCurrent()
+          await this.restoreRgbBackupForContext(entry.payload, context, scope.assertCurrent)
         })
+        scope.assertCurrent()
         restoredIndexes.push(entry.index)
         this.reportRgbBackupRestoreProgress(params.progressId, {
           completed: restoredIndexes.length,
@@ -5325,6 +5409,7 @@ export class WalletController extends BaseController {
         )
       }
     }
+    scope.assertCurrent()
     return { restored: true, createdAt: backup.createdAt, accountIndexes: restoredIndexes }
   }
 
@@ -5370,7 +5455,9 @@ export class WalletController extends BaseController {
     if (!params.replaceRemote) {
       throw new Error('Restoring an RGB backup requires explicit replacement confirmation')
     }
+    const scope = this.captureRgbBackupScope()
     const { account, wallet } = await this.findLegacyRgbBackupAccount(params.payload)
+    scope.assertCurrent()
     this.reportRgbBackupRestoreProgress(params.progressId, {
       completed: 0,
       total: 1,
@@ -5378,9 +5465,12 @@ export class WalletController extends BaseController {
       accountNumber: account.index! + 1,
     })
     const result = await this.withRgbHdBackupWallet(wallet, async () => {
+      scope.assertCurrent()
       const context = await this.getLocalRgbServiceForWallet(wallet)
-      return this.restoreRgbBackupForContext(params.payload, context)
+      scope.assertCurrent()
+      return this.restoreRgbBackupForContext(params.payload, context, scope.assertCurrent)
     })
+    scope.assertCurrent()
     this.reportRgbBackupRestoreProgress(params.progressId, {
       completed: 1,
       total: 1,
