@@ -57,7 +57,7 @@ export function useAlkanesTokenScreenLogic() {
   const [warning, setWarning] = useState(false)
 
   const { t } = useI18n()
-  const defaultMintUrl = useAlkanesInscribeUrl()
+  const defaultMintUrl = useAlkanesInscribeUrl(alkaneid)
 
   useEffect(() => {
     wallet.getAddressAlkanesTokenSummary(account.address, alkaneid, false).then(tokenSummary => {

@@ -121,6 +121,7 @@ export function createWalletMock() {
         logo: '',
       },
     }),
+    getAddressAlkanesTokenSummary: vi.fn(),
     createSendAllBTCPsbt: vi.fn(),
     createSendBTCPsbt: vi.fn(),
     createSendBTCOffsetPsbt: vi.fn(),
