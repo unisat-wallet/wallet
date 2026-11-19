@@ -100,16 +100,21 @@ function RgbReceiveApproval({ data, session }: { data: Props['params']['data']; 
 
   const normalizedAmount = data.amount == null ? '' : String(data.amount).trim();
   const assetPrecision = assetMetadata?.precision;
-  // Provider invoice amounts are atomic integers. Convert only the rendered
-  // value, and do not briefly expose the atomic amount while metadata loads.
+  // Provider invoice amounts are atomic integers. Convert only when the wallet
+  // knows the asset precision; otherwise label the raw value unambiguously.
+  const showsAtomicAmount = Boolean(normalizedAmount && assetPrecision === undefined);
   const amount = normalizedAmount
-    ? assetPrecision === undefined && data.assetId
-      ? '--'
+    ? showsAtomicAmount
+      ? normalizedAmount
       : toRgbDisplayAmount(normalizedAmount, assetPrecision ?? 0)
     : t('rgb_approval_any_amount');
   const ticker = assetMetadata?.ticker?.trim();
   const assetName = assetMetadata?.name?.trim();
-  const amountLabel = ticker && normalizedAmount ? `${amount} ${ticker}` : amount;
+  const amountLabel = showsAtomicAmount
+    ? `${amount} ${t('rgb_approval_atomic_units')}`
+    : ticker && normalizedAmount
+      ? `${amount} ${ticker}`
+      : amount;
   const assetLabel = data.assetId
     ? [ticker, assetName && assetName !== ticker ? assetName : ''].filter(Boolean).join(' · ') ||
       `${t('rgb_approval_rgb_asset')} · ${shortAddress(data.assetId, 6)}`

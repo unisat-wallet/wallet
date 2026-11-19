@@ -3602,6 +3602,7 @@
   "rgb_broadcast_cancellation_review_failed": { "message": "Не удалось запросить проверку отмены" },
   "rgb_acknowledged_requires_cancellation_review": { "message": "Получатель уже принял перевод. Запросите проверку отмены в деталях перевода." },
   "rgb_approval_any_amount": { "message": "Any amount" },
+  "rgb_approval_atomic_units": { "message": "атомарных единиц" },
   "rgb_approval_any_rgb_asset": { "message": "Any RGB asset" },
   "rgb_approval_rgb_asset": { "message": "RGB asset" },
   "rgb_approval_create_utxo_failed": { "message": "Unable to create RGB UTXO" },

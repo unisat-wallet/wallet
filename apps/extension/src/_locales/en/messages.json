@@ -3711,6 +3711,7 @@
     "message": "Accepted. Waiting for on-chain confirmation."
   },
   "rgb_approval_any_amount": { "message": "Any amount" },
+  "rgb_approval_atomic_units": { "message": "atomic units" },
   "rgb_approval_any_rgb_asset": { "message": "Any RGB asset" },
   "rgb_approval_rgb_asset": { "message": "RGB asset" },
   "rgb_approval_create_utxo_failed": { "message": "Unable to create RGB UTXO" },

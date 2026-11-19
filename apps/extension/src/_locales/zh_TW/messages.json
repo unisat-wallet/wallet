@@ -3688,6 +3688,7 @@
     "message": "已接受，等待鏈上確認。"
   },
   "rgb_approval_any_amount": { "message": "任意金額" },
+  "rgb_approval_atomic_units": { "message": "原子單位" },
   "rgb_approval_any_rgb_asset": { "message": "任意 RGB 資產" },
   "rgb_approval_rgb_asset": { "message": "RGB 資產" },
   "rgb_approval_create_utxo_failed": { "message": "無法建立 RGB UTXO" },

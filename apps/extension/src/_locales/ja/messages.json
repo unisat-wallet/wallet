@@ -3606,6 +3606,7 @@
   "rgb_broadcast_cancellation_review_failed": { "message": "キャンセル審査を申請できませんでした" },
   "rgb_acknowledged_requires_cancellation_review": { "message": "受取人はこの送金を承認済みです。送金詳細からキャンセル審査を申請してください。" },
   "rgb_approval_any_amount": { "message": "Any amount" },
+  "rgb_approval_atomic_units": { "message": "最小単位" },
   "rgb_approval_any_rgb_asset": { "message": "Any RGB asset" },
   "rgb_approval_rgb_asset": { "message": "RGB asset" },
   "rgb_approval_create_utxo_failed": { "message": "Unable to create RGB UTXO" },
