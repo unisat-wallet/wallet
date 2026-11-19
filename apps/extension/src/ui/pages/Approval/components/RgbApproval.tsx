@@ -98,10 +98,18 @@ function RgbReceiveApproval({ data, session }: { data: Props['params']['data']; 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
-  const amount = data.amount?.trim() || t('rgb_approval_any_amount');
+  const normalizedAmount = data.amount == null ? '' : String(data.amount).trim();
+  const assetPrecision = assetMetadata?.precision;
+  // Provider invoice amounts are atomic integers. Convert only the rendered
+  // value, and do not briefly expose the atomic amount while metadata loads.
+  const amount = normalizedAmount
+    ? assetPrecision === undefined && data.assetId
+      ? '--'
+      : toRgbDisplayAmount(normalizedAmount, assetPrecision ?? 0)
+    : t('rgb_approval_any_amount');
   const ticker = assetMetadata?.ticker?.trim();
   const assetName = assetMetadata?.name?.trim();
-  const amountLabel = ticker && data.amount?.trim() ? `${amount} ${ticker}` : amount;
+  const amountLabel = ticker && normalizedAmount ? `${amount} ${ticker}` : amount;
   const assetLabel = data.assetId
     ? [ticker, assetName && assetName !== ticker ? assetName : ''].filter(Boolean).join(' · ') ||
       `${t('rgb_approval_rgb_asset')} · ${shortAddress(data.assetId, 6)}`
@@ -124,6 +132,7 @@ function RgbReceiveApproval({ data, session }: { data: Props['params']['data']; 
         setAssetMetadata({
           name: asset.name,
           ticker: asset.ticker,
+          precision: asset.precision ?? asset.balance?.precision,
           iconInfo: asset.iconInfo,
           iconUrl: asset.iconUrl
         });
