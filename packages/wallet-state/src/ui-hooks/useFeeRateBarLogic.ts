@@ -220,8 +220,8 @@ export function useFeeRateBarLogic({ readonly }: { readonly?: boolean }) {
     let val = defaultFeeRate
     if (feeOptionIndex === FeeRateType.CUSTOM) {
       val = parseFloat(feeRateInputVal) || 0
-      // Zero marks an unfinished custom fee so send screens disable submission.
-      if (val <= 0) {
+      // Zero marks an unfinished or sub-minimum fee so send screens disable submission.
+      if (!Number.isFinite(val) || val < (supportLowFeeMode ? 0.1 : 1)) {
         if (feeRate !== 0) updateFeeRateBar({ feeRate: 0 })
         return
       }
@@ -238,7 +238,7 @@ export function useFeeRateBarLogic({ readonly }: { readonly?: boolean }) {
     }
 
     updateFeeRateBar({ feeRate: val })
-  }, [resolvedFeeOptions, feeOptionIndex, feeRateInputVal, defaultFeeRate, feeRate])
+  }, [resolvedFeeOptions, feeOptionIndex, feeRateInputVal, defaultFeeRate, feeRate, supportLowFeeMode])
 
   const adjustFeeRateInput = useCallback(
     (inputVal: string) => {

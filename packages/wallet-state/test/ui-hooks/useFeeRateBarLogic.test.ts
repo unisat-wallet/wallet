@@ -75,6 +75,17 @@ describe('useFeeRateBarLogic editing', () => {
     expect(feeRate()).toBe(0.15)
   })
 
+  it('keeps custom fee state disabled below the active chain minimum', async () => {
+    const lowFee = await setup(false)
+    act(() => lowFee.store.dispatch(uiActions.updateFeeRateBar({ feeRateInputVal: '0.09' })))
+    await waitFor(() => expect(lowFee.feeRate()).toBe(0))
+    lowFee.unmount()
+
+    const normalFee = await setup(true)
+    act(() => normalFee.store.dispatch(uiActions.updateFeeRateBar({ feeRateInputVal: '0.9' })))
+    await waitFor(() => expect(normalFee.feeRate()).toBe(0))
+  })
+
   it('still clamps completed values to the fee limits', async () => {
     const { result, input, feeRate } = await setup(true)
     input('0.5')
