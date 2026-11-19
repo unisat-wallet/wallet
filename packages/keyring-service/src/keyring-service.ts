@@ -160,6 +160,7 @@ export class KeyringService extends EventEmitter {
   private encryptedStorageRegistryKey: string = 'encryptedStorageRegistry'
   private encryptedStorageCache = new Map<string, Record<string, unknown>>()
   private encryptedStorageMutexes = new Map<string, SimpleMutex>()
+  private encryptedStorageRegistryMutex = new SimpleMutex()
   private readonly MAX_CACHE_ITEMS: number = 20
 
   constructor() {
@@ -874,10 +875,12 @@ export class KeyringService extends EventEmitter {
 
   private async ensureEncryptedStorageNamespace(namespace: string): Promise<void> {
     this.assertEncryptedStorageNamespace(namespace)
-    const namespaces = await this.getEncryptedStorageNamespaces()
-    if (!namespaces.includes(namespace)) {
-      await this.storage.set(this.encryptedStorageRegistryKey, [...namespaces, namespace])
-    }
+    await this.encryptedStorageRegistryMutex.lock(async () => {
+      const namespaces = await this.getEncryptedStorageNamespaces()
+      if (!namespaces.includes(namespace)) {
+        await this.storage.set(this.encryptedStorageRegistryKey, [...namespaces, namespace])
+      }
+    })
   }
 
   private assertEncryptedStorageNamespace(namespace: string) {

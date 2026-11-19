@@ -1107,6 +1107,15 @@ describe('RGB wallet references', () => {
 
     expect(firstContext.service).toBe(secondContext.service)
     expect(getEncryptedStorageItem).toHaveBeenCalledTimes(3)
+    expect(getEncryptedStorageItem).toHaveBeenCalledWith(
+      'rgb-meta-v1',
+      expect.stringMatching(/^rgb-feature-enabled:/)
+    )
+    expect(getEncryptedStorageItem.mock.calls).toEqual(
+      expect.arrayContaining([
+        ['rgb-service-v1', expect.not.stringMatching(/^rgb-feature-enabled:/)],
+      ])
+    )
   })
 
   it('returns the local RGB read service without waiting for recovery', async () => {
@@ -1141,8 +1150,17 @@ describe('RGB wallet references', () => {
       network: 'mainnet',
       fundingAddress: 'bc1p-rgb-funding',
     }
-    const getEncryptedStorageItem = vi.fn().mockResolvedValue(undefined)
-    const setEncryptedStorageItem = vi.fn().mockResolvedValue(undefined)
+    const storage = new Map<string, unknown>()
+    const storageKey = (namespace: string, key: string) => `${namespace}:${key}`
+    const getEncryptedStorageItem = vi.fn(
+      (namespace: string, key: string) => Promise.resolve(storage.get(storageKey(namespace, key)))
+    )
+    const setEncryptedStorageItem = vi.fn(
+      (namespace: string, key: string, value: unknown) => {
+        storage.set(storageKey(namespace, key), value)
+        return Promise.resolve()
+      }
+    )
     ;(keyringService as any).getEncryptedStorageItem = getEncryptedStorageItem
     ;(keyringService as any).setEncryptedStorageItem = setEncryptedStorageItem
     vi.spyOn(wallet, 'getCurrentRgbWalletRef').mockResolvedValue(walletRef)
@@ -1160,7 +1178,7 @@ describe('RGB wallet references', () => {
     const openService = vi.spyOn(wallet as any, 'getLocalRgbService').mockResolvedValue(undefined)
     await expect(wallet.enableRgbFeature()).resolves.toEqual({ enabled: true })
     expect(setEncryptedStorageItem).toHaveBeenCalledWith(
-      'rgb-service-v1',
+      'rgb-meta-v1',
       'rgb-feature-enabled:v1:rgb-wallet:mainnet',
       expect.objectContaining({
         enabled: true,
@@ -1202,9 +1220,82 @@ describe('RGB wallet references', () => {
     await expect(wallet.enableRgbFeature()).rejects.toThrow('invalid issue history item')
     expect(storage.has('rgb-feature-enabled:v1:unisat-deadbeef:mainnet')).toBe(false)
     expect(removeEncryptedStorageItem).toHaveBeenCalledWith(
-      'rgb-service-v1',
+      'rgb-meta-v1',
       'rgb-feature-enabled:v1:unisat-deadbeef:mainnet'
     )
+  })
+
+  it('lazily migrates legacy RGB consent and retains the downgrade copy', async () => {
+    const wallet = new WalletController()
+    const key = 'rgb-feature-enabled:v1:unisat-deadbeef:mainnet'
+    const storage = new Map<string, unknown>([[`rgb-service-v1:${key}`, rgbConsent]])
+    const getEncryptedStorageItem = vi.fn(
+      (namespace: string, itemKey: string) => Promise.resolve(storage.get(`${namespace}:${itemKey}`))
+    )
+    const setEncryptedStorageItem = vi.fn(
+      (namespace: string, itemKey: string, value: unknown) => {
+        storage.set(`${namespace}:${itemKey}`, value)
+        return Promise.resolve()
+      }
+    )
+    ;(keyringService as any).getEncryptedStorageItem = getEncryptedStorageItem
+    ;(keyringService as any).setEncryptedStorageItem = setEncryptedStorageItem
+    vi.spyOn(wallet, 'getCurrentRgbWalletRef').mockResolvedValue({
+      walletId: 'unisat-deadbeef-0',
+      network: 'mainnet',
+      fundingAddress: 'bc1p-rgb-funding',
+    })
+
+    await expect(wallet.getRgbFeatureStatus()).resolves.toMatchObject({ enabled: true })
+    expect(storage.get(`rgb-meta-v1:${key}`)).toEqual(rgbConsent)
+    expect(storage.get(`rgb-service-v1:${key}`)).toEqual(rgbConsent)
+    expect(setEncryptedStorageItem).toHaveBeenCalledWith('rgb-meta-v1', key, rgbConsent)
+  })
+
+  it('does not revive legacy consent when a new metadata value is malformed', async () => {
+    const wallet = new WalletController()
+    const key = 'rgb-feature-enabled:v1:unisat-deadbeef:mainnet'
+    const storage = new Map<string, unknown>([
+      [`rgb-meta-v1:${key}`, { enabled: false }],
+      [`rgb-service-v1:${key}`, rgbConsent],
+    ])
+    const getEncryptedStorageItem = vi.fn(
+      (namespace: string, itemKey: string) => Promise.resolve(storage.get(`${namespace}:${itemKey}`))
+    )
+    const setEncryptedStorageItem = vi.fn().mockResolvedValue(undefined)
+    ;(keyringService as any).getEncryptedStorageItem = getEncryptedStorageItem
+    ;(keyringService as any).setEncryptedStorageItem = setEncryptedStorageItem
+    vi.spyOn(wallet, 'getCurrentRgbWalletRef').mockResolvedValue({
+      walletId: 'unisat-deadbeef-0',
+      network: 'mainnet',
+      fundingAddress: 'bc1p-rgb-funding',
+    })
+
+    await expect(wallet.getRgbFeatureStatus()).resolves.toMatchObject({ enabled: false })
+    expect(getEncryptedStorageItem).not.toHaveBeenCalledWith('rgb-service-v1', key)
+    expect(setEncryptedStorageItem).not.toHaveBeenCalled()
+  })
+
+  it('lazily migrates the legacy RGB device ID without removing it', async () => {
+    const wallet = new WalletController()
+    const deviceId = 'device_abcdefghijklmnop'
+    const key = 'rgb-device-id:v1'
+    const storage = new Map<string, unknown>([[`rgb-service-v1:${key}`, deviceId]])
+    const getEncryptedStorageItem = vi.fn(
+      (namespace: string, itemKey: string) => Promise.resolve(storage.get(`${namespace}:${itemKey}`))
+    )
+    const setEncryptedStorageItem = vi.fn(
+      (namespace: string, itemKey: string, value: unknown) => {
+        storage.set(`${namespace}:${itemKey}`, value)
+        return Promise.resolve()
+      }
+    )
+    ;(keyringService as any).getEncryptedStorageItem = getEncryptedStorageItem
+    ;(keyringService as any).setEncryptedStorageItem = setEncryptedStorageItem
+
+    await expect((wallet as any).getRgbDeviceId()).resolves.toBe(deviceId)
+    expect(storage.get(`rgb-meta-v1:${key}`)).toBe(deviceId)
+    expect(storage.get(`rgb-service-v1:${key}`)).toBe(deviceId)
   })
 
   it('shares RGB consent across accounts derived from the same wallet', async () => {

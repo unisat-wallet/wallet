@@ -243,6 +243,36 @@ describe('KeyringService booted KDF migration', () => {
     })
   })
 
+  it('retains every namespace when different encrypted stores are registered concurrently', async () => {
+    const values = new Map<string, any>()
+    const storage = {
+      get: vi.fn(async (key: string) => values.get(key)),
+      set: vi.fn(async (key: string, value: any) => void values.set(key, value)),
+    }
+    const encryptor = {
+      encrypt: vi.fn(async (_password: string, value: any) => JSON.stringify(value)),
+      decrypt: vi.fn(async (_password: string, value: string) => JSON.parse(value)),
+    }
+    const service = new KeyringService()
+    await service.init({
+      storage: storage as any,
+      encryptor,
+      logger: { debug: vi.fn(), info: vi.fn(), error: vi.fn() },
+      t: (key: string) => key,
+    })
+    ;(service as any).password = password
+
+    await Promise.all([
+      service.setEncryptedStorageItem('rgb-service-v1', 'wallet-state', { pending: true }),
+      service.setEncryptedStorageItem('rgb-meta-v1', 'rgb-device-id:v1', 'device_abcdefghijklmnop'),
+    ])
+
+    expect(values.get('encryptedStorageRegistry')).toHaveLength(2)
+    expect(values.get('encryptedStorageRegistry')).toEqual(
+      expect.arrayContaining(['rgb-service-v1', 'rgb-meta-v1'])
+    )
+  })
+
   it('re-encrypts persisted feature state when the wallet password changes', async () => {
     const oldPassword = 'old password'
     const newPassword = 'new password'

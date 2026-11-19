@@ -587,6 +587,7 @@ const getRgbApiService = () => (walletApiService as unknown as { rgb: RgbControl
 const RGB_DEVICE_ID_STORAGE_KEY = 'rgb-device-id:v1'
 const RGB_FEATURE_STORAGE_KEY_PREFIX = 'rgb-feature-enabled:v1'
 const RGB_FEATURE_TERMS_VERSION = 'rgb-terms-v1'
+const RGB_META_STORAGE_NAMESPACE = 'rgb-meta-v1'
 const RGB_LOCAL_HISTORY_STORAGE_NAMESPACE = 'rgb-local-history-v1'
 const RGB_FEE_POOL_WITHDRAWAL_HISTORY_LIMIT = 20
 const RGB_PROXY_CONFIG_CACHE_SECONDS = 10 * 60
@@ -765,7 +766,10 @@ type RgbSignPsbtRequest = {
   toSignInputs?: ToSignInput[]
 }
 
-const RGB_ENCRYPTED_STORAGE_NAMESPACE = 'rgb-service-v1'
+// Preserve the established physical namespace for full wallet state so an
+// extension downgrade observes the same transfer state. Small metadata is
+// migrated separately to avoid contending with large encrypted state writes.
+const RGB_STATE_STORAGE_NAMESPACE = 'rgb-service-v1'
 const RGB_RECOVERY_CHECKPOINT_FORMAT = 2
 // Keep each JSON request safely below the common 1 MB reverse-proxy default.
 const RGB_RECOVERY_PAYLOAD_PART_SIZE = 900_000
@@ -4593,15 +4597,11 @@ export class WalletController extends BaseController {
     const wasEnabled = await this.isRgbFeatureEnabled(wallet)
     const consentKey = this.rgbFeatureStorageKey(wallet)
     if (!wasEnabled) {
-      await keyringService.setEncryptedStorageItem(
-        RGB_ENCRYPTED_STORAGE_NAMESPACE,
-        consentKey,
-        {
-          enabled: true,
-          agreementVersion: RGB_FEATURE_TERMS_VERSION,
-          acceptedAt: Date.now(),
-        } satisfies RgbFeatureConsent
-      )
+      await this.setRgbMetaItem(consentKey, {
+        enabled: true,
+        agreementVersion: RGB_FEATURE_TERMS_VERSION,
+        acceptedAt: Date.now(),
+      } satisfies RgbFeatureConsent)
     }
     try {
       // First enable is intentionally the first point at which recovery is
@@ -4610,7 +4610,7 @@ export class WalletController extends BaseController {
     } catch (error) {
       if (!wasEnabled) {
         try {
-          await keyringService.removeEncryptedStorageItem(RGB_ENCRYPTED_STORAGE_NAMESPACE, consentKey)
+          await keyringService.removeEncryptedStorageItem(RGB_META_STORAGE_NAMESPACE, consentKey)
         } catch (rollbackError) {
           log.warn('Failed to roll back RGB consent after recovery failed', rollbackError)
         }
@@ -4640,12 +4640,56 @@ export class WalletController extends BaseController {
     )
   }
 
+  /**
+   * Read small RGB metadata from its independent namespace. Existing values
+   * are copied lazily from the legacy state namespace and deliberately left
+   * there for downgrade compatibility.
+   */
+  private async getRgbMetaItem<T>(
+    key: string,
+    isValidLegacyValue: (value: unknown) => value is T
+  ): Promise<T | undefined> {
+    const current = await keyringService.getEncryptedStorageItem<unknown>(
+      RGB_META_STORAGE_NAMESPACE,
+      key
+    )
+    // A present but malformed new value must not silently revive legacy
+    // metadata. Callers will fail closed or replace it as appropriate.
+    if (current !== undefined) return current as T
+
+    const legacy = await keyringService.getEncryptedStorageItem<unknown>(
+      RGB_STATE_STORAGE_NAMESPACE,
+      key
+    )
+    if (!isValidLegacyValue(legacy)) return undefined
+
+    try {
+      await this.setRgbMetaItem(key, legacy)
+    } catch (error) {
+      // Migration must not disable an already-enabled wallet merely because
+      // the new namespace could not be persisted. A later read retries it.
+      log.warn('Failed to migrate legacy RGB metadata', error)
+    }
+    return legacy
+  }
+
+  private async setRgbMetaItem<T>(key: string, value: T): Promise<void> {
+    await keyringService.setEncryptedStorageItem(RGB_META_STORAGE_NAMESPACE, key, value)
+    const verified = await keyringService.getEncryptedStorageItem<unknown>(
+      RGB_META_STORAGE_NAMESPACE,
+      key
+    )
+    if (stableRgbJson(verified) !== stableRgbJson(value)) {
+      throw new Error('RGB metadata storage verification failed')
+    }
+  }
+
   private async isRgbFeatureEnabled(
     wallet: Pick<RgbWalletRef, 'walletId' | 'network' | 'fundingAddress'>
   ) {
-    const consent = await keyringService.getEncryptedStorageItem<RgbFeatureConsent>(
-      RGB_ENCRYPTED_STORAGE_NAMESPACE,
-      this.rgbFeatureStorageKey(wallet)
+    const consent = await this.getRgbMetaItem(
+      this.rgbFeatureStorageKey(wallet),
+      (value): value is RgbFeatureConsent => this.isRgbFeatureConsent(value)
     )
     return this.isRgbFeatureConsent(consent)
   }
@@ -7469,17 +7513,15 @@ export class WalletController extends BaseController {
   }
 
   private async getRgbDeviceId() {
-    const existing = await keyringService.getEncryptedStorageItem<string>(
-      RGB_ENCRYPTED_STORAGE_NAMESPACE,
-      RGB_DEVICE_ID_STORAGE_KEY
-    )
-    if (typeof existing === 'string' && /^[A-Za-z0-9_-]{16,128}$/.test(existing)) return existing
-    const deviceId = globalThis.crypto.randomUUID().replace(/-/g, '')
-    await keyringService.setEncryptedStorageItem(
-      RGB_ENCRYPTED_STORAGE_NAMESPACE,
+    const isDeviceId = (value: unknown): value is string =>
+      typeof value === 'string' && /^[A-Za-z0-9_-]{16,128}$/.test(value)
+    const existing = await this.getRgbMetaItem(
       RGB_DEVICE_ID_STORAGE_KEY,
-      deviceId
+      isDeviceId
     )
+    if (isDeviceId(existing)) return existing
+    const deviceId = globalThis.crypto.randomUUID().replace(/-/g, '')
+    await this.setRgbMetaItem(RGB_DEVICE_ID_STORAGE_KEY, deviceId)
     return deviceId
   }
 
@@ -7753,11 +7795,11 @@ export class WalletController extends BaseController {
     }
     service = createRgbService({
       storage: {
-        get: key => keyringService.getEncryptedStorageItem(RGB_ENCRYPTED_STORAGE_NAMESPACE, key),
+        get: key => keyringService.getEncryptedStorageItem(RGB_STATE_STORAGE_NAMESPACE, key),
         set: (key, value) =>
-          keyringService.setEncryptedStorageItem(RGB_ENCRYPTED_STORAGE_NAMESPACE, key, value),
+          keyringService.setEncryptedStorageItem(RGB_STATE_STORAGE_NAMESPACE, key, value),
         remove: key =>
-          keyringService.removeEncryptedStorageItem(RGB_ENCRYPTED_STORAGE_NAMESPACE, key),
+          keyringService.removeEncryptedStorageItem(RGB_STATE_STORAGE_NAMESPACE, key),
       },
       stateSource: createRgbBackendAdapter({
         api: getRgbApiService() as RgbBackendApi,
