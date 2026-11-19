@@ -5905,7 +5905,17 @@ export class RgbService {
       if (pending.broadcast) return this.syncBroadcastedTransfer(transferId, pending)
       this.assertPreparedTransferGeneration(pending)
       const delivery = pending.delivery
-      if (!delivery?.requiresCounterpartySignature) {
+      const interruptedExternalConfirmation = Boolean(
+        delivery?.publishedAt &&
+        delivery.buyerSwapCommit &&
+        !delivery.requiresCounterpartySignature &&
+        !delivery.acknowledgedAt &&
+        !delivery.externalBroadcast
+      )
+      if (
+        !delivery ||
+        (!delivery.requiresCounterpartySignature && !interruptedExternalConfirmation)
+      ) {
         throw new RgbServiceError('RGB transfer is not awaiting a buyer swap PSBT')
       }
       const completed = await this.dependencies.encoder.completeTransfer({
@@ -5925,15 +5935,36 @@ export class RgbService {
       // their signature. Validate the final transaction before either the
       // wallet or the dApp is allowed to broadcast it.
       await this.assertTransactionAcceptedByMempool(completed)
+
+      // Proxy v1 ACKs authenticate the exact consignment originally uploaded
+      // by publishSwap. Do this before replacing delivery.completed with the
+      // buyer-signed version: the latter contains different Bitcoin witnesses
+      // and therefore has a different consignment hash.
+      let publishedCompletion = delivery.completed
+      if (interruptedExternalConfirmation) {
+        // v1.8.4 beta 6 persisted the final completion and cleared the retry
+        // markers before checking the ACK. Rebuild its originally published,
+        // unsigned witness from the prepared PSBT so affected swaps can retry.
+        publishedCompletion = await this.dependencies.encoder.completeTransfer({
+          wallet: state.wallet,
+          pending,
+          signedPsbt: pending.prepared.psbt,
+          allowIncomplete: true,
+        })
+        if (publishedCompletion.txid !== completed.txid) {
+          throw new RgbServiceError('RGB published swap recovery transaction ID does not match')
+        }
+      }
+      await this.advancePendingDelivery(transferId, pending, 'manual', publishedCompletion)
+
+      const rollback = snapshotState(state)
       delivery.completed = completed
       delete delivery.requiresCounterpartySignature
       delete delivery.makerSignedPsbt
-      await this.persist({ waitForRecovery: true })
-      return this.advancePendingDelivery(
-        transferId,
-        pending,
-        options.externalBroadcast ? 'external' : 'broadcast'
-      )
+      if (options.externalBroadcast) delivery.externalBroadcast = true
+      await this.persistWithRecoveryRollback(rollback)
+      if (options.externalBroadcast) return delivery.completed
+      return this.advancePendingDelivery(transferId, pending, 'broadcast')
     })
   }
 
@@ -6852,27 +6883,29 @@ export class RgbService {
   private async advancePendingDelivery(
     transferId: string,
     pending: RgbPendingTransfer,
-    mode: 'manual' | 'broadcast' | 'external' = 'manual'
+    mode: 'manual' | 'broadcast' = 'manual',
+    acknowledgementCompletion?: RgbCompletedTransfer
   ) {
     const state = this.requireState()
     const delivery = pending.delivery
     if (!delivery) throw new RgbServiceError(`RGB transfer ${transferId} has not been signed`)
     const invoice = decodeRgbInvoice(pending.request.invoice)
     const proxyRecipientId = invoice.proxyRecipientId
-    const consignments = delivery.completed.consignments.map((consignment, index) => ({
+    const completionForAcknowledgement = acknowledgementCompletion ?? delivery.completed
+    const consignments = completionForAcknowledgement.consignments.map((consignment, index) => ({
       ...consignment,
       recipientId: proxyRecipientId,
       transportId: `${transferId}:${index}`,
-      txid: delivery.completed.txid,
+      txid: completionForAcknowledgement.txid,
       endpoints: delivery.endpoints,
-      ...(delivery.completed.consignments.length > 1 ? { batch: true } : {}),
+      ...(completionForAcknowledgement.consignments.length > 1 ? { batch: true } : {}),
       ...(pending.request.donation ? { donation: true } : {}),
       ...(invoice.proxyInvoiceId ? {
         proxyInvoiceId: invoice.proxyInvoiceId,
         proxyRecipientPublicKey: invoice.proxyPublicKey,
         proxySenderPrivateKey: pending.proxySenderPrivateKey,
         proxyEncryption: invoice.encryption,
-        signedRawTx: delivery.completed.rawTx,
+        signedRawTx: completionForAcknowledgement.rawTx,
         proxyExpirationTimestamp: invoice.expirationTimestamp,
       } : {}),
     }))
@@ -6953,12 +6986,6 @@ export class RgbService {
     }
 
     if (mode === 'manual' && !pending.request.donation) return delivery.completed
-
-    if (mode === 'external') {
-      delivery.externalBroadcast = true
-      await this.persist({ waitForRecovery: true })
-      return delivery.completed
-    }
 
     delete delivery.broadcastError
     let broadcastTxid: string

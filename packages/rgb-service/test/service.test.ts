@@ -5654,6 +5654,123 @@ describe('RgbService', () => {
     expect(service.getPendingTransfers()).toEqual([])
   })
 
+  it('keeps a published seller swap retryable when ACK verification fails', async () => {
+    const dependencies = createDependencies()
+    const published = {
+      txid: 'c'.repeat(64),
+      rawTx: 'published-raw-tx',
+      consignments: [{
+        recipientId: 'recipient',
+        payload: 'published-consignment',
+        assetId: 'rgb:AQEBAQEB-AQEBAQE-BAQEBAQ-EBAQEBA-QEBAQEB-AQEBAQE',
+        opIds: ['d'.repeat(64)],
+      }],
+    }
+    const finalized = {
+      ...published,
+      rawTx: 'finalized-raw-tx',
+      consignments: [{ ...published.consignments[0]!, payload: 'finalized-consignment' }],
+    }
+    vi.mocked(dependencies.encoder.completeTransfer).mockImplementation(async input =>
+      input.signedPsbt === 'maker-signed-psbt' ? published : finalized
+    )
+    vi.mocked(dependencies.transport.getAcknowledgement!)
+      .mockRejectedValueOnce(new Error('RGB proxy acknowledgement signature is invalid'))
+      .mockResolvedValue(true)
+    const service = new RgbService(dependencies)
+    await service.open(wallet)
+    await service.sync()
+    await service.prepareSend({
+      assetId: published.consignments[0]!.assetId,
+      amount: '60',
+      invoice: rgbInvoice(),
+      feeRate: 2,
+    })
+    await service.publishSwap('transfer-1', 'maker-signed-psbt')
+
+    await expect(service.completePublishedSwap('transfer-1', 'fully-signed-psbt', {
+      externalBroadcast: true,
+    })).rejects.toThrow('acknowledgement signature is invalid')
+
+    expect(dependencies.transport.getAcknowledgement).toHaveBeenLastCalledWith(
+      expect.objectContaining({ payload: 'published-consignment' })
+    )
+    expect(service.getPendingTransfers()[0]?.delivery).toEqual(expect.objectContaining({
+      completed: published,
+      requiresCounterpartySignature: true,
+      makerSignedPsbt: 'maker-signed-psbt',
+    }))
+    expect(service.getPendingTransfers()[0]?.delivery?.externalBroadcast).toBeUndefined()
+
+    await expect(service.completePublishedSwap('transfer-1', 'fully-signed-psbt', {
+      externalBroadcast: true,
+    })).resolves.toEqual(finalized)
+    expect(dependencies.transport.getAcknowledgement).toHaveBeenLastCalledWith(
+      expect.objectContaining({ payload: 'published-consignment' })
+    )
+    expect(service.getPendingTransfers()[0]?.delivery).toEqual(expect.objectContaining({
+      completed: finalized,
+      acknowledgedAt: expect.any(Number),
+      externalBroadcast: true,
+    }))
+  })
+
+  it('recovers an interrupted beta seller confirmation on retry', async () => {
+    const dependencies = createDependencies()
+    const published = {
+      txid: 'c'.repeat(64),
+      rawTx: 'published-raw-tx',
+      consignments: [{
+        recipientId: 'recipient',
+        payload: 'published-consignment',
+        assetId: 'rgb:AQEBAQEB-AQEBAQE-BAQEBAQ-EBAQEBA-QEBAQEB-AQEBAQE',
+        opIds: ['d'.repeat(64)],
+      }],
+    }
+    const finalized = {
+      ...published,
+      rawTx: 'finalized-raw-tx',
+      consignments: [{ ...published.consignments[0]!, payload: 'finalized-consignment' }],
+    }
+    vi.mocked(dependencies.encoder.completeTransfer).mockImplementation(async input =>
+      input.signedPsbt === 'cHNidP8=' ? published : finalized
+    )
+    const service = new RgbService(dependencies)
+    await service.open(wallet)
+    await service.sync()
+    await service.prepareSend({
+      assetId: published.consignments[0]!.assetId,
+      amount: '60',
+      invoice: rgbInvoice(),
+      feeRate: 2,
+    })
+    await service.publishSwap('transfer-1', 'maker-signed-psbt')
+
+    const delivery = (service as any).state.pending['transfer-1'].delivery
+    delivery.completed = finalized
+    delivery.buyerSwapCommit = {
+      proxyTransferId: '1'.repeat(64),
+      txid: finalized.txid,
+      buyerSignedPsbtHash: '2'.repeat(64),
+      commitment: '3'.repeat(128),
+      signedAt: 1,
+    }
+    delete delivery.requiresCounterpartySignature
+    delete delivery.makerSignedPsbt
+
+    await expect(service.completePublishedSwap('transfer-1', 'fully-signed-psbt', {
+      externalBroadcast: true,
+    })).resolves.toEqual(finalized)
+    expect(dependencies.transport.getAcknowledgement).toHaveBeenLastCalledWith(
+      expect.objectContaining({ payload: 'published-consignment' })
+    )
+    expect(service.getPendingTransfers()[0]?.delivery).toEqual(expect.objectContaining({
+      completed: finalized,
+      acknowledgedAt: expect.any(Number),
+      externalBroadcast: true,
+    }))
+  })
+
   it('signs one immutable P2P buyer proposal with the seller Proxy key', async () => {
     const dependencies = createDependencies()
     const service = new RgbService(dependencies)
