@@ -4,6 +4,45 @@ import { describe, expect, it, vi } from 'vitest'
 import { RgbSendOperations } from '../src/rgb/RgbSendOperations'
 
 describe('RgbSendOperations backend-controlled seller swap', () => {
+  it('reconciles an Instant listing under a renewed write lease', async () => {
+    const psbt = new Psbt()
+      .addInput({
+        hash: '11'.repeat(32),
+        index: 0,
+        witnessUtxo: { value: 1_000, script: Buffer.from(`5120${'22'.repeat(32)}`, 'hex') },
+      })
+      .addOutput({ script: Buffer.from([0x6a]), value: 0 })
+    const result = {
+      transferId: 'instant-transfer',
+      txid: 'ab'.repeat(32),
+      status: 'settled' as const,
+    }
+    const service = { settleInstantListing: vi.fn().mockResolvedValue(result) }
+    const ensureWriteLease = vi.fn()
+    const operations = new RgbSendOperations({
+      getContext: vi.fn().mockResolvedValue({
+        service,
+        wallet: { fundingAddress: 'bc1pinstantwallet' },
+      }),
+      ensureWriteLease,
+    } as any)
+
+    await expect(operations.settleInstantListing({
+      transferId: result.transferId,
+      txid: result.txid,
+      finalPsbt: psbt.toHex(),
+    })).resolves.toEqual(result)
+    expect(ensureWriteLease).toHaveBeenCalledWith(
+      expect.objectContaining({ service }),
+      { forceRenew: true }
+    )
+    expect(service.settleInstantListing).toHaveBeenCalledWith(
+      result.transferId,
+      result.txid,
+      psbt.toHex()
+    )
+  })
+
   it('preflights the fully witnessed swap while returning the relayed PSBT', async () => {
     const psbt = new Psbt()
     psbt.addInput({

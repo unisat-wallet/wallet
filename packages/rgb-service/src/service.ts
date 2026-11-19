@@ -50,6 +50,7 @@ import {
 import { getSwapPsbtInputOutpoints } from './protocol/opret-transfer'
 import {
   completeInstantSwapTemplate,
+  extractSignedInstantSwapTransaction,
   type RgbInstantSwapListingPackage,
 } from './protocol/instant-swap'
 import {
@@ -2860,6 +2861,10 @@ export class RgbService {
         payload: completed.consignment,
         counterpartyScriptPubKeys: validated.counterpartyScriptPubKeys,
       }
+      // The consignment has already passed full wallet validation. Preserve
+      // its display metadata immediately so the pending receive does not fall
+      // back to an asset ID while Bitcoin is waiting for its first block.
+      this.queueAssetMetadata(validated.assetId, validated.decoded.metadata)
       delete receive.pendingAccept
       await this.persistWithRecoveryRollback(rollback)
       return { ...completed, status: 'staged' as const }
@@ -5775,6 +5780,100 @@ export class RgbService {
       }
       await this.persistWithRecoveryRollback(rollback)
       return this.instantListingPackage(pending)
+    })
+  }
+
+  /**
+   * Reconcile a buyer-broadcast Instant Swap into the seller wallet.
+   *
+   * The market-provided PSBT is untrusted. Rebuild the final RGB consignment,
+   * verify the retained seller SINGLE|ANYONECANPAY authorization and require
+   * the exact transaction to be visible on Bitcoin before releasing the
+   * seller's local RGB reservation.
+   */
+  async settleInstantListing(transferId: string, expectedTxid: string, finalPsbt: string) {
+    return this.runPendingTransferOperation(transferId, async () => {
+      const state = this.requireState()
+      const pending = state.pending[transferId]
+      if (!pending) {
+        const history = state.pendingSendHistory?.find(item => item.transferId === transferId)
+        if (!history?.txid || history.status !== 'broadcasted') {
+          throw new RgbServiceError(`RGB transfer ${transferId} does not exist`)
+        }
+        const transaction = ((Psbt.fromHex(finalPsbt).data.globalMap.unsignedTx as any).tx ||
+          Psbt.fromHex(finalPsbt).data.globalMap.unsignedTx) as Transaction
+        if (transaction.getId() !== history.txid || history.txid !== expectedTxid.toLowerCase()) {
+          throw new RgbServiceError('RGB Instant Swap final PSBT does not match settled history')
+        }
+        return { transferId, txid: history.txid, status: 'settled' as const }
+      }
+      if (!pending.instantListing || !pending.request.instantSwap) {
+        throw new RgbServiceError('RGB transfer is not an Instant Swap listing')
+      }
+      const final = Psbt.fromHex(finalPsbt)
+      const receiver = final.txOutputs[2]
+      if (!receiver) throw new RgbServiceError('RGB Instant Swap receiver output is missing')
+      const bound = completeInstantSwapTemplate({
+        listing: this.instantListingPackage(pending),
+        finalPsbt: final.toHex(),
+        receiverScriptPubKey: receiver.script.toString('hex'),
+      })
+      if (bound.txid !== expectedTxid.toLowerCase()) {
+        throw new RgbServiceError('RGB Instant Swap final PSBT does not match the broadcast txid')
+      }
+      // A normal RGB send cannot complete this PSBT: Instant Swap explicitly
+      // replaces the buyer placeholder input and receiver output. The
+      // Instant-specific verifier above already checks every seller-protected
+      // field and rebuilds the RGB witness for this final transaction.
+      const signedTransaction = extractSignedInstantSwapTransaction(final.toHex())
+      if (signedTransaction.getId() !== bound.txid) {
+        throw new RgbServiceError('RGB Instant Swap completed transaction ID is inconsistent')
+      }
+      const listingCompleted = pending.instantListing.completed
+      const matchingConsignment = listingCompleted.consignments.find(consignment =>
+        normalizeAssetId(consignment.assetId) === bound.assetId
+      )
+      if (!matchingConsignment) {
+        throw new RgbServiceError('RGB Instant Swap listing consignment is missing')
+      }
+      const completed: RgbCompletedTransfer = {
+        txid: bound.txid,
+        rawTx: signedTransaction.toHex(),
+        consignments: listingCompleted.consignments.map(consignment =>
+          consignment === matchingConsignment
+            ? { ...consignment, payload: bound.consignment }
+            : consignment
+        ),
+        fundingUpdate: {
+          spentOutpoints: pending.prepared.lockedOutpoints,
+        },
+      }
+      const getTransactionStatus = this.dependencies.stateSource.getTransactionStatus
+      if (!getTransactionStatus) {
+        throw new RgbServiceError('RGB Instant Swap chain verification is unavailable')
+      }
+      const chain = await getTransactionStatus(state.wallet, completed.txid)
+      if (chain.status !== 'mempool' && chain.status !== 'confirmed') {
+        return {
+          transferId,
+          txid: completed.txid,
+          status: 'awaiting_broadcast' as const,
+          chainStatus: chain.status,
+          confirmations: chain.confirmations,
+        }
+      }
+      const rollback = snapshotState(state)
+      this.applyFundingUpdate(completed)
+      pending.broadcast = { completed, broadcastAt: this.now() }
+      await this.persistWithRecoveryRollback(rollback)
+      await this.syncBroadcastedTransfer(transferId, pending)
+      return {
+        transferId,
+        txid: completed.txid,
+        status: 'settled' as const,
+        chainStatus: chain.status,
+        confirmations: chain.confirmations,
+      }
     })
   }
 

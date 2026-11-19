@@ -287,6 +287,16 @@ export class RgbSendOperations {
     )
   }
 
+  async settleInstantListing(params: { transferId: string; txid: string; finalPsbt: string }) {
+    const { service, wallet } = await this.dependencies.getContext()
+    await this.dependencies.ensureWriteLease?.({ service, wallet }, { forceRenew: true })
+    return service.settleInstantListing(
+      params.transferId,
+      params.txid,
+      psbtFromString(params.finalPsbt).toHex()
+    )
+  }
+
   /** Sign the standard buyer commitment with this seller transfer's Proxy key. */
   async signBuySwapCommit(params: {
     transferId: string

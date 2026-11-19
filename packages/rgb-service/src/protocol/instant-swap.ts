@@ -1,8 +1,12 @@
 import { schnorr } from '@noble/curves/secp256k1'
-import { Psbt, Transaction } from 'bitcoinjs-lib'
+import { crypto as bitcoinCrypto, Psbt, Transaction } from 'bitcoinjs-lib'
 import { RgbServiceError } from '../errors'
 import { serializeBfaOpretWitnessBundle, serializeNiaOpretWitnessBundle } from './consignment'
-import { encodeBfaTransferConsignment, isSupportedV1TransferConsignment } from './bfa-consignment'
+import {
+  encodeBfaTransferConsignment,
+  isSupportedV1TransferConsignment,
+  normalizeLegacyV1Consignment,
+} from './bfa-consignment'
 import { normalizeRgbAssetId } from './contract-id'
 import { encodeNiaTransferConsignment } from './nia-contract'
 import { convertNiaV0ConsignmentToV1 } from './nia-v0-migration'
@@ -51,6 +55,32 @@ function unsignedTransaction(psbt: Psbt): Transaction {
     throw new RgbServiceError('RGB Instant Swap PSBT is missing its unsigned transaction')
   }
   return transaction
+}
+
+/** Extract the fully signed transaction while preserving explicit Taproot sighash bytes. */
+export function extractSignedInstantSwapTransaction(value: string) {
+  const finalized = parsePsbt(value).clone()
+  finalized.data.inputs.forEach((input, index) => {
+    if (input.finalScriptSig || input.finalScriptWitness) return
+    if (input.tapKeySig) {
+      const signature = Buffer.from(input.tapKeySig)
+      if (signature.length !== 64 && signature.length !== 65) {
+        throw new RgbServiceError(`RGB Instant Swap input ${index} has an invalid Taproot signature`)
+      }
+      input.finalScriptWitness = Buffer.concat([Buffer.from([1, signature.length]), signature])
+      return
+    }
+    try {
+      finalized.finalizeInput(index)
+    } catch {
+      throw new RgbServiceError(`RGB Instant Swap input ${index} is not fully signed`)
+    }
+  })
+  try {
+    return finalized.extractTransaction()
+  } catch {
+    throw new RgbServiceError('RGB Instant Swap final PSBT is not fully signed')
+  }
 }
 
 function bytes32(value: string, name: string) {
@@ -115,6 +145,28 @@ function buildConsignment(state: ProtocolState, transaction: Transaction, native
     terminals: [],
   })
   return Buffer.from(convertNiaV0ConsignmentToV1(legacy)).toString('base64')
+}
+
+function samePayload(left: string, right: string) {
+  return Buffer.from(left, 'base64').equals(Buffer.from(right, 'base64'))
+}
+
+function sameCanonicalV1Payload(left: string, right: string) {
+  try {
+    const normalizedLeft = normalizeLegacyV1Consignment(
+      Uint8Array.from(Buffer.from(left, 'base64'))
+    )
+    const normalizedRight = normalizeLegacyV1Consignment(
+      Uint8Array.from(Buffer.from(right, 'base64'))
+    )
+    return Buffer.from(normalizedLeft).equals(Buffer.from(normalizedRight))
+  } catch {
+    return false
+  }
+}
+
+function shortPayloadHash(payload: string) {
+  return bitcoinCrypto.sha256(Buffer.from(payload, 'base64')).toString('hex').slice(0, 16)
 }
 
 /** Validate the public seller authorization and bind RGB to the buyer's final transaction. */
@@ -206,10 +258,30 @@ export function completeInstantSwapTemplate(input: {
   }
   const state = protocolState(listing)
   const listingPayload = Uint8Array.from(Buffer.from(listing.consignment, 'base64'))
-  const nativeV1 = isSupportedV1TransferConsignment(listingPayload)
-  if (buildConsignment(state, templateTx, nativeV1) !== listing.consignment) {
-    throw new RgbServiceError('RGB Instant Swap template consignment does not match its proof')
+  const preferredNativeV1 = isSupportedV1TransferConsignment(listingPayload)
+  const attempts: Array<{ nativeV1: boolean; payload: string }> = []
+  for (const nativeV1 of [preferredNativeV1, !preferredNativeV1]) {
+    try {
+      attempts.push({ nativeV1, payload: buildConsignment(state, templateTx, nativeV1) })
+    } catch {
+      // A bundle ID belongs to exactly one witness encoding. Keep the other
+      // candidate available for wallets that migrated their history layout.
+    }
   }
+  const exact = attempts.find(candidate => samePayload(candidate.payload, listing.consignment))
+  const compatible = exact || attempts.find(candidate =>
+    sameCanonicalV1Payload(candidate.payload, listing.consignment)
+  )
+  if (!compatible) {
+    const candidateHashes = attempts.map(candidate =>
+      `${candidate.nativeV1 ? 'v1' : 'nia'}:${shortPayloadHash(candidate.payload)}`
+    ).join(',') || 'none'
+    throw new RgbServiceError(
+      `RGB Instant Swap template consignment does not match its proof ` +
+      `(listing=${shortPayloadHash(listing.consignment)}, candidates=${candidateHashes})`
+    )
+  }
+  const nativeV1 = compatible.nativeV1
   const consignment = buildConsignment(state, finalTx, nativeV1)
   return {
     txid: finalTx.getId(),

@@ -6535,6 +6535,9 @@ export class WalletController extends BaseController {
     priceSats: string
   }) => this.rgbSendOperations.finalizeInstantListing(params)
 
+  settleRgbInstantListing = (params: { transferId: string; txid: string; finalPsbt: string }) =>
+    this.rgbSendOperations.settleInstantListing(params)
+
   createRgbSendEnd = (params: Omit<RgbSendEndRequest, 'wallet'>) =>
     this.rgbSendOperations.complete(params)
 

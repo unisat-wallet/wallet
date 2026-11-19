@@ -1566,6 +1566,20 @@ class ProviderController extends BaseController {
     })
   }
 
+  settleRgbInstantListing = async ({
+    data: { params },
+    session: { origin },
+  }: {
+    data: { params: { transferId: string; txid: string; finalPsbt: string } }
+    session: { origin: string }
+  }) => {
+    if (!params.transferId || !/^[0-9a-f]{64}$/i.test(params.txid) || !params.finalPsbt) {
+      throw new Error('transferId, txid and finalPsbt are required')
+    }
+    await assertRgbPaymentOrigin(params.transferId, origin)
+    return wallet.settleRgbInstantListing(params)
+  }
+
   @Reflect.metadata('APPROVAL', [
     'SignPsbt',
     async req => {

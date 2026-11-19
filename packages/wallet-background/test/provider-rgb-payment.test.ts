@@ -25,6 +25,7 @@ vi.mock('../src/controllers/wallet', () => ({
     getRgbBuySwapReceive: vi.fn(),
     getRgbReceiveProviderOrigin: vi.fn(),
     stageRgbInstantSwapReceive: vi.fn(),
+    settleRgbInstantListing: vi.fn(),
     stageRgbBuySwapIntent: vi.fn(),
     acceptRgbBuySwap: vi.fn(),
     signRgbBuySwapCommit: vi.fn(),
@@ -611,6 +612,31 @@ describe('provider RGB payment ownership', () => {
 
     expect(wallet.stageRgbInstantSwapReceive).toHaveBeenCalled()
     expect(wallet.getRgbBuySwapReceive).not.toHaveBeenCalled()
+  })
+
+  it('reconciles only an origin-owned Instant seller listing', async () => {
+    vi.mocked(wallet.getRgbPaymentOrigin).mockResolvedValue('https://dapp.example')
+    vi.mocked(wallet.settleRgbInstantListing).mockResolvedValue({
+      transferId: 'transfer-1',
+      txid: 'ab'.repeat(32),
+      status: 'settled',
+    } as any)
+    const params = {
+      transferId: 'transfer-1',
+      txid: 'ab'.repeat(32),
+      finalPsbt: '70736274ff',
+    }
+
+    await expect(providerController.settleRgbInstantListing({
+      data: { params },
+      session: { origin: 'https://dapp.example' },
+    })).resolves.toMatchObject({ status: 'settled' })
+    expect(wallet.settleRgbInstantListing).toHaveBeenCalledWith(params)
+
+    await expect(providerController.settleRgbInstantListing({
+      data: { params },
+      session: { origin: 'https://other.example' },
+    })).rejects.toThrow('RGB payment is not available to this site')
   })
 
   it('rejects maker signatures before opening buy-swap signing approval', async () => {

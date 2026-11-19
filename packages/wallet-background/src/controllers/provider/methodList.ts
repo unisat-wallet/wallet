@@ -158,6 +158,11 @@ export type ProviderMethodList = {
     transferId: string
     priceSats: string
   }
+  settleRgbInstantListing: {
+    transferId: string
+    txid: string
+    finalPsbt: string
+  }
   signRgbInstantSwap: {
     recipientId: string
     listing: import('@unisat/rgb-service').RgbInstantSwapListingPackage

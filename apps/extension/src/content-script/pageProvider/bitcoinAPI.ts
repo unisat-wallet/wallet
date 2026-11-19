@@ -349,6 +349,13 @@ export class BitcoinAPIMethods {
     return this.provider[requestMethodKey]({ method: 'signRgbInstantSwapListing', params: { transferId, priceSats } });
   };
 
+  settleRgbInstantSwapListing = async (transferId: string, txid: string, finalPsbt: string) => {
+    return this.provider[requestMethodKey]({
+      method: 'settleRgbInstantListing',
+      params: { transferId, txid, finalPsbt }
+    });
+  };
+
   signRgbInstantSwap = async (params: { recipientId: string; listing: any; finalPsbt: string; maxBtcSpend: string }) => {
     return this.provider[requestMethodKey]({ method: 'signRgbInstantSwap', params });
   };

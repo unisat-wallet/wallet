@@ -38,6 +38,7 @@ export class UnisatProvider extends EventEmitter {
     prepareSwap: (params: { invoice: string; assetId: string; amount: string; btcReceiveAmount: string; feeRate?: number; psbt: string }) => Promise<any>;
     prepareInstantSwap: (params: { assetId: string; amount: string; priceSats: string; feeRate?: number; psbt: string }) => Promise<any>;
     signInstantSwapListing: (transferId: string, priceSats: string) => Promise<any>;
+    settleInstantSwapListing: (transferId: string, txid: string, finalPsbt: string) => Promise<any>;
     signInstantSwap: (params: { recipientId: string; listing: any; finalPsbt: string; maxBtcSpend: string }) => Promise<any>;
     signSellSwapAndPublishConsignment: (transferId: string, makerSignedPsbt: string) => Promise<any>;
     signBuySwapCommit: (transferId: string, txid: string, buyerSignedPsbtHash: string) => Promise<{
@@ -100,6 +101,7 @@ export class UnisatProvider extends EventEmitter {
       prepareSwap: params => this.bitcoinAPI.prepareRgbSwap(params),
       prepareInstantSwap: params => this.bitcoinAPI.prepareRgbInstantSwap(params),
       signInstantSwapListing: (transferId, priceSats) => this.bitcoinAPI.signRgbInstantSwapListing(transferId, priceSats),
+      settleInstantSwapListing: (transferId, txid, finalPsbt) => this.bitcoinAPI.settleRgbInstantSwapListing(transferId, txid, finalPsbt),
       signInstantSwap: params => this.bitcoinAPI.signRgbInstantSwap(params),
       signSellSwapAndPublishConsignment: (transferId, makerSignedPsbt) => this.bitcoinAPI.signRgbSellSwapAndPublishConsignment(transferId, makerSignedPsbt),
       signBuySwapCommit: (transferId, txid, buyerSignedPsbtHash) => this.bitcoinAPI.signRgbBuySwapCommit(transferId, txid, buyerSignedPsbtHash),

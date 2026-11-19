@@ -151,4 +151,25 @@ describe('RGB Instant Swap completion', () => {
       listing, finalPsbt: final.toHex(), receiverScriptPubKey: receiverScript.toString('hex'),
     })).not.toThrow()
   })
+
+  it('accepts a semantically identical legacy v1 transfer envelope', () => {
+    const { listing, final } = fixture(true)
+    const current = Buffer.from(listing.consignment, 'base64')
+    // Wallet 1.8.0-1.8.2 inserted a Strict terminals map after the v1
+    // transfer discriminator. An empty map is semantically identical to the
+    // current encoding and must not invalidate an otherwise signed listing.
+    const headerLength = current.subarray(0, 7).equals(Buffer.from('RGB\0TFR')) ? 7 : 0
+    const body = current.subarray(headerLength)
+    const legacy = Buffer.concat([
+      current.subarray(0, headerLength),
+      body.subarray(0, 2),
+      Buffer.from([0, 0]),
+      body.subarray(2),
+    ])
+    listing.consignment = legacy.toString('base64')
+
+    expect(() => completeInstantSwapTemplate({
+      listing, finalPsbt: final.toHex(), receiverScriptPubKey: receiverScript.toString('hex'),
+    })).not.toThrow()
+  })
 })
