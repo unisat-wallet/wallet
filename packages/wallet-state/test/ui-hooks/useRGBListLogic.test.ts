@@ -6,6 +6,7 @@ import { describe, expect, it, vi } from 'vitest'
 import { useRGBListLogic } from '../../src/ui-hooks/useRGBListLogic'
 import { uiActions } from '../../src/reducers/ui'
 import { settingsActions } from '../../src/reducers/settings'
+import { globalActions } from '../../src/reducers/global'
 import { WalletView } from '../../src/types/ui'
 import { uiEventBus } from '../../src/utils/eventBus'
 import { createHookTestHarness } from './testHelpers'
@@ -145,6 +146,23 @@ describe('useRGBListLogic', () => {
     })
 
     expect(wallet.getAddressBalanceV2).not.toHaveBeenCalled()
+  })
+
+  it('does not duplicate the initial list load when a focus refresh mark already exists', async () => {
+    const { store, wrapper, wallet } = createRgbHookTestHarness()
+    store.dispatch(uiActions.setWalletView(WalletView.RGB))
+    store.dispatch(globalActions.update({ wallTabFocusRefresh: 123 }))
+
+    renderHook(() => useRGBListLogic(), { wrapper })
+
+    await waitFor(() => expect(wallet.getRGBList).toHaveBeenCalledTimes(1))
+    await new Promise(resolve => setTimeout(resolve, 0))
+    expect(wallet.getRGBList).toHaveBeenCalledTimes(1)
+
+    act(() => {
+      store.dispatch(globalActions.update({ wallTabFocusRefresh: 124 }))
+    })
+    await waitFor(() => expect(wallet.getRGBList).toHaveBeenCalledTimes(2))
   })
 
   it('syncs RGB allocations and funding balance while the RGB wallet view is visible', async () => {

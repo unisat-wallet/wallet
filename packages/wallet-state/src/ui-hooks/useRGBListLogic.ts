@@ -184,7 +184,7 @@ export function useRGBListLogic({
       isFocus,
     ],
   })
-  const lastRefreshTimeRef = useRef<number>(0)
+  const lastRefreshTimeRef = useRef<number | null>(null)
   const visibleItems = useMemo(
     () => enabled && isRgbSupported
       ? includeConfiguredRgbAssets(items, walletConfig, configuredAssetBalances)
@@ -198,14 +198,18 @@ export function useRGBListLogic({
   const walletTabFocusRefresh = useWallTabFocusRefresh()
 
   useEffect(() => {
-    if (!enabled || !isFocus) return
+    if (!enabled || !isFocus) {
+      lastRefreshTimeRef.current = null
+      return
+    }
 
-    const alreadyRefreshed = lastRefreshTimeRef.current === walletTabFocusRefresh
-    if (alreadyRefreshed) return
+    // Initial loading and focus dependencies already refresh the list and funding balance.
+    const previousMark = lastRefreshTimeRef.current
+    lastRefreshTimeRef.current = walletTabFocusRefresh
+    if (previousMark === null || previousMark === walletTabFocusRefresh) return
 
     refreshFundingAddress()
     refreshList({ showLoading: false })
-    lastRefreshTimeRef.current = walletTabFocusRefresh
   }, [enabled, walletTabFocusRefresh, isFocus, refreshList, refreshFundingAddress])
 
   useEffect(() => {

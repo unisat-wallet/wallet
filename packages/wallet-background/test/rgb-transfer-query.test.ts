@@ -660,6 +660,38 @@ describe('RgbTransferQuery', () => {
     expect(service.getLocalAssetDetail).toHaveBeenCalledWith('rgb:asset')
   })
 
+  it('reads shared local asset metadata only once per transfer query', async () => {
+    const service = {
+      getPendingTransfers: vi.fn().mockReturnValue([]),
+      getPendingSendHistory: vi.fn().mockReturnValue([
+        { transferId: 'send-1', assetId: 'rgb:asset', amount: '10', createdAt: 1, status: 'broadcasted' },
+        { transferId: 'send-2', assetId: 'rgb:asset', amount: '20', createdAt: 2, status: 'broadcasted' },
+      ]),
+      getIssueHistory: vi.fn().mockReturnValue([]),
+      getPendingReceiveHistory: vi.fn().mockReturnValue([]),
+      getPendingReceives: vi.fn().mockReturnValue([]),
+      getLocalAssetDetail: vi.fn().mockReturnValue({ name: 'Token', ticker: 'TKN' }),
+    }
+    const context = {
+      service,
+      wallet: { walletId: 'wallet', fundingAddress: 'funding', network: 'mainnet' },
+    }
+    const query = new RgbTransferQuery({
+      getContext: vi.fn().mockResolvedValue(context),
+      syncReceiveHistory: vi.fn(),
+      syncPendingTransfers: vi.fn(),
+      syncReceivedAllocations: vi.fn().mockResolvedValue(context),
+      getRemoteActivity: vi.fn().mockResolvedValue({ total: 0, list: [] }),
+      warn: vi.fn(),
+    })
+
+    await query.getTransfers(1, 20, { skipSync: true })
+    expect(service.getLocalAssetDetail).toHaveBeenCalledTimes(1)
+
+    await query.getTransfers(1, 20, { skipSync: true })
+    expect(service.getLocalAssetDetail).toHaveBeenCalledTimes(2)
+  })
+
   it('does not create a second page when local history overlaps all remote activity', async () => {
     const localHistory = Array.from({ length: 18 }, (_, index) => ({
       transferId: `receive-${index}`,

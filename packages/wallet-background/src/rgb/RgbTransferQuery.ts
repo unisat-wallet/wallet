@@ -276,10 +276,18 @@ export class RgbTransferQuery {
       }
       return amount.toString()
     }
+    const metadataByAsset = new Map<
+      string,
+      { name: string | undefined; ticker: string | undefined }
+    >()
     const localAssetMetadata = (assetId: string) => {
+      const cached = metadataByAsset.get(assetId)
+      if (cached) return cached
       try {
         const { name, ticker } = service.getLocalAssetDetail(assetId)
-        return { name, ticker }
+        const metadata = { name, ticker }
+        metadataByAsset.set(assetId, metadata)
+        return metadata
       } catch {
         return { name: undefined, ticker: undefined }
       }
